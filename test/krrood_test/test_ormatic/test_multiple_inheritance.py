@@ -8,7 +8,8 @@ from __future__ import annotations
 from sqlalchemy import func, inspect, select
 
 from krrood.entity_query_language.factories import an, entity, variable
-from krrood.ormatic.data_access_objects.dao import StoredObjectDAO
+from krrood.ormatic.data_access_objects.dao import StoredObjectRow
+from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 from ..dataset.multiple_inheritance import (
@@ -24,6 +25,14 @@ from ..dataset.multiple_inheritance import (
 )
 
 # %% generated schema
+
+
+def test_one_class_maps_the_table_of_every_stored_object():
+    """
+    However many interfaces are loaded, the rows of all stored objects are created and
+    loaded through one class.
+    """
+    assert StoredObjectRow.mapped_class() is StoredObjectDAO
 
 
 def test_root_tables_take_their_ids_from_the_table_of_every_stored_object():

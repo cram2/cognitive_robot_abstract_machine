@@ -16,7 +16,6 @@ from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeM
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
     PartDataAccessObject,
-    StoredObjectDAO,
 )
 from krrood.ormatic.utils import classes_of_module
 
@@ -109,7 +108,6 @@ class OrmaticInterfaceChain:
             for mapper in Base.registry.mappers
             if issubclass(mapper.class_, DataAccessObject)
             and not issubclass(mapper.class_, PartDataAccessObject)
-            and mapper.class_ is not StoredObjectDAO
             and mapper.class_.__module__ in self.module_names
         ]
 

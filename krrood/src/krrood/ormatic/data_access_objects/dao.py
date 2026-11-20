@@ -15,10 +15,8 @@ from functools import lru_cache
 
 import sqlalchemy.inspection
 import sqlalchemy.orm
-from sqlalchemy import Integer, String, event
+from sqlalchemy import event
 from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
     MANYTOONE,
     MANYTOMANY,
     ONETOMANY,
@@ -49,6 +47,7 @@ from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import (
     NoDAOFoundDuringParsingError,
     QueryCannotBePersisted,
+    StoredObjectTableNotUniqueError,
 )
 from krrood.patterns.exceptions import NoGenericError
 from krrood.patterns.has_generic import HasGeneric
@@ -92,9 +91,9 @@ class RelationshipInformationKey(StrEnum):
 
     DECLARED_TYPE = "krrood_declared_type"
     """
-    The type a field is declared with, for a relationship that targets
-    :class:`StoredObjectDAO` because objects of that type may lie outside the type's
-    table hierarchy.
+    The type a field is declared with, for a relationship that targets the table of
+    every stored object because objects of that type may lie outside the type's table
+    hierarchy.
     """
 
 
@@ -197,7 +196,8 @@ class DataAccessObjectSchema:
 
     shares_id_with_stored_object: bool
     """
-    Whether the DAO's object takes its id from its row in :class:`StoredObjectDAO`.
+    Whether the DAO's object takes its id from its row in the table of every stored
+    object.
     """
 
     alternative_base: type | None
@@ -309,23 +309,23 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
 
 
 def _shares_id_with_stored_object(
-    *, dao_class: type, mapper: sqlalchemy.orm.Mapper
+    *, dao_class: type[DataAccessObject], mapper: sqlalchemy.orm.Mapper
 ) -> bool:
     """
     :param dao_class: A DAO class.
     :param mapper: The mapper of the DAO class.
     :return: Whether the DAO class's objects take their ids from their rows in
-        :class:`StoredObjectDAO`.
+        the table of every stored object.
     """
     return not issubclass(dao_class, PartDataAccessObject) and any(
-        foreign_key.column.table is StoredObjectDAO.__table__
+        foreign_key.column.table is StoredObjectRow.mapped_class().__table__
         for column in mapper.base_mapper.local_table.primary_key
         for foreign_key in column.foreign_keys
     )
 
 
 def _part_classes(
-    *, dao_class: type, mapper: sqlalchemy.orm.Mapper
+    *, dao_class: type[DataAccessObject], mapper: sqlalchemy.orm.Mapper
 ) -> tuple[type[PartDataAccessObject], ...]:
     """
     :param dao_class: A DAO class.
@@ -623,12 +623,15 @@ class DataAccessObject(HasGeneric[T]):
 
     """
 
-    stored_object_in_memory = None
+    stored_object_in_memory: StoredObjectRow | None = None
     """
-    The row of the DAO's object in :class:`StoredObjectDAO`, once it was asked for.
+    The row of the DAO's object in the table of every stored object, once it was asked
+    for.
     """
 
-    parts_in_memory = None
+    parts_in_memory: (
+        dict[type[PartDataAccessObject], PartDataAccessObject | None] | None
+    ) = None
     """
     The parts of the DAO's object by their classes, once created or loaded; None for a
     part that the object does not have.
@@ -692,21 +695,22 @@ class DataAccessObject(HasGeneric[T]):
         return result
 
     @property
-    def stored_object(self) -> StoredObjectDAO:
+    def stored_object(self) -> StoredObjectRow:
         """
-        :return: The row of this DAO's object in :class:`StoredObjectDAO`, created for an
-            object that was never stored.
+        :return: The row of this DAO's object in the table of every stored object,
+            created for an object that was never stored.
         """
         if self.stored_object_in_memory is not None:
             return self.stored_object_in_memory
+        stored_object_class = StoredObjectRow.mapped_class()
         if self.database_id is None:
-            self.stored_object_in_memory = StoredObjectDAO(
+            self.stored_object_in_memory = stored_object_class(
                 polymorphic_type=self.__tablename__
             )
             self.stored_object_in_memory.object_dao_in_memory = self
         else:
             self.stored_object_in_memory = sqlalchemy.orm.object_session(self).get(
-                StoredObjectDAO, self.database_id
+                stored_object_class, self.database_id
             )
         return self.stored_object_in_memory
 
@@ -997,14 +1001,16 @@ class DataAccessObject(HasGeneric[T]):
         :param source_object: The object referred to.
         :param state: The conversion state.
         :param expected_type: The domain type of the field being filled.
-        :param target_dao_class: The DAO class the relationship points to; for
-            :class:`StoredObjectDAO`, the relationship holds the object's row in it.
+        :param target_dao_class: The DAO class the relationship points to; for the
+            table of every stored object, the relationship holds the object's row in it.
         :return: The DAO the relationship holds.
         """
         dao = self._get_or_queue_dao(
             source_object=source_object, state=state, expected_type=expected_type
         )
-        if target_dao_class is StoredObjectDAO:
+        if target_dao_class is not None and issubclass(
+            target_dao_class, StoredObjectRow
+        ):
             return dao.stored_object
         return dao
 
@@ -1630,31 +1636,39 @@ class DataAccessObject(HasGeneric[T]):
             _repr_thread_local.seen.remove(id(self))
 
 
-class StoredObjectDAO(Base, DataAccessObject[object]):
+class StoredObjectRow:
     """
     The row every stored object has, whatever its class.
 
-    The root table of every generated hierarchy takes its ids from this table, so an
-    object has the same id in the tables of all its mapped base classes, and
-    :attr:`polymorphic_type` names the DAO class it is loaded as.
+    The root table of every generated hierarchy takes its ids from the table of the
+    mapped subclass, so an object has the same id in the tables of all its mapped base
+    classes, and the row's type column names the DAO class the object is loaded as.
     """
 
-    __tablename__ = "StoredObjectDAO"
-
-    database_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    """
-    The id of the object, which its rows in all other tables share.
-    """
-
-    polymorphic_type: Mapped[str] = mapped_column(String(255), nullable=False)
-    """
-    The table name of the DAO class the object is loaded as.
-    """
-
-    object_dao_in_memory = None
+    object_dao_in_memory: DataAccessObject | None = None
     """
     The DAO of the object, while it was created in this process and not loaded.
     """
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """
+        Insert the rows of new objects into the subclass's table before every flush.
+        """
+        super().__init_subclass__(**kwargs)
+        event.listen(
+            sqlalchemy.orm.Session, "before_flush", cls.insert_rows_of_new_objects
+        )
+
+    @staticmethod
+    def mapped_class() -> type[StoredObjectRow]:
+        """
+        :return: The class mapping the table of every stored object.
+        :raises StoredObjectTableNotUniqueError: If not exactly one class maps it.
+        """
+        table_classes = StoredObjectRow.__subclasses__()
+        if len(table_classes) != 1:
+            raise StoredObjectTableNotUniqueError(table_classes=table_classes)
+        return table_classes[0]
 
     @property
     def object_dao(self) -> DataAccessObject:
@@ -1684,7 +1698,7 @@ class StoredObjectDAO(Base, DataAccessObject[object]):
 
     @classmethod
     def object_daos(
-        cls, *, session: sqlalchemy.orm.Session, stored_objects: list[StoredObjectDAO]
+        cls, *, session: sqlalchemy.orm.Session, stored_objects: list[StoredObjectRow]
     ) -> list[DataAccessObject]:
         """
         :param session: The session the rows were loaded with.
@@ -1710,8 +1724,9 @@ class StoredObjectDAO(Base, DataAccessObject[object]):
 
     def from_dao(self, *, state: FromDataAccessObjectState | None = None) -> Any:
         """
-        Convert the DAO of the object this row belongs to, as
-        :meth:`DataAccessObject.from_dao` does.
+        :param state: The conversion state.
+        :return: The object this row belongs to, converted from its DAO as
+            :meth:`DataAccessObject.from_dao` converts it.
         """
         return self.object_dao.from_dao(state=state)
 
@@ -1766,7 +1781,7 @@ class StoredObjectDAO(Base, DataAccessObject[object]):
 
     @classmethod
     def _make_row_persistent(
-        cls, *, session: sqlalchemy.orm.Session, row: StoredObjectDAO, database_id: int
+        cls, *, session: sqlalchemy.orm.Session, row: StoredObjectRow, database_id: int
     ) -> None:
         """
         Turn a row inserted outside the flush into a stored object of the session if a
@@ -1841,11 +1856,6 @@ class StoredObjectDAO(Base, DataAccessObject[object]):
                     session.delete(part)
 
 
-event.listen(
-    sqlalchemy.orm.Session,
-    "before_flush",
-    StoredObjectDAO.insert_rows_of_new_objects,
-)
 event.listen(
     Base, "load", DataAccessObject.register_owner_of_unloaded_parts, propagate=True
 )

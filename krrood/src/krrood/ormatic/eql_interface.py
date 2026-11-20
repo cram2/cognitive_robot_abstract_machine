@@ -56,9 +56,9 @@ from krrood.entity_query_language.operators.conditionals import CaseWhen
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.dao import (
     RelationshipInformationKey,
-    StoredObjectDAO,
     get_dao_schema,
 )
+from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.ormatic.data_access_objects.helper import (
     get_data_access_object_class,
     get_part_class,
@@ -953,8 +953,8 @@ class EQLTranslator:
     def _object_daos(self, *, results: list[Any]) -> list[Any]:
         """
         :param results: The DAOs a query selected.
-        :return: The results, with the rows of :class:`StoredObjectDAO` an open class's
-            selection gives replaced by the DAOs of their objects.
+        :return: The results, with the rows in the table of every stored object that an
+            open class's selection gives replaced by the DAOs of their objects.
         """
         stored_objects = [
             result for result in results if isinstance(result, StoredObjectDAO)

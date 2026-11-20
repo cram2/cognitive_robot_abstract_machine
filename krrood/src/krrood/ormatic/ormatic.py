@@ -30,8 +30,8 @@ from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
     PartDataAccessObject,
     RelationshipInformationKey,
-    StoredObjectDAO,
 )
+from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.patterns.interface import Interface
 
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
@@ -417,7 +417,7 @@ class ORMatic:
         :return: The mapped classes whose objects may lie outside their table's
             hierarchy: interfaces with a table, and every class that some mapped class
             inherits next to its primary chain. Fields typed with one of them refer to
-            :class:`~krrood.ormatic.data_access_objects.dao.StoredObjectDAO`, and they
+            :class:`~krrood.ormatic.stored_object.StoredObjectDAO`, and they
             get a part class for their rows held by other classes' DAOs.
         """
         result = set(self.field_typed_interfaces)

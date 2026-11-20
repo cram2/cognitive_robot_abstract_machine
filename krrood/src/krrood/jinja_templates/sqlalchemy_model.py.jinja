@@ -41,8 +41,6 @@ class {{ assoc_table.name }}(Base, AssociationDataAccessObject):
 {% endfor %}
 
 
-# Part classes of dependencies' tables that classes of this interface inherit next to
-# their primary base
 {% for table in ormatic.external_tables_needing_part_classes %}
 class {{ table.part_class_name }}(Base, PartDataAccessObject[{{ table.domain_class_reference }}]):
 

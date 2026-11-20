@@ -18,8 +18,8 @@ from krrood.ormatic.field_storage import FieldStorage
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import (
     RelationshipInformationKey,
-    StoredObjectDAO,
 )
+from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.patterns.interface import Interface
 from krrood.class_diagrams.class_diagram import (
     WrappedClass,
@@ -130,7 +130,7 @@ class AssociationObject:
     """
     The qualified name of the type the collection is declared with, if that type is open
     and its objects are therefore loaded through
-    :class:`~krrood.ormatic.data_access_objects.dao.StoredObjectDAO`.
+    :class:`~krrood.ormatic.stored_object.StoredObjectDAO`.
     """
 
     @property
