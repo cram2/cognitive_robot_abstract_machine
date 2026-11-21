@@ -335,7 +335,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericAffineFrame], ABC):
         """
 
     def apply_transformation(
-        self, *, transformation: AffineCoordinateChange[Any, Any]
+        self, *, transformation: AffineCoordinateChange[GenericAffineFrame, Any]
     ) -> Self:
         moved = transformation.apply_to_homogeneous_coordinates(
             homogeneous_coordinates=(*self.coordinates, int(self.has_position))
