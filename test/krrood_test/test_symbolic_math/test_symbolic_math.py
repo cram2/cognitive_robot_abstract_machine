@@ -1,3 +1,10 @@
+"""
+Tests of the symbolic expressions of :mod:`krrood.symbolic_math.symbolic_math`: their
+logic, arithmetic, compilation, evaluation and serialization.
+"""
+
+from __future__ import annotations
+
 import copy
 import gc
 import itertools
@@ -1451,6 +1458,10 @@ class TestSubstitutionCache:
 
 
 class TestMatrix:
+    """
+    Building, reshaping, indexing and evaluating matrices.
+    """
+
     @pytest.mark.parametrize("shape", [(1, 1), (1, 5), (3, 1), (2, 3), (4, 4)])
     def test_create_filled_with_variables(self, *, shape):
         m = sm.Matrix.create_filled_with_variables(shape=shape, name="muh")
@@ -1754,6 +1765,19 @@ class TestMatrix:
         assert isinstance(m[2, :], sm.Vector)
         assert np.allclose(m[:2, :2], np.eye(2))
         assert isinstance(m[:2, :2], sm.Matrix)
+
+    @pytest.mark.parametrize("shape", [(1, 5), (3, 1), (2, 3)])
+    def test_a_constant_matrix_evaluates_as_its_compiled_function_does(
+        self, *, shape
+    ):
+        matrix = sm.Matrix(np.arange(shape[0] * shape[1], dtype=float).reshape(shape))
+        compiled = matrix.compile(
+            parameters=VariableParameters.from_lists([]), sparse=False
+        )
+        expected = compiled(np.array([], dtype=np.float64))
+        evaluated = matrix.evaluate()
+        assert evaluated.shape == expected.shape
+        assert np.array_equal(evaluated, expected)
 
 
 # %% JSON serialization

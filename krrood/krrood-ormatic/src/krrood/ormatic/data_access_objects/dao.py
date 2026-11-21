@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import weakref
 from collections.abc import Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from sqlalchemy.orm import (
     MANYTOMANY,
     ONETOMANY,
     RelationshipProperty,
+    make_transient_to_detached,
     selectinload,
 )
 from typing_extensions import get_origin, Any, TypeVar
@@ -28,6 +30,7 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.mapped_variable import Attribute, IndexByValue
 from krrood.entity_query_language.query.match import AbstractMatchExpression
 from krrood.entity_query_language._monitoring import monitored
+from krrood.ormatic.base import Base
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.from_dao import (
     FromDataAccessObjectWorkItem,
@@ -36,6 +39,7 @@ from krrood.ormatic.data_access_objects.from_dao import (
 )
 from krrood.ormatic.data_access_objects.helper import (
     get_data_access_object_class,
+    get_part_class,
     to_dao,
     clear_dao_lookup_caches,
 )
@@ -43,7 +47,9 @@ from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import (
     NoDAOFoundDuringParsingError,
     QueryCannotBePersisted,
+    StoredObjectTableNotUniqueError,
 )
+from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.exceptions import NoGenericError
 from krrood.patterns.has_generic import HasGeneric
 from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
@@ -76,6 +82,31 @@ class AssociationDataAccessObject:
         :param value: The target Data Access Object of this association.
         """
         raise NotImplementedError
+
+
+class RelationshipInformationKey(StrEnum):
+    """
+    Keys of the information a generated relationship carries for the conversion between
+    DAOs and domain objects.
+    """
+
+    DECLARED_TYPE = "krrood_declared_type"
+    """
+    The type a field is declared with, for a relationship that targets the table of
+    every stored object because objects of that type may lie outside the type's table
+    hierarchy.
+    """
+
+
+def _declared_type(relationship: RelationshipProperty) -> type:
+    """
+    :param relationship: A relationship of a DAO class.
+    :return: The domain type of the objects the relationship holds.
+    """
+    declared_type = relationship.info.get(RelationshipInformationKey.DECLARED_TYPE)
+    if declared_type is not None:
+        return declared_type
+    return relationship.mapper.class_.original_class()
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -124,6 +155,9 @@ class CollectionRelationship:
     resolve association targets via the identity map instead of lazy loads.
     """
 
+    target_dao_class: type
+    """The DAO class of the items in the collection."""
+
 
 @dataclass(kw_only=True, frozen=True)
 class DataAccessObjectSchema:
@@ -153,6 +187,18 @@ class DataAccessObjectSchema:
     relationship_keys: tuple[str, ...]
     """
     The keys of all relationships of the DAO class.
+    """
+
+    part_classes: tuple[type[PartDataAccessObject], ...]
+    """
+    The classes of the parts holding the rows of the DAO's objects in the tables of
+    their mapped base classes outside the DAO class's own tables.
+    """
+
+    shares_id_with_stored_object: bool
+    """
+    Whether the DAO's object takes its id from its row in the table of every stored
+    object.
     """
 
     alternative_base: type | None
@@ -215,9 +261,7 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
     for relationship in mapper.relationships:
         if DataAccessObject._is_single_relationship(relationship=relationship):
             single_relationships.append(
-                _build_single_relationship(
-                    relationship, relationship.mapper.class_.original_class()
-                )
+                _build_single_relationship(relationship, _declared_type(relationship))
             )
         elif relationship.direction in (ONETOMANY, MANYTOMANY):
             target_dao_clazz = relationship.mapper.class_
@@ -225,7 +269,7 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
                 target_relationship = sqlalchemy.inspection.inspect(
                     target_dao_clazz
                 ).relationships["target"]
-                domain_type = target_relationship.mapper.class_.original_class()
+                domain_type = _declared_type(target_relationship)
                 collection_relationships.append(
                     CollectionRelationship(
                         key=relationship.key,
@@ -234,6 +278,7 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
                         association_target_relationship=_build_single_relationship(
                             target_relationship, domain_type
                         ),
+                        target_dao_class=target_relationship.mapper.class_,
                     )
                 )
             else:
@@ -242,6 +287,7 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
                         key=relationship.key,
                         association_class=None,
                         domain_type=target_dao_clazz.original_class(),
+                        target_dao_class=target_dao_clazz,
                     )
                 )
 
@@ -254,9 +300,56 @@ def get_dao_schema(dao_class: type) -> DataAccessObjectSchema:
         relationship_keys=tuple(
             relationship.key for relationship in mapper.relationships
         ),
+        part_classes=_part_classes(dao_class=dao_class, mapper=mapper),
+        shares_id_with_stored_object=_shares_id_with_stored_object(
+            dao_class=dao_class, mapper=mapper
+        ),
         alternative_base=dao_class._find_alternative_mapping_base(),
         uses_alternative_mapping=_uses_alternative_mapping(dao_class),
     )
+
+
+def _shares_id_with_stored_object(
+    *, dao_class: type[DataAccessObject], mapper: sqlalchemy.orm.Mapper
+) -> bool:
+    """
+    :param dao_class: A DAO class.
+    :param mapper: The mapper of the DAO class.
+    :return: Whether the DAO class's objects take their ids from their rows in
+        the table of every stored object.
+    """
+    return not issubclass(dao_class, PartDataAccessObject) and any(
+        foreign_key.column.table is StoredObjectRow.mapped_class().__table__
+        for column in mapper.base_mapper.local_table.primary_key
+        for foreign_key in column.foreign_keys
+    )
+
+
+def _part_classes(
+    *, dao_class: type[DataAccessObject], mapper: sqlalchemy.orm.Mapper
+) -> tuple[type[PartDataAccessObject], ...]:
+    """
+    :param dao_class: A DAO class.
+    :param mapper: The mapper of the DAO class.
+    :return: The part classes of the mapped base classes of the DAO class's domain class
+        whose tables lie outside the mapper's tables.
+    """
+    if not _shares_id_with_stored_object(dao_class=dao_class, mapper=mapper):
+        return ()
+    domain_class = dao_class.original_class()
+    if _uses_alternative_mapping(dao_class):
+        domain_class = domain_class.original_class()
+    domain_class = get_origin(domain_class) or domain_class
+    result = []
+    for base in domain_class.__mro__[1:]:
+        part_class = get_part_class(base)
+        if (
+            part_class is not None
+            and part_class not in result
+            and not any(part_class.__table__ is table for table in mapper.tables)
+        ):
+            result.append(part_class)
+    return tuple(result)
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -382,6 +475,11 @@ class _SessionInfoKey(StrEnum):
     BULK_LOADING_FLAG = "krrood_bulk_loading"
     BULK_LOADED_MAPPERS = "krrood_bulk_loaded_mappers"
     PLAIN_LOAD = "krrood_plain_load"
+    OWNERS_OF_UNLOADED_PARTS = "krrood_owners_of_unloaded_parts"
+    """
+    The loaded DAOs, by the classes of the parts they have but whose part of that
+    class was not loaded yet.
+    """
 
 
 def _bulk_load_target_table_if_enabled(
@@ -526,6 +624,20 @@ class DataAccessObject(HasGeneric[T]):
 
     """
 
+    stored_object_in_memory: StoredObjectRow | None = None
+    """
+    The row of the DAO's object in the table of every stored object, once it was asked
+    for.
+    """
+
+    parts_in_memory: (
+        dict[type[PartDataAccessObject], PartDataAccessObject | None] | None
+    ) = None
+    """
+    The parts of the DAO's object by their classes, once created or loaded; None for a
+    part that the object does not have.
+    """
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         # New DAO classes invalidate previously failed (None) lookups.
@@ -582,6 +694,26 @@ class DataAccessObject(HasGeneric[T]):
             cls._process_to_dao_queue(state=state)
 
         return result
+
+    @property
+    def stored_object(self) -> StoredObjectRow:
+        """
+        :return: The row of this DAO's object in the table of every stored object,
+            created for an object that was never stored.
+        """
+        if self.stored_object_in_memory is not None:
+            return self.stored_object_in_memory
+        stored_object_class = StoredObjectRow.mapped_class()
+        if self.database_id is None:
+            self.stored_object_in_memory = stored_object_class(
+                polymorphic_type=self.__tablename__
+            )
+            self.stored_object_in_memory.object_dao_in_memory = self
+        else:
+            self.stored_object_in_memory = sqlalchemy.orm.object_session(self).get(
+                stored_object_class, self.database_id
+            )
+        return self.stored_object_in_memory
 
     @staticmethod
     def _refuse_queries(*, source_object: Any) -> None:
@@ -652,6 +784,33 @@ class DataAccessObject(HasGeneric[T]):
             collection_relationships=plan.collection_relationships,
             state=state,
         )
+        self._fill_parts(
+            source_object=source_object, part_classes=plan.part_classes, state=state
+        )
+
+    def _fill_parts(
+        self,
+        *,
+        source_object: T,
+        part_classes: tuple[type[PartDataAccessObject], ...],
+        state: ToDataAccessObjectState,
+    ) -> None:
+        """
+        Give this DAO the parts holding its object's rows in the tables of its secondary
+        bases, filled from the source object.
+
+        :param source_object: The source object.
+        :param part_classes: The classes of the parts to fill.
+        :param state: The conversion state.
+        """
+        self.parts_in_memory = {}
+        for part_class in part_classes:
+            part_dao = part_class()
+            type_column_key = part_class.type_column_key()
+            if type_column_key is not None:
+                setattr(part_dao, type_column_key, type(self).__tablename__)
+            part_dao.fill_dao_default(source_object=source_object, state=state)
+            self.parts_in_memory[part_class] = part_dao
 
     def fill_dao_if_subclass_of_alternative_mapping(
         self,
@@ -702,6 +861,11 @@ class DataAccessObject(HasGeneric[T]):
             source_object=source_object,
             single_relationships=partition.own_single_relationships,
             collection_relationships=partition.own_collection_relationships,
+            state=state,
+        )
+        self._fill_parts(
+            source_object=source_object,
+            part_classes=get_dao_schema(type(self)).part_classes,
             state=state,
         )
 
@@ -768,10 +932,11 @@ class DataAccessObject(HasGeneric[T]):
             setattr(
                 self,
                 relationship.key,
-                self._get_or_queue_dao(
+                self._get_or_queue_referenced_dao(
                     source_object=value,
                     state=state,
                     expected_type=relationship.domain_type,
+                    target_dao_class=relationship.target_dao_class,
                 ),
             )
 
@@ -795,18 +960,20 @@ class DataAccessObject(HasGeneric[T]):
             dao_collection = []
             for item in source_collection:
                 association_dao = relationship.association_class()
-                association_dao.target = self._get_or_queue_dao(
+                association_dao.target = self._get_or_queue_referenced_dao(
                     source_object=item,
                     state=state,
                     expected_type=relationship.domain_type,
+                    target_dao_class=relationship.target_dao_class,
                 )
                 dao_collection.append(association_dao)
         else:
             dao_collection = [
-                self._get_or_queue_dao(
+                self._get_or_queue_referenced_dao(
                     source_object=item,
                     state=state,
                     expected_type=relationship.domain_type,
+                    target_dao_class=relationship.target_dao_class,
                 )
                 for item in source_collection
             ]
@@ -819,6 +986,34 @@ class DataAccessObject(HasGeneric[T]):
             list if type(source_collection) is tuple else type(source_collection)
         )
         setattr(self, relationship.key, assignable_container_type(dao_collection))
+
+    def _get_or_queue_referenced_dao(
+        self,
+        *,
+        source_object: Any,
+        state: ToDataAccessObjectState,
+        expected_type: type,
+        target_dao_class: type | None,
+    ) -> DataAccessObject:
+        """
+        Resolve an object a relationship refers to into the DAO the relationship holds,
+        queuing the object's own DAO if necessary.
+
+        :param source_object: The object referred to.
+        :param state: The conversion state.
+        :param expected_type: The domain type of the field being filled.
+        :param target_dao_class: The DAO class the relationship points to; for the
+            table of every stored object, the relationship holds the object's row in it.
+        :return: The DAO the relationship holds.
+        """
+        dao = self._get_or_queue_dao(
+            source_object=source_object, state=state, expected_type=expected_type
+        )
+        if target_dao_class is not None and issubclass(
+            target_dao_class, StoredObjectRow
+        ):
+            return dao.stored_object
+        return dao
 
     def _get_or_queue_dao(
         self,
@@ -1068,6 +1263,14 @@ class DataAccessObject(HasGeneric[T]):
         :param state: The conversion state.
         """
         plan = get_dao_schema(type(self))
+        for part_dao, part_plan in self._parts_and_their_plans(plan=plan):
+            part_dao._populate_from_columns_and_relationships(
+                domain_object=domain_object,
+                data_column_names=part_plan.data_column_names,
+                single_relationships=part_plan.single_relationships,
+                collection_relationships=part_plan.collection_relationships,
+                state=state,
+            )
         alternative_parent = self._alternative_parent(state=state)
         if alternative_parent is None:
             self._populate_from_columns_and_relationships(
@@ -1170,7 +1373,89 @@ class DataAccessObject(HasGeneric[T]):
         :return: The domain object.
         """
         plan = get_dao_schema(type(self))
+        self._discover_related_objects(plan=plan, state=state)
+        for part_dao, part_plan in self._parts_and_their_plans(plan=plan):
+            part_dao._discover_related_objects(plan=part_plan, state=state)
 
+        self._alternative_parent(state=state)
+        return domain_object
+
+    def _parts_and_their_plans(
+        self, *, plan: DataAccessObjectSchema
+    ) -> list[tuple[PartDataAccessObject, DataAccessObjectSchema]]:
+        """
+        :param plan: The conversion plan of this DAO's class.
+        :return: The parts this DAO holds, each with the conversion plan of its class.
+        """
+        return [
+            (part_dao, get_dao_schema(part_class))
+            for part_class in plan.part_classes
+            if (part_dao := self.part(part_class=part_class)) is not None
+        ]
+
+    def part(
+        self, *, part_class: type[PartDataAccessObject]
+    ) -> PartDataAccessObject | None:
+        """
+        :param part_class: The class of one of the parts of this DAO's class.
+        :return: The part of this DAO's object of that class, if the object has one.
+        """
+        if self.parts_in_memory is not None and part_class in self.parts_in_memory:
+            return self.parts_in_memory[part_class]
+        session = sqlalchemy.orm.object_session(self)
+        if session is None:
+            return None
+        owners = session.info.get(_SessionInfoKey.OWNERS_OF_UNLOADED_PARTS, {}).pop(
+            part_class, weakref.WeakSet()
+        )
+        owners.add(self)
+        owners_by_id = {owner.database_id: owner for owner in owners}
+        parts_by_id = {
+            part.database_id: part
+            for part in session.scalars(
+                sqlalchemy.select(part_class)
+                .where(part_class.database_id.in_(owners_by_id))
+                .execution_options(**{_SessionInfoKey.PLAIN_LOAD: True})
+            )
+        }
+        for database_id, owner in owners_by_id.items():
+            if owner.parts_in_memory is None:
+                owner.parts_in_memory = {}
+            owner.parts_in_memory[part_class] = parts_by_id.get(database_id)
+        return self.parts_in_memory[part_class]
+
+    @staticmethod
+    @called_positionally
+    def register_owner_of_unloaded_parts(
+        target: Any, context: sqlalchemy.orm.QueryContext
+    ) -> None:
+        """
+        When a DAO that has parts is loaded, remember it, so its parts are loaded
+        together with those of the other DAOs loaded meanwhile.
+
+        :param target: The loaded object.
+        :param context: The query that loaded it.
+        """
+        if not isinstance(target, DataAccessObject):
+            return
+        part_classes = get_dao_schema(type(target)).part_classes
+        if not part_classes:
+            return
+        owners = context.session.info.setdefault(
+            _SessionInfoKey.OWNERS_OF_UNLOADED_PARTS, {}
+        )
+        for part_class in part_classes:
+            owners.setdefault(part_class, weakref.WeakSet()).add(target)
+
+    def _discover_related_objects(
+        self, *, plan: DataAccessObjectSchema, state: FromDataAccessObjectState
+    ) -> None:
+        """
+        Register every object this DAO's relationships refer to for conversion.
+
+        :param plan: The conversion plan of this DAO's class.
+        :param state: The conversion state.
+        """
         for relationship in plan.single_relationships:
             value = _read_single_relationship(self, relationship)
             if value is not None:
@@ -1189,9 +1474,6 @@ class DataAccessObject(HasGeneric[T]):
             else:
                 for item in value:
                     item.from_dao(state=state)
-
-        self._alternative_parent(state=state)
-        return domain_object
 
     def _populate_single_relationship(
         self,
@@ -1354,6 +1636,254 @@ class DataAccessObject(HasGeneric[T]):
             return f"{self.__class__.__name__}({', '.join(representations)})"
         finally:
             _repr_thread_local.seen.remove(id(self))
+
+
+class StoredObjectRow:
+    """
+    The row every stored object has, whatever its class.
+
+    The root table of every generated hierarchy takes its ids from the table of the
+    mapped subclass, so an object has the same id in the tables of all its mapped base
+    classes, and the row's type column names the DAO class the object is loaded as.
+    """
+
+    object_dao_in_memory: DataAccessObject | None = None
+    """
+    The DAO of the object, while it was created in this process and not loaded.
+    """
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """
+        Insert the rows of new objects into the subclass's table before every flush.
+        """
+        super().__init_subclass__(**kwargs)
+        event.listen(
+            sqlalchemy.orm.Session, "before_flush", cls.insert_rows_of_new_objects
+        )
+
+    @staticmethod
+    def mapped_class() -> type[StoredObjectRow]:
+        """
+        :return: The class mapping the table of every stored object.
+        :raises StoredObjectTableNotUniqueError: If not exactly one class maps it.
+        """
+        table_classes = StoredObjectRow.__subclasses__()
+        if len(table_classes) != 1:
+            raise StoredObjectTableNotUniqueError(table_classes=table_classes)
+        return table_classes[0]
+
+    @property
+    def object_dao(self) -> DataAccessObject:
+        """
+        :return: The DAO of the object this row belongs to, loaded as its own class.
+        """
+        if self.object_dao_in_memory is not None:
+            return self.object_dao_in_memory
+        return sqlalchemy.orm.object_session(self).get(
+            self.dao_class_of_table(table_name=self.polymorphic_type), self.database_id
+        )
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def dao_class_of_table(*, table_name: str) -> type[DataAccessObject]:
+        """
+        :param table_name: The name of the table of a generated DAO class.
+        :return: The DAO class objects of that table are loaded as.
+        """
+        return next(
+            mapper.class_
+            for mapper in Base.registry.mappers
+            if mapper.local_table.name == table_name
+            and issubclass(mapper.class_, DataAccessObject)
+            and not issubclass(mapper.class_, PartDataAccessObject)
+        )
+
+    @classmethod
+    def object_daos(
+        cls, *, session: sqlalchemy.orm.Session, stored_objects: list[StoredObjectRow]
+    ) -> list[DataAccessObject]:
+        """
+        :param session: The session the rows were loaded with.
+        :param stored_objects: Rows of this table.
+        :return: The DAOs of the rows' objects, in the same order, loaded with one query
+            per DAO class.
+        """
+        ids_by_table: dict[str, list[int]] = {}
+        for stored_object in stored_objects:
+            ids_by_table.setdefault(stored_object.polymorphic_type, []).append(
+                stored_object.database_id
+            )
+        daos_by_id = {}
+        for table_name, ids in ids_by_table.items():
+            dao_class = cls.dao_class_of_table(table_name=table_name)
+            for dao in session.scalars(
+                sqlalchemy.select(dao_class).where(dao_class.database_id.in_(ids))
+            ):
+                daos_by_id[dao.database_id] = dao
+        return [
+            daos_by_id[stored_object.database_id] for stored_object in stored_objects
+        ]
+
+    def from_dao(self, *, state: FromDataAccessObjectState | None = None) -> Any:
+        """
+        :param state: The conversion state.
+        :return: The object this row belongs to, converted from its DAO as
+            :meth:`DataAccessObject.from_dao` converts it.
+        """
+        return self.object_dao.from_dao(state=state)
+
+    @classmethod
+    @called_positionally
+    def insert_rows_of_new_objects(
+        cls, session: sqlalchemy.orm.Session, flush_context: Any, instances: Any
+    ) -> None:
+        """
+        Before a session flushes, add the DAOs and parts that its new objects hold in
+        memory, insert the rows of all new objects, give their DAOs and parts the rows'
+        ids, and delete the parts of the objects it deletes.
+
+        :param session: The session about to flush.
+        :param flush_context: The flush's unit of work.
+        :param instances: The objects the flush was asked for.
+        """
+        cls._add_objects_held_in_memory(session=session)
+        cls._delete_parts_of_deleted_objects(session=session)
+        new_daos = [
+            dao
+            for dao in session.new
+            if isinstance(dao, DataAccessObject)
+            and get_dao_schema(type(dao)).shares_id_with_stored_object
+            and dao.database_id is None
+        ]
+        if new_daos:
+            cls._insert_rows(session=session, daos=new_daos)
+
+    @classmethod
+    def _insert_rows(
+        cls, *, session: sqlalchemy.orm.Session, daos: list[DataAccessObject]
+    ) -> None:
+        """
+        Insert the rows of new DAOs' objects in one statement and give the rows, the
+        DAOs and their parts the ids the database chose.
+
+        :param session: The session about to flush.
+        :param daos: New DAOs whose objects have no row yet.
+        """
+        rows = [dao.stored_object for dao in daos]
+        ids = session.execute(
+            sqlalchemy.insert(cls.__table__).returning(
+                cls.__table__.c.database_id, sort_by_parameter_order=True
+            ),
+            [{"polymorphic_type": row.polymorphic_type} for row in rows],
+        ).scalars()
+        for row, dao, database_id in zip(rows, daos, ids, strict=True):
+            dao.database_id = database_id
+            for part in (dao.parts_in_memory or {}).values():
+                part.database_id = database_id
+            cls._make_row_persistent(session=session, row=row, database_id=database_id)
+
+    @classmethod
+    def _make_row_persistent(
+        cls, *, session: sqlalchemy.orm.Session, row: StoredObjectRow, database_id: int
+    ) -> None:
+        """
+        Turn a row inserted outside the flush into a stored object of the session if a
+        field already refers to it, or into a detached one otherwise.
+
+        :param session: The session about to flush.
+        :param row: The inserted row.
+        :param database_id: The id the database chose for the row.
+        """
+        referenced = row in session
+        if referenced:
+            session.expunge(row)
+        row.database_id = database_id
+        make_transient_to_detached(row)
+        if not referenced:
+            return
+        # a row deleted without the session may still hold the id the database reused
+        stale_row = session.identity_map.get(
+            cls.__mapper__.identity_key_from_primary_key((database_id,))
+        )
+        if stale_row is not None:
+            session.expunge(stale_row)
+        session.add(row)
+
+    @classmethod
+    def _add_objects_held_in_memory(cls, *, session: sqlalchemy.orm.Session) -> None:
+        """
+        Add the DAOs of the objects whose new rows of this table a session holds, since
+        a field referring to an object holds only its row, and the parts of the new
+        DAOs, together with what they refer to in turn.
+
+        :param session: The session about to flush.
+        """
+        while True:
+            held_in_memory = [
+                held
+                for new in session.new
+                for held in cls._objects_held_in_memory(new_object=new)
+                if held not in session
+            ]
+            if not held_in_memory:
+                return
+            session.add_all(held_in_memory)
+
+    @classmethod
+    def _objects_held_in_memory(cls, *, new_object: Any) -> list[DataAccessObject]:
+        """
+        :param new_object: An object a session is about to insert.
+        :return: The DAO of the object a new row of this table belongs to, or the parts
+            of a new DAO.
+        """
+        if isinstance(new_object, cls):
+            owner = new_object.object_dao_in_memory
+            return [] if owner is None else [owner]
+        if isinstance(new_object, DataAccessObject) and new_object.parts_in_memory:
+            return list(new_object.parts_in_memory.values())
+        return []
+
+    @staticmethod
+    def _delete_parts_of_deleted_objects(*, session: sqlalchemy.orm.Session) -> None:
+        """
+        Delete the stored parts of the DAOs a session is about to delete.
+
+        :param session: The session about to flush.
+        """
+        for dao in list(session.deleted):
+            if not isinstance(dao, DataAccessObject):
+                continue
+            for part_class in get_dao_schema(type(dao)).part_classes:
+                part = dao.part(part_class=part_class)
+                if part is not None and sqlalchemy.inspect(part).persistent:
+                    session.delete(part)
+
+
+event.listen(
+    Base, "load", DataAccessObject.register_owner_of_unloaded_parts, propagate=True
+)
+
+
+class PartDataAccessObject(DataAccessObject[T]):
+    """
+    The row of an object in the table of a base class outside the object's primary
+    chain, mapped to that base class's table and held by the object's own DAO.
+
+    It is never the DAO an object is converted to or loaded as.
+    """
+
+    @classmethod
+    @lru_cache(maxsize=None)
+    def type_column_key(cls) -> str | None:
+        """
+        :return: The attribute of the type column of the base class's hierarchy, if the
+            base class's table is the root of that hierarchy and so holds it.
+        """
+        base_dao = get_data_access_object_class(cls.original_class())
+        type_column = sqlalchemy.inspection.inspect(base_dao).polymorphic_on
+        if type_column is None or type_column.table is not cls.__table__:
+            return None
+        return type_column.key
 
 
 @contextmanager
