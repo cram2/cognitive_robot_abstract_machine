@@ -149,6 +149,28 @@ class SparseEntries:
         )
 
 
+# %% edge positions
+
+
+@dataclass(kw_only=True)
+class EdgePositions:
+    """
+    The row and the column of every edge of an edge matrix.
+
+    The ``k``-th entry of both arrays belongs to the ``k``-th edge.
+    """
+
+    rows: npt.NDArray[np.int64]
+    """
+    The node of every edge.
+    """
+
+    columns: npt.NDArray[np.int64]
+    """
+    The column of the child node of every edge.
+    """
+
+
 # %% edge matrices
 
 
@@ -483,20 +505,22 @@ class DenseEdgeMatrix(EdgeMatrix):
         )
 
     @functools.cached_property
-    def edge_positions(self) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
+    def edge_positions(self) -> EdgePositions:
         """
         :return: The row and the column of every edge, row by row.
         """
         rows, columns = np.nonzero(self.is_edge)
-        return rows.astype(np.int64), columns.astype(np.int64)
+        return EdgePositions(
+            rows=rows.astype(np.int64), columns=columns.astype(np.int64)
+        )
 
     @property
     def rows(self) -> npt.NDArray[np.int64]:
-        return self.edge_positions[0]
+        return self.edge_positions.rows
 
     @property
     def columns(self) -> npt.NDArray[np.int64]:
-        return self.edge_positions[1]
+        return self.edge_positions.columns
 
     @property
     def stored_shape(self) -> tuple[int, ...]:
@@ -546,6 +570,41 @@ class DenseEdgeMatrix(EdgeMatrix):
 
 
 @dataclass(kw_only=True)
+class EdgeBlockStackShape:
+    """
+    The number of blocks of an :class:`EdgeBlockStack` and the shape of each block.
+    """
+
+    number_of_blocks: int
+    """
+    The number of blocks in the stack.
+    """
+
+    rows_per_block: int
+    """
+    The number of rows of every block.
+    """
+
+    columns_per_block: int
+    """
+    The number of columns of every block.
+    """
+
+    @property
+    def number_of_entries(self) -> int:
+        """
+        :return: The number of entries of all blocks together.
+        """
+        return self.number_of_blocks * self.rows_per_block * self.columns_per_block
+
+    def to_tuple(self) -> tuple[int, int, int]:
+        """
+        :return: The shape as array libraries take it.
+        """
+        return self.number_of_blocks, self.rows_per_block, self.columns_per_block
+
+
+@dataclass(kw_only=True)
 class EdgeBlockStack:
     """
     Full blocks of one shape of an edge matrix: every row of a block has an edge to
@@ -568,14 +627,14 @@ class EdgeBlockStack:
     """
 
     @property
-    def block_shape(self) -> tuple[int, int, int]:
+    def stack_shape(self) -> EdgeBlockStackShape:
         """
-        :return: The number of blocks, of rows of a block and of columns of a block.
+        :return: The number of blocks and the shape of each block.
         """
-        return (
-            int(self.block_rows.shape[0]),
-            int(self.block_rows.shape[1]),
-            int(self.block_columns.shape[1]),
+        return EdgeBlockStackShape(
+            number_of_blocks=int(self.block_rows.shape[0]),
+            rows_per_block=int(self.block_rows.shape[1]),
+            columns_per_block=int(self.block_columns.shape[1]),
         )
 
     @property
@@ -583,22 +642,25 @@ class EdgeBlockStack:
         """
         :return: The number of edges of all blocks of this stack.
         """
-        number_of_blocks, rows_per_block, columns_per_block = self.block_shape
-        return number_of_blocks * rows_per_block * columns_per_block
+        return self.stack_shape.number_of_entries
 
     @property
     def edge_rows(self) -> npt.NDArray[np.int64]:
         """
         :return: The row of every edge, block by block and row by row.
         """
-        return np.repeat(self.block_rows, self.block_shape[2], axis=1).reshape(-1)
+        return np.repeat(
+            self.block_rows, self.stack_shape.columns_per_block, axis=1
+        ).reshape(-1)
 
     @property
     def edge_columns(self) -> npt.NDArray[np.int64]:
         """
         :return: The column of every edge, block by block and row by row.
         """
-        return np.tile(self.block_columns, (1, self.block_shape[1])).reshape(-1)
+        return np.tile(
+            self.block_columns, (1, self.stack_shape.rows_per_block)
+        ).reshape(-1)
 
 
 @dataclass(eq=False, kw_only=True)
@@ -626,24 +688,26 @@ class BlockEdgeMatrix(EdgeMatrix):
         return self.matrix_shape
 
     @functools.cached_property
-    def edge_positions(self) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
+    def edge_positions(self) -> EdgePositions:
         """
         :return: The row and the column of every edge, stack by stack.
         """
         if not self.stacks:
-            return np.zeros(0, dtype=np.int64), np.zeros(0, dtype=np.int64)
-        return (
-            np.concatenate([stack.edge_rows for stack in self.stacks]),
-            np.concatenate([stack.edge_columns for stack in self.stacks]),
+            return EdgePositions(
+                rows=np.zeros(0, dtype=np.int64), columns=np.zeros(0, dtype=np.int64)
+            )
+        return EdgePositions(
+            rows=np.concatenate([stack.edge_rows for stack in self.stacks]),
+            columns=np.concatenate([stack.edge_columns for stack in self.stacks]),
         )
 
     @property
     def rows(self) -> npt.NDArray[np.int64]:
-        return self.edge_positions[0]
+        return self.edge_positions.rows
 
     @property
     def columns(self) -> npt.NDArray[np.int64]:
-        return self.edge_positions[1]
+        return self.edge_positions.columns
 
     @property
     def stored_shape(self) -> tuple[int, ...]:
@@ -739,18 +803,19 @@ class BlockEdgeMatrix(EdgeMatrix):
         batch_shape = tuple(values.shape[:-1])
         reduced = []
         for stack in self.stacks:
+            stack_shape = stack.stack_shape
             blocks = namespace.reshape(
                 values[
                     ...,
                     stack.first_position : stack.first_position + stack.number_of_edges,
                 ],
-                batch_shape + stack.block_shape,
+                batch_shape + stack_shape.to_tuple(),
             )
-            number_of_blocks, rows_per_block, _ = stack.block_shape
             reduced.append(
                 namespace.reshape(
                     reduction.reduce_last_axis(namespace, blocks),
-                    batch_shape + (number_of_blocks * rows_per_block,),
+                    batch_shape
+                    + (stack_shape.number_of_blocks * stack_shape.rows_per_block,),
                 )
             )
         number_of_reduced = sum(part.shape[-1] for part in reduced)

@@ -13,6 +13,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
+    EdgeBlockStackShape,
     RowReduction,
     SparseEdgeMatrix,
     SparseEntries,
@@ -127,3 +128,27 @@ def test_sums_of_one_shape_are_one_stack():
     [stack] = matrix.stacks
     assert stack.block_rows.shape == (regions, sums_per_region)
     assert stack.block_columns.shape == (regions, products_per_region)
+
+
+def test_stack_shape_counts_the_blocks_and_their_rows_and_columns(
+    rows_of_two_blocks_and_a_row_without_edges: SparseEntries,
+):
+    """
+    Every stack reports how many blocks it holds and how many rows and columns each
+    block has, and its number of edges is their product.
+    """
+    entries = rows_of_two_blocks_and_a_row_without_edges
+    matrix = BlockEdgeMatrix.from_edge_positions(
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
+    shapes = sorted(
+        (stack.stack_shape for stack in matrix.stacks),
+        key=lambda shape: shape.columns_per_block,
+    )
+    assert shapes == [
+        EdgeBlockStackShape(number_of_blocks=1, rows_per_block=2, columns_per_block=2),
+        EdgeBlockStackShape(number_of_blocks=1, rows_per_block=2, columns_per_block=3),
+    ]
+    assert sum(stack.number_of_edges for stack in matrix.stacks) == len(entries.rows)
