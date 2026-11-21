@@ -252,7 +252,11 @@ The kind of value given in a coordinate system.
 
 
 @dataclass(kw_only=True, eq=False)
-class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
+class AxisCoordinates(
+    CoordinateRepresentation[GenericCoordinateSystem],
+    Generic[GenericCoordinateSystem, GenericCoordinate],
+    ABC,
+):
     """
     A value given by one coordinate per axis of its kind of frame, such as a point or a
     vector, held in the attribute named after that axis.
@@ -264,7 +268,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
     """
 
     @property
-    def coordinates(self) -> tuple[Any, ...]:
+    def coordinates(self) -> tuple[GenericCoordinate, ...]:
         """
         The amounts along the axes of the coordinate system, one per axis, in the order
         of the axes.
@@ -304,7 +308,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
     def from_coordinates(
         cls,
         *,
-        coordinates: tuple[Any, ...],
+        coordinates: tuple[GenericCoordinate, ...],
         coordinate_system: GenericCoordinateSystem | None,
     ) -> Self:
         """

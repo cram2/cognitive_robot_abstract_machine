@@ -489,8 +489,9 @@ class SymbolicSpatialValue(
         cls, *, coordinate_system: GenericCoordinateSystem | None
     ) -> dict[str, Any]:
         """
-        Gives the reference frame ``coordinate_system`` lies on, unlike
-        :meth:`~krrood_spatial_math.coordinate_system.CoordinateRepresentation.coordinate_system_arguments`.
+        Gives the 3D frame ``coordinate_system`` lies on as the ``reference_frame``,
+        where :meth:`~krrood_spatial_math.coordinate_system.CoordinateRepresentation.coordinate_system_arguments`
+        passes ``coordinate_system`` itself.
         """
         if coordinate_system is None:
             return {"reference_frame": None}
