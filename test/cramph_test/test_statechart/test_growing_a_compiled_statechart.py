@@ -1,3 +1,8 @@
+"""
+Tests for adding nodes to a statechart after it compiled, and for a
+:meth:`~cramph.statechart.Statechart.modify` block that raises.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,7 +12,10 @@ import pytest
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
 from cramph.data_types import LifeCycleValue, ObservationStateValue
-from cramph.exceptions import StatechartAlreadyCompiledError
+from cramph.exceptions import (
+    StatechartAlreadyCompiledError,
+    StatechartBrokenByFailedModificationError,
+)
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
@@ -260,26 +268,33 @@ def test_a_modification_on_a_statechart_not_compiled_yet_only_adds(
     _tick_until_succeeded(statechart_executor, first)
 
 
-def test_an_abandoned_modification_leaves_the_statechart_as_it_was(
+# %% a modification that raises
+
+
+def test_an_abandoned_modification_keeps_what_it_changed(
     statechart_executor: StatechartExecutor,
 ) -> None:
-    first = _compile_and_run_one_node(statechart_executor)
+    """
+    Nothing the block changed is undone, so the node it added stays.
+    """
+    _compile_and_run_one_node(statechart_executor)
     statechart = statechart_executor.statechart
-    nodes_before = list(statechart.nodes)
+    second = _node_arriving_at_once("second")
 
     with pytest.raises(ModificationDeliberatelyFailed):
         with statechart.modify():
-            statechart.add_node(node=_node_arriving_at_once("second"))
+            statechart.add_node(node=second)
             raise ModificationDeliberatelyFailed()
 
-    assert statechart.nodes == nodes_before
-    statechart_executor.tick()
-    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert statechart.nodes[-1] is second
 
 
 def test_an_abandoned_modification_compiles_nothing(
     statechart_context: StatechartContext,
 ) -> None:
+    """
+    A block that raised leaves the statechart compiled as it was before the block.
+    """
     counting = ExtensionCountingCompiles()
     executor = StatechartExecutor(context=statechart_context, extensions=[counting])
     _compile_and_run_one_node(executor)
@@ -288,26 +303,100 @@ def test_an_abandoned_modification_compiles_nothing(
 
     with pytest.raises(ModificationDeliberatelyFailed):
         with statechart.modify():
-            statechart.add_node(node=_node_arriving_at_once("dropped"))
+            statechart.add_node(node=_node_arriving_at_once("kept"))
             raise ModificationDeliberatelyFailed()
 
     assert counting.compile_count == compiles_before
 
 
-def test_an_abandoned_inner_modification_keeps_the_outer_one_working(
+def test_a_modification_raising_before_it_changed_anything_leaves_the_statechart_usable(
     statechart_executor: StatechartExecutor,
 ) -> None:
+    """
+    Nothing is half changed, so the statechart grows and runs as before.
+    """
+    _compile_and_run_one_node(statechart_executor)
+    statechart = statechart_executor.statechart
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            raise ModificationDeliberatelyFailed()
+
+    statechart.add_node(node=(second := _node_arriving_at_once("second")))
+
+    _tick_until_succeeded(statechart_executor, second)
+
+
+def test_a_statechart_whose_modification_raised_refuses_to_tick(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The error names the one the block raised.
+    """
+    _compile_and_run_one_node(statechart_executor)
+    statechart = statechart_executor.statechart
+    with pytest.raises(ModificationDeliberatelyFailed) as raised:
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
+            raise ModificationDeliberatelyFailed()
+
+    with pytest.raises(StatechartBrokenByFailedModificationError) as broken:
+        statechart_executor.tick()
+
+    assert broken.value.modification_error is raised.value
+    assert broken.value.__cause__ is raised.value
+
+
+def test_a_statechart_whose_modification_raised_refuses_to_compile(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    A statechart that a block broke before its first compile never compiles.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
+            raise ModificationDeliberatelyFailed()
+
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        statechart_executor.compile(statechart=statechart)
+
+
+def test_a_statechart_whose_modification_raised_refuses_further_modifications(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    Adding a node opens a block, which a broken statechart refuses.
+    """
+    _compile_and_run_one_node(statechart_executor)
+    statechart = statechart_executor.statechart
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
+            raise ModificationDeliberatelyFailed()
+
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        statechart.add_node(node=_node_arriving_at_once("rejected"))
+
+
+def test_an_outer_modification_raises_after_the_error_of_an_inner_one_was_caught(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    Catching the error of the inner block does not let the outer one end quietly.
+    """
     _compile_and_run_one_node(statechart_executor)
     statechart = statechart_executor.statechart
 
-    with statechart.modify():
-        with pytest.raises(ModificationDeliberatelyFailed):
-            with statechart.modify():
-                statechart.add_node(node=_node_arriving_at_once("dropped"))
-                raise ModificationDeliberatelyFailed()
-        statechart.add_node(node=(kept := _node_arriving_at_once("kept")))
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        with statechart.modify():
+            with pytest.raises(ModificationDeliberatelyFailed):
+                with statechart.modify():
+                    statechart.add_node(node=_node_arriving_at_once("kept"))
+                    raise ModificationDeliberatelyFailed()
 
-    _tick_until_succeeded(statechart_executor, kept)
+
+# %% compiled composite nodes
 
 
 def test_a_compiled_composite_node_still_rejects_new_children(
