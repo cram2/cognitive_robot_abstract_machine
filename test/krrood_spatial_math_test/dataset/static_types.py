@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from typing_extensions import assert_type
 
-from krrood_spatial_math.coordinate_system import CoordinateSystem, FrameAxis
+from krrood.symbolic_math import symbolic_math as sm
+from krrood_spatial_math.coordinate_system import (
+    AffineCoordinateChange,
+    CoordinateSystem,
+    FrameAxis,
+)
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
     Point3Dimensional,
@@ -23,6 +28,8 @@ from krrood_spatial_math.spatial_types_2_dimensional import (
 
 from .spaces import (
     AxisScalingChange,
+    OpenCoordinateScalablePlanePoint,
+    OpenCoordinateScalablePlaneVector,
     ScalablePlaneFrame,
     ScalablePlanePoint,
     ScalablePlaneVector,
@@ -81,6 +88,29 @@ def check_axes_of_a_frame_kind() -> None:
     A kind of frame's axes are read through its class property.
     """
     assert_type(ScalablePlaneFrame.axes, tuple[FrameAxis, ...])
+
+
+# %% values whose coordinate type is left to their user
+
+
+def check_values_with_symbolic_coordinates(
+    *,
+    point: OpenCoordinateScalablePlanePoint[sm.Scalar],
+    vector: OpenCoordinateScalablePlaneVector[sm.Scalar],
+    change: AffineCoordinateChange[ScalablePlaneFrame, sm.Scalar],
+) -> None:
+    """
+    A value type that leaves its coordinate type open, given symbolic coordinates, reads
+    them as symbols, subtracts into its vector type of symbols, and is moved by a change
+    of symbolic coordinates.
+    """
+    assert_type(point.x, sm.Scalar)
+    assert_type(vector.y, sm.Scalar)
+    assert_type(point - point, OpenCoordinateScalablePlaneVector[sm.Scalar])
+    assert_type(
+        point.apply_transformation(transformation=change),
+        OpenCoordinateScalablePlanePoint[sm.Scalar],
+    )
 
 
 # %% symbolic values

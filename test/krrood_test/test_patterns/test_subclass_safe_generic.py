@@ -42,6 +42,13 @@ from ..dataset.abstract_class_with_generic_subclass import (
     AbstractGoal,
     GoalWithNumericTarget,
 )
+from ..dataset.measurement_readings import (
+    Length,
+    LengthReading,
+    MagnitudeType,
+    Reading,
+    UnitType,
+)
 from ..dataset.classes_with_generic import (
     FirstGeneric,
     SubClassGenericThatUpdatesGenericTypeToBuiltInType,
@@ -969,6 +976,49 @@ def test_a_derived_parameter_is_read_from_the_type_its_source_is_bound_to():
         reading_field.name: reading_field.type
         for reading_field in fields(LengthReading)
     } == {"measurement": Metres, "unit": str}
+
+
+def test_a_derived_parameter_is_read_from_a_generic_class_given_type_arguments():
+    """
+    A source bound to a generic class given type arguments fixes what that class binds
+    itself and what its type arguments give.
+    """
+
+    @dataclass(kw_only=True)
+    class IntegerLengthReading(Reading[Length[int]]):
+        """
+        A reading of a length with an integer magnitude.
+        """
+
+    assert IntegerLengthReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert (
+        IntegerLengthReading.get_type_of_generic_parameter(parameter=MagnitudeType)
+        is int
+    )
+    assert {
+        reading_field.name: reading_field.type
+        for reading_field in fields(IntegerLengthReading)
+    } == {"measurement": Length[int], "magnitude": int}
+
+
+def test_a_derived_parameter_a_type_argument_leaves_open_is_bound_by_a_subclass():
+    """
+    A class whose source is a generic class given its own open type parameter binds
+    what that class binds itself, and a subclass binding the parameter binds the rest.
+    """
+
+    @dataclass(kw_only=True)
+    class IntegerLengthReading(LengthReading[int]):
+        """
+        A reading of a length with an integer magnitude.
+        """
+
+    assert LengthReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert not LengthReading.binds_generic_parameter(parameter=MagnitudeType)
+    assert (
+        IntegerLengthReading.get_type_of_generic_parameter(parameter=MagnitudeType)
+        is int
+    )
 
 
 def test_a_derived_parameter_a_base_renames_binds_the_parameter_it_renames():

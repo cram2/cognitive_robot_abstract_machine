@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from typing_extensions import Self
+from typing_extensions import Generic, Self
 
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.interface import Interface
@@ -20,6 +20,7 @@ from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
     AffineFrame,
     FrameAxis,
+    GenericCoordinate,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.space import Space
@@ -101,6 +102,50 @@ class ScalablePlanePoint(Point[ScalablePlaneVector]):
     """
 
     y: float
+    """
+    The second coordinate.
+    """
+
+
+# %% points and vectors of a scalable plane, of any coordinate type
+
+
+@dataclass(kw_only=True)
+class OpenCoordinateScalablePlaneVector(
+    Vector[ScalablePlaneFrame, GenericCoordinate], Generic[GenericCoordinate]
+):
+    """
+    A vector on a scalable plane whose coordinate type, such as a number or a symbol,
+    is left to its user.
+    """
+
+    x: GenericCoordinate
+    """
+    The amount along the first axis.
+    """
+
+    y: GenericCoordinate
+    """
+    The amount along the second axis.
+    """
+
+
+@dataclass(kw_only=True)
+class OpenCoordinateScalablePlanePoint(
+    Point[OpenCoordinateScalablePlaneVector[GenericCoordinate]],
+    Generic[GenericCoordinate],
+):
+    """
+    A point on a scalable plane whose coordinate type, such as a number or a symbol, is
+    left to its user.
+    """
+
+    x: GenericCoordinate
+    """
+    The first coordinate.
+    """
+
+    y: GenericCoordinate
     """
     The second coordinate.
     """

@@ -210,18 +210,12 @@ class SubClassSafeGeneric(ABC):
         """
         derived = {}
         for derived_parameter in cls._inherited_derived_generic_parameters():
-            source_type = substitutions.get(derived_parameter.source)
-            if not (
-                isclass(source_type)
-                and issubclass(source_type, SubClassSafeGeneric)
-                and source_type.binds_generic_parameter(
-                    parameter=derived_parameter.parameter
-                )
-            ):
-                continue
-            derived_type = source_type.get_type_of_generic_parameter(
-                parameter=derived_parameter.parameter
+            derived_type = cls._type_a_source_fixes(
+                source_type=substitutions.get(derived_parameter.source),
+                parameter=derived_parameter.parameter,
             )
+            if derived_type is None:
+                continue
             cls._ensure_derived_type_fits(
                 parameter=derived_parameter.parameter,
                 bound_type=substitutions.get(derived_parameter.parameter),
@@ -238,6 +232,34 @@ class SubClassSafeGeneric(ABC):
                 )
             derived[derived_parameter.parameter] = derived_type
         return derived
+
+    @staticmethod
+    def _type_a_source_fixes(
+        *, source_type: ResolvableType, parameter: TypeVar
+    ) -> ResolvableType | None:
+        """
+        :param source_type: The type a derived parameter's source is bound to.
+        :param parameter: The derived parameter.
+        :return: The concrete type ``source_type`` fixes ``parameter`` to, by its own
+            binding or, for a generic class given type arguments, by those arguments;
+            ``None`` if it fixes none.
+        """
+        source_class = get_origin(source_type) or source_type
+        if not (
+            isclass(source_class) and issubclass(source_class, SubClassSafeGeneric)
+        ):
+            return None
+        fixed_type = source_class._get_generic_type_substitutions().get(
+            parameter, parameter
+        )
+        if source_class is not source_type:
+            type_arguments = dict(
+                zip(source_class.__parameters__, get_args(source_type))
+            )
+            fixed_type = type_arguments.get(fixed_type, fixed_type)
+        if fixed_type is None or isinstance(fixed_type, (TypeVar, TypeVarTuple)):
+            return None
+        return fixed_type
 
     @classmethod
     def _ensure_derived_type_fits(

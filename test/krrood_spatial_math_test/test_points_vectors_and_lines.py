@@ -10,6 +10,8 @@ from dataclasses import fields
 import numpy as np
 import pytest
 
+from krrood.symbolic_math import symbolic_math as sm
+
 from krrood.patterns.exceptions import InterfaceInstantiationError
 from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
@@ -35,6 +37,9 @@ from krrood_spatial_math.vector import Vector, GenericVector
 
 from .dataset.frames import NamedFrame
 from .dataset.spaces import (
+    AxisScalingChange,
+    OpenCoordinateScalablePlanePoint,
+    OpenCoordinateScalablePlaneVector,
     ScalablePlaneFrame,
     StoredScalablePlaneLine,
     StoredScalablePlaneLineSegment,
@@ -167,6 +172,48 @@ def test_a_point_moved_by_the_difference_to_another_point_reaches_it():
     end = ScalablePlanePoint(x=4.0, y=6.0, coordinate_system=None)
 
     assert start + (end - start) == end
+
+
+# %% points and vectors with symbolic coordinates
+
+
+def test_the_difference_of_two_points_with_symbolic_coordinates_is_symbolic():
+    """
+    A point type that leaves its coordinate type open subtracts symbolic coordinates
+    into its vector type, as it does numbers.
+    """
+    x = sm.FloatVariable(name="x")
+    y = sm.FloatVariable(name="y")
+    start = OpenCoordinateScalablePlanePoint(x=x, y=y, coordinate_system=None)
+    end = OpenCoordinateScalablePlanePoint(x=x + 3, y=y * 2, coordinate_system=None)
+
+    difference = end - start
+
+    assert type(difference) is OpenCoordinateScalablePlaneVector
+    assert difference.x.equivalent(other=3)
+    assert difference.y.equivalent(other=y)
+
+
+def test_a_point_with_symbolic_coordinates_is_moved_by_a_change():
+    """
+    A change moves a point's symbolic coordinates with its position, and a vector's
+    without.
+    """
+    x = sm.FloatVariable(name="x")
+    y = sm.FloatVariable(name="y")
+    change = AxisScalingChange(x_scale=0.5, y_scale=2.0, x_shift=-50.0, y_shift=10.0)
+
+    point = OpenCoordinateScalablePlanePoint(
+        x=x, y=y, coordinate_system=None
+    ).apply_transformation(transformation=change)
+    vector = OpenCoordinateScalablePlaneVector(
+        x=x, y=y, coordinate_system=None
+    ).apply_transformation(transformation=change)
+
+    assert point.x.equivalent(other=0.5 * x - 50.0)
+    assert point.y.equivalent(other=2.0 * y + 10.0)
+    assert vector.x.equivalent(other=0.5 * x)
+    assert vector.y.equivalent(other=2.0 * y)
 
 
 # %% straight lines given by a point and a direction
