@@ -191,12 +191,14 @@ def test_projected_gaussian_scales_are_at_least_the_minimum_scale():
     Projecting the parameters of a Gaussian layer raises every scale below the minimum
     to the minimum and leaves the locations alone.
     """
-    layer = GaussianLayer(0, np.array([0.0, 1.0]), np.array([1.0, 2.0]))
-    location, scale = layer.projected_parameters(
-        [np.array([0.5, -0.5]), np.array([-1.0, 0.5])]
+    layer = GaussianLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.0, 1.0]), np.log([1.0, 2.0])
+    )
+    location, log_scale = layer.projected_parameters(
+        [np.array([0.5, -0.5]), np.log([1e-6, 0.5])]
     )
     np.testing.assert_array_equal(location, [0.5, -0.5])
-    np.testing.assert_array_equal(scale, [GaussianLayer.minimum_scale, 0.5])
+    np.testing.assert_allclose(np.exp(log_scale), [GaussianLayer.minimum_scale, 0.5])
 
 
 def test_projected_log_probabilities_are_normalized_per_node():
@@ -306,16 +308,30 @@ def test_training_a_categorical_layer_learns_the_frequencies_of_its_data():
     data = np.repeat([[0.0], [1.0]], (frequencies * 100).astype(int), axis=0)
     with jax.enable_x64(True):
         layer = SymbolicLayer(
-            0,
+            np.zeros(1, dtype=np.int64),
             np.arange(2),
             DenseProbabilityTable(jnp.log(jnp.full((1, 2), 0.5))),
-            np.arange(2),
         )
         trained = JaxGradientDescent(
             layer, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize(300, jnp.asarray(data))
         probabilities = np.exp(np.asarray(trained.table.log_probabilities))
     np.testing.assert_allclose(probabilities, [frequencies], atol=1e-2)
+
+
+def test_training_a_gaussian_layer_learns_the_spread_of_its_data():
+    """
+    Gradient descent with Adam moves a Gaussian layer to the standard deviation of data
+    ten times wider than its initial scale.
+    """
+    data = np.random.default_rng(0).normal(loc=0.0, scale=10.0, size=(1000, 1))
+    with jax.enable_x64(True):
+        layer = GaussianLayer(np.zeros(1, dtype=np.int64), jnp.zeros(1), jnp.zeros(1))
+        trained = JaxGradientDescent(
+            layer, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+        ).minimize(500, jnp.asarray(data))
+        scale = np.asarray(trained.scale)
+    np.testing.assert_allclose(scale, [data.std()], rtol=2e-2)
 
 
 def test_training_with_weight_decay_keeps_zero_probability_weights(

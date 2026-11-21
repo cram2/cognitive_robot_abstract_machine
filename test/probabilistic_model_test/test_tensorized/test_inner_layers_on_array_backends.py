@@ -88,10 +88,14 @@ class MixtureOfProductsCase:
         :return: The circuit with every parameter an array of that namespace.
         """
         leaf_x = GaussianLayer(
-            0, namespace.asarray([-1.0, 2.0]), namespace.asarray([0.5, 1.5])
+            np.zeros(2, dtype=np.int64),
+            namespace.asarray([-1.0, 2.0]),
+            namespace.asarray(np.log([0.5, 1.5])),
         )
         leaf_y = GaussianLayer(
-            1, namespace.asarray([0.0, 1.0]), namespace.asarray([1.0, 2.0])
+            np.full(2, 1, dtype=np.int64),
+            namespace.asarray([0.0, 1.0]),
+            namespace.asarray(np.log([1.0, 2.0])),
         )
         products = ProductLayer.node_wise_product_of([leaf_x, leaf_y])
         products.store_edges_as(edge_matrix_type)
@@ -340,7 +344,7 @@ def reduced_by_definition(
     return np.stack(
         [
             combine(values[..., edges.columns[edges.rows == row]], axis=-1)
-            for row in range(edges.shape[0])
+            for row in range(edges.shape.number_of_rows)
         ],
         axis=-1,
     )
@@ -356,14 +360,15 @@ def test_reduce_by_row_on_every_backend(
     edges.
     """
     edges = edge_matrix_type.from_edge_positions(
-        uneven_rows.rows, uneven_rows.columns, uneven_rows.shape
+        rows=uneven_rows.rows, columns=uneven_rows.columns, shape=uneven_rows.shape
     )
     values = np.array(
         [[0.5, -1.0, 2.0, 0.25, -0.5, 1.5], [1.0, 2.0, -3.0, 0.5, 0.75, -0.25]]
     )
     assert_result_of_backend_equals(
         edges.reduce_by_row(
-            edges.values_of_columns(array_backend.asarray(values)), reduction
+            values=edges.values_of_columns(values=array_backend.asarray(values)),
+            reduction=reduction,
         ),
         reduced_by_definition(values, edges, reduction),
         array_backend,

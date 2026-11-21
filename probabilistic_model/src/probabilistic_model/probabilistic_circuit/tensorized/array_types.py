@@ -45,6 +45,18 @@ SampleNodeValues: TypeAlias = BackendArray
 One value per sample and node of a layer, shape (#samples, #nodes).
 """
 
+LeafValues: TypeAlias = BackendArray
+"""
+The values a leaf layer reads in a set of samples: of its one variable, shape
+(#samples,), or of the variable of every node, shape (#samples, #nodes).
+"""
+
+LeafStateIndices: TypeAlias = BackendArray
+"""
+An index into the states of a discrete layer for every value of a :data:`LeafValues`
+array, in its shape.
+"""
+
 SampleNodeMask: TypeAlias = BackendArray
 """
 One flag per sample and node of a layer, shape (#samples, #nodes).
@@ -145,6 +157,11 @@ The values of the variables in the scope of a layer in a set of samples, shape
 VariableValues: TypeAlias = npt.NDArray[np.number]
 """
 One number per variable of a circuit, shape (#variables of the circuit,).
+"""
+
+NodeVariableMask: TypeAlias = npt.NDArray[np.bool_]
+"""
+One flag per node of a layer and variable of a circuit, shape (#nodes, #variables).
 """
 
 VariableMask: TypeAlias = npt.NDArray[np.bool_]

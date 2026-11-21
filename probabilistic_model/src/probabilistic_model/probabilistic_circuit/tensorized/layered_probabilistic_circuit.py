@@ -45,6 +45,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     InnerLayer,
     Layer,
@@ -287,7 +288,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         """
         for layer in self.layers:
             if isinstance(layer, DiscreteLayer):
-                layer.table = table_type.of(layer.table)
+                layer.table = table_type.from_table(table=layer.table)
         return self
 
     # %% parameters
@@ -788,6 +789,15 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         self.variables = kept_variables
         return self
 
+    def folded(self) -> Self:
+        """
+        :return: A copy of this circuit whose layers of one type at one height are one
+            layer each, see :class:`LayerFolding`; it answers every query as this one.
+        """
+        self.raise_if_parameters_are_not_on_host()
+        root = LayerFolding(root=copy.deepcopy(self.root)).folded_root()
+        return self.__class__(self.variables, root)
+
     def simplify(self) -> Self:
         """
         Remove the layers that have no effect on the distribution, in place.
@@ -1009,7 +1019,11 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         cache = QueryCache()
         self.root = self.root.marginal(kept, cache=cache)
         return [
-            LayerNode(cache.result_of(ProductLayer.marginal, node.layer), node.node)
+            LayerNode(
+                cache.result_of(ProductLayer.marginal, node.layer),
+                int(np.cumsum(node.layer.nodes_over(kept=kept, cache=cache))[node.node])
+                - 1,
+            )
             for node in nodes
         ]
 

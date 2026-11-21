@@ -1,3 +1,8 @@
+"""
+Input layers whose nodes are each a multivariate Gaussian over several continuous
+variables.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -175,9 +180,9 @@ class MultivariateGaussianLayer(AbstractMultivariateGaussianLayer):
             if not query.requested[index]:
                 continue
             marginal = GaussianLayer(
-                int(index),
+                np.full(self.number_of_nodes, index, dtype=np.int64),
                 self.mean[:, position],
-                np.sqrt(self.covariance.variances[:, position]),
+                0.5 * np.log(self.covariance.variances[:, position]),
             )
             result[:, index] = marginal.moment_of_nodes_own(
                 int(query.order[index]), float(query.center[index]), variables[index]
