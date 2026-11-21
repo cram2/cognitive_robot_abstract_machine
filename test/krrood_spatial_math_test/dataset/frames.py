@@ -22,7 +22,7 @@ from krrood_spatial_math.spatial_types import Vector3Dimensional
 # %% a space frames chart
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Room(EuclideanSpace):
     """
     A three-dimensional Euclidean space, told apart from other rooms only by identity.
@@ -88,7 +88,7 @@ class KnownFrames(
 # %% frames that extend objects named before they are identified
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class NamedThing(HasName[str]):
     """
     An object that is named whether or not it has an identifier.
@@ -100,7 +100,7 @@ class NamedThing(HasName[str]):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IdentifiedNamedThing(NamedThing, HasID):
     """
     A named object that also has an identifier, given after its name.
@@ -112,7 +112,7 @@ class IdentifiedNamedThing(NamedThing, HasID):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ThingFrame(IdentifiedNamedThing, CartesianFrame3Dimensional[str]):
     """
     A Cartesian frame that extends an object named before it is identified.

@@ -57,6 +57,7 @@ from semantic_digital_twin.world_description.derivatives import (
 
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
@@ -1458,6 +1459,58 @@ def test_rebind_leaves_an_entity_this_world_does_not_contain(world_setup):
     """
     world, l1, l2, bf, r1, r2 = world_setup
     assert World().rebind_world_entities(l1) is l1
+
+
+def test_rebind_spatial_value_is_given_in_the_copys_own_frame(world_setup):
+    """
+    A point given in a body is rebound into the corresponding body of the copy, and
+    keeps its coordinates.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    point = Point3Dimensional(x=1.0, y=2.0, z=3.0, reference_frame=l1)
+
+    rebound = world_copy.rebind_world_entities(point)
+
+    assert rebound.reference_frame is world_copy.get_body_by_name(l1.name)
+    assert rebound.to_np().tolist() == point.to_np().tolist()
+    assert point.reference_frame is l1
+
+
+def test_rebind_spatial_change_is_given_between_the_copys_own_frames(world_setup):
+    """
+    A transformation between two bodies is rebound into the corresponding bodies of the
+    copy, for its reference frame and for its child frame.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    transformation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, reference_frame=l1, child_frame=l2
+    )
+
+    rebound = world_copy.rebind_world_entities(transformation)
+
+    assert rebound.reference_frame is world_copy.get_body_by_name(l1.name)
+    assert rebound.child_frame is world_copy.get_body_by_name(l2.name)
+
+
+def test_rebound_spatial_value_is_acted_on_by_the_copys_forward_kinematics(
+    world_setup,
+):
+    """
+    A point rebound into the copy is a point the copy's forward kinematics acts on,
+    which a point left in the frames of the original world is not.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    copy_root = world_copy.get_body_by_name(bf.name)
+    copy_tip = world_copy.get_body_by_name(l2.name)
+    point = Point3Dimensional(reference_frame=l2)
+
+    root_T_tip = world_copy.compose_forward_kinematics_expression(copy_root, copy_tip)
+    root_P_point = root_T_tip @ world_copy.rebind_world_entities(point)
+
+    assert root_P_point.reference_frame is copy_root
 
 
 def test_lookup_by_id_finds_an_annotation_sharing_a_hash_table_key(world_setup):

@@ -29,7 +29,7 @@ from .dataset.frames import NamedFrame, Room
 # %% the space maps every law runs against
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SpaceMapCase:
     """
     A space map together with a target point it is tested at.

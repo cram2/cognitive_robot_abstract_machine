@@ -64,18 +64,12 @@ class Costmap(Location):
     """
     map: np.ndarray = field(default_factory=lambda: np.zeros((10, 10)), kw_only=True)
     """
-    Numpy array to save the locations distribution
-    
-    Costmaps represent the 2D distribution in a numpy array where axis 0 is the X-Axis of the coordinate system and axis 1 
-    is the Y-Axis of the coordinate system. An increase in the index of the axis of the numpy array corresponds to an increase in the 
-    value of the spatial axis. The factor by how the value of the index of the numpy corresponds to the spatial coordinate 
-    system is given by the resolution. 
+    Numpy array to save the locations distribution.
 
-    Furthermore, there is a difference in the origin of the two representations while the numpy arrays start from the top left 
-    corner, the origin given as Pose3Dimensional is placed in the middle of the array. The locations is build around the origin and 
-    since the array start from 0, 0 in the corner this conversion is necessary. 
+    Axis 0 is the x-axis and axis 1 the y-axis, and the resolution is how far one index
+    step reaches. The array starts in a corner while the origin is its middle.
 
-                y-axis      0, 10
+              y-axis      0, 10
         0,0 ------------------
             ------------------
             ------------------

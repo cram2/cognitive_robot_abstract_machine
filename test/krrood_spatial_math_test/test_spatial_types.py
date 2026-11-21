@@ -35,7 +35,7 @@ from krrood_spatial_math.spatial_types_2_dimensional import (
     Pose2Dimensional,
     Vector2Dimensional,
 )
-from krrood_spatial_math.spatial_types import Pose3Dimensional, SymbolicSpatialType
+from krrood_spatial_math.spatial_types import SymbolicSpatialType
 from krrood_spatial_math.testing.orientation_comparison import (
     assert_same_axis_angle,
     assert_same_orientation,
@@ -1505,10 +1505,6 @@ class TestVector3:
         )
         expected = np.array([1, 0, 0, 0])
         assert np.allclose(projected_cone, expected, atol=1e-10)
-
-        # projected_cone = v.project_to_cone(frame_V_cone_axis=Vector3Dimensional(1,1,0), cone_theta=np.pi/2)
-        # expected = np.array([1, 0, 0, 0])
-        # assert np.allclose()(projected_cone, expected, atol=1e-10)
 
 
 class TestTransformationMatrix:

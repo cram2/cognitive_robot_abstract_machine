@@ -47,7 +47,7 @@ from krrood_spatial_math.spatial_types import (
 # %% rigid changes between frames on one plane
 
 
-@dataclass(eq=False, init=False, repr=False)
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
 class HomogeneousTransformationMatrix2Dimensional(
     SymbolicSpatialChange[CartesianFrame2Dimensional],
 ):
@@ -70,7 +70,7 @@ class HomogeneousTransformationMatrix2Dimensional(
         data: sm.MatrixData | None = None,
         reference_frame: CartesianFrame3Dimensional | None = None,
         child_frame: CartesianFrame3Dimensional | None = None,
-    ):
+    ) -> None:
         """
         :param data: A rigid 3x3 homogeneous matrix. Defaults to the identity.
         :param reference_frame: The frame on whose plane the change ends.
@@ -94,7 +94,7 @@ class HomogeneousTransformationMatrix2Dimensional(
             self.casadi_sx = sm.to_sx(data)
         super().__post_init__()
 
-    def _verify_type(self):
+    def _verify_type(self) -> None:
         if self.shape != (3, 3):
             raise WrongDimensionsError(
                 expected_dimensions=(3, 3), actual_dimensions=self.shape
@@ -275,7 +275,7 @@ class HomogeneousTransformationMatrix2Dimensional(
     # %% JSON serialization
 
     @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
         return cls.from_xy_yaw(
             *data["data"],
             reference_frame=cls._parse_optional_frame_from_json(
@@ -295,7 +295,7 @@ class HomogeneousTransformationMatrix2Dimensional(
             ]
         }
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if self.is_constant():
             return hash(
                 (
@@ -310,7 +310,7 @@ class HomogeneousTransformationMatrix2Dimensional(
 # %% vectors and points on a plane
 
 
-@dataclass(eq=False, init=False, repr=False)
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
 class Vector2Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
     Vector,
@@ -328,7 +328,7 @@ class Vector2Dimensional(
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         reference_frame: CartesianFrame3Dimensional | None = None,
-    ):
+    ) -> None:
         """
         :param x: The amount along the x-axis.
         :param y: The amount along the y-axis.
@@ -343,7 +343,7 @@ class Vector2Dimensional(
         return self[0]
 
     @x.setter
-    def x(self, value: sm.ScalarData):
+    def x(self, value: sm.ScalarData) -> None:
         self[0] = value
 
     @property
@@ -351,17 +351,17 @@ class Vector2Dimensional(
         return self[1]
 
     @y.setter
-    def y(self, value: sm.ScalarData):
+    def y(self, value: sm.ScalarData) -> None:
         self[1] = value
 
-    def _verify_type(self):
+    def _verify_type(self) -> None:
         if self.shape != (2, 1):
             raise WrongDimensionsError(
                 expected_dimensions=(2, 1), actual_dimensions=self.shape
             )
 
     @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -398,7 +398,7 @@ class Vector2Dimensional(
         )
 
 
-@dataclass(eq=False, init=False, repr=False)
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
 class Point2Dimensional(
     SymbolicSpatialValue,
     Point[Vector2Dimensional],
@@ -419,7 +419,7 @@ class Point2Dimensional(
         x: sm.ScalarData = 0,
         y: sm.ScalarData = 0,
         reference_frame: CartesianFrame3Dimensional | None = None,
-    ):
+    ) -> None:
         """
         :param x: X-coordinate of the point. Defaults to 0.
         :param y: Y-coordinate of the point. Defaults to 0.
@@ -434,7 +434,7 @@ class Point2Dimensional(
         return self[0]
 
     @x.setter
-    def x(self, value: sm.ScalarData):
+    def x(self, value: sm.ScalarData) -> None:
         self[0] = value
 
     @property
@@ -442,10 +442,10 @@ class Point2Dimensional(
         return self[1]
 
     @y.setter
-    def y(self, value: sm.ScalarData):
+    def y(self, value: sm.ScalarData) -> None:
         self[1] = value
 
-    def _verify_type(self):
+    def _verify_type(self) -> None:
         if self.shape != (2, 1):
             raise WrongDimensionsError(
                 expected_dimensions=(2, 1), actual_dimensions=self.shape
@@ -498,7 +498,7 @@ class Point2Dimensional(
         )
 
     @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
@@ -527,7 +527,7 @@ class Point2Dimensional(
             self.x - other.x, self.y - other.y, reference_frame=self.reference_frame
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if self.is_constant():
             return hash((*self.to_np().tolist(), self.reference_frame))
         return super().__hash__()
@@ -603,18 +603,17 @@ class EmbeddedPlaneProjection(
 # %% poses on a plane
 
 
-@dataclass(eq=False, init=False, repr=False)
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
 class Pose2Dimensional(
     SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
     Pose,
 ):
     """
-    Represents a 2D pose consisting of an x coordinate, a y coordinate, and a yaw angle.
+    A 2D pose of an x coordinate, a y coordinate and a yaw angle, stored as a 3x1
+    vector.
 
-    Internally stored as a 3×1 symbolic vector ``[x, y, yaw]``. It lies on its reference
-    frame's x-y plane and has no height or tilt of its own, so it carries no ``z``,
-    ``roll`` or ``pitch``. Whenever 3D calculations are required, use :attr:`pose` to
-    obtain the equivalent 3D :class:`Pose3Dimensional`.
+    It lies on its reference frame's x-y plane, so it carries no ``z``, ``roll`` or
+    ``pitch``; :attr:`pose` is its 3D :class:`Pose3Dimensional`.
     """
 
     def __init__(
@@ -636,7 +635,7 @@ class Pose2Dimensional(
         )
         super().__post_init__()
 
-    def _verify_type(self):
+    def _verify_type(self) -> None:
         if self.shape != (3, 1):
             raise WrongDimensionsError(
                 expected_dimensions=(3, 1), actual_dimensions=self.shape
@@ -649,7 +648,7 @@ class Pose2Dimensional(
         return self[0]
 
     @x.setter
-    def x(self, value: sm.ScalarData):
+    def x(self, value: sm.ScalarData) -> None:
         self[0] = value
 
     @property
@@ -657,7 +656,7 @@ class Pose2Dimensional(
         return self[1]
 
     @y.setter
-    def y(self, value: sm.ScalarData):
+    def y(self, value: sm.ScalarData) -> None:
         self[1] = value
 
     @property
@@ -665,7 +664,7 @@ class Pose2Dimensional(
         return self[2]
 
     @yaw.setter
-    def yaw(self, value: sm.ScalarData):
+    def yaw(self, value: sm.ScalarData) -> None:
         self[2] = value
 
     # %% Conversion to 3D
@@ -785,13 +784,13 @@ class Pose2Dimensional(
     # %% JSON serialization
 
     @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, data: dict[str, Any], **kwargs: Any) -> Self:
         reference_frame = cls._parse_optional_frame_from_json(
             data, frame=SpatialFrameKey.REFERENCE, **kwargs
         )
         return cls.from_xy_yaw(*data["data"], reference_frame=reference_frame)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         if self.is_constant():
             return hash((*self.to_np().tolist(), self.reference_frame))
         return super().__hash__()

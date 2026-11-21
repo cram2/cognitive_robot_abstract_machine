@@ -195,9 +195,9 @@ class HasRootKinematicStructureEntity(
     def min_max_points(
         self,
     ) -> tuple[Point3Dimensional, Point3Dimensional]:
-        min = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[0])
-        max = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[1])
-        return min, max
+        lower = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[0])
+        upper = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[1])
+        return lower, upper
 
     def __hash__(self):
         return hash((self.__class__, self.root))

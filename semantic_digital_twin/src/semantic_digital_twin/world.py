@@ -1760,35 +1760,16 @@ class World(HasSimulatorProperties, EuclideanSpace):
     def rebind_world_entities(self, obj: RelocatableType) -> RelocatableType:
         """
         Replace every world entity reachable from `obj` with this world's own instance
-        of it.
+        of it; one this world does not contain is left as it is. A spatial value or
+        change is copied with its frames rebound too.
 
-        `obj` is typically built against a different `World`, for example the one this
-        world was :func:`~copy.deepcopy`'d from, whose bodies and connections this world
-        rebuilt as separate objects. Reading through such a foreign reference is
-        harmless, since execution reads and writes whichever world its context points
-        at, but modifying the model is not: `move_branch` and its kind require the
-        entities they are given to belong to the world being modified.
-
-        Walks `obj` recursively through dataclass fields, list like classes and dict values.
-        A :class:`~semantic_digital_twin.world_description.world_entity.WorldEntityWithID`
-        is looked up here by its id. Anything else is deep-copied, so `obj` and the
-        result never share mutable state. Each object is rebound once, so objects that
-        refer to each other, or one object reached from several places, keep that shape
-        in the result. A type that defines how it is deep-copied is copied its own way
-        rather than walked.
-
-        An entity this world does not contain is left as it is: it is not this world's
-        state to rebind, and leaving it behaves exactly as not rebinding at all.
-
-        .. note:: An ``init=False`` field a dataclass derives from its other fields in
-            `__post_init__` is carried over as originally computed, not recomputed from
-            the rebound values.
+        .. note:: An ``init=False`` field derived from other fields in `__post_init__` is
+            carried over, not recomputed from the rebound values.
 
         :param obj: The object to rebind, or a value containing world entities.
-        :return: An equivalent, independent copy of `obj` referring to this world.
-        :raises WorldEntityWithIDBelongsToAnotherWorld: If this world's lookup answers with an
-            entity that reports belonging elsewhere, rather than letting it fail later
-            wherever it ends up being used.
+        :return: An independent copy of `obj` referring to this world.
+        :raises WorldEntityWithIDBelongsToAnotherWorld: If this world's lookup answers with
+            an entity that reports belonging elsewhere.
         """
         return WorldEntityRebinding(world=self).rebind(obj)
 

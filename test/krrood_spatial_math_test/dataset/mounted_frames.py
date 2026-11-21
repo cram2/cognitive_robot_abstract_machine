@@ -22,7 +22,7 @@ from .frames import NamedFrame
 # %% frames that express the values of the frames they are related to
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ExpressingFrame(NamedFrame):
     """
     A Cartesian frame that compares its x-y plane with that of another frame by
@@ -42,7 +42,7 @@ class ExpressingFrame(NamedFrame):
 # %% frames other frames are fixed on
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MountFrame(ExpressingFrame):
     """
     A Cartesian frame that other frames are fixed on, so it expresses values given in

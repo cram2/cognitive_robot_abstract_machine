@@ -127,7 +127,7 @@ class Vector3DimensionalMapping(AlternativeMapping[Vector3Dimensional]):
     reference_frame: KinematicStructureEntity | None
 
     @classmethod
-    def from_domain_object(cls, *, obj: Vector3Dimensional):
+    def from_domain_object(cls, *, obj: Vector3Dimensional) -> Self:
         x, y, z, _ = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
@@ -150,7 +150,7 @@ class PointMapping(AlternativeMapping[Point], ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Point3DimensionalMapping(PointMapping, AlternativeMapping[Point3Dimensional]):
     """
     A stored point given by three coordinates in its reference frame.
@@ -363,7 +363,9 @@ class HomogeneousTransformationMatrix3DimensionalMapping(
     child_frame: KinematicStructureEntity | None
 
     @classmethod
-    def from_domain_object(cls, *, obj: HomogeneousTransformationMatrix3Dimensional):
+    def from_domain_object(
+        cls, *, obj: HomogeneousTransformationMatrix3Dimensional
+    ) -> Self:
         return cls(
             position=obj.position,
             axis_angle=obj.axis_angle,
@@ -400,14 +402,14 @@ class RotationMatrixMapping(
         return rotation_matrix
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
     position: Point3Dimensional
     axis_angle: AxisAngle
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
     @classmethod
-    def from_domain_object(cls, *, obj: Pose3Dimensional):
+    def from_domain_object(cls, *, obj: Pose3Dimensional) -> Self:
         result = cls(position=obj.position, axis_angle=obj.axis_angle)
         result.reference_frame = obj.reference_frame
         return result
@@ -427,22 +429,13 @@ class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
         reference_frame: KinematicStructureEntity,
     ) -> Pose3Dimensional:
         """
-        Creates a Pose3Dimensional instance from a Point3DimensionalMapping and a
-        QuaternionMapping.
+        Creates a :class:`Pose3Dimensional` from the mappings of its position and
+        orientation.
 
-        This method constructs a Pose3Dimensional object by utilizing the provided
-        Point3DimensionalMapping for the position and the QuaternionMapping for the
-        orientation. The resulting Pose3Dimensional is associated with the specified
-        reference frame.
-
-        :param position: A Point3DimensionalMapping object that provides the position
-            data for the Pose3Dimensional.
-        :param orientation: A QuaternionMapping object that provides the orientation
-            data for the Pose3Dimensional.
-        :param reference_frame: The reference frame to which the Pose3Dimensional will
-            be associated.
-        :return: A Pose3Dimensional instance created from the given
-            Point3DimensionalMapping and QuaternionMapping.
+        :param position: The mapping of the position.
+        :param orientation: The mapping of the orientation.
+        :param reference_frame: The frame the pose is given in.
+        :return: The pose with that position and orientation.
         """
         return Pose3Dimensional(
             position=position.to_domain_object(),
@@ -488,7 +481,7 @@ class Pose2DimensionalMapping(AlternativeMapping[Pose2Dimensional]):
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
     @classmethod
-    def from_domain_object(cls, *, obj: Pose2Dimensional):
+    def from_domain_object(cls, *, obj: Pose2Dimensional) -> Self:
         result = cls(position=obj.position, yaw=float(obj.yaw))
         result.reference_frame = obj.reference_frame
         return result

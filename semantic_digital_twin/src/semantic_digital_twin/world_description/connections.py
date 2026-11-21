@@ -563,29 +563,14 @@ class Connection6DoF(Connection):
         self, transformation: HomogeneousTransformationMatrix3Dimensional
     ) -> None:
         """
-        Set this connection's parent-to-child origin.
+        Set this connection's parent-to-child origin, un-composing the fixed expressions
+        around ``_kinematics`` to find the DOF state that produces it. The writes are
+        held together under ``World._world_lock``, so no observer sees a half applied
+        pose.
 
-        The origin is ``parent_T_connection_expression @ _kinematics @
-        connection_T_child_expression``, of which only ``_kinematics`` is DOF-backed;
-        the other two are fixed at connection creation. So ``transformation`` is first
-        converted into the parent frame and then un-composed with those constants, to
-        find the DOF state that makes the *resulting* origin equal ``transformation``,
-        rather than writing ``transformation`` in as ``_kinematics`` directly.
-
-        The degree-of-freedom writes and the notification they trigger are held
-        together under ``World._world_lock``. They form one logical pose
-        change, and an observer that reads or writes the state between them --
-        such as a running physics simulator syncing its own values back into
-        the world -- would otherwise see, and be able to overwrite, a pose that
-        is only half applied.
-
-        :param transformation: The desired parent-to-child origin. Must carry a
-            reference frame (:meth:`World.transform` raises
-            :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
-            otherwise); does not need to already be expressed in the parent frame. Other
-            spatial types (e.g. ``Pose3Dimensional``) must be converted with their own
-            :meth:`~krrood_spatial_math.pose.Pose.to_coordinate_change` before being
-            assigned here.
+        :param transformation: The desired parent-to-child origin. Must carry a reference
+            frame, else :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
+            is raised; need not be expressed in the parent frame.
         """
         local_kinematics = self._calculate_local_kinematics(
             self._world.transform(transformation, self.parent)
@@ -644,26 +629,15 @@ class WheeledDrive(ActiveConnection, HasUpdateState, ABC):
         self, transformation: NpMatrix4x4 | HomogeneousTransformationMatrix3Dimensional
     ) -> None:
         """
-        Overwrites the origin of the connection.
-
-        The origin is ``parent_T_connection_expression @ _kinematics @
-        connection_T_child_expression``, of which only ``_kinematics`` is degree of
-        freedom backed, so ``transformation`` is un-composed with the other two to find
-        the drive's state that produces it.
+        Overwrites the origin of the connection, un-composing the fixed expressions
+        around ``_kinematics`` to find the drive's state that produces it. The writes
+        are held together under ``World._world_lock``.
 
         .. warning:: Ignores z position, pitch, and roll values, because a drive cannot
             reach them.
 
-        The degree-of-freedom writes and the notification they trigger are held
-        together under ``World._world_lock``. They form one logical pose
-        change, and an observer that reads or writes the state between them --
-        such as a running physics simulator syncing its own values back into
-        the world -- would otherwise see, and be able to overwrite, a pose that
-        is only half applied.
-
-        :param transformation: The desired parent-to-child origin. One given in a
-            reference frame is expressed in the parent frame first; one given in none is
-            taken to be expressed in it already.
+        :param transformation: The desired parent-to-child origin. One given in a frame is
+            expressed in the parent frame first; one given in none is taken to be in it.
         """
         if (
             isinstance(transformation, HomogeneousTransformationMatrix3Dimensional)
