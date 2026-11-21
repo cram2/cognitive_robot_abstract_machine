@@ -32,7 +32,7 @@ class NumbersWrittenToAFile(ParallelJob[int, int]):
     How long writing one number takes, in seconds.
     """
 
-    def work_through(self, *, items: list[int], stop: EventProxy) -> list[int]:
+    def work_through_items(self, *, items: list[int], stop: EventProxy) -> list[int]:
         written = []
         for number in items:
             if stop.is_set():

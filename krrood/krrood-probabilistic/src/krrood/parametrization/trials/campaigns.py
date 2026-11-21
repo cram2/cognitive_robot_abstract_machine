@@ -140,7 +140,7 @@ class TrialCampaign(
         remaining = parameters[len(pilot) :]
         return len(pilot) + len(self.worker_pool.run(job=self, items=remaining))
 
-    def work_through(
+    def work_through_items(
         self, *, items: list[ParametersTypeVar], stop: EventProxy
     ) -> list[bool]:
         store = self.setup.create_store()

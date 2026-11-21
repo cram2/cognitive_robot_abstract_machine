@@ -103,7 +103,7 @@ class StartingStateRecipe(ParallelJob[int, int], Generic[StateTypeVar], ABC):
         self.create_store().prepare()
         return worker_pool.run(job=self, items=list(range(attempts)))
 
-    def work_through(self, *, items: list[int], stop: EventProxy) -> list[int]:
+    def work_through_items(self, *, items: list[int], stop: EventProxy) -> list[int]:
         store = self.create_store()
         stored_ids = []
         with self.reaching() as reacher:

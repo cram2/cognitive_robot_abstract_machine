@@ -37,13 +37,14 @@ What working through one item gives.
 @dataclass(kw_only=True)
 class ParallelJob(Generic[ItemTypeVar, ResultTypeVar], SubClassSafeGeneric, ABC):
     """
-    Work that is divided among workers, each working through a share of the items.
+    Work that is divided among worker processes running in parallel, each working
+    through a share of the items.
 
     It is sent to each worker's process, so it holds only what can be pickled.
     """
 
     @abstractmethod
-    def work_through(
+    def work_through_items(
         self, *, items: list[ItemTypeVar], stop: EventProxy
     ) -> list[ResultTypeVar]:
         """
@@ -114,7 +115,7 @@ class WorkerPool:
             self.stopping_on_signals(stop=manager.Event()) as stop,
         ):
             if number_of_workers == 1:
-                return job.work_through(items=items, stop=stop)
+                return job.work_through_items(items=items, stop=stop)
             with ProcessPoolExecutor(
                 max_workers=number_of_workers,
                 mp_context=context,
@@ -122,7 +123,7 @@ class WorkerPool:
             ) as pool:
                 workers = [
                     pool.submit(
-                        job.work_through,
+                        job.work_through_items,
                         items=items[worker::number_of_workers],
                         stop=stop,
                     )
