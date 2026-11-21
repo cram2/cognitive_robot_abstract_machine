@@ -1,3 +1,7 @@
+"""
+The executors running a plan: on the robot, or simulated kinematically or physically.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -40,7 +44,11 @@ from coraplex.robot_plans.robot_specific_plan_transformations import (
     MoveStretchToolCenterPointInAStraightLine,
 )
 from coraplex.robotiq_grippers import DriveRobotiqGrippersThroughTheirActionServers
-from cramph.composites import ChildChooserAccess, StatementNode
+from cramph.composites import (
+    ChildChooserAccess,
+    DefiniteStatementNode,
+    StatementNode,
+)
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValue
 from cramph.exceptions import EmptyStatechartError
@@ -191,6 +199,12 @@ class PlanExecutor(Executor, ABC):
     """
 
     def __post_init__(self) -> None:
+        """
+        Give the context the chooser grounding the plan's statements, and put the
+        adaptations of this executor before the plan's own transformations.
+
+        :raises DebuggingWithoutRosNode: If the executor debugs without a ROS node.
+        """
         if self.debug and self.ros_node is None:
             raise DebuggingWithoutRosNode()
         self.supplied_context_extensions = list(self.context.extensions.values())
@@ -395,10 +409,11 @@ class PlanExecutor(Executor, ABC):
         """
         :return: A :class:`CandidateLimitReached` if a statement node tried as many
             actions as it may, an :class:`EmptyUnderspecified` if one ran out of actions
-            to try, ``None`` if none did.
+            to try, ``None`` if none did. A definite statement, which runs one action,
+            fails because that action did.
         """
         for node in self.statechart.get_nodes_by_type(node_type=StatementNode):
-            if not node.ran_out_of_children:
+            if isinstance(node, DefiniteStatementNode) or not node.ran_out_of_children:
                 continue
             if node.reached_candidate_limit:
                 return CandidateLimitReached(

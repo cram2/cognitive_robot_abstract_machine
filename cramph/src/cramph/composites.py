@@ -9,12 +9,18 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import partial
 from itertools import combinations, takewhile
+from uuid import UUID
 
 from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
 
 from krrood.adapters.json_serializer import JSONField
-from krrood.entity_query_language.backends import QueryBackend
-from krrood.entity_query_language.query.match import Match
+from krrood.entity_query_language.backends import GeneratedInstance, GenerativeBackend
+from krrood.entity_query_language.core.base_expressions import (
+    Bindings,
+    SymbolicExpression,
+)
+from krrood.entity_query_language.query.match import AbstractMatchExpression, Match
+from krrood.entity_query_language.query.quantifiers import The
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.field_metadata import JSONMetadata
@@ -29,6 +35,7 @@ from cramph.data_types import (
     ObservationStateValue,
 )
 from cramph.exceptions import (
+    ControlStructureStatementLeavesAChoiceError,
     NoChildChooserForNodeError,
     SeveralChildChoosersForNodeError,
     NoControlStructureNodeAboveError,
@@ -124,8 +131,8 @@ class ControlStructureNode(CompositeNode, ABC):
     :meth:`~cramph.statechart.Statechart.replace` rewire the conditions of the current
     children accordingly.
 
-    Wherever it is handed a node, it also takes an underspecified `a(...)` statement,
-    for which it takes a :class:`StatementNode` as its child.
+    Wherever it is handed a node, it also takes a statement of one, see
+    :meth:`_to_node`.
     """
 
     nodes: list[StatechartNode] = field(default_factory=list, init=True)
@@ -133,19 +140,67 @@ class ControlStructureNode(CompositeNode, ABC):
     The children of this goal, in order.
     """
 
+    statement: Match | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        metadata=JSONMetadata(serialize=False).as_dict(),
+    )
+    """
+    The `a(...)` statement stating the nodes this structure was built from, see
+    :meth:`from_statement`, None for a structure constructed directly.
+
+    The statements among its nodes are parts of it, which share the variables it gives
+    them.
+    """
+
     def __post_init__(self) -> None:
+        """
+        Turn every statement among :attr:`nodes` into the node running it, see
+        :meth:`_to_node`.
+        """
         super().__post_init__()
-        self.nodes = [self._as_node(node=node) for node in self.nodes]
+        self.nodes = [self._to_node(node=node) for node in self.nodes]
+
+    @classmethod
+    def from_statement(cls, *, statement: Match[Self]) -> Self:
+        """
+        :param statement: An `a(...)` statement of a control structure that states its
+            nodes.
+        :return: The structure the statement states, built from what it states.
+        :raises ControlStructureStatementLeavesAChoiceError: If the statement leaves
+            open anything but the statements among its nodes.
+        """
+        open_keywords = [
+            keyword
+            for keyword, value in statement._kwargs_.items()
+            if value is ...
+            or isinstance(value, (SymbolicExpression, AbstractMatchExpression))
+        ]
+        if open_keywords:
+            raise ControlStructureStatementLeavesAChoiceError(
+                statement=statement, open_keywords=open_keywords
+            )
+        structure = cls(**statement._kwargs_)
+        structure.statement = statement
+        return structure
 
     @staticmethod
-    def _as_node(*, node: StatechartNode | Match) -> StatechartNode:
+    def _to_node(*, node: StatechartNode | Match) -> StatechartNode:
         """
         :param node: A node this goal was handed, or a statement of one.
-        :return: `node` itself, or a :class:`StatementNode` grounding the statement.
+        :return: `node` itself; for a `the(...)` statement a
+            :class:`DefiniteStatementNode`; for an `a(...)` statement of a control
+            structure stating its nodes that structure, see :meth:`from_statement`; for
+            any other statement a :class:`StatementNode` grounding it.
         """
-        if isinstance(node, Match):
-            return StatementNode(statement=node)
-        return node
+        if not isinstance(node, Match):
+            return node
+        if issubclass(node._quantifier_type_, The):
+            return DefiniteStatementNode(statement=node)
+        if issubclass(node._type_, ControlStructureNode) and "nodes" in node._kwargs_:
+            return node._type_.from_statement(statement=node)
+        return StatementNode(statement=node)
 
     def add_node(self, *, node: StatechartNode) -> None:
         """
@@ -155,7 +210,7 @@ class ControlStructureNode(CompositeNode, ABC):
 
         :param node: The node to add as a child of this goal.
         """
-        node = self._as_node(node=node)
+        node = self._to_node(node=node)
         if self._has_child(node=node):
             return
         self._add_node_sanity_check(node=node)
@@ -294,7 +349,7 @@ class ControlStructureNode(CompositeNode, ABC):
         :raises StatechartAlreadyCompiledError: If this goal accepts no children any
             more, see :meth:`_check_accepts_children`.
         """
-        node = self._as_node(node=node)
+        node = self._to_node(node=node)
         self._check_is_not_a_child(node=node)
         if not self.belongs_to_statechart():
             self.nodes.insert(position, node)
@@ -1321,6 +1376,81 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         return NodeArtifacts(observation=Scalar(latest_child.last_observation))
 
 
+# %% choices shared between statements
+
+
+@dataclass(kw_only=True)
+class StatementBinding:
+    """
+    The value a statement's chosen candidate gave one of the statement's variables.
+    """
+
+    value: Any
+    """
+    The value of the variable.
+    """
+
+    statement_id: str
+    """
+    The identifier of the statement node whose chosen candidate gave the variable its
+    value, which no other node of any statechart has.
+    """
+
+
+@dataclass(kw_only=True)
+class StatementBindings(ContextExtension):
+    """
+    The values the candidates chosen for the statements of a statechart gave their
+    variables, which every other statement reusing such a variable keeps.
+    """
+
+    bindings: dict[UUID, StatementBinding] = field(default_factory=dict)
+    """
+    The binding of every variable bound so far, keyed by the identifier of the variable.
+    """
+
+    def values_bound_by_others(self, *, statement_id: str) -> Bindings:
+        """
+        :param statement_id: The identifier of a statement node.
+        :return: The values statements other than the one identified by `statement_id` bound,
+            keyed by the identifier of each variable.
+        """
+        return {
+            variable_id: binding.value
+            for variable_id, binding in self.bindings.items()
+            if binding.statement_id != statement_id
+        }
+
+    def bind(self, *, statement_id: str, variable_values: Bindings) -> None:
+        """
+        Let the statement identified by `statement_id` bind the variables of
+        `variable_values` that no other statement bound, in place of what it bound
+        before.
+
+        :param statement_id: The identifier of the statement node whose candidate was
+            chosen.
+        :param variable_values: The values the chosen candidate gave the statement's
+            variables, keyed by the identifier of each variable.
+        """
+        self.release(statement_id=statement_id)
+        for variable_id, value in variable_values.items():
+            self.bindings.setdefault(
+                variable_id, StatementBinding(value=value, statement_id=statement_id)
+            )
+
+    def release(self, *, statement_id: str) -> None:
+        """
+        Unbind every variable the statement identified by `statement_id` bound.
+
+        :param statement_id: The identifier of the statement node.
+        """
+        self.bindings = {
+            variable_id: binding
+            for variable_id, binding in self.bindings.items()
+            if binding.statement_id != statement_id
+        }
+
+
 # %% running a child grounded from a statement
 
 
@@ -1361,6 +1491,14 @@ class StatementNode(CompositeNodeChoosingItsChild):
     How many candidates the current run through the statement has yielded.
     """
 
+    _variable_values_of_candidate: dict[int, dict[UUID, Any]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The values each candidate yielded since the statement was last grounded anew gave
+    the statement's variables, keyed by the identity of the candidate.
+    """
+
     @property
     def reached_candidate_limit(self) -> bool:
         """
@@ -1373,10 +1511,11 @@ class StatementNode(CompositeNodeChoosingItsChild):
         return self._candidates_pulled >= self.candidate_limit
 
     def next_candidate(
-        self, *, query_backend: QueryBackend, default_candidate_limit: int
+        self, *, query_backend: GenerativeBackend, default_candidate_limit: int
     ) -> Any | None:
         """
-        Grounds the statement into its next candidate, against the world as it is now.
+        Grounds the statement into its next candidate, against the world as it is now
+        and keeping the values other statements bound, see :class:`StatementBindings`.
 
         The statement is left suspended in between, so the next call resumes where this
         one stopped.
@@ -1390,7 +1529,15 @@ class StatementNode(CompositeNodeChoosingItsChild):
         if self._candidates is None:
             self._candidates_pulled = 0
             self.candidate_limit = self.statement._limit_ or default_candidate_limit
-            self._candidates = query_backend.evaluate(expression=self.statement)
+            self._variable_values_of_candidate = {}
+            self._candidates = self._recorded(
+                generated=query_backend.generate(
+                    expression=self.statement,
+                    bound_values=self.statement_bindings.values_bound_by_others(
+                        statement_id=self._node_id
+                    ),
+                )
+            )
         if self.reached_candidate_limit:
             self.stop_grounding()
             return None
@@ -1400,6 +1547,57 @@ class StatementNode(CompositeNodeChoosingItsChild):
             return None
         self._candidates_pulled += 1
         return candidate
+
+    def _recorded(
+        self, *, generated: Iterator[GeneratedInstance]
+    ) -> Generator[Any, None, None]:
+        """
+        :param generated: The candidates the backend generates for the statement.
+        :return: The candidates of `generated`, remembering in
+            :attr:`_variable_values_of_candidate` the variable values of each.
+        """
+        for each in generated:
+            self._variable_values_of_candidate[id(each.instance)] = each.variable_values
+            yield each.instance
+
+    def variable_values_of(self, *, candidate: Any) -> Bindings:
+        """
+        :param candidate: A candidate this statement yielded since it was last grounded
+            anew.
+        :return: The values `candidate` gave the statement's variables, keyed by the
+            identifier of each variable; empty for a candidate it did not yield.
+        """
+        return self._variable_values_of_candidate.get(id(candidate), {})
+
+    @property
+    def statement_bindings(self) -> StatementBindings:
+        """
+        :return: The values the statements of this node's statechart bound, an empty
+            set of them for a node that belongs to no statechart and so shares nothing.
+        """
+        if self._statechart is None:
+            return StatementBindings()
+        return self.context.ensure_extension(extension=StatementBindings())
+
+    def adopt_chosen_child(self, *, child: StatechartNode) -> None:
+        """
+        Differs from :meth:`CompositeNodeChoosingItsChild.adopt_chosen_child` in also
+        binding the statement's variables to the values the candidate `child` holds gave
+        them.
+        """
+        super().adopt_chosen_child(child=child)
+        self.statement_bindings.bind(
+            statement_id=self._node_id,
+            variable_values=self.variable_values_of(candidate=self.grounded_nodes[-1]),
+        )
+
+    def on_reset(self) -> None:
+        """
+        Differs from :meth:`CompositeNodeChoosingItsChild.on_reset` in also releasing
+        the variables this statement bound.
+        """
+        super().on_reset()
+        self.statement_bindings.release(statement_id=self._node_id)
 
     def go_on_after(self, *, read: list[Any], taken: Any) -> None:
         """
@@ -1474,6 +1672,34 @@ class StatementNode(CompositeNodeChoosingItsChild):
         return f"{self.statement._type_.__name__}"
 
 
+@dataclass(eq=False, repr=False, kw_only=True)
+class DefiniteStatementNode(StatementNode):
+    """
+    Runs the one node a definite `the(...)` statement describes once the statements
+    before it bound the variables it shares with them, see :class:`StatementBindings`.
+
+    It has nothing to choose, so its chooser runs that node without trying it out first
+    and does not ground the statement again once the node failed.
+    """
+
+    def sole_candidate(
+        self, *, query_backend: GenerativeBackend, bound_values: Bindings
+    ) -> Any:
+        """
+        :param query_backend: The backend answering the statement.
+        :param bound_values: The values chosen for variables the statement shares,
+            keyed by the identifier of each variable.
+        :return: The one node the statement describes while its variables keep
+            `bound_values`.
+        :raises MultipleSolutionFound: If the statement describes more than one node.
+        :raises NoSolutionFound: If it describes none.
+        """
+        (generated,) = query_backend.generate(
+            expression=self.statement, bound_values=bound_values
+        )
+        return generated.instance
+
+
 # %% grounding statements together
 
 
@@ -1490,7 +1716,7 @@ class StatementsGroundedTogether:
     The statements grounded together.
     """
 
-    query_backend: QueryBackend
+    query_backend: GenerativeBackend
     """
     The backend answering the statements.
     """
@@ -1527,7 +1753,25 @@ class StatementsGroundedTogether:
             reaches a candidate of it.
         """
         for combination in self._product:
-            yield dict(zip(self.statements, combination))
+            candidates = dict(zip(self.statements, combination))
+            if self._agree_on_shared_variables(combination=candidates):
+                yield candidates
+
+    @staticmethod
+    def _agree_on_shared_variables(*, combination: dict[StatementNode, Any]) -> bool:
+        """
+        :param combination: One candidate of every statement.
+        :return: Whether the candidates give every variable their statements share the
+            same value.
+        """
+        values: Bindings = {}
+        for statement, candidate in combination.items():
+            for variable_id, value in statement.variable_values_of(
+                candidate=candidate
+            ).items():
+                if values.setdefault(variable_id, value) is not value:
+                    return False
+        return True
 
     def take(self, *, combination: dict[StatementNode, Any]) -> None:
         """

@@ -285,7 +285,7 @@ class ActionOfSteps(Action, ControlStructureNode, ABC):
         """
         Puts the steps below this action and lets the control structure node wire them.
         """
-        self.nodes = [self._as_node(node=step) for step in self.create_steps()]
+        self.nodes = [self._to_node(node=step) for step in self.create_steps()]
         self.adopt_handed_children()
 
 

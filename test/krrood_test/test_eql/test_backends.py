@@ -29,6 +29,7 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
 )
 from krrood.ormatic.eql_interface import SQLAlchemyBackend
+from krrood.parametrization.exceptions import BoundValuesNotSupported
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
@@ -638,3 +639,40 @@ def test_a_sampled_row_is_a_role_of_the_operation_result_of_its_bindings(
     assert Role.roles_for(
         role_taker=row.role_taker, role_type=ProbabilisticOperationResult
     ) == [row]
+
+
+def test_probabilistic_backend_refuses_to_sample_a_variable_that_has_a_value(
+    rectangle_backend,
+):
+    """
+    Sampling cannot keep a value a variable of the match has already, so it refuses.
+    """
+    width = variable(float, [side for side, _ in RECTANGLE_SIDES])
+    query = a(Rectangle)(width=width, height=...)
+    with pytest.raises(BoundValuesNotSupported):
+        list(
+            rectangle_backend.generate(
+                expression=query, bound_values={width._id_: RECTANGLE_SIDES[0][0]}
+            )
+        )
+
+
+def test_probabilistic_backend_ignores_a_value_of_a_variable_the_match_is_not_given(
+    rectangle_backend,
+):
+    """
+    A value of a variable the match is not given does not keep the backend from
+    sampling, and the match's own ``...`` leaves are no variables it reports.
+    """
+    unused = variable(float, [1.0])
+    generated = list(
+        rectangle_backend.generate(
+            expression=a(Rectangle)(width=..., height=...),
+            bound_values={unused._id_: 1.0},
+        )
+    )
+    assert len(generated) == rectangle_backend.number_of_samples
+    assert {(each.instance.width, each.instance.height) for each in generated} <= set(
+        RECTANGLE_SIDES
+    )
+    assert [each.variable_values for each in generated] == [{}] * len(generated)

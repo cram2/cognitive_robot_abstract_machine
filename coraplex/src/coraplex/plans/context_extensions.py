@@ -1,3 +1,8 @@
+"""
+The context extensions a plan reads: the robot performing it and how its underspecified
+statements are grounded.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,7 +11,7 @@ from dataclasses import dataclass, field
 from cramph.context import ContextExtension
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
-    QueryBackend,
+    GenerativeBackend,
 )
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
@@ -50,7 +55,7 @@ class StatementGrounding(ContextExtension):
     How the underspecified statements of a plan are grounded into actions.
     """
 
-    query_backend: QueryBackend = field(
+    query_backend: GenerativeBackend = field(
         default_factory=EntityQueryLanguageGenerativeBackend
     )
     """

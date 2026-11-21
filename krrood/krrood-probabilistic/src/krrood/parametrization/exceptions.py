@@ -1,6 +1,12 @@
+"""
+The errors raised while parametrizing matches and answering them from probabilistic
+models.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import UUID
 
 from typing_extensions import Any, Hashable, TYPE_CHECKING
 
@@ -12,7 +18,7 @@ from probabilistic_model.exceptions import ProbabilisticModelException
 if TYPE_CHECKING:
     from krrood.entity_query_language.core.mapped_variable import MappedVariable
     from krrood.entity_query_language.factories import ConditionType
-    from krrood.entity_query_language.query.match import AttributeMatch
+    from krrood.entity_query_language.query.match import AttributeMatch, Match
 
 
 @dataclass(kw_only=True)
@@ -413,4 +419,34 @@ class AttributeNotParameterized(InputError):
         return (
             "Assign the attribute in the query's pattern, with ..., a value or a "
             "variable, or constrain it in a where condition."
+        )
+
+
+@dataclass(kw_only=True)
+class BoundValuesNotSupported(DataclassException):
+    """
+    Raised when a probabilistic model is asked to sample a match while variables the
+    match is given already have values, which the model is not conditioned on.
+    """
+
+    match: Match
+    """
+    The match whose variables are bound.
+    """
+
+    bound_variable_ids: set[UUID]
+    """
+    The identifiers of the match's variables that have values already.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{len(self.bound_variable_ids)} variable(s) of {self.match} have values "
+            f"already, which sampling from a probabilistic model cannot keep."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Generate this match with the EntityQueryLanguageGenerativeBackend, or give "
+            "it variables no earlier choice has bound."
         )

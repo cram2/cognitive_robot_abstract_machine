@@ -7,13 +7,15 @@ import enum
 import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing_extensions import ClassVar, Iterable, Iterator, TypeVar
+from functools import cached_property
+from typing_extensions import Any, ClassVar, Iterable, Iterator, TypeVar
 
 import logging
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
+    OperationResult,
     Selectable,
     SymbolicExpression,
 )
@@ -121,6 +123,96 @@ class SelectiveBackend(QueryBackend, ABC):
     def _evaluate(self, *, expression: Evaluable) -> Iterable[T]: ...
 
 
+# %% generated instances
+
+
+@dataclass(kw_only=True)
+class GeneratedInstance:
+    """
+    An instance a generative backend constructed for a match, with the values the
+    match's variables took for it.
+    """
+
+    instance: Any
+    """
+    The constructed instance.
+    """
+
+    variable_values: Bindings
+    """
+    The value each expression the match was given for an attribute, such as a variable,
+    took for :attr:`instance`, keyed by the identifier of that expression.
+    """
+
+
+@dataclass(kw_only=True)
+class InstanceConstruction:
+    """
+    Constructs the instances of a match from rows of values of its pattern's variables,
+    remembering the row each instance was constructed from.
+    """
+
+    match: Match
+    """
+    The match whose instances are constructed.
+    """
+
+    rows: Iterable[Bindings]
+    """
+    The values of the pattern's variables, one row per instance, keyed by the identifier
+    of the variable assigned to each attribute.
+    """
+
+    _row_of_instance: dict[int, Bindings] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The row each constructed instance not yet handed out by :meth:`generated` was
+    constructed from, keyed by the identity of the instance.
+    """
+
+    def __iter__(self) -> Iterator[Any]:
+        """
+        :return: An instance constructed from each of :attr:`rows`, in their order.
+        """
+        for row in self.rows:
+            instance = self.match._construct_instance_from_bindings_(bindings=row)
+            self._row_of_instance[id(instance)] = row
+            yield instance
+
+    @cached_property
+    def given_expressions(self) -> dict[uuid.UUID, uuid.UUID]:
+        """
+        :return: The identifier of the pattern variable of every attribute the match was
+            given an expression for, such as a variable, keyed by the identifier of that
+            expression.
+        """
+        return {
+            attribute_match.assigned_value._id_: attribute_match.assigned_variable._id_
+            for attribute_match in self.match._matches_with_variables_
+            if isinstance(attribute_match.assigned_value, SymbolicExpression)
+        }
+
+    def generated(self, *, instance: Any) -> GeneratedInstance:
+        """
+        :param instance: An instance this construction yielded.
+        :return: `instance` with the values the expressions the match was given took in
+            the row it was constructed from.
+        """
+        row = self._row_of_instance.pop(id(instance))
+        return GeneratedInstance(
+            instance=instance,
+            variable_values={
+                expression_id: row[pattern_variable_id]
+                for expression_id, pattern_variable_id in self.given_expressions.items()
+                if pattern_variable_id in row
+            },
+        )
+
+
+# %% generative backends
+
+
 @dataclass(kw_only=True)
 class GenerativeBackend(QueryBackend, ABC):
     """
@@ -136,14 +228,37 @@ class GenerativeBackend(QueryBackend, ABC):
     """
 
     def evaluate(self, *, expression: Evaluable) -> Iterable[T]:
+        for generated in self.generate(expression=expression, bound_values={}):
+            yield generated.instance
+
+    def generate(
+        self, *, expression: Evaluable, bound_values: Bindings
+    ) -> Iterator[GeneratedInstance]:
+        """
+        Generate the instances a match describes, each with the values its variables
+        took, while every variable `bound_values` binds keeps its bound value.
+
+        :param expression: The match to generate instances of.
+        :param bound_values: Values already chosen for variables, keyed by the
+            identifier of each variable; values of variables the match does not depend
+            on are ignored.
+        :return: The generated instances.
+        :raises GenerativeBackendQueryIsNotUnderspecifiedVariable: If `expression` is
+            not a match.
+        """
         if not isinstance(expression, Match):
             raise GenerativeBackendQueryIsNotUnderspecifiedVariable(
                 expression=expression
             )
-        yield from self._evaluate(expression=expression)
+        yield from self._generate(expression=expression, bound_values=bound_values)
 
     @abstractmethod
-    def _evaluate(self, *, expression: Match[T]) -> Iterable[T]: ...
+    def _generate(
+        self, *, expression: Match[T], bound_values: Bindings
+    ) -> Iterator[GeneratedInstance]:
+        """
+        :meth:`generate` once `expression` is known to be a match.
+        """
 
 
 @dataclass(kw_only=True)
@@ -184,7 +299,9 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         """
         return True
 
-    def _evaluate(self, *, expression: Match[T]) -> Iterable[T]:
+    def _generate(
+        self, *, expression: Match[T], bound_values: Bindings
+    ) -> Iterator[GeneratedInstance]:
         self._warn_or_raise_on_unresolved_cause_(expression=expression)
         enumerated_variables: dict[uuid.UUID, Selectable] = {}
         for attribute_match in expression._matches_with_variables_:
@@ -197,16 +314,17 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
                 )
             )
 
-        instances = (
-            expression._construct_instance_from_bindings_(bindings=bindings)
-            for bindings in self._enumerate_bindings(
-                enumerated_variables=enumerated_variables
-            )
+        construction = InstanceConstruction(
+            match=expression,
+            rows=self._enumerate_bindings(
+                enumerated_variables=enumerated_variables, bound_values=bound_values
+            ),
         )
-        satisfying = expression._select_satisfying_(instances=instances)
-        yield from satisfying._quantify_(
+        satisfying = expression._select_satisfying_(instances=construction)
+        for instance in satisfying._quantify_(
             quantifier_type=expression._quantifier_type_
-        )._evaluate_natively_()
+        )._evaluate_natively_():
+            yield construction.generated(instance=instance)
 
     @staticmethod
     def _check_attribute_match_is_suitable_for_generation(
@@ -259,14 +377,24 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
     def _enumerate_bindings(
         *,
         enumerated_variables: dict[uuid.UUID, Selectable],
+        bound_values: Bindings,
     ) -> Iterator[Bindings]:
         """
         :param enumerated_variables: The variable whose values each pattern variable
             takes, keyed by the identifier of that pattern variable.
+        :param bound_values: Values the enumerated variables, and the expressions their
+            domains are read from, keep instead of being enumerated.
         :return: The bindings of the pattern variables, one per combination of the
             enumerated values.
         """
-        for combination in set_of(*enumerated_variables.values())._evaluate_natively_():
+        combinations = set_of(*enumerated_variables.values())
+        combinations.build()
+        for result in combinations._create_new_context_and_evaluate_(
+            sources=OperationResult(bindings=bound_values)
+        ):
+            if not result.is_true:
+                continue
+            combination = combinations._process_result_(result=result)
             yield {
                 pattern_variable_id: combination[enumerated_variable]
                 for pattern_variable_id, enumerated_variable in enumerated_variables.items()

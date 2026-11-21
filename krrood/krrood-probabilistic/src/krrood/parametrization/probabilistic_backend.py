@@ -45,6 +45,7 @@ from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
 )
 from krrood.parametrization.exceptions import (
+    BoundValuesNotSupported,
     DoRequiresCausalCircuitModel,
     MultipleEffectVariablesNotSupported,
 )
@@ -71,7 +72,11 @@ from probabilistic_model.causal_structure.identification import (
 )
 from probabilistic_model.causal_structure.learning import LearnedCausalStructure
 
-from krrood.entity_query_language.backends import GenerativeBackend
+from krrood.entity_query_language.backends import (
+    GeneratedInstance,
+    GenerativeBackend,
+    InstanceConstruction,
+)
 
 T = TypeVar("T")
 
@@ -184,15 +189,31 @@ class ProbabilisticBackend(GenerativeBackend):
         [random_event_variable] = parameters.variables.values()
         return model.expectation((random_event_variable,))[random_event_variable]
 
-    def _evaluate(self, *, expression: Match[T]) -> Iterable[T]:
-        # Reject instances contradicting a value the model does not cover.
-        instances = (
-            expression._construct_instance_from_bindings_(bindings=row.bindings)
-            for row in self.sample_bindings(expression=expression)
+    def _generate(
+        self, *, expression: Match[T], bound_values: Bindings
+    ) -> Iterator[GeneratedInstance]:
+        """
+        Differs from
+        :meth:`~krrood.entity_query_language.backends.GenerativeBackend._generate` in
+        raising instead of keeping a bound value of a variable the match is given.
+
+        :raises BoundValuesNotSupported: If `bound_values` binds a variable the match is
+            given.
+        """
+        construction = InstanceConstruction(
+            match=expression,
+            rows=(row.bindings for row in self.sample_bindings(expression=expression)),
         )
-        yield from expression._select_satisfying_(
-            instances=instances
-        )._evaluate_natively_()
+        bound_variable_ids = construction.given_expressions.keys() & bound_values.keys()
+        if bound_variable_ids:
+            raise BoundValuesNotSupported(
+                match=expression, bound_variable_ids=bound_variable_ids
+            )
+        # Reject instances contradicting a value the model does not cover.
+        for instance in expression._select_satisfying_(
+            instances=construction
+        )._evaluate_natively_():
+            yield construction.generated(instance=instance)
 
     def sample_bindings(
         self, *, expression: Match[T]
