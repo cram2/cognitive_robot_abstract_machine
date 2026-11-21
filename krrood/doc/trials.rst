@@ -100,8 +100,8 @@ rate of each parameters is a query of the trials:
 What made the trials succeed
 ----------------------------
 
-A :class:`~krrood.parametrization.trials.models.TrialModel` learns a joint probability
-tree of the features of the trials and the causal structure between them, in which
+A :class:`~krrood.parametrization.trials.models.TrialModel`, bound to the type of the
+trials by a subclass, learns a joint probability tree of the features of the trials and the causal structure between them, in which
 parameters come before measurements and measurements before the outcome. Its
 :attr:`~krrood.parametrization.trials.models.TrialModel.registry` answers queries of
 probabilities, and its
@@ -113,7 +113,11 @@ on, so a mediator is told apart from them:
 
 .. code-block:: python
 
-    model = TrialModel(trials=trials)
+    @dataclass(kw_only=True)
+    class ModelOfThrows(TrialModel[Throw]):
+        ...
+
+    model = ModelOfThrows(trials=trials)
     throw = variable(Throw, domain=trials)
     probability_of(throw.succeeded == True, throw.measurements.reached_angle < 0.6).first(
         backend=ProbabilisticBackend(model_registry=model.registry)

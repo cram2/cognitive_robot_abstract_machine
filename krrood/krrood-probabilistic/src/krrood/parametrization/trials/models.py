@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import cached_property
 
+from typing_extensions import Generic
+
 from probabilistic_model.causal_structure.domain_causal_knowledge import (
     DomainCausalKnowledge,
 )
@@ -38,24 +40,28 @@ from krrood.parametrization.model_registries import (
 )
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.parametrization.trials.exceptions import NoSuccessfulTrials
-from krrood.parametrization.trials.records import Trial
+from krrood.parametrization.trials.records import (
+    ParametersTypeVar,
+    TrialTypeVar,
+)
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
 # %% what the trials of one behaviour tell
 
 
 @dataclass(kw_only=True)
-class TrialModel:
+class TrialModel(Generic[TrialTypeVar], SubClassSafeGeneric):
     """
     A joint model of the parameters, measurements and outcomes of trials, with the
     causal structure learned from them, for queries of what made them succeed.
 
-    Parameters come before measurements and measurements before the outcome, so no
-    learned edge points back in time.
+    A subclass binds the type of the trials. No learned edge points back in time from
+    the outcome to the measurements or from these to the parameters.
     """
 
-    trials: list[Trial]
+    trials: list[TrialTypeVar]
     """
-    The trials learned from, all of the same type.
+    The trials learned from.
     """
 
     learning_method: LearningMethod = field(
@@ -75,11 +81,11 @@ class TrialModel:
     """
 
     @cached_property
-    def trial_type(self) -> type[Trial]:
+    def trial_type(self) -> type[TrialTypeVar]:
         """
-        The type of the trials.
+        The type of the trials, as the subclass binds it.
         """
-        return type(self.trials[0])
+        return self.get_type_of_generic_parameter(parameter=TrialTypeVar)
 
     @cached_property
     def circuit(self) -> RelationalProbabilisticCircuit:
@@ -218,4 +224,7 @@ class TrialModel:
                 extractor.create_dataframe(instances=every_parameters)
             ),
         )
-        return DictRegistry(models={type(successful[0]): model})
+        parameter_type = self.trial_type.get_type_of_generic_parameter(
+            parameter=ParametersTypeVar
+        )
+        return DictRegistry(models={parameter_type: model})

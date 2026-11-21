@@ -21,6 +21,7 @@ from krrood.ormatic.utils import create_engine
 from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.trials.campaigns import TrialPerformer, TrialSetup
 from krrood.parametrization.trials.database import DatabaseTrialStore
+from krrood.parametrization.trials.models import TrialModel
 from krrood.parametrization.trials.parameter_spaces import ParameterSpace
 from krrood.parametrization.trials.starting_states import (
     StartingStateRecipe,
@@ -320,6 +321,13 @@ class SteepThrowsLand(TrialPerformer[ThrowParameters, Throw]):
             measurements=ThrowMeasurements(reached_angle=reached_angle),
             succeeded=self.steepness.lower <= reached_angle < self.steepness.upper,
         )
+
+
+@dataclass(kw_only=True)
+class ModelOfThrows(TrialModel[Throw]):
+    """
+    What throws tell about which of them land.
+    """
 
 
 @dataclass(kw_only=True)

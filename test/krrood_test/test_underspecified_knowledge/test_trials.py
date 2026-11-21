@@ -29,7 +29,6 @@ from krrood.parametrization.trials.exceptions import (
     NoSuccessfulTrials,
     OutcomeDidNotVaryInPilot,
 )
-from krrood.parametrization.trials.models import TrialModel
 from krrood.parametrization.trials.parameter_spaces import (
     DrawnParameters,
     GivenParameters,
@@ -42,6 +41,7 @@ from ..dataset.throwing_trials import (
     CourtRecipe,
     CourtsInADatabase,
     FastThrowSpace,
+    ModelOfThrows,
     ReleasePoint,
     SteepThrowsLand,
     Throw,
@@ -497,11 +497,11 @@ def throws_in_the_wind(many_drawn) -> list[Throw]:
 
 
 @pytest.fixture(scope="module")
-def model_in_the_wind(throws_in_the_wind) -> TrialModel:
+def model_in_the_wind(throws_in_the_wind) -> ModelOfThrows:
     """
     The model of the throws turned by the wind.
     """
-    return TrialModel(trials=throws_in_the_wind)
+    return ModelOfThrows(trials=throws_in_the_wind)
 
 
 def test_the_probability_of_success_is_the_fraction_of_trials_that_succeeded(
@@ -605,7 +605,7 @@ def test_the_next_campaign_drawn_near_the_successes_succeeds_more_often(
     Throws drawn near the throws that landed land more often than throws drawn
     uniformly.
     """
-    registry = TrialModel(trials=drawn_throws).registry_near_successes()
+    registry = ModelOfThrows(trials=drawn_throws).registry_near_successes()
     np.random.seed(8)
     performer = SteepThrowsLand()
     next_throws = [
@@ -627,7 +627,7 @@ def test_drawing_near_the_successes_of_trials_that_all_failed_is_refused(drawn):
     performer = SteepThrowsLand(steepness=Bounds(lower=2.0, upper=3.0))
     trials = [performer.perform(parameters=parameters) for parameters in drawn]
     with pytest.raises(NoSuccessfulTrials):
-        TrialModel(trials=trials).registry_near_successes()
+        ModelOfThrows(trials=trials).registry_near_successes()
 
 
 def test_the_best_values_are_adopted_for_the_fields_they_inform(
