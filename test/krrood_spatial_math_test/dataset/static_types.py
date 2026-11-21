@@ -67,6 +67,15 @@ def check_frame_of_a_vector(*, vector: ScalablePlaneVector) -> None:
     assert_type(vector.coordinate_system, ScalablePlaneFrame | None)
 
 
+def check_frame_kind_of_a_value_type(*, vector: ScalablePlaneVector) -> None:
+    """
+    A value type's kind of frame is read as the kind it binds, on the class and on an
+    instance.
+    """
+    assert_type(ScalablePlaneVector.frame_kind, type[ScalablePlaneFrame])
+    assert_type(vector.frame_kind, type[ScalablePlaneFrame])
+
+
 def check_axes_of_a_frame_kind() -> None:
     """
     A kind of frame's axes are read through its class property.

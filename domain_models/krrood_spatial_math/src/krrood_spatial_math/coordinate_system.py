@@ -275,7 +275,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         return tuple(getattr(self, axis) for axis in self.frame_kind.axes)
 
     @classproperty
-    def frame_kind(cls) -> type[AffineFrame]:
+    def frame_kind(cls) -> type[GenericCoordinateSystem]:
         """
         The kind of frame values of this type are given in, which names their axes and
         measures their lengths and angles.
