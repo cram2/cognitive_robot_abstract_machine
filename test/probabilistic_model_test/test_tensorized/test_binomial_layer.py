@@ -94,7 +94,7 @@ def test_the_nodes_are_the_distributions_the_layer_was_made_of(
     """
     assert [
         (node.number_of_trials, node.success_probability, node.offset)
-        for node in layer.node_distributions(count)
+        for node in layer.node_distributions(variables=SortedSet([count]))
     ] == [
         (each.number_of_trials, each.success_probability, each.offset)
         for each in distributions
@@ -195,7 +195,7 @@ def test_a_truncated_layer_holds_the_truncated_distributions(
     event = SimpleEvent.from_data({count: assignment}).as_composite_set()
     with np.errstate(divide="ignore"):
         truncation = layer.log_truncated_of_assignment(
-            assignment=assignment, singleton_allowed=False
+            assignment=assignment, variable=count, singleton_allowed=False
         )
         expected = [distribution.log_truncated(event) for distribution in distributions]
 
@@ -203,7 +203,9 @@ def test_a_truncated_layer_holds_the_truncated_distributions(
     assert np.allclose(
         truncation.log_probabilities, [each.log_probability for each in expected]
     )
-    for node, each in zip(truncation.layer.node_distributions(count), expected):
+    for node, each in zip(
+        truncation.layer.node_distributions(variables=SortedSet([count])), expected
+    ):
         if each.distribution is None:
             continue
         assert dict(node.probabilities) == pytest.approx(
@@ -218,7 +220,7 @@ def test_a_truncated_layer_keeps_the_success_probabilities_as_parameters(
     Truncated, the nodes keep their success probabilities as the parameters.
     """
     truncated = layer.log_truncated_of_assignment(
-        assignment=closed(1, 3), singleton_allowed=False
+        assignment=closed(1, 3), variable=count, singleton_allowed=False
     ).layer
     [success_probability] = truncated.parameters
     assert success_probability.tolist() == [
@@ -232,13 +234,15 @@ def test_truncating_twice_restricts_to_both_assignments(layer, distributions, co
     of both.
     """
     once = layer.log_truncated_of_assignment(
-        assignment=closed(0, 3), singleton_allowed=False
+        assignment=closed(0, 3), variable=count, singleton_allowed=False
     ).layer
     twice = once.log_truncated_of_assignment(
-        assignment=closed(2, 6), singleton_allowed=False
+        assignment=closed(2, 6), variable=count, singleton_allowed=False
     ).layer
     event = SimpleEvent.from_data({count: closed(2, 3)}).as_composite_set()
-    for node, distribution in zip(twice.node_distributions(count), distributions):
+    for node, distribution in zip(
+        twice.node_distributions(variables=SortedSet([count])), distributions
+    ):
         assert dict(node.probabilities) == pytest.approx(
             dict(distribution.log_truncated(event).distribution.probabilities)
         )
@@ -293,7 +297,9 @@ def test_a_layer_of_truncated_distributions_holds_them(distributions, count, val
         )
 
     assert np.allclose(layer.log_likelihood_of_nodes(events=values), expected)
-    for node, distribution in zip(layer.node_distributions(count), truncated):
+    for node, distribution in zip(
+        layer.node_distributions(variables=SortedSet([count])), truncated
+    ):
         assert dict(node.probabilities) == pytest.approx(
             dict(distribution.probabilities)
         )
@@ -307,17 +313,18 @@ def test_selected_and_concatenated_truncated_layers_keep_their_nodes(
     restricted as it was.
     """
     truncated = layer.log_truncated_of_assignment(
-        assignment=closed(0, 2), singleton_allowed=False
+        assignment=closed(0, 2), variable=count, singleton_allowed=False
     ).layer
-    expected = truncated.node_distributions(count)
+    expected = truncated.node_distributions(variables=SortedSet([count]))
     pieces = [
         truncated.select_nodes(mask=np.array([True, False, False])),
         truncated.select_nodes(mask=np.array([False, True, True])),
     ]
     joined = TruncatedBinomialLayer.concatenate(layers=pieces)
-    assert [dict(node.probabilities) for node in joined.node_distributions(count)] == [
-        dict(node.probabilities) for node in expected
-    ]
+    assert [
+        dict(node.probabilities)
+        for node in joined.node_distributions(variables=SortedSet([count]))
+    ] == [dict(node.probabilities) for node in expected]
 
 
 # %% the success probabilities are parameters

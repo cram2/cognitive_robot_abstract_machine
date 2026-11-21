@@ -20,10 +20,14 @@ from typing_extensions import Any, Iterator, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     NodeMask,
     NodeValues,
+    NodeVariableMask,
     NodeVariableValues,
     SampleArray,
     SampleNodeValues,
@@ -593,16 +597,41 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         return rebuilt[id(self)]
 
     @abstractmethod
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        """
+        :param width: The number of variables of the circuit.
+        :param cache: The shared cache of the current pass.
+        :return: Whether every node of this layer has every variable in its scope.
+        """
+        raise NotImplementedError
+
+    def nodes_over(
+        self, *, kept: VariableMask, cache: QueryCache | None = None
+    ) -> NodeMask:
+        """
+        :param kept: The variables of the circuit to keep.
+        :param cache: The shared cache of the current pass.
+        :return: Whether the scope of every node of this layer meets the kept variables,
+            which are the nodes :meth:`marginal` keeps.
+        """
+        return self.node_scopes(width=len(kept), cache=cache)[:, kept].any(axis=1)
+
+    @abstractmethod
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
     ) -> Layer | None:
         """
         Restrict this layer to a subset of the variables.
 
+        A node over none of the kept variables marginalizes to one: it is removed, and
+        the edges of the parents to it are dropped.
+
         :param kept: The variables of the circuit to keep.
         :param cache: The shared cache of the current pass.
-        :return: The marginalized layer, or ``None`` if this layer models none of the
-            kept variables.
+        :return: The marginal of the nodes of :meth:`nodes_over`, in their order, or
+            ``None`` if no node is over a kept variable.
         """
         raise NotImplementedError
 
@@ -790,10 +819,13 @@ class InnerLayer(Layer, ABC):
 
     @property
     def number_of_nodes(self) -> int:
-        return self.edges.shape[0]
+        return self.edges.shape.number_of_rows
 
     def validate_own(self):
-        expected_shape = (self.number_of_nodes, int(self.column_offsets[-1]))
+        expected_shape = MatrixShape2D(
+            number_of_rows=self.number_of_nodes,
+            number_of_columns=self.column_offsets[-1],
+        )
         if self.edges.shape != expected_shape:
             raise ShapeMismatchError(expected_shape, self.edges.shape)
 
@@ -824,6 +856,39 @@ class InnerLayer(Layer, ABC):
             child_layer.remap_variables(remap, cache=cache)
         self.reset_variables()
 
+    def scopes_of_edges(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        """
+        :param width: The number of variables of the circuit.
+        :param cache: The shared cache of the current pass.
+        :return: The scope of the child node of every edge, shape (#edges, width), the
+            edges in the order of :attr:`inner_layer_edges`.
+        """
+        edges = self.inner_layer_edges
+        child_scopes = np.concatenate(
+            [
+                child_layer.node_scopes(width=width, cache=cache)
+                for child_layer in self.child_layers
+            ],
+            axis=0,
+        )
+        return child_scopes[
+            self.column_offsets[edges.child_layer_indices] + edges.child_nodes
+        ]
+
+    @memoized
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        result = np.zeros((self.number_of_nodes, width), dtype=bool)
+        np.logical_or.at(
+            result,
+            self.inner_layer_edges.nodes,
+            self.scopes_of_edges(width=width, cache=cache),
+        )
+        return result
+
     @classmethod
     def stacked(
         cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
@@ -851,7 +916,7 @@ class InnerLayer(Layer, ABC):
             for a layer whose nodes are connected to most child nodes.
         """
         self.edges = edge_matrix_type.from_edge_positions(
-            self.edges.rows, self.edges.columns, self.edges.shape
+            rows=self.edges.rows, columns=self.edges.columns, shape=self.edges.shape
         )
         self.__dict__.pop(InnerLayer.inner_layer_edges.attrname, None)
 

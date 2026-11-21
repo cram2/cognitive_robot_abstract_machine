@@ -1,5 +1,6 @@
 """
-The base classes of the input layers of continuous distributions with a density.
+Input layers over continuous variables whose distributions have a density, possibly on a
+constrained support.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from random_events.interval import Bound, Interval, SimpleInterval
+from random_events.variable import Variable
 from typing_extensions import Any, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
@@ -85,7 +87,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
         return self.type_of_layer_truncated_to_interval(interval)
 
     def log_truncated_of_assignment(
-        self, *, assignment: Interval, singleton_allowed: bool
+        self, *, assignment: Interval, variable: Variable, singleton_allowed: bool
     ) -> LayerWithLogProbabilities:
         pieces = [
             self.log_truncated_of_simple_interval(interval, singleton_allowed)
@@ -116,7 +118,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
             np.array([interval.lower])
         )[0]
         dirac_delta_layer = DiracDeltaLayer(
-            self.variable,
+            self.node_variables.copy(),
             np.full(self.number_of_nodes, float(interval.lower)),
             np.ones(self.number_of_nodes),
         )
@@ -125,7 +127,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
     def log_conditional_of_value(self, *, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]
         dirac_delta_layer = DiracDeltaLayer(
-            self.variable,
+            self.node_variables.copy(),
             np.full(self.number_of_nodes, float(value)),
             np.exp(log_likelihood),
         )
@@ -203,6 +205,11 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         )
 
     def validate_own(self):
+        """
+        :raises ShapeMismatchError: If there are not bounds for every interval, in
+            addition to what :meth:`Layer.validate_own` raises.
+        """
+        super().validate_own()
         if self.interval.shape != self.bounds.shape:
             raise ShapeMismatchError(self.interval.shape, self.bounds.shape)
 
@@ -312,12 +319,18 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         )
 
     def select_nodes(self, *, mask: NodeMask) -> Self:
-        return self.__class__(self.variable, self.interval[mask], self.bounds[mask])
+        """
+        Keep the supports of the selected nodes, see
+        :meth:`UnivariateInputLayer.select_nodes`.
+        """
+        return self.__class__(
+            self.node_variables[mask], self.interval[mask], self.bounds[mask]
+        )
 
     @classmethod
     def concatenate(cls, *, layers: list[Self]) -> Self:
         return cls(
-            layers[0].variable,
+            np.concatenate([layer.node_variables for layer in layers]),
             np.concatenate([layer.interval for layer in layers]),
             np.concatenate([layer.bounds for layer in layers]),
         )
@@ -329,12 +342,16 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
 
     def apply_translation_own(self, *, translation: VariableValues) -> None:
         """
-        Moves the support of every node by the translation of its variable.
+        Translate the supports of the nodes, see :meth:`Layer.apply_translation_own`.
         """
-        self.interval = self.interval + translation[self.variable]
+        self.interval = (
+            self.interval + self.node_variable_values(values=translation)[:, None]
+        )
 
     def apply_scaling_own(self, *, scaling: VariableValues) -> None:
         """
-        Multiplies the support of every node by the scaling of its variable.
+        Scale the supports of the nodes, see :meth:`Layer.apply_scaling_own`.
         """
-        self.interval = self.interval * scaling[self.variable]
+        self.interval = (
+            self.interval * self.node_variable_values(values=scaling)[:, None]
+        )

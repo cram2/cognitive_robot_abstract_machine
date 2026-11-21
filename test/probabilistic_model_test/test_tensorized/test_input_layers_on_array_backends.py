@@ -143,7 +143,9 @@ def gaussian_case() -> InputLayerQueryCase:
     """
     return InputLayerQueryCase(
         build=lambda namespace: GaussianLayer(
-            0, namespace.asarray([-1.0, 2.0]), namespace.asarray([0.5, 1.5])
+            np.zeros(2, dtype=np.int64),
+            namespace.asarray([-1.0, 2.0]),
+            namespace.asarray(np.log([0.5, 1.5])),
         ),
         variable=Continuous("x"),
         values=[-3.0, -1.0, 0.0, 0.5, 2.0, 7.0],
@@ -158,7 +160,7 @@ def truncated_gaussian_case() -> InputLayerQueryCase:
     """
     return InputLayerQueryCase(
         build=lambda namespace: TruncatedGaussianLayer(
-            0,
+            np.zeros(3, dtype=np.int64),
             namespace.asarray([[-1.0, 0.5], [0.0, 3.0], [2.0, 10.0]]),
             np.array(
                 [
@@ -169,7 +171,7 @@ def truncated_gaussian_case() -> InputLayerQueryCase:
                 dtype=np.int64,
             ),
             namespace.asarray([0.0, 2.5, 0.0]),
-            namespace.asarray([1.0, 0.5, 2.0]),
+            namespace.asarray(np.log([1.0, 0.5, 2.0])),
         ),
         variable=Continuous("x"),
         values=[-2.0, -1.0, 0.0, 0.5, 2.0, 3.0, 11.0],
@@ -184,7 +186,7 @@ def uniform_case() -> InputLayerQueryCase:
     """
     return InputLayerQueryCase(
         build=lambda namespace: UniformLayer(
-            0,
+            np.zeros(2, dtype=np.int64),
             namespace.asarray([[0.0, 2.0], [1.0, 5.0]]),
             np.array(
                 [
@@ -207,7 +209,9 @@ def dirac_delta_case() -> InputLayerQueryCase:
     """
     return InputLayerQueryCase(
         build=lambda namespace: DiracDeltaLayer(
-            0, namespace.asarray([0.5, 3.0]), namespace.asarray([1.0, 2.0])
+            np.zeros(2, dtype=np.int64),
+            namespace.asarray([0.5, 3.0]),
+            namespace.asarray([1.0, 2.0]),
         ),
         variable=Continuous("x"),
         values=[0.0, 0.5, 1.0, 3.0, 4.0],

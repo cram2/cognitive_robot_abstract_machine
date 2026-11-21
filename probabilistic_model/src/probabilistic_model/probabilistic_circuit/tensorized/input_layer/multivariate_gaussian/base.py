@@ -1,5 +1,6 @@
 """
-The base class of the input layers of multivariate Gaussian distributions.
+The base of input layers whose nodes are each a Gaussian over several continuous
+variables.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
     NodeMask,
     NodeScopeValues,
+    NodeVariableMask,
     SampleArray,
     SampleScopeValues,
     ScopeValues,
@@ -200,7 +202,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         """
         raise NotImplementedError
 
-    def node_distributions(self, variables: SortedSet) -> list[Any]:
+    def node_distributions(self, *, variables: SortedSet) -> list[Any]:
         """
         :param variables: The variables of the circuit.
         :return: The distribution of every node.
@@ -230,7 +232,8 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         self, variables: SortedSet, cache: QueryCache | None = None
     ) -> list[Event]:
         return [
-            distribution.support for distribution in self.node_distributions(variables)
+            distribution.support
+            for distribution in self.node_distributions(variables=variables)
         ]
 
     def sample_forward(
@@ -405,7 +408,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
 
         point_masses = [
             DiracDeltaLayer(
-                int(self.scope[position]),
+                np.full(self.number_of_nodes, self.scope[position], dtype=np.int64),
                 np.full(self.number_of_nodes, value),
                 np.ones(self.number_of_nodes),
             )
@@ -442,6 +445,14 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         if not alive.any():
             return None
         return self.select_nodes(mask=alive)
+
+    @memoized
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        result = np.zeros((self.number_of_nodes, width), dtype=bool)
+        result[:, self.scope] = True
+        return result
 
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None

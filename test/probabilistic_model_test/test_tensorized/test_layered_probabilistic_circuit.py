@@ -1509,10 +1509,11 @@ def test_uniform_layer_likelihood():
 
 def test_dirac_delta_layer_likelihood():
     """
-    Every node of a Dirac delta layer has its density at its location and none
-    elsewhere.
+    A Dirac delta layer gives each node its density at its location and zero elsewhere.
     """
-    layer = DiracDeltaLayer(0, np.array([0.0, 1.0]), np.array([1.0, 2.0]))
+    layer = DiracDeltaLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.0, 1.0]), np.array([1.0, 2.0])
+    )
     np.testing.assert_allclose(
         layer.log_likelihood_of_nodes(events=np.array([[0.0], [1.0], [2.0]])),
         np.array([[0.0, -np.inf], [-np.inf, np.log(2)], [-np.inf, -np.inf]]),
@@ -1540,15 +1541,22 @@ def test_layers_visits_parents_first(shared_children_circuit):
 
 
 def test_validate_detects_a_shape_mismatch():
+    """
+    A Dirac delta layer whose locations and densities differ in length is refused.
+    """
     with pytest.raises(ShapeMismatchError):
-        DiracDeltaLayer(0, np.array([0.0, 1.0]), np.array([1.0])).validate()
+        DiracDeltaLayer(
+            np.zeros(2, dtype=np.int64), np.array([0.0, 1.0]), np.array([1.0])
+        ).validate()
 
 
 def test_gaussian_layer_likelihood(x):
     """
-    Every node of a Gaussian layer has the log-likelihood of its distribution.
+    A Gaussian layer gives each node the density of its Gaussian.
     """
-    layer = GaussianLayer(0, np.array([0.0, 2.0]), np.array([1.0, 0.5]))
+    layer = GaussianLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.0, 2.0]), np.log([1.0, 0.5])
+    )
     points = np.array([[0.0], [2.0]])
     result = layer.log_likelihood_of_nodes(events=points)
     for node in range(2):

@@ -1,5 +1,6 @@
 """
-The input layer of uniform distributions over intervals.
+Input layers whose nodes are each a uniform distribution over an interval of a
+continuous variable.
 """
 
 from __future__ import annotations
@@ -107,7 +108,11 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
             ],
             dtype=np.int64,
         )
-        return cls(variable_index, interval, bounds)
+        return cls(
+            np.full(len(distributions), variable_index, dtype=np.int64),
+            interval,
+            bounds,
+        )
 
     def sample_of_nodes(
         self, *, nodes: NodeIndices, variables: SortedSet

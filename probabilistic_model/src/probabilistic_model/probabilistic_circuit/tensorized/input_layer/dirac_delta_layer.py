@@ -1,5 +1,5 @@
 """
-The input layer of Dirac delta distributions.
+Input layers whose nodes each put all probability on one value of a continuous variable.
 """
 
 from __future__ import annotations
@@ -77,6 +77,11 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         return dataclasses.replace(self, location=location, density_cap=density_cap)
 
     def validate_own(self):
+        """
+        :raises ShapeMismatchError: If there is not one density cap per location, in
+            addition to what :meth:`Layer.validate_own` raises.
+        """
+        super().validate_own()
         if self.location.shape != self.density_cap.shape:
             raise ShapeMismatchError(self.location.shape, self.density_cap.shape)
 
@@ -95,7 +100,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         cls, *, variable_index: int, distributions: list[DiracDeltaDistribution]
     ) -> Self:
         return cls(
-            variable_index,
+            np.full(len(distributions), variable_index, dtype=np.int64),
             np.array([distribution.location for distribution in distributions]),
             np.array([distribution.density_cap for distribution in distributions]),
             distributions[0].tolerance,
@@ -103,13 +108,16 @@ class DiracDeltaLayer(AbstractContinuousLayer):
 
     def select_nodes(self, *, mask: NodeMask) -> Self:
         return self.__class__(
-            self.variable, self.location[mask], self.density_cap[mask], self.tolerance
+            self.node_variables[mask],
+            self.location[mask],
+            self.density_cap[mask],
+            self.tolerance,
         )
 
     @classmethod
     def concatenate(cls, *, layers: list[Self]) -> Self:
         return cls(
-            layers[0].variable,
+            np.concatenate([layer.node_variables for layer in layers]),
             np.concatenate([layer.location for layer in layers]),
             np.concatenate([layer.density_cap for layer in layers]),
             layers[0].tolerance,
@@ -192,7 +200,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         return inside
 
     def log_truncated_of_assignment(
-        self, *, assignment: Interval, singleton_allowed: bool
+        self, *, assignment: Interval, variable: Variable, singleton_allowed: bool
     ) -> LayerWithLogProbabilities:
         """
         Truncating a Dirac delta either keeps it unchanged or makes it impossible, so
@@ -218,6 +226,10 @@ class DiracDeltaLayer(AbstractContinuousLayer):
         node has probability one if the event reaches its location up to
         :attr:`tolerance` and zero otherwise.
         """
+        if not self.is_over_one_variable:
+            return super().probability_of_simple_event_of_nodes(
+                event=event, variables=variables
+            )
         return self.namespace.astype(
             self.contains(event[variables[self.variable]]), self.floating_point_type
         )
@@ -225,7 +237,7 @@ class DiracDeltaLayer(AbstractContinuousLayer):
     def log_conditional_of_value(self, *, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]
         conditioned = self.__class__(
-            self.variable,
+            self.node_variables.copy(),
             np.full(self.number_of_nodes, float(value)),
             self.density_cap.copy(),
             self.tolerance,
@@ -234,12 +246,12 @@ class DiracDeltaLayer(AbstractContinuousLayer):
 
     def apply_translation_own(self, *, translation: VariableValues) -> None:
         """
-        Moves the location of every node by the translation of its variable.
+        Translate the locations of the nodes, see :meth:`Layer.apply_translation_own`.
         """
-        self.location = self.location + translation[self.variable]
+        self.location = self.location + self.node_variable_values(values=translation)
 
     def apply_scaling_own(self, *, scaling: VariableValues) -> None:
         """
-        Multiplies the location of every node by the scaling of its variable.
+        Scale the locations of the nodes, see :meth:`Layer.apply_scaling_own`.
         """
-        self.location = self.location * scaling[self.variable]
+        self.location = self.location * self.node_variable_values(values=scaling)

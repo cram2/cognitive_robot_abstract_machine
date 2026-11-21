@@ -56,7 +56,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 @dataclass(eq=False, repr=False, kw_only=True)
 class BinomialLayer(UnivariateInputLayer):
     """
-    A layer of binomial distributions over one integer variable, see
+    A layer of binomial distributions, every node over its own integer variable, see
     :class:`~probabilistic_model.distributions.binomial.BinomialDistribution`.
 
     The success probabilities are its parameters; everything else is structure.
@@ -265,7 +265,7 @@ class BinomialLayer(UnivariateInputLayer):
         self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         namespace = self.namespace
-        successes = self.successes_of_column(values=self.column_of(events))
+        successes = self.successes_of_column(values=self.column_of(events=events))
         possible = (
             (successes >= 0)
             & (successes <= len(self.successes) - 1)
@@ -283,7 +283,7 @@ class BinomialLayer(UnivariateInputLayer):
     ) -> SampleNodeValues:
         namespace = self.namespace
         successes = namespace.floor(
-            self.successes_of_column(values=self.column_of(events))
+            self.successes_of_column(values=self.column_of(events=events))
         )
         cumulative = namespace.cumulative_sum(
             namespace.exp(self.log_probabilities_of_successes()), axis=1
@@ -303,6 +303,16 @@ class BinomialLayer(UnivariateInputLayer):
         cache: QueryCache | None = None,
     ) -> NodeValues:
         namespace = self.namespace
+        if not self.is_over_one_variable:
+            return namespace.concat(
+                [
+                    group.probability_of_simple_event_of_nodes(
+                        event=event, variables=variables
+                    )
+                    for group in self.groups_of_one_variable()
+                ],
+                axis=0,
+            )
         selected = self.selected_successes(assignment=event[variables[self.variable]])
         return namespace.sum(
             namespace.where(
@@ -351,9 +361,24 @@ class BinomialLayer(UnivariateInputLayer):
         return TruncatedBinomialLayer
 
     def log_truncated_of_assignment(
-        self, *, assignment: AbstractCompositeSet, singleton_allowed: bool
+        self,
+        *,
+        assignment: AbstractCompositeSet,
+        variable: Variable,
+        singleton_allowed: bool,
     ) -> LayerWithLogProbabilities:
-        selected = self.selected_successes(assignment=assignment)
+        return self.log_truncated_to_successes(
+            selected=self.selected_successes(assignment=assignment)
+        )
+
+    def log_truncated_to_successes(
+        self, *, selected: NodeStateMask
+    ) -> LayerWithLogProbabilities:
+        """
+        :param selected: The numbers of :attr:`successes` to keep for every node.
+        :return: The nodes restricted to these numbers of successes and renormalized,
+            and the log-probability of these numbers under every node.
+        """
         probabilities = np.exp(self.host_copy(self.log_probabilities_of_successes()))
         with np.errstate(divide="ignore"):
             log_probabilities = np.log(
@@ -367,15 +392,17 @@ class BinomialLayer(UnivariateInputLayer):
         )
 
     def log_conditional_of_value(self, *, value: Any) -> LayerWithLogProbabilities:
-        return self.log_truncated_of_assignment(
-            assignment=singleton(value), singleton_allowed=False
+        return self.log_truncated_to_successes(
+            selected=self.selected_successes(assignment=singleton(value))
         )
 
     def apply_translation_own(self, *, translation: VariableValues) -> None:
         """
         Moves the :attr:`offset` of every node by the translation of its variable.
         """
-        self.offset = self.offset + int(translation[self.variable])
+        self.offset = self.offset + self.node_variable_values(
+            values=translation
+        ).astype(np.int64)
 
     # %% nodes
 
@@ -394,7 +421,7 @@ class BinomialLayer(UnivariateInputLayer):
         cls, *, variable_index: int, distributions: list[BinomialDistribution]
     ) -> Self:
         return cls(
-            variable=variable_index,
+            node_variables=np.full(len(distributions), variable_index, dtype=np.int64),
             number_of_trials=np.array(
                 [distribution.number_of_trials for distribution in distributions],
                 dtype=np.int64,
@@ -411,6 +438,7 @@ class BinomialLayer(UnivariateInputLayer):
     def select_nodes(self, *, mask: NodeMask) -> Self:
         return dataclasses.replace(
             self,
+            node_variables=self.node_variables[mask],
             number_of_trials=self.number_of_trials[mask],
             success_probability=self.success_probability[mask],
             offset=self.offset[mask],
@@ -420,6 +448,7 @@ class BinomialLayer(UnivariateInputLayer):
     def concatenate(cls, *, layers: list[Self]) -> Self:
         return dataclasses.replace(
             layers[0],
+            node_variables=np.concatenate([layer.node_variables for layer in layers]),
             number_of_trials=np.concatenate(
                 [layer.number_of_trials for layer in layers]
             ),
@@ -446,7 +475,8 @@ class BinomialLayer(UnivariateInputLayer):
 @dataclass(eq=False, repr=False, kw_only=True)
 class TruncatedBinomialLayer(BinomialLayer):
     """
-    A layer of binomial distributions over one integer variable, each restricted to its
+    A layer of binomial distributions, every node over its own integer variable and
+    restricted to its
     :attr:`allowed_successes` and renormalized, see
     :class:`~probabilistic_model.distributions.binomial.TruncatedBinomialDistribution`.
     """
@@ -467,7 +497,7 @@ class TruncatedBinomialLayer(BinomialLayer):
             copies of its arrays on the host.
         """
         return cls(
-            variable=layer.variable,
+            node_variables=layer.node_variables.copy(),
             number_of_trials=layer.number_of_trials.copy(),
             success_probability=layer.host_copy(layer.success_probability).copy(),
             offset=layer.offset.copy(),

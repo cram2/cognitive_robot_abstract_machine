@@ -21,6 +21,7 @@ from probabilistic_model.learning.gradient_descent import AverageNegativeLogLike
 from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.learning.training_schedule import (
     Convergence,
+    ConvergenceHistory,
     LearningRatePlateau,
     MiniBatches,
     MiniBatchTraining,
@@ -133,6 +134,58 @@ def test_an_elapsed_time_limit_starts_no_further_epoch(convergence):
 
     assert not history.converged
     assert history.epochs == 0
+
+
+def test_every_epoch_records_its_duration(convergence):
+    """
+    Training records one duration per epoch, which together take no longer than the
+    whole training.
+    """
+    history = convergence.history_until_converged(
+        training=scripted_training([1.0] * convergence.maximum_epochs)
+    )
+
+    assert len(history.epoch_durations) == history.epochs
+    assert sum(history.epoch_durations, timedelta()) <= history.duration
+
+
+def test_the_average_epoch_duration_leaves_out_the_first_epoch():
+    """
+    The average duration of an epoch is that of the epochs after the first, which also
+    compiles the training step.
+    """
+    history = ConvergenceHistory(
+        epoch_losses=[3.0, 2.0, 1.0],
+        converged=True,
+        epoch_durations=[
+            timedelta(seconds=10),
+            timedelta(seconds=1),
+            timedelta(seconds=3),
+        ],
+    )
+
+    assert history.average_epoch_duration == timedelta(seconds=2)
+
+
+def test_a_single_epoch_is_its_own_average_duration():
+    """
+    With a single epoch, the average duration of an epoch is its duration.
+    """
+    history = ConvergenceHistory(
+        epoch_losses=[1.0], converged=False, epoch_durations=[timedelta(seconds=4)]
+    )
+
+    assert history.average_epoch_duration == timedelta(seconds=4)
+
+
+def test_no_epoch_has_no_average_duration():
+    """
+    A training that ran no epoch has no average epoch duration.
+    """
+    assert (
+        ConvergenceHistory(epoch_losses=[], converged=False).average_epoch_duration
+        is None
+    )
 
 
 # %% learning rate plateau
