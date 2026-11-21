@@ -95,6 +95,16 @@ NodeIndices: TypeAlias = npt.NDArray[np.int64]
 Indices of nodes of a layer.
 """
 
+NodeIntegers: TypeAlias = npt.NDArray[np.int64]
+"""
+One whole number per node of a layer, shape (#nodes,).
+"""
+
+NodeStateMask: TypeAlias = npt.NDArray[np.bool_]
+"""
+One flag per node of a layer and state of a discrete variable, shape (#nodes, #states).
+"""
+
 NodeMask: TypeAlias = npt.NDArray[np.bool_]
 """
 One flag per node of a layer, shape (#nodes,).

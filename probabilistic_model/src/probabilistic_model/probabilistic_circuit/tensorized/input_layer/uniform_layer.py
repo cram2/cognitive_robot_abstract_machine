@@ -60,8 +60,12 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
         return self.namespace.minimum(self.namespace.maximum(result, 0.0), 1.0)
 
     def moment_of_nodes_own(
-        self, order: int, center: float, variable: Variable
+        self, *, order: int, center: float, variable: Variable
     ) -> NodeValues:
+        """
+        Like :meth:`UnivariateInputLayer.moment_of_nodes_own`, in closed form from the
+        antiderivative of the moment.
+        """
         return self.antiderivative_of_moment_at(
             self.upper, order, center
         ) - self.antiderivative_of_moment_at(self.lower, order, center)
@@ -79,14 +83,16 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
         density = self.namespace.exp(self.log_probability_density_function_value())
         return density * (bound - center) ** (order + 1) / (order + 1)
 
-    def node_distribution(self, index: int, variable: Variable) -> UniformDistribution:
+    def node_distribution(
+        self, *, index: int, variable: Variable
+    ) -> UniformDistribution:
         return UniformDistribution(
             variable=variable, interval=self.simple_interval_of(index)
         )
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: list[UniformDistribution]
+        cls, *, variable_index: int, distributions: list[UniformDistribution]
     ) -> Self:
         interval = np.array(
             [
@@ -108,5 +114,11 @@ class UniformLayer(ContinuousLayerWithConstrainedSupport):
             bounds,
         )
 
-    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+    def sample_of_nodes(
+        self, *, nodes: NodeIndices, variables: SortedSet
+    ) -> SampleColumn:
+        """
+        Like :meth:`UnivariateInputLayer.sample_of_nodes`, drawing from the uniform
+        distributions of all nodes at once.
+        """
         return np.random.uniform(self.lower[nodes], self.upper[nodes])

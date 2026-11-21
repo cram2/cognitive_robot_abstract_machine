@@ -247,11 +247,11 @@ class LayerFolding:
         :return: Where their nodes went in one layer, sorted by variable.
         """
         layer_type = type(layers[0])
-        joined = layer_type.concatenate(layers)
+        joined = layer_type.concatenate(layers=layers)
         variables = np.unique(joined.node_variables)
         folded = layer_type.concatenate(
-            [
-                joined.select_nodes(joined.node_variables == variable)
+            layers=[
+                joined.select_nodes(mask=joined.node_variables == variable)
                 for variable in variables
             ]
         )

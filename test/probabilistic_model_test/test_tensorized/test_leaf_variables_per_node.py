@@ -123,8 +123,8 @@ class MixtureOverFourVariables:
         :return: The circuit whose two leaf layers each hold the nodes of two variables.
         """
         leaves = [
-            GaussianLayer.concatenate(self.gaussian_layers),
-            SymbolicLayer.concatenate(self.symbolic_layers),
+            GaussianLayer.concatenate(layers=self.gaussian_layers),
+            SymbolicLayer.concatenate(layers=self.symbolic_layers),
         ]
         # product i multiplies node i and node 2 + i of both leaf layers
         edges = InnerLayerEdges(
@@ -186,7 +186,7 @@ def test_a_layer_over_several_variables_has_no_single_variable(
     """
     Asking the one variable of a layer whose nodes are over several raises.
     """
-    layer = GaussianLayer.concatenate(mixture.gaussian_layers)
+    layer = GaussianLayer.concatenate(layers=mixture.gaussian_layers)
     with pytest.raises(LayerOverSeveralVariablesError):
         layer.variable
 
@@ -207,7 +207,7 @@ def test_concatenated_symbolic_layers_pad_the_states_a_variable_lacks(
     Joining symbolic layers over variables with different numbers of states gives the
     nodes of the smaller one probability zero for the states it lacks.
     """
-    layer = SymbolicLayer.concatenate(mixture.symbolic_layers)
+    layer = SymbolicLayer.concatenate(layers=mixture.symbolic_layers)
     np.testing.assert_array_equal(layer.states, np.arange(3))
     np.testing.assert_array_equal(np.exp(layer.table.log_probabilities)[2:, 2], [0, 0])
 
@@ -220,7 +220,8 @@ def test_log_likelihood_of_mixed_leaves(mixture, samples):
     The mixed circuit gives every sample the log-likelihood of the separate circuit.
     """
     np.testing.assert_allclose(
-        mixture.mixed.log_likelihood(samples), mixture.separate.log_likelihood(samples)
+        mixture.mixed.log_likelihood(events=samples),
+        mixture.separate.log_likelihood(events=samples),
     )
 
 
@@ -242,8 +243,8 @@ def test_truncation_of_mixed_leaves(mixture, event, samples):
     separate = mixture.separate.log_truncated(event.as_composite_set())
     assert mixed.log_probability == pytest.approx(separate.log_probability)
     np.testing.assert_allclose(
-        mixed.distribution.log_likelihood(samples),
-        separate.distribution.log_likelihood(samples),
+        mixed.distribution.log_likelihood(events=samples),
+        separate.distribution.log_likelihood(events=samples),
     )
 
 
@@ -261,8 +262,8 @@ def test_conditioning_of_mixed_leaves(mixture, samples):
     conditioned_samples[:, 0] = 0.3
     conditioned_samples[:, 1] = -0.2
     np.testing.assert_allclose(
-        mixed.distribution.log_likelihood(conditioned_samples),
-        separate.distribution.log_likelihood(conditioned_samples),
+        mixed.distribution.log_likelihood(events=conditioned_samples),
+        separate.distribution.log_likelihood(events=conditioned_samples),
     )
 
 
@@ -309,8 +310,8 @@ def test_a_marginal_that_splits_mixed_leaf_layers(mixture, samples):
     mixed = mixture.mixed.marginal([y, letter])
     separate = mixture.separate.marginal([y, letter])
     np.testing.assert_allclose(
-        mixed.log_likelihood(samples[:, [1, 2]]),
-        separate.log_likelihood(samples[:, [1, 2]]),
+        mixed.log_likelihood(events=samples[:, [1, 2]]),
+        separate.log_likelihood(events=samples[:, [1, 2]]),
     )
 
 
@@ -328,8 +329,8 @@ def test_conditioning_on_some_variables_of_mixed_leaf_layers(mixture, samples):
     conditioned_samples[:, 0] = 0.3
     conditioned_samples[:, 2] = hash("b")
     np.testing.assert_allclose(
-        mixed.distribution.log_likelihood(conditioned_samples),
-        separate.distribution.log_likelihood(conditioned_samples),
+        mixed.distribution.log_likelihood(events=conditioned_samples),
+        separate.distribution.log_likelihood(events=conditioned_samples),
     )
 
 

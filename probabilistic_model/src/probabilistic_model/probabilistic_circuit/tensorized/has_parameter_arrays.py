@@ -58,7 +58,7 @@ class HasParameterArrays(
         raise NotImplementedError
 
     @abstractmethod
-    def copy_with_parameters(self, parameters: list[ArrayType]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[ArrayType]) -> Self:
         """
         :param parameters: Arrays of one backend in the order and with the shapes of
             :attr:`parameters`.

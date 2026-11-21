@@ -444,7 +444,7 @@ class ExchangeablePartGrounder(Generic[NodeType], SubClassSafeGeneric):
                 events[row, index_of_variable[variable]] = value
         return [
             float(log_likelihood)
-            for log_likelihood in subcircuit.log_likelihood(events)
+            for log_likelihood in subcircuit.log_likelihood(events=events)
         ]
 
     def _node_local_assignments(

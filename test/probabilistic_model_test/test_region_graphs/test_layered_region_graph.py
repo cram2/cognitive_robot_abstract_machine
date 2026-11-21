@@ -63,7 +63,7 @@ def test_a_region_graph_builds_a_layered_circuit_with_numpy_parameters(region_gr
     circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
     assert all(isinstance(parameter, np.ndarray) for parameter in circuit.parameters)
     data = np.random.default_rng(0).normal(size=(50, 6))
-    assert np.all(np.isfinite(circuit.log_likelihood(data)))
+    assert np.all(np.isfinite(circuit.log_likelihood(events=data)))
 
 
 def test_the_circuit_of_a_region_graph_moves_to_jax_with_the_same_likelihoods(
@@ -77,8 +77,8 @@ def test_the_circuit_of_a_region_graph_moves_to_jax_with_the_same_likelihoods(
     assert all(isinstance(parameter, jax.Array) for parameter in jax_circuit.parameters)
     data = np.random.default_rng(0).normal(size=(50, 6))
     np.testing.assert_allclose(
-        np.asarray(jax_circuit.log_likelihood(jnp.asarray(data))),
-        circuit.log_likelihood(data),
+        np.asarray(jax_circuit.log_likelihood(events=jnp.asarray(data))),
+        circuit.log_likelihood(events=data),
         rtol=1e-4,
     )
 
@@ -149,9 +149,9 @@ def test_fitting_a_layered_circuit_raises_the_log_likelihood_of_its_data(region_
         input_units=4, sum_units=3
     ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
     data = jnp.asarray(np.random.default_rng(0).normal(size=(500, 6)) * 0.5 + 1.0)
-    before = float(jnp.mean(circuit.log_likelihood(data)))
+    before = float(jnp.mean(circuit.log_likelihood(events=data)))
     circuit.fit(data=data, epochs=100, optimizer=optax.adam(0.05))
-    assert float(jnp.mean(circuit.log_likelihood(data))) > before + 0.5
+    assert float(jnp.mean(circuit.log_likelihood(events=data))) > before + 0.5
 
 
 # %% classification
@@ -220,7 +220,7 @@ class SeparatedCategories:
         for label in range(len(hashes)):
             candidate = self.data.copy()
             candidate[:, predicted_column] = hashes[label]
-            joint.append(np.asarray(self.circuit.log_likelihood(candidate)))
+            joint.append(np.asarray(self.circuit.log_likelihood(events=candidate)))
         return np.stack(joint, axis=1)
 
 

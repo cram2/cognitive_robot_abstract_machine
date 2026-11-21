@@ -183,7 +183,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         """
         return []
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         """
         :param parameters: Arrays in the order and with the shapes of
             :attr:`parameters`.
@@ -192,7 +192,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         return self
 
     def projected_parameters(
-        self, parameters: list[BackendArray]
+        self, *, parameters: list[BackendArray]
     ) -> list[BackendArray]:
         """
         :param parameters: Arrays in the order and with the shapes of
@@ -236,7 +236,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
             number_of_arrays = len(layer.parameters)
             result.extend(
                 layer.projected_parameters(
-                    parameters[position : position + number_of_arrays]
+                    parameters=parameters[position : position + number_of_arrays]
                 )
             )
             position += number_of_arrays
@@ -267,7 +267,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
                 [copies[id(child_layer)] for child_layer in layer.child_layers]
             )
             copies[id(layer)] = copy_of_layer.copy_with_parameters(
-                parameters_of_layer[id(layer)]
+                parameters=parameters_of_layer[id(layer)]
             )
         return copies[id(self)]
 
@@ -304,7 +304,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     @abstractmethod
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         """
         Calculate the log-likelihood of every node of this layer.
@@ -317,7 +317,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     @abstractmethod
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         """
         Calculate the cumulative distribution function of every node of this layer.
@@ -331,6 +331,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
     @abstractmethod
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
@@ -669,30 +670,30 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         Normalize the parameters stored in this layer alone in-place.
         """
 
-    def apply_translation(self, translation: VariableValues):
+    def apply_translation(self, *, translation: VariableValues) -> None:
         """
         Translate the circuit rooted here in-place.
 
         :param translation: The translation per variable of the circuit.
         """
         for layer in self.all_layers():
-            layer.apply_translation_own(translation)
+            layer.apply_translation_own(translation=translation)
 
-    def apply_translation_own(self, translation: VariableValues):
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
         """
         Translate the parameters of this layer alone in-place.
         """
 
-    def apply_scaling(self, scaling: VariableValues):
+    def apply_scaling(self, *, scaling: VariableValues) -> None:
         """
         Scale the circuit rooted here in-place.
 
         :param scaling: The scaling per variable of the circuit.
         """
         for layer in self.all_layers():
-            layer.apply_scaling_own(scaling)
+            layer.apply_scaling_own(scaling=scaling)
 
-    def apply_scaling_own(self, scaling: VariableValues):
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
         """
         Scale the parameters of this layer alone in-place.
         """
@@ -986,14 +987,14 @@ class LeafLayer(Layer, ABC):
     def stacked(
         cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
     ) -> StackedLayer:
-        return StackedLayer.of_leaf_layer_copies(copies)
+        return StackedLayer.from_leaf_layer_copies(copies=copies)
 
     def nodes_with_child_in(self, nodes_of_layers: dict[int, NodeMask]) -> NodeMask:
         return np.zeros(self.number_of_nodes, dtype=bool)
 
     @classmethod
     @abstractmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         """
         Join layers of this type over the same variables into one layer, the nodes of
         ``layers[k]`` as one contiguous block.
@@ -1007,7 +1008,7 @@ class LeafLayer(Layer, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         """
         :param other: A layer that :meth:`concatenate` may join with this one.
         :return: Whether every node of both layers has the same parameters.

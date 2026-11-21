@@ -1,3 +1,7 @@
+"""
+The exceptions raised by probabilistic models and their queries.
+"""
+
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
@@ -255,8 +259,7 @@ class EventMixesPointsAndIntervalsError(ProbabilisticModelException, ValueError)
 
     def error_message(self) -> str:
         return (
-            f"A continuous variable of {self.event} takes points and intervals at "
-            f"once."
+            f"A continuous variable of {self.event} takes points and intervals at once."
         )
 
     def suggest_correction(self) -> str:
@@ -355,3 +358,27 @@ class NumberOfWeightsMismatchError(ProbabilisticModelException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Pass exactly one weight per component."
+
+
+@dataclass(kw_only=True)
+class SuccessProbabilityOutsideUnitIntervalError(
+    ProbabilisticModelException, ValueError
+):
+    """
+    Exception raised when a binomial distribution is given a success probability that is
+    not a probability.
+    """
+
+    success_probabilities: list[float]
+    """
+    The success probabilities outside of [0, 1].
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The success probabilities {self.success_probabilities} are not within "
+            f"[0, 1]."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Give every binomial distribution a success probability within [0, 1]."

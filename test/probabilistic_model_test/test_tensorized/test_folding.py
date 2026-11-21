@@ -166,7 +166,8 @@ def test_folded_log_likelihood(circuit, samples):
     The folded circuit gives every sample the log-likelihood of the circuit.
     """
     np.testing.assert_allclose(
-        circuit.folded().log_likelihood(samples), circuit.log_likelihood(samples)
+        circuit.folded().log_likelihood(events=samples),
+        circuit.log_likelihood(events=samples),
     )
 
 
@@ -179,8 +180,8 @@ def test_folded_log_likelihood_in_jax(circuit, samples):
     with jax.enable_x64(True):
         folded = circuit.folded().to_namespace(jnp)
         np.testing.assert_allclose(
-            np.asarray(folded.log_likelihood(jnp.asarray(samples))),
-            circuit.log_likelihood(samples),
+            np.asarray(folded.log_likelihood(events=jnp.asarray(samples))),
+            circuit.log_likelihood(events=samples),
         )
 
 
@@ -202,8 +203,8 @@ def test_folded_truncation(circuit, event, samples):
     truncated = circuit.log_truncated(event.as_composite_set())
     assert folded.log_probability == pytest.approx(truncated.log_probability)
     np.testing.assert_allclose(
-        folded.distribution.log_likelihood(samples),
-        truncated.distribution.log_likelihood(samples),
+        folded.distribution.log_likelihood(events=samples),
+        truncated.distribution.log_likelihood(events=samples),
     )
 
 
@@ -239,8 +240,8 @@ def test_folded_conditioning(circuit, samples):
         point[circuit.variables[symbolic_column]]
     )
     np.testing.assert_allclose(
-        folded.distribution.log_likelihood(conditioned_samples),
-        conditioned.distribution.log_likelihood(conditioned_samples),
+        folded.distribution.log_likelihood(events=conditioned_samples),
+        conditioned.distribution.log_likelihood(events=conditioned_samples),
     )
 
 
@@ -252,8 +253,8 @@ def test_folded_marginal(circuit, samples):
     kept = list(circuit.variables)[1::2]
     columns = [circuit.variables.index(variable) for variable in kept]
     np.testing.assert_allclose(
-        circuit.folded().marginal(kept).log_likelihood(samples[:, columns]),
-        circuit.marginal(kept).log_likelihood(samples[:, columns]),
+        circuit.folded().marginal(kept).log_likelihood(events=samples[:, columns]),
+        circuit.marginal(kept).log_likelihood(events=samples[:, columns]),
     )
 
 
