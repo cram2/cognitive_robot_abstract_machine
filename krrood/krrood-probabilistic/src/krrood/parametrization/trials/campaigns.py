@@ -104,6 +104,8 @@ class TrialCampaign(
     """
     How often each parameters is tried, so that a success rate is learned for it where
     the same parameters do not always lead to the same outcome.
+
+    Every parameters is tried once before any is tried again.
     """
 
     pilot_trials: int = 0
@@ -128,11 +130,7 @@ class TrialCampaign(
         # refuse before anything is tried or created
         self.worker_pool.workers_that_fit()
         self.setup.create_store().prepare()
-        parameters = [
-            parameters_to_repeat
-            for parameters_to_repeat in self.parameter_source.parameters_to_try()
-            for _ in range(self.repetitions)
-        ]
+        parameters = self.parameter_source.parameters_to_try() * self.repetitions
         pilot = parameters[: self.pilot_trials]
         if pilot:
             successes = WorkerPool().run(job=self, items=pilot)

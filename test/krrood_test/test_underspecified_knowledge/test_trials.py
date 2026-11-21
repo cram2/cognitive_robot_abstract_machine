@@ -405,6 +405,32 @@ def test_each_parameters_is_tried_as_often_as_it_is_repeated(
     )
 
 
+def test_the_pilot_of_repeated_parameters_tries_distinct_parameters(
+    database_url, court_id
+):
+    """
+    Without wind a throw's outcome follows from its parameters, so a pilot as long as
+    the given throws varies only if it tries each of them before repeating any.
+    """
+    setup = ThrowingSetup(database_url=database_url, starting_state_id=court_id)
+    landing_and_missing_throws = GivenParameters(
+        parameters=[
+            ThrowParameters(angle=angle, speed=3.0, release=ReleasePoint(height=1.5))
+            for angle in [0.75, 0.3]
+        ]
+    )
+    campaign = TrialCampaign(
+        setup=setup,
+        parameter_source=landing_and_missing_throws,
+        repetitions=3,
+        pilot_trials=len(landing_and_missing_throws.parameters),
+    )
+
+    kept = campaign.run()
+
+    assert kept == len(landing_and_missing_throws.parameters) * campaign.repetitions
+
+
 @pytest.fixture
 def repeated_throws_in_the_wind(
     database_url, court_id, central_and_edge_throws
