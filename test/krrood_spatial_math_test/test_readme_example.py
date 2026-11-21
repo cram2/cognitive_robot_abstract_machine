@@ -4,11 +4,9 @@ The README's example of adding a space, run as written, and the refusals it desc
 
 from __future__ import annotations
 
-import re
 import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -25,23 +23,18 @@ from krrood_spatial_math.point import Point
 
 
 @pytest.fixture(scope="module")
-def adding_a_space_example() -> Iterator[ModuleType]:
+def adding_a_space_example(adding_a_space_example_code) -> Iterator[ModuleType]:
     """
     :return: The README's *Adding a space* example as a module, after running all of
         its code blocks in order, its own assertions included.
     """
-    readme = (
-        Path(__file__).parents[2]
-        / "domain_models"
-        / "krrood_spatial_math"
-        / "README.md"
-    ).read_text()
-    section = readme.split("## Adding a space", maxsplit=1)[1]
-    code = "\n".join(re.findall(r"```python\n(.*?)```", section, flags=re.DOTALL))
     example = ModuleType("adding_a_space_example")
     with pytest.MonkeyPatch.context() as patch:
         patch.setitem(sys.modules, example.__name__, example)
-        exec(compile(code, "README.md: Adding a space", "exec"), example.__dict__)
+        exec(
+            compile(adding_a_space_example_code, "README.md: Adding a space", "exec"),
+            example.__dict__,
+        )
         yield example
 
 
