@@ -220,15 +220,18 @@ class CoordinateRepresentation(
             )
 
     @classmethod
-    def coordinate_system_arguments(
-        cls, *, coordinate_system: GenericCoordinateSystem | None
-    ) -> dict[str, Any]:
+    def from_constructor_arguments(
+        cls,
+        *,
+        coordinate_system: GenericCoordinateSystem | None,
+        **constructor_arguments: Any,
+    ) -> Self:
         """
-        :param coordinate_system: The coordinate system a new value is to be given in.
-        :return: The keyword arguments of this type's constructor that give a new value
-            in ``coordinate_system``.
+        :param coordinate_system: The coordinate system the new value is given in.
+        :param constructor_arguments: This type's other constructor arguments.
+        :return: The value these arguments give, in ``coordinate_system``.
         """
-        return {"coordinate_system": coordinate_system}
+        return cls(coordinate_system=coordinate_system, **constructor_arguments)
 
     @abstractmethod
     def apply_transformation(self, *, transformation: CoordinateChange) -> Self:
@@ -312,9 +315,9 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         :param coordinate_system: The coordinate system the coordinates are given in.
         :return: The value with these coordinates.
         """
-        return cls(
+        return cls.from_constructor_arguments(
+            coordinate_system=coordinate_system,
             **dict(zip(cls.frame_kind.axes, coordinates, strict=True)),
-            **cls.coordinate_system_arguments(coordinate_system=coordinate_system),
         )
 
     @classproperty

@@ -485,16 +485,25 @@ class SymbolicSpatialValue(
         return frame_kind.from_frame_3_dimensional(frame=self.reference_frame)
 
     @classmethod
-    def coordinate_system_arguments(
-        cls, *, coordinate_system: GenericCoordinateSystem | None
-    ) -> dict[str, Any]:
+    def from_constructor_arguments(
+        cls,
+        *,
+        coordinate_system: GenericCoordinateSystem | None,
+        **constructor_arguments: Any,
+    ) -> Self:
         """
-        Gives the reference frame ``coordinate_system`` lies on, unlike
-        :meth:`~krrood_spatial_math.coordinate_system.CoordinateRepresentation.coordinate_system_arguments`.
+        Gives the new value the reference frame that ``coordinate_system`` lies on,
+        unlike
+        :meth:`~krrood_spatial_math.coordinate_system.CoordinateRepresentation.from_constructor_arguments`.
         """
-        if coordinate_system is None:
-            return {"reference_frame": None}
-        return {"reference_frame": coordinate_system.frame_3_dimensional}
+        return cls(
+            reference_frame=(
+                None
+                if coordinate_system is None
+                else coordinate_system.frame_3_dimensional
+            ),
+            **constructor_arguments,
+        )
 
 
 @dataclass(eq=False, init=False, repr=False)
