@@ -22,7 +22,7 @@ from krrood_spatial_math.coordinate_system import (
 
 @dataclass(kw_only=True, eq=False)
 class Vector(
-    AxisCoordinates[GenericAffineFrame],
+    AxisCoordinates[GenericAffineFrame, GenericCoordinate],
     Generic[GenericAffineFrame, GenericCoordinate],
 ):
     """
@@ -32,8 +32,7 @@ class Vector(
     A vector has no position: a change of frame turns its axes but never shifts it.
 
     .. note::
-        The type parameters are, in order, the kind of frame and the coordinate type,
-        which is :class:`float` unless given.
+        The type parameters are, in order, the kind of frame and the coordinate type.
     """
 
     @classproperty

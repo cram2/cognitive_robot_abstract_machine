@@ -74,7 +74,7 @@ class NamedScalablePlaneFrame(ScalablePlaneFrame):
 
 
 @dataclass(kw_only=True)
-class ScalablePlaneVector(Vector[ScalablePlaneFrame]):
+class ScalablePlaneVector(Vector[ScalablePlaneFrame, float]):
     """
     A vector on a scalable plane whose coordinates are its fields named after the axes.
     """
@@ -202,7 +202,7 @@ class StoredScalablePlaneLineSegment(LineSegment[StoredScalablePlaneLine]):
 
 
 @dataclass(kw_only=True)
-class ScalingChange(AffineCoordinateChange[ScalablePlaneFrame]):
+class ScalingChange(AffineCoordinateChange[ScalablePlaneFrame, float]):
     """
     An affine change between two frames of one scalable plane.
     """
@@ -210,7 +210,7 @@ class ScalingChange(AffineCoordinateChange[ScalablePlaneFrame]):
 
 @dataclass(kw_only=True)
 class CartesianFrame3DimensionalChange(
-    RigidCoordinateChange[CartesianFrame3Dimensional]
+    RigidCoordinateChange[CartesianFrame3Dimensional, float]
 ):
     """
     A rigid change between two Cartesian frames, such as from a gripper to the table.

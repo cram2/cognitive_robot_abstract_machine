@@ -105,7 +105,7 @@ def check_values_with_symbolic_coordinates(
     of symbolic coordinates.
     """
     assert_type(point.x, sm.Scalar)
-    assert_type(vector.y, sm.Scalar)
+    assert_type(vector.coordinates, tuple[sm.Scalar, ...])
     assert_type(point - point, OpenCoordinateScalablePlaneVector[sm.Scalar])
     assert_type(
         point.apply_transformation(transformation=change),

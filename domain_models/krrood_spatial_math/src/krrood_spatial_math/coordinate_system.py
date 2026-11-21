@@ -174,10 +174,10 @@ class CartesianFrame(AffineFrame[GenericEuclideanSpace, NameT], Interface):
 
 # %% values given in a coordinate system
 
-GenericCoordinate = TypeVar("GenericCoordinate", default=float)
+GenericCoordinate = TypeVar("GenericCoordinate")
 """
 The type a coordinate's real value is stored as, such as a float, or a symbolic
-expression standing for a real number; a float unless a class binds another type.
+expression standing for a real number.
 """
 
 GenericCoordinateSystem = TypeVar("GenericCoordinateSystem", bound=CoordinateSystem)
@@ -261,7 +261,11 @@ The kind of value given in a coordinate system.
 
 
 @dataclass(kw_only=True, eq=False)
-class AxisCoordinates(CoordinateRepresentation[GenericAffineFrame], ABC):
+class AxisCoordinates(
+    CoordinateRepresentation[GenericAffineFrame],
+    Generic[GenericAffineFrame, GenericCoordinate],
+    ABC,
+):
     """
     A value given by one coordinate per axis of its kind of frame, such as a point or a
     vector, held in the attribute named after that axis.
@@ -273,7 +277,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericAffineFrame], ABC):
     """
 
     @property
-    def coordinates(self) -> tuple[Any, ...]:
+    def coordinates(self) -> tuple[GenericCoordinate, ...]:
         """
         The amounts along the axes of the coordinate system, one per axis, in the order
         of the axes.
@@ -313,7 +317,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericAffineFrame], ABC):
     def from_coordinates(
         cls,
         *,
-        coordinates: tuple[Any, ...],
+        coordinates: tuple[GenericCoordinate, ...],
         coordinate_system: GenericAffineFrame | None,
     ) -> Self:
         """
@@ -358,8 +362,8 @@ class CoordinateChange(
 
     .. note::
         Each implementation binds the kind of coordinate system once, so the kind of
-        change a space allows is part of its type, and the coordinate type, which is
-        :class:`float` unless given. A map between two spaces is a
+        change a space allows is part of its type, and the coordinate type. A map
+        between two spaces is a
         :class:`~krrood_spatial_math.space_map.SpaceMap`, not a coordinate change.
     """
 

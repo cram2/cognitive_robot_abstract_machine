@@ -33,14 +33,15 @@ coordinate system. Its base depends on `krrood` alone.
 - `krrood_spatial_math.cartesian_frame_2_dimensional`: `CartesianFrame2Dimensional`, the
   right-handed Cartesian frame on the `EmbeddedPlane` of a `CartesianFrame3Dimensional`,
   with that frame's origin, x-axis and y-axis, that values on the plane are given in.
-- `krrood_spatial_math.vector`: `Vector[frame]`, a translation of an affine space given
-  by its coordinates in an affine frame, one per axis that frame's kind names in its
-  `axes`, held in the field or property of that name. A second parameter names the coordinate type when it is not
-  `float`. Its `norm` and `dot` are measured by the kind of frame, and an affine one
-  that is not Cartesian raises `FrameMeasuresNoLengthsError`. Its `cross` is the kind
-  of frame's too: only a `CartesianFrame3Dimensional` has a cross product, and any
-  other kind raises `FrameHasNoCrossProductError`. A change of frame maps its axes but
-  never shifts it, as homogeneous coordinates with weight 0.
+- `krrood_spatial_math.vector`: `Vector[frame, coordinate]`, a translation of an affine
+  space given by its coordinates in an affine frame, one per axis that frame's kind
+  names in its `axes`, held in the field or property of that name, each of the
+  coordinate type, such as `float` or `sm.Scalar`. Its `norm` and `dot` are measured by
+  the kind of frame, and an affine one that is not Cartesian raises
+  `FrameMeasuresNoLengthsError`. Its `cross` is the kind of frame's too: only a
+  `CartesianFrame3Dimensional` has a cross product, and any other kind raises
+  `FrameHasNoCrossProductError`. A change of frame maps its axes but never shifts it, as
+  homogeneous coordinates with weight 0.
 - `krrood_spatial_math.point`: `Point[vector]`, a point of an affine space, given in the
   kind of frame of its vector type and measured by it in the same way. The difference
   of two points is a vector, and a point moved by a vector is a point. A change of frame
@@ -151,7 +152,7 @@ class ImagePixels(PixelFrame):
 
 
 @dataclass(kw_only=True)
-class PixelVector(Vector[PixelFrame]):
+class PixelVector(Vector[PixelFrame, float]):
     """An offset between two pixels, such as the width of a bounding box."""
 
     u: float
@@ -172,7 +173,7 @@ top-left corner, and a resize scales each axis:
 
 ```python
 @dataclass(kw_only=True)
-class CropAndResize(AffineCoordinateChange[PixelFrame]):
+class CropAndResize(AffineCoordinateChange[PixelFrame, float]):
     """From an image's pixels to those of a crop of it, scaled per axis."""
 
     source_coordinate_system: PixelFrame | None
@@ -263,3 +264,46 @@ What the interfaces refuse, each where it is first possible:
 
 Points of two spaces, such as a body and an image of it, relate only through a map
 between the spaces, such as a camera, never through a coordinate change.
+
+### Symbolic coordinates
+
+Being symbolic is the coordinate type, not another kind of value. A point and vector
+type that leave their coordinate type open take numbers or symbols, and the same change
+moves both:
+
+```python
+from typing_extensions import Generic
+
+from krrood.symbolic_math import symbolic_math as sm
+from krrood_spatial_math.coordinate_system import GenericCoordinate
+
+
+@dataclass(kw_only=True)
+class OpenCoordinatePixelVector(
+    Vector[PixelFrame, GenericCoordinate], Generic[GenericCoordinate]
+):
+    u: GenericCoordinate
+    v: GenericCoordinate
+
+
+@dataclass(kw_only=True)
+class OpenCoordinatePixelPoint(
+    Point[OpenCoordinatePixelVector[GenericCoordinate]], Generic[GenericCoordinate]
+):
+    u: GenericCoordinate
+    v: GenericCoordinate
+
+
+column = sm.FloatVariable(name="column")
+row = sm.FloatVariable(name="row")
+symbolic_keypoint = OpenCoordinatePixelPoint(u=column, v=row, coordinate_system=camera_image)
+
+moved_keypoint = symbolic_keypoint.apply_transformation(
+    transformation=thumbnail_from_camera_image
+)
+assert moved_keypoint.u.equivalent(other=0.5 * column - 50)
+assert moved_keypoint.v.equivalent(other=0.5 * row - 25)
+```
+
+The symbolic spatial types, such as `Point3Dimensional`, are the Cartesian points and
+vectors of a 3D frame whose coordinates are `sm.Scalar`, stored as one casadi matrix.
