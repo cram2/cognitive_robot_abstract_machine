@@ -328,7 +328,9 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         with the origin, rather than an offset, which it only turns or scales.
         """
 
-    def apply_transformation(self, *, transformation: AffineCoordinateChange) -> Self:
+    def apply_transformation(
+        self, *, transformation: AffineCoordinateChange[Any, Any]
+    ) -> Self:
         moved = transformation.apply_to_homogeneous_coordinates(
             homogeneous_coordinates=(*self.coordinates, int(self.has_position))
         )

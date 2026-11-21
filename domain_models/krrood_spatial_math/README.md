@@ -193,7 +193,7 @@ class CropAndResize(AffineCoordinateChange[PixelFrame]):
         )
 
     def inverse(self) -> Self:
-        return CropAndResize(
+        return type(self)(
             source_coordinate_system=self.target_coordinate_system,
             target_coordinate_system=self.source_coordinate_system,
             crop_u=-self.crop_u * self.scale_u,
@@ -203,7 +203,7 @@ class CropAndResize(AffineCoordinateChange[PixelFrame]):
         )
 
     def __matmul__(self, other: Self) -> Self:
-        return CropAndResize(
+        return type(self)(
             source_coordinate_system=other.source_coordinate_system,
             target_coordinate_system=self.target_coordinate_system,
             crop_u=other.crop_u + self.crop_u / other.scale_u,

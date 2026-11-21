@@ -39,6 +39,7 @@ from krrood_spatial_math.coordinate_system import (
     GenericCoordinateChange,
     GenericCoordinateSystem,
     CoordinateRepresentation,
+    CoordinateSystem,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.line import Line, LineSegment
@@ -472,7 +473,7 @@ class SymbolicSpatialValue(
         return cls.get_type_of_generic_parameter(parameter=GenericCoordinateChange)
 
     @property
-    def coordinate_system(self) -> GenericCoordinateSystem | None:
+    def coordinate_system(self) -> CoordinateSystem | None:
         """
         The frame of this value's kind that its reference frame fixes; ``None`` for a
         value without a reference frame.
@@ -488,7 +489,7 @@ class SymbolicSpatialValue(
     def from_constructor_arguments(
         cls,
         *,
-        coordinate_system: GenericCoordinateSystem | None,
+        coordinate_system: CoordinateSystem | None,
         **constructor_arguments: Any,
     ) -> Self:
         """
