@@ -410,7 +410,15 @@ class SubClassSafeGeneric(ABC):
             substitutions = cls._resolve_substitutions_transitively(
                 substitutions=substitutions
             )
-        substitutions.update(cls._derived_substitutions(substitutions=substitutions))
+        derived = cls._derived_substitutions(substitutions=substitutions)
+        renamed_derived = {
+            substitutions[parameter]: derived_type
+            for parameter, derived_type in derived.items()
+            if isinstance(substitutions.get(parameter), TypeVar)
+        }
+        substitutions = cls._resolve_substitutions_transitively(
+            substitutions=substitutions | derived | renamed_derived
+        )
 
         cls._subclass_safe_substitutions = substitutions
         return substitutions

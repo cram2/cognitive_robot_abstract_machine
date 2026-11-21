@@ -138,6 +138,12 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
         raise FrameHasNoCrossProductError(frame_kind=cls)
 
 
+GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
+"""
+The kind of affine frame coordinates are given in.
+"""
+
+
 GenericEuclideanSpace = TypeVar("GenericEuclideanSpace", bound=EuclideanSpace)
 """
 The kind of Euclidean space a Cartesian frame charts.
@@ -220,15 +226,18 @@ class CoordinateRepresentation(
             )
 
     @classmethod
-    def coordinate_system_arguments(
-        cls, *, coordinate_system: GenericCoordinateSystem | None
-    ) -> dict[str, Any]:
+    def from_constructor_arguments(
+        cls,
+        *,
+        coordinate_system: GenericCoordinateSystem | None,
+        **constructor_arguments: Any,
+    ) -> Self:
         """
-        :param coordinate_system: The coordinate system a new value is to be given in.
-        :return: The keyword arguments of this type's constructor that give a new value
-            in ``coordinate_system``.
+        :param coordinate_system: The coordinate system the new value is given in.
+        :param constructor_arguments: This type's other constructor arguments.
+        :return: The value these arguments give, in ``coordinate_system``.
         """
-        return {"coordinate_system": coordinate_system}
+        return cls(coordinate_system=coordinate_system, **constructor_arguments)
 
     @abstractmethod
     def apply_transformation(self, *, transformation: CoordinateChange) -> Self:
@@ -253,8 +262,8 @@ The kind of value given in a coordinate system.
 
 @dataclass(kw_only=True, eq=False)
 class AxisCoordinates(
-    CoordinateRepresentation[GenericCoordinateSystem],
-    Generic[GenericCoordinateSystem, GenericCoordinate],
+    CoordinateRepresentation[GenericAffineFrame],
+    Generic[GenericAffineFrame, GenericCoordinate],
     ABC,
 ):
     """
@@ -262,7 +271,7 @@ class AxisCoordinates(
     vector, held in the attribute named after that axis.
     """
 
-    coordinate_system: GenericCoordinateSystem | None
+    coordinate_system: GenericAffineFrame | None
     """
     The coordinate system the coordinates are given in; ``None`` where it is not known.
     """
@@ -276,12 +285,12 @@ class AxisCoordinates(
         return tuple(getattr(self, axis) for axis in self.frame_kind.axes)
 
     @classproperty
-    def frame_kind(cls) -> type[AffineFrame]:
+    def frame_kind(cls) -> type[GenericAffineFrame]:
         """
         The kind of frame values of this type are given in, which names their axes and
         measures their lengths and angles.
         """
-        return cls.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
+        return cls.get_type_of_generic_parameter(parameter=GenericAffineFrame)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """
@@ -290,7 +299,7 @@ class AxisCoordinates(
         """
         super().__init_subclass__(**kwargs)
         if Interface.is_abstract(class_=cls) or not cls.binds_generic_parameter(
-            parameter=GenericCoordinateSystem
+            parameter=GenericAffineFrame
         ):
             return
         missing_axes = tuple(
@@ -309,16 +318,16 @@ class AxisCoordinates(
         cls,
         *,
         coordinates: tuple[GenericCoordinate, ...],
-        coordinate_system: GenericCoordinateSystem | None,
+        coordinate_system: GenericAffineFrame | None,
     ) -> Self:
         """
         :param coordinates: One amount per axis, in the order of the axes.
         :param coordinate_system: The coordinate system the coordinates are given in.
         :return: The value with these coordinates.
         """
-        return cls(
+        return cls.from_constructor_arguments(
+            coordinate_system=coordinate_system,
             **dict(zip(cls.frame_kind.axes, coordinates, strict=True)),
-            **cls.coordinate_system_arguments(coordinate_system=coordinate_system),
         )
 
     @classproperty
@@ -329,7 +338,9 @@ class AxisCoordinates(
         with the origin, rather than an offset, which it only turns or scales.
         """
 
-    def apply_transformation(self, *, transformation: AffineCoordinateChange) -> Self:
+    def apply_transformation(
+        self, *, transformation: AffineCoordinateChange[Any, Any]
+    ) -> Self:
         moved = transformation.apply_to_homogeneous_coordinates(
             homogeneous_coordinates=(*self.coordinates, int(self.has_position))
         )
@@ -385,12 +396,6 @@ class CoordinateChange(
 GenericCoordinateChange = TypeVar("GenericCoordinateChange", bound=CoordinateChange)
 """
 The kind of change that re-expresses a value in another coordinate system of its kind.
-"""
-
-
-GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
-"""
-The kind of affine frame coordinates are given in.
 """
 
 

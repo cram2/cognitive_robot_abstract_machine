@@ -39,6 +39,7 @@ from krrood_spatial_math.coordinate_system import (
     GenericCoordinateChange,
     GenericCoordinateSystem,
     CoordinateRepresentation,
+    CoordinateSystem,
     RigidCoordinateChange,
 )
 from krrood_spatial_math.line import Line, LineSegment
@@ -472,7 +473,7 @@ class SymbolicSpatialValue(
         return cls.get_type_of_generic_parameter(parameter=GenericCoordinateChange)
 
     @property
-    def coordinate_system(self) -> GenericCoordinateSystem | None:
+    def coordinate_system(self) -> CoordinateSystem | None:
         """
         The frame of this value's kind that its reference frame fixes; ``None`` for a
         value without a reference frame.
@@ -485,17 +486,26 @@ class SymbolicSpatialValue(
         return frame_kind.from_frame_3_dimensional(frame=self.reference_frame)
 
     @classmethod
-    def coordinate_system_arguments(
-        cls, *, coordinate_system: GenericCoordinateSystem | None
-    ) -> dict[str, Any]:
+    def from_constructor_arguments(
+        cls,
+        *,
+        coordinate_system: CoordinateSystem | None,
+        **constructor_arguments: Any,
+    ) -> Self:
         """
-        Gives the 3D frame ``coordinate_system`` lies on as the ``reference_frame``,
-        where :meth:`~krrood_spatial_math.coordinate_system.CoordinateRepresentation.coordinate_system_arguments`
+        Gives the new value the 3D frame ``coordinate_system`` lies on as its
+        ``reference_frame``, where
+        :meth:`~krrood_spatial_math.coordinate_system.CoordinateRepresentation.from_constructor_arguments`
         passes ``coordinate_system`` itself.
         """
-        if coordinate_system is None:
-            return {"reference_frame": None}
-        return {"reference_frame": coordinate_system.frame_3_dimensional}
+        return cls(
+            reference_frame=(
+                None
+                if coordinate_system is None
+                else coordinate_system.frame_3_dimensional
+            ),
+            **constructor_arguments,
+        )
 
 
 @dataclass(eq=False, init=False, repr=False)

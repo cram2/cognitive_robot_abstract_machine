@@ -547,18 +547,22 @@ def test_a_symbolic_value_is_placed_in_a_coordinate_system_by_its_reference_fram
     """
     A symbolic value is given in a frame through its reference frame, not a field.
     """
-    assert SymbolicSpatialValue.coordinate_system_arguments(
-        coordinate_system=table_frame
-    ) == {"reference_frame": table_frame}
+    vector = Vector3Dimensional.from_constructor_arguments(
+        coordinate_system=table_frame, x=1, y=2, z=3
+    )
+
+    assert vector.reference_frame is table_frame
 
 
 def test_a_symbolic_value_placed_in_no_coordinate_system_has_no_reference_frame():
     """
     A value given in no coordinate system is built without a reference frame.
     """
-    assert SymbolicSpatialValue.coordinate_system_arguments(coordinate_system=None) == {
-        "reference_frame": None
-    }
+    vector = Vector3Dimensional.from_constructor_arguments(
+        coordinate_system=None, x=1, y=2, z=3
+    )
+
+    assert vector.reference_frame is None
 
 
 def test_a_three_dimensional_vector_is_built_from_its_coordinates_in_a_frame(

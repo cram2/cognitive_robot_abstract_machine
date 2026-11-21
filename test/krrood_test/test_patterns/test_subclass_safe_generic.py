@@ -971,6 +971,130 @@ def test_a_derived_parameter_is_read_from_the_type_its_source_is_bound_to():
     } == {"measurement": Metres, "unit": str}
 
 
+def test_a_derived_parameter_a_base_renames_binds_the_parameter_it_renames():
+    """
+    A class deriving the parameter its base renames another one to binds both, and
+    narrows the fields typed with either.
+    """
+    UnitType = TypeVar("UnitType")
+    LengthUnitType = TypeVar("LengthUnitType", bound=str)
+    MeasurementType = TypeVar("MeasurementType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+        unit: UnitType
+        """
+        The unit the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Length(Measurement[LengthUnitType]):
+        """
+        A length, in a unit named by text.
+        """
+
+        unit_of_length: LengthUnitType
+        """
+        The unit of length the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Length[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class LengthReading(Length, Generic[MeasurementType]):
+        """
+        A length whose unit the measurement type it was read as fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(
+                    parameter=LengthUnitType, source=MeasurementType
+                ),
+            )
+
+    @dataclass(kw_only=True)
+    class MetreReading(LengthReading[Metres]):
+        """
+        A length read in metres.
+        """
+
+    assert MetreReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert {
+        reading_field.name: reading_field.type for reading_field in fields(MetreReading)
+    } == {"unit": str, "unit_of_length": str}
+
+
+def test_a_derived_parameter_binds_the_parameter_another_base_renames_it_to():
+    """
+    A class deriving a parameter that another of its bases renames binds the renamed
+    parameter too, and narrows the fields typed with it.
+    """
+    UnitType = TypeVar("UnitType")
+    LengthUnitType = TypeVar("LengthUnitType", bound=str)
+    MeasurementType = TypeVar("MeasurementType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+        unit: UnitType
+        """
+        The unit the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Length(Measurement[LengthUnitType]):
+        """
+        A length, in a unit named by text.
+        """
+
+        unit_of_length: LengthUnitType
+        """
+        The unit of length the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A measurement given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Measurement, Generic[MeasurementType]):
+        """
+        A measurement whose unit the measurement type it was read as fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    @dataclass(kw_only=True)
+    class MetreReading(Reading[Metres], Length):
+        """
+        A length read in metres.
+        """
+
+    assert MetreReading.get_type_of_generic_parameter(parameter=LengthUnitType) is str
+    assert {
+        reading_field.name: reading_field.type for reading_field in fields(MetreReading)
+    } == {"unit": str, "unit_of_length": str}
+
+
 def test_a_class_binding_a_derived_parameter_to_another_type_is_refused():
     """
     A class that binds a derived parameter through another base, to a type its source

@@ -14,7 +14,7 @@ from krrood_spatial_math.coordinate_system import (
     AxisCoordinates,
     GenericCoordinateChange,
     GenericCoordinate,
-    GenericCoordinateSystem,
+    GenericAffineFrame,
 )
 from krrood_spatial_math.vector import GenericVector
 
@@ -41,9 +41,7 @@ class Point(AxisCoordinates, Generic[GenericVector]):
         type.
         """
         return (
-            DerivedGenericParameter(
-                parameter=GenericCoordinateSystem, source=GenericVector
-            ),
+            DerivedGenericParameter(parameter=GenericAffineFrame, source=GenericVector),
             DerivedGenericParameter(parameter=GenericCoordinate, source=GenericVector),
             DerivedGenericParameter(
                 parameter=GenericCoordinateChange, source=GenericVector
@@ -91,10 +89,7 @@ class Point(AxisCoordinates, Generic[GenericVector]):
         :return: The straight-line distance between this point and ``other``.
         :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
-        frame_kind = self.get_type_of_generic_parameter(
-            parameter=GenericCoordinateSystem
-        )
-        return frame_kind.distance(first=self, second=other)
+        return self.frame_kind.distance(first=self, second=other)
 
 
 GenericPoint = TypeVar("GenericPoint", bound=Point)
