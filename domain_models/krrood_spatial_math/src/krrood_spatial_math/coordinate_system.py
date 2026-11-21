@@ -138,6 +138,12 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
         raise FrameHasNoCrossProductError(frame_kind=cls)
 
 
+GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
+"""
+The kind of affine frame coordinates are given in.
+"""
+
+
 GenericEuclideanSpace = TypeVar("GenericEuclideanSpace", bound=EuclideanSpace)
 """
 The kind of Euclidean space a Cartesian frame charts.
@@ -255,13 +261,13 @@ The kind of value given in a coordinate system.
 
 
 @dataclass(kw_only=True, eq=False)
-class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
+class AxisCoordinates(CoordinateRepresentation[GenericAffineFrame], ABC):
     """
     A value given by one coordinate per axis of its kind of frame, such as a point or a
     vector, held in the attribute named after that axis.
     """
 
-    coordinate_system: GenericCoordinateSystem | None
+    coordinate_system: GenericAffineFrame | None
     """
     The coordinate system the coordinates are given in; ``None`` where it is not known.
     """
@@ -275,12 +281,12 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         return tuple(getattr(self, axis) for axis in self.frame_kind.axes)
 
     @classproperty
-    def frame_kind(cls) -> type[GenericCoordinateSystem]:
+    def frame_kind(cls) -> type[GenericAffineFrame]:
         """
         The kind of frame values of this type are given in, which names their axes and
         measures their lengths and angles.
         """
-        return cls.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
+        return cls.get_type_of_generic_parameter(parameter=GenericAffineFrame)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """
@@ -289,7 +295,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         """
         super().__init_subclass__(**kwargs)
         if Interface.is_abstract(class_=cls) or not cls.binds_generic_parameter(
-            parameter=GenericCoordinateSystem
+            parameter=GenericAffineFrame
         ):
             return
         missing_axes = tuple(
@@ -308,7 +314,7 @@ class AxisCoordinates(CoordinateRepresentation[GenericCoordinateSystem], ABC):
         cls,
         *,
         coordinates: tuple[Any, ...],
-        coordinate_system: GenericCoordinateSystem | None,
+        coordinate_system: GenericAffineFrame | None,
     ) -> Self:
         """
         :param coordinates: One amount per axis, in the order of the axes.
@@ -386,12 +392,6 @@ class CoordinateChange(
 GenericCoordinateChange = TypeVar("GenericCoordinateChange", bound=CoordinateChange)
 """
 The kind of change that re-expresses a value in another coordinate system of its kind.
-"""
-
-
-GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
-"""
-The kind of affine frame coordinates are given in.
 """
 
 
