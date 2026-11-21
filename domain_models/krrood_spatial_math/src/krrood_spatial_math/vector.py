@@ -22,7 +22,7 @@ from krrood_spatial_math.coordinate_system import (
 
 @dataclass(kw_only=True, eq=False)
 class Vector(
-    AxisCoordinates[GenericAffineFrame, GenericCoordinate],
+    AxisCoordinates[GenericAffineFrame],
     Generic[GenericAffineFrame, GenericCoordinate],
 ):
     """
