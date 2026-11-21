@@ -58,28 +58,27 @@ class Pipeline(Sequence):
         """
         Monotonic CAS counter that is local to this pipeline instance.
         """
-        self.cas_start_timer: float | None = None
+        self.processing_start_time: float = timeit.default_timer()
         """
-        Timer for measuring pipeline execution time.
+        Reading of :func:`timeit.default_timer`, in seconds, when processing of the
+        current CAS started; the processing duration that is logged is measured from it.
         """
         self.rk_logger = logging.getLogger(defs.PACKAGE_NAME)
         """
         Logger instance for this pipeline.
         """
         self.create_new_cas()
-        # self.update_gui_for_this_pipeline = False
-        # self.annotator_outputs = AnnotatorOutputs()
 
     def create_new_cas(self) -> None:
         """
         Create a new Common Analysis Structure (CAS) for this pipeline.
 
-        Also resets the execution timer.
+        Also restarts the measurement of the processing duration.
         """
         self._cas_counter += 1
         self.cas = cas.CAS()
         self.cas.cas_id = self._cas_counter
-        self.cas_start_timer = timeit.default_timer()
+        self.processing_start_time = timeit.default_timer()
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -198,8 +197,8 @@ class Pipeline(Sequence):
             annotator_output_pipeline_map_buffer.map[self.name].redraw = True
 
         if new_status == Status.SUCCESS or new_status == Status.FAILURE:
-            self.feedback_message = f"Processing took {(timeit.default_timer() - self.cas_start_timer):.4f}s"
+            self.feedback_message = f"Processing took {(timeit.default_timer() - self.processing_start_time):.4f}s"
             self.rk_logger.debug(
-                f"Pipeline Processing took in total {(timeit.default_timer() - self.cas_start_timer):.4f}s"
+                f"Pipeline Processing took in total {(timeit.default_timer() - self.processing_start_time):.4f}s"
             )
-            self.cas_start_timer = timeit.default_timer()
+            self.processing_start_time = timeit.default_timer()
