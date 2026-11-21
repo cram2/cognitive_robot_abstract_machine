@@ -70,12 +70,12 @@ from semantic_digital_twin.semantic_annotations.part_whole import (
     IsPartWholeRelationship,
 )
 from krrood_spatial_math.spatial_types import (
-    LineSegment3,
-    Point3,
-    HomogeneousTransformationMatrix,
-    Vector3,
+    LineSegment3Dimensional,
+    Point3Dimensional,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
-from krrood_spatial_math.spatial_types import Pose, RotationMatrix
+from krrood_spatial_math.spatial_types import Pose3Dimensional, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ActiveConnection1DOF,
@@ -192,10 +192,12 @@ class HasRootKinematicStructureEntity(
         )
 
     @property
-    def min_max_points(self) -> tuple[Point3, Point3]:
-        min = Point3.from_iterable(self.root.combined_mesh.bounds[0])
-        max = Point3.from_iterable(self.root.combined_mesh.bounds[1])
-        return min, max
+    def min_max_points(
+        self,
+    ) -> tuple[Point3Dimensional, Point3Dimensional]:
+        lower = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[0])
+        upper = Point3Dimensional.from_iterable(self.root.combined_mesh.bounds[1])
+        return lower, upper
 
     def __hash__(self):
         return hash((self.__class__, self.root))
@@ -317,7 +319,7 @@ class HasRootKinematicStructureEntity(
         )
 
     @property
-    def global_transform(self) -> HomogeneousTransformationMatrix:
+    def global_transform(self) -> HomogeneousTransformationMatrix3Dimensional:
         return self.root.global_transform
 
     @property
@@ -348,7 +350,7 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
         cls,
         name: str,
         world: World,
-        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         parent_connection_specification: ConnectionSpecification | None = None,
         scale: Scale | None = None,
     ) -> Self:
@@ -459,7 +461,7 @@ class IsGraspable(HasRootBody, Mixin):
         return [
             GraspCandidate(
                 self,
-                Pose(
+                Pose3Dimensional(
                     orientation=RotationMatrix.from_rpy(yaw=yaw).quaternion,
                     reference_frame=self.root,
                 ),
@@ -515,7 +517,7 @@ class IsGraspable(HasRootBody, Mixin):
             raise NoGraspGeometry(self)
         return trimesh.util.concatenate(surfaces)
 
-    def grasp_axis(self) -> LineSegment3:
+    def grasp_axis(self) -> LineSegment3Dimensional:
         """
         :return: The axis an elongated object is grasped around, in the root body's
             frame: through the centre of the bounding box of :meth:`grasp_surface`,
@@ -526,9 +528,9 @@ class IsGraspable(HasRootBody, Mixin):
         axis_index = int(np.argmax(highest - lowest))
         start, end = (lowest + highest) / 2, (lowest + highest) / 2
         start[axis_index], end[axis_index] = lowest[axis_index], highest[axis_index]
-        return LineSegment3(
-            start=Point3.from_iterable(start, reference_frame=self.root),
-            end=Point3.from_iterable(end, reference_frame=self.root),
+        return LineSegment3Dimensional(
+            start=Point3Dimensional.from_iterable(start, reference_frame=self.root),
+            end=Point3Dimensional.from_iterable(end, reference_frame=self.root),
         )
 
     def grasped_part(self) -> IsGraspable:
@@ -565,7 +567,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
         cls,
         name: str,
         world: World,
-        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         parent_connection_specification: ConnectionSpecification | None = None,
         scale: Scale | None = None,
     ) -> Self:
@@ -767,8 +769,8 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
 
     @abstractmethod
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
-    ) -> HomogeneousTransformationMatrix:
+        self, axis: Vector3Dimensional
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Calculate where the joint that moves this annotation sits, relative to its root.
 
@@ -1082,7 +1084,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         vertices = candidates_filtered.vertices
         self_P_supporting_surface = vertices.mean(axis=0)
         points_3d = [
-            Point3(
+            Point3Dimensional(
                 x,
                 y,
                 z,
@@ -1102,7 +1104,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         self_C_supporting_surface = FixedConnection(
             parent=self.root,
             child=supporting_surface,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=x, y=y, z=z, reference_frame=self.root
             ),
         )
@@ -1150,7 +1152,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         body_to_sample_for: HasRootBody | None = None,
         category_of_interest: type[SemanticAnnotation] | None = None,
         amount: int = 100,
-    ) -> list[Point3]:
+    ) -> list[Point3Dimensional]:
         """
         Samples points from a surface around the semantic annotation.
 
@@ -1200,9 +1202,13 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
         if category_of_interest:
             return [
-                Point3(*s[1:], reference_frame=self.supporting_surface) for s in samples
+                Point3Dimensional(*s[1:], reference_frame=self.supporting_surface)
+                for s in samples
             ]
-        return [Point3(*s, reference_frame=self.supporting_surface) for s in samples]
+        return [
+            Point3Dimensional(*s, reference_frame=self.supporting_surface)
+            for s in samples
+        ]
 
     def _build_surface_sampler(
         self,
@@ -1335,7 +1341,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def spawn_bounding_boxes_as_region(
         self,
-        boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+        boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         name: PrefixedName | None = None,
         color: Color | None = None,
     ) -> Region:
@@ -1415,7 +1421,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
         # The surface's own frame lies on its top, so the free space and the paths
         # through it are expressed relative to what stands on it.
-        origin = HomogeneousTransformationMatrix(
+        origin = HomogeneousTransformationMatrix3Dimensional(
             reference_frame=self.supporting_surface
         )
         surface_box = self.supporting_surface.area.as_bounding_box_collection_at_origin(
@@ -1461,7 +1467,7 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
 
     @classproperty
     @abstractmethod
-    def _hole_direction_axis(cls) -> Vector3:
+    def _hole_direction_axis(cls) -> Vector3Dimensional:
         """
         The unit vector along the direction of the physical hole of the geometry, without
         a reference frame.
@@ -1472,7 +1478,7 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
         """
 
     @property
-    def hole_direction(self) -> Vector3:
+    def hole_direction(self) -> Vector3Dimensional:
         """
         The direction of the physical hole of the geometry.
 
@@ -1480,7 +1486,7 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
                 ..warning:: This does not describe the axis along, for example, a drawer opens. Its the physical opening where
                 you can put something into the drawer.
         """
-        return Vector3.from_iterable(
+        return Vector3Dimensional.from_iterable(
             self._hole_direction_axis.to_np(), reference_frame=self.root
         )
 

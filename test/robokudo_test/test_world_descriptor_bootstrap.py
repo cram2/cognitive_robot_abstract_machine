@@ -5,7 +5,9 @@ from robokudo.annotators.world_descriptor_bootstrap import (
     WorldDescriptorBootstrapAnnotator,
 )
 from robokudo.world_descriptor import PredefinedObject
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Region
 
 
@@ -20,7 +22,7 @@ class TestWorldDescriptorBootstrapAnnotator:
         camera_body_id = camera_body.id
         map_body_id = map_body.id
 
-        transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.1,
             pos_y=0.2,
             pos_z=0.3,

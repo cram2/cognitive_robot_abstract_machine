@@ -11,7 +11,9 @@ from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecu
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -111,7 +113,7 @@ class GiskardTester(ABC):
         *,
         name: str,
         size: tuple[float, float, float],
-        pose: HomogeneousTransformationMatrix,
+        pose: HomogeneousTransformationMatrix3Dimensional,
         parent_link: KinematicStructureEntity | None = None,
     ) -> None:
         """
@@ -147,7 +149,7 @@ class GiskardTester(ABC):
         *,
         name: str,
         file_path: str,
-        pose: HomogeneousTransformationMatrix,
+        pose: HomogeneousTransformationMatrix3Dimensional,
         parent_link: str | PrefixedName | None = None,
     ) -> None:
         """

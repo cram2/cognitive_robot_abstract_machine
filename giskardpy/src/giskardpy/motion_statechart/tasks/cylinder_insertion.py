@@ -27,7 +27,7 @@ from giskardpy.motion_statechart.mixins import (
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
 from krrood.symbolic_math.symbolic_math import logic_and
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% staying on a line
@@ -44,17 +44,17 @@ class StayOnLineTask(
     meters.
     """
 
-    tip_P_tool: Point3
+    tip_P_tool: Point3Dimensional
     """
     The controlled point.
     """
 
-    root_P_start: Point3
+    root_P_start: Point3Dimensional
     """
     Start of the line segment.
     """
 
-    root_P_end: Point3
+    root_P_end: Point3Dimensional
     """
     End of the line segment.
     """
@@ -114,12 +114,12 @@ class InsertCylinder(
     Observes True once the cylinder is straightened.
     """
 
-    tip_P_tool: Point3
+    tip_P_tool: Point3Dimensional
     """
     The point of the cylinder that leads the insertion.
     """
 
-    tip_V_axis: Vector3
+    tip_V_axis: Vector3Dimensional
     """
     Insertion axis of the cylinder.
     """

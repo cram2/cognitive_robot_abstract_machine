@@ -12,7 +12,7 @@ from cramph.node import EndStatechart, NodeArtifacts, StatechartNode
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -60,7 +60,7 @@ def sliding_world() -> SlidingWorld:
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         slider_connection = PrismaticConnection.create_with_dofs(
-            world=world, parent=root, child=slider, axis=Vector3.X()
+            world=world, parent=root, child=slider, axis=Vector3Dimensional.X()
         )
         world.add_connection(slider_connection)
         world.add_connection(FixedConnection(parent=root, child=box))

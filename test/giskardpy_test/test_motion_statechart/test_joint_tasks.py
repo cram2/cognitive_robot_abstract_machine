@@ -31,7 +31,10 @@ from krrood.symbolic_math.symbolic_math import (
 )
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
@@ -89,7 +92,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
 
-    goal = HomogeneousTransformationMatrix.from_xyz_rpy(
+    goal = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1,
         y=-1,
         z=1,
@@ -98,7 +101,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
         yaw=1,
         reference_frame=pr2_world_state_reset.root,
     )
-    expected = HomogeneousTransformationMatrix.from_xyz_rpy(
+    expected = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, y=-1, yaw=1, reference_frame=pr2_world_state_reset.root
     )
 
@@ -143,7 +146,7 @@ def test_joint_goal(tmp_path):
         )
         world.add_degree_of_freedom(dof)
         root_C_tip = RevoluteConnection(
-            parent=root, child=tip, axis=Vector3.Z(), raw_dof=dof
+            parent=root, child=tip, axis=Vector3Dimensional.Z(), raw_dof=dof
         )
         world.add_connection(root_C_tip)
 
@@ -153,7 +156,7 @@ def test_joint_goal(tmp_path):
         )
         world.add_degree_of_freedom(dof)
         root_C_tip2 = RevoluteConnection(
-            parent=root, child=tip2, axis=Vector3.Z(), raw_dof=dof
+            parent=root, child=tip2, axis=Vector3Dimensional.Z(), raw_dof=dof
         )
         world.add_connection(root_C_tip2)
 
@@ -457,7 +460,7 @@ def world_with_revolute_joints(
             joint = RevoluteConnection(
                 parent=root,
                 child=Body(name=PrefixedName(f"tip_{index}")),
-                axis=Vector3.Z(),
+                axis=Vector3Dimensional.Z(),
                 raw_dof=dof,
             )
             world.add_connection(joint)

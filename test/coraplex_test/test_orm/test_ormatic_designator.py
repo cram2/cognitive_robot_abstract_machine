@@ -21,7 +21,8 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from cramph.composites import Sequence
 from cramph.node import StatechartNode
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import context_of, simulated_executor, statechart_of
 from cramph.context import ContextExtension
@@ -38,7 +39,7 @@ def simple_plan(pr2_apartment_context):
     plan = Sequence(
         nodes=[
             NavigateAction(
-                planar_goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                     1.6, 1.9, reference_frame=world.root
                 )
             ),
@@ -116,18 +117,18 @@ def complex_plan(pr2_apartment_context):
 
     plan = TransportAction(
         pick_up=MoveAndPickUpAction.from_standing_position(
-            standing_position=Pose2D.from_xy_yaw(
+            standing_position=Pose2Dimensional.from_xy_yaw(
                 x=1.63, y=1.98, reference_frame=world.root
             ),
             grasp=milk.grasp_candidates()[0],
             arm=robot_view.left_arm,
         ),
         place=MoveAndPlaceAction.from_standing_position(
-            standing_position=Pose2D.from_xy_yaw(
+            standing_position=Pose2Dimensional.from_xy_yaw(
                 x=1.8, y=2.54, reference_frame=world.root
             ),
             graspable=milk,
-            goal_pose=Pose.from_xyz_quaternion(
+            goal_pose=Pose3Dimensional.from_xyz_quaternion(
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
             arm=robot_view.left_arm,
@@ -163,7 +164,9 @@ def test_a_plan_whose_transport_still_holds_queries_cannot_be_stored(
     world, robot_view, extensions = pr2_apartment_context
     transport = TransportAction.from_graspable_by_closest_grasps(
         world.get_semantic_annotations_by_type(Milk)[0],
-        Pose.from_xyz_quaternion(2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root),
+        Pose3Dimensional.from_xyz_quaternion(
+            2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
+        ),
         robot_view.left_arm,
         context_of(extensions),
     )

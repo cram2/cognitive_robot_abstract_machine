@@ -13,7 +13,10 @@ from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
@@ -32,9 +35,9 @@ def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
 
-    bar_center = Point3(0.6, -0.3, 1.0, reference_frame=root)
-    bar_axis = Vector3.Z(reference_frame=root)
-    tip_grasp_axis = Vector3.X(reference_frame=tip)
+    bar_center = Point3Dimensional(0.6, -0.3, 1.0, reference_frame=root)
+    bar_axis = Vector3Dimensional.Z(reference_frame=root)
+    tip_grasp_axis = Vector3Dimensional.X(reference_frame=tip)
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -58,7 +61,8 @@ def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
 
     # Tip must end up within the bar segment and aligned with the bar axis.
     root_P_tip = pr2_world_state_reset.transform(
-        target_frame=root, spatial_object=Point3(0, 0, 0, reference_frame=tip)
+        target_frame=root,
+        spatial_object=Point3Dimensional(0, 0, 0, reference_frame=tip),
     ).to_np()[:3]
     bar_center_np = bar_center.to_np()[:3]
     distance = np.linalg.norm(np.cross(root_P_tip - bar_center_np, [0, 0, 1]))

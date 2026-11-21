@@ -46,7 +46,7 @@ from semantic_digital_twin.reasoning.robot_predicates import (
 )
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector, TCamera
 from semantic_digital_twin.robots.pr2 import PR2
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.testing import *
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -112,7 +112,9 @@ def two_block_world():
         result = Body(name=PrefixedName(name))
         collision = Box(
             scale=Scale(1.0, 1.0, 1.0),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=result),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=result
+            ),
         )
         result.collision = ShapeCollection([collision], reference_frame=result)
         return result
@@ -126,7 +128,7 @@ def two_block_world():
         connection = FixedConnection(
             parent=body_1,
             child=body_2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=3, reference_frame=body_1
             ),
         )
@@ -140,7 +142,7 @@ def test_in_contact() -> None:
     b1 = Body(name=PrefixedName("b1"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             0,
             0,
             0.0,
@@ -156,7 +158,7 @@ def test_in_contact() -> None:
     b2 = Body(name=PrefixedName("b2"))
     collision2 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             0.9, 0, 0.0, 0, 0, 0, reference_frame=b2
         ),
         color=Color.from_rgba(red=0.0, green=1.0, blue=0.0),
@@ -166,7 +168,7 @@ def test_in_contact() -> None:
     b3 = Body(name=PrefixedName("b3"))
     collision3 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1.8, 0, 0.0, 0, 0, 0, reference_frame=b3
         ),
         color=Color.from_rgba(red=0.0, green=0.0, blue=1.0),
@@ -189,7 +191,7 @@ def test_robot_in_contact(pr2_world_copy: World) -> None:
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=0.5,
             reference_frame=body,
         ),
@@ -209,8 +211,10 @@ def test_robot_in_contact(pr2_world_copy: World) -> None:
     # Ensure the call runs without raising
     assert robot_in_collision(pr2)
 
-    body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        4, 0, 0.5, 0, 0, 0, pr2_world_copy.root
+    body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            4, 0, 0.5, 0, 0, 0, pr2_world_copy.root
+        )
     )
     assert not robot_in_collision(pr2)
 
@@ -219,7 +223,7 @@ def test_get_visible_objects(pr2_world_copy: World) -> None:
     body = Body(name=PrefixedName("test_body"))
     collision1 = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=2.0,
             z=1.0,
             reference_frame=body,
@@ -266,7 +270,7 @@ def test_visibility_follows_camera_orientation(pr2_world_copy: World) -> None:
         [
             Box(
                 scale=Scale(1.0, 1.0, 1.0),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=2.0, z=1.0, reference_frame=body
                 ),
             )
@@ -297,13 +301,17 @@ def test_occluding_bodies(pr2_world_state_reset: World):
     world = deepcopy(pr2_world_state_reset)
     world.get_body_by_name(
         "base_footprint"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0, 0, 0)
+    )
 
     def make_body(name: str) -> Body:
         result = Body(name=PrefixedName(name))
         collision = Box(
             scale=Scale(1.0, 1.0, 1.0),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=result),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=result
+            ),
         )
         result.collision = ShapeCollection([collision])
         return result
@@ -316,14 +324,14 @@ def test_occluding_bodies(pr2_world_state_reset: World):
         c1 = FixedConnection(
             parent=root,
             child=obstacle,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 reference_frame=root, x=3, z=0.8
             ),
         )
         c2 = FixedConnection(
             parent=root,
             child=occluded_body,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 reference_frame=root, x=10, z=0.5
             ),
         )
@@ -346,13 +354,17 @@ def test_occluding_bodies_follows_camera_orientation(pr2_world_state_reset: Worl
     world = deepcopy(pr2_world_state_reset)
     world.get_body_by_name(
         "base_footprint"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0)
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0, 0, 0)
+    )
 
     def make_body(name: str) -> Body:
         result = Body(name=PrefixedName(name))
         collision = Box(
             scale=Scale(1.0, 1.0, 1.0),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=result),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=result
+            ),
         )
         result.collision = ShapeCollection([collision])
         return result
@@ -366,7 +378,7 @@ def test_occluding_bodies_follows_camera_orientation(pr2_world_state_reset: Worl
             FixedConnection(
                 parent=root,
                 child=obstacle,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=root, y=3, z=0.8
                 ),
             )
@@ -375,7 +387,7 @@ def test_occluding_bodies_follows_camera_orientation(pr2_world_state_reset: Worl
             FixedConnection(
                 parent=root,
                 child=occluded_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=root, y=10, z=0.5
                 ),
             )
@@ -392,7 +404,7 @@ def test_occluding_bodies_follows_camera_orientation(pr2_world_state_reset: Worl
 def test_above_and_below(two_block_world) -> None:
     center, top = two_block_world
 
-    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=-3)
+    pov = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-3)
     assert Above(
         point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
     )()
@@ -400,7 +412,7 @@ def test_above_and_below(two_block_world) -> None:
         point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
     )()
 
-    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, yaw=np.pi)
+    pov = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=3, yaw=np.pi)
     assert Above(
         point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
     )()
@@ -408,7 +420,7 @@ def test_above_and_below(two_block_world) -> None:
         point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
     )()
 
-    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi)
+    pov = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=3, roll=np.pi)
     assert Above(
         point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
     )()
@@ -420,7 +432,7 @@ def test_above_and_below(two_block_world) -> None:
 def test_left_and_right(two_block_world) -> None:
     center, top = two_block_world
 
-    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=np.pi / 2)
+    pov = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=3, roll=np.pi / 2)
     assert LeftOf(
         point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
     )()
@@ -428,7 +440,7 @@ def test_left_and_right(two_block_world) -> None:
         point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
     )()
 
-    pov = HomogeneousTransformationMatrix.from_xyz_rpy(x=3, roll=-np.pi / 2)
+    pov = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=3, roll=-np.pi / 2)
     assert RightOf(
         point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
     )()
@@ -440,7 +452,9 @@ def test_left_and_right(two_block_world) -> None:
 def test_behind_and_in_front_of(two_block_world) -> None:
     center, top = two_block_world
 
-    pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=-5, pitch=np.pi / 2)
+    pov = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        z=-5, pitch=np.pi / 2
+    )
     assert Behind(
         point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
     )()
@@ -448,7 +462,9 @@ def test_behind_and_in_front_of(two_block_world) -> None:
         point=center.center_of_mass, other=top.center_of_mass, point_of_view=pov
     )()
 
-    pov = HomogeneousTransformationMatrix.from_xyz_rpy(z=5, pitch=-np.pi / 2)
+    pov = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        z=5, pitch=-np.pi / 2
+    )
     assert InFrontOf(
         point=top.center_of_mass, other=center.center_of_mass, point_of_view=pov
     )()
@@ -462,7 +478,9 @@ def test_body_in_region(two_block_world) -> None:
     region = Region(name=PrefixedName("test_region"))
     region_box = Box(
         scale=Scale(1.0, 1.0, 1.0),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=region),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=region
+        ),
     )
     region.area = ShapeCollection([region_box])
 
@@ -470,7 +488,7 @@ def test_body_in_region(two_block_world) -> None:
         connection = FixedConnection(
             parent=center,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=0.5, reference_frame=center
             ),
         )
@@ -486,7 +504,7 @@ def test_supporting(two_block_world) -> None:
 
     with center._world.modify_world():
         top.parent_connection.update_parent_T_connection(
-            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 reference_frame=center, z=1.0
             )
         )
@@ -513,7 +531,9 @@ def test_is_body_in_gripper(pr2_world_copy) -> None:
     test_box = Body(name=PrefixedName("test_box"))
     box_collision = Box(
         scale=Scale(0.05, 0.01, 0.05),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=test_box),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=test_box
+        ),
         color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
     )
     test_box.collision = ShapeCollection([box_collision])
@@ -532,7 +552,7 @@ def test_is_body_in_gripper(pr2_world_copy) -> None:
             world=pr2_world_copy,
         )
         pr2_world_copy.add_connection(connection)
-        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=between_fingers[0],
             y=between_fingers[1],
             z=between_fingers[2],
@@ -541,7 +561,9 @@ def test_is_body_in_gripper(pr2_world_copy) -> None:
 
     assert is_body_in_gripper(test_box, left_gripper) > 0
     assert robot_holds_body(pr2, test_box)
-    connection.origin = HomogeneousTransformationMatrix(reference_frame=root)
+    connection.origin = HomogeneousTransformationMatrix3Dimensional(
+        reference_frame=root
+    )
     assert is_body_in_gripper(test_box, left_gripper) == 0
 
 
@@ -549,16 +571,18 @@ def test_region_is_occupied(pr2_world_state_reset) -> None:
     view = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
 
     target_box = VolumetricBoundingBox(
-        0, 0, 0, 1, 1, 1, HomogeneousTransformationMatrix()
+        0, 0, 0, 1, 1, 1, HomogeneousTransformationMatrix3Dimensional()
     )
     assert not PlaceIsOccupied(
         box=target_box,
-        pose=Pose.from_xyz_rpy(2.5, 2, 0, reference_frame=pr2_world_state_reset.root),
+        pose=Pose3Dimensional.from_xyz_rpy(
+            2.5, 2, 0, reference_frame=pr2_world_state_reset.root
+        ),
         world=pr2_world_state_reset,
     )()
 
-    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        3.5, 2.5, 0
+    view.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(3.5, 2.5, 0)
     )
     pr2_world_state_reset.notify_state_change()
 
@@ -568,7 +592,7 @@ def test_region_is_occupied(pr2_world_state_reset) -> None:
 
     assert not PlaceIsOccupied(
         box=target_box,
-        pose=Pose.from_xyz_rpy(
+        pose=Pose3Dimensional.from_xyz_rpy(
             3.5, 2.5, 1, 0, reference_frame=pr2_world_state_reset.root
         ),
         world=pr2_world_state_reset,
@@ -580,26 +604,34 @@ def test_is_pose_free_for_robot(pr2_apartment_state_reset) -> None:
     view = pr2_apartment_state_reset.get_semantic_annotations_by_type(PR2)[0]
     assert is_pose_free_for_robot(
         view,
-        Pose.from_xyz_rpy(2, -2, 0, reference_frame=pr2_apartment_state_reset.root),
+        Pose3Dimensional.from_xyz_rpy(
+            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
     )
 
     assert not is_pose_free_for_robot(
         view,
-        Pose.from_xyz_rpy(3, 2, 0, reference_frame=pr2_apartment_state_reset.root),
+        Pose3Dimensional.from_xyz_rpy(
+            3, 2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
     )
 
-    view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, -2, 0
-    )
-
-    assert is_pose_free_for_robot(
-        view,
-        Pose.from_xyz_rpy(2, -2, 0, reference_frame=pr2_apartment_state_reset.root),
+    view.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2, -2, 0)
     )
 
     assert is_pose_free_for_robot(
         view,
-        Pose.from_xyz_rpy(2.1, -2.1, 0, reference_frame=pr2_apartment_state_reset.root),
+        Pose3Dimensional.from_xyz_rpy(
+            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
+    )
+
+    assert is_pose_free_for_robot(
+        view,
+        Pose3Dimensional.from_xyz_rpy(
+            2.1, -2.1, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
     )
 
 
@@ -607,7 +639,9 @@ def test_is_pose_free_for_robot_with_robot_pose(pr2_apartment_state_reset) -> No
     view = pr2_apartment_state_reset.get_semantic_annotations_by_type(PR2)[0]
     assert is_pose_free_for_robot(
         view,
-        Pose.from_xyz_rpy(2, -2, 0, reference_frame=pr2_apartment_state_reset.root),
+        Pose3Dimensional.from_xyz_rpy(
+            2, -2, 0, reference_frame=pr2_apartment_state_reset.root
+        ),
     )
 
     assert is_pose_free_for_robot(
@@ -630,8 +664,8 @@ def test_bodies_in_gripper(pr2_apartment_world) -> None:
         connection = FixedConnection(tcp, body)
         world.add_connection(connection)
 
-    pr2.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        2, -2, 0
+    pr2.root.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2, -2, 0)
     )
 
     bodies = bodies_in_gripper(pr2.left_arm.end_effector)
@@ -650,12 +684,12 @@ def test_empty_gripper_is_not_holding_something():
         """
 
         @property
-        def approach_axis(self) -> Vector3:
-            return Vector3.X(reference_frame=self.tool_frame)
+        def approach_axis(self) -> Vector3Dimensional:
+            return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
         @property
-        def closing_axis(self) -> Vector3:
-            return Vector3.Y(reference_frame=self.tool_frame)
+        def closing_axis(self) -> Vector3Dimensional:
+            return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
         def setup_hardware_interfaces(self):
             pass
@@ -674,7 +708,9 @@ def test_empty_gripper_is_not_holding_something():
     palm = Body(name=PrefixedName("palm", prefix="review"))
     collision = Box(
         scale=Scale(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=palm),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=palm
+        ),
     )
     palm.collision = ShapeCollection([collision], reference_frame=palm)
     tool_frame = Body(name=PrefixedName("tool_frame", prefix="review"))
@@ -722,7 +758,9 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight() -> None:
     target = Body(name=PrefixedName("target", prefix="review"))
     collision = Box(
         scale=Scale(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=target),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=target
+        ),
     )
     target.collision = ShapeCollection([collision], reference_frame=target)
     with world.modify_world():
@@ -733,7 +771,7 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight() -> None:
             FixedConnection(
                 parent=root,
                 child=camera_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=1.0, reference_frame=root
                 ),
             )
@@ -742,7 +780,7 @@ def test_nothing_occludes_a_body_in_clear_line_of_sight() -> None:
             FixedConnection(
                 parent=root,
                 child=target,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=3.0, z=1.0, reference_frame=root
                 ),
             )
@@ -768,7 +806,7 @@ def _stand_on(center: Body, top: Body, gap: float = 0.0) -> None:
     """
     with center._world.modify_world():
         top.parent_connection.update_parent_T_connection(
-            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 reference_frame=center, z=1.0 + gap
             )
         )
@@ -811,7 +849,7 @@ def test_a_body_inside_another_s_bounding_box_but_not_touching_it_is_not_support
         [
             Sphere(
                 radius=BALL_RADIUS,
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=ball
                 ),
             )
@@ -823,7 +861,7 @@ def test_a_body_inside_another_s_bounding_box_but_not_touching_it_is_not_support
         [
             Box(
                 scale=Scale(0.05, 0.05, 0.05),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=beside_the_ball
                 ),
             )
@@ -836,7 +874,7 @@ def test_a_body_inside_another_s_bounding_box_but_not_touching_it_is_not_support
             FixedConnection(
                 parent=ball,
                 child=beside_the_ball,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     corner, corner, corner, reference_frame=ball
                 ),
             )
@@ -856,14 +894,14 @@ def test_a_body_standing_in_a_container_is_supported_by_it() -> None:
         [
             Box(
                 scale=Scale(1.0, 1.0, CONTAINER_FLOOR_THICKNESS),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=container
                 ),
             ),
             *(
                 Box(
                     scale=Scale(0.05, 1.0, CONTAINER_WALL_HEIGHT),
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         side * 0.5,
                         0.0,
                         CONTAINER_WALL_HEIGHT / 2,
@@ -880,7 +918,7 @@ def test_a_body_standing_in_a_container_is_supported_by_it() -> None:
         [
             Box(
                 scale=Scale(0.05, 0.05, 0.05),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=content
                 ),
             )
@@ -892,7 +930,7 @@ def test_a_body_standing_in_a_container_is_supported_by_it() -> None:
             FixedConnection(
                 parent=container,
                 child=content,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=CONTAINER_FLOOR_THICKNESS / 2 + 0.025, reference_frame=container
                 ),
             )
@@ -942,7 +980,7 @@ def _box_body(name: str, scale: Scale, identifier: UUID | None = None) -> Body:
         [
             Box(
                 scale=scale,
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=body
                 ),
             )
@@ -953,7 +991,9 @@ def _box_body(name: str, scale: Scale, identifier: UUID | None = None) -> Body:
 
 
 def _fix_to(
-    parent: Body, child: Body, parent_T_child: HomogeneousTransformationMatrix
+    parent: Body,
+    child: Body,
+    parent_T_child: HomogeneousTransformationMatrix3Dimensional,
 ) -> None:
     """
     Fix ``child`` to ``parent`` at ``parent_T_child``.
@@ -989,12 +1029,14 @@ def test_a_body_touched_only_on_its_side_is_not_supported_by_what_touches_it() -
     _fix_to(
         table,
         crate,
-        HomogeneousTransformationMatrix.from_xyz_rpy(z=0.15, reference_frame=table),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            z=0.15, reference_frame=table
+        ),
     )
     _fix_to(
         table,
         kerb,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.15, z=0.08, reference_frame=table
         ),
     )
@@ -1017,14 +1059,16 @@ def _box_on_a_slope(slope: float) -> tuple[Body, Body]:
     _fix_to(
         ground,
         slab,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=1.0, pitch=slope, reference_frame=ground
         ),
     )
     _fix_to(
         slab,
         box,
-        HomogeneousTransformationMatrix.from_xyz_rpy(z=0.075, reference_frame=slab),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            z=0.075, reference_frame=slab
+        ),
     )
     return box, slab
 
@@ -1054,7 +1098,7 @@ def test_a_body_standing_upside_down_is_supported_by_what_it_stands_on() -> None
     _fix_to(
         table,
         crate,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=0.15, roll=np.pi, reference_frame=table
         ),
     )
@@ -1081,7 +1125,9 @@ def test_a_body_rests_on_a_surface_whichever_of_the_two_is_checked_first(
     _fix_to(
         table,
         crate,
-        HomogeneousTransformationMatrix.from_xyz_rpy(z=0.15, reference_frame=table),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            z=0.15, reference_frame=table
+        ),
     )
 
     assert SupportedBy(supported=crate, supporting=table)()
@@ -1100,14 +1146,14 @@ def test_a_body_taller_than_the_deepest_allowed_clipping_is_supported_by_the_flo
         [
             Box(
                 scale=Scale(1.0, 1.0, CONTAINER_FLOOR_THICKNESS),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=container
                 ),
             ),
             *(
                 Box(
                     scale=Scale(0.05, 1.0, CONTAINER_WALL_HEIGHT),
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         side * 0.5,
                         0.0,
                         CONTAINER_WALL_HEIGHT / 2,
@@ -1126,7 +1172,7 @@ def test_a_body_taller_than_the_deepest_allowed_clipping_is_supported_by_the_flo
     _fix_to(
         container,
         bottle,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=CONTAINER_FLOOR_THICKNESS / 2 + height / 2, reference_frame=container
         ),
     )
@@ -1150,7 +1196,7 @@ def test_a_body_sunk_deeper_than_the_deepest_allowed_clipping_is_not_supported()
     _fix_to(
         table,
         crate,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=0.5 + 0.25 - deepest * 1.5, reference_frame=table
         ),
     )
@@ -1241,7 +1287,7 @@ def test_containment_is_the_fraction_of_vertices_within_the_other_s_bounding_box
     crate = _box_body("crate", Scale(0.5, 0.5, 0.5))
     with world.modify_world():
         world.add_kinematic_structure_entity(box)
-    _fix_to(box, crate, HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5))
+    _fix_to(box, crate, HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(z=0.5))
 
     assert InsideOf(body=crate, other=box).compute_containment_ratio() == 0.5
 
@@ -1257,8 +1303,16 @@ def test_containment_is_measured_against_the_world_aligned_bounding_box():
     crate = _box_body("crate", Scale(0.1, 0.1, 0.1))
     with world.modify_world():
         world.add_kinematic_structure_entity(room)
-    _fix_to(room, box, HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 4))
-    _fix_to(room, crate, HomogeneousTransformationMatrix.from_xyz_rpy(x=0.6, y=0.6))
+    _fix_to(
+        room,
+        box,
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=np.pi / 4),
+    )
+    _fix_to(
+        room,
+        crate,
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.6, y=0.6),
+    )
 
     assert InsideOf(body=crate, other=box).compute_containment_ratio() == 1.0
 
@@ -1274,7 +1328,7 @@ def _sphere_body(name: str, radius: float, subdivisions: int) -> Body:
                 mesh=trimesh.creation.icosphere(
                     subdivisions=subdivisions, radius=radius
                 ),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     reference_frame=body
                 ),
             )
@@ -1294,7 +1348,7 @@ def test_measuring_containment_allocates_less_than_a_copy_of_both_meshes():
     ball = _sphere_body("ball", radius=0.2, subdivisions=5)
     with world.modify_world():
         world.add_kinematic_structure_entity(bowl)
-    _fix_to(bowl, ball, HomogeneousTransformationMatrix.from_xyz_rpy())
+    _fix_to(bowl, ball, HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy())
     relation = InsideOf(body=ball, other=bowl)
     relation.compute_containment_ratio()
     geometry_size = sum(

@@ -18,10 +18,10 @@ from cramph.context import StatechartContext
 from cramph.node import StatechartNode
 from krrood.entity_query_language.factories import a, variable
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-    Pose2D,
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
@@ -73,7 +73,7 @@ class SearchAction(SequentialAction):
     @classmethod
     def looking_around(
         cls,
-        target_location: Pose,
+        target_location: Pose3Dimensional,
         object_semantic_annotation: type[SemanticAnnotation],
         context: StatechartContext,
         cross_arm_length: float = 0.5,
@@ -97,7 +97,7 @@ class SearchAction(SequentialAction):
         reference_frame = target_location.reference_frame
         half_extent = cross_arm_length + detection_margin
         detection_box = VolumetricBoundingBox(
-            origin=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=target_location.position, reference_frame=reference_frame
             ),
             min_x=-half_extent,
@@ -117,7 +117,7 @@ class SearchAction(SequentialAction):
         return cls(
             navigate=a(NavigateAction)(
                 planar_goal_pose=variable(
-                    Pose2D,
+                    Pose2Dimensional,
                     domain=VisibilityLocation(
                         target_pose=target_location, context=context
                     ),
@@ -126,7 +126,7 @@ class SearchAction(SequentialAction):
             looks=[
                 LookAtAndDetectAction(
                     look_at=LookAtAction(
-                        look_target=Pose.from_xyz_rpy(
+                        look_target=Pose3Dimensional.from_xyz_rpy(
                             target_location.x + x_offset,
                             target_location.y + y_offset,
                             target_location.z,

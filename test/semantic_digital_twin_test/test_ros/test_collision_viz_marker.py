@@ -4,7 +4,9 @@ from time import sleep
 import pytest
 
 from rclpy.node import Node
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import OmniDrive
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -118,7 +120,7 @@ def test_color_red_when_violated(rclpy_node, cylinder_bot_world):
     # zone.
     cylinder_bot_world.get_connections_by_type(OmniDrive)[
         0
-    ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    ].origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1)
 
     collision_manager.compute_collisions()
 
@@ -140,7 +142,7 @@ def test_color_green_when_above_buffer_threshold(rclpy_node, cylinder_bot_world)
     # put robot to 10.3 to be above buffer threshold but close enough to still get checked.
     cylinder_bot_world.get_connections_by_type(OmniDrive)[
         0
-    ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
+    ].origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-10.3)
 
     collision_manager.compute_collisions()
 
@@ -245,7 +247,7 @@ def test_no_labels_for_contacts_outside_the_buffer_zone(rclpy_node, cylinder_bot
     # put robot to 10.3 to be above buffer threshold but close enough to still get checked.
     cylinder_bot_world.get_connections_by_type(OmniDrive)[
         0
-    ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
+    ].origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-10.3)
 
     collision_manager.compute_collisions()
 
@@ -273,7 +275,7 @@ def test_labels_of_contacts_that_left_the_buffer_zone_are_deleted(
 
     cylinder_bot_world.get_connections_by_type(OmniDrive)[
         0
-    ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
+    ].origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-10.3)
     collision_manager.compute_collisions()
 
     _wait_for_message(recorder)

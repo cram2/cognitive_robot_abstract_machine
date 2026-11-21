@@ -28,7 +28,7 @@ from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
-from krrood_spatial_math.spatial_types import Pose, Vector3, Quaternion
+from krrood_spatial_math.spatial_types import Pose3Dimensional, Vector3Dimensional, Quaternion
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world_description.world_entity import Body
@@ -78,13 +78,13 @@ executor = StatechartExecutor(
 )
 statechart = Statechart(context=executor.context)
 
-# 3. Define a Cartesian Pose Goal
+# 3. Define a Cartesian Pose3Dimensional Goal
 # We want to move the left gripper to a specific pose relative to the world root
 root_link = world.root
 tip_link = world.get_body_by_name("l_gripper_tool_frame")
 
-goal_pose = Pose(
-    position=Vector3(0.5, 0.5, 1.2), 
+goal_pose = Pose3Dimensional(
+    position=Vector3Dimensional(0.5, 0.5, 1.2), 
     orientation=Quaternion(0, 0, 0, 1), 
     reference_frame=root_link
 )

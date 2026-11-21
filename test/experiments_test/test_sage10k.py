@@ -17,9 +17,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Handle,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -47,7 +49,9 @@ def wall_door_handle_world():
             name="door",
             world=world,
             scale=Scale(0.11, 1, 2),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0),
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                z=1.0
+            ),
         )
         door.root.visual.dye_shapes(Color.from_rgba(red=0.55, green=0.27, blue=0.07))
 
@@ -58,7 +62,7 @@ def wall_door_handle_world():
         handle = Handle.create_with_new_body_in_world(
             name="handle",
             world=world,
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=0.6,
                 y=0.25,
                 x=0.06,
@@ -71,7 +75,7 @@ def wall_door_handle_world():
 
     door.mount_on_movable_joint(
         RevoluteConnectionSpecification(
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             dof_limits=DegreeOfFreedomLimits(
                 lower=DerivativeMap(position=0.0, velocity=0.0),
                 upper=DerivativeMap(position=np.pi / 2, velocity=1.0),
@@ -88,7 +92,7 @@ def test_door_opening(wall_door_handle_world, _hsr_world_setup, rclpy_node):
     world.merge_world(hsr_copy)
     odom_combined = world.get_body_by_name("odom_combined")
     odom_combined.parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1, reference_frame=odom_combined.parent_kinematic_structure_entity
         )
     )

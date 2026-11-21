@@ -27,7 +27,9 @@ from robokudo.io.ray_tracing_camera_interface import RayTracingCameraInterface
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.camera_rendering import RenderedRGBDFrame
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 
 # %% Rectangular rendered observation
@@ -46,8 +48,8 @@ def optical_interface() -> RayTracingCameraInterface:
     context = interface.context_resolver.resolve()
     root = context.camera.root
     with context.world.modify_world():
-        root.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(
+        root.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, y=0.2, z=0.3, yaw=np.pi / 2
             ),
             reference_frame=root.parent_connection.parent,
@@ -177,10 +179,12 @@ def test_static_optical_pose_binds_camera_root(
     optical_interface.set_data(cas)
     descriptor = StaticCameraTransformAnnotator.Descriptor()
     descriptor.parameters = descriptor.Parameters()
-    descriptor.parameters.world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=1.0, y=2.0, z=3.0, pitch=0.1, yaw=0.2
+    descriptor.parameters.world_T_camera = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1.0, y=2.0, z=3.0, pitch=0.1, yaw=0.2
+        )
     )
-    expected_world_T_root = HomogeneousTransformationMatrix(
+    expected_world_T_root = HomogeneousTransformationMatrix3Dimensional(
         data=descriptor.parameters.world_T_camera,
         reference_frame=context.world.root,
         child_frame=context.camera.root,
@@ -218,7 +222,7 @@ def test_replayed_optical_pose_updates_camera_root(
     optical_interface.set_data(cas)
     world = RecordedCameraWorld(cas.camera_observation).project()
     camera = world.get_semantic_annotation_by_id(context.camera.id)
-    world_T_optical = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_optical = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.0, y=2.0, z=3.0, roll=0.2, reference_frame=world.root
     )
     observation = CameraObservation(

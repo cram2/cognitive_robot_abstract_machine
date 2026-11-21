@@ -37,7 +37,7 @@ from giskardpy.motion_statechart.tasks.grasped_mechanism import (
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from semantic_digital_twin.robots.justin import Justin
 from semantic_digital_twin.robots.stretch import Stretch
-from krrood_spatial_math.spatial_types import Pose, Vector3
+from krrood_spatial_math.spatial_types import Pose3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world_description.connections import DifferentialDrive
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
@@ -72,8 +72,8 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
         return [
             AlignPlanes(
                 kinematic_chain=KinematicChain(root=root, tip=torso_tip),
-                tip_normal=Vector3.X(torso_tip),
-                reference_normal=Vector3.Z(root),
+                tip_normal=Vector3Dimensional.X(torso_tip),
+                reference_normal=Vector3Dimensional.Z(root),
                 weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE.value,
             )
         ]
@@ -164,7 +164,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
     line, by giving every pose goal that an action moving it sets relative to its
     controlled root the tasks of a
     :class:`~giskardpy.motion_statechart.tasks.cartesian_tasks.CartesianPoseStraight`
-    reaching the same pose. Pose goals inside another goal are left as they are.
+    reaching the same pose. Pose3Dimensional goals inside another goal are left as they are.
     """
 
     def is_applicable(self, plan_node: CartesianPose) -> bool:
@@ -242,14 +242,14 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
                     CartesianPose(
                         name="Keep holding handle",
                         kinematic_chain=KinematicChain(root=handle, tip=tool_frame),
-                        goal_pose=Pose(reference_frame=tool_frame),
+                        goal_pose=Pose3Dimensional(reference_frame=tool_frame),
                     ),
                     AlignPlanes(
                         kinematic_chain=KinematicChain(
                             root=plan_node.world.root, tip=robot_root
                         ),
-                        reference_normal=Vector3.X(handle),
-                        tip_normal=Vector3.NEGATIVE_Y(robot_root),
+                        reference_normal=Vector3Dimensional.X(handle),
+                        tip_normal=Vector3Dimensional.NEGATIVE_Y(robot_root),
                     ),
                     ArticulateGraspedMechanism(
                         tip_link=tool_frame,

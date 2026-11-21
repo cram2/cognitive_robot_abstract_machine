@@ -53,8 +53,11 @@ from krrood.patterns.classproperty import classproperty
 from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood.utils import recursive_subclasses
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.collision_checking.collision_rules import (
     AvoidExternalCollisions,
@@ -257,7 +260,7 @@ class BenchmarkRobot(GiskardTester):
         if self.has_odometry_joint():
             odometry = SetOdometry(
                 name="initial pose",
-                base_pose=HomogeneousTransformationMatrix(
+                base_pose=HomogeneousTransformationMatrix3Dimensional(
                     reference_frame=self.api.world.root
                 ),
             )
@@ -269,7 +272,9 @@ class BenchmarkRobot(GiskardTester):
         self.api.compile(statechart=motion_statechart)
         self.api.execute()
 
-    def add_environment(self, *, name: str, package_path: str, pose: Pose) -> None:
+    def add_environment(
+        self, *, name: str, package_path: str, pose: Pose3Dimensional
+    ) -> None:
         """
         Load a whole environment into the world, which grows the cost of forward
         kinematics and collision checking.
@@ -365,7 +370,7 @@ class CartesianGoalScenario(BenchmarkScenario):
                         ),
                         tip=tip,
                     ),
-                    goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                    goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                         pos_x=-0.2, reference_frame=tip
                     ),
                 )
@@ -392,7 +397,7 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
         robot.add_box_to_world(
             name="box",
             size=(1.0, 1.0, 1.0),
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1.2,
                 z=0.3,
                 reference_frame=robot.get_kinematic_structure_entity(name="map"),
@@ -409,11 +414,11 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
                         name="r_gripper_tool_frame"
                     ),
                 ),
-                goal_pose=Pose.from_xyz_axis_angle(
+                goal_pose=Pose3Dimensional.from_xyz_axis_angle(
                     x=0.8,
                     y=-0.38,
                     z=0.84,
-                    axis=Vector3.Y(),
+                    axis=Vector3Dimensional.Y(),
                     angle=np.pi / 2.0,
                     reference_frame=robot.default_root,
                 ),
@@ -455,7 +460,7 @@ class ApartmentDrivingScenario(BenchmarkScenario):
         robot.add_environment(
             name="iai_apartment",
             package_path="package://iai_apartment/urdf/apartment.urdf",
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1.5, y=1.4, yaw=np.pi, reference_frame=robot.api.world.root
             ),
         )
@@ -469,7 +474,7 @@ class ApartmentDrivingScenario(BenchmarkScenario):
                     kinematic_chain=KinematicChain(
                         root=robot.get_kinematic_structure_entity(name="map"), tip=base
                     ),
-                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=0.4, y=-2.0, reference_frame=base
                     ),
                 )
@@ -497,13 +502,15 @@ class KitchenPointingScenario(BenchmarkScenario):
         robot.add_environment(
             name="iai_kitchen",
             package_path="package://iai_kitchen/urdf_obj/iai_kitchen_python.urdf.xacro",
-            pose=HomogeneousTransformationMatrix(reference_frame=robot.api.world.root),
+            pose=HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=robot.api.world.root
+            ),
         )
 
     def build_motion_statechart(self, robot: BenchmarkRobot) -> Statechart:
         camera = robot.get_kinematic_structure_entity(name="head_mount_kinect_rgb_link")
         map_frame = robot.get_kinematic_structure_entity(name="map")
-        pointing_axis = Vector3.X(reference_frame=camera)
+        pointing_axis = Vector3Dimensional.X(reference_frame=camera)
         handle_point = robot.api.world.compute_forward_kinematics(
             root=map_frame,
             tip=robot.get_kinematic_structure_entity(name="iai_fridge_door_handle"),
@@ -539,9 +546,9 @@ class KitchenPointingScenario(BenchmarkScenario):
                                             name="base_footprint"
                                         ),
                                     ),
-                                    goal_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
+                                    goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
                                         y=2.0,
-                                        axis=Vector3.Z(),
+                                        axis=Vector3Dimensional.Z(),
                                         angle=1,
                                         reference_frame=robot.get_kinematic_structure_entity(
                                             name="base_footprint"
@@ -596,7 +603,7 @@ class LongSequenceScenario(BenchmarkScenario):
                     root=robot.get_kinematic_structure_entity(name="base_footprint"),
                     tip=tips[index % len(tips)],
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tips[index % len(tips)]
                 ),
             )
@@ -657,7 +664,7 @@ class DeeplyNestedCascadeScenario(BenchmarkScenario):
                     root=robot.get_kinematic_structure_entity(name="base_footprint"),
                     tip=tip,
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tip
                 ),
             )

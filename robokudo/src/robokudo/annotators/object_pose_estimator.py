@@ -12,7 +12,7 @@ from typing_extensions import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from krrood_spatial_math.spatial_types import Pose
+    from krrood_spatial_math.spatial_types import Pose3Dimensional
 
     from robokudo.annotators.object_observation import ObjectObservation
 
@@ -27,7 +27,9 @@ class ObjectPoseEstimator(ABC):
     """
 
     @abstractmethod
-    def estimate_pose(self, object_observation: ObjectObservation) -> Pose | None:
+    def estimate_pose(
+        self, object_observation: ObjectObservation
+    ) -> Pose3Dimensional | None:
         """
         Estimate the pose of an object without prior knowledge.
 
@@ -38,8 +40,8 @@ class ObjectPoseEstimator(ABC):
 
     @abstractmethod
     def track_pose(
-        self, object_observation: ObjectObservation, previous_pose: Pose
-    ) -> Pose:
+        self, object_observation: ObjectObservation, previous_pose: Pose3Dimensional
+    ) -> Pose3Dimensional:
         """
         Refine a known pose of an object to an observation of the object that moved a
         little since.

@@ -25,7 +25,9 @@ from semantic_digital_twin.pipeline.mesh_decomposition.bullet_vhacd import (
 )
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.testing import world_setup_simple
 from semantic_digital_twin.world_description.geometry import (
     Mesh,
@@ -204,8 +206,10 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     )
     baseline_distance_b = baseline_collision_b.distance
 
-    box_a.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        5, 5, 5, reference_frame=box_a.parent_kinematic_structure_entity
+    box_a.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            5, 5, 5, reference_frame=box_a.parent_kinematic_structure_entity
+        )
     )
     world_a.notify_state_change()
 

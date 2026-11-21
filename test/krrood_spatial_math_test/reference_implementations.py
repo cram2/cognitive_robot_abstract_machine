@@ -276,3 +276,24 @@ def rigid_motion_rate_matrix(
     ]
     matrix[:3, 3] = translation
     return matrix
+
+
+def adjoint_matrix_from_homogeneous_matrix(matrix: np.ndarray) -> np.ndarray:
+    """
+    :param matrix: A rigid 4x4 homogeneous transformation.
+    :return: The 6x6 matrix that moves a twist, angular part first, by the
+        transformation: ``[[R, 0], [p x R, R]]``.
+    """
+    rotation, shift = matrix[:3, :3], matrix[:3, 3]
+    shift_cross = np.array(
+        [
+            [0.0, -shift[2], shift[1]],
+            [shift[2], 0.0, -shift[0]],
+            [-shift[1], shift[0], 0.0],
+        ]
+    )
+    adjoint = np.zeros((6, 6))
+    adjoint[:3, :3] = rotation
+    adjoint[3:, :3] = shift_cross @ rotation
+    adjoint[3:, 3:] = rotation
+    return adjoint

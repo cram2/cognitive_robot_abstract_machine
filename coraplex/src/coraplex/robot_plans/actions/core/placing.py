@@ -31,7 +31,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from krrood.patterns.field_metadata import JSONMetadata
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 # %% placing a held object
 
@@ -132,7 +132,7 @@ class PlaceAction(
         ]
 
     @property
-    def variable_poses(self) -> list[Pose]:
+    def variable_poses(self) -> list[Pose3Dimensional]:
         return self._tool_goals.poses
 
     def on_start(self) -> None:

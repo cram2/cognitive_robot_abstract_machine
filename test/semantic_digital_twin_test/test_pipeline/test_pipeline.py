@@ -21,7 +21,9 @@ from semantic_digital_twin.pipeline.pipeline import (
     CenterLocalGeometryAndPreserveWorldPose,
     BodyFactoryReplace,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -34,7 +36,7 @@ class PipelineTestCase(unittest.TestCase):
         cls.dummy_world = World()
         b1 = Body(name=PrefixedName("body1", "krrood_test"))
         b2 = Body(name=PrefixedName("body2", "krrood_test"))
-        c1 = FixedConnection(b1, b2, HomogeneousTransformationMatrix())
+        c1 = FixedConnection(b1, b2, HomogeneousTransformationMatrix3Dimensional())
         with cls.dummy_world.modify_world():
             cls.dummy_world.add_body(b1)
             cls.dummy_world.add_body(b2)
@@ -84,7 +86,7 @@ class PipelineTestCase(unittest.TestCase):
 
         original_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=world.root)
+                HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
             ).bounding_boxes[0]
             for body in world.bodies_with_collision
         ]
@@ -108,7 +110,9 @@ class PipelineTestCase(unittest.TestCase):
 
         new_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=centered_world.root)
+                HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=centered_world.root
+                )
             ).bounding_boxes[0]
             for body in centered_world.bodies_with_collision
         ]

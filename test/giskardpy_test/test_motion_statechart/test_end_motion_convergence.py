@@ -9,7 +9,7 @@ import pytest
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
@@ -31,7 +31,9 @@ def test_end_motion_abruptness(cylinder_bot_world: World):
     motion_statechart = Statechart(context=executor.context)
     goal = CartesianPose(
         kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-        goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=cylinder_bot_world.root),
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
+            x=1, reference_frame=cylinder_bot_world.root
+        ),
         position_threshold=0.01,
     )
     motion_statechart.add_node(node=goal)

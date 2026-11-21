@@ -67,10 +67,10 @@ from semantic_digital_twin.predefined_maps.apartment_environment import (
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.semantic_annotations.semantic_annotations import CheezeIt
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-    Pose2D,
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from cramph.composites import Sequence, StatementNode
 
@@ -84,7 +84,7 @@ CEREAL_SHELF_LAYER_NAME = "shelf_layer2"
 Name of the shelf layer the cereal starts on.
 """
 
-CEREAL_SHELF_LAYER_T_CEREAL = HomogeneousTransformationMatrix.from_xyz_rpy(
+CEREAL_SHELF_LAYER_T_CEREAL = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
     x=-0.1, y=0.0, z=0.115
 )
 """
@@ -121,7 +121,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
         """
         return RobotSpecification(
             semantic_annotation_type=self.used_robot,
-            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
+            odometry_T_robot_start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                1, 1
+            ),
         )
 
     def is_scene_populated(self, world: World) -> bool:
@@ -177,22 +179,26 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 NavigateAction(
-                    planar_goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                         x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
                 LookAtAction(
-                    look_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                    look_target=Pose3Dimensional.from_xyz_rpy(
+                        reference_frame=shelf_layer_body
+                    )
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        planar_goal_pose=Pose2D.from_xy_yaw(
+                        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                             x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                         )
                     )
                 ),
                 LookAtAction(
-                    look_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                    look_target=Pose3Dimensional.from_xyz_rpy(
+                        reference_frame=shelf_layer_body
+                    )
                 ),
                 DetectAction(
                     technique=DetectionTechnique.TYPES,
@@ -206,14 +212,14 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    planar_goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                         x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                     )
                 ),
                 PlaceAction(
                     arm=arm,
                     graspable=cereal,
-                    goal_pose=Pose.from_xyz_rpy(
+                    goal_pose=Pose3Dimensional.from_xyz_rpy(
                         x=0.1,
                         z=0.56,
                         yaw=np.pi,
@@ -227,22 +233,26 @@ class StretchApartmentDemonstration(RobotDemonstration):
                     )
                 ),
                 NavigateAction(
-                    planar_goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                         x=1.2, y=1.2, yaw=np.pi, reference_frame=world.root
                     )
                 ),
                 LookAtAction(
-                    look_target=Pose.from_xyz_rpy(reference_frame=shelf_layer_body)
+                    look_target=Pose3Dimensional.from_xyz_rpy(
+                        reference_frame=shelf_layer_body
+                    )
                 ),
                 StatementNode(
                     statement=a(NavigateAction)(
-                        planar_goal_pose=Pose2D.from_xy_yaw(
+                        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                             x=0.8, y=0, yaw=np.pi, reference_frame=bedside_table_body
                         )
                     )
                 ),
                 LookAtAction(
-                    look_target=Pose.from_xyz_rpy(reference_frame=bedside_table_body)
+                    look_target=Pose3Dimensional.from_xyz_rpy(
+                        reference_frame=bedside_table_body
+                    )
                 ),
                 DetectAction(
                     technique=DetectionTechnique.TYPES,
@@ -258,7 +268,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    planar_goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                         x=0.8, y=0.6, yaw=-np.pi / 2, reference_frame=world.root
                     )
                 ),

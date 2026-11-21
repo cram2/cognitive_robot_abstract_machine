@@ -19,7 +19,9 @@ from timeit import default_timer
 import cv2
 import numpy as np
 from py_trees.common import Status
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 from typing_extensions import TYPE_CHECKING
 
@@ -219,7 +221,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         self,
         body: Body,
         object_id: int = 0,
-        camera_T_world: HomogeneousTransformationMatrix | None = None,
+        camera_T_world: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> ObjectHypothesis | None:
         """
         Create a camera-relative hypothesis from the body's collision or visual bounds.
@@ -251,7 +253,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         ).bounding_box()
         bounding_box_scale = bounding_box.scale
         body_T_bounding_box = (
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=bounding_box.center,
                 reference_frame=body,
             )
@@ -320,7 +322,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         return object_hypothesis
 
     def detect_from_body_base(
-        self, camera_T_world: HomogeneousTransformationMatrix | None = None
+        self, camera_T_world: HomogeneousTransformationMatrix3Dimensional | None = None
     ) -> list[ObjectHypothesis]:
         """
         Detect configured bodies using their world-descriptor geometry.

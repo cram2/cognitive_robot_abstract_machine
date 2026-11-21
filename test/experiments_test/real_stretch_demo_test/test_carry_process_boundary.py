@@ -10,7 +10,10 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from cramph.context import StatechartContext
 from cramph.data_types import LifeCycleValue
 from cramph.statechart import Statechart
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
+)
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.stretch import Stretch
@@ -42,7 +45,7 @@ def test_a_carry_runs_against_a_controller_in_another_process(
             FixedConnection(
                 parent=tool_frame,
                 child=held_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     roll=0.4, pitch=0.3, reference_frame=tool_frame
                 ),
             )
@@ -55,7 +58,9 @@ def test_a_carry_runs_against_a_controller_in_another_process(
     )
     carry = CarryAction(
         navigate=NavigateAction(
-            planar_goal_pose=Pose.from_xyz_rpy(x=0.3, reference_frame=stretch.root)
+            planar_goal_pose=Pose3Dimensional.from_xyz_rpy(
+                x=0.3, reference_frame=stretch.root
+            )
         ),
         holding_arms=[arm],
     )

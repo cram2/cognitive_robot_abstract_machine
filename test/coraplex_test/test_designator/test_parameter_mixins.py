@@ -56,7 +56,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.code_generation.naming import to_snake_case
 from krrood.patterns.mixin import ParameterMixin
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
 
@@ -341,7 +341,7 @@ def test_parameters_inherited_from_node_mixins_resolve_to_their_types():
     hints = get_type_hints_of_object(PickUpAction)
     assert hints["position_threshold"] is float
     assert hints["tolerate_finger_stall"] is bool
-    assert get_type_hints_of_object(PlaceAction)["goal_pose"] is Pose
+    assert get_type_hints_of_object(PlaceAction)["goal_pose"] is Pose3Dimensional
 
 
 def test_a_place_takes_its_goal_as_a_pose_goal_does():

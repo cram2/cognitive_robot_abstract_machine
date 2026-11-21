@@ -19,7 +19,7 @@ from giskardpy.motion_statechart.graph_node import (
     DebugExpression,
     MotionStatechartNode,
 )
-from krrood_spatial_math.spatial_types import SpatialType, Vector3
+from krrood_spatial_math.spatial_types import SymbolicSpatialType, Vector3Dimensional
 from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 from semantic_digital_twin.adapters.ros.visualization.spatial_type_marker_renderer import (
     SpatialTypeVisualization,
@@ -257,7 +257,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
                     debug_expression=debug_expression, node=node, world=world
                 )
                 for debug_expression in node.debug_expressions
-                if isinstance(debug_expression.expression, SpatialType)
+                if isinstance(debug_expression.expression, SymbolicSpatialType)
             ]
             if visualizations:
                 self._visualizations_per_node[node] = visualizations
@@ -349,7 +349,7 @@ class DebugExpressionPublishing(TickingExecutorExtension):
         """
         expression = debug_expression.expression
         if (
-            isinstance(expression, Vector3)
+            isinstance(expression, Vector3Dimensional)
             and expression.visualisation_frame is not None
             and expression.reference_frame is not None
             and expression.visualisation_frame is not expression.reference_frame

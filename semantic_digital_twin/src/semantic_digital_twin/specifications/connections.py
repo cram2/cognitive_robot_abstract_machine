@@ -13,7 +13,10 @@ from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospect
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.exceptions import MissingConnectionParentError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.specifications.base import NamedSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -65,7 +68,7 @@ class ConnectionSpecification(
     a :class:`PrefixedName` only at materialization time.
     """
 
-    connection_T_child: HomogeneousTransformationMatrix | None = field(
+    connection_T_child: HomogeneousTransformationMatrix3Dimensional | None = field(
         default=None, kw_only=True
     )
     """
@@ -111,8 +114,8 @@ class ConnectionSpecification(
         return result
 
     def parent_T_connection_for_child_at(
-        self, parent_T_child: HomogeneousTransformationMatrix
-    ) -> HomogeneousTransformationMatrix:
+        self, parent_T_child: HomogeneousTransformationMatrix3Dimensional
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Compute where the connection frame has to sit so that the child is at
         ``parent_T_child`` while the connection is at its zero position.
@@ -122,7 +125,7 @@ class ConnectionSpecification(
         """
         if self.connection_T_child is None:
             return parent_T_child
-        return HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix3Dimensional(
             (parent_T_child @ self.connection_T_child.inverse()).evaluate()
         )
 
@@ -158,7 +161,7 @@ class ConnectionSpecification(
             )
             placed_connection = connection.copy_with_new_parent(
                 parent,
-                HomogeneousTransformationMatrix(
+                HomogeneousTransformationMatrix3Dimensional(
                     (
                         parent_T_child
                         @ connection.origin_expression.inverse()
@@ -175,7 +178,7 @@ class ConnectionSpecification(
         world: World,
         child: KinematicStructureEntity,
         parent: KinematicStructureEntity | None = None,
-        parent_T_connection: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection: HomogeneousTransformationMatrix3Dimensional | None = None,
         name: str | None = None,
     ) -> TConnection:
         """
@@ -207,7 +210,7 @@ class ConnectionSpecification(
                 new_reference_frame=parent, new_child_frame=child
             )
             if parent_T_connection is not None
-            else HomogeneousTransformationMatrix(
+            else HomogeneousTransformationMatrix3Dimensional(
                 reference_frame=parent, child_frame=child
             )
         )
@@ -263,7 +266,7 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
     prismatic or revolute).
     """
 
-    axis: Vector3 = field(kw_only=True)
+    axis: Vector3Dimensional = field(kw_only=True)
     """
     Movement axis of the connection.
 
@@ -366,7 +369,7 @@ class ConnectionSpecificationWithEndpoints:
     The body the joint moves.
     """
 
-    parent_T_connection: HomogeneousTransformationMatrix
+    parent_T_connection: HomogeneousTransformationMatrix3Dimensional
     """
     The pose of the joint relative to the parent body.
     """

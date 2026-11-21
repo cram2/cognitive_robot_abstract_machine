@@ -117,13 +117,13 @@ parent frame. Because a specification is reusable, that placement and the name c
 *overridden* when you spawn, together with the `parent` the entity attaches to.
 
 ```{code-cell} ipython3
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 
 # Bake a default pose straight into the specification.
 leg = BodySpecification.box(
     name="leg_0",
     scale=Scale(0.05, 0.05, 0.7),
-    parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.55, y=0.35, z=-0.35),
+    parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.55, y=0.35, z=-0.35),
 ).spawn(world, parent=table_top)
 
 # The same specification is reusable; override the pose (and name) per spawn.
@@ -133,7 +133,7 @@ for index, (x, y) in enumerate([(0.55, -0.35), (-0.55, 0.35), (-0.55, -0.35)], s
         world,
         name=f"leg_{index}",
         parent=table_top,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=x, y=y, z=-0.35),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=x, y=y, z=-0.35),
     )
 
 # root + table_top + four legs
@@ -187,7 +187,7 @@ corresponding `Body` constructors:
 from importlib.resources import files
 from pathlib import Path
 
-from krrood_spatial_math.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3Dimensional
 
 resources = Path(files("semantic_digital_twin")).parent.parent / "resources"
 
@@ -206,7 +206,7 @@ crate = BodySpecification.from_event("crate", outer - inner).spawn(world)
 # The convex hull of a point cloud.
 hull = BodySpecification.from_3d_points(
     "hull",
-    [Point3(0, 0, 0), Point3(0.2, 0, 0), Point3(0, 0.2, 0), Point3(0, 0, 0.2)],
+    [Point3Dimensional(0, 0, 0), Point3Dimensional(0.2, 0, 0), Point3Dimensional(0, 0.2, 0), Point3Dimensional(0, 0, 0.2)],
 ).spawn(world)
 
 assert len(milk_mesh.collision.shapes) == 1
@@ -293,14 +293,14 @@ rotation to its translation.
 from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 
 world = World.create_with_root_body()
 
 drawer = BodySpecification.box(
     name="drawer",
     scale=Scale(0.4, 0.5, 0.2),
-    connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
+    connection_specification=PrismaticConnectionSpecification(axis=Vector3Dimensional.Z()),
 ).spawn(world)
 
 assert isinstance(drawer.parent_connection, PrismaticConnection)
@@ -337,7 +337,7 @@ connection = FixedConnectionSpecification().connect(
     world,
     parent=world.root,
     child=free_body,
-    parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
+    parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1, y=2, z=3),
 )
 
 assert connection.child is free_body
@@ -373,7 +373,7 @@ milk = SemanticAnnotationWithRootSpecification(
     root_specification=BodySpecification.box(
          name="milk", 
          scale=Scale(0.1, 0.1, 0.2),
-         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, z=0.8)
+         parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.3, z=0.8)
     ),
 ).spawn(world)
 
@@ -403,7 +403,7 @@ drawer = SemanticAnnotationWithRootSpecification(
     root_specification=BodySpecification.box(
         "drawer",
         Scale(0.4, 0.5, 0.2),
-        connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
+        connection_specification=PrismaticConnectionSpecification(axis=Vector3Dimensional.X()),
     ),
 ).spawn(world)
 
@@ -479,12 +479,12 @@ handle_specification = Handle.get_annotation_specification(
 left = handle_specification.spawn(
     world,
     name="left_handle",
-    parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.2),
+    parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=-0.2),
 )
 right = handle_specification.spawn(
     world,
     name="right_handle",
-    parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.2),
+    parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.2),
 )
 
 assert left.name.name == "left_handle" and right.name.name == "right_handle"
@@ -538,13 +538,13 @@ window_left = Aperture.get_annotation_specification(
     "window_left", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.5, 0.5))
 )
 window_left.root_specification.parent_T_self = (
-    HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.8)
+    HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=-0.8)
 )
 window_right = Aperture.get_annotation_specification(
     "window_right", Aperture.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.1, 0.5, 0.5))
 )
 window_right.root_specification.parent_T_self = (
-    HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8)
+    HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.8)
 )
 
 wall = Wall.get_annotation_specification(
@@ -579,12 +579,12 @@ from semantic_digital_twin.world_description.connections import RevoluteConnecti
 
 world = World.create_with_root_body()
 
-hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+hinge_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.5)
 door = Door.get_annotation_specification(
     "door",
     Door.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.03, 1, 2)),
     parent_connection_specification=RevoluteConnectionSpecification(
-        axis=Vector3.Z(), connection_T_child=hinge_T_door
+        axis=Vector3Dimensional.Z(), connection_T_child=hinge_T_door
     ),
 ).spawn(world)
 assert isinstance(door.movable_joint, RevoluteConnection)
@@ -593,7 +593,7 @@ door.movable_joint.position = np.pi / 2
 world.notify_state_change()
 
 # The door's centre swung a quarter turn around the hinge, not around itself.
-expected = hinge_T_door.inverse() @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2) @ hinge_T_door
+expected = hinge_T_door.inverse() @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=np.pi / 2) @ hinge_T_door
 assert np.allclose(door.root.global_transform.to_np(), expected.to_np())
 print("Door centre after opening:", door.root.global_transform.position.to_np()[:3])
 ```
@@ -692,8 +692,8 @@ world = WorldSpecification.from_urdf(
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
-            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(y=2.0),
+            localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1.0),
+            odometry_T_robot_start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=2.0),
         )
     ],
 ).create_world()
@@ -711,11 +711,11 @@ two_robot_world = WorldSpecification.from_urdf(
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
-            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1.0),
         ),
         RobotSpecification(
             semantic_annotation_type=PR2,
-            localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0),
+            localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-1.0),
         ),
     ],
 ).create_world()
@@ -750,7 +750,7 @@ world = WorldSpecification.from_urdf(
             root_specification=BodySpecification.box(
                 "milk",
                 Scale(0.1, 0.1, 0.2),
-                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, z=0.8),
+                parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.3, z=0.8),
             ),
         ),
     ],

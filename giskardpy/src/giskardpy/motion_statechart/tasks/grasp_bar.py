@@ -13,7 +13,7 @@ from giskardpy.motion_statechart.mixins import (
     HasCruiseAngularVelocityParameter,
     HasKinematicChainParameter,
 )
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3Dimensional, Vector3Dimensional
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -31,17 +31,17 @@ class GraspBar(
     It aligns ``tip_grasp_axis`` with ``bar_axis`` while allowing rotation around it.
     """
 
-    tip_grasp_axis: Vector3
+    tip_grasp_axis: Vector3Dimensional
     """
     Axis of the tip link that will be aligned with the bar axis.
     """
 
-    bar_center: Point3
+    bar_center: Point3Dimensional
     """
     Center of the bar to be grasped.
     """
 
-    bar_axis: Vector3
+    bar_axis: Vector3Dimensional
     """
     Alignment of the bar to be grasped.
     """

@@ -17,7 +17,9 @@ from robokudo.utils.transform import (
     get_quaternion_from_transform_matrix,
     get_translation_from_transform_matrix,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 import trimesh.creation
 from semantic_digital_twin.world_description.geometry import Mesh, Scale, Box
 import sys
@@ -201,7 +203,9 @@ def setup_world_for_camera_frame(
             world_body.visual.append(
                 Mesh.from_trimesh(
                     mesh=trimesh.creation.axis(),
-                    origin=HomogeneousTransformationMatrix(reference_frame=world_body),
+                    origin=HomogeneousTransformationMatrix3Dimensional(
+                        reference_frame=world_body
+                    ),
                 )
             )
 
@@ -212,7 +216,9 @@ def setup_world_for_camera_frame(
             camera_body.visual.append(
                 Mesh.from_trimesh(
                     mesh=trimesh.creation.axis(),
-                    origin=HomogeneousTransformationMatrix(reference_frame=camera_body),
+                    origin=HomogeneousTransformationMatrix3Dimensional(
+                        reference_frame=camera_body
+                    ),
                 )
             )
 
@@ -230,7 +236,7 @@ def setup_world_for_camera_frame(
 def update_connection_transform(
     to_name: PrefixedName,
     from_name: PrefixedName,
-    transform: HomogeneousTransformationMatrix,
+    transform: HomogeneousTransformationMatrix3Dimensional,
 ) -> None:
     """
     Update the connection connecting from_name to to_name with the given transformation.
@@ -273,7 +279,7 @@ def _create_world_origin_and_scale_from_latest_bbox(
     object_belief: ObjectBeliefState,
     cas: CAS,
     world_body: Body,
-) -> tuple[HomogeneousTransformationMatrix, Scale] | None:
+) -> tuple[HomogeneousTransformationMatrix3Dimensional, Scale] | None:
     """
     Convert the latest camera-frame bbox into a world-frame SemDT origin and scale.
     """
@@ -290,7 +296,7 @@ def _create_world_origin_and_scale_from_latest_bbox(
     translation = list(get_translation_from_transform_matrix(pose_in_world_mat))
 
     object_belief_body = object_belief.body
-    origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=translation[0],
         pos_y=translation[1],
         pos_z=translation[2],

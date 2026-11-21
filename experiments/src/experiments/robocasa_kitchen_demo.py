@@ -55,7 +55,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
     CounterTop,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import OmniDrive
 from coraplex.plans.context_extensions import RobotAccess
@@ -349,12 +351,12 @@ def _spawn_robot_and_prepare_pick_up(
             parent=world.root, child=pr2_world.root, world=world
         )
         world.merge_world(pr2_world, drive)
-        drive.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        drive.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             place_x, robot_y, 0.0, 0.0, 0.0, robot_yaw
         )
         world.merge_world_at_pose(
             apple_world,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 place_x,
                 apple_y,
                 apple_z,

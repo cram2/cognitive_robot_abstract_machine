@@ -23,7 +23,9 @@ import pytest
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -53,8 +55,10 @@ def milk_in_the_apartment(_simple_apartment_setup):
     milk = world.get_body_by_name("milk.stl")
     yield world, milk, world.get_body_by_name("box")
     x, y, z = WHERE_THE_MILK_STOOD
-    milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x, y, z, yaw=np.pi, reference_frame=milk.parent_connection.parent
+    milk.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x, y, z, yaw=np.pi, reference_frame=milk.parent_connection.parent
+        )
     )
 
 
@@ -134,21 +138,21 @@ class BoxAndTrays:
         return 2 * self.tray_width
 
     @property
-    def set_aside(self) -> HomogeneousTransformationMatrix:
+    def set_aside(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Where the box stands when the trays are built, clear of both.
         """
         return self._box_at(-1.0, 0.0, self.box_size / 2)
 
     @property
-    def set_down_in_the_tray(self) -> HomogeneousTransformationMatrix:
+    def set_down_in_the_tray(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Where the box stands on the tray's floor.
         """
         return self._box_at(0.0, 0.0, self.tray_wall_thickness + self.box_size / 2)
 
     @property
-    def set_down_in_the_hole(self) -> HomogeneousTransformationMatrix:
+    def set_down_in_the_hole(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Where the box stands on the floor of the tray named as a hole.
         """
@@ -157,24 +161,26 @@ class BoxAndTrays:
         )
 
     @property
-    def held_up_in_the_tray(self) -> HomogeneousTransformationMatrix:
+    def held_up_in_the_tray(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Where the box hangs inside the tray's walls, a box's height clear of its floor.
         """
         return self._box_at(0.0, 0.0, self.tray_wall_thickness + 1.5 * self.box_size)
 
     @property
-    def lifted_out_of_the_tray(self) -> HomogeneousTransformationMatrix:
+    def lifted_out_of_the_tray(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Where the box hangs high above the tray, clear of its walls.
         """
         return self._box_at(0.0, 0.0, 2 * self.tray_wall_height)
 
-    def _box_at(self, x: float, y: float, z: float) -> HomogeneousTransformationMatrix:
+    def _box_at(
+        self, x: float, y: float, z: float
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :return: The origin that puts the box's centre at the given point.
         """
-        return HomogeneousTransformationMatrix.from_xyz_rpy(
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x, y, z, reference_frame=self.box.parent_connection.parent
         )
 
@@ -191,7 +197,7 @@ class BoxAndTrays:
                 scale=Scale(
                     self.tray_wall_thickness, self.tray_width, self.tray_wall_height
                 ),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=side * self.tray_width / 2, z=self.tray_wall_height / 2
                 ),
             )
@@ -202,7 +208,7 @@ class BoxAndTrays:
                 scale=Scale(
                     self.tray_width, self.tray_wall_thickness, self.tray_wall_height
                 ),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=side * self.tray_width / 2, z=self.tray_wall_height / 2
                 ),
             )
@@ -210,7 +216,7 @@ class BoxAndTrays:
         ]
         floor = Box(
             scale=Scale(self.tray_width, self.tray_width, self.tray_wall_thickness),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=self.tray_wall_thickness / 2
             ),
         )
@@ -222,7 +228,7 @@ class BoxAndTrays:
             FixedConnection(
                 parent=self.world.root,
                 child=tray,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=x, reference_frame=self.world.root
                 ),
             )

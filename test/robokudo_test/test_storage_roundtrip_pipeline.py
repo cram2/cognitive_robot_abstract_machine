@@ -24,7 +24,9 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.io.storage import Storage, StorageDocumentField
 import robokudo.utils.tree_execution
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
@@ -46,7 +48,7 @@ def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
     camera_config = file_reader_descriptor.parameters.camera_config
     camera_config.static_camera_transform_enabled = True
     camera_config.static_world_T_camera = (
-        HomogeneousTransformationMatrix.from_xyz_quaternion(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.1,
             pos_y=0.2,
             pos_z=0.3,

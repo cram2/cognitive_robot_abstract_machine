@@ -12,9 +12,10 @@ import gc
 import weakref
 from collections import Counter
 from dataclasses import dataclass, field
+from types import MethodType
 
 from krrood.exceptions import DataclassException
-from typing_extensions import Any
+from typing_extensions import Any, Callable
 
 MAXIMUM_LIVING_WORLDS: int = 30
 """
@@ -79,8 +80,8 @@ class WorldCreation:
 @dataclass
 class UnwatchableWorldTypeError(DataclassException, TypeError):
     """
-    Raised when a type creates its instances its own way, which the record could only
-    watch by taking that over.
+    Raised when a type is already watched by a record, which a second record would take
+    over.
     """
 
     world_type: type
@@ -89,16 +90,10 @@ class UnwatchableWorldTypeError(DataclassException, TypeError):
     """
 
     def error_message(self) -> str:
-        return (
-            f"{self.world_type.__name__} creates its instances its own way rather than "
-            f"with the plain {CREATION_ATTRIBUTE}, which watching it would take over."
-        )
+        return f"{self.world_type.__name__} is already watched by a record."
 
     def suggest_correction(self) -> str:
-        return (
-            f"Record the worlds of a type that leaves {CREATION_ATTRIBUTE} as it "
-            f"inherits it, and that no other record watches already."
-        )
+        return "Read the worlds from the record that already watches the type."
 
 
 @dataclass
@@ -174,13 +169,16 @@ class LivingWorlds:
     Name of the test the worlds created now are attributed to.
     """
 
+    creation_of_the_type: Callable[..., Any] = field(default=object.__new__, init=False)
+    """
+    How the watched type created its instances before it was watched.
+    """
+
     def watch(self) -> None:
         """
         Record every world the watched type creates from now on.
 
-        :raises UnwatchableWorldTypeError: When the type creates its instances its own
-            way, which watching it would take over. A type that is already watched
-            creates them the record's way, so it is refused a second record too.
+        :raises UnwatchableWorldTypeError: When another record watches the type already.
 
         ..note:: Watching cannot be undone: python leaves a type that was once given a
             :attr:`CREATION_ATTRIBUTE` dispatching through one, so taking it away again
@@ -188,24 +186,34 @@ class LivingWorlds:
             creating its worlds through the record for as long as the process lives,
             which costs it one reference per world.
         """
-        if self.world_type.__new__ is not object.__new__:
+        creation = self.world_type.__new__
+        if isinstance(creation, MethodType) and isinstance(
+            creation.__self__, LivingWorlds
+        ):
             raise UnwatchableWorldTypeError(self.world_type)
+        self.creation_of_the_type = creation
         self.world_type.__new__ = self.create_and_record
 
     def create_and_record(
         self, world_type: type, *arguments: Any, **keyword_arguments: Any
     ) -> Any:
         """
-        Create a world the plain way, and record it against the test running now.
+        Create a world the way the watched type did before, and record it against the
+        test running now.
 
         :param world_type: The type asked for a world, which is the watched type or one
             deriving from it.
         :return: The created world, for its own initialization to fill in.
 
         ..note:: The arguments are the ones the world is initialized with, which plain
-            creation neither reads nor accepts.
+            :func:`object.__new__` neither reads nor accepts.
         """
-        world = object.__new__(world_type)
+        if self.creation_of_the_type is object.__new__:
+            world = object.__new__(world_type)
+        else:
+            world = self.creation_of_the_type(
+                world_type, *arguments, **keyword_arguments
+            )
         self.record(world)
         return world
 

@@ -21,9 +21,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
 from semantic_digital_twin.exceptions import MissingConnectionAxisError
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+    Point3Dimensional,
     Quaternion,
 )
 
@@ -67,8 +67,10 @@ class FixedConnection(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
     ) -> Self:
         return cls(
             parent=parent,
@@ -112,7 +114,7 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
     Superclass for active connections with 1 degree of freedom.
     """
 
-    axis: Vector3 = field(kw_only=True)
+    axis: Vector3Dimensional = field(kw_only=True)
     """
     Connection moves along this unit vector, given in the frame of the parent.
 
@@ -157,12 +159,14 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
         dof_limits: DegreeOfFreedomLimits | None = None,
-        axis: Vector3 | None = None,
+        axis: Vector3Dimensional | None = None,
         dynamics: JointDynamics | None = None,
     ) -> Self:
         """
@@ -289,7 +293,7 @@ class PrismaticConnection(ActiveConnection1DOF):
         super().add_to_world(world=world)
 
         translation_axis = self.axis * self.dof.variables.position
-        self._kinematics = HomogeneousTransformationMatrix.from_xyz_rpy(
+        self._kinematics = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=translation_axis[0],
             y=translation_axis[1],
             z=translation_axis[2],
@@ -306,10 +310,12 @@ class RevoluteConnection(ActiveConnection1DOF):
     def add_to_world(self, *, world: World):
         super().add_to_world(world=world)
 
-        self._kinematics = HomogeneousTransformationMatrix.from_xyz_axis_angle(
-            axis=self.axis,
-            angle=self.dof.variables.position,
-            child_frame=self.child,
+        self._kinematics = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
+                axis=self.axis,
+                angle=self.dof.variables.position,
+                child_frame=self.child,
+            )
         )
 
 
@@ -347,13 +353,15 @@ class ScrewConnection(ActiveConnection1DOF):
 
         angle = self.dof.variables.position
         translation_axis = self.axis * (self.screw_pitch * angle / (2 * np.pi))
-        self._kinematics = HomogeneousTransformationMatrix.from_xyz_axis_angle(
-            x=translation_axis[0],
-            y=translation_axis[1],
-            z=translation_axis[2],
-            axis=self.axis,
-            angle=angle,
-            child_frame=self.child,
+        self._kinematics = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
+                x=translation_axis[0],
+                y=translation_axis[1],
+                z=translation_axis[2],
+                axis=self.axis,
+                angle=angle,
+                child_frame=self.child,
+            )
         )
 
     def rotation_angle_for_travel_distance(self, travel_distance: float) -> float:
@@ -377,12 +385,14 @@ class ScrewConnection(ActiveConnection1DOF):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
         multiplier: float = 1.0,
         offset: float = 0.0,
         dof_limits: DegreeOfFreedomLimits | None = None,
-        axis: Vector3 | None = None,
+        axis: Vector3Dimensional | None = None,
         dynamics: JointDynamics | None = None,
         screw_pitch: float,
     ) -> Self:
@@ -451,7 +461,7 @@ class Connection6DoF(Connection):
 
     def add_to_world(self, *, world: World):
         super().add_to_world(world=world)
-        parent_P_child = Point3(
+        parent_P_child = Point3Dimensional(
             x=self.x.variables.position,
             y=self.y.variables.position,
             z=self.z.variables.position,
@@ -461,11 +471,13 @@ class Connection6DoF(Connection):
             y=self.qy.variables.position,
             z=self.qz.variables.position,
             w=self.qw.variables.position,
-        ).rotation_matrix
-        self._kinematics = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=parent_P_child,
-            rotation_matrix=parent_R_child,
-            child_frame=self.child,
+        ).to_coordinate_change()
+        self._kinematics = (
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                point=parent_P_child,
+                rotation_matrix=parent_R_child,
+                child_frame=self.child,
+            )
         )
 
     @classmethod
@@ -476,8 +488,10 @@ class Connection6DoF(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
     ) -> Self:
         """
         Creates an instance of the class with automatically generated degrees of freedom
@@ -541,34 +555,22 @@ class Connection6DoF(Connection):
         return [self.x, self.y, self.z, self.qx, self.qy, self.qz, self.qw]
 
     @property
-    def origin(self) -> HomogeneousTransformationMatrix:
+    def origin(self) -> HomogeneousTransformationMatrix3Dimensional:
         return super().origin
 
     @origin.setter
-    def origin(self, transformation: HomogeneousTransformationMatrix) -> None:
+    def origin(
+        self, transformation: HomogeneousTransformationMatrix3Dimensional
+    ) -> None:
         """
-        Set this connection's parent-to-child origin.
+        Set this connection's parent-to-child origin, un-composing the fixed expressions
+        around ``_kinematics`` to find the DOF state that produces it. The writes are
+        held together under ``World._world_lock``, so no observer sees a half applied
+        pose.
 
-        The origin is ``parent_T_connection_expression @ _kinematics @
-        connection_T_child_expression``, of which only ``_kinematics`` is DOF-backed;
-        the other two are fixed at connection creation. So ``transformation`` is first
-        converted into the parent frame and then un-composed with those constants, to
-        find the DOF state that makes the *resulting* origin equal ``transformation``,
-        rather than writing ``transformation`` in as ``_kinematics`` directly.
-
-        The degree-of-freedom writes and the notification they trigger are held
-        together under ``World._world_lock``. They form one logical pose
-        change, and an observer that reads or writes the state between them --
-        such as a running physics simulator syncing its own values back into
-        the world -- would otherwise see, and be able to overwrite, a pose that
-        is only half applied.
-
-        :param transformation: The desired parent-to-child origin. Must carry a
-            reference frame (:meth:`World.transform` raises
-            :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
-            otherwise); does not need to already be expressed in the parent frame. Other
-            spatial types (e.g. ``Pose``) must be converted with their own
-            ``homogeneous_matrix`` before being assigned here.
+        :param transformation: The desired parent-to-child origin. Must carry a reference
+            frame, else :class:`~krrood_spatial_math.exceptions.MissingReferenceFrameError`
+            is raised; need not be expressed in the parent frame.
         """
         local_kinematics = self._calculate_local_kinematics(
             self._world.transform(transformation, self.parent)
@@ -619,33 +621,29 @@ class WheeledDrive(ActiveConnection, HasUpdateState, ABC):
     """
 
     @property
-    def origin(self) -> HomogeneousTransformationMatrix:
+    def origin(self) -> HomogeneousTransformationMatrix3Dimensional:
         return super().origin
 
     @origin.setter
     def origin(
-        self, transformation: NpMatrix4x4 | HomogeneousTransformationMatrix
+        self, transformation: NpMatrix4x4 | HomogeneousTransformationMatrix3Dimensional
     ) -> None:
         """
-        Overwrites the origin of the connection.
-
-        The origin is ``parent_T_connection_expression @ _kinematics @
-        connection_T_child_expression``, of which only ``_kinematics`` is degree of
-        freedom backed, so ``transformation`` is un-composed with the other two to find
-        the drive's state that produces it.
+        Overwrites the origin of the connection, un-composing the fixed expressions
+        around ``_kinematics`` to find the drive's state that produces it. The writes
+        are held together under ``World._world_lock``.
 
         .. warning:: Ignores z position, pitch, and roll values, because a drive cannot
             reach them.
 
-        The degree-of-freedom writes and the notification they trigger are held
-        together under ``World._world_lock``. They form one logical pose
-        change, and an observer that reads or writes the state between them --
-        such as a running physics simulator syncing its own values back into
-        the world -- would otherwise see, and be able to overwrite, a pose that
-        is only half applied.
-
-        :param transformation: The desired parent-to-child origin.
+        :param transformation: The desired parent-to-child origin. One given in a frame is
+            expressed in the parent frame first; one given in none is taken to be in it.
         """
+        if (
+            isinstance(transformation, HomogeneousTransformationMatrix3Dimensional)
+            and transformation.reference_frame is not None
+        ):
+            transformation = self._world.transform(transformation, self.parent)
         local_kinematics = self._calculate_local_kinematics(transformation)
         position = local_kinematics.position
         roll, pitch, yaw = local_kinematics.rotation_matrix.rpy
@@ -690,15 +688,15 @@ class OmniDrive(WheeledDrive):
 
     def add_to_world(self, *, world: World):
         super().add_to_world(world=world)
-        odom_T_bf = HomogeneousTransformationMatrix.from_xyz_rpy(
+        odom_T_bf = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=self.x.variables.position,
             y=self.y.variables.position,
             yaw=self.yaw.variables.position,
         )
-        bf_T_bf_vel = HomogeneousTransformationMatrix.from_xyz_rpy(
+        bf_T_bf_vel = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=self.x_velocity.variables.position, y=self.y_velocity.variables.position
         )
-        bf_vel_T_bf = HomogeneousTransformationMatrix.from_xyz_rpy(
+        bf_vel_T_bf = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0,
             y=0,
             z=0,
@@ -717,8 +715,10 @@ class OmniDrive(WheeledDrive):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
     ) -> Self:
@@ -841,15 +841,15 @@ class DifferentialDrive(WheeledDrive):
 
     def add_to_world(self, *, world: World):
         super().add_to_world(world=world)
-        odom_T_bf = HomogeneousTransformationMatrix.from_xyz_rpy(
+        odom_T_bf = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=self.x.variables.position,
             y=self.y.variables.position,
             yaw=self.yaw.variables.position,
         )
-        bf_T_bf_vel = HomogeneousTransformationMatrix.from_xyz_rpy(
+        bf_T_bf_vel = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=self.x_velocity.variables.position,
         )
-        bf_vel_T_bf = HomogeneousTransformationMatrix.from_xyz_rpy(
+        bf_vel_T_bf = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0,
             y=0,
             z=0,
@@ -868,8 +868,10 @@ class DifferentialDrive(WheeledDrive):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
         translation_velocity_limits: float = 0.6,
         rotation_velocity_limits: float = 0.5,
     ) -> Self:

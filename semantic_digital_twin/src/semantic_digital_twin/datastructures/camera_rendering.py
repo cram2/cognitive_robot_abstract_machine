@@ -23,7 +23,9 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
-    from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+    from krrood_spatial_math.spatial_types import (
+        HomogeneousTransformationMatrix3Dimensional,
+    )
     from semantic_digital_twin.world_description.world_entity import Body
     from semantic_digital_twin.world import World
 
@@ -179,7 +181,7 @@ class DepthMode(ABC):
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
-        world_T_camera: HomogeneousTransformationMatrix,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     ) -> npt.NDArray[np.float64]:
         """
         Return depths aligned with the input hits.
@@ -204,7 +206,7 @@ class OpticalAxisDepthMode(DepthMode):
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
-        world_T_camera: HomogeneousTransformationMatrix,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     ) -> npt.NDArray[np.float64]:
         camera_T_world = world_T_camera.inverse().to_np()
         world_P_hits = np.concatenate(
@@ -226,7 +228,7 @@ class RayDistanceDepthMode(DepthMode):
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
-        world_T_camera: HomogeneousTransformationMatrix,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     ) -> npt.NDArray[np.float64]:
         return trimesh.util.diagonal_dot(hit_points - ray_origins, ray_directions)
 

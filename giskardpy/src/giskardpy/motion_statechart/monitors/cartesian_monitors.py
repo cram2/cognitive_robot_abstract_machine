@@ -25,7 +25,7 @@ from giskardpy.motion_statechart.mixins import (
     HasThresholdParameter,
     HasTipNormalParameter,
 )
-from krrood_spatial_math.spatial_types import Vector3, Point3
+from krrood_spatial_math.spatial_types import Vector3Dimensional, Point3Dimensional
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -136,7 +136,9 @@ class OrientationReached(
         :return: Artifacts observing whether the tip is turned less than
             :attr:`threshold` away from :attr:`goal_orientation`.
         """
-        root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
+        root_R_goal = (
+            self.root_T_goal_reference_frame.rotation_matrix @ self.goal_orientation
+        )
         root_R_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
@@ -178,7 +180,7 @@ class PointingAt(
             self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_P_tip = root_T_tip.position
-        root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
+        root_V_pointing_axis = root_T_tip.dot(other=tip_V_pointing_axis)
 
         _, distance = root_P_goal_point.project_to_line(
             line_point=root_P_tip, line_direction=root_V_pointing_axis
@@ -218,7 +220,7 @@ class VectorsAligned(
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
-        root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
+        root_V_tip_normal = root_R_tip.dot(other=tip_V_tip_normal)
         error = root_V_tip_normal.angle_between(root_V_root_normal)
         return NodeArtifacts(observation=error < self.threshold)
 
@@ -235,12 +237,12 @@ class DistanceToLine(
     segment centered at ``center_point`` along ``line_axis``.
     """
 
-    center_point: Point3
+    center_point: Point3Dimensional
     """
     Center of the line segment.
     """
 
-    line_axis: Vector3
+    line_axis: Vector3Dimensional
     """
     Direction of the line segment.
     """

@@ -8,7 +8,9 @@ from experiments.free_space_volume_estimation import (
     ObstacleContainmentChecker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -29,7 +31,7 @@ def _search_space_box(world: World, half_extent: float = 5.0) -> VolumetricBound
         max_x=half_extent,
         max_y=half_extent,
         max_z=half_extent,
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
     )
 
 

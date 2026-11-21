@@ -35,7 +35,7 @@ from semantic_digital_twin.datastructures.camera_rendering import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from krrood_spatial_math.spatial_types import (
     GenericSpatialType,
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -284,7 +284,9 @@ class RayTracer:
             hit_points=points,
             ray_origins=ray_origins[ray_indices],
             ray_directions=ray_directions[ray_indices],
-            world_T_camera=HomogeneousTransformationMatrix(self.scene.camera_transform),
+            world_T_camera=HomogeneousTransformationMatrix3Dimensional(
+                self.scene.camera_transform
+            ),
         )
         valid_depths = hit_depths >= 0.0
         hit_pixels = hit_pixels[valid_depths]
@@ -452,7 +454,7 @@ class RayTracer:
         resolution = camera_model.resolution
         rgb_mode.validate_camera_model(camera_model)
         world_T_optical = camera.root.global_transform
-        world_T_forward_view = HomogeneousTransformationMatrix(
+        world_T_forward_view = HomogeneousTransformationMatrix3Dimensional(
             data=world_T_optical.to_np() @ camera.optical_R_forward_view.to_np(),
             reference_frame=world_T_optical.reference_frame,
         )

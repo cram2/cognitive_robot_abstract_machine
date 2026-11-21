@@ -75,7 +75,9 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -538,7 +540,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         :returns: List of bounding boxes.
         """
         annotation = SemanticEnvironmentAnnotation(root=world.root, _world=world)
-        origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+        origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
         return list(annotation.as_bounding_box_collection_at_origin(origin))
 
     @staticmethod
@@ -610,7 +612,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         :param xy_widen: Total amount to widen the minimal covering box by, split evenly
             between both sides, in x and y.
         """
-        origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+        origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
         if not obstacle_bounding_boxes:
             return BoundingBoxCollection(
                 shapes=[

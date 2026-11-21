@@ -27,7 +27,9 @@ from semantic_digital_twin.datastructures.camera_model import (
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Camera, RobotCamera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -177,7 +179,7 @@ def test_resolver_applies_camera_pose_override_once() -> None:
     """
     The first camera load applies the override without pinning later motion.
     """
-    camera_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+    camera_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=-0.8,
         y=0.2,
         z=1.4,
@@ -201,7 +203,7 @@ def test_resolver_applies_camera_pose_override_once() -> None:
         camera.root.parent_connection.origin.to_np(), camera_pose.to_np()
     )
 
-    later_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+    later_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=-0.7,
         y=0.3,
         z=1.2,
@@ -235,5 +237,5 @@ def test_resolver_rejects_pose_override_for_world_root_camera() -> None:
         RayTracingContextResolver._apply_camera_pose(
             world,
             camera,
-            camera_pose=HomogeneousTransformationMatrix(),
+            camera_pose=HomogeneousTransformationMatrix3Dimensional(),
         )

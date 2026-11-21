@@ -1,10 +1,11 @@
 """
-The alternative mappings and column types semantic_digital_twin stores its
-non-dataclass types, such as the world and the spatial types, with.
+The alternative mappings and column types semantic_digital_twin stores its non-dataclass
+types, such as the world and the spatial types, with.
 """
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass, field
 from io import BytesIO
 from uuid import UUID
@@ -16,23 +17,26 @@ from sqlalchemy import TypeDecorator, types
 from typing_extensions import Self
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood_spatial_math.point import Point
 from semantic_digital_twin.mixin import HasSimulatorProperties
 from krrood_spatial_math.spatial_types import (
     RotationMatrix,
-    Vector3,
-    Point3,
-    HomogeneousTransformationMatrix,
+    Vector3Dimensional,
+    Point3Dimensional,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from krrood_spatial_math.spatial_types import (
     Quaternion,
-    Pose,
-    Point2,
-    Pose2D,
+    Pose3Dimensional,
     AxisAngle,
-    SpatialType,
+    SymbolicSpatialType,
     Displacement,
     ScrewAxis,
     Twist,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    Point2Dimensional,
+    Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection
@@ -89,7 +93,7 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [WorldState, SpatialType, WorldEntity]
+        return [WorldState, SymbolicSpatialType, WorldEntity]
 
     __hash__ = AlternativeMapping.__hash__
 
@@ -115,7 +119,7 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
 
 
 @dataclass(eq=False)
-class Vector3Mapping(AlternativeMapping[Vector3]):
+class Vector3DimensionalMapping(AlternativeMapping[Vector3Dimensional]):
     x: float
     y: float
     z: float
@@ -123,33 +127,61 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
     reference_frame: KinematicStructureEntity | None
 
     @classmethod
-    def from_domain_object(cls, *, obj: Vector3):
+    def from_domain_object(cls, *, obj: Vector3Dimensional) -> Self:
         x, y, z, _ = obj.to_np().tolist()
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
-    def to_domain_object(self) -> Vector3:
-        return Vector3(
+    def to_domain_object(self) -> Vector3Dimensional:
+        return Vector3Dimensional(
             x=self.x, y=self.y, z=self.z, reference_frame=self.reference_frame
         )
 
 
 @dataclass(eq=False)
-class Point3Mapping(AlternativeMapping[Point3]):
-    x: float
-    y: float
-    z: float
+class PointMapping(AlternativeMapping[Point], ABC):
+    """
+    What every stored point given in a Cartesian frame keeps, whatever its dimension.
+    """
 
     reference_frame: KinematicStructureEntity | None
+    """
+    The frame the point is given in, or *None* where it is given in no frame.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Point3DimensionalMapping(PointMapping, AlternativeMapping[Point3Dimensional]):
+    """
+    A stored point given by three coordinates in its reference frame.
+    """
+
+    x: float
+    """
+    The amount along the frame's x-axis.
+    """
+
+    y: float
+    """
+    The amount along the frame's y-axis.
+    """
+
+    z: float
+    """
+    The amount along the frame's z-axis.
+    """
 
     @classmethod
-    def from_domain_object(cls, *, obj: Point3):
-        x, y, z, _ = float(obj.x), float(obj.y), float(obj.z), obj.reference_frame
-        result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
-        return result
+    def from_domain_object(cls, *, obj: Point3Dimensional) -> Self:
+        return cls(
+            x=float(obj.x),
+            y=float(obj.y),
+            z=float(obj.z),
+            reference_frame=obj.reference_frame,
+        )
 
-    def to_domain_object(self) -> Point3:
-        return Point3(
+    def to_domain_object(self) -> Point3Dimensional:
+        return Point3Dimensional(
             x=self.x, y=self.y, z=self.z, reference_frame=self.reference_frame
         )
 
@@ -181,7 +213,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
 @dataclass(eq=False)
 class AxisAngleMapping(AlternativeMapping[AxisAngle]):
-    axis: Vector3
+    axis: Vector3Dimensional
     angle: float
     reference_frame: KinematicStructureEntity | None
 
@@ -198,13 +230,13 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [Vector3]
+        return [Vector3Dimensional]
 
 
 @dataclass(eq=False)
 class DisplacementMapping(AlternativeMapping[Displacement]):
-    translation: Vector3
-    rotation_vector: Vector3
+    translation: Vector3Dimensional
+    rotation_vector: Vector3Dimensional
     reference_frame: KinematicStructureEntity | None
 
     @classmethod
@@ -224,7 +256,7 @@ class DisplacementMapping(AlternativeMapping[Displacement]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [Vector3]
+        return [Vector3Dimensional]
 
 
 @dataclass(eq=False, kw_only=True)
@@ -233,12 +265,12 @@ class TwistMapping(AlternativeMapping[Twist]):
     A :class:`Twist` stored as its two velocities and its reference frame.
     """
 
-    angular_velocity: Vector3
+    angular_velocity: Vector3Dimensional
     """
     The axis the body turns around, scaled by how fast it turns.
     """
 
-    linear_velocity: Vector3
+    linear_velocity: Vector3Dimensional
     """
     How fast the point of the body at the origin of the reference frame moves.
     """
@@ -267,9 +299,9 @@ class TwistMapping(AlternativeMapping[Twist]):
     def required_pre_build_classes(cls) -> list[type]:
         """
         Extends :meth:`AlternativeMapping.required_pre_build_classes` by the
-        :class:`Vector3` both vectors are stored as.
+        :class:`Vector3Dimensional` both vectors are stored as.
         """
-        return [Vector3]
+        return [Vector3Dimensional]
 
 
 @dataclass(eq=False, kw_only=True)
@@ -279,12 +311,13 @@ class ScrewAxisMapping(AlternativeMapping[ScrewAxis]):
     its reference frame.
     """
 
-    rotation_per_unit_position: Vector3
+    rotation_per_unit_position: Vector3Dimensional
     """
-    The axis the body turns around, scaled by the angle it turns by per unit of position.
+    The axis the body turns around, scaled by the angle it turns by per unit of
+    position.
     """
 
-    translation_per_unit_position: Vector3
+    translation_per_unit_position: Vector3Dimensional
     """
     How far the point of the body at the origin of the reference frame moves per unit of
     position.
@@ -314,42 +347,25 @@ class ScrewAxisMapping(AlternativeMapping[ScrewAxis]):
     def required_pre_build_classes(cls) -> list[type]:
         """
         Extends :meth:`AlternativeMapping.required_pre_build_classes` by the
-        :class:`Vector3` both vectors are stored as.
+        :class:`Vector3Dimensional` both vectors are stored as.
         """
-        return [Vector3]
+        return [Vector3Dimensional]
 
 
 @dataclass(eq=False)
-class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
-    axis_angle: AxisAngle
-    reference_frame: KinematicStructureEntity | None
-
-    @classmethod
-    def from_domain_object(cls, *, obj: RotationMatrix):
-        return cls(axis_angle=obj.axis_angle, reference_frame=obj.reference_frame)
-
-    def to_domain_object(self) -> RotationMatrix:
-        rotation_matrix = self.axis_angle.rotation_matrix
-        rotation_matrix.reference_frame = self.reference_frame
-        return rotation_matrix
-
-    @classmethod
-    def required_pre_build_classes(cls) -> list[type]:
-        return [AxisAngle]
-
-
-@dataclass(eq=False)
-class HomogeneousTransformationMatrixMapping(
-    AlternativeMapping[HomogeneousTransformationMatrix]
+class HomogeneousTransformationMatrix3DimensionalMapping(
+    AlternativeMapping[HomogeneousTransformationMatrix3Dimensional]
 ):
-    position: Point3
+    position: Point3Dimensional
     axis_angle: AxisAngle
 
     reference_frame: KinematicStructureEntity | None
     child_frame: KinematicStructureEntity | None
 
     @classmethod
-    def from_domain_object(cls, *, obj: HomogeneousTransformationMatrix):
+    def from_domain_object(
+        cls, *, obj: HomogeneousTransformationMatrix3Dimensional
+    ) -> Self:
         return cls(
             position=obj.position,
             axis_angle=obj.axis_angle,
@@ -357,33 +373,49 @@ class HomogeneousTransformationMatrixMapping(
             child_frame=obj.child_frame,
         )
 
-    def to_domain_object(self) -> HomogeneousTransformationMatrix:
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+    def to_domain_object(self) -> HomogeneousTransformationMatrix3Dimensional:
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=self.position,
-            rotation_matrix=self.axis_angle.rotation_matrix,
+            rotation_matrix=self.axis_angle.to_coordinate_change(),
             reference_frame=self.reference_frame,
             child_frame=self.child_frame,
         )
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [Point3, AxisAngle]
+        return [Point3Dimensional, AxisAngle]
 
 
 @dataclass(eq=False)
-class PoseMapping(AlternativeMapping[Pose]):
-    position: Point3
+class RotationMatrixMapping(
+    HomogeneousTransformationMatrix3DimensionalMapping,
+    AlternativeMapping[RotationMatrix],
+):
+    """
+    A stored rotation: a stored transformation whose position is the origin.
+    """
+
+    def to_domain_object(self) -> RotationMatrix:
+        rotation_matrix = self.axis_angle.to_coordinate_change()
+        rotation_matrix.reference_frame = self.reference_frame
+        rotation_matrix.child_frame = self.child_frame
+        return rotation_matrix
+
+
+@dataclass(eq=False, kw_only=True)
+class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
+    position: Point3Dimensional
     axis_angle: AxisAngle
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
     @classmethod
-    def from_domain_object(cls, *, obj: Pose):
+    def from_domain_object(cls, *, obj: Pose3Dimensional) -> Self:
         result = cls(position=obj.position, axis_angle=obj.axis_angle)
         result.reference_frame = obj.reference_frame
         return result
 
-    def to_domain_object(self) -> Pose:
-        return Pose(
+    def to_domain_object(self) -> Pose3Dimensional:
+        return Pose3Dimensional(
             position=self.position,
             orientation=self.axis_angle.quaternion,
             reference_frame=self.reference_frame,
@@ -392,27 +424,20 @@ class PoseMapping(AlternativeMapping[Pose]):
     @classmethod
     def from_point_mapping_quaternion_mapping(
         cls,
-        position: Point3Mapping,
+        position: Point3DimensionalMapping,
         orientation: QuaternionMapping,
         reference_frame: KinematicStructureEntity,
-    ) -> Pose:
+    ) -> Pose3Dimensional:
         """
-        Creates a Pose instance from a Point3Mapping and a QuaternionMapping.
+        Creates a :class:`Pose3Dimensional` from the mappings of its position and
+        orientation.
 
-        This method constructs a Pose object by utilizing the provided Point3Mapping for
-        the position and the QuaternionMapping for the orientation. The resulting Pose
-        is associated with the specified reference frame.
-
-        :param position: A Point3Mapping object that provides the position data for the
-            Pose.
-        :param orientation: A QuaternionMapping object that provides the orientation
-            data for the Pose.
-        :param reference_frame: The reference frame to which the Pose will be
-            associated.
-        :return: A Pose instance created from the given Point3Mapping and
-            QuaternionMapping.
+        :param position: The mapping of the position.
+        :param orientation: The mapping of the orientation.
+        :param reference_frame: The frame the pose is given in.
+        :return: The pose with that position and orientation.
         """
-        return Pose(
+        return Pose3Dimensional(
             position=position.to_domain_object(),
             orientation=orientation.to_domain_object(),
             reference_frame=reference_frame,
@@ -420,41 +445,49 @@ class PoseMapping(AlternativeMapping[Pose]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [Point3, AxisAngle]
+        return [Point3Dimensional, AxisAngle]
 
 
 @dataclass(eq=False)
-class Point2Mapping(AlternativeMapping[Point2]):
-    x: float
-    y: float
+class Point2DimensionalMapping(PointMapping, AlternativeMapping[Point2Dimensional]):
+    """
+    A stored point given by two coordinates on the x-y plane of its reference frame.
+    """
 
-    reference_frame: KinematicStructureEntity | None
+    x: float
+    """
+    The amount along the frame's x-axis.
+    """
+
+    y: float
+    """
+    The amount along the frame's y-axis.
+    """
 
     @classmethod
-    def from_domain_object(cls, *, obj: Point2):
-        result = cls(
-            x=float(obj.x), y=float(obj.y), reference_frame=obj.reference_frame
-        )
-        return result
+    def from_domain_object(cls, *, obj: Point2Dimensional) -> Self:
+        return cls(x=float(obj.x), y=float(obj.y), reference_frame=obj.reference_frame)
 
-    def to_domain_object(self) -> Point2:
-        return Point2(x=self.x, y=self.y, reference_frame=self.reference_frame)
+    def to_domain_object(self) -> Point2Dimensional:
+        return Point2Dimensional(
+            x=self.x, y=self.y, reference_frame=self.reference_frame
+        )
 
 
 @dataclass(eq=False)
-class Pose2DMapping(AlternativeMapping[Pose2D]):
-    position: Point2
+class Pose2DimensionalMapping(AlternativeMapping[Pose2Dimensional]):
+    position: Point2Dimensional
     yaw: float
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
     @classmethod
-    def from_domain_object(cls, *, obj: Pose2D):
+    def from_domain_object(cls, *, obj: Pose2Dimensional) -> Self:
         result = cls(position=obj.position, yaw=float(obj.yaw))
         result.reference_frame = obj.reference_frame
         return result
 
-    def to_domain_object(self) -> Pose2D:
-        return Pose2D(
+    def to_domain_object(self) -> Pose2Dimensional:
+        return Pose2Dimensional(
             position=self.position,
             yaw=self.yaw,
             reference_frame=self.reference_frame,
@@ -462,7 +495,7 @@ class Pose2DMapping(AlternativeMapping[Pose2D]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
-        return [Point2]
+        return [Point2Dimensional]
 
 
 class TrimeshType(TypeDecorator):

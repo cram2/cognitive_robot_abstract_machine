@@ -9,11 +9,11 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Iterator, Iterable
 
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 
 @dataclass
-class Location(Iterable[Pose2D], ABC):
+class Location(Iterable[Pose2Dimensional], ABC):
     """
     A region of poses the robot can be sent to, iterated as the pose candidates sampled
     from it.
@@ -25,20 +25,20 @@ class Location(Iterable[Pose2D], ABC):
     """
 
     @abstractmethod
-    def candidates(self) -> Iterator[Pose2D]:
+    def candidates(self) -> Iterator[Pose2Dimensional]:
         """
         Sample pose candidates from this location, :attr:`number_of_samples` of them.
 
         :return: The pose candidates, in the order they should be tried.
         """
 
-    def ground(self) -> Pose2D:
+    def ground(self) -> Pose2Dimensional:
         """
         :return: The first pose candidate of this location.
         """
         return next(iter(self))
 
-    def __iter__(self) -> Iterator[Pose2D]:
+    def __iter__(self) -> Iterator[Pose2Dimensional]:
         """
         :return: The candidates of this location.
 

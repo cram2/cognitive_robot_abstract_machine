@@ -1,3 +1,8 @@
+"""
+The entities a world is made of: bodies, regions and the connections between them,
+semantic annotations, and actuators.
+"""
+
 from __future__ import annotations
 
 import hashlib
@@ -31,7 +36,10 @@ from krrood.patterns.caching import memoize
 from krrood.symbolic_math.symbolic_math import Matrix
 from krrood.utils import get_full_class_name
 from krrood.patterns.identifier_and_name import HasID, HasName
-from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3D
+from krrood_spatial_math.cartesian_frame_3_dimensional import (
+    CartesianFrame3Dimensional,
+    EmbeddedPlaneRelation,
+)
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityReference,
     WorldEntityWithIDKwargsTracker,
@@ -47,10 +55,11 @@ from semantic_digital_twin.world_description.connection_properties import (
 )
 from krrood_spatial_math.spatial_types import (
     GenericSpatialType,
-    HomogeneousTransformationMatrix,
-    Point3,
-    Pose,
-    SpatialType,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Pose3Dimensional,
+    SymbolicSpatialType,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -274,8 +283,8 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
         """
 
         def _resolve_frame(
-            frame: CartesianFrame3D | None, world: World
-        ) -> CartesianFrame3D | None:
+            frame: CartesianFrame3Dimensional | None, world: World
+        ) -> CartesianFrame3Dimensional | None:
             if isinstance(frame, KinematicStructureEntity):
                 return world.get_kinematic_structure_entity_by_id(frame.id)
             return frame
@@ -287,10 +296,10 @@ class WorldEntityWithID(WorldEntity, SubclassJSONSerializer, HasID):
                 return item.copy_for_world(world)
             elif isinstance(item, ShapeCollection):
                 return item.copy_without_reference_frame()
-            elif isinstance(item, SpatialType):
+            elif isinstance(item, SymbolicSpatialType):
                 copied = deepcopy(item)
                 copied.reference_frame = _resolve_frame(item.reference_frame, world)
-                if isinstance(item, HomogeneousTransformationMatrix):
+                if isinstance(item, HomogeneousTransformationMatrix3Dimensional):
                     copied.child_frame = _resolve_frame(item.child_frame, world)
                 return copied
             return deepcopy(item)
@@ -387,7 +396,7 @@ class WorldEntityWithSimulatorProperties(WorldEntityWithID, HasSimulatorProperti
 
 @dataclass(eq=False)
 class KinematicStructureEntity(
-    WorldEntityWithSimulatorProperties, CartesianFrame3D[PrefixedName], ABC
+    WorldEntityWithSimulatorProperties, CartesianFrame3Dimensional[PrefixedName], ABC
 ):
     """
     An entity that is part of the kinematic structure of the world.
@@ -408,8 +417,29 @@ class KinematicStructureEntity(
         super().remove_from_world()
         self.index = None
 
-    def express_in_own_frame(self, value: GenericSpatialType) -> GenericSpatialType:
+    @property
+    def space(self) -> World | None:
+        """
+        The world this entity belongs to, which is the space its frame charts; ``None``
+        while it belongs to no world.
+        """
+        return self._world
+
+    def transform_into_own_frame(
+        self, *, value: GenericSpatialType
+    ) -> GenericSpatialType:
         return self._world.transform(value, self)
+
+    @property
+    def z_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Z(reference_frame=self)
+
+    def compare_embedded_plane_in_own_space(
+        self, *, frame: CartesianFrame3Dimensional
+    ) -> EmbeddedPlaneRelation:
+        return self._world.transform(
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=frame), self
+        ).embedded_plane_relation
 
     @property
     @abstractmethod
@@ -419,14 +449,14 @@ class KinematicStructureEntity(
         """
 
     @property
-    def center_of_mass(self) -> Point3:
+    def center_of_mass(self) -> Point3Dimensional:
         """
         Computes the center of mass of this KinematicStructureEntity.
         """
         # Center of mass in the body's local frame (collision geometry)
         com_local: np.ndarray[np.float64] = self.combined_mesh.center_mass  # (3,)
         # Transform to world frame using the body's global pose
-        com = Point3(
+        com = Point3Dimensional(
             x=com_local[0],
             y=com_local[1],
             z=com_local[2],
@@ -436,7 +466,7 @@ class KinematicStructureEntity(
         return world.transform(com, world.root)
 
     @property
-    def global_transform(self) -> HomogeneousTransformationMatrix:
+    def global_transform(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the transform of the KinematicStructureEntity in the world frame.
 
@@ -445,11 +475,11 @@ class KinematicStructureEntity(
         return self._world.compute_forward_kinematics(self._world.root, self)
 
     @property
-    def global_pose(self) -> Pose:
+    def global_pose(self) -> Pose3Dimensional:
         """
         Computes the Pose of the KinematicStructureEntity in the world frame.
 
-        :return: Pose representing the global pose.
+        :return: Pose3Dimensional representing the global pose.
         """
         return self._world.compute_forward_kinematics(self._world.root, self).pose
 
@@ -500,7 +530,7 @@ class KinematicStructureEntity(
     def from_3d_points(
         cls,
         name: PrefixedName,
-        points_3d: list[Point3],
+        points_3d: list[Point3Dimensional],
         minimum_thickness: float = 0.005,
         singular_value_ratio_tolerance: float = 1e-7,
     ) -> Self:
@@ -884,7 +914,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         return list({body.id: body for body in self.bodies}.values())
 
     def as_bounding_box_collection_at_origin(
-        self, origin: HomogeneousTransformationMatrix
+        self, origin: HomogeneousTransformationMatrix3Dimensional
     ) -> BoundingBoxCollection:
         """
         Returns a bounding box collection that contains the bounding boxes of all bodies
@@ -910,7 +940,7 @@ class SemanticAnnotation(WorldEntityWithSimulatorProperties):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=reference_frame)
         )
 
     def _referenced_semantic_annotations(
@@ -968,7 +998,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
     The child KinematicStructureEntity of the connection.
     """
 
-    parent_T_connection_expression: HomogeneousTransformationMatrix = field(
+    parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional = field(
         default=None
     )
     """
@@ -978,10 +1008,12 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         a direct assignment is not recorded, published or rolled back.
     """
 
-    _kinematics: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix, init=False
+    _kinematics: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=HomogeneousTransformationMatrix3Dimensional, init=False
     )
-    connection_T_child_expression: HomogeneousTransformationMatrix = field(default=None)
+    connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional = field(
+        default=None
+    )
     """
     The origin expression of a connection is split into 2 transforms:
     1. parent_T_connection describes the pose of the connection relative to its parent and must be constant.
@@ -1006,9 +1038,13 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
 
         # If I use default factories, I'd have to complicate the from_json, because I couldn't blindly pass these args
         if self.parent_T_connection_expression is None:
-            self.parent_T_connection_expression = HomogeneousTransformationMatrix()
+            self.parent_T_connection_expression = (
+                HomogeneousTransformationMatrix3Dimensional()
+            )
         if self.connection_T_child_expression is None:
-            self.connection_T_child_expression = HomogeneousTransformationMatrix()
+            self.connection_T_child_expression = (
+                HomogeneousTransformationMatrix3Dimensional()
+            )
 
         if not self.parent_T_connection_expression.is_constant():
             raise RuntimeError(
@@ -1037,7 +1073,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
 
     @synchronized_attribute_modification
     def update_parent_T_connection(
-        self, *, parent_T_connection: HomogeneousTransformationMatrix
+        self, *, parent_T_connection: HomogeneousTransformationMatrix3Dimensional
     ) -> None:
         """
         Replace the constant pose of this connection relative to its parent and record
@@ -1059,7 +1095,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         )
 
     def _validate_parent_T_connection_frame(
-        self, *, parent_T_connection: HomogeneousTransformationMatrix
+        self, *, parent_T_connection: HomogeneousTransformationMatrix3Dimensional
     ) -> None:
         """
         :param parent_T_connection: A pose of this connection relative to its parent.
@@ -1113,7 +1149,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         return cls(**arguments)
 
     @property
-    def origin_expression(self) -> HomogeneousTransformationMatrix:
+    def origin_expression(self) -> HomogeneousTransformationMatrix3Dimensional:
         return (
             self.parent_T_connection_expression
             @ self._kinematics
@@ -1121,7 +1157,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         )
 
     @property
-    def reference_origin_expression(self) -> HomogeneousTransformationMatrix:
+    def reference_origin_expression(
+        self,
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         The parent-to-child transform at the reference configuration, excluding the
         variable joint :attr:`_kinematics`.
@@ -1167,7 +1205,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         return hash((self.parent, self.child))
 
     @property
-    def origin(self) -> HomogeneousTransformationMatrix:
+    def origin(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :return: The relative transform between the parent and child frame.
         """
@@ -1181,7 +1219,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
 
     @staticmethod
     def _as_position_quaternion(
-        parent_T_child: HomogeneousTransformationMatrix,
+        parent_T_child: HomogeneousTransformationMatrix3Dimensional,
     ) -> Matrix:
         """
         Stack a transform's translation and rotation into a single row.
@@ -1222,8 +1260,10 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
     ) -> Self:
         """
         Generates the degrees of freedom for this connection into the given world and
@@ -1243,7 +1283,7 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
     def copy_with_new_parent(
         self,
         new_parent: KinematicStructureEntity,
-        parent_T_connection_expression: HomogeneousTransformationMatrix,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         Create a copy of this connection re-parented under ``new_parent``, using
@@ -1297,8 +1337,8 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         self.parent_T_connection_expression.child_frame = self.child
 
     def _calculate_local_kinematics(
-        self, transformation: HomogeneousTransformationMatrix
-    ) -> HomogeneousTransformationMatrix:
+        self, transformation: HomogeneousTransformationMatrix3Dimensional
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Un-compose an origin with this connection's constant offsets, leaving the part a
         degree of freedom can carry.
@@ -1308,7 +1348,9 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         :return: The local kinematics producing that origin.
         """
         if isinstance(transformation, np.ndarray):
-            transformation = HomogeneousTransformationMatrix(data=transformation)
+            transformation = HomogeneousTransformationMatrix3Dimensional(
+                data=transformation
+            )
         local_kinematics = (
             self.parent_T_connection_expression.inverse()
             @ transformation

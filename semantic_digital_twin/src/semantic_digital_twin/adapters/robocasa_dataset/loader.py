@@ -41,7 +41,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Handle,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.utils import camel_case_split
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
@@ -107,7 +109,7 @@ class RoboCasaTask:
     The bodies in :attr:`world` that the task requires the robot to interact with.
     """
 
-    robot_base_pose: HomogeneousTransformationMatrix
+    robot_base_pose: HomogeneousTransformationMatrix3Dimensional
     """
     The pose, relative to the world root, at which RoboCasa intends the robot to start,
     for spawning the ``semantic_digital_twin``-owned robot.
@@ -391,7 +393,7 @@ class RoboCasaDatasetLoader:
             world=world,
             instruction=episode_metadata["lang"],
             manipulated_objects=manipulated_objects,
-            robot_base_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            robot_base_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 *episode_metadata["init_robot_base_pos"],
                 *episode_metadata["init_robot_base_ori"],
             ),

@@ -24,7 +24,7 @@ from giskardpy.middleware.ros2.command_publishing import (
 )
 from giskardpy.middleware.ros2.exceptions import UnknownMinimumVelocityJointError
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -104,7 +104,7 @@ def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
                 world=world,
                 parent=parent,
                 child=child,
-                axis=Vector3.Z(),
+                axis=Vector3Dimensional.Z(),
                 name=PrefixedName(spec.name),
                 multiplier=spec.multiplier,
             )
@@ -136,7 +136,7 @@ def add_removable_joint(world: World, parent: Body) -> ActiveConnection1DOF:
             world=world,
             parent=parent,
             child=Body(name=PrefixedName("removable_body")),
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             name=PrefixedName("removable_joint"),
         )
         world.add_connection(connection)

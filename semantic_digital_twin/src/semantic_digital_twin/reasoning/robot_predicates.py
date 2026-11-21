@@ -47,7 +47,7 @@ from semantic_digital_twin.robots.robot_parts import (
 from semantic_digital_twin.semantic_annotations.mixins import TKinematicStructureEntity
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
@@ -197,7 +197,7 @@ def is_gripper_holding_something(gripper: EndEffector) -> bool:
 
 
 @symbolic_function
-def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
+def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose3Dimensional) -> bool:
     return not PlaceIsOccupied(
         box=robot.mobile_base.bounding_box,
         pose=pose,

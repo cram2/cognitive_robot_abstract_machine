@@ -32,7 +32,10 @@ from semantic_digital_twin.exceptions import (
     ConnectionCannotBeTrackedByTfFrameError,
     UnboundMessageTypeError,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -102,7 +105,7 @@ def joint_state_message(joint_name: str, position: float) -> JointState:
     return message
 
 
-def odometry_message(pose: HomogeneousTransformationMatrix) -> Odometry:
+def odometry_message(pose: HomogeneousTransformationMatrix3Dimensional) -> Odometry:
     """
     An odometry message that reports the given pose.
     """
@@ -162,10 +165,10 @@ def world_with_two_connections() -> tuple[
         part_body = Body(name=PrefixedName("part_body"))
         other_body = Body(name=PrefixedName("other_body"))
         part_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=part_body, axis=Vector3.Z()
+            world=world, parent=root, child=part_body, axis=Vector3Dimensional.Z()
         )
         other_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=other_body, axis=Vector3.Z()
+            world=world, parent=root, child=other_body, axis=Vector3Dimensional.Z()
         )
         world.add_connection(part_connection)
         world.add_connection(other_connection)
@@ -224,13 +227,13 @@ def world_with_mimic_joint() -> tuple[
         driving_body = Body(name=PrefixedName("driving_body"))
         mimicking_body = Body(name=PrefixedName("mimicking_body"))
         driving_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=driving_body, axis=Vector3.Z()
+            world=world, parent=root, child=driving_body, axis=Vector3Dimensional.Z()
         )
         mimic_connection = RevoluteConnection(
             name=PrefixedName("mimic_connection"),
             parent=root,
             child=mimicking_body,
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             multiplier=2.0,
             offset=0.1,
             raw_dof=driving_connection.raw_dof,
@@ -626,7 +629,9 @@ def test_the_source_of_a_base_writes_the_reported_pose_into_the_drive(
     rclpy_node, omni_drive_world: World
 ):
     connection = omni_drive_world.get_connection_by_name("root_T_base")
-    expected_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5, yaw=-0.25)
+    expected_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.5, yaw=-0.25
+    )
     source = SubscribedBasePoseSource(
         world=omni_drive_world,
         node=rclpy_node,
@@ -647,7 +652,7 @@ def test_odometry_synchronizer_writes_the_pose_into_the_drive(
     rclpy_node, omni_drive_world: World
 ):
     connection = omni_drive_world.get_connection_by_name("root_T_base")
-    expected_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+    expected_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.5, y=-2.5, yaw=0.75
     )
     synchronizer = OdometrySynchronizer(
@@ -689,7 +694,7 @@ def test_apply_writes_the_looked_up_transform_into_the_connection(
     assert wrote_something
     assert_allclose(
         connection.origin,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.0, y=-2.0, z=0.5, reference_frame=connection.parent
         ),
         atol=1e-9,

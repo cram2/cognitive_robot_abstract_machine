@@ -28,7 +28,9 @@ from semantic_digital_twin.exceptions import (
     VideoRecordingNotStartedError,
 )
 from semantic_digital_twin.testing import ray_test_world
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -321,7 +323,7 @@ def test_a_body_added_while_recording_is_rendered_with_a_new_renderer(
         collision=ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
                     scale=Scale(0.1, 0.1, 0.1),
                 )
             ]

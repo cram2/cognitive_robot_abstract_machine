@@ -27,7 +27,9 @@ from semantic_digital_twin.world_description.degree_of_freedom import (
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Actuator, Body
 from semantic_digital_twin.world_description.inertial_properties import (
@@ -35,7 +37,7 @@ from semantic_digital_twin.world_description.inertial_properties import (
     InertiaTensor,
 )
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
 )
@@ -126,7 +128,7 @@ def test_insert(session):
     """
     from semantic_digital_twin.orm.ormatic_interface import BodyDAO, BoxDAO, ShapeDAO
 
-    origin = HomogeneousTransformationMatrix.from_xyz_rpy(1, 2, 3, 1, 2, 3)
+    origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1, 2, 3, 1, 2, 3)
     scale = Scale(1.0, 1.0, 1.0)
     color = Color.from_rgba(red=0.0, green=1.0, blue=1.0)
     shape1 = Box(origin=origin, scale=scale, color=color)
@@ -357,7 +359,7 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     """
     from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 
-    hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+    hinge_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.5)
     world = World.create_with_root_body("root")
     with world.modify_world():
         Door.create_with_new_body_in_world(
@@ -365,7 +367,7 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
             scale=Scale(0.03, 1, 2),
             world=world,
             parent_connection_specification=RevoluteConnectionSpecification(
-                axis=Vector3.Z(), connection_T_child=hinge_T_door
+                axis=Vector3Dimensional.Z(), connection_T_child=hinge_T_door
             ),
         )
 
@@ -464,7 +466,7 @@ def test_an_actuator_keeps_the_degree_of_freedom_it_drives_through_a_round_trip(
             world=world_with_box,
             parent=box,
             child=arm,
-            axis=Vector3.Z(reference_frame=box),
+            axis=Vector3Dimensional.Z(reference_frame=box),
         )
         world_with_box.add_connection(joint)
         actuator.add_dof(joint.dof)

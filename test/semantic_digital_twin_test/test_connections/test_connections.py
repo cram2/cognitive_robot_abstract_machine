@@ -13,7 +13,10 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood.utils import recursive_subclasses
 from semantic_digital_twin.exceptions import MissingConnectionAxisError
 from krrood_spatial_math.exceptions import MissingReferenceFrameError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -42,13 +45,15 @@ def _add_drive(world_with_two_bodies, drive_type):
 
 def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_bodies):
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.3, y=0.4
+    )
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
         world.add_connection(connection)
@@ -66,10 +71,12 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
     transform in as the DOF state directly.
     """
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.3, y=0.4, z=0.1
     )
-    connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.05, yaw=0.2)
+    connection_T_child = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.05, yaw=0.2
+    )
     with world.modify_world():
         connection = Connection6DoF.create_with_dofs(
             world=world,
@@ -80,7 +87,7 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
         )
         world.add_connection(connection)
 
-    desired_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    desired_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.0, y=-2.0, z=0.5, yaw=0.7, reference_frame=parent
     )
     connection.origin = desired_origin
@@ -97,7 +104,7 @@ def test_connection6dof_origin_setter_requires_a_reference_frame(world_with_two_
         world.add_connection(connection)
 
     transformation_without_reference_frame = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1.0)
     )
 
     with pytest.raises(MissingReferenceFrameError):
@@ -114,7 +121,9 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
     """
     world, parent, child = world_with_two_bodies
     grandparent = Body(name=PrefixedName("grandparent"))
-    grandparent_T_parent = HomogeneousTransformationMatrix.from_xyz_rpy(x=2.0, y=1.0)
+    grandparent_T_parent = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=2.0, y=1.0
+    )
     with world.modify_world():
         world.add_connection(
             FixedConnection.create_with_dofs(
@@ -129,8 +138,10 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
         )
         world.add_connection(connection)
 
-    desired_origin_in_grandparent = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=2.5, y=1.5, z=0.2, reference_frame=grandparent
+    desired_origin_in_grandparent = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=2.5, y=1.5, z=0.2, reference_frame=grandparent
+        )
     )
     connection.origin = desired_origin_in_grandparent
 
@@ -147,13 +158,15 @@ def test_reference_origin_excludes_joint_state(world_with_two_bodies):
     applies it a second time.
     """
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.3, y=0.4
+    )
     with world.modify_world():
         connection = RevoluteConnection.create_with_dofs(
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             parent_T_connection_expression=parent_T_connection,
         )
         world.add_connection(connection)
@@ -222,7 +235,8 @@ def _add_screw_connection(
     world_with_two_bodies,
     screw_pitch: float,
     multiplier: float = 1.0,
-    parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+    parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+    | None = None,
 ) -> ScrewConnection:
     """
     Creates a screw connection about the z-axis and adds it to the world.
@@ -233,7 +247,7 @@ def _add_screw_connection(
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             screw_pitch=screw_pitch,
             multiplier=multiplier,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -264,7 +278,7 @@ def test_screw_connection_origin_couples_rotation_and_translation(
     connection = _add_screw_connection(
         world_with_two_bodies,
         screw_pitch=screw_pitch,
-        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.3, y=0.4
         ),
     )
@@ -391,7 +405,7 @@ def test_screw_connection_copy_with_new_parent_preserves_screw_pitch(
 
     new_parent = Body(name=PrefixedName("new_parent"))
     copied_connection = connection.copy_with_new_parent(
-        new_parent, HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1)
+        new_parent, HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.1)
     )
 
     assert copied_connection.screw_pitch == screw_pitch
@@ -410,9 +424,9 @@ def test_screw_connection_copy_with_new_parent_preserves_screw_pitch(
         (Connection6DoF, {}),
         (OmniDrive, {}),
         (DifferentialDrive, {}),
-        (RevoluteConnection, {"axis": Vector3.Z()}),
-        (PrismaticConnection, {"axis": Vector3.X()}),
-        (ScrewConnection, {"axis": Vector3.Z(), "screw_pitch": 0.01}),
+        (RevoluteConnection, {"axis": Vector3Dimensional.Z()}),
+        (PrismaticConnection, {"axis": Vector3Dimensional.X()}),
+        (ScrewConnection, {"axis": Vector3Dimensional.Z(), "screw_pitch": 0.01}),
     ],
 )
 def test_copy_with_new_parent_keeps_name(
@@ -430,7 +444,8 @@ def test_copy_with_new_parent_keeps_name(
         world.add_connection(connection)
 
     copied_connection = connection.copy_with_new_parent(
-        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        Body(name=PrefixedName("new_parent")),
+        HomogeneousTransformationMatrix3Dimensional(),
     )
 
     assert copied_connection.name == connection.name
@@ -479,7 +494,7 @@ def test_create_with_dofs_accepts_the_shared_parameters(connection_type):
         (Connection6DoF, {}),
         (OmniDrive, {}),
         (DifferentialDrive, {}),
-        (RevoluteConnection, {"axis": Vector3.Z()}),
+        (RevoluteConnection, {"axis": Vector3Dimensional.Z()}),
     ],
 )
 def test_create_with_dofs_rejects_unknown_keyword_argument(
@@ -569,7 +584,7 @@ def test_create_with_dofs_applies_multiplier_and_offset(world_with_two_bodies):
             world=world,
             parent=parent,
             child=child,
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             multiplier=multiplier,
             offset=offset,
         )
@@ -656,9 +671,15 @@ def test_joint_dynamics_custom_values():
         (Connection6DoF, {}),
         (OmniDrive, {}),
         (DifferentialDrive, {}),
-        (PrismaticConnection, {"axis": Vector3.Y(), "multiplier": 2.0, "offset": 0.5}),
-        (RevoluteConnection, {"axis": Vector3.Y(), "multiplier": 2.0, "offset": 0.5}),
-        (ScrewConnection, {"axis": Vector3.Y(), "screw_pitch": 0.25}),
+        (
+            PrismaticConnection,
+            {"axis": Vector3Dimensional.Y(), "multiplier": 2.0, "offset": 0.5},
+        ),
+        (
+            RevoluteConnection,
+            {"axis": Vector3Dimensional.Y(), "multiplier": 2.0, "offset": 0.5},
+        ),
+        (ScrewConnection, {"axis": Vector3Dimensional.Y(), "screw_pitch": 0.25}),
     ],
 )
 def test_a_connection_survives_a_json_round_trip(

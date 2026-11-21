@@ -62,8 +62,11 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from .conftest import motion_nodes_in_physics_of, motion_nodes_of
 from ..plan_running import robot_executor, statechart_of
@@ -125,7 +128,7 @@ def test_detection_moves_the_annotated_body_to_the_perceived_pose(
     """
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    perceived_pose = Pose.from_xyz_rpy(
+    perceived_pose = Pose3Dimensional.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
     )
 
@@ -153,7 +156,7 @@ def test_detection_of_an_object_the_world_does_not_hold_is_rejected(
     with pytest.raises(PerceivedObjectNotInWorld):
         Detection(
             semantic_annotation=Bowl,
-            pose=Pose(reference_frame=world.root),
+            pose=Pose3Dimensional(reference_frame=world.root),
         ).apply_to(world)
 
 
@@ -168,7 +171,7 @@ def test_detection_matching_several_bodies_is_rejected(pr2_apartment_context):
 
     with pytest.raises(AmbiguousDetection):
         Detection(
-            semantic_annotation=Milk, pose=Pose(reference_frame=world.root)
+            semantic_annotation=Milk, pose=Pose3Dimensional(reference_frame=world.root)
         ).apply_to(world)
 
 
@@ -181,7 +184,7 @@ def test_several_annotations_on_one_body_are_not_ambiguous(pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     with world.modify_world():
         world.add_semantic_annotation(Milk(root=milk_body))
-    perceived_pose = Pose.from_xyz_rpy(
+    perceived_pose = Pose3Dimensional.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
     )
 
@@ -208,7 +211,7 @@ def test_an_upside_down_detection_is_flipped_without_moving_the_body(
     """
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    upside_down_pose = Pose.from_xyz_rpy(
+    upside_down_pose = Pose3Dimensional.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, roll=np.pi, reference_frame=world.root
     )
 
@@ -234,7 +237,7 @@ def test_untrusted_orientation_still_moves_the_body_to_the_perceived_position(
     """
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    perceived_pose = Pose.from_xyz_rpy(
+    perceived_pose = Pose3Dimensional.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, yaw=np.pi / 2, reference_frame=world.root
     )
 
@@ -261,7 +264,7 @@ def test_untrusted_orientation_keeps_the_bodys_existing_orientation(
     orientation_before_detection = (
         milk_body.parent_connection.origin.rotation_matrix.to_np()
     )
-    perceived_pose = Pose.from_xyz_rpy(
+    perceived_pose = Pose3Dimensional.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, yaw=np.pi / 2, reference_frame=world.root
     )
 
@@ -299,8 +302,10 @@ def test_world_perception_reports_the_pose_the_world_holds(
     """
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *PERCEIVED_MILK_POSITION, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *PERCEIVED_MILK_POSITION, reference_frame=world.root
+        )
     )
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
 
@@ -441,8 +446,10 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     milk_body = milk.root
     wrong_prior = (1.0, 1.0, 1.0)
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *wrong_prior, reference_frame=world.root
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *wrong_prior, reference_frame=world.root
+        )
     )
 
     plan = PickUpAction(
@@ -477,7 +484,9 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
 
     Detection(
         semantic_annotation=Milk,
-        pose=Pose.from_xyz_rpy(*PERCEIVED_MILK_POSITION, reference_frame=world.root),
+        pose=Pose3Dimensional.from_xyz_rpy(
+            *PERCEIVED_MILK_POSITION, reference_frame=world.root
+        ),
     ).apply_to(world)
 
     assert min(distances_to(PERCEIVED_MILK_POSITION)) < 1e-9
@@ -1056,7 +1065,7 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
         kinematic_chain=KinematicChain(
             root=world.root, tip=view.right_arm.end_effector.tool_frame
         ),
-        goal_point=Point3(reference_frame=milk_body),
+        goal_point=Point3Dimensional(reference_frame=milk_body),
         name="MoveTCP",
     )
     statechart = build_perception_task(detection, world, rclpy_node)
@@ -1143,7 +1152,7 @@ def test_a_detection_without_a_box_looks_as_far_to_every_side_of_the_robot(
 
     for x, y in [(distance, 0), (-distance, 0), (0, distance), (0, -distance)]:
         assert task.query.region.contains(
-            Point3(x, y, distance, reference_frame=view.root)
+            Point3Dimensional(x, y, distance, reference_frame=view.root)
         )
 
 

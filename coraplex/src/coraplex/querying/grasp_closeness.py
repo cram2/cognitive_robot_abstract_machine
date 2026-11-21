@@ -18,7 +18,7 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 # %% how close a grasp is to where the robot stands
 
@@ -82,7 +82,7 @@ class GraspsByCloseness(SymbolicFunction):
     The object offering the grasps.
     """
 
-    standing_position: Pose2D
+    standing_position: Pose2Dimensional
     """
     Where the robot stands on the floor while taking one of the grasps, read when the
     grasps are ranked, so a pose relative to the robot is where the robot stands then.

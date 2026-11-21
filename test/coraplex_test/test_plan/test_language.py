@@ -31,7 +31,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from cramph.monitors import CountNodeResets
 from cramph.nodes_for_testing import ConstFalseNode, ConstTrueNode
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from cramph.threaded_nodes import FunctionCall
 from ...plan_running import run_plan
@@ -41,7 +41,7 @@ def test_factory_construction():
     """
     A sequence holds the actions it was built from as its children.
     """
-    act = NavigateAction(planar_goal_pose=Pose2D())
+    act = NavigateAction(planar_goal_pose=Pose2Dimensional())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -54,7 +54,7 @@ def test_parallel_construction():
     """
     A parallel holds the actions it was built from as its children.
     """
-    act = NavigateAction(planar_goal_pose=Pose2D())
+    act = NavigateAction(planar_goal_pose=Pose2Dimensional())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -67,7 +67,7 @@ def test_try_in_order_construction():
     """
     Trying in order holds the actions it was built from as its children.
     """
-    act = NavigateAction(planar_goal_pose=Pose2D())
+    act = NavigateAction(planar_goal_pose=Pose2Dimensional())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -80,7 +80,7 @@ def test_try_all_construction():
     """
     Trying all holds the actions it was built from as its children.
     """
-    act = NavigateAction(planar_goal_pose=Pose2D())
+    act = NavigateAction(planar_goal_pose=Pose2Dimensional())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
 
@@ -93,7 +93,7 @@ def test_combination_construction():
     """
     A parallel can hold a sequence beside an action.
     """
-    act = NavigateAction(planar_goal_pose=Pose2D())
+    act = NavigateAction(planar_goal_pose=Pose2Dimensional())
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = DetectAction(technique=DetectionTechnique.TYPES)
     root = Parallel(nodes=[Sequence(nodes=[act, act2]), act3])
@@ -110,7 +110,9 @@ def test_perform_execute_single(pr2_apartment_context):
     """
     world, robot_view, extensions = pr2_apartment_context
     act = NavigateAction(
-        planar_goal_pose=Pose2D.from_xy_yaw(x=0.3, y=-1.3, reference_frame=world.root)
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+            x=0.3, y=-1.3, reference_frame=world.root
+        )
     )
     act2 = MoveTorsoAction(torso_state=TorsoState.HIGH)
     act3 = ParkArmsAction(arms=robot_view.all_arms)
@@ -195,7 +197,9 @@ def test_exception_sequential(pr2_apartment_context):
         raise PlanFailure()
 
     act = NavigateAction(
-        planar_goal_pose=Pose2D.from_xy_yaw(x=1, y=-1, reference_frame=world.root)
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+            x=1, y=-1, reference_frame=world.root
+        )
     )
     act2 = FunctionCall(function=raise_except, failure_types=(PlanFailure,))
 
@@ -220,7 +224,9 @@ def test_exception_try_in_order(pr2_apartment_context):
         raise PlanFailure()
 
     act = NavigateAction(
-        planar_goal_pose=Pose2D.from_xy_yaw(x=1, y=-1, reference_frame=world.root)
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+            x=1, y=-1, reference_frame=world.root
+        )
     )
     act2 = FunctionCall(function=raise_except, failure_types=(PlanFailure,))
 
@@ -240,7 +246,7 @@ def test_exception_try_all(pr2_apartment_context):
         raise PlanFailure()
 
     act = NavigateAction(
-        planar_goal_pose=Pose2D.from_xy_yaw(x=-2, reference_frame=world.root)
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=-2, reference_frame=world.root)
     )
     act2 = FunctionCall(function=raise_except, failure_types=(PlanFailure,))
 

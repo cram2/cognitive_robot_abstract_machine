@@ -17,7 +17,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Door,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
@@ -39,7 +42,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
             world=world,
         )
         world_T_drawer = drawer_body.global_transform
-        drawer_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+        drawer_T_handle = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=drawer_scale.x / 2, roll=np.pi / 2
         )
         world_T_handle = world_T_drawer @ drawer_T_handle
@@ -72,7 +75,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
     sampled_2d_point = semantic_handle_position.sample_point_from_event(
         scale.to_simple_event().as_composite_set().marginal(SpatialVariables.yz)
     )
-    door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+    door_T_handle = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1], roll=np.pi / 2
     )
     world_T_door = door_body.global_transform
@@ -92,7 +95,9 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
             world_root_T_self=world_T_handle,
         )
         door.add(handle)
-    door.mount_on_movable_joint(RevoluteConnectionSpecification(axis=Vector3.Z()))
+    door.mount_on_movable_joint(
+        RevoluteConnectionSpecification(axis=Vector3Dimensional.Z())
+    )
 
     return door
 

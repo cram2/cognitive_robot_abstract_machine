@@ -17,8 +17,14 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose, RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import (
+    Pose3Dimensional,
+    RotationMatrix,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -64,7 +70,7 @@ def boxed_pr2_world(simple_pr2_context):
             world=world, parent=world.root, child=box
         )
         world.add_connection(connection)
-        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             1, 0, 1, reference_frame=world.root
         )
         graspable = Milk(root=box)
@@ -88,10 +94,10 @@ def grasp_from_above(graspable) -> GraspCandidate:
     """
     return GraspCandidate(
         graspable,
-        Pose(
-            position=Vector3(0, 0, BOX_SCALE.z / 2).point3,
+        Pose3Dimensional(
+            position=Vector3Dimensional(0, 0, BOX_SCALE.z / 2).point_3_dimensional,
             orientation=RotationMatrix.from_vectors(
-                x=Vector3.NEGATIVE_Z(), y=Vector3.X()
+                x=Vector3Dimensional.NEGATIVE_Z(), y=Vector3Dimensional.X()
             ).quaternion,
             reference_frame=graspable.root,
         ),
@@ -108,7 +114,7 @@ def _fingers_at(goal, end_effector) -> np.ndarray:
     :return: Where the point its fingers meet at lands once the goal is reached, which
         is what the sequence aims and so what the clearances are measured at.
     """
-    reached = goal.homogeneous_matrix.to_np()
+    reached = goal.to_coordinate_change().to_np()
     tool_P_grasp = end_effector.tool_P_grasp_when_closed.to_np()[:3].ravel()
     return reached[:3, :3] @ tool_P_grasp + reached[:3, 3]
 
@@ -190,8 +196,8 @@ def test_a_grasp_outside_the_body_is_approached_from_the_clearance_alone(
     action = GraspApproachingAction()
     in_front = GraspCandidate(
         graspable,
-        Pose(
-            position=Vector3(-BOX_SCALE.x, 0, 0).point3,
+        Pose3Dimensional(
+            position=Vector3Dimensional(-BOX_SCALE.x, 0, 0).point_3_dimensional,
             reference_frame=graspable.root,
         ),
     )
@@ -212,7 +218,7 @@ def test_a_diagonal_approach_leaves_the_body_through_its_nearest_face(
     action = GraspApproachingAction()
     diagonal = GraspCandidate(
         graspable,
-        Pose(
+        Pose3Dimensional(
             orientation=RotationMatrix.from_rpy(yaw=np.pi / 4).quaternion,
             reference_frame=graspable.root,
         ),
@@ -266,10 +272,10 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
     )
 
     world_P_grasp = world.transform(
-        grasp.grasp_pose.homogeneous_matrix, world.root
+        grasp.grasp_pose.to_coordinate_change(), world.root
     ).to_np()
     world_P_retreat = world.transform(
-        poses.retreat.homogeneous_matrix, world.root
+        poses.retreat.to_coordinate_change(), world.root
     ).to_np()
     np.testing.assert_allclose(
         world_P_retreat[:3, 3] - world_P_grasp[:3, 3],

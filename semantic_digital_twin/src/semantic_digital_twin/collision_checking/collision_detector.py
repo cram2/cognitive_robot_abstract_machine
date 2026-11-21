@@ -20,7 +20,9 @@ from semantic_digital_twin.callbacks.callback import (
     ModelChangeCallback,
     StateChangeCallback,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     WorldEntityWithID,
@@ -151,7 +153,7 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         for body in self._world.bodies_with_collision:
             if body == world_root:
                 if body.has_collision():
-                    collision_fks.append(HomogeneousTransformationMatrix())
+                    collision_fks.append(HomogeneousTransformationMatrix3Dimensional())
                 continue
             collision_fks.append(
                 self._world.compose_forward_kinematics_expression(world_root, body)

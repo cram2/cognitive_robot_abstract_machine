@@ -27,10 +27,13 @@ from semantic_digital_twin.reasoning.robot_predicates import VisibleTo
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
 )
-from krrood_spatial_math.spatial_types import Pose, Point3
+from krrood_spatial_math.spatial_types import (
+    Pose3Dimensional,
+    Point3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import (
@@ -157,7 +160,7 @@ class Detection:
     The annotation the perception source identified the object as.
     """
 
-    pose: Pose
+    pose: Pose3Dimensional
     """
     Where the perception source saw the object.
     """
@@ -183,8 +186,10 @@ class Detection:
         body = matching_annotation.root
         robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
 
-        # Foundation Pose may return a upside down pose. this detects and fixes it by rotation around x by 180 degree
-        detected_global_pose = world.transform(self.pose, world.root).homogeneous_matrix
+        # Foundation Pose3Dimensional may return a upside down pose. this detects and fixes it by rotation around x by 180 degree
+        detected_global_pose = world.transform(
+            self.pose, world.root
+        ).to_coordinate_change()
         detected_global_pose = self._with_z_up_and_x_towards(
             root_T_frame=detected_global_pose,
             root_P_target=robot.root.global_transform.position,
@@ -198,7 +203,7 @@ class Detection:
             )
             parent_origin = body.parent_connection.origin
             body.parent_connection.origin = (
-                HomogeneousTransformationMatrix.from_point_rotation_matrix(
+                HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                     point=parent_T_object.position,
                     rotation_matrix=parent_origin.rotation_matrix,
                     reference_frame=body.parent_connection.parent,
@@ -208,16 +213,18 @@ class Detection:
 
     @staticmethod
     def _with_z_up_and_x_towards(
-        root_T_frame: HomogeneousTransformationMatrix, root_P_target: Point3
-    ) -> HomogeneousTransformationMatrix:
+        root_T_frame: HomogeneousTransformationMatrix3Dimensional,
+        root_P_target: Point3Dimensional,
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Return ``root_T_frame`` rotated by 180° around its own axes so that its z axis
         points along the world z axis and its x axis points towards ``root_P_target`` as
         closely as those rotations allow.
 
         The position is left untouched, and every axis stays on the axis it started on.
-        :param root_T_frame:``HomogeneousTransformationMatrix`` which will be rotated
-        :param root_P_target:``Point3`` towards which root_T_frame x axis will point
+        :param root_T_frame:``HomogeneousTransformationMatrix3Dimensional`` which will be rotated
+        :param root_P_target:``Point3Dimensional`` towards which root_T_frame x axis will
+            point
         :return: rotated transformation matrix
         """
         root_V_target = root_P_target - root_T_frame.position
@@ -225,7 +232,7 @@ class Detection:
         flip_z = root_T_frame[2, 2] < 0
         flip_x = root_T_frame.rotation_matrix.x_vector().dot(root_V_target) > 0
 
-        return root_T_frame @ HomogeneousTransformationMatrix.from_xyz_rpy(
+        return root_T_frame @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             roll=np.pi if flip_z and not flip_x else 0,
             pitch=np.pi if flip_z and flip_x else 0,
             yaw=np.pi if flip_x and not flip_z else 0,
@@ -416,7 +423,7 @@ class RoboKudoPerception(PerceptionInterface):
         pose_stamped = designator.pose[0]
         return Detection(
             semantic_annotation=query.semantic_annotation,
-            pose=Pose.from_xyz_quaternion(
+            pose=Pose3Dimensional.from_xyz_quaternion(
                 pose_stamped.pose.position.x,
                 pose_stamped.pose.position.y,
                 pose_stamped.pose.position.z,

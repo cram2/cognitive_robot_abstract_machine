@@ -22,7 +22,7 @@ from pathlib import Path
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
 )
 from semantic_digital_twin.world import World
@@ -47,22 +47,22 @@ Finally, in our kinematic structure, each entity has a name. For this we can use
 
 ```{code-cell} ipython3
 import os
-from krrood_spatial_math.spatial_types import AxisAngle, Point3, Vector3
+from krrood_spatial_math.spatial_types import AxisAngle, Point3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
 
-box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=0, y=0, z=0, roll=0, pitch=0, yaw=0)
+box_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0, y=0, z=0, roll=0, pitch=0, yaw=0)
 box = Box(origin=box_origin, scale=Scale(1., 1., 0.5), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1., ))
 
-sphere_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(pos_x=0, pos_y=1., pos_z=1., quat_x=0., quat_y=0., quat_z=0.,
+sphere_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(pos_x=0, pos_y=1., pos_z=1., quat_x=0., quat_y=0., quat_z=0.,
                                                    quat_w=1.)
 sphere = Sphere(origin=sphere_origin, radius=0.4)
 
-cylinder_origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(point=Point3.from_iterable([1, -1, 2]),
-                                                                  rotation_matrix=RotationMatrix.from_axis_angle(AxisAngle(Vector3.from_iterable([1., 0., 0.]), 0.8)),)
+cylinder_origin = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(point=Point3Dimensional.from_iterable([1, -1, 2]),
+                                                                  rotation_matrix=RotationMatrix.from_axis_angle(AxisAngle(Vector3Dimensional.from_iterable([1., 0., 0.]), 0.8)),)
 cylinder = Cylinder(origin=cylinder_origin, width=0.05, height=0.5)
 
-mesh = Mesh(origin=HomogeneousTransformationMatrix(),
+mesh = Mesh(origin=HomogeneousTransformationMatrix3Dimensional(),
             filename=os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "stl", "milk.stl"))
 
 collision = ShapeCollection([cylinder, sphere, box])

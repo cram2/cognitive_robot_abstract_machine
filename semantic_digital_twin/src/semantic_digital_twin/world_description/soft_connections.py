@@ -14,7 +14,9 @@ from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 
 
@@ -74,8 +76,10 @@ class PiecewiseConstantCurvatureConnection(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
         kappa_dof_id: UUID,
         phi_dof_id: UUID,
         segment_length: float,
@@ -162,7 +166,7 @@ class PiecewiseConstantCurvatureConnection(Connection):
             ]
         )
 
-        self._kinematics = HomogeneousTransformationMatrix(matrix.casadi_sx)
+        self._kinematics = HomogeneousTransformationMatrix3Dimensional(matrix.casadi_sx)
         self._kinematics.child_frame = self.child
 
     @property
@@ -248,8 +252,10 @@ class CosseratRodConnection(Connection):
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
         name: PrefixedName | None = None,
-        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
-        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix3Dimensional
+        | None = None,
         bending_x_dof_id: UUID,
         bending_y_dof_id: UUID,
         torsion_dof_id: UUID,
@@ -355,7 +361,7 @@ class CosseratRodConnection(Connection):
                 k1 + 2 * k2 + 2 * k3 + k4
             )
 
-        self._kinematics = HomogeneousTransformationMatrix(
+        self._kinematics = HomogeneousTransformationMatrix3Dimensional(
             accumulated_transform.casadi_sx
         )
         self._kinematics.child_frame = self.child

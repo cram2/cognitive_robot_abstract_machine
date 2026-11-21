@@ -17,7 +17,7 @@ from segmind.datastructures.events import (
 )
 from segmind.detectors.base import SegmindContext, AbstractDetector
 from semantic_digital_twin.reasoning.predicates import InContactWith
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -105,7 +105,7 @@ class MotionDetector(AbstractDetector):
     Threshold for the rotation error between two poses to be considered rotation.
     """
 
-    _pose_history: dict[Body, list[Pose]] = field(
+    _pose_history: dict[Body, list[Pose3Dimensional]] = field(
         default_factory=dict, init=False, repr=False
     )
     """
@@ -147,7 +147,10 @@ class MotionDetector(AbstractDetector):
 
     @abstractmethod
     def _check_and_trigger_event(
-        self, segmind_context: SegmindContext, tracked_object: Body, poses: list[Pose]
+        self,
+        segmind_context: SegmindContext,
+        tracked_object: Body,
+        poses: list[Pose3Dimensional],
     ) -> DetectionEvent | None:
         """
         Subclass-specific logic to trigger a Motion or StopMotion event.
@@ -163,7 +166,7 @@ class MotionDetector(AbstractDetector):
         """
         pass
 
-    def _is_moving(self, poses: list[Pose]) -> bool:
+    def _is_moving(self, poses: list[Pose3Dimensional]) -> bool:
         """
         Determines whether an object is moving by evaluating the distance between the
         first and the last recorded position of the window.
@@ -176,7 +179,7 @@ class MotionDetector(AbstractDetector):
             > self.distance_threshold
         )
 
-    def _is_rotating(self, poses: list[Pose]) -> bool:
+    def _is_rotating(self, poses: list[Pose3Dimensional]) -> bool:
         """
         Determines whether an object is rotating by evaluating the rotation error
         between the first and the last recorded pose of the window.
@@ -202,7 +205,10 @@ class TranslationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, segmind_context: SegmindContext, tracked_object: Body, poses: list[Pose]
+        self,
+        segmind_context: SegmindContext,
+        tracked_object: Body,
+        poses: list[Pose3Dimensional],
     ) -> DetectionEvent | None:
         """
         Reports the object starting to move or, when it was moving, coming to a stop.
@@ -249,7 +255,10 @@ class RotationDetector(MotionDetector):
     """
 
     def _check_and_trigger_event(
-        self, segmind_context: SegmindContext, tracked_object: Body, poses: list[Pose]
+        self,
+        segmind_context: SegmindContext,
+        tracked_object: Body,
+        poses: list[Pose3Dimensional],
     ) -> DetectionEvent | None:
         """
         Reports the object starting to rotate or, when it was rotating, coming to a

@@ -49,13 +49,13 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.enforcement_strategy import IntegralStrategy
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Quaternion,
     RotationMatrix,
-    Vector3,
-    Point3,
+    Vector3Dimensional,
+    Point3Dimensional,
 )
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Color, Scale
@@ -333,7 +333,7 @@ def test_long_goal(pr2_world_state_reset: World):
                         "base_footprint"
                     ),
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=50, reference_frame=pr2_world_state_reset.root
                 ),
             ),
@@ -401,7 +401,7 @@ class TestTemplates:
                 FixedConnection(
                     parent=gripper,
                     child=knife,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         z=0.06, reference_frame=gripper
                     ),
                 )
@@ -421,7 +421,7 @@ class TestTemplates:
                 FixedConnection(
                     parent=map_link,
                     child=loaf,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=0.91, y=0.25, z=0.62, reference_frame=map_link
                     ),
                 )
@@ -430,12 +430,12 @@ class TestTemplates:
         depth = 0.1
         right_shift = -0.1
         # The knife's x axis points up in map, so its -x stroke cuts downwards.
-        pre_cut_pose = Pose(
-            position=Point3(x=0.85, y=0.2, z=0.75, reference_frame=map_link),
+        pre_cut_pose = Pose3Dimensional(
+            position=Point3Dimensional(x=0.85, y=0.2, z=0.75, reference_frame=map_link),
             orientation=Quaternion.from_rotation_matrix(
                 RotationMatrix.from_vectors(
-                    x=Vector3(z=1, reference_frame=map_link),
-                    y=Vector3(y=-1, reference_frame=map_link),
+                    x=Vector3Dimensional(z=1, reference_frame=map_link),
+                    y=Vector3Dimensional(y=-1, reference_frame=map_link),
                 )
             ),
             reference_frame=map_link,
@@ -456,24 +456,26 @@ class TestTemplates:
                 CartesianPose(
                     name="Down",
                     kinematic_chain=KinematicChain(root=map_link, tip=knife),
-                    goal_pose=Pose(
-                        position=Point3(x=-depth, reference_frame=knife),
+                    goal_pose=Pose3Dimensional(
+                        position=Point3Dimensional(x=-depth, reference_frame=knife),
                         reference_frame=knife,
                     ),
                 ),
                 CartesianPose(
                     name="Up",
                     kinematic_chain=KinematicChain(root=map_link, tip=knife),
-                    goal_pose=Pose(
-                        position=Point3(x=depth, reference_frame=knife),
+                    goal_pose=Pose3Dimensional(
+                        position=Point3Dimensional(x=depth, reference_frame=knife),
                         reference_frame=knife,
                     ),
                 ),
                 CartesianPose(
                     name="Move Right",
                     kinematic_chain=KinematicChain(root=map_link, tip=knife),
-                    goal_pose=Pose(
-                        position=Point3(y=right_shift, reference_frame=knife),
+                    goal_pose=Pose3Dimensional(
+                        position=Point3Dimensional(
+                            y=right_shift, reference_frame=knife
+                        ),
                         reference_frame=knife,
                     ),
                 ),
@@ -539,13 +541,13 @@ class TestTemplates:
                     nodes=[
                         AlignPlanes(
                             kinematic_chain=KinematicChain(root=map, tip=r_tip),
-                            tip_normal=Vector3.X(reference_frame=r_tip),
-                            reference_normal=Vector3.X(reference_frame=map),
+                            tip_normal=Vector3Dimensional.X(reference_frame=r_tip),
+                            reference_normal=Vector3Dimensional.X(reference_frame=map),
                         ),
                         AlignPlanes(
                             kinematic_chain=KinematicChain(root=map, tip=r_tip),
-                            tip_normal=Vector3.Y(reference_frame=r_tip),
-                            reference_normal=Vector3.Z(reference_frame=map),
+                            tip_normal=Vector3Dimensional.Y(reference_frame=r_tip),
+                            reference_normal=Vector3Dimensional.Z(reference_frame=map),
                         ),
                     ]
                 )
@@ -572,11 +574,13 @@ def test_constraint_collection(pr2_world_state_reset: World):
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
 
-    expr = Vector3.X(tip).angle_between(Vector3.Y(root))
+    expr = Vector3Dimensional.X(tip).angle_between(
+        tip.express_in_own_frame(value=Vector3Dimensional.Y(root))
+    )
 
     GeometricConstraintBuilder(collection=col).add_point_goal_constraints(
-        frame_P_current=Point3(0, 0, 0, reference_frame=tip),
-        frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
+        frame_P_current=Point3Dimensional(0, 0, 0, reference_frame=tip),
+        frame_P_goal=Point3Dimensional(0, 0, 0, reference_frame=tip),
         cruise_velocity=0.1,
         quadratic_weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
     )
@@ -670,7 +674,7 @@ class TestMaxManipulability:
         root = pr2_world_state_reset.get_body_by_name("base_footprint")
         tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
 
-        goal_pose = Pose.from_xyz_rpy(
+        goal_pose = Pose3Dimensional.from_xyz_rpy(
             x=0.8, y=-0.3, z=1.0, reference_frame=pr2_world_state_reset.root
         )
         executor = StatechartExecutor(

@@ -22,8 +22,10 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import ParsingError
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -41,7 +43,7 @@ class RecordsHowItWasSampled(Location):
     Yields one candidate and records how many samples it was asked for.
     """
 
-    pose: Pose
+    pose: Pose3Dimensional
     """
     The single candidate to yield.
     """
@@ -51,7 +53,7 @@ class RecordsHowItWasSampled(Location):
     One entry per call: the number of samples it was asked for.
     """
 
-    def candidates(self) -> Iterator[Pose]:
+    def candidates(self) -> Iterator[Pose3Dimensional]:
         self.sampled_with.append(self.number_of_samples)
         return iter([self.pose])
 
@@ -60,11 +62,13 @@ class RecordsHowItWasSampled(Location):
 
 # The drive is an OmniDrive, which represents x, y and yaw only, so the odom offset stays
 # in that plane.
-_ODOM = HomogeneousTransformationMatrix.from_xyz_rpy(0.5, 0.5, 0, yaw=np.pi / 2)
+_ODOM = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+    0.5, 0.5, 0, yaw=np.pi / 2
+)
 
 
 def _world_with_a_robot_behind_a_displaced_odom(
-    world_T_odometry: HomogeneousTransformationMatrix,
+    world_T_odometry: HomogeneousTransformationMatrix3Dimensional,
 ) -> World:
     """
     A world holding nothing but a PR2, reached through a displaced odom.
@@ -95,8 +99,10 @@ def single_robot_world(_single_robot_world_setup):
     return world, robot, robot_extensions(robot)
 
 
-def _candidate(world: World) -> Pose:
-    return Pose.from_xyz_rpy(1.3, 2.0, 0.0, yaw=0.25, reference_frame=world.root)
+def _candidate(world: World) -> Pose3Dimensional:
+    return Pose3Dimensional.from_xyz_rpy(
+        1.3, 2.0, 0.0, yaw=0.25, reference_frame=world.root
+    )
 
 
 # %% a location samples its candidates on its own terms
@@ -169,7 +175,7 @@ def test_a_ring_from_the_arm_reach_distance_stands_off_by_the_reach_fraction(
     The standing distance follows the reach fraction, so tuning it moves the robot.
     """
     world, robot, extensions = single_robot_world
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     # approximate_length returns a symbolic scalar, and so does the distance derived
@@ -197,7 +203,7 @@ How many of the standing poses a reachability location offers are checked.
 """
 
 
-def _horizontal_distance(pose: Pose, target: Pose) -> float:
+def _horizontal_distance(pose: Pose3Dimensional, target: Pose3Dimensional) -> float:
     """
     :return: How far `pose` stands from `target` along the floor.
     """
@@ -214,7 +220,7 @@ def test_a_reachability_location_stands_around_the_reach_fraction_of_the_arm(
     the poses offered stand that far off on the whole.
     """
     world, robot, extensions = single_robot_world
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     arm = robot.right_arm
@@ -251,7 +257,7 @@ def test_a_reachability_location_offers_no_standing_pose_farther_than_the_arm_is
     from there, so such a standing pose is not worth trying.
     """
     world, robot, extensions = single_robot_world
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     arm = robot.right_arm
@@ -282,7 +288,7 @@ def test_a_reachability_location_offers_the_poses_in_reach_in_the_order_sampled(
     first, so a plan that found a standing pose before still finds the same one.
     """
     world, robot, extensions = single_robot_world
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     arm = robot.right_arm
@@ -324,7 +330,7 @@ def _box_in(world: World) -> Milk:
             FixedConnection(
                 parent=world.root,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.0, y=-1.0, z=0.9
                 ),
             )
@@ -335,7 +341,7 @@ def _box_in(world: World) -> Milk:
 
 def test_a_reachability_location_is_sampled_around_its_target(single_robot_world):
     world, robot, extensions = single_robot_world
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
 
@@ -404,13 +410,13 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
     world, robot, extensions = single_robot_world
     box = _box_in(world).root
     location = ReachabilityLocation(
-        Pose(reference_frame=box),
+        Pose3Dimensional(reference_frame=box),
         robot.right_arm,
         context=context_of(extensions),
     )
     with world.modify_world():
         box.parent_connection.update_parent_T_connection(
-            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 *REACHABILITY_TARGET_POSITION
             )
         )
@@ -429,7 +435,7 @@ def test_a_visibility_location_offers_poses_facing_its_target(single_robot_world
     A pose to see a target from is only any use looking at it.
     """
     world, robot, extensions = single_robot_world
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     location = VisibilityLocation(target, context=context_of(extensions))
@@ -450,7 +456,7 @@ def test_a_costmap_location_samples_with_the_seed_of_its_plan(single_robot_world
     """
     world, robot, extensions = single_robot_world
     sampling_seed = SAMPLING_SEED + 1
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     location = VisibilityLocation(
@@ -478,7 +484,7 @@ def test_a_plan_without_a_seed_of_its_own_samples_the_same_candidates_every_run(
     finds it again.
     """
     world, robot, extensions = single_robot_world
-    target = Pose.from_xyz_rpy(
+    target = Pose3Dimensional.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     context = context_of([RobotAccess(robot=robot), StatementGrounding()])

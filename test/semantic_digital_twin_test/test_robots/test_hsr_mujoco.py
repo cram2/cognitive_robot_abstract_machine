@@ -25,7 +25,10 @@ from semantic_digital_twin.world_description.contact import ContactParameters
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -327,7 +330,9 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
     support.collision = ShapeCollection(
         [
             Box(
-                origin=HomogeneousTransformationMatrix(reference_frame=support),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=support
+                ),
                 scale=support_scale,
             )
         ],
@@ -337,7 +342,9 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
     carton.collision = ShapeCollection(
         [
             Box(
-                origin=HomogeneousTransformationMatrix(reference_frame=carton),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=carton
+                ),
                 scale=carton_scale,
             )
         ],
@@ -348,7 +355,7 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
             FixedConnection(
                 parent=world.root,
                 child=support,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=x, y=y, z=z - carton_scale.z / 2 - support_scale.z / 2
                 ),
             )
@@ -358,7 +365,7 @@ def _carton_between_the_open_fingers(hsrb: HSRB, carton_scale: Scale) -> Body:
                 world=world,
                 parent=world.root,
                 child=carton,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=x, y=y, z=z, reference_frame=world.root
                 ),
             )
@@ -464,10 +471,10 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_base_back(hsrb):
             name="floor",
             world=world,
             floor_polytope=[
-                Point3(-3, -3, 0),
-                Point3(3, -3, 0),
-                Point3(3, 3, 0),
-                Point3(-3, 3, 0),
+                Point3Dimensional(-3, -3, 0),
+                Point3Dimensional(3, -3, 0),
+                Point3Dimensional(3, 3, 0),
+                Point3Dimensional(-3, 3, 0),
             ],
         )
     hsrb_on_the_floor = RobotSpecification(HSRB).spawn(world)

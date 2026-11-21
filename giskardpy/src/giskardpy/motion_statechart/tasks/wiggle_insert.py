@@ -28,7 +28,7 @@ from giskardpy.motion_statechart.mixins import (
 )
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    Vector3,
+    Vector3Dimensional,
     RotationMatrix,
 )
 
@@ -130,7 +130,9 @@ class WiggleInsert(
     Current translational momentum of the random walk.
     """
 
-    _random_translation: Vector3 = field(default=None, init=False, repr=False)
+    _random_translation: Vector3Dimensional = field(
+        default=None, init=False, repr=False
+    )
     """
     Auxiliary variable holding the current translational noise in the root frame.
     """
@@ -161,7 +163,7 @@ class WiggleInsert(
         self._current_vector = np.zeros(3)
         self._vector_momentum = np.zeros(3)
 
-        self._random_translation = Vector3.create_with_variables(
+        self._random_translation = Vector3Dimensional.create_with_variables(
             f"{self.name}_rand_translation"
         )
         self._random_translation.reference_frame = self.kinematic_chain.root
@@ -215,7 +217,7 @@ class WiggleInsert(
         root_R_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
-        root_R_goal = root_R_current.dot(tip_R_hole_normal)
+        root_R_goal = root_R_current.dot(other=tip_R_hole_normal)
 
         artifacts.geometry.add_rotation_goal_constraints(
             frame_R_current=root_R_current,

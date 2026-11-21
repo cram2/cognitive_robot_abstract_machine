@@ -37,8 +37,8 @@ from semantic_digital_twin.robots.robot_parts import MobileBase
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
     VizMarkerPublisher,
 )
-from krrood_spatial_math.spatial_types import Point3
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Point3Dimensional
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
@@ -70,7 +70,7 @@ def unreachable_arm_goal(world: World) -> CartesianPosition:
             root=world.get_kinematic_structure_entity_by_name("base_footprint"),
             tip=world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame"),
         ),
-        goal_point=Point3(
+        goal_point=Point3Dimensional(
             5,
             0,
             0,
@@ -177,7 +177,9 @@ class TestStallDetection:
                 root=cylinder_bot_world.root,
                 tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
             ),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+            goal_point=Point3Dimensional(
+                1, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
         )
         progressing = StillProgressing(monitored_node=goal, timeout=STALL_TIMEOUT)
         motion_control = MotionControl()
@@ -225,7 +227,9 @@ class TestStallDetection:
                 root=cylinder_bot_world.root,
                 tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
             ),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+            goal_point=Point3Dimensional(
+                1, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
         )
         motion_statechart.add_node(node=goal)
         motion_statechart.add_node(node=EndMotion.when_true(node=goal))
@@ -258,7 +262,7 @@ class TestStallDetection:
             mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                 MobileBase
             )[0],
-            goal_pose=Pose.from_xyz_rpy(
+            goal_pose=Pose3Dimensional.from_xyz_rpy(
                 x=1, y=1, reference_frame=cylinder_bot_diff_world.root
             ),
         )
@@ -302,12 +306,12 @@ class TestStallDetection:
         reachable = CartesianPosition(
             name="reachable",
             kinematic_chain=KinematicChain(root=base_footprint, tip=tip),
-            goal_point=Point3(0, 0, 0.1, reference_frame=tip),
+            goal_point=Point3Dimensional(0, 0, 0.1, reference_frame=tip),
         )
         unreachable = CartesianPosition(
             name="unreachable",
             kinematic_chain=KinematicChain(root=base_footprint, tip=tip),
-            goal_point=Point3(5, 0, 0, reference_frame=base_footprint),
+            goal_point=Point3Dimensional(5, 0, 0, reference_frame=base_footprint),
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -353,12 +357,12 @@ class TestStallDetection:
         holding = CartesianPosition(
             name="holding",
             kinematic_chain=KinematicChain(root=base_footprint, tip=other_tip),
-            goal_point=Point3(0, 0, 0, reference_frame=other_tip),
+            goal_point=Point3Dimensional(0, 0, 0, reference_frame=other_tip),
         )
         unreachable = CartesianPosition(
             name="unreachable",
             kinematic_chain=KinematicChain(root=base_footprint, tip=tip),
-            goal_point=Point3(5, 0, 0, reference_frame=base_footprint),
+            goal_point=Point3Dimensional(5, 0, 0, reference_frame=base_footprint),
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -397,7 +401,7 @@ class TestStallDetection:
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         arrived = CartesianPosition(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
-            goal_point=Point3(0, 0, 0, reference_frame=bot),
+            goal_point=Point3Dimensional(0, 0, 0, reference_frame=bot),
         )
         progressing = StillProgressing(monitored_node=arrived, timeout=STALL_TIMEOUT)
         motion_control = MotionControl()
@@ -439,7 +443,9 @@ class TestStallDetection:
                 root=cylinder_bot_world.root,
                 tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
             ),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+            goal_point=Point3Dimensional(
+                1, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
         )
         blocker = ConstFalseNode()
         motion_statechart.add_nodes(nodes=[goal, blocker])
@@ -472,7 +478,9 @@ class TestStallDetection:
                 root=cylinder_bot_world.root,
                 tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
             ),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+            goal_point=Point3Dimensional(
+                1, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
         )
         progressing = StillProgressing(monitored_node=goal, timeout=timeout)
         executor = StatechartExecutor(
@@ -502,7 +510,9 @@ class TestStallDetection:
         tasks = [
             CartesianPosition(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
-                goal_point=Point3(x, 0, 0, reference_frame=cylinder_bot_world.root),
+                goal_point=Point3Dimensional(
+                    x, 0, 0, reference_frame=cylinder_bot_world.root
+                ),
             )
             for x in (1, 2, 3)
         ]
@@ -537,7 +547,7 @@ class TestStallDetection:
         arrived = CartesianPosition(
             name="arrived",
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
-            goal_point=Point3(0, 0, 0, reference_frame=bot),
+            goal_point=Point3Dimensional(0, 0, 0, reference_frame=bot),
         )
         monitor = NoMonitoredTaskApproachingItsGoal(monitored_tasks=[arrived])
         executor = StatechartExecutor(
@@ -627,7 +637,9 @@ class ScriptedErrorRun:
                     root=self.world.root,
                     tip=self.world.get_kinematic_structure_entity_by_name("bot"),
                 ),
-                goal_point=Point3(goal_x, 0, 0, reference_frame=self.world.root),
+                goal_point=Point3Dimensional(
+                    goal_x, 0, 0, reference_frame=self.world.root
+                ),
                 threshold=TASK_THRESHOLD,
             )
             for goal_x in self.goal_xs
@@ -813,7 +825,7 @@ class TestErrorDrivesObservation:
         CartesianPosition reports the distance between tip and goal as its error.
         """
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-        goal_point = Point3(1, 0, 0, reference_frame=cylinder_bot_world.root)
+        goal_point = Point3Dimensional(1, 0, 0, reference_frame=cylinder_bot_world.root)
         goal = CartesianPosition(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
             goal_point=goal_point,
@@ -836,7 +848,9 @@ class TestErrorDrivesObservation:
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         goal = CartesianPosition(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+            goal_point=Point3Dimensional(
+                1, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
         )
 
         add_to_statechart_with_motion_control(goal, cylinder_bot_world)
@@ -855,7 +869,9 @@ class TestErrorDrivesObservation:
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         goal = CartesianPosition(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+            goal_point=Point3Dimensional(
+                1, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_world),
@@ -901,7 +917,7 @@ def position_task_at_its_goal(world: World) -> CartesianPosition:
         kinematic_chain=KinematicChain(
             root=world.root, tip=world.get_kinematic_structure_entity_by_name("bot")
         ),
-        goal_point=Point3(GOAL_DISTANCE, 0, 0, reference_frame=world.root),
+        goal_point=Point3Dimensional(GOAL_DISTANCE, 0, 0, reference_frame=world.root),
         threshold=THRESHOLD_WIDER_THAN_THE_GOAL_DISTANCE,
     )
 
@@ -916,7 +932,7 @@ def trajectory_task_at_its_goal(world: World) -> CartesianPositionTrajectory:
             root=world.root, tip=world.get_kinematic_structure_entity_by_name("bot")
         ),
         goal_points=[
-            Point3(GOAL_DISTANCE * x / 100, 0, 0, reference_frame=world.root)
+            Point3Dimensional(GOAL_DISTANCE * x / 100, 0, 0, reference_frame=world.root)
             for x in range(100)
         ],
         threshold=THRESHOLD_WIDER_THAN_THE_GOAL_DISTANCE,
@@ -1054,7 +1070,9 @@ class TestNodeDependencies:
         bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
         goal = CartesianPosition(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+            goal_point=Point3Dimensional(
+                1, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
         )
         sequence = Sequence(nodes=[goal])
         progressing = StillProgressing(
@@ -1109,7 +1127,9 @@ class TestTrajectoryProgress:
         trajectory = CartesianPositionTrajectory(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
             goal_points=[
-                Point3(x / 100, 0, 0, reference_frame=cylinder_bot_world.root)
+                Point3Dimensional(
+                    x / 100, 0, 0, reference_frame=cylinder_bot_world.root
+                )
                 for x in range(100)
             ],
         )

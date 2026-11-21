@@ -39,7 +39,7 @@ from semantic_digital_twin.world_description.connections import (
     RevoluteConnection,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 world = World()
@@ -67,7 +67,7 @@ with world.modify_world():
         parent=base,
         child=link,
         raw_dof=dof,
-        axis=Vector3.Z(reference_frame=base),
+        axis=Vector3Dimensional.Z(reference_frame=base),
     )
     world.add_connection(c_base_link)
 

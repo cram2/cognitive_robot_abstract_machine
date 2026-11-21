@@ -46,7 +46,7 @@ from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import Arm
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -60,7 +60,7 @@ class MoveToolCenterPointAction(GoalAction):
     The arm whose tool center point moves.
     """
 
-    target: Pose
+    target: Pose3Dimensional
     """
     Where the tool center point should end up.
     """
@@ -81,7 +81,7 @@ statechart = Statechart(context=executor.context)
 statechart.add_node(
     node=MoveToolCenterPointAction(
         arm=pr2.left_arm,
-        target=Pose.from_xyz_rpy(0.6, 0.3, 0.9, reference_frame=pr2.root),
+        target=Pose3Dimensional.from_xyz_rpy(0.6, 0.3, 0.9, reference_frame=pr2.root),
     )
 )
 executor.compile(statechart=statechart)

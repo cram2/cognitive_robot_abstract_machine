@@ -36,7 +36,7 @@ from semantic_digital_twin.specifications.connections import (
     PrismaticConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale, Box, Color
 from semantic_digital_twin.world_description.world_entity import Body
@@ -52,14 +52,14 @@ with world.modify_world():
         name="drawer",
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix(),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional(),
         parent_connection_specification=PrismaticConnectionSpecification(
-            axis=Vector3.X()
+            axis=Vector3Dimensional.X()
         ),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.15),
         world=world,
     )
     drawer.add(handle)
@@ -108,7 +108,7 @@ with world.modify_world():
     new_root = Body(name=PrefixedName("virtual root"))
     
     # Add a visual for the new root so we can see the change of position in the visualization
-    box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=new_root)
+    box_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(reference_frame=new_root)
     box = Box(origin=box_origin, scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1.))
     new_root.collision = [box]
     
@@ -128,7 +128,7 @@ from semantic_digital_twin.world_description.world_entity import Connection
 connection = variable(type_=Connection, domain=world.connections)
 free_connection = the(entity(connection).where(connection.parent == world.root)).first()
 with world.modify_world():
-    free_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi, reference_frame=world.root)
+    free_connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1., 1., 0., 0., 0., 0.5 * np.pi, reference_frame=world.root)
 rt = RayTracer(world)
 rt.update_scene()
 rt.scene.show("jupyter")

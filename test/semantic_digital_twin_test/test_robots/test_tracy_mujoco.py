@@ -19,7 +19,9 @@ from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Table
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,
@@ -56,7 +58,9 @@ def test_a_stationary_robot_stands_at_its_localization_pose():
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    localization_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, y=2.0
+    )
 
     tracy = RobotSpecification(Tracy, localization_pose=localization_pose).spawn(world)
 
@@ -273,7 +277,7 @@ class ArmSwungIntoAWall:
                 FixedConnection(
                     parent=world.root,
                     child=wall,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=0.95,
                         y=0.22,
                         z=tracy.table.top_z + wall_scale.z / 2,

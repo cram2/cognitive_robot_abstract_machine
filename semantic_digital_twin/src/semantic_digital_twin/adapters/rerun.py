@@ -16,7 +16,9 @@ from semantic_digital_twin.callbacks.callback import (
     ModelChangeCallback,
     StateChangeCallback,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 
 class RerunMode(StrEnum):
@@ -82,7 +84,7 @@ class RerunModelCallback(ModelChangeCallback):
             return
         body_fks = [
             (
-                HomogeneousTransformationMatrix()
+                HomogeneousTransformationMatrix3Dimensional()
                 if body == self._world.root
                 else self._world.compose_forward_kinematics_expression(
                     self._world.root, body

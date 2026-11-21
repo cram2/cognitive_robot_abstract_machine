@@ -15,7 +15,7 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
 from semantic_digital_twin.robots.robot_parts import MobileBase, TGenericDrive
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     OmniDrive,
@@ -34,8 +34,8 @@ class RootBodyBase(MobileBase[TGenericDrive], ABC):
     """
 
     @classproperty
-    def forward_axis(cls) -> Vector3:
-        return Vector3.X()
+    def forward_axis(cls) -> Vector3Dimensional:
+        return Vector3Dimensional.X()
 
     def setup_hardware_interfaces(self) -> None:
         return None

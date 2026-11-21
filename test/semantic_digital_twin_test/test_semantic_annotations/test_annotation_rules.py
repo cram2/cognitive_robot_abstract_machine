@@ -26,8 +26,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SideTable,
     Spoon,
 )
-from krrood_spatial_math.spatial_types import Vector3
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Vector3Dimensional
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -104,7 +106,9 @@ class FurnitureUnderTest:
             )
         parent_body = self.bodies[parent]
         if issubclass(connection_type, ActiveConnection):
-            connection_kwargs.setdefault("axis", Vector3.X(reference_frame=parent_body))
+            connection_kwargs.setdefault(
+                "axis", Vector3Dimensional.X(reference_frame=parent_body)
+            )
         with self.world.modify_world():
             self.world.add_kinematic_structure_entity(body)
             self.world.add_connection(
@@ -112,7 +116,7 @@ class FurnitureUnderTest:
                     world=self.world,
                     parent=parent_body,
                     child=body,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=parent_body
                     ),
                     **connection_kwargs,

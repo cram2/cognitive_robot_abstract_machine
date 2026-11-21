@@ -12,7 +12,7 @@ from experiments.shelf_generation_experiments.shelf_schema import (
     RelationalCircuitExperimentObject2D,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
@@ -46,7 +46,7 @@ def _object_2d() -> RelationalCircuitExperimentObject2D:
     return RelationalCircuitExperimentObject2D(
         object_type=ObjectType.VASE,
         scale=Scale(x=0.3, y=0.3, z=0.5),
-        pose=Pose2D.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
+        pose=Pose2Dimensional.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
         source_id="test_object",
     )
 

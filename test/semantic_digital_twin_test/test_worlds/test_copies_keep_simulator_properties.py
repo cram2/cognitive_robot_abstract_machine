@@ -17,7 +17,10 @@ from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.adapters.multi_sim import MujocoJoint, MujocoTendon
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.soft_trunk import SoftTrunk, SoftTrunkSection
@@ -65,7 +68,7 @@ def simulated_world() -> World:
     with world.modify_world():
         world.add_simulator_property(MujocoTendon(name="coupling"))
         hinge = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=arm, axis=Vector3.Z()
+            world=world, parent=root, child=arm, axis=Vector3Dimensional.Z()
         )
         hinge.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
         world.add_connection(hinge)
@@ -371,9 +374,11 @@ def connect_with_dofs(
     "connect",
     [
         lambda world, parent, child: FixedConnection(parent=parent, child=child),
-        connect_with_dofs(RevoluteConnection, axis=Vector3.Z()),
-        connect_with_dofs(PrismaticConnection, axis=Vector3.X()),
-        connect_with_dofs(ScrewConnection, axis=Vector3.Z(), screw_pitch=0.01),
+        connect_with_dofs(RevoluteConnection, axis=Vector3Dimensional.Z()),
+        connect_with_dofs(PrismaticConnection, axis=Vector3Dimensional.X()),
+        connect_with_dofs(
+            ScrewConnection, axis=Vector3Dimensional.Z(), screw_pitch=0.01
+        ),
         connect_with_dofs(Connection6DoF),
         connect_with_dofs(OmniDrive),
         connect_with_dofs(DifferentialDrive),
@@ -434,7 +439,8 @@ def test_connection_with_new_parent_has_its_own_properties(simulated_world: Worl
     hinge = simulated_world.connections[0]
 
     moved = hinge.copy_with_new_parent(
-        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        Body(name=PrefixedName("new_parent")),
+        HomogeneousTransformationMatrix3Dimensional(),
     )
 
     assert (

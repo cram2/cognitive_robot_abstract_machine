@@ -20,7 +20,7 @@ from giskardpy.motion_statechart.mixins import (
     HasRootLinkParameter,
     HasTipNormalParameter,
 )
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.geometry import Color
@@ -80,7 +80,9 @@ class AlignPlanes(
             color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
         )
         # a copy, as transforming returns the reference normal itself when it is in the root
-        root_V_reference_normal_at_tip = Vector3.from_iterable(root_V_root_normal)
+        root_V_reference_normal_at_tip = Vector3Dimensional.from_iterable(
+            root_V_root_normal
+        )
         root_V_reference_normal_at_tip.visualisation_frame = self.kinematic_chain.tip
         reference_normal_debug_expression = DebugExpression(
             name=f"{self.name}/reference_normal",
@@ -123,12 +125,12 @@ class KeepHeldBodyUpright(AlignPlanes, HasRootLinkParameter):
     The chain from :attr:`root_link` to the tool frame of :attr:`end_effector`.
     """
 
-    reference_normal: Vector3 = field(init=False)
+    reference_normal: Vector3Dimensional = field(init=False)
     """
     The z-axis of :attr:`root_link`.
     """
 
-    tip_normal: Vector3 = field(init=False)
+    tip_normal: Vector3Dimensional = field(init=False)
     """
     The z-axis of the held body in the tool frame, as bound when this task starts.
     """
@@ -145,14 +147,14 @@ class KeepHeldBodyUpright(AlignPlanes, HasRootLinkParameter):
         super().set_up()
         tool_frame = self.end_effector.tool_frame
         self.kinematic_chain = KinematicChain(root=self.root_link, tip=tool_frame)
-        self.reference_normal = Vector3.Z(reference_frame=self.root_link)
+        self.reference_normal = Vector3Dimensional.Z(reference_frame=self.root_link)
         self._tool_T_held_body = ForwardKinematicsBinding(
             name=PrefixedName("tool_T_held_body", str(self.name)),
             kinematic_chain=KinematicChain(root=tool_frame, tip=tool_frame),
             float_variable_data=self.context.float_variable_data,
         )
         self._tool_T_held_body.bind(world=self.context.world)
-        self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3.Z(
+        self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3Dimensional.Z(
             reference_frame=tool_frame
         )
 

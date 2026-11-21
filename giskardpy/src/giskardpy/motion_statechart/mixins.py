@@ -11,7 +11,12 @@ from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from krrood.patterns.mixin import ParameterMixin
-from krrood_spatial_math.spatial_types import Point3, Pose, RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    Pose3Dimensional,
+    RotationMatrix,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
@@ -82,7 +87,7 @@ class HasGoalPoseParameter(ParameterMixin):
     A node bringing something to a pose.
     """
 
-    goal_pose: Pose
+    goal_pose: Pose3Dimensional
     """
     The pose this node brings what it moves to.
     """
@@ -94,7 +99,7 @@ class HasGoalPointParameter(ParameterMixin):
     A node bringing the tip of a kinematic chain to a point, or aiming it at one.
     """
 
-    goal_point: Point3
+    goal_point: Point3Dimensional
     """
     The point the tip is brought to or aimed at.
     """
@@ -106,7 +111,7 @@ class HasGoalPointsParameter(ParameterMixin):
     A node moving the tip of a kinematic chain along a sequence of points.
     """
 
-    goal_points: list[Point3]
+    goal_points: list[Point3Dimensional]
     """
     The points the tip passes in order, all in one reference frame, ending at the last.
     """
@@ -193,7 +198,7 @@ class HasTipPointParameter(ParameterMixin):
     A node moving or observing a point fixed on a link.
     """
 
-    tip_point: Point3
+    tip_point: Point3Dimensional
     """
     The point moved or observed, in the frame of the link it is fixed on.
     """
@@ -205,7 +210,7 @@ class HasReferencePointParameter(ParameterMixin):
     A node measuring a point it moves or observes against another point.
     """
 
-    reference_point: Point3
+    reference_point: Point3Dimensional
     """
     The point the moved or observed point is measured against.
     """
@@ -217,7 +222,7 @@ class HasTipNormalParameter(ParameterMixin):
     A node turning or observing a plane fixed on a link.
     """
 
-    tip_normal: Vector3
+    tip_normal: Vector3Dimensional
     """
     The normal of the plane turned or observed, in the frame of the link it is fixed on.
     """
@@ -229,7 +234,7 @@ class HasReferenceNormalParameter(ParameterMixin):
     A node relating a plane it turns or observes to another plane.
     """
 
-    reference_normal: Vector3
+    reference_normal: Vector3Dimensional
     """
     The normal of the plane the turned or observed plane is related to.
     """
@@ -241,7 +246,7 @@ class HasTipVectorParameter(ParameterMixin):
     A node turning or observing a direction fixed on a link.
     """
 
-    tip_vector: Vector3
+    tip_vector: Vector3Dimensional
     """
     The direction turned or observed, in the frame of the link it is fixed on.
     """
@@ -253,7 +258,7 @@ class HasReferenceVectorParameter(ParameterMixin):
     A node measuring the angle of a direction it turns or observes to another direction.
     """
 
-    reference_vector: Vector3
+    reference_vector: Vector3Dimensional
     """
     The direction the angle of the turned or observed direction is measured from.
     """
@@ -315,7 +320,7 @@ class HasPointingAxisParameter(ParameterMixin):
     A node aiming an axis of a link at a point.
     """
 
-    pointing_axis: Vector3
+    pointing_axis: Vector3Dimensional
     """
     The axis aimed at the point, in the frame of the link it is fixed on.
     """
@@ -327,7 +332,7 @@ class HasHolePointParameter(ParameterMixin):
     A node inserting what a gripper holds into a hole.
     """
 
-    hole_point: Point3
+    hole_point: Point3Dimensional
     """
     The center of the opening of the hole.
     """
@@ -339,7 +344,7 @@ class HasHoleNormalParameter(ParameterMixin):
     A node inserting what a gripper holds along the axis of a hole.
     """
 
-    hole_normal: Vector3
+    hole_normal: Vector3Dimensional
     """
     The axis of the hole, pointing out of its opening.
     """

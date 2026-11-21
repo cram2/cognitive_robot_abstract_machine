@@ -44,7 +44,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -287,7 +289,7 @@ def test_tf_binding_preserves_robot_camera_mount(runtime_world: World) -> None:
     """
     reference, camera_body = _mounted_camera_bodies(runtime_world)
     original_parent = camera_body.parent_connection
-    numeric_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    numeric_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.4,
         pos_y=0.2,
         pos_z=1.3,
@@ -319,7 +321,7 @@ def test_mismatched_pose_child_is_rejected_at_acquisition(
     """
     reference, camera_body = _mounted_camera_bodies(runtime_world)
     other_frame = camera_body.parent_connection.parent
-    pose = HomogeneousTransformationMatrix(
+    pose = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=reference, child_frame=other_frame
     )
     interface = CameraInterface(BaseCameraConfig(interface_type="test"))
@@ -358,7 +360,7 @@ def test_static_pose_uses_observation_camera_without_reparenting_robot(
     descriptor = StaticCameraTransformAnnotator.Descriptor()
     descriptor.parameters.world_frame = "map"
     descriptor.parameters.world_T_camera = (
-        HomogeneousTransformationMatrix.from_xyz_quaternion(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.4,
             pos_y=0.2,
             pos_z=1.3,
@@ -402,7 +404,7 @@ def test_static_pose_creates_isolated_world_reference(
         world_T_camera=None,
     )
     camera_root = cas.require_camera_observation().camera.root
-    numeric_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    numeric_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.4,
         pos_y=0.2,
         pos_z=1.3,
@@ -571,8 +573,10 @@ def test_live_reader_uses_robot_optical_body_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.4, pos_y=0.2, pos_z=1.3
+    interface._world_T_camera = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+            pos_x=0.4, pos_y=0.2, pos_z=1.3
+        )
     )
     interface.color = np.zeros(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
@@ -606,8 +610,10 @@ def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface._world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
-        pos_x=0.4, pos_y=0.2, pos_z=1.3
+    interface._world_T_camera = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+            pos_x=0.4, pos_y=0.2, pos_z=1.3
+        )
     )
     interface.color = np.zeros(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
@@ -856,7 +862,7 @@ def test_tf_binding_attaches_existing_camera_root_to_new_reference(
     camera_body = Body(name=PrefixedName(name="standalone_camera"))
     with runtime_world.modify_world():
         runtime_world.add_body(camera_body)
-    numeric_pose = HomogeneousTransformationMatrix()
+    numeric_pose = HomogeneousTransformationMatrix3Dimensional()
 
     pose = CameraInterface.bind_world_T_camera(
         world_frame="map",
@@ -910,7 +916,7 @@ def test_available_transform_updates_pose(transform_camera: ROSCameraInterface) 
     transform_camera.tf_wrapper.lookup_transform.return_value = sample
     timestamp = ROSClockTime(nanoseconds=123)
     assert transform_camera.lookup_transform(timestamp=timestamp) is True
-    expected_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    expected_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=sample.transform.translation.x,
         pos_y=sample.transform.translation.y,
         pos_z=sample.transform.translation.z,

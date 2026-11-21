@@ -21,7 +21,7 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.hsrb import HSRB
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -51,7 +51,9 @@ def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
     """
     hsrb, simulation = simulated_hsrb
     world = hsrb._world
-    goal = Pose.from_xyz_rpy(1.0, 0.5, 0.0, yaw=0.5, reference_frame=world.root)
+    goal = Pose3Dimensional.from_xyz_rpy(
+        1.0, 0.5, 0.0, yaw=0.5, reference_frame=world.root
+    )
     raised = hsrb.mobile_base.torso.get_joint_state_by_type(TorsoState.HIGH)
     plan = Sequence(
         nodes=[

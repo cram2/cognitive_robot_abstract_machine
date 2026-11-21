@@ -19,7 +19,10 @@ from semantic_digital_twin.adapters.multi_sim import (
     MujocoSim,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
     ServoGains,
@@ -120,7 +123,7 @@ def _pendulum_world() -> PendulumWorld:
             body.collision = ShapeCollection(
                 [
                     Box(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             x=0.1, z=height, reference_frame=body
                         ),
                         scale=Scale(0.2, 0.02, 0.02),
@@ -139,7 +142,7 @@ def _pendulum_world() -> PendulumWorld:
             name=PrefixedName("hinge"),
             parent=base,
             child=arm,
-            axis=Vector3.Z(reference_frame=arm),
+            axis=Vector3Dimensional.Z(reference_frame=arm),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(hinge)
@@ -147,7 +150,7 @@ def _pendulum_world() -> PendulumWorld:
             name=PrefixedName("mirrored_hinge"),
             parent=base,
             child=mirrored_arm,
-            axis=Vector3.Z(reference_frame=mirrored_arm),
+            axis=Vector3Dimensional.Z(reference_frame=mirrored_arm),
             raw_dof=degree_of_freedom,
             multiplier=-1.0,
         )
@@ -322,7 +325,7 @@ def _blocked_servoed_pendulum_world() -> PendulumWorld:
             FixedConnection(
                 parent=base,
                 child=post,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.15, y=0.06, reference_frame=base
                 ),
             )

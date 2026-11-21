@@ -22,9 +22,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Displacement,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -52,7 +52,9 @@ class RecordingPerformer(GraspPerformer):
         return GraspResult(
             object_raised=True,
             motion_completed=True,
-            object_displacement=Displacement(translation=Vector3(0.0, 0.0, 0.2)),
+            object_displacement=Displacement(
+                translation=Vector3Dimensional(0.0, 0.0, 0.2)
+            ),
             slip=Displacement(),
         )
 
@@ -67,7 +69,9 @@ def in_world(annotation_type, shape: trimesh.Trimesh, name: str):
         [
             Mesh.from_trimesh(
                 mesh=shape,
-                origin=HomogeneousTransformationMatrix(reference_frame=body),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,

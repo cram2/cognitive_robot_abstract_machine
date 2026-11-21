@@ -9,7 +9,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Handle,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -41,7 +43,7 @@ def _box_body(name: str, scale: Scale, x: float = 0.0) -> Body:
     body.collision = ShapeCollection(
         [
             Box(
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=x, reference_frame=body
                 ),
                 scale=scale,

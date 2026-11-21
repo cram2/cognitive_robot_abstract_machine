@@ -9,7 +9,7 @@ import trimesh.boolean
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import FloatVariable
-from krrood_spatial_math.exceptions import MissingCartesianFrame3DResolver
+from krrood_spatial_math.exceptions import MissingCartesianFrame3DimensionalResolver
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
@@ -20,17 +20,19 @@ from semantic_digital_twin.exceptions import (
     MissingWorldError,
 )
 from krrood_spatial_math.spatial_types import (
-    Point3,
-    Vector3,
+    Point3Dimensional,
+    Vector3Dimensional,
     Quaternion,
     RotationMatrix,
 )
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point2,
-    Pose,
-    Pose2D,
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    Point2Dimensional,
+    Pose2Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -56,7 +58,11 @@ def test_body_json_serialization():
     world = World()
     body = Body(name=PrefixedName("body"))
     collision = [
-        Box(origin=HomogeneousTransformationMatrix.from_xyz_rpy(0, 1, 0, 0, 0, 1, body))
+        Box(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                0, 1, 0, 0, 0, 1, body
+            )
+        )
     ]
     body.collision = ShapeCollection(collision, reference_frame=body)
 
@@ -104,7 +110,7 @@ def test_dof_hardware_interface_serialization():
 def test_transformation_matrix_json_serialization():
     body = Body(name=PrefixedName("body"))
     body2 = Body(name=PrefixedName("body2"))
-    transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+    transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, y=2, z=3, roll=1, pitch=2, yaw=3, reference_frame=body, child_frame=body2
     )
     json_data = transform.to_json()
@@ -112,20 +118,22 @@ def test_transformation_matrix_json_serialization():
     tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
     tracker.add(key=body.id, tracked_object=body)
     tracker.add(key=body2.id, tracked_object=body2)
-    transform_copy = HomogeneousTransformationMatrix.from_json(data=json_data, **kwargs)
+    transform_copy = HomogeneousTransformationMatrix3Dimensional.from_json(
+        data=json_data, **kwargs
+    )
     assert transform.reference_frame == transform_copy.reference_frame
     assert id(transform.reference_frame) == id(transform_copy.reference_frame)
     assert np.allclose(transform.to_np(), transform_copy.to_np())
 
 
-def test_point3_json_serialization():
+def test_point_3_dimensional_json_serialization():
     body = Body(name=PrefixedName("body"))
-    point = Point3(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
     tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
     tracker.add(key=body.id, tracked_object=body)
-    point_copy = Point3.from_json(data=json_data, **kwargs)
+    point_copy = Point3Dimensional.from_json(data=json_data, **kwargs)
     assert point.reference_frame == point_copy.reference_frame
     assert id(point.reference_frame) == id(point_copy.reference_frame)
     assert np.allclose(point.to_np(), point_copy.to_np())
@@ -133,20 +141,20 @@ def test_point3_json_serialization():
 
 def test_KinematicStructureEntityNotInKwargs():
     body = Body(name=PrefixedName("body"))
-    point = Point3(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
-    with pytest.raises(MissingCartesianFrame3DResolver):
-        Point3.from_json(data=json_data, **kwargs)
+    with pytest.raises(MissingCartesianFrame3DimensionalResolver):
+        Point3Dimensional.from_json(data=json_data, **kwargs)
 
 
 def test_KinematicStructureEntityNotInKwargs2():
     body = Body(name=PrefixedName("body"))
-    point = Point3(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
     with pytest.raises(WorldEntityWithIDNotInKwargs) as raised:
-        Point3.from_json(data=json_data, **tracker.create_kwargs())
+        Point3Dimensional.from_json(data=json_data, **tracker.create_kwargs())
 
     assert raised.value.key == body.id
     assert raised.value.world_entity_name == body.name
@@ -263,21 +271,21 @@ def test_a_connection_written_as_a_reference_is_read_as_the_connection_of_the_wo
 
 def test_world_entity_missing_from_the_world_is_an_untracked_object():
     body = Body(name=PrefixedName("body"))
-    point = Point3(1, 2, 3, reference_frame=body)
+    point = Point3Dimensional(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
     with pytest.raises(UntrackedObjectError):
-        Point3.from_json(data=json_data, **tracker.create_kwargs())
+        Point3Dimensional.from_json(data=json_data, **tracker.create_kwargs())
 
 
 def test_vector3_json_serialization():
     body = Body(name=PrefixedName("body"))
-    vector = Vector3(1, 2, 3, reference_frame=body)
+    vector = Vector3Dimensional(1, 2, 3, reference_frame=body)
     json_data = vector.to_json()
     kwargs = {}
     tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
     tracker.add(key=body.id, tracked_object=body)
-    vector_copy = Vector3.from_json(data=json_data, **kwargs)
+    vector_copy = Vector3Dimensional.from_json(data=json_data, **kwargs)
     assert vector.reference_frame == vector_copy.reference_frame
     assert id(vector.reference_frame) == id(vector_copy.reference_frame)
     assert np.allclose(vector.to_np(), vector_copy.to_np())
@@ -311,14 +319,14 @@ def test_rotation_matrix_json_serialization():
 
 def test_pose_json_serialization():
     body = Body(name=PrefixedName("body"))
-    pose = Pose.from_xyz_rpy(
+    pose = Pose3Dimensional.from_xyz_rpy(
         x=4, y=5, z=7, roll=1, pitch=2, yaw=3, reference_frame=body
     )
     json_data = pose.to_json()
     kwargs = {}
     tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
     tracker.add(key=body.id, tracked_object=body)
-    pose_copy = Pose.from_json(data=json_data, **kwargs)
+    pose_copy = Pose3Dimensional.from_json(data=json_data, **kwargs)
     assert pose.reference_frame == pose_copy.reference_frame
     assert id(pose.reference_frame) == id(pose_copy.reference_frame)
     assert np.allclose(pose, pose_copy)
@@ -334,7 +342,7 @@ def test_connection_json_serialization_with_world():
         c = FixedConnection(
             parent=body,
             child=body2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, roll=2, reference_frame=body, child_frame=body2
             ),
         )
@@ -372,11 +380,11 @@ def test_screw_connection_json_serialization_with_world():
             world=world,
             parent=body,
             child=body2,
-            axis=Vector3.Z(),
+            axis=Vector3Dimensional.Z(),
             screw_pitch=screw_pitch,
             multiplier=2.0,
             offset=0.1,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, reference_frame=body, child_frame=body2
             ),
         )
@@ -447,7 +455,7 @@ def _world_with_two_equally_named_connections() -> tuple[
                 world=world,
                 parent=world.root,
                 child=child,
-                axis=Vector3.Z(),
+                axis=Vector3Dimensional.Z(),
                 name=PrefixedName("shared_joint"),
             )
             world.add_connection(connection)
@@ -478,14 +486,16 @@ def test_joint_state_resolves_the_connection_it_was_built_from():
 @pytest.mark.parametrize(
     "spatial_type",
     [
-        Point3(1.0, 2.0, 3.0),
-        Point2(1.0, 2.0),
-        Vector3(1.0, 2.0, 3.0),
+        Point3Dimensional(1.0, 2.0, 3.0),
+        Point2Dimensional(1.0, 2.0),
+        Vector3Dimensional(1.0, 2.0, 3.0),
         Quaternion(0.0, 0.0, 0.0, 1.0),
         RotationMatrix.from_rpy(0.1, 0.2, 0.3),
-        HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 3.0, 0.1, 0.2, 0.3),
-        Pose.from_xyz_quaternion(1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 1.0),
-        Pose2D.from_xy_yaw(1.0, 2.0, 0.3),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1.0, 2.0, 3.0, 0.1, 0.2, 0.3
+        ),
+        Pose3Dimensional.from_xyz_quaternion(1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 1.0),
+        Pose2Dimensional.from_xy_yaw(1.0, 2.0, 0.3),
     ],
 )
 def test_a_spatial_type_survives_a_json_round_trip(spatial_type):
@@ -510,7 +520,7 @@ def test_a_spatial_type_carries_the_frame_it_is_expressed_in():
     travels with it and is resolved back to the entity of the reading world.
     """
     body = Body(name=PrefixedName("reference"))
-    point = Point3(1.0, 2.0, 3.0, reference_frame=body)
+    point = Point3Dimensional(1.0, 2.0, 3.0, reference_frame=body)
     payload = point.to_json()
 
     tracker = WorldEntityWithIDKwargsTracker.from_world(World())
@@ -544,16 +554,20 @@ def test_a_degree_of_freedom_survives_a_json_round_trip():
 # %% expressions over variables
 
 
-def symbolic_point3(variable: FloatVariable, frame: Body) -> Point3:
-    return Point3(variable, 2.0, 3.0, reference_frame=frame)
+def symbolic_point_3_dimensional(
+    variable: FloatVariable, frame: Body
+) -> Point3Dimensional:
+    return Point3Dimensional(variable, 2.0, 3.0, reference_frame=frame)
 
 
-def symbolic_point2(variable: FloatVariable, frame: Body) -> Point2:
-    return Point2(variable, 2.0, reference_frame=frame)
+def symbolic_point_2_dimensional(
+    variable: FloatVariable, frame: Body
+) -> Point2Dimensional:
+    return Point2Dimensional(variable, 2.0, reference_frame=frame)
 
 
-def symbolic_vector3(variable: FloatVariable, frame: Body) -> Vector3:
-    return Vector3(variable, 2.0, 3.0, reference_frame=frame)
+def symbolic_vector3(variable: FloatVariable, frame: Body) -> Vector3Dimensional:
+    return Vector3Dimensional(variable, 2.0, 3.0, reference_frame=frame)
 
 
 def symbolic_quaternion(variable: FloatVariable, frame: Body) -> Quaternion:
@@ -566,27 +580,27 @@ def symbolic_rotation_matrix(variable: FloatVariable, frame: Body) -> RotationMa
 
 def symbolic_transformation_matrix(
     variable: FloatVariable, frame: Body
-) -> HomogeneousTransformationMatrix:
-    return HomogeneousTransformationMatrix.from_xyz_rpy(
+) -> HomogeneousTransformationMatrix3Dimensional:
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         variable, 2.0, 3.0, 0.1, variable, 0.3, reference_frame=frame
     )
 
 
-def symbolic_pose(variable: FloatVariable, frame: Body) -> Pose:
-    return Pose.from_xyz_rpy(
+def symbolic_pose(variable: FloatVariable, frame: Body) -> Pose3Dimensional:
+    return Pose3Dimensional.from_xyz_rpy(
         variable, 2.0, 3.0, 0.1, variable, 0.3, reference_frame=frame
     )
 
 
-def symbolic_pose2d(variable: FloatVariable, frame: Body) -> Pose2D:
-    return Pose2D.from_xy_yaw(variable, 2.0, variable, reference_frame=frame)
+def symbolic_pose2d(variable: FloatVariable, frame: Body) -> Pose2Dimensional:
+    return Pose2Dimensional.from_xy_yaw(variable, 2.0, variable, reference_frame=frame)
 
 
 @pytest.mark.parametrize(
     "build_spatial_type",
     [
-        symbolic_point3,
-        symbolic_point2,
+        symbolic_point_3_dimensional,
+        symbolic_point_2_dimensional,
         symbolic_vector3,
         symbolic_quaternion,
         symbolic_rotation_matrix,
@@ -621,7 +635,7 @@ def test_a_transformation_over_a_variable_keeps_its_child_frame():
     child_frame = Body(name=PrefixedName("child"))
     # the transformation does not keep its variable alive, so the test has to
     variable = FloatVariable(name="muh")
-    transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
+    transformation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         variable,
         reference_frame=reference_frame,
         child_frame=child_frame,

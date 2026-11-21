@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
@@ -46,7 +46,10 @@ def test_nested_block_keeps_degree_of_freedom_of_outer_block(
             world.add_kinematic_structure_entity(child)
         world.add_connection(
             RevoluteConnection(
-                parent=parent, child=child, axis=Vector3.Z(), raw_dof=degree_of_freedom
+                parent=parent,
+                child=child,
+                axis=Vector3Dimensional.Z(),
+                raw_dof=degree_of_freedom,
             )
         )
 
@@ -92,7 +95,9 @@ def test_updating_connection_origin_is_recorded(mini_world: World):
 
     with mini_world.modify_world():
         connection.update_parent_T_connection(
-            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+            parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=1.0
+            )
         )
 
     last_block = mini_world.get_world_model_manager().model_modification_blocks[-1]
@@ -103,7 +108,9 @@ def test_updating_connection_origin_is_recorded(mini_world: World):
 
 def test_updating_connection_origin_moves_child(mini_world: World):
     connection = mini_world.connections[0]
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0
+    )
 
     with mini_world.modify_world():
         connection.update_parent_T_connection(parent_T_connection=parent_T_connection)
@@ -120,7 +127,9 @@ def test_rollback_of_connection_origin_update_restores_it(mini_world: World):
     version = mini_world.get_world_model_manager().version
     with mini_world.modify_world():
         connection.update_parent_T_connection(
-            parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+            parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=1.0
+            )
         )
 
     mini_world.rollback_to_version(version)
@@ -135,7 +144,9 @@ def test_rollback_of_connection_origin_update_restores_it(mini_world: World):
 
 def test_updating_connection_origin_leaves_given_pose_unchanged(mini_world: World):
     connection = mini_world.connections[0]
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0
+    )
 
     with mini_world.modify_world():
         connection.update_parent_T_connection(parent_T_connection=parent_T_connection)
@@ -149,7 +160,7 @@ def test_updating_connection_origin_in_another_frame_raises(mini_world: World):
     with pytest.raises(ReferenceFrameMismatchError):
         with mini_world.modify_world():
             connection.update_parent_T_connection(
-                parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.0, reference_frame=connection.child
                 )
             )

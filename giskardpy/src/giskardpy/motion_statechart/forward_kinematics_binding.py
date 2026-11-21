@@ -11,7 +11,9 @@ from numpy.typing import NDArray
 
 from giskardpy.motion_statechart.mixins import HasKinematicChainParameter
 from krrood.symbolic_math.float_variable_data import FloatVariableData
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
@@ -48,7 +50,7 @@ class ForwardKinematicsBinding(HasKinematicChainParameter):
         holding the binding.
     """
 
-    root_T_tip: HomogeneousTransformationMatrix | None = field(
+    root_T_tip: HomogeneousTransformationMatrix3Dimensional | None = field(
         default=None, kw_only=True
     )
     """
@@ -70,8 +72,10 @@ class ForwardKinematicsBinding(HasKinematicChainParameter):
         with :attr:`float_variable_data`.
         """
         if self.root_T_tip is None:
-            self.root_T_tip = HomogeneousTransformationMatrix.create_with_variables(
-                str(self.name)
+            self.root_T_tip = (
+                HomogeneousTransformationMatrix3Dimensional.create_with_variables(
+                    str(self.name)
+                )
             )
         self.root_T_tip.reference_frame = self.kinematic_chain.root
         self.root_T_tip.child_frame = self.kinematic_chain.tip

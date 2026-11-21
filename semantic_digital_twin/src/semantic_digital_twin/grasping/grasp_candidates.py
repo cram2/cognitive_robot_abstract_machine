@@ -14,7 +14,7 @@ from krrood_spatial_math.exceptions import (
     MissingReferenceFrameError,
     ReferenceFrameMismatchError,
 )
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
@@ -40,7 +40,7 @@ class GraspCandidate:
     The annotation of the object offering this grasp.
     """
 
-    grasp_pose: Pose
+    grasp_pose: Pose3Dimensional
     """
     The grasp frame relative to :attr:`graspable`'s root body, so that it stays correct
     when the object moves.
@@ -64,7 +64,7 @@ class GraspCandidate:
         :param graspable: The annotation of the object to be grasped.
         :return: A grasp at that object's origin.
         """
-        return cls(graspable, Pose(reference_frame=graspable.root))
+        return cls(graspable, Pose3Dimensional(reference_frame=graspable.root))
 
     @property
     def width_along_closing_axis(self) -> float:
@@ -97,18 +97,18 @@ class GraspCandidate:
         return float(np.abs(closing_direction) @ extents)
 
     @property
-    def world_T_grasp(self) -> Pose:
+    def world_T_grasp(self) -> Pose3Dimensional:
         """
         :return: The grasp frame in the world frame, where the object is now.
         """
         world = self.graspable.root._world
         return world.transform(self.grasp_pose, world.root)
 
-    def moved_to(self, reference_T_object: Pose) -> Pose:
+    def moved_to(self, reference_T_object: Pose3Dimensional) -> Pose3Dimensional:
         """
         Transform this grasp candidate to where it would be, once the object is placed.
 
         :param reference_T_object: The pose the object is going to have.
         :return:``reference_T_grasp``, the grasp in the same frame that pose is in.
         """
-        return reference_T_object.homogeneous_matrix @ self.grasp_pose
+        return reference_T_object.to_coordinate_change() @ self.grasp_pose

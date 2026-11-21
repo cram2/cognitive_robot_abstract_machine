@@ -28,7 +28,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.connections import PrismaticConnection
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
@@ -72,7 +72,7 @@ with world.modify_world():
     root_C_slider: PrismaticConnection = PrismaticConnection.create_with_dofs(
         parent=root,
         child=slider,
-        axis=Vector3.X(reference_frame=root),
+        axis=Vector3Dimensional.X(reference_frame=root),
         world=world,
     )
     world.add_connection(root_C_slider)

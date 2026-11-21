@@ -34,7 +34,9 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 
 def _recursive_convert(value: Any) -> Any:
@@ -420,7 +422,7 @@ class StampedTransformCodec(ViewCodec):
         return result
 
 
-class HomogeneousTransformationMatrixCodec(ViewCodec):
+class HomogeneousTransformationMatrix3DimensionalCodec(ViewCodec):
     """
     Codec for SemDT homogeneous transformation matrices.
     """
@@ -431,9 +433,9 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
         """
         Check whether the value is a homogeneous transformation matrix.
         """
-        return isinstance(value, HomogeneousTransformationMatrix)
+        return isinstance(value, HomogeneousTransformationMatrix3Dimensional)
 
-    def encode(self, value: HomogeneousTransformationMatrix) -> ViewPayload:
+    def encode(self, value: HomogeneousTransformationMatrix3Dimensional) -> ViewPayload:
         """
         Encode a transformation matrix with its native JSON representation.
         """
@@ -455,13 +457,17 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
             },
         )
 
-    def decode(self, payload: ViewPayload) -> HomogeneousTransformationMatrix:
+    def decode(
+        self, payload: ViewPayload
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Decode matrix payload data using the active world entity tracker.
         """
         tracker = world.get_world_entity_tracker()
         kwargs = tracker.create_kwargs() if tracker is not None else {}
-        return HomogeneousTransformationMatrix.from_json(data=payload.payload, **kwargs)
+        return HomogeneousTransformationMatrix3Dimensional.from_json(
+            data=payload.payload, **kwargs
+        )
 
 
 # %% Recorded camera observations
@@ -481,7 +487,7 @@ class RecordedCameraObservation:
     Projection model matching the recorded image.
     """
 
-    world_T_camera: HomogeneousTransformationMatrix | None
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional | None
     """
     Sampled optical-frame pose in world coordinates.
     """
@@ -619,7 +625,7 @@ class CASViewCodecRegistry:
                 Open3DPointCloudCodec(),
                 StampedTransformCodec(),
                 CameraObservationCodec(),
-                HomogeneousTransformationMatrixCodec(),
+                HomogeneousTransformationMatrix3DimensionalCodec(),
                 RosMessageCodec(),
                 KrroodCodec(),
                 JsonLikeCodec(),

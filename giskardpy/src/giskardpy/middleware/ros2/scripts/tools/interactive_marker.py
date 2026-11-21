@@ -21,7 +21,9 @@ from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecu
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.patterns.called_positionally import called_positionally
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.world_description.world_entity import (
@@ -257,15 +259,17 @@ class InteractiveMarkerNode:
 
         kinematic_chain_marker = self.markers[feedback.marker_name]
 
-        goal_transformation = HomogeneousTransformationMatrix.from_xyz_quaternion(
-            pos_x=feedback.pose.position.x,
-            pos_y=feedback.pose.position.y,
-            pos_z=feedback.pose.position.z,
-            quat_x=feedback.pose.orientation.x,
-            quat_y=feedback.pose.orientation.y,
-            quat_z=feedback.pose.orientation.z,
-            quat_w=feedback.pose.orientation.w,
-            reference_frame=kinematic_chain_marker.tip_body,
+        goal_transformation = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+                pos_x=feedback.pose.position.x,
+                pos_y=feedback.pose.position.y,
+                pos_z=feedback.pose.position.z,
+                quat_x=feedback.pose.orientation.x,
+                quat_y=feedback.pose.orientation.y,
+                quat_z=feedback.pose.orientation.z,
+                quat_w=feedback.pose.orientation.w,
+                reference_frame=kinematic_chain_marker.tip_body,
+            )
         )
 
         motion_statechart = Statechart(context=self.giskard.context)

@@ -42,7 +42,7 @@ from importlib.resources import files
 from pathlib import Path
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.connections import Connection6DoF, FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
@@ -55,7 +55,7 @@ urdf_path = os.path.join(root, "resources", "urdf", "table.urdf")
 table_world = URDFParser.from_file(urdf_path).create_world()
 
 root_C_left_leg = table_world.get_body_by_name("left_front_leg").parent_connection
-moved_root_T_left_leg = HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5, y=-0.5)
+moved_root_T_left_leg = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.5, y=-0.5)
 moved_root_C_left_leg = FixedConnection(name=root_C_left_leg.name,
                                         parent=root_C_left_leg.parent,
                                         child=root_C_left_leg.child,
@@ -80,15 +80,15 @@ rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 
 ## 1. Craft a transform: Place the cube on top of the table
 Now we will move the cube using a rigid transform. The pose of a 6DoF connection can be set via
-the `origin`, which is a `HomogeneousTransformationMatrix` between the parent (in this case world root) and the child (in this case the cube).
+the `origin`, which is a `HomogeneousTransformationMatrix3Dimensional` between the parent (in this case world root) and the child (in this case the cube).
 This naming style, while not strictly pythonic, makes calculating with transformations a lot easier. To learn more about this naming convention, please refer to our [style guide](https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/style_guide.html)!
 
 Our goal is now to place the cube on top of the table (the cube should be lifted 72cm from the ground). For this you need to create a transform `new_table_world_T_box` below, and then comment in the rest of the code in the code in the cell, which will apply the transform to the Connection6DoF which connects the cube to the table.
 
-Our `HomogeneousTransformationMatrix` class has multiple factory methods to create transforms, but for now you can focus on the `from_xyz_rpy` method, which creates a transform from a position (x, y, and z coordinates) and orientation. The orientation is represented by roll (rotation around the x-axis), pitch (rotation around the y-axis), and yaw (rotation around the z-axis)), all in radians.
+Our `HomogeneousTransformationMatrix3Dimensional` class has multiple factory methods to create transforms, but for now you can focus on the `from_xyz_rpy` method, which creates a transform from a position (x, y, and z coordinates) and orientation. The orientation is represented by roll (rotation around the x-axis), pitch (rotation around the y-axis), and yaw (rotation around the z-axis)), all in radians.
 
 Your goal:
-- Create a translation-only transform using `HomogeneousTransformationMatrix.from_xyz_rpy(x=..., y=..., z=..., reference_frame=table_world.root)`
+- Create a translation-only transform using `HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=..., y=..., z=..., reference_frame=table_world.root)`
 - Choose an assignment of x, y, and z coordinates that place the cube on top of the table, right in the middle.
 
 Store your transform in a variable named `new_table_world_T_box`.
@@ -97,7 +97,7 @@ Store your transform in a variable named `new_table_world_T_box`.
 :tags: [exercise]
 
 # TODO: set the cube on top of the table by crafting a transform
-new_table_world_T_box: HomogeneousTransformationMatrix = ...
+new_table_world_T_box: HomogeneousTransformationMatrix3Dimensional = ...
 
 # Visualization
 rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
@@ -105,7 +105,7 @@ rt = RayTracer(table_world); rt.update_scene(); rt.scene.show("jupyter")
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-new_table_world_T_box = HomogeneousTransformationMatrix.from_xyz_rpy(
+new_table_world_T_box = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
     z=0.72,
     reference_frame=table_world.root,
 )
@@ -114,8 +114,8 @@ new_table_world_T_box = HomogeneousTransformationMatrix.from_xyz_rpy(
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-if new_table_world_T_box is ...: raise ExerciseVerificationFailed("Create and assign a HomogeneousTransformationMatrix to place the cube on the table.")
-if not isinstance(new_table_world_T_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed("Use a HomogeneousTransformationMatrix for `T_root_cube_on_table`.")
+if new_table_world_T_box is ...: raise ExerciseVerificationFailed("Create and assign a HomogeneousTransformationMatrix3Dimensional to place the cube on the table.")
+if not isinstance(new_table_world_T_box, HomogeneousTransformationMatrix3Dimensional): raise ExerciseVerificationFailed("Use a HomogeneousTransformationMatrix3Dimensional for `T_root_cube_on_table`.")
 with table_world.modify_world():
     table_world_C_box.origin = new_table_world_T_box
 if not abs(new_table_world_T_box.x.to_np()) < 1e-5: raise ExerciseVerificationFailed("The cube should be at the middle of the table.")
@@ -143,8 +143,8 @@ If you don't know how to combine two transforms, you can check out [the appropri
 # TODO: translate and rotate the cube
 table_world_C_box = box_body.parent_connection
 table_world_T_box = table_world_C_box.origin
-box_T_moved_box: HomogeneousTransformationMatrix = ...
-table_world_T_moved_box: HomogeneousTransformationMatrix = ...
+box_T_moved_box: HomogeneousTransformationMatrix3Dimensional = ...
+table_world_T_moved_box: HomogeneousTransformationMatrix3Dimensional = ...
 
 ```
 
@@ -154,7 +154,7 @@ table_world_T_moved_box: HomogeneousTransformationMatrix = ...
 table_world_C_box = box_body.parent_connection
 table_world_T_box = table_world_C_box.origin
 yaw = math.radians(45)
-box_T_moved_box = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=-0.4, yaw=yaw, reference_frame=box_body)
+box_T_moved_box = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.3, y=-0.4, yaw=yaw, reference_frame=box_body)
 table_world_T_moved_box = table_world_T_box @ box_T_moved_box
 
 ```
@@ -163,7 +163,7 @@ table_world_T_moved_box = table_world_T_box @ box_T_moved_box
 :tags: [verify-solution, remove-input]
 
 if table_world_T_moved_box is ...: raise ExerciseVerificationFailed("Craft a new transform to move and rotate the cube and assign it to `table_world_T_moved_box`.")
-if not isinstance(table_world_T_moved_box, HomogeneousTransformationMatrix): raise ExerciseVerificationFailed("`table_world_T_moved_box` must be a HomogeneousTransformationMatrix.")
+if not isinstance(table_world_T_moved_box, HomogeneousTransformationMatrix3Dimensional): raise ExerciseVerificationFailed("`table_world_T_moved_box` must be a HomogeneousTransformationMatrix3Dimensional.")
 
 with table_world.modify_world():
     table_world_C_box.origin = table_world_T_moved_box

@@ -8,7 +8,9 @@ from dataclasses import dataclass
 
 from typing_extensions import TYPE_CHECKING, Self, cast
 
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.exceptions import (
@@ -57,7 +59,7 @@ class RobotSpecification:
     :meth:`~semantic_digital_twin.robots.robot_parts.AbstractRobot.from_description`.
     """
 
-    localization_pose: HomogeneousTransformationMatrix | None = None
+    localization_pose: HomogeneousTransformationMatrix3Dimensional | None = None
     """
     The pose, in the ``world.root`` frame, of the body the localization attaches: the
     odometry body of a robot with a mobile base, and the root of the robot's description
@@ -66,7 +68,7 @@ class RobotSpecification:
     If None, identity is used.
     """
 
-    odometry_T_robot_start: HomogeneousTransformationMatrix | None = None
+    odometry_T_robot_start: HomogeneousTransformationMatrix3Dimensional | None = None
     """
     The start pose of a robot with a mobile base in the frame of its odometry body.
 
@@ -274,7 +276,7 @@ class RobotSpecification:
 
     def _reframe_localization_pose(
         self, world: World, localized_body: Body
-    ) -> HomogeneousTransformationMatrix | None:
+    ) -> HomogeneousTransformationMatrix3Dimensional | None:
         """
         :param world: The world whose root is the reference frame.
         :param localized_body: The body the localization attaches, which is the child

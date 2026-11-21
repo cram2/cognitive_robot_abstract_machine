@@ -67,7 +67,9 @@ from semantic_digital_twin.datastructures.camera_model import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -127,8 +129,8 @@ class CameraInterface(object):
     def bind_world_T_camera(
         world_frame: str,
         camera_frame: str,
-        world_T_camera: HomogeneousTransformationMatrix,
-    ) -> HomogeneousTransformationMatrix:
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Bind a sampled pose without changing a robot camera's attachment.
 
@@ -190,7 +192,7 @@ class CameraInterface(object):
         ):
             mount = camera_body.parent_connection
 
-        runtime_world_T_camera = HomogeneousTransformationMatrix(
+        runtime_world_T_camera = HomogeneousTransformationMatrix3Dimensional(
             data=world_T_camera,
             reference_frame=world_body,
             child_frame=camera_body,
@@ -211,7 +213,7 @@ class CameraInterface(object):
 
     def static_world_T_camera_if_configured(
         self, camera_frame: str
-    ) -> HomogeneousTransformationMatrix | None:
+    ) -> HomogeneousTransformationMatrix3Dimensional | None:
         """
         Return the configured static camera pose bound to the runtime world.
 
@@ -234,7 +236,7 @@ class CameraInterface(object):
         camera_frame: str,
         timestamp_nanoseconds: int,
         modalities: tuple[CameraModality, ...],
-        world_T_camera: HomogeneousTransformationMatrix | None,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional | None,
     ) -> None:
         """
         Store semantic identity and effective calibration for a camera frame.
@@ -262,7 +264,7 @@ class CameraInterface(object):
         )
         if world_T_camera is not None and world_T_camera.child_frame is not camera.root:
             observation = observation.with_world_T_camera(
-                HomogeneousTransformationMatrix(
+                HomogeneousTransformationMatrix3Dimensional(
                     data=world_T_camera,
                     reference_frame=world_T_camera.reference_frame,
                     child_frame=camera.root,
@@ -401,7 +403,7 @@ class ROSCameraInterface(CameraInterface):
             """
             Whether to look up camera transforms.
             """
-        self._world_T_camera: HomogeneousTransformationMatrix | None = None
+        self._world_T_camera: HomogeneousTransformationMatrix3Dimensional | None = None
         """
         Camera pose from the most recent successful TF lookup.
         """
@@ -438,7 +440,7 @@ class ROSCameraInterface(CameraInterface):
 
     def world_T_camera_from_tf(
         self, timestamp: builtin_interfaces.msg.Time
-    ) -> HomogeneousTransformationMatrix | None:
+    ) -> HomogeneousTransformationMatrix3Dimensional | None:
         """
         Return the sampled TF camera pose bound to the runtime world.
 

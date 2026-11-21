@@ -60,8 +60,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 
 # %% what the scene is built from
@@ -118,7 +120,7 @@ class PlaceSettingObject:
     The mesh the object is shaped by.
     """
 
-    start: HomogeneousTransformationMatrix
+    start: HomogeneousTransformationMatrix3Dimensional
     """
     Where the object stands before the plan begins, in :attr:`starts_on`'s frame.
     """
@@ -191,12 +193,12 @@ class PlaceSettingObject:
             ).evaluate()
         )
 
-    def target_location(self, world: World) -> Pose:
+    def target_location(self, world: World) -> Pose3Dimensional:
         """
         :param world: The world the table stands in.
         :return: Where on the table the object is laid.
         """
-        return Pose.from_xyz_rpy(
+        return Pose3Dimensional.from_xyz_rpy(
             self.along_table,
             self.across_table,
             self.height,
@@ -216,9 +218,9 @@ class BulletWorldDemonstration(RobotDemonstration):
 
     ros_node_name: str = "bullet_world_demo_node"
 
-    robot_start: HomogeneousTransformationMatrix = field(
-        default_factory=lambda: HomogeneousTransformationMatrix.from_xyz_rpy(
-            1.1, 2.5, 0
+    robot_start: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=lambda: (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.1, 2.5, 0)
         )
     )
     """
@@ -231,7 +233,7 @@ class BulletWorldDemonstration(RobotDemonstration):
         default_factory=lambda: PlaceSettingObject(
             Milk,
             SceneFile.MILK,
-            HomogeneousTransformationMatrix.from_xyz_rpy(2.37, 2, 1.0345),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2.37, 2, 1.0345),
             along_table=4.8,
             height=0.81,
         )
@@ -244,7 +246,7 @@ class BulletWorldDemonstration(RobotDemonstration):
         default_factory=lambda: PlaceSettingObject(
             Bowl,
             SceneFile.BOWL,
-            HomogeneousTransformationMatrix.from_xyz_rpy(2.4, 2.2, 0.98),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2.4, 2.2, 0.98),
             along_table=5.0,
             height=0.76,
         )
@@ -257,7 +259,9 @@ class BulletWorldDemonstration(RobotDemonstration):
         default_factory=lambda: PlaceSettingObject(
             Spoon,
             SceneFile.SPOON,
-            HomogeneousTransformationMatrix.from_xyz_rpy(-0.05, -0.05, -0.01),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                -0.05, -0.05, -0.01
+            ),
             along_table=5.2,
             height=0.73,
             across_table=3.25,

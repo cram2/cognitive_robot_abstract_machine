@@ -52,6 +52,9 @@ parts:
   chapters:
     - file: patterns/role
     - file: patterns/developer/role
+- caption: Derived Generic Parameters
+  chapters:
+    - file: patterns/derived_generic_parameters
 
 - caption: rustworkx_utils
   chapters:

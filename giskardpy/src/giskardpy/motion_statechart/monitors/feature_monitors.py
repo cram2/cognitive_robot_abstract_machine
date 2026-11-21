@@ -25,7 +25,7 @@ from giskardpy.motion_statechart.mixins import (
     HasUpperLimitParameter,
 )
 from cramph.node import NodeArtifacts
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3Dimensional, Vector3Dimensional
 
 # %% monitors on geometric features
 
@@ -40,12 +40,12 @@ class FeatureFunctionMonitor(
     the frame of the root.
     """
 
-    reference_feature: Point3 | Vector3 = field(init=False)
+    reference_feature: Point3Dimensional | Vector3Dimensional = field(init=False)
     """
     Reference feature, typically the target for `controlled_feature`.
     """
 
-    controlled_feature: Point3 | Vector3 = field(init=False)
+    controlled_feature: Point3Dimensional | Vector3Dimensional = field(init=False)
     """
     Controlled feature, typically moved towards `reference_feature`.
     """
@@ -67,14 +67,14 @@ class FeatureFunctionMonitor(
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         )
-        if isinstance(self.controlled_feature, Point3):
+        if isinstance(self.controlled_feature, Point3Dimensional):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
-        elif isinstance(self.controlled_feature, Vector3):
+        elif isinstance(self.controlled_feature, Vector3Dimensional):
             self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
 
-        if isinstance(self.reference_feature, Point3):
+        if isinstance(self.reference_feature, Point3Dimensional):
             self.root_P_reference_feature = root_reference_feature
-        if isinstance(self.reference_feature, Vector3):
+        if isinstance(self.reference_feature, Vector3Dimensional):
             self.root_V_reference_feature = root_reference_feature
 
         return NodeArtifacts()
@@ -100,7 +100,7 @@ class HeightMonitor(
 
         distance = (
             self.root_P_controlled_feature - self.root_P_reference_feature
-        ) @ Vector3.Z()
+        ) @ Vector3Dimensional.Z()
         artifacts.observation = sm.logic_and(
             distance >= self.lower_limit,
             distance <= self.upper_limit,

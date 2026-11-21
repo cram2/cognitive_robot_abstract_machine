@@ -288,7 +288,7 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.world_entity import KinematicStructureEntity
 
 
@@ -315,12 +315,12 @@ class MyRobotGripper(
         )
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
     def setup_hardware_interfaces(self):
         # _setup_hardware_interfaces_for_active_connections marks every active

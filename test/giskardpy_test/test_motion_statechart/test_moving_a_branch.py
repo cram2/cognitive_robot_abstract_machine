@@ -28,8 +28,10 @@ from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -51,7 +53,7 @@ def _add_box_next_to_the_robot(world: World) -> Body:
             FixedConnection(
                 parent=world.root,
                 child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.5
                 ),
             )
@@ -76,14 +78,16 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    goal_pose = Pose.from_xyz_rpy(x=1.5, reference_frame=world.root)
+    goal_pose = Pose3Dimensional.from_xyz_rpy(x=1.5, reference_frame=world.root)
     statechart.add_node(
         node=(
             carry := Sequence(
                 nodes=[
                     CartesianPose(
                         kinematic_chain=KinematicChain(root=world.root, tip=robot),
-                        goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+                        goal_pose=Pose3Dimensional.from_xyz_rpy(
+                            x=0.2, reference_frame=world.root
+                        ),
                         name="approach",
                     ),
                     MoveBranch(branch_root=box, new_parent=robot),
@@ -124,7 +128,7 @@ def test_building_the_nodes_again_registers_no_further_variables(
     statechart.add_node(
         node=CartesianPose(
             kinematic_chain=KinematicChain(root=world.root, tip=robot),
-            goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+            goal_pose=Pose3Dimensional.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
     executor.compile(statechart=statechart)
@@ -198,7 +202,7 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
     statechart.add_node(
         node=CartesianPose(
             kinematic_chain=KinematicChain(root=world.root, tip=robot),
-            goal_pose=Pose.from_xyz_rpy(x=5, reference_frame=world.root),
+            goal_pose=Pose3Dimensional.from_xyz_rpy(x=5, reference_frame=world.root),
         )
     )
     statechart.add_node(node=(driving_a_while := CountTicks(ticks=20)))
@@ -251,7 +255,7 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
     statechart.add_node(
         node=CartesianPose(
             kinematic_chain=KinematicChain(root=world.root, tip=robot),
-            goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+            goal_pose=Pose3Dimensional.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
     executor.compile(statechart=statechart)
@@ -277,7 +281,7 @@ def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_a
     statechart.add_node(
         node=CartesianPose(
             kinematic_chain=KinematicChain(root=world.root, tip=robot),
-            goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
+            goal_pose=Pose3Dimensional.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
     executor.compile(statechart=statechart)

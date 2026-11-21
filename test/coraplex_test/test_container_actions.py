@@ -16,7 +16,11 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
-from krrood_spatial_math.spatial_types import Pose, RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    Pose3Dimensional,
+    RotationMatrix,
+    Vector3Dimensional,
+)
 from .conftest import left_or_only_arm
 from ..plan_running import simulated_executor, statechart_of
 
@@ -107,7 +111,7 @@ def test_back_off_pose_clears_the_grasp_by_the_release_clearance(pr2_at_drawer):
         grasp_candidate=GraspCandidate.from_body_origin(graspable=handle),
         arm=left_or_only_arm(robot),
     )
-    grasp_pose = Pose(reference_frame=handle.root)
+    grasp_pose = Pose3Dimensional(reference_frame=handle.root)
 
     tool_goal = end_effector.tool_frame_goal_for_grasp(grasp_pose)
     back_off = action.back_off_pose(grasp_pose, end_effector)
@@ -130,11 +134,13 @@ def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
     """
     world, robot, extensions, handle = pr2_at_drawer
     arm = left_or_only_arm(robot)
-    world_T_handle = world.transform(Pose(reference_frame=handle.root), world.root)
-    downward = Vector3(0, 0, -1, reference_frame=world.root)
-    pull_axis = Vector3(1, 0, 0, reference_frame=world.root)
+    world_T_handle = world.transform(
+        Pose3Dimensional(reference_frame=handle.root), world.root
+    )
+    downward = Vector3Dimensional(0, 0, -1, reference_frame=world.root)
+    pull_axis = Vector3Dimensional(1, 0, 0, reference_frame=world.root)
     grasp_pose = world.transform(
-        Pose(
+        Pose3Dimensional(
             position=world_T_handle.position,
             orientation=RotationMatrix.from_vectors(x=downward, y=pull_axis).quaternion,
             reference_frame=world.root,

@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer
-from krrood_spatial_math.spatial_types import Point3, RotationMatrix
+from krrood_spatial_math.spatial_types import Point3Dimensional, RotationMatrix
 from semantic_digital_twin.world_description.exceptions import (
     ArrayShapeError,
     AsymmetricInertiaTensorError,
@@ -265,7 +265,7 @@ class Inertial:
     The mass of the body in kilograms.
     """
 
-    center_of_mass: Point3 = field(default_factory=Point3)
+    center_of_mass: Point3Dimensional = field(default_factory=Point3Dimensional)
     """
     The center of mass of the body.
 
