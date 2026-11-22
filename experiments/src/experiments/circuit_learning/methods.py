@@ -299,6 +299,7 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
                 circuit.root,
                 AverageNegativeLogLikelihood(),
                 learning_rate=self.learning_rate,
+                records_cuda_graphs=True,
             )
         else:
             trainer = JaxGradientDescent(

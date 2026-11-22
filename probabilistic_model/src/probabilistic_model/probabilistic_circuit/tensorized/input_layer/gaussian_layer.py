@@ -103,7 +103,7 @@ class HasLocationAndScale:
         """
         *others, log_scale = parameters
         return others + [
-            self.namespace.maximum(log_scale, math.log(self.minimum_scale))
+            self.namespace.clip(log_scale, min=math.log(self.minimum_scale))
         ]
 
     def validate_own(self):

@@ -435,6 +435,105 @@ def test_a_torch_step_reports_its_loss_as_a_tensor(mixture_of_products_case):
     assert not loss.requires_grad
 
 
+# %% steps recorded as CUDA graphs
+
+
+def torch_parameters_after_training(
+    *,
+    case,
+    edge_matrix_type: type,
+    device: str,
+    records_cuda_graphs: bool,
+    takes_steps_one_by_one: bool,
+) -> list[np.ndarray]:
+    """
+    :param case: The circuit to train and to sample the data from.
+    :param edge_matrix_type: The type of matrix every inner layer stores its edges in.
+    :param device: The torch device to train on.
+    :param records_cuda_graphs: Whether the steps may be recorded as CUDA graphs.
+    :param takes_steps_one_by_one: Whether every step is taken by
+        :meth:`TorchGradientDescent.step` with the optimizer of the training, instead
+        of by the training itself.
+    :return: The parameters after four epochs of mini-batches of 100 rows of data the
+        circuit samples, the learning rate scaled by a tenth before the last epoch.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.torch_gradient_descent"
+    )
+    np.random.seed(0)
+    host = case.circuit(np, edge_matrix_type)
+    namespace = array_namespace(torch.zeros(0))
+    circuit = host.to_namespace(namespace, device=device)
+    data = namespace.asarray(host.sample(450), device=device)
+    trainer = torch_gradient_descent.TorchGradientDescent(
+        circuit.root,
+        AverageNegativeLogLikelihood(),
+        learning_rate=0.05,
+        records_cuda_graphs=records_cuda_graphs,
+    )
+    training = trainer.start_training(
+        arguments=(data,),
+        mini_batches=MiniBatches(batch_size=100, seed=0),
+        learning_rate_plateau=LearningRatePlateau(),
+    )
+    for epoch in range(4):
+        if epoch == 3:
+            training.scale_learning_rate(scale=0.1)
+        for batch in training.mini_batches.batches_of_epoch(arguments=(data,)):
+            if takes_steps_one_by_one:
+                trainer.step(optimizer=training.optimizer, arguments=batch)
+            else:
+                training.step_on_batch(batch=batch)
+    return [parameter.detach().cpu().numpy() for parameter in trainer.parameters]
+
+
+def test_steps_recorded_as_cuda_graphs_train_as_steps_taken_one_by_one(
+    mixture_of_products_case, edge_matrix_type
+):
+    """
+    Recording the steps as CUDA graphs and replaying them gives the parameters that
+    taking every step on its own with the same optimizer gives, also after the learning
+    rate is scaled.
+    """
+    torch = pytest.importorskip("torch")
+    if not torch.cuda.is_available():
+        pytest.skip("needs a CUDA device")
+    recorded, taken = (
+        torch_parameters_after_training(
+            case=mixture_of_products_case,
+            edge_matrix_type=edge_matrix_type,
+            device="cuda",
+            records_cuda_graphs=True,
+            takes_steps_one_by_one=one_by_one,
+        )
+        for one_by_one in (False, True)
+    )
+    for recorded_parameter, taken_parameter in zip(recorded, taken):
+        np.testing.assert_array_equal(recorded_parameter, taken_parameter)
+
+
+def test_steps_on_the_cpu_are_taken_one_by_one_even_if_cuda_graphs_are_asked_for(
+    mixture_of_products_case, edge_matrix_type
+):
+    """
+    Parameters on the CPU are trained step by step with the same optimizer, whether CUDA
+    graphs are asked for or not.
+    """
+    asked, not_asked = (
+        torch_parameters_after_training(
+            case=mixture_of_products_case,
+            edge_matrix_type=edge_matrix_type,
+            device="cpu",
+            records_cuda_graphs=records,
+            takes_steps_one_by_one=False,
+        )
+        for records in (True, False)
+    )
+    for asked_parameter, not_asked_parameter in zip(asked, not_asked):
+        np.testing.assert_array_equal(asked_parameter, not_asked_parameter)
+
+
 # %% training until convergence
 
 

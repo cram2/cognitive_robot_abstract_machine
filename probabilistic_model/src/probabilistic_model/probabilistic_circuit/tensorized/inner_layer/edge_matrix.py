@@ -25,6 +25,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
 from probabilistic_model.probabilistic_circuit.tensorized.gradient_stop import (
     GradientStop,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.structure_array_copies import (
+    StructureArrayCopies,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     EdgeValues,
@@ -370,6 +373,14 @@ class EdgeMatrix(ABC):
         return len(self.rows)
 
     @functools.cached_property
+    def structure_array_copies(self) -> StructureArrayCopies:
+        """
+        :return: The copies of the arrays of this matrix on the devices of the values
+            they are used with.
+        """
+        return StructureArrayCopies()
+
+    @functools.cached_property
     def gather(self) -> npt.NDArray[np.int64]:
         """
         The positions of the edges of every node in the order of this matrix, as a
@@ -520,10 +531,15 @@ class SparseEdgeMatrix(EdgeMatrix):
         # would copy an array with one entry per event per column for nothing
         if self.stores_every_column_once_in_order:
             return values
-        return values[..., self.edge_columns]
+        return values[
+            ...,
+            self.structure_array_copies.placed(array=self.edge_columns, values=values),
+        ]
 
     def values_of_rows(self, *, values: NodeValues) -> BackendArray:
-        return values[..., self.edge_rows]
+        return values[
+            ..., self.structure_array_copies.placed(array=self.edge_rows, values=values)
+        ]
 
     def reduce_by_row(
         self, *, values: BackendArray, reduction: RowReduction
@@ -537,7 +553,9 @@ class SparseEdgeMatrix(EdgeMatrix):
             device=array_api_compat.device(values),
         )
         for positions in reversed(self.entry_positions_by_rank):
-            entries = values[..., positions]
+            entries = values[
+                ..., self.structure_array_copies.placed(array=positions, values=values)
+            ]
             number_of_reduced_rows = result.shape[-1]
             result = namespace.concat(
                 [
@@ -555,7 +573,12 @@ class SparseEdgeMatrix(EdgeMatrix):
             device=array_api_compat.device(values),
         )
         result = namespace.concat([result, rows_without_edges], axis=-1)
-        return result[..., self.entry_count_ranks]
+        return result[
+            ...,
+            self.structure_array_copies.placed(
+                array=self.entry_count_ranks, values=result
+            ),
+        ]
 
 
 @dataclass(eq=False)
@@ -637,7 +660,7 @@ class DenseEdgeMatrix(EdgeMatrix):
     ) -> BackendArray:
         namespace = array_namespace(values)
         masked = namespace.where(
-            namespace.asarray(self.is_edge, device=array_api_compat.device(values)),
+            self.structure_array_copies.placed(array=self.is_edge, values=values),
             values,
             reduction.identity,
         )
@@ -898,12 +921,25 @@ class EdgeBlockStack:
             ``values`` with shape (..., #blocks, #columns of a block).
         """
         if not self.has_contiguous_columns:
-            return values[..., self.block_columns]
+            return values[
+                ...,
+                self.structure_array_copies.placed(
+                    array=self.block_columns, values=values
+                ),
+            ]
         first_column = int(self.block_columns[0, 0])
         return array_namespace(values).reshape(
             values[..., first_column : first_column + self.block_columns.size],
             tuple(values.shape[:-1]) + self.block_columns.shape,
         )
+
+    @functools.cached_property
+    def structure_array_copies(self) -> StructureArrayCopies:
+        """
+        :return: The copies of the columns of the blocks on the devices of the values
+            they index.
+        """
+        return StructureArrayCopies()
 
     @functools.cached_property
     def cross_product_ranges(self) -> CrossProductRanges | None:
@@ -1177,10 +1213,14 @@ class BlockEdgeMatrix(EdgeMatrix):
         return stored
 
     def values_of_columns(self, *, values: BackendArray) -> BackendArray:
-        return values[..., self.columns]
+        return values[
+            ..., self.structure_array_copies.placed(array=self.columns, values=values)
+        ]
 
     def values_of_rows(self, *, values: NodeValues) -> BackendArray:
-        return values[..., self.rows]
+        return values[
+            ..., self.structure_array_copies.placed(array=self.rows, values=values)
+        ]
 
     def reduce_by_row(
         self, *, values: BackendArray, reduction: RowReduction
@@ -1271,4 +1311,9 @@ class BlockEdgeMatrix(EdgeMatrix):
         result = reduced[0] if len(reduced) == 1 else namespace.concat(reduced, axis=-1)
         if self.reduces_nodes_in_order:
             return result
-        return result[..., self.node_positions]
+        return result[
+            ...,
+            self.structure_array_copies.placed(
+                array=self.node_positions, values=result
+            ),
+        ]
