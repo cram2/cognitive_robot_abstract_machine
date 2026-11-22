@@ -364,10 +364,10 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 
         self.root = JaxGradientDescent(
-            self.root,
-            AverageNegativeLogLikelihood() if loss is None else loss,
-            optimizer,
-        ).minimize(epochs, self.encoded(data))
+            layer=self.root,
+            loss=AverageNegativeLogLikelihood() if loss is None else loss,
+            optimizer=optimizer,
+        ).minimize(self.encoded(data), epochs=epochs)
         return self
 
     def raise_if_parameters_are_not_on_host(self):

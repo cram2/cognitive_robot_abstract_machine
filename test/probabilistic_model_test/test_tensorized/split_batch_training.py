@@ -42,7 +42,9 @@ def main() -> None:
     circuit = host.to_namespace(jnp)
     data = jnp.asarray(host.sample(450))
     gradient_descent = JaxGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(5e-2),
     )
     training = gradient_descent.start_training(
         arguments=(data,), mini_batches=MiniBatches(batch_size=100, seed=0)

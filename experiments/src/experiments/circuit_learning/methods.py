@@ -136,7 +136,7 @@ class TrainingContext:
         )
         placed = jax_setting.placed(circuit=circuit)
         step_memory = JaxGradientDescent(
-            placed.root, AverageNegativeLogLikelihood()
+            layer=placed.root, loss=AverageNegativeLogLikelihood()
         ).step_memory(jax_setting.asarray(rows=placed.encoded(rows)))
         batch_size = MiniBatches.fitting_in_memory(
             memory=self.device_memory(setting=setting), step_memory=step_memory
@@ -289,16 +289,18 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
         data = setting.asarray(rows=circuit.encoded(rows))
         if setting.array_library is ArrayLibrary.TORCH:
             trainer = TorchGradientDescent(
-                circuit.root,
-                AverageNegativeLogLikelihood(),
+                layer=circuit.root,
+                loss=AverageNegativeLogLikelihood(),
                 learning_rate=self.learning_rate,
                 records_cuda_graphs=True,
             )
         else:
             trainer = JaxGradientDescent(
-                circuit.root,
-                AverageNegativeLogLikelihood(),
-                optax.inject_hyperparams(optax.adam)(learning_rate=self.learning_rate),
+                layer=circuit.root,
+                loss=AverageNegativeLogLikelihood(),
+                optimizer=optax.inject_hyperparams(optax.adam)(
+                    learning_rate=self.learning_rate
+                ),
             )
         mini_batches = MiniBatches(
             batch_size=trainer.largest_even_batch_size(

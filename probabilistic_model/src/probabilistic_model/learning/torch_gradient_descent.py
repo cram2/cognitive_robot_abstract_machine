@@ -5,19 +5,23 @@ leaf tensors of a torch optimizer and the loss is differentiated by autograd.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import StrEnum
+# %% imports
+from dataclasses import dataclass
 
 import torch
-from krrood_compute_resources.memory import HostMemory, PeakTrackingMemory
 from krrood_compute_resources.torch_memory import TorchDeviceMemory
 
+from probabilistic_model.learning.circuit_parameter_learning import LayerType
+from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
 from probabilistic_model.learning.gradient_descent import (
     GradientDescent,
     GradientDescentTraining,
-    LayerType,
 )
-from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
+from probabilistic_model.learning.torch_circuit_parameter_learning import (
+    TorchCircuitParameterLearning,
+    TorchCircuitParameterTraining,
+    TorchDeviceType,
+)
 from probabilistic_model.learning.training_schedule import (
     LearningRatePlateau,
     MiniBatches,
@@ -27,12 +31,16 @@ from probabilistic_model.learning.training_schedule import (
 # %% gradient descent
 
 
-@dataclass
-class TorchGradientDescent(GradientDescent[LayerType]):
+@dataclass(kw_only=True)
+class TorchGradientDescent(
+    GradientDescent[LayerType], TorchCircuitParameterLearning[LayerType]
+):
     """
     Gradient descent with torch, one optimizer step per batch, after which the
     parameters are projected onto valid parameters with
     ``projected_circuit_parameters``.
+
+    A recorded step needs an optimizer that accepts ``capturable``.
     """
 
     learning_rate: float = 1e-3
@@ -45,30 +53,6 @@ class TorchGradientDescent(GradientDescent[LayerType]):
     The torch optimizer to use.
     """
 
-    records_cuda_graphs: bool = field(default=False, kw_only=True)
-    """
-    Whether training on a CUDA device records the step on batches of every shape as a
-    CUDA graph and replays it.
-
-    The optimizer has to accept ``capturable``, and the numeric queries of the circuit
-    must not copy from the host.
-    """
-
-    parameters: list[torch.Tensor] = field(init=False)
-    """
-    The leaf tensors the optimizer updates, copies of the parameters of the circuit.
-    """
-
-    def __post_init__(self) -> None:
-        """
-        Copy the parameters of the circuit into the trained leaf tensors.
-        """
-        super().__post_init__()
-        self.parameters = [
-            parameter.detach().clone().requires_grad_(True)
-            for parameter in self.layer.circuit_parameters
-        ]
-
     def start_training(
         self,
         *,
@@ -80,6 +64,7 @@ class TorchGradientDescent(GradientDescent[LayerType]):
             arguments=arguments,
             mini_batches=mini_batches,
             gradient_descent=self,
+            replays_recorded_steps=self.replays_recorded_steps,
             optimizer=(
                 self.optimizer_type(
                     self.parameters,
@@ -95,24 +80,6 @@ class TorchGradientDescent(GradientDescent[LayerType]):
             ),
             learning_rate_plateau=learning_rate_plateau,
         )
-
-    @property
-    def replays_recorded_steps(self) -> bool:
-        """
-        :return: Whether steps are recorded as CUDA graphs and replayed, which needs
-            :attr:`records_cuda_graphs` and parameters on a CUDA device.
-        """
-        return (
-            self.records_cuda_graphs
-            and self.parameters[0].device.type
-            == TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
-        )
-
-    def device_memory(self) -> PeakTrackingMemory:
-        device = self.parameters[0].device
-        if device.type == TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
-            return TorchDeviceMemory(device=device)
-        return HostMemory()
 
     def probe_step_bytes(self, *, batch: tuple[torch.Tensor, ...]) -> int:
         """
@@ -167,7 +134,9 @@ class TorchGradientDescent(GradientDescent[LayerType]):
 
 
 @dataclass(kw_only=True)
-class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
+class TorchGradientDescentTraining(
+    GradientDescentTraining[LayerType], TorchCircuitParameterTraining[LayerType]
+):
     """
     Mini-batch training by :class:`TorchGradientDescent`, one optimizer step per batch.
     """
@@ -182,25 +151,8 @@ class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
     The optimizer of the parameters of :attr:`gradient_descent`.
     """
 
-    recorded_steps: dict[BatchShape, RecordedTrainingStep] = field(
-        default_factory=dict, init=False
-    )
-    """
-    The step on batches of every shape, if
-    :attr:`TorchGradientDescent.replays_recorded_steps`, by their :class:`BatchShape`.
-    """
-
-    def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
-        if not self.gradient_descent.replays_recorded_steps:
-            return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
-        shape = BatchShape.from_batch(batch=batch)
-        if shape not in self.recorded_steps:
-            self.recorded_steps[shape] = RecordedTrainingStep()
-        return self.recorded_steps[shape].take(
-            gradient_descent=self.gradient_descent,
-            optimizer=self.optimizer,
-            batch=batch,
-        )
+    def take_step(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
 
     def scale_learning_rate(self, *, scale: float) -> None:
         learning_rate = self.gradient_descent.learning_rate * scale
@@ -215,134 +167,3 @@ class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
         return self.gradient_descent.layer.copy_with_circuit_parameters(
             [parameter.detach() for parameter in self.gradient_descent.parameters]
         )
-
-
-# %% steps recorded as CUDA graphs
-
-
-@dataclass(kw_only=True, frozen=True)
-class BatchShape:
-    """
-    The shapes of the arrays of a batch, which a recorded step only takes batches of.
-    """
-
-    array_shapes: tuple[torch.Size, ...]
-    """
-    The shape of every array of the batch, in the order of the batch.
-    """
-
-    @classmethod
-    def from_batch(cls, *, batch: tuple[torch.Tensor, ...]) -> BatchShape:
-        """
-        :param batch: The same rows of every training array.
-        :return: The shape of ``batch``.
-        """
-        return cls(array_shapes=tuple(array.shape for array in batch))
-
-
-@dataclass(kw_only=True)
-class RecordedTrainingStep:
-    """
-    The training step on batches of one shape, taken operation by operation for
-    :attr:`warm_up_steps` steps, then recorded as a CUDA graph and replayed.
-    """
-
-    warm_up_steps: int = 3
-    """
-    The steps taken operation by operation before the step is recorded, which lets torch
-    and the optimizer create their lazily created state.
-    """
-
-    steps_taken: int = 0
-    """
-    The steps taken operation by operation so far.
-    """
-
-    graph: torch.cuda.CUDAGraph | None = None
-    """
-    The recorded step, ``None`` before it is recorded.
-    """
-
-    batch: tuple[torch.Tensor, ...] = ()
-    """
-    The arrays the recorded step reads its batch from.
-    """
-
-    loss: torch.Tensor | None = None
-    """
-    The tensor the recorded step writes the loss of its batch to.
-    """
-
-    def take(
-        self,
-        *,
-        gradient_descent: TorchGradientDescent,
-        optimizer: torch.optim.Optimizer,
-        batch: tuple[torch.Tensor, ...],
-    ) -> torch.Tensor:
-        """
-        :param gradient_descent: The gradient descent whose step is taken.
-        :param optimizer: The capturable optimizer of its parameters.
-        :param batch: The same rows of every training array, of the shape of this step.
-        :return: The loss of the batch before the step.
-        """
-        if self.steps_taken < self.warm_up_steps:
-            self.steps_taken += 1
-            return self.take_on_side_stream(
-                gradient_descent=gradient_descent, optimizer=optimizer, batch=batch
-            )
-        if self.graph is None:
-            self.record(
-                gradient_descent=gradient_descent, optimizer=optimizer, batch=batch
-            )
-        for recorded, array in zip(self.batch, batch):
-            recorded.copy_(array)
-        self.graph.replay()
-        return self.loss.clone()
-
-    @staticmethod
-    def take_on_side_stream(
-        *,
-        gradient_descent: TorchGradientDescent,
-        optimizer: torch.optim.Optimizer,
-        batch: tuple[torch.Tensor, ...],
-    ) -> torch.Tensor:
-        """
-        Take the step operation by operation on a stream of its own, as recording a CUDA
-        graph needs of the steps before it.
-
-        :return: The loss of the batch before the step.
-        """
-        side_stream = torch.cuda.Stream()
-        side_stream.wait_stream(torch.cuda.current_stream())
-        with torch.cuda.stream(side_stream):
-            loss = gradient_descent.step(optimizer=optimizer, arguments=batch)
-        torch.cuda.current_stream().wait_stream(side_stream)
-        return loss
-
-    def record(
-        self,
-        *,
-        gradient_descent: TorchGradientDescent,
-        optimizer: torch.optim.Optimizer,
-        batch: tuple[torch.Tensor, ...],
-    ) -> None:
-        """
-        Record the step on copies of the arrays of a batch as :attr:`graph`, without
-        taking it.
-        """
-        self.batch = tuple(array.clone() for array in batch)
-        self.graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(self.graph):
-            self.loss = gradient_descent.step(optimizer=optimizer, arguments=self.batch)
-
-
-# %% device memory
-
-
-class TorchDeviceType(StrEnum):
-    """
-    The types of torch devices that are told apart.
-    """
-
-    COMPUTE_UNIFIED_DEVICE_ARCHITECTURE = "cuda"

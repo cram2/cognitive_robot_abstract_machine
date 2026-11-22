@@ -274,7 +274,9 @@ def test_a_plateau_needs_an_optimizer_whose_learning_rate_can_change(jax_circuit
     A schedule for an optax optimizer with a fixed learning rate is rejected.
     """
     trainer = JaxGradientDescent(
-        jax_circuit.root, AverageNegativeLogLikelihood(), optax.adam(1e-2)
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(1e-2),
     )
     with pytest.raises(UnscheduledOptimizerError):
         trainer.start_training(
@@ -290,9 +292,9 @@ def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
     """
     learning_rate = 0.1
     training = JaxGradientDescent(
-        jax_circuit.root,
-        AverageNegativeLogLikelihood(),
-        optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
     ).start_training(
         arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
         mini_batches=MiniBatches(),
@@ -319,7 +321,7 @@ def test_torch_training_scales_the_learning_rate_of_its_optimizer(
         array_namespace(torch.zeros(0))
     )
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=0.1
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=0.1
     )
     training = trainer.start_training(
         arguments=(torch.zeros((1, len(circuit.variables))),),
@@ -406,7 +408,9 @@ def test_a_jax_step_reports_its_loss_as_a_jax_array(jax_circuit):
     A step of jax training reports the loss of its batch as a jax array.
     """
     training = JaxGradientDescent(
-        jax_circuit.root, AverageNegativeLogLikelihood(), optax.adam(1e-2)
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(1e-2),
     ).start_training(
         arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
         mini_batches=MiniBatches(),
@@ -428,7 +432,7 @@ def test_a_torch_step_reports_its_loss_as_a_tensor(mixture_of_products_case):
         array_namespace(torch.zeros(0))
     )
     training = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=0.1
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=0.1
     ).start_training(
         arguments=(torch.zeros((1, len(circuit.variables)), dtype=torch.float64),),
         mini_batches=MiniBatches(),
@@ -472,8 +476,8 @@ def torch_parameters_after_training(
     circuit = host.to_namespace(namespace, device=device)
     data = namespace.asarray(host.sample(450), device=device)
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root,
-        AverageNegativeLogLikelihood(),
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
         learning_rate=0.05,
         records_cuda_graphs=records_cuda_graphs,
     )
@@ -499,10 +503,10 @@ def test_batches_of_the_same_array_shapes_share_their_recorded_step():
     apart from batches of other shapes.
     """
     torch = pytest.importorskip("torch")
-    torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+    torch_circuit_parameter_learning = pytest.importorskip(
+        "probabilistic_model.learning.torch_circuit_parameter_learning"
     )
-    batch_shape = torch_gradient_descent.BatchShape.from_batch
+    batch_shape = torch_circuit_parameter_learning.BatchShape.from_batch
 
     first = batch_shape(batch=(torch.zeros(100, 3),))
 
@@ -641,7 +645,9 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
         events = jnp.asarray(data)
         before = float(jnp.mean(circuit.log_likelihood(events=events)))
         run = JaxGradientDescent(
-            circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adam(5e-2),
         ).minimize_until_converged(
             events,
             convergence=training_convergence,
@@ -676,7 +682,7 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     events = namespace.asarray(data)
     before = float(circuit.log_likelihood(events=events).mean())
     run = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize_until_converged(
         events,
         convergence=training_convergence,

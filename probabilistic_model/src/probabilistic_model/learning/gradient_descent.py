@@ -16,14 +16,14 @@ from array_api_compat import array_namespace
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from random_events.variable import Symbolic
 from sortedcontainers import SortedSet
-from typing_extensions import Generic, Self, TypeVar
+from typing_extensions import Generic, Self
 
-from krrood_compute_resources.memory import DeviceMemory
-
-from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
+from probabilistic_model.learning.circuit_parameter_learning import (
+    CircuitParameterLearning,
+    CircuitParameterTraining,
+    LayerType,
+)
 from probabilistic_model.learning.training_schedule import (
-    Convergence,
-    ConvergenceHistory,
     LearningRatePlateau,
     MiniBatches,
     PlateauScheduledTraining,
@@ -31,12 +31,6 @@ from probabilistic_model.learning.training_schedule import (
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
 )
-
-LayerType = TypeVar("LayerType")
-"""
-The type of the root layer that gradient descent trains, such as
-:class:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base.Layer`.
-"""
 
 # %% losses
 
@@ -126,54 +120,20 @@ class CrossEntropy(Loss[LayerType]):
 
 
 @dataclass(kw_only=True)
-class TrainingRun(Generic[LayerType], SubClassSafeGeneric):
-    """
-    A circuit trained until convergence, with the losses of the epochs it took.
-    """
-
-    trained_root: LayerType
-    """
-    The root of the trained circuit.
-    """
-
-    history: ConvergenceHistory
-    """
-    The average loss of every epoch and whether training converged.
-    """
-
-
-@dataclass(kw_only=True)
 class GradientDescentTraining(
-    PlateauScheduledTraining, Generic[LayerType], SubClassSafeGeneric, ABC
+    PlateauScheduledTraining, CircuitParameterTraining[LayerType], ABC
 ):
     """
     Mini-batch training of the parameters of a circuit by a :class:`GradientDescent`.
     """
 
-    @abstractmethod
-    def trained_root(self) -> LayerType:
-        """
-        :return: The root of a copy of the circuit with the parameters after the last
-            step.
-        """
-        raise NotImplementedError
 
-
-@dataclass
-class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
+@dataclass(kw_only=True)
+class GradientDescent(CircuitParameterLearning[LayerType], ABC):
     """
     Minimizes a loss of the circuit rooted at a layer by gradient descent, with the
-    array library of its subclass.
-
-    The layer gives its parameters as the flat list ``circuit_parameters``, projects
-    such a list onto valid parameters with ``projected_circuit_parameters`` and rebuilds
-    itself from it with ``copy_with_circuit_parameters``; the optimizer works on that
-    list.
-    """
-
-    layer: LayerType
-    """
-    The root of the circuit to train, which is left unchanged.
+    array library of its subclass, on the flat list of the layer's
+    ``circuit_parameters``, projected onto valid parameters after every step.
     """
 
     loss: Loss[LayerType]
@@ -191,6 +151,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         """
         Record the :attr:`zero_probability_entries` of the circuit.
         """
+        super().__post_init__()
         self.zero_probability_entries = [
             array_namespace(parameter).isinf(parameter) & (parameter < 0)
             for parameter in self.layer.circuit_parameters
@@ -205,43 +166,15 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> GradientDescentTraining[LayerType]:
         """
-        :param arguments: The arrays the :attr:`loss` takes after the circuit, one row
-            per training example each.
-        :param mini_batches: How the rows are split into the batches of every epoch.
-        :param learning_rate_plateau: The schedule of the learning rate, a constant
-            learning rate if ``None``.
-        :return: Training that starts from the parameters of the circuit.
+        Like :meth:`CircuitParameterLearning.start_training`, with the arrays the
+        :attr:`loss` takes after the circuit as ``arguments``.
         """
         raise NotImplementedError
 
-    @abstractmethod
-    def device_memory(self) -> DeviceMemory:
+    def minimize(self, *arguments: BackendArray, epochs: int) -> LayerType:
         """
-        :return: The memory of the device the parameters of the circuit are stored on.
-        """
-        raise NotImplementedError
-
-    def largest_even_batch_size(self, *, rows: int) -> int:
-        """
-        :param rows: The most rows a batch may have.
-        :return: The most rows of at most ``rows`` that a step splits evenly across the
-            devices it computes on, ``rows`` itself on one device.
-        """
-        return rows
-
-    @abstractmethod
-    def probe_step_bytes(self, *, batch: tuple[BackendArray, ...]) -> int:
-        """
-        :param batch: The same rows of every training array.
-        :return: The bytes one step on the batch allocates beyond what is in use before
-            it; the parameters stay unchanged.
-        """
-        raise NotImplementedError
-
-    def minimize(self, epochs: int, *arguments: BackendArray) -> LayerType:
-        """
-        :param epochs: The number of epochs, one step on all rows each.
         :param arguments: The arrays the :attr:`loss` takes after the circuit.
+        :param epochs: The number of epochs, one step on all rows each.
         :return: The root of the trained circuit.
         """
         training = self.start_training(arguments=arguments, mini_batches=MiniBatches())
@@ -250,58 +183,3 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
             loss = float(training.step_on_batch(batch=arguments))
             progress_bar.set_postfix_str(f"Loss: {loss}")
         return training.trained_root()
-
-    def minimize_until_converged(
-        self,
-        *arguments: BackendArray,
-        convergence: Convergence | None = None,
-        mini_batches: MiniBatches | None = None,
-        learning_rate_plateau: LearningRatePlateau | None = None,
-    ) -> TrainingRun[LayerType]:
-        """
-        Minimize the :attr:`loss` on shuffled mini-batches, one step per batch, until
-        the average loss of an epoch converges.
-
-        :param arguments: The arrays the :attr:`loss` takes after the circuit, one row
-            per training example each.
-        :param convergence: When training stops, :class:`Convergence` with its defaults
-            if ``None``.
-        :param mini_batches: How the rows are split into the batches of every epoch,
-            :class:`MiniBatches` with its defaults, one batch of all rows, if ``None``.
-        :param learning_rate_plateau: The schedule of the learning rate, a constant
-            learning rate if ``None``.
-        :return: The trained circuit and the losses of its epochs.
-        """
-        training = self.start_training(
-            arguments=arguments,
-            mini_batches=MiniBatches() if mini_batches is None else mini_batches,
-            learning_rate_plateau=learning_rate_plateau,
-        )
-        history = (
-            Convergence() if convergence is None else convergence
-        ).history_until_converged(training=training)
-        return TrainingRun(trained_root=training.trained_root(), history=history)
-
-    def step_memory(self, *arguments: BackendArray, probe_rows: int = 64) -> StepMemory:
-        """
-        :param arguments: The arrays the :attr:`loss` takes after the circuit, one row
-            per training example each.
-        :param probe_rows: The rows of the smaller of the two batches a step is measured
-            on; the larger has twice as many.
-        :return: The memory one step allocates.
-        """
-        smaller_rows = max(1, min(probe_rows, arguments[0].shape[0] // 2))
-        return StepMemory.from_two_probes(
-            smaller=ProbeMeasurement(
-                rows=smaller_rows,
-                step_bytes=self.probe_step_bytes(
-                    batch=tuple(argument[:smaller_rows] for argument in arguments)
-                ),
-            ),
-            larger=ProbeMeasurement(
-                rows=2 * smaller_rows,
-                step_bytes=self.probe_step_bytes(
-                    batch=tuple(argument[: 2 * smaller_rows] for argument in arguments)
-                ),
-            ),
-        )

@@ -105,6 +105,7 @@ core = [
     "probabilistic_model.graph",
     "probabilistic_model.gui",
     "probabilistic_model.interfaces",
+    "probabilistic_model.learning.circuit_parameter_learning",
     "probabilistic_model.learning.exceptions",
     "probabilistic_model.learning.expectation_maximization",
     "probabilistic_model.learning.gaussian_mixture",
