@@ -164,9 +164,9 @@ def test_log_likelihood_on_every_backend(
     case = mixture_of_products_case
     assert_result_of_backend_equals(
         case.circuit(array_backend, edge_matrix_type).log_likelihood(
-            case.events(array_backend)
+            events=case.events(array_backend)
         ),
-        case.circuit(np).log_likelihood(case.events(np)),
+        case.circuit(np).log_likelihood(events=case.events(np)),
         array_backend,
     )
 
@@ -199,9 +199,11 @@ def test_probability_of_simple_event_of_nodes_on_every_backend(
     assert_result_of_backend_equals(
         case.circuit(
             array_backend, edge_matrix_type
-        ).root.probability_of_simple_event_of_nodes(case.simple_event, case.variables),
+        ).root.probability_of_simple_event_of_nodes(
+            event=case.simple_event, variables=case.variables
+        ),
         case.circuit(np).root.probability_of_simple_event_of_nodes(
-            case.simple_event, case.variables
+            event=case.simple_event, variables=case.variables
         ),
         array_backend,
     )
@@ -235,9 +237,11 @@ def test_log_likelihood_compiles_with_jax(mixture_of_products_case, edge_matrix_
     case = mixture_of_products_case
     with jax.enable_x64(True):
         circuit = case.circuit(jnp, edge_matrix_type)
-        result = jax.jit(circuit.log_likelihood)(case.events(jnp))
+        result = jax.jit(lambda events: circuit.log_likelihood(events=events))(
+            case.events(jnp)
+        )
         assert_result_of_backend_equals(
-            result, case.circuit(np).log_likelihood(case.events(np)), jnp
+            result, case.circuit(np).log_likelihood(events=case.events(np)), jnp
         )
 
 
@@ -268,9 +272,9 @@ def test_a_circuit_that_answered_a_query_can_be_deep_copied(
     """
     case = mixture_of_products_case
     circuit = case.circuit(array_backend, edge_matrix_type)
-    expected = np.asarray(circuit.log_likelihood(case.events(array_backend)))
+    expected = np.asarray(circuit.log_likelihood(events=case.events(array_backend)))
     assert_result_of_backend_equals(
-        copy.deepcopy(circuit).log_likelihood(case.events(array_backend)),
+        copy.deepcopy(circuit).log_likelihood(events=case.events(array_backend)),
         expected,
         array_backend,
     )
@@ -294,8 +298,8 @@ def test_storing_the_edges_in_another_matrix_keeps_the_log_likelihood(
         if isinstance(layer, InnerLayer)
     )
     np.testing.assert_allclose(
-        circuit.log_likelihood(case.events(np)),
-        case.circuit(np).log_likelihood(case.events(np)),
+        circuit.log_likelihood(events=case.events(np)),
+        case.circuit(np).log_likelihood(events=case.events(np)),
         rtol=1e-12,
     )
 
@@ -318,8 +322,8 @@ def test_a_truncated_circuit_keeps_the_type_of_its_edge_matrices(
     )
     assert truncation.probability == pytest.approx(expected.probability, rel=1e-12)
     np.testing.assert_allclose(
-        truncation.distribution.log_likelihood(case.events(np)),
-        expected.distribution.log_likelihood(case.events(np)),
+        truncation.distribution.log_likelihood(events=case.events(np)),
+        expected.distribution.log_likelihood(events=case.events(np)),
         rtol=1e-12,
     )
 

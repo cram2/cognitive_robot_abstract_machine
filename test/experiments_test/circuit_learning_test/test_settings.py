@@ -100,8 +100,10 @@ def test_placing_keeps_the_likelihood(tree_circuit, dataset):
     """
     rows = dataset.encoded(frame=dataset.test)
     np.testing.assert_allclose(
-        ComputationSetting.host().placed(circuit=tree_circuit).log_likelihood(rows),
-        tree_circuit.log_likelihood(rows),
+        ComputationSetting.host()
+        .placed(circuit=tree_circuit)
+        .log_likelihood(events=rows),
+        tree_circuit.log_likelihood(events=rows),
     )
 
 

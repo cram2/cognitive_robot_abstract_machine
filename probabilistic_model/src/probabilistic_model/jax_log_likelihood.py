@@ -52,7 +52,7 @@ class CompiledLogLikelihood:
             parameters.
         """
         root = self.circuit.root.copy_with_circuit_parameters(parameters)
-        return root.log_likelihood_of_nodes(encoded_events)[:, 0]
+        return root.log_likelihood_of_nodes(events=encoded_events)[:, 0]
 
     def log_likelihood(self, *, encoded_events: SampleArray) -> jax.Array:
         """

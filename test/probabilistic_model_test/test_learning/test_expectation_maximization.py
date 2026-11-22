@@ -265,6 +265,10 @@ def test_fit_rejects_variables_other_than_those_of_starting_circuit():
 def test_fit_matches_diagonal_gaussian_mixture_of_scikit_learn(
     iris, iris_starting_circuit
 ):
+    """
+    Expectation maximization of a mixture of products of Gaussians reaches the means of
+    scikit-learn's diagonal Gaussian mixture from the same start.
+    """
     iterations = 10
     means = _iris_starting_means(iris)
     component_count = len(means)
@@ -284,7 +288,7 @@ def test_fit_matches_diagonal_gaussian_mixture_of_scikit_learn(
     ).fit(iris)
 
     data = iris[[variable.name for variable in circuit.variables]]
-    assert circuit.log_likelihood(data.to_numpy()).mean() == pytest.approx(
+    assert circuit.log_likelihood(events=data.to_numpy()).mean() == pytest.approx(
         scikit_learn_mixture.score(iris.to_numpy())
     )
 

@@ -109,14 +109,17 @@ def test_unreachable_representation_is_refused(
 def test_rustworkx_circuit_converts_into_the_same_layered_distribution(
     representations, rustworkx_mixture_of_products
 ):
+    """
+    A rustworkx circuit converted into a layered circuit has its likelihood.
+    """
     layered = representations.convert(
         rustworkx_mixture_of_products, LayeredProbabilisticCircuit
     )
     assert isinstance(layered, LayeredProbabilisticCircuit)
     events = np.random.normal(size=(20, 2))
     np.testing.assert_allclose(
-        layered.log_likelihood(events),
-        rustworkx_mixture_of_products.log_likelihood(events),
+        layered.log_likelihood(events=events),
+        rustworkx_mixture_of_products.log_likelihood(events=events),
         rtol=1e-12,
     )
 
@@ -124,6 +127,10 @@ def test_rustworkx_circuit_converts_into_the_same_layered_distribution(
 def test_region_graph_circuit_converts_into_the_same_rustworkx_distribution(
     representations,
 ):
+    """
+    A layered circuit of a region graph converted into a rustworkx circuit has its
+    likelihood.
+    """
     variables = SortedSet(Continuous(name) for name in "wxyz")
     layered = (
         RegionGraph(variables=variables, partitions=2, depth=1, repetitions=2)
@@ -135,7 +142,9 @@ def test_region_graph_circuit_converts_into_the_same_rustworkx_distribution(
     assert isinstance(rustworkx, RustworkxProbabilisticCircuit)
     events = np.random.normal(size=(20, 4))
     np.testing.assert_allclose(
-        rustworkx.log_likelihood(events), layered.log_likelihood(events), rtol=1e-9
+        rustworkx.log_likelihood(events=events),
+        layered.log_likelihood(events=events),
+        rtol=1e-9,
     )
 
 

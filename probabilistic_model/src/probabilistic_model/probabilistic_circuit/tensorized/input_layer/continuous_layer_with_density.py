@@ -75,7 +75,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
         return self.__class__
 
     def type_of_truncated_layer(
-        self, assignment: Interval, singleton_allowed: bool
+        self, *, assignment: Interval, singleton_allowed: bool
     ) -> type[Layer]:
         if len(assignment.simple_sets) > 1:
             return SumLayer
@@ -124,7 +124,7 @@ class ContinuousLayerWithDensity(AbstractContinuousLayer, ABC):
         )
         return LayerWithLogProbabilities(dirac_delta_layer, log_likelihood)
 
-    def log_conditional_of_value(self, value: float) -> LayerWithLogProbabilities:
+    def log_conditional_of_value(self, *, value: float) -> LayerWithLogProbabilities:
         log_likelihood = self.log_likelihood_of_nodes_from_column(np.array([value]))[0]
         dirac_delta_layer = DiracDeltaLayer(
             self.node_variables.copy(),
@@ -156,7 +156,7 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
     def parameters(self) -> list[BackendArray]:
         return [self.interval]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         (interval,) = parameters
         return dataclasses.replace(self, interval=interval)
 
@@ -318,7 +318,7 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
             log_probabilities,
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         """
         Keep the supports of the selected nodes, see
         :meth:`UnivariateInputLayer.select_nodes`.
@@ -328,19 +328,19 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         )
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         return cls(
             np.concatenate([layer.node_variables for layer in layers]),
             np.concatenate([layer.interval for layer in layers]),
             np.concatenate([layer.bounds for layer in layers]),
         )
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         return np.array_equal(self.interval, other.interval) and np.array_equal(
             self.bounds, other.bounds
         )
 
-    def apply_translation_own(self, translation: VariableValues):
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
         """
         Translate the supports of the nodes, see :meth:`Layer.apply_translation_own`.
         """
@@ -348,7 +348,7 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
             self.interval + self.node_variable_values(values=translation)[:, None]
         )
 
-    def apply_scaling_own(self, scaling: VariableValues):
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
         """
         Scale the supports of the nodes, see :meth:`Layer.apply_scaling_own`.
         """
