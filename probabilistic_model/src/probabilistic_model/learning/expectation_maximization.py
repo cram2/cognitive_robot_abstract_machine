@@ -181,7 +181,7 @@ class ExpectationMaximization:
         :param data: One row per sample, columns ordered like the circuit's variables.
         :return: The average log-likelihood and the responsibilities of every unit.
         """
-        average_log_likelihood = float(np.mean(circuit.log_likelihood(data)))
+        average_log_likelihood = float(np.mean(circuit.log_likelihood(events=data)))
         log_responsibilities = np.full(
             (len(data), max(circuit.graph.node_indices()) + 1), -np.inf
         )

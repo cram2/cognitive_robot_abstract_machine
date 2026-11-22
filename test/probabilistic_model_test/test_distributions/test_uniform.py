@@ -1,3 +1,7 @@
+"""
+Tests of the uniform distribution.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -108,10 +112,13 @@ def test_conditioning_on_a_point(uniform, x):
 
 
 def test_translation_shifts_the_interval(x):
+    """
+    Translated, a uniform distribution moves its interval.
+    """
     distribution = UniformDistribution(
         variable=x, interval=SimpleInterval.from_data(0, 1)
     )
-    distribution.apply_translation({x: 2.0})
+    distribution.apply_translation(translation={x: 2.0})
     assert distribution == UniformDistribution(
         variable=x, interval=SimpleInterval.from_data(2, 3)
     )

@@ -1,3 +1,7 @@
+"""
+Tests that copies of probabilistic models are independent of the originals.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -173,10 +177,17 @@ def test_a_deep_copy_of_a_circuit_shares_variables_across_its_leaves(
 def test_a_deep_copy_of_a_model_does_not_move_with_the_original(
     model: ProbabilisticModel,
 ):
+    """
+    Changing a model after deep copying it leaves the copy as it was.
+    """
     copied = copy.deepcopy(model)
     samples = copied.sample(10)
-    log_likelihood_before = copied.log_likelihood(samples)
+    log_likelihood_before = copied.log_likelihood(events=samples)
     model.apply_translation(
-        {variable: 100.0 for variable in model.variables if variable.is_numeric}
+        translation={
+            variable: 100.0 for variable in model.variables if variable.is_numeric
+        }
     )
-    np.testing.assert_array_equal(copied.log_likelihood(samples), log_likelihood_before)
+    np.testing.assert_array_equal(
+        copied.log_likelihood(events=samples), log_likelihood_before
+    )

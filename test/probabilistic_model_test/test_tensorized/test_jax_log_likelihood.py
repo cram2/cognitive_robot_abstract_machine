@@ -31,7 +31,9 @@ def test_compiled_log_likelihood_is_the_log_likelihood_of_the_circuit(
         )
         assert isinstance(compiled, jax.Array)
         np.testing.assert_allclose(
-            np.asarray(compiled), np.asarray(circuit.log_likelihood(events)), rtol=1e-12
+            np.asarray(compiled),
+            np.asarray(circuit.log_likelihood(events=events)),
+            rtol=1e-12,
         )
 
 
@@ -54,6 +56,6 @@ def test_compiled_log_likelihood_of_a_second_shape_of_events(
                     encoded_events=circuit.encoded(events[:2])
                 )
             ),
-            np.asarray(circuit.log_likelihood(events[:2])),
+            np.asarray(circuit.log_likelihood(events=events[:2])),
             rtol=1e-12,
         )

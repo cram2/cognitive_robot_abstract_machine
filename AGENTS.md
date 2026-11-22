@@ -212,9 +212,9 @@
 
 # Krrood isolation
 <!-- from KrroodIsolationRules in agent_rules.py -->
-- `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events` and `probabilistic_model`, which `krrood`'s source already depends on
+- `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events`, `probabilistic_model` and `krrood_compute_resources`, which `krrood`'s source already depends on
 - When a `krrood` test needs behaviour another package triggers, mimic the relevant classes and patterns in `test/krrood_test/dataset` and test against the mimics. Keep the test in `krrood` and do not depend on another package to reproduce the scenario
-- Those mimic classes import only `krrood`, `random_events` and `probabilistic_model`
+- Those mimic classes import only `krrood`, `random_events`, `probabilistic_model` and `krrood_compute_resources`
 
 # Pull request labels
 <!-- from PullRequestLabelsRules in agent_rules.py -->

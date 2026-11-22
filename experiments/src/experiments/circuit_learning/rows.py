@@ -130,6 +130,12 @@ class TrainingResult(ExperimentResult):
     Number of passes over the training rows, ``None`` for methods without iterations.
     """
 
+    average_epoch_duration: timedelta | None
+    """
+    Mean wall-clock time of an epoch after the first, which also compiles the training
+    step, ``None`` for methods without iterations.
+    """
+
     converged: bool | None
     """
     Whether training stopped by convergence rather than by the epoch or time limit,

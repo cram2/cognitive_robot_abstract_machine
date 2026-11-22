@@ -215,7 +215,7 @@ class ProbabilisticBackend(GenerativeBackend):
         )
 
         samples = model.sample(number_of_samples)
-        log_likelihoods = model.log_likelihood(samples)
+        log_likelihoods = model.log_likelihood(events=samples)
         most_likely_first = log_likelihoods.argsort()[::-1]
         for bindings, log_likelihood in zip(
             parameters.bindings_from_model_samples(
@@ -248,7 +248,7 @@ class ProbabilisticBackend(GenerativeBackend):
             parameters=parameters, expression=expression
         )
         [log_likelihood] = model.log_likelihood(
-            parameters.model_sample_from_bindings(
+            events=parameters.model_sample_from_bindings(
                 variables=model.variables, bindings=bindings
             )
         )
