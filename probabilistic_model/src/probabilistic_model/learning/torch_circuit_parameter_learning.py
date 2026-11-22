@@ -90,39 +90,35 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
     :attr:`TorchCircuitParameterLearning.replays_recorded_steps`.
     """
 
-    recorded_steps: dict[BatchShape, RecordedTrainingStep] = field(
+    recorded_steps: dict[RecordedStepKey, RecordedTrainingStep] = field(
         default_factory=dict, init=False
     )
     """
-    The step on batches of every shape, if :attr:`replays_recorded_steps`, by their
-    :class:`BatchShape`.
+    Every step on batches of every shape, if :attr:`replays_recorded_steps`.
     """
 
-    @abstractmethod
-    def take_step(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def take_step_or_replay(
+        self,
+        *,
+        step: Callable[..., torch.Tensor],
+        batch: tuple[torch.Tensor, ...],
+    ) -> torch.Tensor:
         """
-        Update the parameters by one step on a batch, operation by operation.
+        Take a step on a batch, replayed from its recording for batches of its shape if
+        :attr:`replays_recorded_steps`.
 
-        :param batch: The same rows of every training array.
-        :return: The loss of the batch before the step, a scalar tensor without a
+        :param step: The step operation by operation, called with ``batch=`` and
+            returning the loss of the batch before the step, a scalar tensor without a
             gradient on the device of the parameters.
-        """
-        raise NotImplementedError
-
-    def take_step_or_replay(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
-        """
-        Take the step of :meth:`take_step` on a batch, replayed from its recording for
-        batches of its shape if :attr:`replays_recorded_steps`.
-
         :param batch: The same rows of every training array.
         :return: The loss of the batch before the step.
         """
         if not self.replays_recorded_steps:
-            return self.take_step(batch=batch)
-        shape = BatchShape.from_batch(batch=batch)
-        if shape not in self.recorded_steps:
-            self.recorded_steps[shape] = RecordedTrainingStep()
-        return self.recorded_steps[shape].take(step=self.take_step, batch=batch)
+            return step(batch=batch)
+        key = RecordedStepKey(step=step, batch_shape=BatchShape.from_batch(batch=batch))
+        if key not in self.recorded_steps:
+            self.recorded_steps[key] = RecordedTrainingStep()
+        return self.recorded_steps[key].take(step=step, batch=batch)
 
 
 # %% steps recorded as CUDA graphs
@@ -146,6 +142,23 @@ class BatchShape:
         :return: The shape of ``batch``.
         """
         return cls(array_shapes=tuple(array.shape for array in batch))
+
+
+@dataclass(kw_only=True, frozen=True)
+class RecordedStepKey:
+    """
+    Which step, on batches of which shape, a recording replays.
+    """
+
+    step: Callable[..., torch.Tensor]
+    """
+    The step operation by operation.
+    """
+
+    batch_shape: BatchShape
+    """
+    The shape of the batches it takes.
+    """
 
 
 @dataclass(kw_only=True)

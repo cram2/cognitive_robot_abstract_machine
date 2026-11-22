@@ -223,6 +223,20 @@ class TensorizedExpectationMaximizationTraining(
         raise NotImplementedError
 
     @abstractmethod
+    def accumulate_statistics_and_update(
+        self, *, batch: tuple[BackendArray, ...]
+    ) -> BackendArray:
+        """
+        Add the sufficient statistics of a batch and update the parameters from all
+        statistics since the last update, starting to accumulate anew.
+
+        :param batch: The same rows of every training array.
+        :return: The negative average log-likelihood of the rows of the batch before the
+            update, a scalar array of the backend.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def update_parameters(self) -> None:
         """
         Update the parameters from the statistics since the last update and start
@@ -231,12 +245,11 @@ class TensorizedExpectationMaximizationTraining(
         raise NotImplementedError
 
     def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> BackendArray:
-        loss = self.accumulate_statistics(batch=batch)
         self.batches_since_update += 1
-        if self.batches_since_update == self.batches_per_update:
-            self.update_parameters()
-            self.batches_since_update = 0
-        return loss
+        if self.batches_since_update != self.batches_per_update:
+            return self.accumulate_statistics(batch=batch)
+        self.batches_since_update = 0
+        return self.accumulate_statistics_and_update(batch=batch)
 
     def finish_epoch(self, *, average_loss: float) -> None:
         """

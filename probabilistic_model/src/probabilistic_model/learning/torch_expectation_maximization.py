@@ -174,6 +174,11 @@ class TorchExpectationMaximizationTraining(
             )
 
     def take_step(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        """
+        :param batch: The same rows of every training array.
+        :return: The loss of the batch, whose statistics are added to
+            :attr:`statistics`.
+        """
         [data] = batch
         batch_statistics = self.expectation_maximization.batch_statistics(data=data)
         with torch.no_grad():
@@ -184,8 +189,23 @@ class TorchExpectationMaximizationTraining(
                     accumulated_array.add_(added_array)
         return -batch_statistics.total_log_likelihood / data.shape[0]
 
+    def take_step_and_update(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        """
+        :param batch: The same rows of every training array.
+        :return: The loss of :meth:`take_step` on the batch, after which the parameters
+            are updated.
+        """
+        loss = self.take_step(batch=batch)
+        self.update_parameters()
+        return loss
+
     def accumulate_statistics(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
-        return self.take_step_or_replay(batch=batch)
+        return self.take_step_or_replay(step=self.take_step, batch=batch)
+
+    def accumulate_statistics_and_update(
+        self, *, batch: tuple[torch.Tensor, ...]
+    ) -> torch.Tensor:
+        return self.take_step_or_replay(step=self.take_step_and_update, batch=batch)
 
     def update_parameters(self) -> None:
         parameters = self.expectation_maximization.parameters

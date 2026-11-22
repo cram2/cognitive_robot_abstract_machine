@@ -155,10 +155,14 @@ class TorchGradientDescentTraining(
     """
 
     def take_step(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        """
+        :param batch: The same rows of every training array.
+        :return: The loss of the batch before one optimizer step on it.
+        """
         return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
 
     def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
-        return self.take_step_or_replay(batch=batch)
+        return self.take_step_or_replay(step=self.take_step, batch=batch)
 
     def scale_learning_rate(self, *, scale: float) -> None:
         learning_rate = self.gradient_descent.learning_rate * scale

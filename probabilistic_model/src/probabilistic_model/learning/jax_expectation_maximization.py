@@ -155,6 +155,17 @@ class JaxExpectationMaximization(
             loss=state.loss,
         )
 
+    @called_positionally
+    def step_and_update(
+        self, state: ExpectationMaximizationState, *batch: jax.Array
+    ) -> ExpectationMaximizationState:
+        """
+        :param state: The state before the step.
+        :param batch: The same rows of every training array.
+        :return: The state after :meth:`step` on the batch and :meth:`update`.
+        """
+        return self.update(self.step(state, *batch))
+
     def initial_state(self) -> ExpectationMaximizationState:
         """
         :return: The state before the first step: the parameters before training and no
@@ -203,6 +214,14 @@ class JaxExpectationMaximizationTraining(
     :meth:`JaxExpectationMaximization.step`, compiled once for every shape of batch.
     """
 
+    compiled_step_and_update: Callable[..., ExpectationMaximizationState] = field(
+        init=False
+    )
+    """
+    :meth:`JaxExpectationMaximization.step_and_update`, compiled once for every shape of
+    batch.
+    """
+
     compiled_update: Callable[..., ExpectationMaximizationState] = field(init=False)
     """
     :meth:`JaxExpectationMaximization.update`, compiled.
@@ -225,6 +244,9 @@ class JaxExpectationMaximizationTraining(
         to every training device.
         """
         self.compiled_step = jax.jit(self.expectation_maximization.step)
+        self.compiled_step_and_update = jax.jit(
+            self.expectation_maximization.step_and_update
+        )
         self.compiled_update = jax.jit(self.expectation_maximization.update)
         self.state = self.expectation_maximization.initial_state()
         self.batch_split_devices = BatchSplitDevices.from_devices(
@@ -234,10 +256,26 @@ class JaxExpectationMaximizationTraining(
             self.state = self.batch_split_devices.replicated(state=self.state)
 
     def accumulate_statistics(self, *, batch: tuple[jax.Array, ...]) -> jax.Array:
-        if self.batch_split_devices is not None:
-            batch = self.batch_split_devices.placed_batch(batch=batch)
-        self.state = self.compiled_step(self.state, *batch)
+        self.state = self.compiled_step(self.state, *self.placed_batch(batch=batch))
         return self.state.loss
+
+    def accumulate_statistics_and_update(
+        self, *, batch: tuple[jax.Array, ...]
+    ) -> jax.Array:
+        self.state = self.compiled_step_and_update(
+            self.state, *self.placed_batch(batch=batch)
+        )
+        return self.state.loss
+
+    def placed_batch(self, *, batch: tuple[jax.Array, ...]) -> tuple[jax.Array, ...]:
+        """
+        :param batch: The same rows of every training array.
+        :return: The batch as :attr:`batch_split_devices` place it, as it is without
+            them.
+        """
+        if self.batch_split_devices is None:
+            return batch
+        return self.batch_split_devices.placed_batch(batch=batch)
 
     def update_parameters(self) -> None:
         self.state = self.compiled_update(self.state)
