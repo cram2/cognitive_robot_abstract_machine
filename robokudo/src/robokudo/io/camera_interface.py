@@ -42,7 +42,7 @@ from typing_extensions import Any, TYPE_CHECKING
 from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.classproperty import classproperty
 from robokudo.cas import CASViews, CAS
-from robokudo.datastructures import ROSImageEncoding
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
 from robokudo.defs import PACKAGE_NAME
 from robokudo.exceptions import (
     CameraDataMissing,

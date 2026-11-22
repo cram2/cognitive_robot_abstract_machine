@@ -24,7 +24,7 @@ from sensor_msgs.msg import CameraInfo, Image as ROSImage
 from typing_extensions import TYPE_CHECKING
 
 from robokudo.cas import CASViews
-from robokudo.datastructures import ROSImageEncoding
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
 from robokudo.io.camera_interface import ROSCameraInterface
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter

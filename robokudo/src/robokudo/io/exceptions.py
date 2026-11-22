@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from robokudo.exceptions import InvalidCameraObservation, RoboKudoError
 from robokudo.types.image import ImageRotation
 from semantic_digital_twin.datastructures.camera_model import CameraDistortionModel
-from robokudo.datastructures import ROSImageEncoding
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
 
 
 # %% Compressed depth

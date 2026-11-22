@@ -9,7 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from robokudo.datastructures import ROSImageEncoding
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
 # %% ROS image encodings

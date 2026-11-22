@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from sensor_msgs.msg import CompressedImage
 
-from robokudo.datastructures import ROSImageEncoding
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
 from robokudo.io.camera_interface import depth_convert_workaround
 from robokudo.io.exceptions import (
     CompressedDepthDecodingFailed,

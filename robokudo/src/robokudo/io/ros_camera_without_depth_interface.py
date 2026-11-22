@@ -31,7 +31,7 @@ from sensor_msgs.msg import CameraInfo, Image
 from typing_extensions import Any, TYPE_CHECKING
 
 from robokudo.cas import CASViews
-from robokudo.datastructures import ROSImageEncoding
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
 from robokudo.exceptions import InvalidCameraObservation
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.image import ImageRotation
