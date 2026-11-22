@@ -34,8 +34,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     NonPositiveScaleError,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_layer import (
-    ExpectationMaximizationLayer,
+from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
+    ExpectationMaximizationParameters,
     SufficientStatistics,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
@@ -199,7 +199,7 @@ class GaussianStatistics(SufficientStatistics):
 
 @dataclass(eq=False, repr=False)
 class GaussianLayer(
-    HasLocationAndScale, ExpectationMaximizationLayer, ContinuousLayerWithDensity
+    HasLocationAndScale, ExpectationMaximizationParameters, ContinuousLayerWithDensity
 ):
     """
     A layer of Gaussian distributions over one continuous variable.

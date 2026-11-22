@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from types import ModuleType
 
@@ -22,6 +23,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from array_api_compat import array_namespace
+from random_events.set import Set
+from random_events.variable import Symbolic
+from sortedcontainers import SortedSet
 
 from probabilistic_model.adapters.circuit_representations import (
     CircuitRepresentations,
@@ -56,13 +60,11 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
     SumLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
-    SymbolicLayer,
+    DiscreteLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
-    DenseProbabilityTable,
+    TruncatedGaussianLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
@@ -77,7 +79,7 @@ from .test_inner_layers_on_array_backends import MixtureOfProductsCase
 @dataclass(kw_only=True)
 class RandomSumProductNetworkCase:
     """
-    A small RAT-SPN with Gaussian leaves on the host and rows drawn from two clusters.
+    A small RAT-SPN on the host and its training rows.
     """
 
     host: ProbabilisticCircuit
@@ -123,29 +125,58 @@ class RandomSumProductNetworkCase:
         return learned
 
 
-@pytest.fixture
-def random_sum_product_network() -> RandomSumProductNetworkCase:
+class VariableKinds(StrEnum):
     """
-    A RAT-SPN over four continuous variables with three Gaussians per leaf region and
-    two sums per region, and 40 rows.
+    The kinds of variables of the RAT-SPN of a test.
     """
-    layered = (
-        RegionGraph(
-            variables=continuous_variables(4),
-            partitions=2,
-            depth=2,
-            repetitions=2,
-            seed=3,
-        )
-        .create_random_region_graph()
-        .to_probabilistic_circuit(input_units=3, sum_units=2)
-    )
+
+    CONTINUOUS = "continuous"
+    """
+    Four continuous variables, learned by Gaussian leaves.
+    """
+
+    MIXED = "mixed"
+    """
+    Two continuous and two symbolic variables, the symbolic ones learned by dense
+    probability tables.
+    """
+
+
+@pytest.fixture(params=list(VariableKinds))
+def random_sum_product_network(request) -> RandomSumProductNetworkCase:
+    """
+    A RAT-SPN over four variables with three input distributions per leaf region and
+    two sums per region, and 40 rows, the continuous values drawn from two clusters.
+    """
     generator = np.random.default_rng(5)
-    rows = np.concatenate(
+    continuous_rows = np.concatenate(
         [
             generator.normal(loc=-1.0, scale=0.5, size=(25, 4)),
             generator.normal(loc=2.0, scale=1.0, size=(15, 4)),
         ]
+    )
+    variables = continuous_variables(4)
+    rows = continuous_rows
+    if request.param is VariableKinds.MIXED:
+        variables = SortedSet(
+            [
+                Symbolic(name="s", domain=Set.from_iterable([0, 1, 2])),
+                Symbolic(name="t", domain=Set.from_iterable([0, 1])),
+                *continuous_variables(2, prefix="x"),
+            ]
+        )
+        # the columns follow the variables sorted by name: s, t, x0, x1
+        rows = np.column_stack(
+            [
+                generator.integers(0, 3, len(continuous_rows)),
+                continuous_rows[:, 0] > 0,
+                continuous_rows[:, :2],
+            ]
+        ).astype(float)
+    layered = (
+        RegionGraph(variables=variables, partitions=2, depth=2, repetitions=2, seed=3)
+        .create_random_region_graph()
+        .to_probabilistic_circuit(input_units=3, sum_units=2)
     )
     return RandomSumProductNetworkCase(
         host=CircuitRepresentations().convert(layered, ProbabilisticCircuit),
@@ -270,6 +301,47 @@ def test_the_loss_of_an_epoch_is_the_negative_average_log_likelihood_before_it(
     )
 
 
+@pytest.mark.parametrize(
+    "random_sum_product_network", [VariableKinds.MIXED], indirect=True
+)
+def test_rows_impossible_under_the_circuit_are_left_out_as_by_the_host(
+    random_sum_product_network, differentiable_backend
+):
+    """
+    A row with a symbolic value outside the domain of its variable has probability zero;
+    like the host expectation maximization, the update leaves it out of every count.
+    """
+    case = random_sum_product_network
+    impossible = case.rows[:3].copy()
+    impossible[:, 0] = 7
+    rows = np.concatenate([case.rows, impossible])
+    circuit = case.layered(
+        host=case.host,
+        namespace=differentiable_backend,
+        edge_matrix_type=BlockEdgeMatrix,
+    )
+    run = learner_of(
+        layer=circuit.root, namespace=differentiable_backend
+    ).minimize_until_converged(
+        differentiable_backend.asarray(circuit.encoded(rows)),
+        convergence=epochs_of(1),
+    )
+    learned = copy.deepcopy(case.host)
+    ExpectationMaximization().learn(
+        learned, rows, LearnableUnits.from_units(learned.nodes()), 1
+    )
+    expected = case.layered(
+        host=learned, namespace=np, edge_matrix_type=BlockEdgeMatrix
+    )
+
+    for learned_parameter, reference in zip(
+        comparable_parameters(run.trained_root),
+        comparable_parameters(expected.root),
+        strict=True,
+    ):
+        np.testing.assert_allclose(learned_parameter, reference, rtol=1e-9, atol=1e-12)
+
+
 # %% online updates
 
 
@@ -319,9 +391,9 @@ def test_a_step_size_blends_the_weights_and_moments_toward_the_full_update(
     random_sum_product_network, differentiable_backend
 ):
     """
-    With a step size, an update moves the weights of every sum and the mean and second
-    moment of every Gaussian that share of the way from their values before it to those
-    of an update with step size one.
+    With a step size, an update moves the weights of every sum, the probabilities of
+    every table, and the mean and second moment of every Gaussian that share of the way
+    from their values before it to those of an update with step size one.
     """
     case = random_sum_product_network
     step_size = 0.3
@@ -364,6 +436,19 @@ def test_a_step_size_blends_the_weights_and_moments_toward_the_full_update(
                 (1 - step_size) * layer_before.normalized_weights
                 + step_size
                 * HasParameterArrays.host_copy(layer_full.normalized_weights),
+                rtol=1e-10,
+                atol=1e-13,
+            )
+        if isinstance(layer_before, DiscreteLayer):
+            np.testing.assert_allclose(
+                HasParameterArrays.host_copy(
+                    layer_blended.table.normalized_probabilities
+                ),
+                (1 - step_size) * layer_before.table.normalized_probabilities
+                + step_size
+                * HasParameterArrays.host_copy(
+                    layer_full.table.normalized_probabilities
+                ),
                 rtol=1e-10,
                 atol=1e-13,
             )
@@ -499,14 +584,16 @@ def test_batches_split_across_devices_learn_as_on_one_device():
 
 def test_a_circuit_with_a_layer_that_cannot_be_learned_raises():
     """
-    Only sums and Gaussians are learned; any other layer with parameters is refused
-    before training starts.
+    A truncated Gaussian is not learned; a circuit with one is refused before training
+    starts.
     """
     with jax.enable_x64(True):
-        layer = SymbolicLayer(
+        layer = TruncatedGaussianLayer(
             np.zeros(1, dtype=np.int64),
-            np.arange(2),
-            DenseProbabilityTable(jnp.log(jnp.full((1, 2), 0.5))),
+            jnp.array([[0.0, 1.0]]),
+            np.array([[1, 1]], dtype=np.int64),
+            jnp.zeros(1),
+            jnp.zeros(1),
         )
         with pytest.raises(UnsupportedLayerError):
             JaxExpectationMaximization(layer=layer)

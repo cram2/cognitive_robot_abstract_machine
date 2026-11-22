@@ -16,7 +16,7 @@ from random_events.set import Set
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Self
+from typing_extensions import TYPE_CHECKING, Any, Self
 
 from probabilistic_model.distributions.distributions import (
     DiscreteDistribution,
@@ -43,6 +43,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     UndefinedCumulativeDistributionError,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
+    ExpectationMaximizationParameters,
+    SufficientStatistics,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.base import (
     UnivariateInputLayer,
@@ -64,8 +68,14 @@ from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding impo
 from probabilistic_model.utils import MissingDict
 
 
+if TYPE_CHECKING:
+    from probabilistic_model.learning.expectation_maximization import (
+        MaximizationRegularization,
+    )
+
+
 @dataclass(eq=False, repr=False)
-class DiscreteLayer(UnivariateInputLayer, ABC):
+class DiscreteLayer(UnivariateInputLayer, ExpectationMaximizationParameters, ABC):
     """
     Abstract base class for the input layers of discrete univariate distributions.
 
@@ -116,6 +126,33 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         Like :meth:`Layer.projected_parameters`, as the :attr:`table` projects them.
         """
         return self.table.projected_parameters(parameters=parameters)
+
+    # %% expectation maximization
+
+    @property
+    def learns_by_expectation_maximization(self) -> bool:
+        """
+        :return: Whether expectation maximization can learn the :attr:`table`.
+        """
+        return isinstance(self.table, ExpectationMaximizationParameters)
+
+    def expected_statistics(
+        self, *, parameter_gradients: list[BackendArray], node_counts: NodeValues
+    ) -> SufficientStatistics:
+        return self.table.expected_statistics(
+            parameter_gradients=parameter_gradients, node_counts=node_counts
+        )
+
+    def maximized_parameters(
+        self,
+        *,
+        statistics: SufficientStatistics,
+        regularization: MaximizationRegularization,
+        step_size: float,
+    ) -> list[BackendArray]:
+        return self.table.maximized_parameters(
+            statistics=statistics, regularization=regularization, step_size=step_size
+        )
 
     @property
     def float_states(self) -> BackendArray:

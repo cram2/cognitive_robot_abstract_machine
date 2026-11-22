@@ -32,8 +32,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     VariableMask,
 )
 from probabilistic_model.exceptions import NumberOfWeightsMismatchError
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_layer import (
-    ExpectationMaximizationLayer,
+from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
+    ExpectationMaximizationParameters,
     SufficientStatistics,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
@@ -104,7 +104,7 @@ class EdgeCounts(SufficientStatistics):
 
 
 @dataclass(eq=False, repr=False)
-class SumLayer(HasParameterArrays, ExpectationMaximizationLayer, InnerLayer):
+class SumLayer(HasParameterArrays, ExpectationMaximizationParameters, InnerLayer):
     """
     A layer of sum units.
 

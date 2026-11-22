@@ -26,7 +26,7 @@ from probabilistic_model.learning.training_schedule import (
     LearningRatePlateau,
     MiniBatches,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_layer import (
+from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
     SufficientStatistics,
 )
 

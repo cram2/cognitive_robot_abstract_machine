@@ -25,8 +25,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     SampleArray,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_layer import (
-    ExpectationMaximizationLayer,
+from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
+    ExpectationMaximizationParameters,
     SufficientStatistics,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
@@ -92,11 +92,14 @@ class TensorizedExpectationMaximization(
         """
         super().__post_init__()
         for layer in self.layer.all_layers():
-            if layer.parameters and not isinstance(layer, ExpectationMaximizationLayer):
+            if layer.parameters and not (
+                isinstance(layer, ExpectationMaximizationParameters)
+                and layer.learns_by_expectation_maximization
+            ):
                 raise UnsupportedLayerError(layer_type=type(layer))
 
     @staticmethod
-    def learned_layers(*, root: Any) -> list[ExpectationMaximizationLayer]:
+    def learned_layers(*, root: Any) -> list[ExpectationMaximizationParameters]:
         """
         :param root: The root of the circuit or of a copy of it.
         :return: The layers with parameters, in the order of ``all_layers``.

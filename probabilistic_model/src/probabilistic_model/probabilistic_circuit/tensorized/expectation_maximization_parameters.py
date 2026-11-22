@@ -1,6 +1,6 @@
 """
-The layers whose parameters tensorized expectation maximization learns, and the
-sufficient statistics their maximization step reads.
+The parts of a layered circuit whose parameters tensorized expectation maximization
+learns, and the sufficient statistics their maximization step reads.
 """
 
 from __future__ import annotations
@@ -60,17 +60,25 @@ class SufficientStatistics(ABC):
         )
 
 
-# %% layers
+# %% parameters
 
 
-class ExpectationMaximizationLayer(ABC):
+class ExpectationMaximizationParameters(ABC):
     """
-    Interface of a layer whose parameters expectation maximization learns from the
-    gradient of the total log-likelihood of a batch.
+    Interface of a layer, or of a part of one, whose parameters expectation maximization
+    learns from the gradient of the total log-likelihood of a batch.
 
     The node count of a node is the derivative of the total log-likelihood by the log-
     value of the node, the expected number of rows the node explains.
     """
+
+    @property
+    def learns_by_expectation_maximization(self) -> bool:
+        """
+        :return: Whether expectation maximization can learn these parameters, always
+            unless what they are stored in decides otherwise.
+        """
+        return True
 
     @abstractmethod
     def expected_statistics(
