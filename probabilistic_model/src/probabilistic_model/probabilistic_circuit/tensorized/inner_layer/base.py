@@ -221,8 +221,25 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
             parameter for layer in self.all_layers() for parameter in layer.parameters
         ]
 
+    def parameters_by_layer(
+        self, *, parameters: list[BackendArray]
+    ) -> list[list[BackendArray]]:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`circuit_parameters`.
+        :return: The arrays of every layer, the layers in the order of
+            :meth:`all_layers`.
+        """
+        result = []
+        position = 0
+        for layer in self.all_layers():
+            number_of_arrays = len(layer.parameters)
+            result.append(parameters[position : position + number_of_arrays])
+            position += number_of_arrays
+        return result
+
     def projected_circuit_parameters(
-        self, parameters: list[BackendArray]
+        self, *, parameters: list[BackendArray]
     ) -> list[BackendArray]:
         """
         :param parameters: Arrays in the order and with the shapes of
@@ -230,19 +247,15 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         :return: The arrays with those of every layer replaced by its
             :meth:`projected_parameters`.
         """
-        result = []
-        position = 0
-        for layer in self.all_layers():
-            number_of_arrays = len(layer.parameters)
-            result.extend(
-                layer.projected_parameters(
-                    parameters=parameters[position : position + number_of_arrays]
-                )
+        return [
+            projected
+            for layer, own in zip(
+                self.all_layers(), self.parameters_by_layer(parameters=parameters)
             )
-            position += number_of_arrays
-        return result
+            for projected in layer.projected_parameters(parameters=own)
+        ]
 
-    def copy_with_circuit_parameters(self, parameters: list[BackendArray]) -> Layer:
+    def copy_with_circuit_parameters(self, *, parameters: list[BackendArray]) -> Layer:
         """
         Copy the circuit rooted here with other parameter arrays, keeping every layer
         that several parents share shared. It runs under :func:`jax.jit`.
@@ -252,15 +265,12 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         :return: The root of the copy.
         """
         order = self.all_layers()
-        parameters_of_layer: dict[int, list[BackendArray]] = {}
-        position = 0
-        for layer in order:
-            number_of_arrays = len(layer.parameters)
-            parameters_of_layer[id(layer)] = parameters[
-                position : position + number_of_arrays
-            ]
-            position += number_of_arrays
-
+        parameters_of_layer = {
+            id(layer): own
+            for layer, own in zip(
+                order, self.parameters_by_layer(parameters=parameters)
+            )
+        }
         copies: dict[int, Layer] = {}
         for layer in reversed(order):
             copy_of_layer = layer.copy_with_child_layers(

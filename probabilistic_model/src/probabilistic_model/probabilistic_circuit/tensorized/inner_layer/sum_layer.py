@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
-from typing_extensions import Iterable, Self
+from typing_extensions import TYPE_CHECKING, Iterable, Self
 
 from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
@@ -32,6 +32,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     VariableMask,
 )
 from probabilistic_model.exceptions import NumberOfWeightsMismatchError
+from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_layer import (
+    ExpectationMaximizationLayer,
+    SufficientStatistics,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
@@ -72,9 +76,35 @@ from probabilistic_model.probabilistic_circuit.tensorized.utils import (
     remap_indices,
 )
 
+if TYPE_CHECKING:
+    from probabilistic_model.learning.expectation_maximization import (
+        MaximizationRegularization,
+    )
+
+
+@dataclass(kw_only=True)
+class EdgeCounts(SufficientStatistics):
+    """
+    The expected number of rows that pass through every edge of a sum layer.
+    """
+
+    counts: BackendArray
+    """
+    The expected count of every edge, laid out as the edges of the layer store values.
+    """
+
+    @property
+    def arrays(self) -> list[BackendArray]:
+        return [self.counts]
+
+    @classmethod
+    def from_arrays(cls, *, arrays: list[BackendArray]) -> Self:
+        [counts] = arrays
+        return cls(counts=counts)
+
 
 @dataclass(eq=False, repr=False)
-class SumLayer(HasParameterArrays, InnerLayer):
+class SumLayer(HasParameterArrays, ExpectationMaximizationLayer, InnerLayer):
     """
     A layer of sum units.
 
@@ -417,6 +447,48 @@ class SumLayer(HasParameterArrays, InnerLayer):
 
     def normalize_own(self):
         self.log_weights = self.normalized_log_weights
+
+    # %% expectation maximization
+
+    def expected_statistics(
+        self, *, parameter_gradients: list[BackendArray], node_counts: NodeValues
+    ) -> EdgeCounts:
+        # the log-likelihood subtracts the log normalization constants, whose derivative
+        # takes the normalized weight times the node count off every edge count
+        [log_weight_gradient] = parameter_gradients
+        return EdgeCounts(
+            counts=log_weight_gradient
+            + self.normalized_weights * self.edges.values_of_rows(values=node_counts)
+        )
+
+    def maximized_parameters(
+        self,
+        *,
+        statistics: EdgeCounts,
+        regularization: MaximizationRegularization,
+        step_size: float,
+    ) -> list[BackendArray]:
+        # edges of weight zero keep it, as gradient descent keeps it
+        is_edge = self.namespace.isfinite(self.log_weights)
+        counts = self.namespace.where(
+            is_edge, statistics.counts + regularization.smoothing, 0.0
+        )
+        proportions = counts / self.edges.values_of_rows(
+            values=self.edges.reduce_by_row(values=counts, reduction=RowReduction.SUM)
+        )
+        weights = (1.0 - step_size) * self.normalized_weights + step_size * proportions
+        log_weights = self.namespace.where(
+            is_edge,
+            self.namespace.log(
+                self.namespace.clip(
+                    weights, min=regularization.minimum_mixture_proportion
+                )
+            ),
+            -np.inf,
+        )
+        return [
+            self.copy_with_parameters(parameters=[log_weights]).normalized_log_weights
+        ]
 
     # %% queries
 

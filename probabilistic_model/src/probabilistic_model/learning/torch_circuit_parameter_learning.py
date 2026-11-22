@@ -109,7 +109,14 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
         """
         raise NotImplementedError
 
-    def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def take_step_or_replay(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        """
+        Take the step of :meth:`take_step` on a batch, replayed from its recording for
+        batches of its shape if :attr:`replays_recorded_steps`.
+
+        :param batch: The same rows of every training array.
+        :return: The loss of the batch before the step.
+        """
         if not self.replays_recorded_steps:
             return self.take_step(batch=batch)
         shape = BatchShape.from_batch(batch=batch)

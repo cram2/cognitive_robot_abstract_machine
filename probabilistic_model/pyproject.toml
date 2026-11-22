@@ -116,6 +116,7 @@ core = [
     "probabilistic_model.learning.progressive",
     "probabilistic_model.learning.region_graph",
     "probabilistic_model.learning.step_memory",
+    "probabilistic_model.learning.tensorized_expectation_maximization",
     "probabilistic_model.learning.training_schedule",
     "probabilistic_model.monte_carlo_estimator",
     "probabilistic_model.probabilistic_circuit",

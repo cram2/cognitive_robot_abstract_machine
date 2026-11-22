@@ -93,7 +93,7 @@ class JaxGradientDescent(
         :return: The :attr:`loss` of the circuit with these parameter arrays.
         """
         return self.loss.evaluate(
-            self.layer.copy_with_circuit_parameters(parameters), *arguments
+            self.layer.copy_with_circuit_parameters(parameters=parameters), *arguments
         )
 
     @called_positionally
@@ -111,7 +111,7 @@ class JaxGradientDescent(
                 optax.apply_updates(state.parameters, updates),
             )
         ]
-        parameters = self.layer.projected_circuit_parameters(updated)
+        parameters = self.layer.projected_circuit_parameters(parameters=updated)
         return TrainingState(
             parameters=parameters, optimizer_state=optimizer_state, loss=loss
         )
@@ -216,7 +216,7 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
 
     def trained_root(self) -> LayerType:
         return self.gradient_descent.layer.copy_with_circuit_parameters(
-            jax.device_put(
+            parameters=jax.device_put(
                 self.state.parameters, self.gradient_descent.parameter_device
             )
         )

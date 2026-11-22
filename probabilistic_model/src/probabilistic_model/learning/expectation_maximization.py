@@ -117,15 +117,12 @@ class ExpectationStepResult:
     """
 
 
-# %% expectation maximization
-@dataclass
-class ExpectationMaximization:
+# %% regularization of the maximization step
+@dataclass(kw_only=True)
+class MaximizationRegularization:
     """
-    Expectation maximization for the parameters of some units of an existing circuit.
-
-    The expectation step evaluates the whole circuit; the maximization step updates the
-    weights of the learned sum units and the distributions of the learned leaves, while
-    every other unit keeps its parameters.
+    How the maximization step of expectation maximization keeps the learned weights and
+    variances away from zero.
     """
 
     smoothing: float = 1e-8
@@ -141,6 +138,18 @@ class ExpectationMaximization:
     minimum_gaussian_variance: float = 1e-6
     """
     Lower bound for the variance of a learned Gaussian leaf.
+    """
+
+
+# %% expectation maximization
+@dataclass(kw_only=True)
+class ExpectationMaximization(MaximizationRegularization):
+    """
+    Expectation maximization for the parameters of some units of an existing circuit.
+
+    The expectation step evaluates the whole circuit; the maximization step updates the
+    weights of the learned sum units and the distributions of the learned leaves, while
+    every other unit keeps its parameters.
     """
 
     def learn(

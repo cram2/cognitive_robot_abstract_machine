@@ -94,7 +94,7 @@ class TorchGradientDescent(
         memory.reset_peak()
         before = memory.in_use_bytes()
         self.loss.evaluate(
-            self.layer.copy_with_circuit_parameters(self.parameters), *batch
+            self.layer.copy_with_circuit_parameters(parameters=self.parameters), *batch
         ).backward()
         peak = memory.peak_bytes()
         for parameter in self.parameters:
@@ -115,7 +115,8 @@ class TorchGradientDescent(
         """
         optimizer.zero_grad()
         loss = self.loss.evaluate(
-            self.layer.copy_with_circuit_parameters(self.parameters), *arguments
+            self.layer.copy_with_circuit_parameters(parameters=self.parameters),
+            *arguments,
         )
         loss.backward()
         optimizer.step()
@@ -124,7 +125,9 @@ class TorchGradientDescent(
                 self.parameters, self.zero_probability_entries
             ):
                 parameter.masked_fill_(zero_probability, -torch.inf)
-            projected = self.layer.projected_circuit_parameters(self.parameters)
+            projected = self.layer.projected_circuit_parameters(
+                parameters=self.parameters
+            )
             for parameter, valid in zip(self.parameters, projected):
                 parameter.copy_(valid)
         return loss.detach()
@@ -154,6 +157,9 @@ class TorchGradientDescentTraining(
     def take_step(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
 
+    def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        return self.take_step_or_replay(batch=batch)
+
     def scale_learning_rate(self, *, scale: float) -> None:
         learning_rate = self.gradient_descent.learning_rate * scale
         for group in self.optimizer.param_groups:
@@ -165,5 +171,7 @@ class TorchGradientDescentTraining(
 
     def trained_root(self) -> LayerType:
         return self.gradient_descent.layer.copy_with_circuit_parameters(
-            [parameter.detach() for parameter in self.gradient_descent.parameters]
+            parameters=[
+                parameter.detach() for parameter in self.gradient_descent.parameters
+            ]
         )

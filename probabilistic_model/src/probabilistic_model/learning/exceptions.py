@@ -178,3 +178,28 @@ class NoRowsToFitError(ProbabilisticModelException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Fit on at least one row."
+
+
+@dataclass(kw_only=True)
+class UnsupportedLayerError(ProbabilisticModelException, TypeError):
+    """
+    Exception raised when tensorized expectation maximization is asked to learn a
+    circuit with a layer whose parameters it cannot learn.
+    """
+
+    layer_type: type
+    """
+    The type of the layer that cannot be learned.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Expectation maximization cannot learn the parameters of a "
+            f"{self.layer_type.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Learn circuits whose layers with parameters are sum and Gaussian layers, "
+            "or train the circuit by gradient descent."
+        )

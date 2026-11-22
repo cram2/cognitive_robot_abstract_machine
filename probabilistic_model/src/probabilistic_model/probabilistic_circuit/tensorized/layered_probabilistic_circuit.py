@@ -309,7 +309,8 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             structure.
         """
         return self.__class__(
-            self.variables, self.root.copy_with_circuit_parameters(parameters)
+            self.variables,
+            self.root.copy_with_circuit_parameters(parameters=parameters),
         )
 
     def to_namespace(
@@ -1039,7 +1040,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         self.root = self.root.marginal(kept, cache=cache)
         return [
             LayerNode(
-                cache.result_of(ProductLayer.marginal, node.layer),
+                cache.result_of(query=ProductLayer.marginal, layer=node.layer),
                 int(np.cumsum(node.layer.nodes_over(kept=kept, cache=cache))[node.node])
                 - 1,
             )
