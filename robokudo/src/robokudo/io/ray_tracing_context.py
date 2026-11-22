@@ -55,7 +55,7 @@ class RayTracingContextResolver:
     Resolve and cache a ray-tracing context from a configured world source.
     """
 
-    camera_config: RayTracingCameraConfiguration
+    camera_configuration: RayTracingCameraConfiguration
     """
     Camera configuration whose source is resolved.
     """
@@ -82,7 +82,7 @@ class RayTracingContextResolver:
         if self._context is not None:
             return self._context
 
-        source = self.camera_config.source
+        source = self.camera_configuration.source
         if isinstance(source, WorldDescriptorSource):
             world = self._load_descriptor_world(source)
             camera = self._select_descriptor_camera(world, source)
@@ -173,7 +173,7 @@ class RayTracingContextResolver:
         :return: Newly constructed descriptor world.
         """
         world_descriptor = self.module_loader.load_world_descriptor(
-            ros_pkg_name=source.ros_package,
+            ros_package_name=source.ros_package,
             module_name=source.descriptor_name,
         )
         return world_descriptor.world

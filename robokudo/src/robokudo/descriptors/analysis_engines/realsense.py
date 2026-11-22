@@ -1,3 +1,9 @@
+"""
+Build object perception from a live RealSense RGB-D camera.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -12,6 +18,10 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Process live RealSense camera frames into object hypotheses.
+    """
+
     def name(self) -> str:
         return "realsense"
 
@@ -27,7 +37,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 # PipelineTrigger(),
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

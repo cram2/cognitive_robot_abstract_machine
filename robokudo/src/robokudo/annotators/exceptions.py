@@ -12,6 +12,20 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from robokudo.exceptions import RoboKudoError
 
 
+# %% Query lifecycle
+@dataclass(kw_only=True)
+class QueryServerMissing(RoboKudoError, RuntimeError):
+    """
+    Query processing was requested before the action server was initialized.
+    """
+
+    def error_message(self) -> str:
+        return "The query action server has not been initialized."
+
+    def suggest_correction(self) -> str:
+        return "Initialize the query annotator before processing requests."
+
+
 # %% Collection reader placement
 @dataclass
 class InvalidCollectionReaderParent(RoboKudoError):
@@ -43,6 +57,7 @@ class InvalidAnalysisData(RoboKudoError):
     """
     Type required by the analysis operation.
     """
+
     actual_type: type
     """
     Type of the supplied data.

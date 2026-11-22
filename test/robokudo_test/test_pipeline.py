@@ -1,3 +1,9 @@
+"""
+Verify annotators resolve the CAS belonging to their enclosing pipeline.
+"""
+
+from __future__ import annotations
+
 import py_trees
 
 from robokudo.annotators.core import BaseAnnotator
@@ -10,13 +16,16 @@ from robokudo.pipeline import Pipeline
 
 
 def create_test_tree():
+    """
+    Construct a sequence containing simulated collection, failure, and processing steps.
+    """
     root = py_trees.composites.Sequence("Sequence", memory=True)
 
     # for annotator in [CollectionReader(), ThreadedAnnotator("ImagePreprocessor"), CaffeAnnotator("CaffeAnnotator")]:
     for annotator in [
         FakeCollectionReaderAnnotator(),
-        FailingAnnotator("FailingAnnotator"),
-        SlowAnnotator("CaffeAnnotator"),
+        FailingAnnotator(name="FailingAnnotator"),
+        SlowAnnotator(name="CaffeAnnotator"),
     ]:
         root.add_child(annotator)
 

@@ -1,3 +1,9 @@
+"""
+Perceive recorded frames using a world descriptor and configured static detections.
+"""
+
+from __future__ import annotations
+
 import robokudo.analysis_engine
 import robokudo.behaviours.clear_errors
 import robokudo.descriptors.camera_configs.config_mongodb_playback
@@ -20,10 +26,17 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
+    """
+    Combine stored camera observations with configured detections and world geometry.
+    """
+
     def name(self):
         return "static_detector_world_descriptor_from_storage"
 
     def implementation(self):
+        """
+        Build the configured camera acquisition and perception pipeline.
+        """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
@@ -44,7 +57,7 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 robokudo.idioms.pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 WorldDescriptorBootstrapAnnotator(descriptor=bootstrap),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 StaticObjectDetectorAnnotator(descriptor=sod),
                 ObjectHypothesisVisualizer(descriptor=oh_vis),
             ]

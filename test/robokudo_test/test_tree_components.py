@@ -1,3 +1,9 @@
+"""
+Verify task scheduling and pipeline execution in behavior trees.
+"""
+
+from __future__ import annotations
+
 from typing_extensions import Any
 
 import py_trees
@@ -29,6 +35,10 @@ class DummyBehaviour(py_trees.behaviour.Behaviour):
 
 
 class TestTreeComponents:
+    """
+    Check task scheduling and completion through behavior trees.
+    """
+
     def test_iterative_task_scheduler(self):
         leaf_behaviour1 = DummyBehaviour("Behaviour1")
         par1 = py_trees.composites.Parallel(
@@ -82,7 +92,7 @@ class TestTreeComponents:
                 "detect": par1,
                 "track": par2,
             },
-            filter_fn=lambda query: query["query"],
+            filter_function=lambda query: query["query"],
         )
         pipe = Pipeline("Seq", memory=True, children=[scheduler])
 

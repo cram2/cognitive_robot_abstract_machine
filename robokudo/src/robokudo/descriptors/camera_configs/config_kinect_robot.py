@@ -1,3 +1,9 @@
+"""
+Configure synchronized Kinect RGB-D input and its ROS camera frames.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 from typing_extensions import ClassVar
@@ -60,7 +66,7 @@ class KinectCameraConfig(
     Overwrite RGBDComponent.
     """
 
-    hi_res_mode: bool = True
+    high_resolution_mode: bool = True
     """
     Overwrite RGBDComponent.
     """

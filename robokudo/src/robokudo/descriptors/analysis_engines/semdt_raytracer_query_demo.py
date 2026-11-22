@@ -11,7 +11,9 @@ from __future__ import annotations
 # %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
-from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
@@ -31,10 +33,17 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Answer object queries using a rendered semantic world camera.
+    """
+
     def name(self) -> str:
         return "semdt_raytracer_query_demo"
 
     def implementation(self) -> Pipeline:
+        """
+        Build the rendered camera perception pipeline.
+        """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
@@ -53,12 +62,12 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(),
                 ClusterColorAnnotator(),
-                ClusterPoseBBAnnotator(),
+                ClusterPoseBoundingBoxAnnotator(),
                 GenerateQueryResult(descriptor=query_result_desc),
                 ActionServerCheck(),
             ]

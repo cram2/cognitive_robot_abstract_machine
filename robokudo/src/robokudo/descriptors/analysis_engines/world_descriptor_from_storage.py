@@ -21,6 +21,8 @@ The pipeline implements the following functionality:
     or scenarios.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 
@@ -110,7 +112,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 WorldDescriptorBootstrapAnnotator(descriptor=bootstrap),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 StaticObjectDetectorAnnotator(descriptor=sod),
                 ObjectHypothesisVisualizer(),
                 WorldVisualizer(),

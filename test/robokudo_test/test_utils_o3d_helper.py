@@ -1,3 +1,9 @@
+"""
+Verify point cloud geometry operations preserve their spatial contracts.
+"""
+
+from __future__ import annotations
+
 # %% Imports
 
 import numpy as np
@@ -28,6 +34,10 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 
 # %% Point cloud geometry
 class TestUtilsO3DHelper(object):
+    """
+    Check spatial properties of point cloud transformations and geometry helpers.
+    """
+
     @pytest.fixture
     def cas(self, kinect_intrinsics: open3d.camera.PinholeCameraIntrinsic) -> CAS:
         cas = robokudo.cas.CAS()
@@ -524,7 +534,7 @@ class TestUtilsO3DHelper(object):
         mask[100:200, 100:200] = 255
 
         pc = get_cloud_from_rgb_depth_and_mask(
-            rgb_image, depth_image, mask, camera_model, depth_truncate=0.2
+            rgb_image, depth_image, mask, camera_model, depth_truncation=0.2
         )  # truncate from 200 mm
 
         assert len(pc.points) == 0

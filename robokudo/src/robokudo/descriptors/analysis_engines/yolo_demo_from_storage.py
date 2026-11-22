@@ -1,3 +1,9 @@
+"""
+Detect objects with YOLO in camera frames replayed from storage.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -41,7 +47,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 YoloAnnotator(descriptor=yolo_descriptor),
                 ClusterColorAnnotator(),
             ]

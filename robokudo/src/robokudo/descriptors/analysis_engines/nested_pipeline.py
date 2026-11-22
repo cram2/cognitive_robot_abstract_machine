@@ -17,6 +17,8 @@ The pipeline implements the following functionality:
     processing flows using nested pipelines and conditional execution.
 """
 
+from __future__ import annotations
+
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
@@ -109,8 +111,8 @@ class AnalysisEngine(AnalysisEngineInterface):
         for annotator in [
             ClearAnnotatorOutputs(),
             CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
-            SlowAnnotator("SlowAnnotator"),
+            ImagePreprocessorAnnotator(name="ImagePreprocessor"),
+            SlowAnnotator(name="SlowAnnotator"),
         ]:
             seq.add_child(annotator)
 

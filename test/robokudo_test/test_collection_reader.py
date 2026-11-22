@@ -8,9 +8,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from unittest.mock import Mock
+
 import pytest
 from py_trees.common import Status
-from robokudo.annotators.collection_reader import CollectionReaderAnnotator
+from robokudo.annotators.collection_reader import (
+    CollectionReaderAnnotator,
+    CollectionReaderParameters,
+)
 from robokudo.annotators.exceptions import InvalidCollectionReaderParent
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.io.camera_interface import CameraInterface
@@ -47,10 +51,12 @@ def reader_pipeline() -> ReaderPipeline:
     """
     camera_interface = Mock(spec=CameraInterface)
     descriptor = CollectionReaderAnnotator.Descriptor(
-        camera_config=BaseCameraConfig(interface_type="test"),
-        camera_interface=camera_interface,
+        parameters=CollectionReaderParameters.from_defaults(
+            camera_configuration=BaseCameraConfig(interface_type="test"),
+            camera_interface_type=CameraInterface,
+        ),
     )
-    reader = CollectionReaderAnnotator(descriptor)
+    reader = CollectionReaderAnnotator(descriptor, camera_interface=camera_interface)
     pipeline = Pipeline(children=[reader])
     return ReaderPipeline(reader, pipeline, camera_interface)
 
@@ -58,14 +64,13 @@ def reader_pipeline() -> ReaderPipeline:
 # %% Single-reader configuration
 
 
-def test_collection_reader_descriptor_uses_configured_camera_interface(
+def test_collection_reader_uses_configured_camera_interface(
     reader_pipeline: ReaderPipeline,
 ) -> None:
     """
-    The reader parameters retain the configured camera interface.
+    The reader retains the explicitly supplied acquisition implementation.
     """
-    parameters = reader_pipeline.reader.descriptor.parameters
-    assert parameters.camera_interface is reader_pipeline.camera_interface
+    assert reader_pipeline.reader.camera_interface is reader_pipeline.camera_interface
 
 
 # %% Acquisition lifecycle
@@ -118,7 +123,7 @@ def test_collection_reader_reports_wait_threshold(
     Reaching the wait threshold emits a warning and resets the counter.
     """
     reader_pipeline.camera_interface.has_new_data.return_value = False
-    reader_pipeline.reader.iterations_since_last_data_warn_threshold = 1
+    reader_pipeline.reader.iterations_since_last_data_warning_threshold = 1
     with caplog.at_level(logging.WARNING):
         assert reader_pipeline.reader.update() == Status.RUNNING
     assert reader_pipeline.reader.iterations_since_last_data == 0

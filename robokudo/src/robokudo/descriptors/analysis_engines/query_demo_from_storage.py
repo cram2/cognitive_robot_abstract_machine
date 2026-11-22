@@ -19,6 +19,8 @@ The pipeline implements the following functionality:
     without requiring live camera input.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 
@@ -98,7 +100,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
