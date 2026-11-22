@@ -5,6 +5,8 @@ Tests for the edge matrix whose rows with the same child columns form full block
 from __future__ import annotations
 
 # %% imports
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -14,6 +16,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
     EdgeBlockStackShape,
+    EdgeWeighting,
     RowReduction,
     SparseEdgeMatrix,
     SparseEntries,
@@ -105,10 +108,11 @@ def test_stored_values_follow_their_edges(
     } == expected
 
 
-def test_sums_of_one_shape_are_one_stack():
+@pytest.fixture
+def sums_of_a_region_graph() -> BlockEdgeMatrix:
     """
-    Sums like those of a region graph, every one mixing all products of its region, are
-    stacked into a single stack.
+    Four regions of three sums, every sum mixing the nine products of its region, the
+    products of the regions laid out one region after another.
     """
     regions, sums_per_region, products_per_region = 4, 3, 9
     rows = np.repeat(np.arange(regions * sums_per_region), products_per_region)
@@ -117,7 +121,7 @@ def test_sums_of_one_shape_are_one_stack():
     ) * products_per_region + np.tile(
         np.arange(products_per_region), regions * sums_per_region
     )
-    matrix = BlockEdgeMatrix.from_edge_positions(
+    return BlockEdgeMatrix.from_edge_positions(
         rows=rows,
         columns=columns,
         shape=MatrixShape2D(
@@ -125,9 +129,131 @@ def test_sums_of_one_shape_are_one_stack():
             number_of_columns=regions * products_per_region,
         ),
     )
-    [stack] = matrix.stacks
-    assert stack.block_rows.shape == (regions, sums_per_region)
-    assert stack.block_columns.shape == (regions, products_per_region)
+
+
+def test_sums_of_one_shape_are_one_stack(sums_of_a_region_graph: BlockEdgeMatrix):
+    """
+    Sums like those of a region graph, every one mixing all products of its region, are
+    stacked into a single stack of one block per region.
+    """
+    [stack] = sums_of_a_region_graph.stacks
+    assert stack.block_rows.shape == (4, 3)
+    assert stack.block_columns.shape == (4, 9)
+
+
+def test_blocks_of_consecutive_regions_have_contiguous_columns(
+    sums_of_a_region_graph: BlockEdgeMatrix,
+    rows_of_two_blocks_and_a_row_without_edges: SparseEntries,
+):
+    """
+    The stack of a region graph's sums reads the columns of its blocks as one range, as
+    does a block of the columns 1 and 2, while the block of the columns 0, 3 and 4 skips
+    some.
+    """
+    entries = rows_of_two_blocks_and_a_row_without_edges
+    scattered = BlockEdgeMatrix.from_edge_positions(
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
+    [stack] = sums_of_a_region_graph.stacks
+    assert stack.has_contiguous_columns
+    assert {
+        tuple(stack.block_columns[0].tolist()): stack.has_contiguous_columns
+        for stack in scattered.stacks
+    } == {(1, 2): True, (0, 3, 4): False}
+
+
+@pytest.mark.parametrize("reduction", list(RowReduction), ids=str)
+@pytest.mark.parametrize(
+    "combination", [None, RowReduction.SUM, RowReduction.PRODUCT], ids=str
+)
+def test_block_reduction_of_child_values_is_the_sparse_reduction(
+    sums_of_a_region_graph: BlockEdgeMatrix,
+    rows_of_two_blocks_and_a_row_without_edges: SparseEntries,
+    reduction: RowReduction,
+    combination: RowReduction | None,
+):
+    """
+    Reducing the values of the children of every node, weighted by the values of their
+    edges or not, gives what the sparse matrix of the same edges gives, whether the
+    columns of the blocks are contiguous or not.
+    """
+    entries = rows_of_two_blocks_and_a_row_without_edges
+    scattered = BlockEdgeMatrix.from_edge_positions(
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
+    generator = np.random.default_rng(0)
+    for block in (scattered, sums_of_a_region_graph):
+        sparse = SparseEdgeMatrix.from_edge_positions(
+            rows=block.rows, columns=block.columns, shape=block.shape
+        )
+        edge_entries = SparseEntries(
+            generator.normal(size=block.number_of_edges), block.rows, block.columns
+        )
+        values = generator.normal(size=(3, block.shape.number_of_columns))
+        results = [
+            matrix.reduce_child_values_by_row(
+                values=values,
+                reduction=reduction,
+                weighting=(
+                    None
+                    if combination is None
+                    else EdgeWeighting(
+                        stored=matrix.stored_values(entries=edge_entries, padding=0.0),
+                        combination=combination,
+                    )
+                ),
+            )
+            for matrix in (sparse, block)
+        ]
+        np.testing.assert_allclose(results[1], results[0])
+
+
+def test_gradients_of_block_reduction_are_those_of_the_sparse_reduction(
+    sums_of_a_region_graph: BlockEdgeMatrix,
+):
+    """
+    The gradients of a log-weighted sum with respect to the values of the children and
+    the weights of the edges are those the sparse matrix of the same edges gives.
+    """
+    block = sums_of_a_region_graph
+    sparse = SparseEdgeMatrix.from_edge_positions(
+        rows=block.rows, columns=block.columns, shape=block.shape
+    )
+    generator = np.random.default_rng(1)
+    log_weights = generator.normal(size=block.number_of_edges)
+    values = generator.normal(size=(5, block.shape.number_of_columns))
+
+    def gradients(matrix: BlockEdgeMatrix | SparseEdgeMatrix) -> tuple:
+        """
+        :return: The gradients of the summed reduction by the values and the weights,
+            in double precision.
+        """
+
+        def total(values: jnp.ndarray, log_weights: jnp.ndarray) -> jnp.ndarray:
+            """
+            :return: The sum of the log-weighted sums of all nodes and rows.
+            """
+            return jnp.sum(
+                matrix.reduce_child_values_by_row(
+                    values=values,
+                    reduction=RowReduction.LOG_SUM_EXP,
+                    weighting=EdgeWeighting(
+                        stored=log_weights, combination=RowReduction.SUM
+                    ),
+                )
+            )
+
+        return jax.grad(total, argnums=(0, 1))(
+            jnp.asarray(values), jnp.asarray(log_weights)
+        )
+
+    with jax.enable_x64(True):
+        for expected, result in zip(gradients(sparse), gradients(block)):
+            np.testing.assert_allclose(np.asarray(result), np.asarray(expected))
 
 
 def test_stack_shape_counts_the_blocks_and_their_rows_and_columns(

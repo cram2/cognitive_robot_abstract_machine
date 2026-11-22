@@ -149,6 +149,28 @@ class SparseEntries:
         )
 
 
+# %% edge weighting
+
+
+@dataclass(kw_only=True)
+class EdgeWeighting:
+    """
+    Values along the edges that the value of the child of every edge is joined with
+    before the values along the edges of a node are reduced.
+    """
+
+    stored: BackendArray
+    """
+    The values along the edges, as the edge matrix stores them.
+    """
+
+    combination: RowReduction
+    """
+    The reduction whose :meth:`RowReduction.combine` joins the value of a child with the
+    value of its edge.
+    """
+
+
 # %% edge positions
 
 
@@ -286,6 +308,32 @@ class EdgeMatrix(ABC):
             backend of ``values``.
         """
         raise NotImplementedError
+
+    def reduce_child_values_by_row(
+        self,
+        *,
+        values: BackendArray,
+        reduction: RowReduction,
+        weighting: EdgeWeighting | None = None,
+    ) -> BackendArray:
+        """
+        Combine the values of the children of every node, each first joined with the
+        value of its edge if a weighting is given, giving the identity of the reduction
+        to a node without edges.
+
+        :param values: One value per column, the columns in the last axis.
+        :param reduction: How the values along the edges of a node are combined.
+        :param weighting: The values along the edges and how they join the values of the
+            children.
+        :return: The combined values with the nodes in the last axis, an array of the
+            backend of ``values``.
+        """
+        edge_values = self.values_of_columns(values=values)
+        if weighting is not None:
+            edge_values = weighting.combination.combine(
+                array_namespace(values), edge_values, weighting.stored
+            )
+        return self.reduce_by_row(values=edge_values, reduction=reduction)
 
     @property
     def number_of_edges(self) -> int:
@@ -662,6 +710,35 @@ class EdgeBlockStack:
             self.block_columns, (1, self.stack_shape.rows_per_block)
         ).reshape(-1)
 
+    @functools.cached_property
+    def has_contiguous_columns(self) -> bool:
+        """
+        :return: Whether the columns of all blocks form one range without gaps, those of
+            every block following those of the block before it.
+        """
+        first_column = self.block_columns[0, 0]
+        return bool(
+            np.array_equal(
+                self.block_columns,
+                first_column
+                + np.arange(self.block_columns.size).reshape(self.block_columns.shape),
+            )
+        )
+
+    def block_column_values(self, *, values: BackendArray) -> BackendArray:
+        """
+        :param values: One value per column, the columns in the last axis.
+        :return: The values of the columns of every block, an array of the backend of
+            ``values`` with shape (..., #blocks, #columns of a block).
+        """
+        if not self.has_contiguous_columns:
+            return values[..., self.block_columns]
+        first_column = int(self.block_columns[0, 0])
+        return array_namespace(values).reshape(
+            values[..., first_column : first_column + self.block_columns.size],
+            tuple(values.shape[:-1]) + self.block_columns.shape,
+        )
+
 
 @dataclass(eq=False, kw_only=True)
 class BlockEdgeMatrix(EdgeMatrix):
@@ -818,13 +895,95 @@ class BlockEdgeMatrix(EdgeMatrix):
                     + (stack_shape.number_of_blocks * stack_shape.rows_per_block,),
                 )
             )
-        number_of_reduced = sum(part.shape[-1] for part in reduced)
-        reduced.append(
-            namespace.full(
-                batch_shape + (self.matrix_shape.number_of_rows - number_of_reduced,),
-                reduction.identity,
-                dtype=values.dtype,
-                device=array_api_compat.device(values),
+        return self.nodes_in_order(reduced=reduced, reduction=reduction, values=values)
+
+    def reduce_child_values_by_row(
+        self,
+        *,
+        values: BackendArray,
+        reduction: RowReduction,
+        weighting: EdgeWeighting | None = None,
+    ) -> BackendArray:
+        """
+        Read the values of the children of every block once and broadcast them over its
+        rows, see :meth:`EdgeMatrix.reduce_child_values_by_row`.
+        """
+        namespace = array_namespace(values)
+        batch_shape = tuple(values.shape[:-1])
+        reduced = []
+        for stack in self.stacks:
+            stack_shape = stack.stack_shape
+            children = namespace.expand_dims(
+                stack.block_column_values(values=values), axis=-2
+            )
+            if weighting is not None:
+                children = weighting.combination.combine(
+                    namespace,
+                    children,
+                    namespace.reshape(
+                        weighting.stored[
+                            stack.first_position : stack.first_position
+                            + stack.number_of_edges
+                        ],
+                        stack_shape.to_tuple(),
+                    ),
+                )
+            rows_of_blocks = batch_shape + (
+                stack_shape.number_of_blocks,
+                stack_shape.rows_per_block,
+            )
+            reduced.append(
+                namespace.reshape(
+                    namespace.broadcast_to(
+                        reduction.reduce_last_axis(namespace, children), rows_of_blocks
+                    ),
+                    batch_shape
+                    + (stack_shape.number_of_blocks * stack_shape.rows_per_block,),
+                )
+            )
+        return self.nodes_in_order(reduced=reduced, reduction=reduction, values=values)
+
+    @functools.cached_property
+    def reduces_nodes_in_order(self) -> bool:
+        """
+        :return: Whether reducing the stacks one after another puts every node at its
+            own position already.
+        """
+        return bool(
+            np.array_equal(
+                self.node_positions, np.arange(self.matrix_shape.number_of_rows)
             )
         )
-        return namespace.concat(reduced, axis=-1)[..., self.node_positions]
+
+    def nodes_in_order(
+        self,
+        *,
+        reduced: list[BackendArray],
+        reduction: RowReduction,
+        values: BackendArray,
+    ) -> BackendArray:
+        """
+        :param reduced: The reduced values of the nodes of every stack, the stacks in
+            order.
+        :param reduction: The reduction, whose identity the nodes without edges get.
+        :param values: The values that were reduced.
+        :return: The reduced values of all nodes in the order of the nodes, an array of
+            the backend, type and device of ``values``.
+        """
+        namespace = array_namespace(values)
+        number_without_edges = self.matrix_shape.number_of_rows - sum(
+            part.shape[-1] for part in reduced
+        )
+        if number_without_edges or not reduced:
+            reduced = reduced + [
+                namespace.full(
+                    tuple(values.shape[:-1]) + (number_without_edges,),
+                    reduction.identity,
+                    dtype=values.dtype,
+                    device=array_api_compat.device(values),
+                )
+            ]
+        result = reduced[0] if len(reduced) == 1 else namespace.concat(reduced, axis=-1)
+        if self.reduces_nodes_in_order:
+            return result
+        return result[..., self.node_positions]
