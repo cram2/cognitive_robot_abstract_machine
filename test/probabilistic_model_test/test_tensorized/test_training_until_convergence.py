@@ -6,8 +6,13 @@ trainers raise the log-likelihood of their data that way.
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -532,6 +537,60 @@ def test_steps_on_the_cpu_are_taken_one_by_one_even_if_cuda_graphs_are_asked_for
     )
     for asked_parameter, not_asked_parameter in zip(asked, not_asked):
         np.testing.assert_array_equal(asked_parameter, not_asked_parameter)
+
+
+# %% batches split across devices
+
+
+def split_batch_training(*, devices: int) -> dict:
+    """
+    :param devices: The number of CPU devices jax starts with.
+    :return: What :mod:`split_batch_training` prints, run in a process of its own.
+    """
+    repository = Path(__file__).resolve().parents[3]
+    environment = dict(
+        os.environ,
+        XLA_FLAGS=f"--xla_force_host_platform_device_count={devices}",
+        JAX_PLATFORMS="cpu",
+        JAX_ENABLE_X64="1",
+    )
+    finished = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "test.probabilistic_model_test.test_tensorized.split_batch_training",
+        ],
+        cwd=repository,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(finished.stdout.splitlines()[-1])
+
+
+def test_batches_split_across_devices_train_as_on_one_device():
+    """
+    With four CPU devices, every batch whose rows four divides is split across them and
+    the others run whole on every device; training gives the parameters and losses of
+    training on one device, and the trained parameters are back on one device.
+    """
+    one, four = (split_batch_training(devices=devices) for devices in (1, 4))
+
+    assert (four["devices"], four["devices_of_state"]) == (4, 4)
+    assert four["devices_of_trained_parameters"] == 1
+    np.testing.assert_allclose(four["epoch_losses"], one["epoch_losses"], rtol=1e-12)
+    for split, whole in zip(four["parameters"], one["parameters"]):
+        np.testing.assert_allclose(split, whole, rtol=1e-10, atol=1e-12)
+
+
+def test_the_largest_even_batch_size_is_a_multiple_of_the_devices():
+    """
+    The largest batch size of at most 450 rows that four devices split evenly is 448,
+    and one device splits every batch size evenly.
+    """
+    assert split_batch_training(devices=4)["even_batch_size"] == 448
+    assert split_batch_training(devices=1)["even_batch_size"] == 450
 
 
 # %% training until convergence

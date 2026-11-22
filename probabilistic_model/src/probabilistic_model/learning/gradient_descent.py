@@ -221,6 +221,14 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         """
         raise NotImplementedError
 
+    def largest_even_batch_size(self, *, rows: int) -> int:
+        """
+        :param rows: The most rows a batch may have.
+        :return: The most rows of at most ``rows`` that a step splits evenly across the
+            devices it computes on, ``rows`` itself on one device.
+        """
+        return rows
+
     @abstractmethod
     def probe_step_bytes(self, *, batch: tuple[BackendArray, ...]) -> int:
         """

@@ -13,6 +13,7 @@ import argparse
 import dataclasses
 import functools
 import json
+import math
 import os
 import subprocess
 import sys
@@ -69,6 +70,22 @@ class CompilerVariable(StrEnum):
     ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
     """
     The options of the XLA compiler.
+    """
+
+
+class CompilerOption(StrEnum):
+    """
+    The options of the XLA compiler a run is given.
+    """
+
+    GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL = "--xla_gpu_autotune_level"
+    """
+    How much XLA tunes the kernels it compiles for the GPU.
+    """
+
+    HOST_PLATFORM_DEVICE_COUNT = "--xla_force_host_platform_device_count"
+    """
+    The number of devices jax divides the processor cores into.
     """
 
 
@@ -429,15 +446,30 @@ class BenchmarkRunner:
         )
         print(f"{status} {run.key} {duration}", flush=True)
 
+    def run_environment(self, *, share: MachineShare) -> dict[str, str]:
+        """
+        :param share: The share of the machine a run computes on.
+        :return: The environment of the process of the run, whose jax divides the
+            processor cores of a share without the GPU into as many devices as the
+            largest power of two of at most its number of cores.
+        """
+        environment = share.process_environment(environment=dict(os.environ))
+        # autotuning makes compiling a step take minutes on large batches
+        options = [f"{CompilerOption.GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL}=0"]
+        if share.device is Device.CENTRAL_PROCESSOR:
+            # a power of two splits the batch sizes of the methods evenly
+            devices = 2 ** int(math.log2(len(share.processor_cores)))
+            options.append(f"{CompilerOption.HOST_PLATFORM_DEVICE_COUNT}={devices}")
+        environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = " ".join(
+            options
+        )
+        return environment
+
     def start(self, *, run: BenchmarkRun, share: MachineShare) -> RunInProgress:
         """
         :return: The run, started in a process of its own on the share.
         """
-        environment = share.process_environment(environment=dict(os.environ))
-        # autotuning makes compiling a step take minutes on large batches
-        environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = (
-            "--xla_gpu_autotune_level=0"
-        )
+        environment = self.run_environment(share=share)
         limits = dataclasses.replace(
             self.limits, memory_budget_bytes=share.memory_budget_bytes
         )
