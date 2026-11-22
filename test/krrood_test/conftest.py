@@ -45,6 +45,13 @@ from .dataset import (
     interface_typed_fields,
     single_value_classes,
 )
+from .dataset.throwing_trials import (
+    Court,
+    ReleasePoint,
+    Throw,
+    ThrowMeasurements,
+    ThrowParameters,
+)
 from .dataset.example_classes import (
     KRROODPhysicalObject,
     NotMappedParent,
@@ -100,6 +107,7 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(identity_hashed_values_created_on_access))
     all_classes |= set(classes_of_module(interface_typed_fields))
     all_classes |= {Symbol, Role}
+    all_classes |= {Court, ReleasePoint, Throw, ThrowMeasurements, ThrowParameters}
 
     # remove classes that don't need persistence
     all_classes -= {HasType, HasTypes, ContainsType}

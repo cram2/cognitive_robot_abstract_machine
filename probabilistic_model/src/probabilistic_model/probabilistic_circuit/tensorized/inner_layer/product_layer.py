@@ -13,6 +13,9 @@ from sortedcontainers import SortedSet
 from typing_extensions import Self
 
 from probabilistic_model.probabilistic_model import PartialPointType
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     NodeIndices,
@@ -59,9 +62,9 @@ class ProductLayer(InnerLayer):
     """
     A layer of product units.
 
-    Every node multiplies at most one node of each child layer, so the scope of a node
-    is the union of the scopes of its child layers and its likelihood is the sum of
-    their log-likelihoods. A node of a child layer may be a factor of several nodes.
+    Every node multiplies nodes of its child layers, possibly several of one child
+    layer, so its scope is the union of the scopes of its factors. A node of a child
+    layer may be a factor of several nodes.
     """
 
     @classmethod
@@ -123,7 +126,7 @@ class ProductLayer(InnerLayer):
         """
         :param child_layers: The child layers.
         :param edges: The edges from the nodes of the new layer into the child layers,
-            at most one per node and child layer.
+            at most one per node and child node.
         :param number_of_nodes: The number of nodes of the new layer.
         :param edge_matrix_type: The type of matrix to store the edges in.
         :return: The product layer with these edges.
@@ -134,10 +137,12 @@ class ProductLayer(InnerLayer):
         return cls(
             child_layers,
             edge_matrix_type.from_edge_positions(
-                np.asarray(edges.nodes, dtype=np.int64),
-                offsets[np.asarray(edges.child_layer_indices, dtype=np.int64)]
+                rows=np.asarray(edges.nodes, dtype=np.int64),
+                columns=offsets[np.asarray(edges.child_layer_indices, dtype=np.int64)]
                 + np.asarray(edges.child_nodes, dtype=np.int64),
-                (number_of_nodes, int(offsets[-1])),
+                shape=MatrixShape2D(
+                    number_of_rows=number_of_nodes, number_of_columns=offsets[-1]
+                ),
             ),
         )
 
@@ -198,44 +203,38 @@ class ProductLayer(InnerLayer):
         # the edges of a product layer are structure, not parameters
         return 0
 
+    @property
+    def scope_width(self) -> int:
+        """
+        :return: The number of variables up to the largest index in the scope of this
+            layer, the width of the scopes it compares.
+        """
+        return int(self.variables.max()) + 1 if len(self.variables) else 0
+
     def is_decomposable_of_nodes(self) -> NodeMask:
         """
         A product node is decomposable if no variable is in the scope of more than one
         of its factors.
         """
-        edges = self.inner_layer_edges
-        factors_of_node = np.zeros(
-            (len(self.child_layers), self.number_of_nodes), dtype=np.int64
-        )
-        np.add.at(factors_of_node, (edges.child_layer_indices, edges.nodes), 1)
-        scope_of_child_layer = np.array(
-            [
-                np.isin(self.variables, child_layer.variables)
-                for child_layer in self.child_layers
-            ],
-            dtype=np.int64,
-        )
         # how many factors of every node have every variable in their scope
-        occurrences = factors_of_node.T @ scope_of_child_layer
+        occurrences = np.zeros((self.number_of_nodes, self.scope_width), dtype=np.int64)
+        np.add.at(
+            occurrences,
+            self.inner_layer_edges.nodes,
+            self.scopes_of_edges(width=self.scope_width),
+        )
         return occurrences.max(axis=1, initial=0) <= 1
 
     def products_over(self, variables: VariableIndices) -> NodeMask:
-        edges = self.inner_layer_edges
-        result = np.ones(self.number_of_nodes, dtype=bool)
-        for variable in variables:
-            child_layer_models_variable = np.array(
-                [
-                    variable in child_layer.variables
-                    for child_layer in self.child_layers
-                ],
-                dtype=bool,
-            )
-            models_variable = np.zeros(self.number_of_nodes, dtype=bool)
-            models_variable[
-                edges.nodes[child_layer_models_variable[edges.child_layer_indices]]
-            ] = True
-            result &= models_variable
-        return result
+        """
+        Find the products over all of the variables, see :meth:`Layer.products_over`.
+
+        :param variables: Indices of variables.
+        :return: The nodes whose scope contains every one of the variables.
+        """
+        variables = np.asarray(variables, dtype=np.int64)
+        width = max(self.scope_width, int(variables.max(initial=-1)) + 1)
+        return self.node_scopes(width=width)[:, variables].all(axis=1)
 
     # %% queries
 
@@ -253,25 +252,27 @@ class ProductLayer(InnerLayer):
             backend.
         """
         namespace = array_namespace(*child_results)
-        values = self.edges.values_of_columns(namespace.concat(child_results, axis=-1))
-        return self.edges.reduce_by_row(values, reduction)
+        values = self.edges.values_of_columns(
+            values=namespace.concat(child_results, axis=-1)
+        )
+        return self.edges.reduce_by_row(values=values, reduction=reduction)
 
     @memoized
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
-            child_layer.log_likelihood_of_nodes(events, cache=cache)
+            child_layer.log_likelihood_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
         return self.combine_factors(child_results, RowReduction.SUM)
 
     @memoized
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         child_results = [
-            child_layer.cumulative_distribution_of_nodes(events, cache=cache)
+            child_layer.cumulative_distribution_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
         return self.combine_factors(child_results, RowReduction.PRODUCT)
@@ -279,13 +280,14 @@ class ProductLayer(InnerLayer):
     @memoized
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
     ) -> NodeValues:
         child_results = [
             child_layer.probability_of_simple_event_of_nodes(
-                event, variables, cache=cache
+                event=event, variables=variables, cache=cache
             )
             for child_layer in self.child_layers
         ]
@@ -552,12 +554,14 @@ class ProductLayer(InnerLayer):
             marginal_child = child_layer.marginal(kept, cache=cache)
             if marginal_child is None:
                 continue
-            mask = edges.child_layer_indices == child_layer_index
+            kept_child_nodes = child_layer.nodes_over(kept=kept, cache=cache)
+            of_child = edges.child_layer_indices == child_layer_index
+            of_child[of_child] = kept_child_nodes[edges.child_nodes[of_child]]
             new_edges.append(
                 InnerLayerEdges(
-                    edges.nodes[mask],
-                    np.full(mask.sum(), len(new_child_layers), dtype=np.int64),
-                    edges.child_nodes[mask],
+                    edges.nodes[of_child],
+                    np.full(of_child.sum(), len(new_child_layers), dtype=np.int64),
+                    (np.cumsum(kept_child_nodes) - 1)[edges.child_nodes[of_child]],
                 )
             )
             new_child_layers.append(marginal_child)
@@ -565,10 +569,16 @@ class ProductLayer(InnerLayer):
         if not new_child_layers:
             return None
 
+        kept_nodes = self.nodes_over(kept=kept, cache=cache)
+        joined = InnerLayerEdges.concatenate(new_edges)
         return self.from_edges(
             new_child_layers,
-            InnerLayerEdges.concatenate(new_edges),
-            self.number_of_nodes,
+            InnerLayerEdges(
+                (np.cumsum(kept_nodes) - 1)[joined.nodes],
+                joined.child_layer_indices,
+                joined.child_nodes,
+            ),
+            int(kept_nodes.sum()),
             type(self.edges),
         )
 

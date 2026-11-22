@@ -1,3 +1,8 @@
+"""
+The base of input layers whose nodes are each a Gaussian over several continuous
+variables.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -20,6 +25,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     NodeIndices,
     NodeMask,
     NodeScopeValues,
+    NodeVariableMask,
     SampleArray,
     SampleScopeValues,
     ScopeValues,
@@ -188,7 +194,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
     # %% per node view
 
     @abstractmethod
-    def node_distribution(self, index: int, variables: SortedSet) -> Any:
+    def node_distribution(self, *, index: int, variables: SortedSet) -> Any:
         """
         :param index: The index of a node.
         :param variables: The variables of the circuit.
@@ -196,25 +202,25 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         """
         raise NotImplementedError
 
-    def node_distributions(self, variables: SortedSet) -> list[Any]:
+    def node_distributions(self, *, variables: SortedSet) -> list[Any]:
         """
         :param variables: The variables of the circuit.
         :return: The distribution of every node.
         """
         return [
-            self.node_distribution(index, variables)
+            self.node_distribution(index=index, variables=variables)
             for index in range(self.number_of_nodes)
         ]
 
     @abstractmethod
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
         """
         :param mask: A boolean mask over the nodes of this layer.
         :return: A layer that only holds the selected nodes.
         """
         raise NotImplementedError
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         return np.array_equal(self.mean, other.mean) and np.array_equal(
             self.covariance.lower_triangles, other.covariance.lower_triangles
         )
@@ -226,7 +232,8 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         self, variables: SortedSet, cache: QueryCache | None = None
     ) -> list[Event]:
         return [
-            distribution.support for distribution in self.node_distributions(variables)
+            distribution.support
+            for distribution in self.node_distributions(variables=variables)
         ]
 
     def sample_forward(
@@ -305,7 +312,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         return SumLayer.mixture_of_pieces(pieces)
 
     def type_of_truncated_layer(
-        self, event: SimpleEvent, variables: SortedSet
+        self, *, event: SimpleEvent, variables: SortedSet
     ) -> type[Layer]:
         """
         :param event: A simple event.
@@ -337,10 +344,13 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
     def can_truncate_in_one_batch(
         self, events: list[SimpleEvent], query: StructuralQuery
     ) -> bool:
-        # the truncations are joined with concatenate, which needs them all to be
-        # layers of one Gaussian type
+        """
+        Like :meth:`Layer.can_truncate_in_one_batch`, only if the truncations are all
+        layers of one Gaussian type.
+        """
         types = {
-            self.type_of_truncated_layer(event, query.variables) for event in events
+            self.type_of_truncated_layer(event=event, variables=query.variables)
+            for event in events
         }
         return len(types) == 1 and issubclass(
             types.pop(), AbstractMultivariateGaussianLayer
@@ -362,7 +372,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         layers = [piece.layer for piece in truncated]
         return query.log_probabilities.record(
             LayerWithLogProbabilities(
-                type(layers[0]).concatenate(layers),
+                type(layers[0]).concatenate(layers=layers),
                 np.concatenate([piece.log_probabilities for piece in truncated]),
             )
         )
@@ -398,7 +408,7 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
 
         point_masses = [
             DiracDeltaLayer(
-                int(self.scope[position]),
+                np.full(self.number_of_nodes, self.scope[position], dtype=np.int64),
                 np.full(self.number_of_nodes, value),
                 np.ones(self.number_of_nodes),
             )
@@ -434,7 +444,15 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         alive = needed[id(self)]
         if not alive.any():
             return None
-        return self.select_nodes(alive)
+        return self.select_nodes(mask=alive)
+
+    @memoized
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        result = np.zeros((self.number_of_nodes, width), dtype=bool)
+        result[:, self.scope] = True
+        return result
 
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
@@ -470,10 +488,17 @@ class AbstractMultivariateGaussianLayer(LeafLayer, ABC):
         self.mean = self.mean[:, order]
         self.covariance = self.covariance.marginal(order)
 
-    def apply_translation_own(self, translation: VariableValues):
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
+        """
+        Moves the mean of every node by the translation of its variables.
+        """
         self.mean = self.mean + translation[self.scope]
 
-    def apply_scaling_own(self, scaling: VariableValues):
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
+        """
+        Multiplies the mean of every node by the scaling of its variables and scales its
+        covariance with them.
+        """
         factors = scaling[self.scope]
         self.mean = self.mean * factors
         self.covariance = self.covariance.scaled(factors)

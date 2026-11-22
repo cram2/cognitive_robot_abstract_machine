@@ -1196,7 +1196,9 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
             return []
 
         samples = surface_circuit.sample(amount)
-        samples = samples[np.argsort(surface_circuit.log_likelihood(samples))[::-1]]
+        samples = samples[
+            np.argsort(surface_circuit.log_likelihood(events=samples))[::-1]
+        ]
         samples = np.concatenate((samples, z_coordinate), axis=1)
 
         if category_of_interest:
