@@ -60,6 +60,39 @@ class NodeCountQueryCache(QueryCache):
         return result + self.node_offsets[key]
 
 
+# %% statistics of a batch
+
+
+@dataclass(kw_only=True)
+class BatchStatistics:
+    """
+    What one pass of automatic differentiation learns about the rows of a batch.
+    """
+
+    total_log_likelihood: BackendArray
+    """
+    The sum of the log-likelihoods of the rows, without a gradient.
+    """
+
+    statistics: list[SufficientStatistics]
+    """
+    The sufficient statistics of every learned layer on the rows.
+    """
+
+    def added(self, *, other: BatchStatistics) -> BatchStatistics:
+        """
+        :param other: What a pass learned about other rows.
+        :return: What a pass over the rows of both learns.
+        """
+        return BatchStatistics(
+            total_log_likelihood=self.total_log_likelihood + other.total_log_likelihood,
+            statistics=[
+                own.added(other=others)
+                for own, others in zip(self.statistics, other.statistics)
+            ],
+        )
+
+
 # %% expectation maximization
 
 
