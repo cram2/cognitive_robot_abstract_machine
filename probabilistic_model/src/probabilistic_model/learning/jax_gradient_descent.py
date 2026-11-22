@@ -225,7 +225,7 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
     The learning rate before any reduction, ``None`` without a schedule.
     """
 
-    mesh: Mesh | None = field(init=False, default=None)
+    batch_split_devices: Mesh | None = field(init=False, default=None)
     """
     The :attr:`JaxGradientDescent.training_devices` that the rows of a batch are split
     across and the state is copied to, ``None`` if there is only one.
@@ -243,9 +243,9 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
         self.state = self.gradient_descent.initial_state()
         devices = self.gradient_descent.training_devices
         if len(devices) > 1:
-            self.mesh = Mesh(np.array(devices), (MeshAxis.ROWS,))
+            self.batch_split_devices = Mesh(np.array(devices), (BatchSplitAxis.ROWS,))
             self.state = jax.device_put(
-                self.state, NamedSharding(self.mesh, PartitionSpec())
+                self.state, NamedSharding(self.batch_split_devices, PartitionSpec())
             )
         if self.learning_rate_plateau is None:
             return
@@ -270,18 +270,19 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
     def placed_batch(self, *, batch: tuple[jax.Array, ...]) -> tuple[jax.Array, ...]:
         """
         :param batch: The same rows of every training array.
-        :return: The batch split by rows across :attr:`mesh` if its devices split the
-            rows evenly, whole on every device of it otherwise, and as it is without one.
+        :return: The batch split by rows across :attr:`batch_split_devices` if they
+            split the rows evenly, whole on every one of them otherwise, and as it is
+            without them.
         """
-        if self.mesh is None:
+        if self.batch_split_devices is None:
             return batch
         rows = batch[0].shape[0]
         partition = (
-            PartitionSpec(MeshAxis.ROWS)
-            if rows % self.mesh.size == 0
+            PartitionSpec(BatchSplitAxis.ROWS)
+            if rows % self.batch_split_devices.size == 0
             else PartitionSpec()
         )
-        return jax.device_put(batch, NamedSharding(self.mesh, partition))
+        return jax.device_put(batch, NamedSharding(self.batch_split_devices, partition))
 
     def trained_root(self) -> LayerType:
         return self.gradient_descent.layer.copy_with_circuit_parameters(
@@ -291,12 +292,12 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
         )
 
 
-# %% device mesh
+# %% batch split across devices
 
 
-class MeshAxis(StrEnum):
+class BatchSplitAxis(StrEnum):
     """
-    The named axes of the device mesh training splits batches across.
+    The named axes of the arrangement of devices that training splits batches across.
     """
 
     ROWS = "rows"

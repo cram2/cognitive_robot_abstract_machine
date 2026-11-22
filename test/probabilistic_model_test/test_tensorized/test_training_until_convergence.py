@@ -493,6 +493,24 @@ def torch_parameters_after_training(
     return [parameter.detach().cpu().numpy() for parameter in trainer.parameters]
 
 
+def test_batches_of_the_same_array_shapes_share_their_recorded_step():
+    """
+    Batches whose arrays have the same shapes have one batch shape, which tells them
+    apart from batches of other shapes.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.torch_gradient_descent"
+    )
+    batch_shape = torch_gradient_descent.BatchShape.from_batch
+
+    first = batch_shape(batch=(torch.zeros(100, 3),))
+
+    assert first == batch_shape(batch=(torch.ones(100, 3),))
+    assert hash(first) == hash(batch_shape(batch=(torch.ones(100, 3),)))
+    assert first != batch_shape(batch=(torch.zeros(50, 3),))
+
+
 def test_steps_recorded_as_cuda_graphs_train_as_steps_taken_one_by_one(
     mixture_of_products_case, edge_matrix_type
 ):

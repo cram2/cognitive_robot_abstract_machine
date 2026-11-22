@@ -182,21 +182,21 @@ class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
     The optimizer of the parameters of :attr:`gradient_descent`.
     """
 
-    recorded_steps: dict[tuple[tuple[int, ...], ...], RecordedTrainingStep] = field(
+    recorded_steps: dict[BatchShape, RecordedTrainingStep] = field(
         default_factory=dict, init=False
     )
     """
-    The step on batches of every shape, by the shapes of the arrays of the batch, if
-    :attr:`TorchGradientDescent.replays_recorded_steps`.
+    The step on batches of every shape, if
+    :attr:`TorchGradientDescent.replays_recorded_steps`, by their :class:`BatchShape`.
     """
 
     def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         if not self.gradient_descent.replays_recorded_steps:
             return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
-        shapes = tuple(tuple(array.shape) for array in batch)
-        if shapes not in self.recorded_steps:
-            self.recorded_steps[shapes] = RecordedTrainingStep()
-        return self.recorded_steps[shapes].take(
+        shape = BatchShape.from_batch(batch=batch)
+        if shape not in self.recorded_steps:
+            self.recorded_steps[shape] = RecordedTrainingStep()
+        return self.recorded_steps[shape].take(
             gradient_descent=self.gradient_descent,
             optimizer=self.optimizer,
             batch=batch,
@@ -218,6 +218,26 @@ class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
 
 
 # %% steps recorded as CUDA graphs
+
+
+@dataclass(kw_only=True, frozen=True)
+class BatchShape:
+    """
+    The shapes of the arrays of a batch, which a recorded step only takes batches of.
+    """
+
+    array_shapes: tuple[torch.Size, ...]
+    """
+    The shape of every array of the batch, in the order of the batch.
+    """
+
+    @classmethod
+    def from_batch(cls, *, batch: tuple[torch.Tensor, ...]) -> BatchShape:
+        """
+        :param batch: The same rows of every training array.
+        :return: The shape of ``batch``.
+        """
+        return cls(array_shapes=tuple(array.shape for array in batch))
 
 
 @dataclass(kw_only=True)
