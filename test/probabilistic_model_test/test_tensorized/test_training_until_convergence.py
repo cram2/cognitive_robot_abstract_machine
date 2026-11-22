@@ -45,12 +45,12 @@ class ScriptedLossTraining(MiniBatchTraining):
     epoch.
     """
 
-    losses: list[float]
+    losses: list[float | np.ndarray]
     """
-    The loss each step reports, in order.
+    The loss each step reports, in order, a float or a scalar array.
     """
 
-    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float | np.ndarray:
         return self.losses.pop(0)
 
 
@@ -371,6 +371,68 @@ def test_without_a_batch_size_an_epoch_is_one_batch_of_every_row():
 
     assert len(batches) == 1
     assert sorted(batches[0][0]) == list(rows)
+
+
+# %% losses of an epoch
+
+
+def test_an_epoch_averages_the_losses_of_its_batches_over_their_rows():
+    """
+    The loss of an epoch is the average of the scalar array losses of its batches, each
+    weighted by its number of rows, as a float.
+    """
+    batch_losses = [np.asarray(1.0), np.asarray(4.0), np.asarray(10.0)]
+    training = ScriptedLossTraining(
+        arguments=(np.zeros(5),),
+        mini_batches=MiniBatches(batch_size=2),
+        losses=list(batch_losses),
+    )
+
+    average = training.train_one_epoch()
+
+    assert type(average) is float
+    assert average == pytest.approx(
+        float(2 * batch_losses[0] + 2 * batch_losses[1] + batch_losses[2]) / 5
+    )
+
+
+def test_a_jax_step_reports_its_loss_as_a_jax_array(jax_circuit):
+    """
+    A step of jax training reports the loss of its batch as a jax array.
+    """
+    training = JaxGradientDescent(
+        jax_circuit.root, AverageNegativeLogLikelihood(), optax.adam(1e-2)
+    ).start_training(
+        arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
+        mini_batches=MiniBatches(),
+    )
+
+    assert isinstance(training.step_on_batch(batch=training.arguments), jax.Array)
+
+
+def test_a_torch_step_reports_its_loss_as_a_tensor(mixture_of_products_case):
+    """
+    A step of torch training reports the loss of its batch as a tensor without a
+    gradient.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.torch_gradient_descent"
+    )
+    circuit = mixture_of_products_case.circuit(np).to_namespace(
+        array_namespace(torch.zeros(0))
+    )
+    training = torch_gradient_descent.TorchGradientDescent(
+        circuit.root, AverageNegativeLogLikelihood(), learning_rate=0.1
+    ).start_training(
+        arguments=(torch.zeros((1, len(circuit.variables)), dtype=torch.float64),),
+        mini_batches=MiniBatches(),
+    )
+
+    loss = training.step_on_batch(batch=training.arguments)
+
+    assert isinstance(loss, torch.Tensor)
+    assert not loss.requires_grad
 
 
 # %% training until convergence

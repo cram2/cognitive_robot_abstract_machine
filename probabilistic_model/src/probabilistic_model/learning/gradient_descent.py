@@ -239,7 +239,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         training = self.start_training(arguments=arguments, mini_batches=MiniBatches())
         progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
         for _ in progress_bar:
-            loss = training.step_on_batch(batch=arguments)
+            loss = float(training.step_on_batch(batch=arguments))
             progress_bar.set_postfix_str(f"Loss: {loss}")
         return training.trained_root()
 

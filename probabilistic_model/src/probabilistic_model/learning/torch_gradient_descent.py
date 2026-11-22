@@ -103,14 +103,15 @@ class TorchGradientDescent(GradientDescent[LayerType]):
 
     def step(
         self, *, optimizer: torch.optim.Optimizer, arguments: tuple[torch.Tensor, ...]
-    ) -> float:
+    ) -> torch.Tensor:
         """
         Update the parameters by one optimizer step and project them onto valid
         parameters.
 
         :param optimizer: The optimizer of :attr:`parameters`.
         :param arguments: The tensors the :attr:`loss` takes after the circuit.
-        :return: The loss of the parameters before the step.
+        :return: The loss of the parameters before the step, a scalar tensor without a
+            gradient on the device of the parameters.
         """
         optimizer.zero_grad()
         loss = self.loss.evaluate(
@@ -126,7 +127,7 @@ class TorchGradientDescent(GradientDescent[LayerType]):
             projected = self.layer.projected_circuit_parameters(self.parameters)
             for parameter, valid in zip(self.parameters, projected):
                 parameter.copy_(valid)
-        return loss.item()
+        return loss.detach()
 
 
 # %% training on mini-batches
@@ -148,7 +149,7 @@ class TorchGradientDescentTraining(GradientDescentTraining[LayerType]):
     The optimizer of the parameters of :attr:`gradient_descent`.
     """
 
-    def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> float:
+    def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
 
     def scale_learning_rate(self, *, scale: float) -> None:

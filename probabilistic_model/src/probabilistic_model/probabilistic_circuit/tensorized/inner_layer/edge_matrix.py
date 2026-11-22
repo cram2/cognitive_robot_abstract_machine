@@ -7,6 +7,7 @@ reductions that combine values along the edges of every node.
 from __future__ import annotations
 
 import functools
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
@@ -20,6 +21,9 @@ from typing_extensions import Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
     MatrixShape2D,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.gradient_stop import (
+    GradientStop,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -96,18 +100,41 @@ class RowReduction(Enum):
             case RowReduction.PRODUCT:
                 return namespace.prod(values, axis=-1)
             case RowReduction.LOG_SUM_EXP:
-                largest = namespace.max(values, axis=-1, keepdims=True)
-                # a row of only -inf has no finite value to shift by and sums to zero,
-                # whose logarithm is taken of one instead to keep it free of warnings
-                shift = namespace.where(namespace.isfinite(largest), largest, 0.0)
+                shift = self.finite_largest_value(values=values)
                 total = namespace.sum(namespace.exp(values - shift), axis=-1)
-                has_mass = total > 0.0
-                return namespace.where(
-                    has_mass,
-                    namespace.log(namespace.where(has_mass, total, 1.0))
-                    + namespace.squeeze(shift, axis=-1),
-                    -np.inf,
+                return self.shifted_logarithm(
+                    total=total, shift=namespace.squeeze(shift, axis=-1)
                 )
+
+    @staticmethod
+    def finite_largest_value(*, values: BackendArray) -> BackendArray:
+        """
+        :param values: Logarithms of values to add up along the last axis.
+        :return: The largest value along the last axis, kept as an axis of length one,
+            or zero where every value is ``-inf``, a constant of automatic
+            differentiation, as subtracting it and adding it back cancels out.
+        """
+        namespace = array_namespace(values)
+        largest = namespace.max(values, axis=-1, keepdims=True)
+        return GradientStop.from_arrays(values).stop_gradient(
+            values=namespace.where(namespace.isfinite(largest), largest, 0.0)
+        )
+
+    @staticmethod
+    def shifted_logarithm(*, total: BackendArray, shift: BackendArray) -> BackendArray:
+        """
+        :param total: Non-negative sums of the exponentials of values minus ``shift``.
+        :param shift: What was subtracted from the logarithms before they were summed.
+        :return: The logarithm of the sums plus ``shift``, ``-inf`` where a sum is zero.
+        """
+        # a zero total's logarithm is taken of one instead to keep it free of warnings
+        namespace = array_namespace(total, shift)
+        has_mass = total > 0.0
+        return namespace.where(
+            has_mass,
+            namespace.log(namespace.where(has_mass, total, 1.0)) + shift,
+            -np.inf,
+        )
 
 
 # %% sparse entries
@@ -653,6 +680,145 @@ class EdgeBlockStackShape:
 
 
 @dataclass(kw_only=True)
+class CrossProductRanges:
+    """
+    Groups of equally long ranges of columns, one group after another without gaps,
+    whose blocks each have one row that combines one column of every range of a group,
+    every combination once.
+    """
+
+    first_column: int
+    """
+    The first column of the first range of the first group.
+    """
+
+    number_of_groups: int
+    """
+    The number of groups of ranges.
+    """
+
+    ranges_per_group: int
+    """
+    The number of ranges in every group, the columns every block combines.
+    """
+
+    columns_per_range: int
+    """
+    The number of columns of every range.
+    """
+
+    @property
+    def number_of_columns(self) -> int:
+        """
+        :return: The number of columns of all ranges together.
+        """
+        return self.number_of_groups * self.ranges_per_group * self.columns_per_range
+
+    @property
+    def combinations_per_group(self) -> int:
+        """
+        :return: The number of blocks of every group.
+        """
+        return self.columns_per_range**self.ranges_per_group
+
+    @property
+    def block_columns(self) -> npt.NDArray[np.int64]:
+        """
+        :return: The columns of every block, shape (#blocks, :attr:`ranges_per_group`),
+            the blocks in the order of their group and then of their columns.
+        """
+        grids = np.meshgrid(
+            *[np.arange(self.columns_per_range)] * self.ranges_per_group, indexing="ij"
+        )
+        offsets = np.stack(
+            [
+                range_index * self.columns_per_range + grid.reshape(-1)
+                for range_index, grid in enumerate(grids)
+            ],
+            axis=-1,
+        )
+        group_starts = (
+            self.first_column
+            + np.arange(self.number_of_groups)
+            * self.ranges_per_group
+            * self.columns_per_range
+        )
+        return (group_starts[:, None, None] + offsets[None]).reshape(
+            -1, self.ranges_per_group
+        )
+
+    @classmethod
+    def from_block_columns(
+        cls, *, block_columns: npt.NDArray[np.int64]
+    ) -> CrossProductRanges | None:
+        """
+        :param block_columns: The columns of every block of one row, shape (#blocks,
+            #columns of a block).
+        :return: The ranges of at least two columns whose cross products the blocks
+            are, in the order of :attr:`block_columns`, or ``None`` if they are none.
+        """
+        number_of_blocks, ranges_per_group = block_columns.shape
+        if ranges_per_group < 2:
+            return None
+        first_column = int(block_columns.min())
+        width = int(block_columns.max()) - first_column + 1
+        columns_per_range = round(
+            (number_of_blocks * ranges_per_group / width)
+            ** (1 / (ranges_per_group - 1))
+        )
+        if columns_per_range < 2 or width % (ranges_per_group * columns_per_range):
+            return None
+        candidate = cls(
+            first_column=first_column,
+            number_of_groups=width // (ranges_per_group * columns_per_range),
+            ranges_per_group=ranges_per_group,
+            columns_per_range=columns_per_range,
+        )
+        if (
+            candidate.number_of_groups * candidate.combinations_per_group
+            != number_of_blocks
+            or not np.array_equal(candidate.block_columns, block_columns)
+        ):
+            return None
+        return candidate
+
+    def combine_ranges(
+        self, *, values: BackendArray, reduction: RowReduction
+    ) -> BackendArray:
+        """
+        :param values: One value per column, the columns in the last axis.
+        :param reduction: How the values of the columns of a block are combined.
+        :return: The combined values of every block in the order of
+            :attr:`block_columns`, in the last axis.
+        """
+        namespace = array_namespace(values)
+        batch_shape = tuple(values.shape[:-1])
+        ranges = namespace.reshape(
+            values[..., self.first_column : self.first_column + self.number_of_columns],
+            batch_shape
+            + (self.number_of_groups, self.ranges_per_group, self.columns_per_range),
+        )
+        combined = ranges[..., 0, :]
+        for range_index in range(1, self.ranges_per_group):
+            combined = namespace.reshape(
+                reduction.combine(
+                    namespace,
+                    namespace.expand_dims(combined, axis=-1),
+                    namespace.expand_dims(ranges[..., range_index, :], axis=-2),
+                ),
+                batch_shape
+                + (
+                    self.number_of_groups,
+                    self.columns_per_range ** (range_index + 1),
+                ),
+            )
+        return namespace.reshape(
+            combined,
+            batch_shape + (self.number_of_groups * self.combinations_per_group,),
+        )
+
+
+@dataclass(kw_only=True)
 class EdgeBlockStack:
     """
     Full blocks of one shape of an edge matrix: every row of a block has an edge to
@@ -737,6 +903,149 @@ class EdgeBlockStack:
         return array_namespace(values).reshape(
             values[..., first_column : first_column + self.block_columns.size],
             tuple(values.shape[:-1]) + self.block_columns.shape,
+        )
+
+    @functools.cached_property
+    def cross_product_ranges(self) -> CrossProductRanges | None:
+        """
+        :return: The ranges whose cross products the blocks of this stack are, ``None``
+            if a block has several rows or the blocks are no such cross products.
+        """
+        if self.stack_shape.rows_per_block != 1:
+            return None
+        return CrossProductRanges.from_block_columns(block_columns=self.block_columns)
+
+    def reduce_child_values_by_row(
+        self,
+        *,
+        values: BackendArray,
+        reduction: RowReduction,
+        weighting: EdgeWeighting | None = None,
+    ) -> BackendArray:
+        """
+        :meth:`EdgeMatrix.reduce_child_values_by_row` for the rows of this stack only.
+
+        :return: The combined values of the rows of every block, block by block, in the
+            last axis.
+        """
+        namespace = array_namespace(values)
+        batch_shape = tuple(values.shape[:-1])
+        shape = self.stack_shape
+        if weighting is None and self.cross_product_ranges is not None:
+            return self.cross_product_ranges.combine_ranges(
+                values=values, reduction=reduction
+            )
+        children = self.block_column_values(values=values)
+        if weighting is None:
+            combined = namespace.broadcast_to(
+                namespace.expand_dims(
+                    reduction.reduce_last_axis(namespace, children), axis=-1
+                ),
+                batch_shape + (shape.number_of_blocks, shape.rows_per_block),
+            )
+        else:
+            combined = self.weighted_reduction(
+                children=children,
+                edge_values=namespace.reshape(
+                    weighting.stored[
+                        self.first_position : self.first_position + self.number_of_edges
+                    ],
+                    shape.to_tuple(),
+                ),
+                reduction=reduction,
+                combination=weighting.combination,
+            )
+        return namespace.reshape(
+            combined,
+            batch_shape + (shape.number_of_blocks * shape.rows_per_block,),
+        )
+
+    def weighted_reduction(
+        self,
+        *,
+        children: BackendArray,
+        edge_values: BackendArray,
+        reduction: RowReduction,
+        combination: RowReduction,
+    ) -> BackendArray:
+        """
+        :param children: The values of the columns of every block, shape (...,
+            #blocks, #columns of a block).
+        :param edge_values: The value of every edge, the shape of this stack.
+        :param reduction: How the joined values along the edges of a row are combined.
+        :param combination: How the value of a child joins the value of its edge.
+        :return: The combined values of every row, shape (..., #blocks, #rows of a
+            block).
+        """
+        namespace = array_namespace(children)
+        match reduction, combination:
+            case RowReduction.SUM, RowReduction.PRODUCT:
+                return self.weighted_sums(children=children, weights=edge_values)
+            case RowReduction.LOG_SUM_EXP, RowReduction.SUM:
+                return self.log_weighted_sums(
+                    children=children, log_weights=edge_values
+                )
+        return reduction.reduce_last_axis(
+            namespace,
+            combination.combine(
+                namespace, namespace.expand_dims(children, axis=-2), edge_values
+            ),
+        )
+
+    def weighted_sums(
+        self, *, children: BackendArray, weights: BackendArray
+    ) -> BackendArray:
+        """
+        :param children: The values of the columns of every block, shape (...,
+            #blocks, #columns of a block).
+        :param weights: The weight of every edge, the shape of this stack.
+        :return: The sum of the weighted values of the children of every row, shape
+            (..., #blocks, #rows of a block).
+        """
+        namespace = array_namespace(children)
+        batch_shape = tuple(children.shape[:-2])
+        number_of_blocks, rows_per_block, columns_per_block = (
+            self.stack_shape.to_tuple()
+        )
+        blocks_first = namespace.permute_dims(
+            namespace.reshape(
+                children,
+                (math.prod(batch_shape), number_of_blocks, columns_per_block),
+            ),
+            (1, 0, 2),
+        )
+        sums = namespace.matmul(
+            blocks_first, namespace.permute_dims(weights, (0, 2, 1))
+        )
+        return namespace.reshape(
+            namespace.permute_dims(sums, (1, 0, 2)),
+            batch_shape + (number_of_blocks, rows_per_block),
+        )
+
+    def log_weighted_sums(
+        self, *, children: BackendArray, log_weights: BackendArray
+    ) -> BackendArray:
+        """
+        :param children: The logarithms of the values of the columns of every block,
+            shape (..., #blocks, #columns of a block).
+        :param log_weights: The logarithm of the weight of every edge, the shape of
+            this stack.
+        :return: The logarithm of the sum of the weighted values of the children of
+            every row, shape (..., #blocks, #rows of a block).
+
+        .. warning::
+            A row whose children and weights both spread over more than the exponent
+            range of their floating point type can come out as ``-inf``.
+        """
+        namespace = array_namespace(children)
+        child_shift = RowReduction.finite_largest_value(values=children)
+        weight_shift = RowReduction.finite_largest_value(values=log_weights)
+        total = self.weighted_sums(
+            children=namespace.exp(children - child_shift),
+            weights=namespace.exp(log_weights - weight_shift),
+        )
+        return RowReduction.shifted_logarithm(
+            total=total, shift=child_shift + namespace.squeeze(weight_shift, axis=-1)
         )
 
 
@@ -905,43 +1214,19 @@ class BlockEdgeMatrix(EdgeMatrix):
         weighting: EdgeWeighting | None = None,
     ) -> BackendArray:
         """
-        Read the values of the children of every block once and broadcast them over its
-        rows, see :meth:`EdgeMatrix.reduce_child_values_by_row`.
+        Read the values of the children of every block once and combine them one stack
+        at a time, see :meth:`EdgeMatrix.reduce_child_values_by_row`.
         """
-        namespace = array_namespace(values)
-        batch_shape = tuple(values.shape[:-1])
-        reduced = []
-        for stack in self.stacks:
-            stack_shape = stack.stack_shape
-            children = namespace.expand_dims(
-                stack.block_column_values(values=values), axis=-2
-            )
-            if weighting is not None:
-                children = weighting.combination.combine(
-                    namespace,
-                    children,
-                    namespace.reshape(
-                        weighting.stored[
-                            stack.first_position : stack.first_position
-                            + stack.number_of_edges
-                        ],
-                        stack_shape.to_tuple(),
-                    ),
+        return self.nodes_in_order(
+            reduced=[
+                stack.reduce_child_values_by_row(
+                    values=values, reduction=reduction, weighting=weighting
                 )
-            rows_of_blocks = batch_shape + (
-                stack_shape.number_of_blocks,
-                stack_shape.rows_per_block,
-            )
-            reduced.append(
-                namespace.reshape(
-                    namespace.broadcast_to(
-                        reduction.reduce_last_axis(namespace, children), rows_of_blocks
-                    ),
-                    batch_shape
-                    + (stack_shape.number_of_blocks * stack_shape.rows_per_block,),
-                )
-            )
-        return self.nodes_in_order(reduced=reduced, reduction=reduction, values=values)
+                for stack in self.stacks
+            ],
+            reduction=reduction,
+            values=values,
+        )
 
     @functools.cached_property
     def reduces_nodes_in_order(self) -> bool:

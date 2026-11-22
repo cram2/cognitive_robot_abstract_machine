@@ -15,6 +15,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
+    CrossProductRanges,
     EdgeBlockStackShape,
     EdgeWeighting,
     RowReduction,
@@ -170,6 +171,7 @@ def test_blocks_of_consecutive_regions_have_contiguous_columns(
 )
 def test_block_reduction_of_child_values_is_the_sparse_reduction(
     sums_of_a_region_graph: BlockEdgeMatrix,
+    products_of_three_ranges: BlockEdgeMatrix,
     rows_of_two_blocks_and_a_row_without_edges: SparseEntries,
     reduction: RowReduction,
     combination: RowReduction | None,
@@ -177,7 +179,7 @@ def test_block_reduction_of_child_values_is_the_sparse_reduction(
     """
     Reducing the values of the children of every node, weighted by the values of their
     edges or not, gives what the sparse matrix of the same edges gives, whether the
-    columns of the blocks are contiguous or not.
+    columns of the blocks are contiguous, scattered or the cross products of ranges.
     """
     entries = rows_of_two_blocks_and_a_row_without_edges
     scattered = BlockEdgeMatrix.from_edge_positions(
@@ -186,7 +188,7 @@ def test_block_reduction_of_child_values_is_the_sparse_reduction(
         shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
     )
     generator = np.random.default_rng(0)
-    for block in (scattered, sums_of_a_region_graph):
+    for block in (scattered, sums_of_a_region_graph, products_of_three_ranges):
         sparse = SparseEdgeMatrix.from_edge_positions(
             rows=block.rows, columns=block.columns, shape=block.shape
         )
@@ -254,6 +256,151 @@ def test_gradients_of_block_reduction_are_those_of_the_sparse_reduction(
     with jax.enable_x64(True):
         for expected, result in zip(gradients(sparse), gradients(block)):
             np.testing.assert_allclose(np.asarray(result), np.asarray(expected))
+
+
+# %% cross products of ranges
+
+
+def cross_product_edges(*, ranges: CrossProductRanges) -> BlockEdgeMatrix:
+    """
+    :param ranges: The ranges whose cross products the rows are.
+    :return: The matrix with one row per combination of one column of every range of a
+        group, the rows in the order of the groups and the combinations, two columns
+        before the first range that no row has an edge to.
+    """
+    block_columns = ranges.block_columns
+    number_of_blocks, ranges_per_group = block_columns.shape
+    return BlockEdgeMatrix.from_edge_positions(
+        rows=np.repeat(np.arange(number_of_blocks), ranges_per_group),
+        columns=block_columns.reshape(-1),
+        shape=MatrixShape2D(
+            number_of_rows=number_of_blocks,
+            number_of_columns=ranges.first_column + ranges.number_of_columns,
+        ),
+    )
+
+
+@pytest.fixture
+def products_of_three_ranges() -> BlockEdgeMatrix:
+    """
+    Two groups of three ranges of two columns, every row the product of one column of
+    every range of its group.
+    """
+    return cross_product_edges(
+        ranges=CrossProductRanges(
+            first_column=2, number_of_groups=2, ranges_per_group=3, columns_per_range=2
+        )
+    )
+
+
+def test_cross_products_of_ranges_list_every_combination_in_order():
+    """
+    The columns of the blocks of two groups of two ranges of two columns combine every
+    column of the first range of a group with every column of its second range.
+    """
+    ranges = CrossProductRanges(
+        first_column=1, number_of_groups=2, ranges_per_group=2, columns_per_range=2
+    )
+    assert ranges.block_columns.tolist() == [
+        [1, 3],
+        [1, 4],
+        [2, 3],
+        [2, 4],
+        [5, 7],
+        [5, 8],
+        [6, 7],
+        [6, 8],
+    ]
+
+
+@pytest.mark.parametrize("ranges_per_group", [2, 3])
+def test_rows_that_combine_every_column_of_ranges_are_found_as_cross_products(
+    ranges_per_group: int,
+):
+    """
+    A stack of single rows that combine one column of every range of a group, every
+    combination once, reports those ranges.
+    """
+    ranges = CrossProductRanges(
+        first_column=2,
+        number_of_groups=3,
+        ranges_per_group=ranges_per_group,
+        columns_per_range=4,
+    )
+    [stack] = cross_product_edges(ranges=ranges).stacks
+    assert stack.cross_product_ranges == ranges
+
+
+def test_blocks_that_are_not_cross_products_report_none(
+    sums_of_a_region_graph: BlockEdgeMatrix,
+    rows_of_two_blocks_and_a_row_without_edges: SparseEntries,
+):
+    """
+    Blocks of several rows, single rows whose columns skip some of their range or miss a
+    combination, and a single row of many columns are no cross products of ranges.
+    """
+    entries = rows_of_two_blocks_and_a_row_without_edges
+    scattered = BlockEdgeMatrix.from_edge_positions(
+        rows=entries.rows,
+        columns=entries.columns,
+        shape=MatrixShape2D(number_of_rows=5, number_of_columns=5),
+    )
+    incomplete = BlockEdgeMatrix.from_edge_positions(
+        rows=np.array([0, 0, 1, 1, 2, 2]),
+        columns=np.array([0, 2, 0, 3, 1, 2]),
+        shape=MatrixShape2D(number_of_rows=3, number_of_columns=4),
+    )
+    one_wide_row = BlockEdgeMatrix.from_edge_positions(
+        rows=np.zeros(100, dtype=np.int64),
+        columns=np.arange(100),
+        shape=MatrixShape2D(number_of_rows=1, number_of_columns=100),
+    )
+    stacks = (
+        sums_of_a_region_graph.stacks
+        + scattered.stacks
+        + incomplete.stacks
+        + one_wide_row.stacks
+    )
+    assert [stack.cross_product_ranges for stack in stacks] == [None] * len(stacks)
+
+
+# %% log-weighted sums of impossible values
+
+
+def test_log_weighted_sums_of_impossible_children_or_edges_are_impossible(
+    sums_of_a_region_graph: BlockEdgeMatrix,
+):
+    """
+    A log-weighted sum whose children or edges all have zero probability has zero
+    probability, and one with some impossible children or edges the sum of the rest, as
+    the sparse matrix of the same edges gives.
+    """
+    block = sums_of_a_region_graph
+    sparse = SparseEdgeMatrix.from_edge_positions(
+        rows=block.rows, columns=block.columns, shape=block.shape
+    )
+    generator = np.random.default_rng(2)
+    log_weights = generator.normal(size=block.number_of_edges)
+    log_weights[: 2 * 9] = -np.inf
+    log_weights[2 * 9 + 3] = -np.inf
+    values = generator.normal(size=(2, block.shape.number_of_columns))
+    values[0, 9:18] = -np.inf
+    values[1, 20] = -np.inf
+    results = [
+        matrix.reduce_child_values_by_row(
+            values=values,
+            reduction=RowReduction.LOG_SUM_EXP,
+            weighting=EdgeWeighting(
+                stored=matrix.stored_values(
+                    entries=SparseEntries(log_weights, block.rows, block.columns),
+                    padding=-np.inf,
+                ),
+                combination=RowReduction.SUM,
+            ),
+        )
+        for matrix in (sparse, block)
+    ]
+    np.testing.assert_allclose(results[1], results[0])
 
 
 def test_stack_shape_counts_the_blocks_and_their_rows_and_columns(

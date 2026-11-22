@@ -222,9 +222,9 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
             self.initial_learning_rate * scale
         )
 
-    def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> float:
+    def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> jax.Array:
         self.state = self.compiled_step(self.state, *batch)
-        return float(self.state.loss)
+        return self.state.loss
 
     def trained_root(self) -> LayerType:
         return self.gradient_descent.layer.copy_with_circuit_parameters(
