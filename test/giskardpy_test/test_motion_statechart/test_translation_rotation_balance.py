@@ -379,6 +379,9 @@ def test_pr2_translation_rotation_balance(
 def test_tracy_translation_rotation_balance(
     tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
 ) -> None:
+    """
+    Tracy's right arm, starting elbow-up, reaches every offset pose goal.
+    """
     world = tracy_world_copy
     JointState.from_str_dict(tracy_arm_pose, world=world).apply_to(world)
     tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")

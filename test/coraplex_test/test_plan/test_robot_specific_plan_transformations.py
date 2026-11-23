@@ -827,9 +827,8 @@ def test_a_simulated_stretch_facing_away_fails_to_reach_rather_than_turning(
     Turning to bring a target into reach sweeps the base through wide arcs, so a Stretch
     whose arm points away from the milk fails to reach it instead.
 
-    Straining towards the milk bends the held heading by less than a degree, far from
-    the turn reaching it would take, and drives the retracted arm into its position
-    limits.
+    Straining towards the milk bends the heading by under a degree and drives the
+    retracted arm into its position limits.
     """
     world, robot, extensions = stretch_apartment_context
     executor, action, recording = stretch_reaching_milk_from(

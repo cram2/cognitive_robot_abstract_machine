@@ -16,9 +16,10 @@ from ..orm_interface_build import regenerate_orm_interfaces
 regenerate_orm_interfaces(OrmPackage.GISKARDPY)
 
 
-from copy import deepcopy
+# Below the ORM build at the top of this module, which has to run first.
+from copy import deepcopy  # noqa: E402
 
-import numpy as np
+import numpy as np  # noqa: E402
 import pytest
 
 from giskardpy.middleware.ros2.giskard_tester import GiskardTester
@@ -52,7 +53,7 @@ from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
+from semantic_digital_twin.robots.tracy import Tracy, TracyJoint  # noqa: E402
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
