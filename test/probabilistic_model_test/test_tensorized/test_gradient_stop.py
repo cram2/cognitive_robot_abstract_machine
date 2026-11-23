@@ -27,7 +27,7 @@ def test_numpy_arrays_get_the_gradient_stop_that_keeps_them():
     values as they are.
     """
     values = np.array([1.0, -2.0])
-    stop = GradientStop.from_arrays(values)
+    stop = GradientStop.from_arrays(arrays=[values])
     assert type(stop) is GradientStop
     assert stop.stop_gradient(values=values) is values
 
@@ -36,7 +36,7 @@ def test_jax_arrays_get_the_jax_gradient_stop():
     """
     Jax arrays select the gradient stop of jax.
     """
-    assert isinstance(GradientStop.from_arrays(jnp.zeros(2)), JaxGradientStop)
+    assert isinstance(GradientStop.from_arrays(arrays=[jnp.zeros(2)]), JaxGradientStop)
 
 
 def test_torch_tensors_get_the_torch_gradient_stop():
@@ -44,7 +44,9 @@ def test_torch_tensors_get_the_torch_gradient_stop():
     Torch tensors select the gradient stop of torch.
     """
     torch = pytest.importorskip("torch")
-    assert isinstance(GradientStop.from_arrays(torch.zeros(2)), TorchGradientStop)
+    assert isinstance(
+        GradientStop.from_arrays(arrays=[torch.zeros(2)]), TorchGradientStop
+    )
 
 
 # %% stopped values have no gradient
@@ -61,7 +63,7 @@ def test_stopped_jax_values_have_no_gradient():
         """
         :return: The sum of the stopped values times the values.
         """
-        return jnp.sum(GradientStop.from_arrays(x).stop_gradient(values=x) * x)
+        return jnp.sum(GradientStop.from_arrays(arrays=[x]).stop_gradient(values=x) * x)
 
     np.testing.assert_allclose(np.asarray(jax.grad(total)(values)), np.asarray(values))
 
@@ -75,6 +77,6 @@ def test_stopped_torch_values_have_no_gradient():
     values = torch.tensor([1.0, -2.0, 0.5], requires_grad=True)
     namespace = array_namespace(values)
     namespace.sum(
-        GradientStop.from_arrays(values).stop_gradient(values=values) * values
+        GradientStop.from_arrays(arrays=[values]).stop_gradient(values=values) * values
     ).backward()
     np.testing.assert_allclose(values.grad.numpy(), values.detach().numpy())

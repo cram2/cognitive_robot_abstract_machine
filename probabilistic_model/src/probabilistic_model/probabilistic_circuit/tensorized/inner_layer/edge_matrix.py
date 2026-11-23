@@ -119,7 +119,7 @@ class RowReduction(Enum):
         """
         namespace = array_namespace(values)
         largest = namespace.max(values, axis=-1, keepdims=True)
-        return GradientStop.from_arrays(values).stop_gradient(
+        return GradientStop.from_arrays(arrays=[values]).stop_gradient(
             values=namespace.where(namespace.isfinite(largest), largest, 0.0)
         )
 

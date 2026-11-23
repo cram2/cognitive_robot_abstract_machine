@@ -17,6 +17,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import optax
 from krrood.adapters.json_serializer import to_json
 from random_events.variable import Continuous
@@ -67,7 +68,7 @@ class SplitBatchTrainingResult:
     The average loss of every epoch.
     """
 
-    parameters: list[np.ndarray]
+    parameters: list[npt.NDArray[np.float64]]
     """
     The parameters of the trained circuit.
     """
