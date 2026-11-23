@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
-from krrood.adapters import json_serializer
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
@@ -68,7 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
+class Layer(DataclassDeepcopyMixin, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
@@ -114,6 +112,15 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         :return: The number of parameters stored in this layer alone.
         """
         raise NotImplementedError
+
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :return: Whether a training step through this layer copies nothing from the
+            host to the device of its parameters, as recording the step as a CUDA graph
+            requires.
+        """
+        return False
 
     def validate(self):
         """
@@ -747,46 +754,6 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.number_of_nodes})"
-
-    # %% serialization
-
-    @classmethod
-    def serialized_fields(cls) -> list[dataclasses.Field]:
-        """
-        :return: The dataclass fields that describe a layer, which are the ones its
-            constructor takes. The caches a layer fills in on its own are declared with
-            ``init=False`` and are left out.
-        """
-        return [field_ for field_ in dataclasses.fields(cls) if field_.init]
-
-    def to_json(self, **kwargs) -> dict[str, Any]:
-        """
-        Serialize this layer through the fields it declares.
-
-        The parameter arrays, the child layers and the sparse edge and weight blocks are
-        all types that :mod:`krrood.adapters.json_serializer` serializes generically, so
-        a layer type is serializable by declaring its fields and none of them has to
-        write a method per field.
-
-        :param kwargs: Keyword arguments to hand on to the nested ``to_json`` calls.
-        :return: The JSON dict.
-        """
-        result = super().to_json(**kwargs)
-        for field_ in self.serialized_fields():
-            result[field_.name] = json_serializer.to_json(
-                getattr(self, field_.name), **kwargs
-            )
-        return result
-
-    @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        return cls(
-            **{
-                field_.name: json_serializer.from_json(data[field_.name], **kwargs)
-                for field_ in cls.serialized_fields()
-                if field_.name in data
-            }
-        )
 
 
 @dataclass(eq=False, repr=False)
