@@ -25,7 +25,7 @@ from array_api_compat import array_namespace
 from random_events.set import Set
 from random_events.variable import Continuous, Integer, Symbolic
 from sortedcontainers import SortedSet
-from krrood.adapters.json_serializer import DataclassJSONSerializer
+from krrood.adapters.json_serializer import from_json
 
 from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
@@ -64,7 +64,7 @@ from .test_circuit_parameters_and_training import (
     minimum_improvement,
     parameters_shifted,
 )
-from .split_batch_training import SplitBatchTrainingResult
+from .split_batch_training_result import SplitBatchTrainingResult
 # %% convergence criterion
 
 
@@ -721,9 +721,7 @@ def split_batch_training(*, devices: int, output: Path) -> SplitBatchTrainingRes
         env=environment,
         check=True,
     )
-    return DataclassJSONSerializer.from_json(
-        data=json.loads(output.read_text()), clazz=SplitBatchTrainingResult
-    )
+    return from_json(json.loads(output.read_text()))
 
 
 def test_batches_split_across_devices_train_as_on_one_device(tmp_path: Path):

@@ -11,13 +11,11 @@ from __future__ import annotations
 # %% imports
 import argparse
 import json
-from dataclasses import dataclass
 from pathlib import Path
 
 import jax
 import jax.numpy as jnp
 import numpy as np
-import numpy.typing as npt
 import optax
 from krrood.adapters.json_serializer import to_json
 from random_events.variable import Continuous
@@ -32,47 +30,8 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matri
     BlockEdgeMatrix,
 )
 
+from .split_batch_training_result import SplitBatchTrainingResult
 from .test_inner_layers_on_array_backends import MixtureOfProductsCase
-
-# %% result
-
-
-@dataclass(kw_only=True)
-class SplitBatchTrainingResult:
-    """
-    What training on mini-batches gave and where its arrays lived.
-    """
-
-    number_of_devices: int
-    """
-    The number of devices jax started with.
-    """
-
-    devices_of_state: int
-    """
-    The number of devices the training state was placed on.
-    """
-
-    devices_of_trained_parameters: int
-    """
-    The number of devices the parameters of the trained circuit are on.
-    """
-
-    even_batch_size: int
-    """
-    The largest batch size of at most 450 rows that the devices split evenly.
-    """
-
-    epoch_losses: list[float]
-    """
-    The average loss of every epoch.
-    """
-
-    parameters: list[npt.NDArray[np.float64]]
-    """
-    The parameters of the trained circuit.
-    """
-
 
 # %% training
 
