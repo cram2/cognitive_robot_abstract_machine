@@ -129,6 +129,18 @@ class Action(CompositeNode, ABC):
             extension_type=RobotAccess
         ).controlled_root
 
+    @classmethod
+    def innermost_holding(cls, *, node: StatechartNode) -> Action | None:
+        """
+        :param node: A node of a plan.
+        :return: The innermost action holding `node`, `node` itself included; None if
+            no action holds it.
+        """
+        return next(
+            (ancestor for ancestor in [node, *node.path] if isinstance(ancestor, cls)),
+            None,
+        )
+
     def handed_over_from(self) -> list[StatechartNode]:
         """
         :return: The nodes of the plan whose result this action takes over and acts on,
