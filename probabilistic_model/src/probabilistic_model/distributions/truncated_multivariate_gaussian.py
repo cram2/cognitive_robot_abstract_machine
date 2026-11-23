@@ -1,3 +1,7 @@
+"""
+The multivariate Gaussian distribution restricted to a box and renormalized.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -30,7 +34,6 @@ from probabilistic_model.probabilistic_model import (
 from probabilistic_model.query_results import LogConditioning, LogMode, LogTruncation
 
 if TYPE_CHECKING:
-
     from probabilistic_model.distributions.multivariate_gaussian import (
         MultivariateGaussianDistribution,
     )
@@ -173,7 +176,7 @@ class TruncatedMultivariateGaussianDistribution(
             )
         )
 
-    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
+    def log_likelihood(self, *, events: npt.NDArray) -> npt.NDArray:
         return np.where(
             [self.box_contains(event) for event in events],
             np.atleast_1d(self.untruncated.scipy_distribution.logpdf(events))
@@ -234,7 +237,9 @@ class TruncatedMultivariateGaussianDistribution(
                 for variable, value in zip(self.variables, most_likely)
             }
         ).as_composite_set()
-        return LogMode(mode, float(self.log_likelihood(most_likely.reshape(1, -1))[0]))
+        return LogMode(
+            mode, float(self.log_likelihood(events=most_likely.reshape(1, -1))[0])
+        )
 
     def _most_likely_point(self, precision: npt.NDArray) -> npt.NDArray:
         """

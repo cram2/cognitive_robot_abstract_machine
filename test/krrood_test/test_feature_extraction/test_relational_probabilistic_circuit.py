@@ -1,3 +1,9 @@
+"""
+Tests of relational probabilistic circuits learned from instances and their parts.
+"""
+
+from __future__ import annotations
+
 import functools
 import json
 import operator
@@ -439,10 +445,10 @@ def test_deserialized_circuit_preserves_likelihoods(
     samples = relational_probabilistic_circuit.class_probabilistic_circuit.sample(10)
     assert np.allclose(
         relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
-            samples
+            events=samples
         ),
         deserialized_relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
-            samples
+            events=samples
         ),
     )
 

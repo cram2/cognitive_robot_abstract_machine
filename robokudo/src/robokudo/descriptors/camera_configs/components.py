@@ -1,7 +1,14 @@
+"""
+The components a camera configuration combines: depth and color settings, the source of
+the camera pose and the world descriptor of a camera.
+"""
+
 from __future__ import annotations
 
 # %% Imports
+import math
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
@@ -78,6 +85,27 @@ class TfComponent:
     lookup_viewpoint: bool = True
     """
     Whether to lookup the viewpoint between the camera and the world.
+    """
+
+    camera_pose_timeout: timedelta = timedelta(seconds=0.1)
+    """
+    How long to wait for TF to provide the camera pose at the acquisition time of a
+    frame; a frame without one by then is dropped.
+    """
+
+    tolerated_camera_pose_distance: float = 0.05
+    """
+    How far, in meters, a shared world may place a camera that belongs to a robot model
+    another process serves, such as a robot's head camera, away from where TF places it
+    before a warning is logged. Perceived objects are placed with the TF pose, so beyond
+    this they may be misplaced relative to the robot in the world.
+    """
+
+    tolerated_camera_pose_angle: float = math.radians(5.0)
+    """
+    How far, in radians, a shared world may turn a camera that belongs to a robot model
+    another process serves away from how TF turns it before a warning is logged, as for
+    :attr:`tolerated_camera_pose_distance`.
     """
 
 

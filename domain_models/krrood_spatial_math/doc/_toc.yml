@@ -1,0 +1,14 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: intro
+parts:
+- caption: Explanations
+  chapters:
+    - file: frames_and_transformations
+    - file: rates_of_motion
+- caption: References
+  chapters:
+    - file: autoapi/index
+    - file: bibliography

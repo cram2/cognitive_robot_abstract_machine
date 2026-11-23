@@ -92,6 +92,9 @@ coordinate system. Its base depends on `krrood` alone.
 Other domain models add their own spaces on these interfaces; `krrood_image`, for
 example, adds image planes, whose pixel frames are affine and related by affine changes.
 
+The documentation, including how a twist or a screw axis becomes a displacement, is at
+https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math.
+
 ## Adding a space
 
 This example adds the pixels of camera images. A camera's image plane is a plane, but

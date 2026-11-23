@@ -1,0 +1,424 @@
+"""
+Placement of a camera interface's camera in the world perception perceives into.
+"""
+
+from __future__ import annotations
+
+# %% Imports
+import numpy as np
+import pytest
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from semantic_digital_twin.datastructures.camera_model import CameraModality
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.robots.robot_parts import Camera
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
+
+from robokudo.cas import CAS
+from robokudo.exceptions import UnknownWorldFrameError
+from robokudo.io.exceptions import CameraAnnotationAmbiguous
+
+from ._perception_world import (
+    FrameName,
+    RobotName,
+    SharedWorld,
+    camera_interface,
+    camera_model,
+    camera_pose,
+    place_camera_of,
+    ros_camera_interface,
+    world_with_a_head_camera,
+)
+
+
+def bound_pose(
+    world: World,
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional,
+    located_through_tf: bool = False,
+    reference_frame: str = FrameName.WORLD,
+) -> HomogeneousTransformationMatrix3Dimensional:
+    """
+    :return: ``world_T_camera``, measured against ``reference_frame`` for the test camera,
+        bound to the bodies of ``world``.
+    """
+    return camera_interface(located_through_tf=located_through_tf).bind_world_T_camera(
+        world=world,
+        reference_frame=reference_frame,
+        camera_frame=FrameName.CAMERA,
+        world_T_camera=world_T_camera,
+    )
+
+
+# %% world frame
+
+
+class TestWorldFrame:
+    """
+    The world frame a camera pose is measured against.
+    """
+
+    def test_empty_world_gets_the_world_frame_as_its_root(self) -> None:
+        """
+        An empty world gets the measured world frame as its root.
+        """
+        world = World()
+        world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1.0, y=2.0, z=3.0
+        )
+
+        pose = bound_pose(world, world_T_camera)
+
+        world_body = world.get_body_by_name(FrameName.WORLD)
+        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        assert world.root is world_body
+        assert pose.reference_frame is world_body
+        assert pose.child_frame is camera_body
+        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
+
+    def test_unknown_world_frame_of_a_world_with_bodies_is_not_added(self) -> None:
+        """
+        A world with a root gets no body for a world frame it lacks.
+        """
+        world = World()
+        with world.modify_world():
+            world.add_body(Body(name=PrefixedName("root_of_another_world")))
+        names_before = [body.name for body in world.bodies]
+
+        with pytest.raises(UnknownWorldFrameError):
+            bound_pose(world, camera_pose())
+
+        assert [body.name for body in world.bodies] == names_before
+
+
+# %% camera perception mounts
+
+
+class TestCameraPerceptionMounts:
+    """
+    Cameras perception mounts below their world frame itself.
+    """
+
+    def test_adds_the_camera_below_a_known_world_frame_and_moves_it(self) -> None:
+        """
+        A camera the world lacks hangs below its world frame at the measured pose.
+        """
+        world = World()
+        with world.modify_world():
+            world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
+        bound_pose(world, camera_pose(x=1.0))
+        world_T_camera = camera_pose(x=2.0)
+
+        bound_pose(world, world_T_camera)
+
+        [camera_body] = world.get_bodies_by_name(FrameName.CAMERA)
+        assert camera_body.parent_connection.parent is world.get_body_by_name(
+            FrameName.WORLD
+        )
+        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
+
+    def test_camera_interfaces_of_one_world_share_its_camera(self) -> None:
+        """
+        A camera placed twice keeps one body, at the latest measured pose.
+        """
+        world = World()
+        bound_pose(world, camera_pose(x=1.0))
+        world_T_camera = camera_pose(x=2.0)
+
+        bound_pose(world, world_T_camera)
+
+        [camera_body] = world.get_bodies_by_name(FrameName.CAMERA)
+        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
+
+
+# %% camera of the world
+
+
+class TestCameraOfTheWorld:
+    """
+    Cameras another process attached to the world.
+    """
+
+    def test_camera_of_the_world_keeps_its_attachment_at_the_measured_pose(
+        self,
+    ) -> None:
+        """
+        A robot's camera keeps its attachment, and its pose is the measured one.
+        """
+        world = world_with_a_head_camera()
+        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        camera_pose_before = camera_body.global_transform.to_np()
+        world_T_camera = camera_pose(x=4.0)
+
+        pose = bound_pose(world, world_T_camera, located_through_tf=True)
+
+        assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
+        assert pose.reference_frame is world.get_body_by_name(FrameName.WORLD)
+        assert pose.child_frame is camera_body
+        assert np.allclose(pose.to_np(), world_T_camera.to_np())
+
+    def test_camera_of_the_world_needs_a_known_world_frame(self) -> None:
+        """
+        A robot's camera cannot be placed against a world frame the world lacks.
+        """
+        world = world_with_a_head_camera()
+
+        with pytest.raises(UnknownWorldFrameError):
+            bound_pose(
+                world,
+                camera_pose(),
+                located_through_tf=True,
+                reference_frame="frame_unknown_to_the_world",
+            )
+
+
+# %% camera of a shared world
+
+
+class TestCameraOfASharedWorld:
+    """
+    Cameras of a world other processes share.
+    """
+
+    def test_shared_world_gets_nothing_for_a_camera_located_through_tf(
+        self, *, shared_world: SharedWorld
+    ) -> None:
+        """
+        A camera located through TF adds neither a body nor an annotation to a shared
+        world.
+        """
+        world = shared_world.world
+        body_ids_before = [body.id for body in world.bodies]
+
+        place_camera_of(
+            CAS(),
+            world,
+            camera_pose(x=1.0),
+            camera_interface(located_through_tf=True),
+        )
+
+        assert [body.id for body in world.bodies] == body_ids_before
+        assert world.get_semantic_annotations_by_type(Camera) == []
+
+    def test_camera_located_through_tf_is_located_by_its_measured_pose(
+        self, *, shared_world: SharedWorld
+    ) -> None:
+        """
+        A camera located through TF that a shared world lacks keeps its measured pose.
+        """
+        cas = CAS()
+        world_T_camera = camera_pose(x=1.0)
+
+        place_camera_of(
+            cas,
+            shared_world.world,
+            world_T_camera,
+            camera_interface(located_through_tf=True),
+        )
+
+        pose = cas.camera_observation.world_T_camera
+        assert pose.reference_frame is shared_world.world.get_body_by_name(
+            FrameName.WORLD
+        )
+        assert pose.child_frame is cas.camera_observation.camera.root
+        assert np.allclose(pose.to_np(), world_T_camera.to_np())
+
+    def test_shared_world_gets_a_camera_not_located_through_tf(
+        self, *, shared_world: SharedWorld
+    ) -> None:
+        """
+        A camera not located through TF gets a body and an annotation in a shared world.
+        """
+        world = shared_world.world
+        cas = CAS()
+        world_T_camera = camera_pose(x=1.0)
+
+        place_camera_of(
+            cas, world, world_T_camera, camera_interface(located_through_tf=False)
+        )
+
+        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        assert camera_body.parent_connection.parent is world.get_body_by_name(
+            FrameName.WORLD
+        )
+        assert world.get_semantic_annotations_by_type(Camera) == [
+            cas.camera_observation.camera
+        ]
+        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
+
+    def test_shared_world_gets_a_ros_camera_without_tf_lookup(
+        self, *, shared_world: SharedWorld
+    ) -> None:
+        """
+        A ROS camera that does not look up its pose through TF gets a body and an
+        annotation in a shared world.
+        """
+        world = shared_world.world
+        cas = CAS()
+        world_T_camera = camera_pose(x=1.0)
+
+        place_camera_of(
+            cas, world, world_T_camera, ros_camera_interface(lookup_viewpoint=False)
+        )
+
+        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        assert camera_body.parent_connection.parent is world.get_body_by_name(
+            FrameName.WORLD
+        )
+        assert world.get_semantic_annotations_by_type(Camera) == [
+            cas.camera_observation.camera
+        ]
+        assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
+
+    def test_camera_of_a_robot_in_a_shared_world_is_at_the_measured_pose(
+        self, *, shared_world_with_a_robot: SharedWorld
+    ) -> None:
+        """
+        A robot's camera in a shared world keeps its attachment, and its pose is the
+        measured one.
+        """
+        world = shared_world_with_a_robot.world
+        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        camera_pose_before = camera_body.global_transform.to_np()
+        world_T_camera = camera_pose(x=4.0)
+
+        pose = bound_pose(world, world_T_camera, located_through_tf=True)
+
+        assert pose.child_frame is camera_body
+        assert np.allclose(pose.to_np(), world_T_camera.to_np())
+        assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
+
+
+# %% camera of a robot whose parts carry its name
+
+
+def robot_camera_frames() -> list[str]:
+    """
+    :return: The frame of the camera of :attr:`RobotName.ROBOT`, as robot drivers
+        publish it and as its prefixed body is named.
+    """
+    return [
+        FrameName.CAMERA,
+        str(PrefixedName(FrameName.CAMERA, prefix=RobotName.ROBOT)),
+    ]
+
+
+def annotate_robot_camera(world: World) -> Camera:
+    """
+    Annotate the camera body of :attr:`RobotName.ROBOT` in ``world`` as its camera, as a
+    robot loaded from its description is annotated.
+
+    :param world: A world from :func:`world_with_a_head_camera` for that robot.
+    :return: The camera annotation.
+    """
+    camera_name = PrefixedName(FrameName.CAMERA, prefix=RobotName.ROBOT)
+    camera = Camera(
+        name=camera_name,
+        root=world.get_body_by_name(camera_name),
+        camera_model=camera_model(),
+        modalities=(CameraModality.COLOR, CameraModality.DEPTH),
+    )
+    with world.modify_world():
+        world.add_semantic_annotation(camera)
+    return camera
+
+
+class TestCameraOfARobotWhosePartsCarryItsName:
+    """
+    Cameras not located through TF whose frame names the camera of a robot whose parts
+    carry the robot's name as prefix.
+    """
+
+    @pytest.mark.parametrize("camera_frame", robot_camera_frames())
+    def test_robot_camera_is_used_without_adding_a_body(
+        self, *, camera_frame: str
+    ) -> None:
+        """
+        The camera is the robot's camera body; no body is added for it.
+        """
+        world = world_with_a_head_camera(robot_name=RobotName.ROBOT)
+        body_ids_before = [body.id for body in world.bodies]
+        cas = CAS()
+
+        place_camera_of(
+            cas,
+            world,
+            camera_pose(x=1.0),
+            camera_interface(located_through_tf=False),
+            camera_frame=camera_frame,
+        )
+
+        assert [body.id for body in world.bodies] == body_ids_before
+        assert cas.camera_observation.camera.root is world.get_body_by_name(
+            PrefixedName(FrameName.CAMERA, prefix=RobotName.ROBOT)
+        )
+
+    @pytest.mark.parametrize("camera_frame", robot_camera_frames())
+    def test_robot_camera_annotation_observes(self, *, camera_frame: str) -> None:
+        """
+        The observation is made with the camera annotation the robot already has, at the
+        measured pose.
+        """
+        world = world_with_a_head_camera(robot_name=RobotName.ROBOT)
+        robot_camera = annotate_robot_camera(world)
+        cas = CAS()
+        world_T_camera = camera_pose(x=1.0)
+
+        place_camera_of(
+            cas,
+            world,
+            world_T_camera,
+            camera_interface(located_through_tf=False),
+            camera_frame=camera_frame,
+        )
+
+        assert cas.camera_observation.camera is robot_camera
+        assert world.get_semantic_annotations_by_type(Camera) == [robot_camera]
+        assert np.allclose(
+            cas.camera_observation.world_T_camera.to_np(), world_T_camera.to_np()
+        )
+
+    @pytest.mark.parametrize("camera_frame", robot_camera_frames())
+    def test_robot_camera_is_annotated_once_over_several_passes(
+        self, *, camera_frame: str
+    ) -> None:
+        """
+        A robot camera without an annotation gets exactly one, however often it is
+        placed.
+        """
+        world = world_with_a_head_camera(robot_name=RobotName.ROBOT)
+        observations = []
+
+        for _ in range(2):
+            cas = CAS()
+            place_camera_of(
+                cas,
+                world,
+                camera_pose(x=1.0),
+                camera_interface(located_through_tf=False),
+                camera_frame=camera_frame,
+            )
+            observations.append(cas.camera_observation)
+
+        assert world.get_semantic_annotations_by_type(Camera) == [
+            observations[0].camera
+        ]
+        assert observations[1].camera is observations[0].camera
+
+    def test_robot_camera_annotated_twice_is_ambiguous(self) -> None:
+        """
+        A robot camera body that two camera annotations share does not say which one
+        observes.
+        """
+        world = world_with_a_head_camera(robot_name=RobotName.ROBOT)
+        annotate_robot_camera(world)
+        annotate_robot_camera(world)
+
+        with pytest.raises(CameraAnnotationAmbiguous):
+            place_camera_of(
+                CAS(),
+                world,
+                camera_pose(x=1.0),
+                camera_interface(located_through_tf=False),
+            )

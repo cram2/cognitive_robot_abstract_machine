@@ -13,7 +13,6 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from robokudo import world as rk_world
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_mongodb_playback import MongoReplayMode
 from robokudo.exceptions import InvalidCameraObservation, CameraObservationMissing
@@ -199,11 +198,11 @@ def test_full_snapshot_replays_only_camera_context() -> None:
     restored_observation = CameraObservationCodec().decode_with_tracker(
         ViewPayload.from_document(document), tracker
     )
-    rk_world.init_world_with_entity_tracker()
-    reasoning_world = rk_world.world_instance()
+    reasoning_world = World()
     RecordedCameraWorld(restored_observation).install(reasoning_world)
-    rk_world.init_world_entity_tracker_from_world(reasoning_world)
-    _, replayed = Storage.decode_view_document(document)
+    _, replayed = Storage.decode_view_document(
+        view_document=document, world=reasoning_world
+    )
     RecordedCameraWorld.apply_pose(reasoning_world, replayed)
 
     assert replayed.camera is not scene.observation.camera
@@ -238,13 +237,19 @@ def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader.storage = Mock(load_view_document=Mock(return_value=document))
     reader.rk_logger = Mock()
-    rk_world.init_world_with_entity_tracker()
+    reasoning_world = World()
 
     reader._restore_sensor_world(
-        {**frame, StorageDocumentField.VIEW_IDS: {CASViews.CAMERA_OBSERVATION: 1}}
+        cas_frame={
+            **frame,
+            StorageDocumentField.VIEW_IDS: {CASViews.CAMERA_OBSERVATION: 1},
+        },
+        world=reasoning_world,
     )
-    _, replayed = Storage.decode_view_document(document)
-    RecordedCameraWorld.apply_pose(rk_world.world_instance(), replayed)
+    _, replayed = Storage.decode_view_document(
+        view_document=document, world=reasoning_world
+    )
+    RecordedCameraWorld.apply_pose(reasoning_world, replayed)
 
     assert replayed.camera.root.id == scene.observation.camera.root.id
     assert replayed.world_T_camera.child_frame.id == (
@@ -259,7 +264,7 @@ def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
         replayed.camera.root.global_transform.to_np(),
         replayed.world_T_camera.to_np(),
     )
-    assert rk_world.world_instance().get_bodies_by_name(scene.inferred_body.name) == []
+    assert reasoning_world.get_bodies_by_name(scene.inferred_body.name) == []
 
 
 @pytest.mark.parametrize("pose_frame_alias", [False, True])
@@ -268,14 +273,14 @@ def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool) -> N
     Apply a new sampled pose without replacing the projected camera.
     """
     scene = _recorded_scene(pose_frame_alias=pose_frame_alias)
-    rk_world.init_world_with_entity_tracker()
-    reasoning_world = rk_world.world_instance()
+    reasoning_world = World()
     RecordedCameraWorld(scene.observation).install(reasoning_world)
-    rk_world.init_world_entity_tracker_from_world(reasoning_world)
     first_document = Storage.encode_view_document(
         CASViews.CAMERA_OBSERVATION, scene.observation
     )
-    _, first = Storage.decode_view_document(first_document)
+    _, first = Storage.decode_view_document(
+        view_document=first_document, world=reasoning_world
+    )
 
     moved_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.5,
@@ -294,7 +299,9 @@ def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool) -> N
     second_document = Storage.encode_view_document(
         CASViews.CAMERA_OBSERVATION, second_observation
     )
-    _, second = Storage.decode_view_document(second_document)
+    _, second = Storage.decode_view_document(
+        view_document=second_document, world=reasoning_world
+    )
     RecordedCameraWorld.apply_pose(reasoning_world, second)
 
     assert second.camera is first.camera
@@ -310,16 +317,17 @@ def test_missing_pose_merges_camera_into_existing_world() -> None:
     Attach an unposed recorded camera without restoring recorded objects.
     """
     scene = _recorded_scene(with_pose=False)
-    rk_world.init_world_with_entity_tracker()
-    reasoning_world = rk_world.world_instance()
+    reasoning_world = World()
     unrelated = Body(name=PrefixedName(name="runtime_entity"))
     with reasoning_world.modify_world():
         reasoning_world.add_body(unrelated)
     RecordedCameraWorld(scene.observation).install(reasoning_world)
-    rk_world.init_world_entity_tracker_from_world(reasoning_world)
 
     _, replayed = Storage.decode_view_document(
-        Storage.encode_view_document(CASViews.CAMERA_OBSERVATION, scene.observation)
+        view_document=Storage.encode_view_document(
+            CASViews.CAMERA_OBSERVATION, scene.observation
+        ),
+        world=reasoning_world,
     )
 
     assert replayed.world_T_camera is None
@@ -365,15 +373,21 @@ def test_storage_reader_keeps_camera_identity_in_cas() -> None:
     Keep the world camera instance when transferring decoded views into a CAS.
     """
     scene = _recorded_scene()
-    rk_world.set_world(scene.world)
-    rk_world.init_world_entity_tracker_from_world(scene.world)
     frame = {StorageDocumentField.VIEW_IDS: {CASViews.CAMERA_OBSERVATION: 1}}
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader._recorded_camera_id = scene.observation.camera.id
     reader.reader = Mock(get_next_frame=Mock(return_value=frame))
 
-    def load_views(cas_frame, included_view_names):
-        cas_frame[StorageDocumentField.VIEWS] = {
+    def load_views(
+        *,
+        cas_document: dict[str, Any],
+        world: World,
+        included_view_names: set[str] | None,
+    ) -> None:
+        """
+        Load the recorded camera observation and an empty depth image.
+        """
+        cas_document[StorageDocumentField.VIEWS] = {
             CASViews.CAMERA_OBSERVATION: scene.observation,
             CASViews.DEPTH_IMAGE: np.zeros((1, 1)),
         }
@@ -384,7 +398,7 @@ def test_storage_reader_keeps_camera_identity_in_cas() -> None:
     )
     cas = CAS()
 
-    reader.set_data(cas)
+    reader.set_data(cas=cas, world=scene.world)
 
     assert cas.require_camera_observation().camera is scene.observation.camera
 
@@ -409,7 +423,9 @@ def test_sensor_replay_skips_recorded_nonsensor_views() -> None:
     }
 
     storage.load_views_from_mongo_in_cas(
-        frame, included_view_names=set(StorageReaderInterface.SENSOR_VIEW_NAMES)
+        cas_document=frame,
+        world=World(),
+        included_view_names=set(StorageReaderInterface.SENSOR_VIEW_NAMES),
     )
 
     assert frame[StorageDocumentField.VIEWS] == {CASViews.COLOR_IMAGE: 7}
@@ -421,7 +437,7 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
     Restore inferred entities only when full-world playback is selected.
     """
     scene = _recorded_scene()
-    rk_world.init_world_with_entity_tracker()
+    reasoning_world = World()
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader.rk_logger = Mock()
     reader._recorded_camera_id = None
@@ -437,12 +453,20 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
         CASViews.CAMERA_OBSERVATION, scene.observation
     )
 
-    def load_views(cas_frame, included_view_names):
+    def load_views(
+        *,
+        cas_document: dict[str, Any],
+        world: World,
+        included_view_names: set[str] | None,
+    ) -> None:
+        """
+        Load every recorded view, decoding the camera observation into ``world``.
+        """
         assert included_view_names is None
-        cas_frame[StorageDocumentField.VIEWS] = {
-            CASViews.CAMERA_OBSERVATION: Storage.decode_view_document(camera_document)[
-                1
-            ],
+        cas_document[StorageDocumentField.VIEWS] = {
+            CASViews.CAMERA_OBSERVATION: Storage.decode_view_document(
+                view_document=camera_document, world=world
+            )[1],
             CASViews.DEPTH_IMAGE: np.zeros((1, 1)),
             CASViews.QUERY: {"recorded": True},
         }
@@ -450,17 +474,12 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
     reader.storage = Mock(load_views_from_mongo_in_cas=Mock(side_effect=load_views))
     cas = CAS()
 
-    reader.set_data(cas)
+    reader.set_data(cas=cas, world=reasoning_world)
 
-    assert (
-        rk_world.world_instance().find_world_entity_with_id(scene.inferred_body.id)
-        is not None
-    )
+    assert reasoning_world.find_world_entity_with_id(scene.inferred_body.id) is not None
     assert (
         cas.require_camera_observation().camera
-        is rk_world.world_instance().get_semantic_annotation_by_id(
-            scene.observation.camera.id
-        )
+        is reasoning_world.get_semantic_annotation_by_id(scene.observation.camera.id)
     )
     assert cas.contains(CASViews.QUERY)
 
@@ -501,7 +520,9 @@ def test_sensor_replay_requires_recorded_camera_observation() -> None:
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader.storage = Mock()
     with pytest.raises(CameraObservationMissing):
-        reader._restore_sensor_world({StorageDocumentField.VIEW_IDS: {}})
+        reader._restore_sensor_world(
+            cas_frame={StorageDocumentField.VIEW_IDS: {}}, world=World()
+        )
     reader.storage.load_view_document.assert_not_called()
 
 
@@ -519,8 +540,7 @@ def test_sensor_replay_rejects_conflicting_camera_root_without_changing_world(
         if conflicting_identity
         else Body(name=root.name)
     )
-    rk_world.init_world_with_entity_tracker()
-    reasoning_world = rk_world.world_instance()
+    reasoning_world = World()
     with reasoning_world.modify_world():
         reasoning_world.add_body(conflict)
     document = Storage.encode_view_document(
@@ -534,7 +554,7 @@ def test_sensor_replay_rejects_conflicting_camera_root_without_changing_world(
         StorageDocumentField.VIEW_IDS: {CASViews.CAMERA_OBSERVATION: 1},
     }
     with pytest.raises(InvalidCameraObservation):
-        reader._restore_sensor_world(frame)
+        reader._restore_sensor_world(cas_frame=frame, world=reasoning_world)
     assert reasoning_world.bodies == [conflict]
     assert reasoning_world.get_semantic_annotations_by_type(Camera) == []
 

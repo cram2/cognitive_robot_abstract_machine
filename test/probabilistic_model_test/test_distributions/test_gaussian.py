@@ -1,3 +1,7 @@
+"""
+Tests of the Gaussian and truncated Gaussian distributions.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -128,6 +132,10 @@ def test_gaussian_variance(gaussian, x):
 
 
 def test_gaussian_truncation_to_a_singleton(standard_gaussian, x):
+    """
+    A Gaussian truncated to a singleton is impossible, unless singletons are allowed, in
+    which case it becomes a Dirac delta at the singleton.
+    """
     event = SimpleEvent.from_data({x: singleton(0)}).as_composite_set()
 
     conditional = standard_gaussian.truncated(event).distribution
@@ -137,7 +145,7 @@ def test_gaussian_truncation_to_a_singleton(standard_gaussian, x):
     assert isinstance(truncation.distribution, DiracDeltaDistribution)
     assert truncation.distribution.location == 0.0
     assert truncation.probability == pytest.approx(
-        np.exp(standard_gaussian.log_likelihood(np.array([[0]]))[0])
+        np.exp(standard_gaussian.log_likelihood(events=np.array([[0]]))[0])
     )
 
 

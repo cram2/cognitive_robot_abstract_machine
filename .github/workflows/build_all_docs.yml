@@ -59,6 +59,10 @@ jobs:
             doc_path: doc
             artifact_name: cramph-doc
             use_container: false
+          - lib: domain_models/krrood_spatial_math
+            doc_path: doc
+            artifact_name: krrood-spatial-math-doc
+            use_container: false
     uses: ./.github/workflows/build_doc_reusable.yml
     with:
       lib: ${{ matrix.lib }}
@@ -140,6 +144,12 @@ jobs:
         with:
           name: cramph-doc
           path: aggregate/cramph
+
+      - name: Download krrood-spatial-math-doc
+        uses: actions/download-artifact@v4
+        with:
+          name: krrood-spatial-math-doc
+          path: aggregate/krrood_spatial_math
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

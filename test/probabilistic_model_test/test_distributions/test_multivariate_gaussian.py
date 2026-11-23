@@ -1,3 +1,9 @@
+"""
+Tests of the multivariate and truncated multivariate Gaussian distributions.
+"""
+
+from __future__ import annotations
+
 import copy
 import dataclasses
 import math
@@ -250,6 +256,10 @@ class TestBuildingADistribution:
 
 
 class TestLikelihood:
+    """
+    The likelihood of a multivariate Gaussian.
+    """
+
     def test_the_joint_density_of_independent_variables_is_the_product_of_the_marginals(
         self, independent, horizontal, vertical
     ):
@@ -262,11 +272,11 @@ class TestLikelihood:
 
     def test_every_point_is_scored(self, independent):
         points = np.array([[0.0, 0.0], [1.0, -2.0], [5.0, 5.0]])
-        assert independent.log_likelihood(points).shape == (3,)
+        assert independent.log_likelihood(events=points).shape == (3,)
 
     def test_the_mean_is_the_most_likely_point(self, correlated):
-        at_mean = correlated.log_likelihood(np.array([[0.0, 0.0]]))[0]
-        elsewhere = correlated.log_likelihood(np.array([[0.4, -0.7]]))[0]
+        at_mean = correlated.log_likelihood(events=np.array([[0.0, 0.0]]))[0]
+        elsewhere = correlated.log_likelihood(events=np.array([[0.4, -0.7]]))[0]
         assert at_mean > elsewhere
 
 
@@ -475,6 +485,10 @@ class TestConditioningOnAValue:
 
 
 class TestProductWithAGaussianLikelihood:
+    """
+    The product of a multivariate Gaussian with a Gaussian likelihood.
+    """
+
     def test_the_density_is_the_product_of_the_two_densities_up_to_normalization(
         self, correlated, horizontal, vertical
     ):
@@ -490,9 +504,9 @@ class TestProductWithAGaussianLikelihood:
         product = correlated.product_with_gaussian_likelihood(likelihood)
         points = np.array([[0.0, 0.0], [1.0, 2.0], [-3.0, 0.5]])
         log_normalization = (
-            correlated.log_likelihood(points)
-            + likelihood.log_likelihood(points)
-            - product.log_likelihood(points)
+            correlated.log_likelihood(events=points)
+            + likelihood.log_likelihood(events=points)
+            - product.log_likelihood(events=points)
         )
         assert log_normalization == pytest.approx(
             np.full(len(points), log_normalization[0])
@@ -509,9 +523,9 @@ class TestProductWithAGaussianLikelihood:
         product = correlated.product_with_gaussian_likelihood(likelihood)
         points = np.array([[0.0, 0.0], [1.0, 2.0], [-3.0, 0.5]])
         log_normalization = (
-            correlated.log_likelihood(points)
-            + likelihood.log_likelihood(points[:, [1]])
-            - product.log_likelihood(points)
+            correlated.log_likelihood(events=points)
+            + likelihood.log_likelihood(events=points[:, [1]])
+            - product.log_likelihood(events=points)
         )
         assert product.variables == correlated.variables
         assert log_normalization == pytest.approx(
@@ -628,10 +642,14 @@ class TestMoments:
 
 
 class TestTranslationAndScaling:
+    """
+    Translating and scaling a multivariate Gaussian.
+    """
+
     def test_translating_moves_the_mean_and_leaves_the_covariance(
         self, independent, horizontal, vertical
     ):
-        independent.apply_translation({horizontal: 3.0})
+        independent.apply_translation(translation={horizontal: 3.0})
         assert mean_of(independent, horizontal) == 4.0
         assert mean_of(independent, vertical) == -2.0
         assert variance_of(independent, horizontal) == 4.0
@@ -639,7 +657,7 @@ class TestTranslationAndScaling:
     def test_scaling_multiplies_the_mean_and_squares_into_the_variance(
         self, independent, horizontal, vertical
     ):
-        independent.apply_scaling({horizontal: 2.0})
+        independent.apply_scaling(scaling={horizontal: 2.0})
         assert mean_of(independent, horizontal) == 2.0
         assert variance_of(independent, horizontal) == 16.0
         assert variance_of(independent, vertical) == 9.0
@@ -647,25 +665,27 @@ class TestTranslationAndScaling:
     def test_scaling_carries_into_a_covariance_once_per_variable(
         self, correlated, horizontal, vertical
     ):
-        correlated.apply_scaling({horizontal: 2.0})
+        correlated.apply_scaling(scaling={horizontal: 2.0})
         assert correlated.covariance_between(horizontal, vertical) == pytest.approx(1.2)
 
     def test_a_translation_of_a_variable_it_is_not_over_is_ignored(
         self, independent, horizontal
     ):
-        independent.apply_translation({horizontal: 3.0, Continuous("absent"): 5.0})
+        independent.apply_translation(
+            translation={horizontal: 3.0, Continuous("absent"): 5.0}
+        )
         assert independent.mean.tolist() == [4.0, -2.0]
 
     def test_a_scaling_of_a_variable_it_is_not_over_is_ignored(
         self, independent, horizontal
     ):
-        independent.apply_scaling({horizontal: 2.0, Continuous("absent"): 5.0})
+        independent.apply_scaling(scaling={horizontal: 2.0, Continuous("absent"): 5.0})
         assert independent.covariance.matrix.tolist() == [[16.0, 0.0], [0.0, 9.0]]
 
     def test_a_variable_left_out_of_a_scaling_keeps_its_size(
         self, independent, vertical
     ):
-        independent.apply_scaling({})
+        independent.apply_scaling(scaling={})
         assert mean_of(independent, vertical) == -2.0
         assert variance_of(independent, vertical) == 9.0
 
@@ -690,9 +710,13 @@ class TestSampling:
 
 
 class TestCopying:
+    """
+    Copies of a multivariate Gaussian.
+    """
+
     def test_a_copy_moves_without_moving_the_original(self, independent, horizontal):
         copied = copy.deepcopy(independent)
-        copied.apply_translation({horizontal: 10.0})
+        copied.apply_translation(translation={horizontal: 10.0})
         assert mean_of(independent, horizontal) == 1.0
         assert mean_of(copied, horizontal) == 11.0
 
@@ -708,7 +732,7 @@ class TestCopying:
         self, independent, horizontal
     ):
         copied = copy.deepcopy(independent)
-        copied.apply_scaling({horizontal: 2.0})
+        copied.apply_scaling(scaling={horizontal: 2.0})
         assert independent.covariance.matrix.tolist() == [[4.0, 0.0], [0.0, 9.0]]
 
     def test_a_deep_copy_of_a_truncated_distribution_keeps_its_box(
@@ -748,6 +772,10 @@ def mode_point_of(truncated: TruncatedMultivariateGaussianDistribution) -> np.nd
 
 
 class TestTruncation:
+    """
+    Truncating a multivariate Gaussian to a box.
+    """
+
     def test_truncating_answers_with_a_distribution_that_is_no_longer_gaussian(
         self, correlated, horizontal, vertical
     ):
@@ -908,7 +936,7 @@ class TestTruncation:
         log_density = truncated.log_mode().log_likelihood
         assert mode_point_of(truncated) == pytest.approx([3.0, 3.0])
         assert log_density == pytest.approx(
-            truncated.log_likelihood(np.array([[3.0, 3.0]]))[0]
+            truncated.log_likelihood(events=np.array([[3.0, 3.0]]))[0]
         )
 
     def test_a_variable_the_box_leaves_free_follows_the_one_it_confines(
@@ -937,7 +965,7 @@ class TestTruncation:
         log_density = truncated.log_mode().log_likelihood
         grid = np.linspace(3.0, 4.0, 11)
         elsewhere = np.array([[first, second] for first in grid for second in grid])
-        assert max(truncated.log_likelihood(elsewhere)) <= log_density
+        assert max(truncated.log_likelihood(events=elsewhere)) <= log_density
 
     def test_the_mode_of_an_open_box_is_a_point_the_box_still_allows(
         self, correlated, horizontal, vertical
@@ -953,7 +981,7 @@ class TestTruncation:
         truncated = correlated.truncated(box).distribution
         log_density = truncated.log_mode().log_likelihood
         assert log_density > -np.inf
-        assert truncated.log_likelihood(np.array([[3.0, 3.0]]))[0] == -np.inf
+        assert truncated.log_likelihood(events=np.array([[3.0, 3.0]]))[0] == -np.inf
 
     def test_truncating_again_narrows_the_event(self, correlated, horizontal, vertical):
         box = box_over(horizontal, vertical, 0.0, 2.0).as_composite_set()
@@ -1050,6 +1078,10 @@ class TestTruncation:
 
 
 class TestNormalizingConstant:
+    """
+    The probability of the box a truncated multivariate Gaussian is restricted to.
+    """
+
     def test_the_probability_of_the_box_is_computed_once(
         self, correlated, horizontal, vertical, monkeypatch
     ):
@@ -1064,8 +1096,10 @@ class TestNormalizingConstant:
 
         monkeypatch.setattr(type(correlated), "probability_of_simple_event", counted)
         points = np.array([[0.5, 0.5], [0.2, 0.7]])
-        first_answer = truncated.log_likelihood(points)
-        np.testing.assert_array_equal(truncated.log_likelihood(points), first_answer)
+        first_answer = truncated.log_likelihood(events=points)
+        np.testing.assert_array_equal(
+            truncated.log_likelihood(events=points), first_answer
+        )
         assert len(calls) <= 1
 
 
@@ -1139,6 +1173,10 @@ class TestConditioningATruncatedDistribution:
 
 
 class TestMarginalOfATruncatedDistribution:
+    """
+    The marginal of a truncated multivariate Gaussian.
+    """
+
     def test_a_marginal_over_some_of_its_variables_has_no_closed_form(
         self, correlated, horizontal, vertical
     ):
@@ -1161,7 +1199,8 @@ class TestMarginalOfATruncatedDistribution:
         assert marginal.variables == truncated.variables
         points = np.array([[0.5, 0.5], [0.2, 0.7]])
         np.testing.assert_array_equal(
-            marginal.log_likelihood(points), truncated.log_likelihood(points)
+            marginal.log_likelihood(events=points),
+            truncated.log_likelihood(events=points),
         )
 
     def test_a_marginal_over_none_of_its_variables_is_nothing(
