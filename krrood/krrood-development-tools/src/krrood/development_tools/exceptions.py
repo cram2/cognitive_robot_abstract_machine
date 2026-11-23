@@ -73,3 +73,34 @@ class RuffCheckFailed(DataclassException):
 
     def suggest_correction(self) -> str:
         return 'Install the ruff version krrood pins with `pip install "krrood[development-tools]"`.'
+
+
+@dataclass(kw_only=True)
+class UnknownContinuousIntegrationLibraryError(DataclassException, ValueError):
+    """
+    Raised when a CI job layout names a library the repository has no tests of.
+    """
+
+    section: str
+    """
+    The shared job or the table of the layout that names the library.
+    """
+
+    library_names: tuple[str, ...]
+    """
+    The libraries it names that have no tests.
+    """
+
+    known_library_names: tuple[str, ...]
+    """
+    The libraries the repository has tests of.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.section} of the CI job layout names "
+            f"{', '.join(self.library_names)}, which the repository has no tests of."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"Name only libraries with tests: {', '.join(self.known_library_names)}."
