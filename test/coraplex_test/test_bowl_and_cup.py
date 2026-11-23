@@ -1,6 +1,7 @@
 """
 Tests a plan that takes a bowl and a cup out of a kitchen drawer, one in each hand and
-both at once, and sets them down on the kitchen island, while avoiding collisions.
+both at once, and sets them down on the kitchen island, while avoiding collisions; also
+with the arms left to the pick-ups and the places referring to them.
 """
 
 from __future__ import annotations
@@ -21,13 +22,14 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
 )
 from coraplex.robot_plans.mixins import MovesToolCenterPoint
-from cramph.composites import Parallel, Sequence
+from cramph.composites import DefiniteStatementNode, Parallel, Sequence, StatementNode
 from cramph.context import ContextExtension
+from cramph.node import StatechartNode
 from giskardpy.motion_control import WorldStateTrajectoryRecording, MotionControl
 from giskardpy.motion_statechart.tasks.cartesian_tasks import HoldPose
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.qp_controller_config import QPControllerConfig
-from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.factories import a, the, variable
 from krrood.entity_query_language.query.match import Match
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Pose
@@ -35,6 +37,7 @@ from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
+from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bowl,
     Cup,
@@ -219,6 +222,40 @@ def transport_plan(
         cup with the right arm at once, and sets both down on the kitchen island at
         once.
     """
+    robot = kitchen.robot
+    return Sequence(
+        nodes=transport_steps(
+            kitchen,
+            pick_ups=pick_ups,
+            places=[
+                PlaceAction(
+                    arm=robot.left_arm,
+                    graspable=kitchen.bowl,
+                    goal_pose=kitchen.world_T_bowl_goal,
+                ),
+                PlaceAction(
+                    arm=robot.right_arm,
+                    graspable=kitchen.cup,
+                    goal_pose=kitchen.world_T_cup_goal,
+                ),
+            ],
+        )
+    )
+
+
+def transport_steps(
+    kitchen: KitchenWithFilledDrawer,
+    *,
+    pick_ups: list[PickUpAction | Match],
+    places: list[PlaceAction | Match],
+) -> list[StatechartNode]:
+    """
+    :param kitchen: The kitchen the plan is performed in.
+    :param pick_ups: The pick-up of the bowl and of the cup, run at once.
+    :param places: The place of the bowl and of the cup, run at once.
+    :return: The steps that open the drawer, take the bowl and the cup out of it at
+        once, and set both down on the kitchen island at once.
+    """
     world, robot = kitchen.world, kitchen.robot
     in_front_of_the_closed_drawer = Pose2D.from_xy_yaw(
         x=0.4, y=0.7, reference_frame=world.root
@@ -229,49 +266,38 @@ def transport_plan(
     facing_the_kitchen_island = Pose2D.from_xy_yaw(
         x=-0.25, y=1.85, yaw=np.pi, reference_frame=world.root
     )
-    return Sequence(
-        nodes=[
-            # The arms start stretched out, which would reach into the counter.
-            ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(planar_goal_pose=in_front_of_the_closed_drawer),
-            OpenAction.from_handle(kitchen.drawer_handle, robot.left_arm),
-            ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(planar_goal_pose=in_front_of_the_open_drawer),
-            Parallel(
-                nodes=[
-                    HoldPose(
-                        kinematic_chain=KinematicChain(
-                            root=kitchen.world.root, tip=robot.mobile_base.root
-                        )
-                    ),
-                    *pick_ups,
-                ]
-            ),
-            ParkArmsAction(arms=robot.all_arms),
-            NavigateAction(planar_goal_pose=facing_the_kitchen_island),
-            MoveTorsoAction(torso_state=TorsoState.HIGH),
-            Parallel(
-                nodes=[
-                    HoldPose(
-                        kinematic_chain=KinematicChain(
-                            root=kitchen.world.root, tip=robot.mobile_base.root
-                        )
-                    ),
-                    PlaceAction(
-                        arm=robot.left_arm,
-                        graspable=kitchen.bowl,
-                        goal_pose=kitchen.world_T_bowl_goal,
-                    ),
-                    PlaceAction(
-                        arm=robot.right_arm,
-                        graspable=kitchen.cup,
-                        goal_pose=kitchen.world_T_cup_goal,
-                    ),
-                ]
-            ),
-            ParkArmsAction(arms=robot.all_arms),
-        ]
-    )
+    return [
+        # The arms start stretched out, which would reach into the counter.
+        ParkArmsAction(arms=robot.all_arms),
+        NavigateAction(planar_goal_pose=in_front_of_the_closed_drawer),
+        OpenAction.from_handle(kitchen.drawer_handle, robot.left_arm),
+        ParkArmsAction(arms=robot.all_arms),
+        NavigateAction(planar_goal_pose=in_front_of_the_open_drawer),
+        Parallel(
+            nodes=[
+                HoldPose(
+                    kinematic_chain=KinematicChain(
+                        root=kitchen.world.root, tip=robot.mobile_base.root
+                    )
+                ),
+                *pick_ups,
+            ]
+        ),
+        ParkArmsAction(arms=robot.all_arms),
+        NavigateAction(planar_goal_pose=facing_the_kitchen_island),
+        MoveTorsoAction(torso_state=TorsoState.HIGH),
+        Parallel(
+            nodes=[
+                HoldPose(
+                    kinematic_chain=KinematicChain(
+                        root=kitchen.world.root, tip=robot.mobile_base.root
+                    )
+                ),
+                *places,
+            ]
+        ),
+        ParkArmsAction(arms=robot.all_arms),
+    ]
 
 
 def assert_bowl_and_cup_stand_on_the_kitchen_island(
@@ -341,6 +367,55 @@ def test_bowl_and_cup_picked_up_as_statements_are_moved_onto_the_kitchen_island(
     )
 
     assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
+
+
+def test_bowl_and_cup_placed_by_the_arms_their_pick_ups_chose_are_moved_onto_the_kitchen_island(
+    kitchen_with_filled_drawer: KitchenWithFilledDrawer,
+) -> None:
+    """
+    The pick-ups leave their arms open and the places refer to them.
+
+    Each place is built in the trial of the pick-ups before anything is grasped there,
+    and measures the grasp only when it starts, in the trial as on the robot.
+    """
+    kitchen = kitchen_with_filled_drawer
+    robot = kitchen.robot
+    bowl_pick_up, cup_pick_up = pick_ups_from_above(kitchen)
+    bowl_arm = variable(Arm, domain=[robot.left_arm, robot.right_arm])
+    cup_arm = variable(Arm, domain=[robot.right_arm, robot.left_arm])
+    pick_ups = [
+        a(PickUpAction)(grasp_candidate=bowl_pick_up.grasp_candidate, arm=bowl_arm),
+        a(PickUpAction)(grasp_candidate=cup_pick_up.grasp_candidate, arm=cup_arm),
+    ]
+    places = [
+        the(PlaceAction)(
+            arm=bowl_arm, graspable=kitchen.bowl, goal_pose=kitchen.world_T_bowl_goal
+        ),
+        the(PlaceAction)(
+            arm=cup_arm, graspable=kitchen.cup, goal_pose=kitchen.world_T_cup_goal
+        ),
+    ]
+    plan = Sequence(
+        nodes=[
+            a(Sequence)(
+                nodes=transport_steps(kitchen, pick_ups=pick_ups, places=places)
+            )
+        ]
+    )
+
+    run_plan(plan, kitchen.context_extensions, collision_avoidance=True)
+
+    assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
+    statement_nodes = [
+        node for node in plan.descendants if isinstance(node, StatementNode)
+    ]
+    for pick_up, place in zip(pick_ups, places):
+        [picked_up] = next(
+            node for node in statement_nodes if node.statement is pick_up
+        ).grounded_nodes
+        placing = next(node for node in statement_nodes if node.statement is place)
+        assert isinstance(placing, DefiniteStatementNode)
+        assert [placed.arm for placed in placing.grounded_nodes] == [picked_up.arm]
 
 
 def test_the_drawer_stays_open_while_its_contents_are_carried_away(
