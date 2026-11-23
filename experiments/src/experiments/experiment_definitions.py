@@ -1,3 +1,8 @@
+"""
+Results of experiments, the units their measurements are given in, and the tables they
+are presented in.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -29,12 +34,18 @@ class Unit(StrEnum):
     NONE = ""
     SECONDS = "s"
     MILLISECONDS = "ms"
+    MICROSECONDS = "µs"
 
-
-_SECONDS_PER_UNIT: dict[Unit, float] = {
-    Unit.SECONDS: 1.0,
-    Unit.MILLISECONDS: 0.001,
-}
+    @property
+    def seconds(self) -> float | None:
+        """
+        How many seconds one of this unit is; ``None`` for a unit that is no duration.
+        """
+        return {
+            Unit.SECONDS: 1.0,
+            Unit.MILLISECONDS: 0.001,
+            Unit.MICROSECONDS: 0.000001,
+        }.get(self)
 
 
 @dataclass
@@ -61,7 +72,7 @@ class IncompatibleUnitConversionError(DataclassException):
         )
 
     def suggest_correction(self) -> str:
-        return "Only convert between units that are both listed in _SECONDS_PER_UNIT."
+        return "Only convert between units that are both durations, with Unit.seconds."
 
 
 @dataclass
@@ -111,11 +122,11 @@ class MeanAndStandardDeviation:
         :raises IncompatibleUnitConversionError: If either the current or the requested
             unit has no known conversion factor.
         """
-        if self.unit not in _SECONDS_PER_UNIT or unit not in _SECONDS_PER_UNIT:
+        if self.unit.seconds is None or unit.seconds is None:
             raise IncompatibleUnitConversionError(
                 source_unit=self.unit, target_unit=unit
             )
-        factor = _SECONDS_PER_UNIT[self.unit] / _SECONDS_PER_UNIT[unit]
+        factor = self.unit.seconds / unit.seconds
         return MeanAndStandardDeviation(
             mean=round(self.mean * factor, 2),
             standard_deviation=round(self.standard_deviation * factor, 4),
