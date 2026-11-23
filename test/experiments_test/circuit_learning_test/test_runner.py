@@ -20,12 +20,12 @@ from experiments.circuit_learning.datasets import (
 from experiments.circuit_learning.exceptions import NoShareForRunError
 from experiments.circuit_learning.methods import LearningMethod
 from experiments.circuit_learning.records import BenchmarkRun, RunKind
-from experiments.circuit_learning.runner import (
-    BenchmarkRunner,
+from experiments.circuit_learning.runner import BenchmarkRunner
+from experiments.circuit_learning.settings import ComputationSetting
+from probabilistic_model.learning.jax_gradient_descent import (
     CompilerOption,
     CompilerVariable,
 )
-from experiments.circuit_learning.settings import ComputationSetting
 
 # %% fixtures
 
@@ -114,11 +114,10 @@ def test_a_run_on_processor_cores_gets_a_jax_device_per_power_of_two_cores(
     A run on a share of 25 processor cores computes with jax on 16 CPU devices, the
     largest power of two of at most 25.
     """
-    assert (
-        f"{CompilerOption.HOST_PLATFORM_DEVICE_COUNT}=16"
-        in compiler_options_of_share(
-            cache=prepared_cache, device=Device.CENTRAL_PROCESSOR
-        )
+    assert CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(
+        value=16
+    ) in compiler_options_of_share(
+        cache=prepared_cache, device=Device.CENTRAL_PROCESSOR
     )
 
 

@@ -306,6 +306,44 @@ class BatchSplitAxis(StrEnum):
     """
 
 
+# %% compiler options
+
+
+class CompilerVariable(StrEnum):
+    """
+    The environment variables that configure the compilers of a process.
+    """
+
+    ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
+    """
+    The options of the XLA compiler.
+    """
+
+
+class CompilerOption(StrEnum):
+    """
+    The options of the XLA compiler a process is given.
+    """
+
+    GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL = "--xla_gpu_autotune_level"
+    """
+    How much XLA tunes the kernels it compiles for the GPU.
+    """
+
+    HOST_PLATFORM_DEVICE_COUNT = "--xla_force_host_platform_device_count"
+    """
+    The number of devices jax divides the processor cores into.
+    """
+
+    def to_flag(self, *, value: int) -> str:
+        """
+        :param value: The value of this option.
+        :return: This option set to ``value``, as one of the options in
+            :attr:`CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS`.
+        """
+        return f"{self}={value}"
+
+
 # %% device memory
 
 

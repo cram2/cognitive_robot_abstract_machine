@@ -56,37 +56,14 @@ from experiments.circuit_learning.settings import (
     ComputationSetting,
     Device,
 )
+from probabilistic_model.learning.jax_gradient_descent import (
+    CompilerOption,
+    CompilerVariable,
+)
 from probabilistic_model.learning.torch_gradient_descent import TorchDeviceType
 from probabilistic_model.learning.training_schedule import Convergence
 
 # %% names
-
-
-class CompilerVariable(StrEnum):
-    """
-    The environment variables that configure the compilers of a run.
-    """
-
-    ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
-    """
-    The options of the XLA compiler.
-    """
-
-
-class CompilerOption(StrEnum):
-    """
-    The options of the XLA compiler a run is given.
-    """
-
-    GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL = "--xla_gpu_autotune_level"
-    """
-    How much XLA tunes the kernels it compiles for the GPU.
-    """
-
-    HOST_PLATFORM_DEVICE_COUNT = "--xla_force_host_platform_device_count"
-    """
-    The number of devices jax divides the processor cores into.
-    """
 
 
 class OutputFile(StrEnum):
@@ -455,11 +432,13 @@ class BenchmarkRunner:
         """
         environment = share.process_environment(environment=dict(os.environ))
         # autotuning makes compiling a step take minutes on large batches
-        options = [f"{CompilerOption.GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL}=0"]
+        options = [CompilerOption.GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL.to_flag(value=0)]
         if share.device is Device.CENTRAL_PROCESSOR:
             # a power of two splits the batch sizes of the methods evenly
             devices = 2 ** int(math.log2(len(share.processor_cores)))
-            options.append(f"{CompilerOption.HOST_PLATFORM_DEVICE_COUNT}={devices}")
+            options.append(
+                CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(value=devices)
+            )
         environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = " ".join(
             options
         )

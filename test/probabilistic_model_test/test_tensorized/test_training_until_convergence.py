@@ -20,10 +20,15 @@ import numpy as np
 import optax
 import pytest
 from array_api_compat import array_namespace
+from krrood.adapters.json_serializer import DataclassJSONSerializer
 
 from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+from probabilistic_model.learning.jax_gradient_descent import (
+    CompilerOption,
+    CompilerVariable,
+    JaxGradientDescent,
+)
 from probabilistic_model.learning.training_schedule import (
     Convergence,
     ConvergenceHistory,
@@ -40,6 +45,7 @@ from .test_circuit_parameters_and_training import (
     minimum_improvement,
     parameters_shifted,
 )
+from .split_batch_training import SplitBatchTrainingResult
 # %% convergence criterion
 
 
@@ -560,55 +566,65 @@ def test_steps_on_the_cpu_are_taken_one_by_one_even_if_cuda_graphs_are_asked_for
 # %% batches split across devices
 
 
-def split_batch_training(*, devices: int) -> dict:
+def split_batch_training(*, devices: int, output: Path) -> SplitBatchTrainingResult:
     """
     :param devices: The number of CPU devices jax starts with.
-    :return: What :mod:`split_batch_training` prints, run in a process of its own.
+    :param output: The JSON file the training writes its result to.
+    :return: What :func:`split_batch_training.train_on_split_batches` gives, run in a
+        process of its own.
     """
     repository = Path(__file__).resolve().parents[3]
-    environment = dict(
-        os.environ,
-        XLA_FLAGS=f"--xla_force_host_platform_device_count={devices}",
-        JAX_PLATFORMS="cpu",
-        JAX_ENABLE_X64="1",
+    environment = dict(os.environ)
+    environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = (
+        CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(value=devices)
     )
-    finished = subprocess.run(
+    subprocess.run(
         [
             sys.executable,
             "-m",
             "test.probabilistic_model_test.test_tensorized.split_batch_training",
+            str(output),
         ],
         cwd=repository,
         env=environment,
-        capture_output=True,
-        text=True,
         check=True,
     )
-    return json.loads(finished.stdout.splitlines()[-1])
+    return DataclassJSONSerializer.from_json(
+        data=json.loads(output.read_text()), clazz=SplitBatchTrainingResult
+    )
 
 
-def test_batches_split_across_devices_train_as_on_one_device():
+def test_batches_split_across_devices_train_as_on_one_device(tmp_path: Path):
     """
     With four CPU devices, every batch whose rows four divides is split across them and
     the others run whole on every device; training gives the parameters and losses of
     training on one device, and the trained parameters are back on one device.
     """
-    one, four = (split_batch_training(devices=devices) for devices in (1, 4))
+    one, four = (
+        split_batch_training(devices=devices, output=tmp_path / f"{devices}.json")
+        for devices in (1, 4)
+    )
 
-    assert (four["devices"], four["devices_of_state"]) == (4, 4)
-    assert four["devices_of_trained_parameters"] == 1
-    np.testing.assert_allclose(four["epoch_losses"], one["epoch_losses"], rtol=1e-12)
-    for split, whole in zip(four["parameters"], one["parameters"]):
+    assert (four.number_of_devices, four.devices_of_state) == (4, 4)
+    assert four.devices_of_trained_parameters == 1
+    np.testing.assert_allclose(four.epoch_losses, one.epoch_losses, rtol=1e-12)
+    for split, whole in zip(four.parameters, one.parameters):
         np.testing.assert_allclose(split, whole, rtol=1e-10, atol=1e-12)
 
 
-def test_the_largest_even_batch_size_is_a_multiple_of_the_devices():
+def test_the_largest_even_batch_size_is_a_multiple_of_the_devices(tmp_path: Path):
     """
     The largest batch size of at most 450 rows that four devices split evenly is 448,
     and one device splits every batch size evenly.
     """
-    assert split_batch_training(devices=4)["even_batch_size"] == 448
-    assert split_batch_training(devices=1)["even_batch_size"] == 450
+    assert (
+        split_batch_training(devices=4, output=tmp_path / "4.json").even_batch_size
+        == 448
+    )
+    assert (
+        split_batch_training(devices=1, output=tmp_path / "1.json").even_batch_size
+        == 450
+    )
 
 
 # %% training until convergence
