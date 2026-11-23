@@ -470,42 +470,6 @@ def test_a_step_size_blends_the_weights_and_moments_toward_the_full_update(
             )
 
 
-# %% chunks of a batch
-
-
-def test_statistics_added_up_over_chunks_of_a_batch_learn_what_the_whole_batch_learns(
-    random_sum_product_network, edge_matrix_type
-):
-    """
-    Computing the statistics of batches of 16 rows in chunks of 8 rows, and the last
-    batch of 8 rows at once, learns the parameters of computing every batch at once.
-    """
-    case = random_sum_product_network
-
-    def parameters_after_two_epochs(rows_per_chunk: int | None) -> list[np.ndarray]:
-        """
-        :param rows_per_chunk: The rows whose statistics are computed at a time.
-        :return: The parameters after two epochs on batches of 16 rows.
-        """
-        with jax.enable_x64(True):
-            circuit = case.layered(
-                host=case.host, namespace=jnp, edge_matrix_type=edge_matrix_type
-            )
-            run = JaxExpectationMaximization(
-                layer=circuit.root, rows_per_chunk=rows_per_chunk
-            ).minimize_until_converged(
-                jnp.asarray(circuit.encoded(case.rows)),
-                convergence=epochs_of(2),
-                mini_batches=MiniBatches(batch_size=16),
-            )
-            return comparable_parameters(run.trained_root)
-
-    for chunked, whole in zip(
-        parameters_after_two_epochs(8), parameters_after_two_epochs(None), strict=True
-    ):
-        np.testing.assert_allclose(chunked, whole, rtol=1e-10, atol=1e-13)
-
-
 # %% steps recorded as CUDA graphs
 
 

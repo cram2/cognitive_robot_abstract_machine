@@ -15,7 +15,6 @@ from krrood_compute_resources.torch_memory import TorchDeviceMemory
 from probabilistic_model.learning.circuit_parameter_learning import LayerType
 from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
 from probabilistic_model.learning.tensorized_expectation_maximization import (
-    BatchStatistics,
     TensorizedExpectationMaximization,
     TensorizedExpectationMaximizationTraining,
 )
@@ -31,6 +30,26 @@ from probabilistic_model.learning.training_schedule import (
 from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
     SufficientStatistics,
 )
+
+# %% statistics of a batch
+
+
+@dataclass(kw_only=True)
+class BatchStatistics:
+    """
+    What one autograd pass learns about the rows of a batch.
+    """
+
+    total_log_likelihood: torch.Tensor
+    """
+    The sum of the log-likelihoods of the rows, without a gradient.
+    """
+
+    statistics: list[SufficientStatistics]
+    """
+    The sufficient statistics of every learned layer on the rows.
+    """
+
 
 # %% expectation maximization
 

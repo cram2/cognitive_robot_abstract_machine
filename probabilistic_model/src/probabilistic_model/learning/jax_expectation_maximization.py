@@ -19,7 +19,6 @@ from probabilistic_model.learning.jax_circuit_parameter_learning import (
     JaxCircuitParameterLearning,
 )
 from probabilistic_model.learning.tensorized_expectation_maximization import (
-    BatchStatistics,
     TensorizedExpectationMaximization,
     TensorizedExpectationMaximizationTraining,
 )
@@ -68,31 +67,15 @@ class JaxExpectationMaximization(
     Expectation maximization with jax, one compiled step per batch.
     """
 
-    rows_per_chunk: int | None = None
-    """
-    The rows of a batch whose statistics the compiled step computes at a time, adding
-    them up over the batch; the whole batch at once if ``None``.
-
-    A batch whose rows it does not divide, or that the devices do not divide it across,
-    is computed at once.
-    """
-
     def __post_init__(self) -> None:
         """
-        Make the statistics of every learned layer and of a batch jax pytrees.
+        Make the statistics of every learned layer a jax pytree.
         """
         super().__post_init__()
         for statistics in self.zero_statistics(parameters=self.initial_parameters):
             [first_leaf, *_] = jax.tree_util.tree_leaves(statistics)
             if first_leaf is statistics:
                 self.register_as_pytree(statistics_type=type(statistics))
-        [first_leaf, *_] = jax.tree_util.tree_leaves(self.zero_batch_statistics())
-        if isinstance(first_leaf, BatchStatistics):
-            jax.tree_util.register_dataclass(
-                BatchStatistics,
-                data_fields=["total_log_likelihood", "statistics"],
-                meta_fields=[],
-            )
 
     @staticmethod
     def register_as_pytree(*, statistics_type: type[SufficientStatistics]) -> None:
@@ -131,99 +114,29 @@ class JaxExpectationMaximization(
             node_counts=self.zero_node_counts(),
         )
 
-    def zero_batch_statistics(self) -> BatchStatistics:
-        """
-        :return: What a pass over no rows learns.
-        """
-        return BatchStatistics(
-            total_log_likelihood=jnp.zeros(
-                (), dtype=jnp.result_type(*self.initial_parameters)
-            ),
-            statistics=self.zero_statistics(parameters=self.initial_parameters),
-        )
-
-    def batch_statistics(
-        self, *, parameters: list[jax.Array], data: jax.Array
-    ) -> BatchStatistics:
-        """
-        :param parameters: Arrays in the order of the circuit's parameters.
-        :param data: The rows of a batch.
-        :return: What one pass of automatic differentiation over all rows learns.
-        """
-        total, (parameter_gradients, node_counts) = jax.value_and_grad(
-            lambda differentiated, node_offsets: self.total_log_likelihood(
-                parameters=differentiated, node_offsets=node_offsets, data=data
-            ),
-            argnums=(0, 1),
-        )(parameters, self.zero_node_counts())
-        return BatchStatistics(
-            total_log_likelihood=total,
-            statistics=self.statistics_from_gradients(
-                parameters=parameters,
-                parameter_gradients=parameter_gradients,
-                node_counts=node_counts,
-            ),
-        )
-
-    def chunked_batch_statistics(
-        self, *, parameters: list[jax.Array], data: jax.Array
-    ) -> BatchStatistics:
-        """
-        :param parameters: Arrays in the order of the circuit's parameters.
-        :param data: The rows of a batch, split by rows across the training devices.
-        :return: What passes over chunks of :attr:`rows_per_chunk` rows learn about all
-            rows, each device passing over chunks of its own rows.
-        """
-        rows, columns = data.shape
-        devices = len(self.training_devices)
-        if (
-            self.rows_per_chunk is None
-            or rows <= self.rows_per_chunk
-            or rows % self.rows_per_chunk != 0
-            or self.rows_per_chunk % devices != 0
-        ):
-            return self.batch_statistics(parameters=parameters, data=data)
-        chunks = jnp.moveaxis(
-            data.reshape(
-                devices,
-                rows // self.rows_per_chunk,
-                self.rows_per_chunk // devices,
-                columns,
-            ),
-            1,
-            0,
-        )
-        statistics_of_all_chunks, _ = jax.lax.scan(
-            lambda accumulated, chunk: (
-                accumulated.added(
-                    other=self.batch_statistics(
-                        parameters=parameters, data=chunk.reshape(-1, columns)
-                    )
-                ),
-                None,
-            ),
-            self.zero_batch_statistics(),
-            chunks,
-        )
-        return statistics_of_all_chunks
-
     @called_positionally
     def step(
         self, state: ExpectationMaximizationState, *batch: jax.Array
     ) -> ExpectationMaximizationState:
         [data] = batch
-        batch_statistics = self.chunked_batch_statistics(
-            parameters=state.parameters, data=data
+        total, (parameter_gradients, node_counts) = jax.value_and_grad(
+            lambda parameters, node_offsets: self.total_log_likelihood(
+                parameters=parameters, node_offsets=node_offsets, data=data
+            ),
+            argnums=(0, 1),
+        )(state.parameters, self.zero_node_counts())
+        batch_statistics = self.statistics_from_gradients(
+            parameters=state.parameters,
+            parameter_gradients=parameter_gradients,
+            node_counts=node_counts,
         )
         return ExpectationMaximizationState(
             parameters=state.parameters,
             statistics=[
                 accumulated.added(other=added)
-                for accumulated, added in zip(
-                    state.statistics, batch_statistics.statistics
-                )
+                for accumulated, added in zip(state.statistics, batch_statistics)
             ],
-            loss=-batch_statistics.total_log_likelihood / data.shape[0],
+            loss=-total / data.shape[0],
         )
 
     @called_positionally
