@@ -14,7 +14,10 @@ import pytest
 from cramph.node import EndedByOwner
 from cramph.data_types import ObservationStateValue
 from cramph.exceptions import CyclicNodeDependencyError, PrerequisiteNotExpandedError
-from giskardpy.motion_statechart.exceptions import NoProgressError
+from giskardpy.motion_statechart.exceptions import (
+    NoProgressError,
+    PositionLimitBlockedError,
+)
 from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
@@ -170,7 +173,7 @@ class TestStallDetection:
 
         executor.compile(statechart=motion_statechart)
 
-        with pytest.raises(NoProgressError) as exception_info:
+        with pytest.raises(PositionLimitBlockedError) as exception_info:
             executor.tick_until_end(timeout=2000)
 
         assert goal.unique_name in str(exception_info.value)
@@ -339,7 +342,7 @@ class TestStallDetection:
 
         assert progressing.monitored_tasks == [reachable, unreachable]
 
-        with pytest.raises(NoProgressError) as exception_info:
+        with pytest.raises(PositionLimitBlockedError) as exception_info:
             executor.tick_until_end(timeout=2000)
 
         assert exception_info.value.stalled_tasks == [unreachable]
@@ -388,7 +391,7 @@ class TestStallDetection:
 
         executor.compile(statechart=motion_statechart)
 
-        with pytest.raises(NoProgressError) as exception_info:
+        with pytest.raises(PositionLimitBlockedError) as exception_info:
             executor.tick_until_end(timeout=2000)
 
         assert exception_info.value.stalled_tasks == [unreachable]
