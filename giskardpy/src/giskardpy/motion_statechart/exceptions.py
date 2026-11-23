@@ -250,9 +250,10 @@ class PositionLimitBlockedError(NoProgressError):
         correction for the limits known to block the motion.
         """
         return (
-            "Start the motion from a configuration further from these limits, for "
-            "example by first turning a joint whose range spans more than a full turn "
-            "a full turn away from the limit."
+            "The goal lies beyond what these joints can reach from this configuration. "
+            "Move the robot so that the motion does not need to drive them past their "
+            "limits, for example by moving its base, or turn a joint whose range spans "
+            "more than a full turn a full turn away from the limit it lies at."
         )
 
 
