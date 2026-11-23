@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+from krrood.patterns.field_metadata import JSONMetadata
 from random_events.interval import Interval
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.sigma_algebra import AbstractCompositeSet
@@ -82,11 +83,15 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     """
 
     structure_array_copies: StructureArrayCopies = field(
-        default_factory=StructureArrayCopies, kw_only=True, repr=False
+        default_factory=StructureArrayCopies,
+        kw_only=True,
+        repr=False,
+        metadata=JSONMetadata(serialize=False).as_dict(),
     )
     """
     The copies of :attr:`node_variables` on the devices of the events it selects from,
-    shared by the copies of this layer with other parameters.
+    shared by the copies of this layer with other parameters, but not by its deep copies
+    or its JSON.
     """
 
     @property

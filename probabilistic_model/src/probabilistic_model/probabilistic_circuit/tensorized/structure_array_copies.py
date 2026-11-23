@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from array_api_compat import array_namespace, is_torch_array
+from typing_extensions import Any, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -66,6 +67,13 @@ class StructureArrayCopies:
     """
     The copies made so far, by the array they copy and their device.
     """
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
+        """
+        :return: Copies of no arrays, since a deep copy of a structure has arrays of its
+            own, which no copy made so far is of.
+        """
+        return type(self)()
 
     def placed(self, *, array: np.ndarray, values: BackendArray) -> BackendArray:
         """

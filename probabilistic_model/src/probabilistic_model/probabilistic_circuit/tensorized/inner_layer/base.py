@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
+from krrood.patterns.field_metadata import JSONMetadata
 from krrood.adapters import json_serializer
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent
@@ -753,11 +754,15 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
     @classmethod
     def serialized_fields(cls) -> list[dataclasses.Field]:
         """
-        :return: The dataclass fields that describe a layer, which are the ones its
-            constructor takes. The caches a layer fills in on its own are declared with
-            ``init=False`` and are left out.
+        :return: The dataclass fields that describe a layer: the ones its constructor
+            takes, except those whose :class:`JSONMetadata` says not to serialize them.
         """
-        return [field_ for field_ in dataclasses.fields(cls) if field_.init]
+        return [
+            field_
+            for field_ in dataclasses.fields(cls)
+            if field_.init
+            and field_.metadata.get(JSONMetadata, JSONMetadata()).serialize
+        ]
 
     def to_json(self, **kwargs) -> dict[str, Any]:
         """
