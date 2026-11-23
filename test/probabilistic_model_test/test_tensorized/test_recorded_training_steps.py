@@ -15,17 +15,17 @@ import numpy as np
 import pytest
 from array_api_compat import array_namespace
 
-from probabilistic_model.learning.training_schedule import MiniBatches
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
 )
 
 torch = pytest.importorskip("torch")
 torch_circuit_parameter_learning = pytest.importorskip(
-    "probabilistic_model.learning.torch_circuit_parameter_learning"
+    "probabilistic_model.learning.parameters.torch_circuit_parameter_learning"
 )
 torch_expectation_maximization = pytest.importorskip(
-    "probabilistic_model.learning.torch_expectation_maximization"
+    "probabilistic_model.learning.parameters.expectation_maximization.torch_expectation_maximization"
 )
 
 # %% fixtures

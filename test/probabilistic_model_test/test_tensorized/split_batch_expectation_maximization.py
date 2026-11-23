@@ -16,10 +16,10 @@ import jax.numpy as jnp
 import numpy as np
 from random_events.variable import Continuous
 
-from probabilistic_model.learning.jax_expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.jax_expectation_maximization import (
     JaxExpectationMaximization,
 )
-from probabilistic_model.learning.training_schedule import MiniBatches
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
 )

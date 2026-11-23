@@ -39,7 +39,7 @@ from krrood.entity_query_language.factories import a, variable_from
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
-from probabilistic_model.learning.gaussian_mixture.gaussian_mixture_model import (
+from probabilistic_model.learning.structure.gaussian_mixture.gaussian_mixture_model import (
     GaussianMixtureModel,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (

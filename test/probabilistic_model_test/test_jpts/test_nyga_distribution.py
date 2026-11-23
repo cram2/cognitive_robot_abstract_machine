@@ -17,7 +17,10 @@ from scipy.special import logsumexp, rel_entr
 from krrood.adapters.json_serializer import from_json, to_json
 from probabilistic_model.distributions.distributions import DiracDeltaDistribution
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.learning.nyga_induction import InductionStep, NygaInduction
+from probabilistic_model.learning.structure.nyga_induction import (
+    InductionStep,
+    NygaInduction,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     SumUnit,

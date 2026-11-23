@@ -1,5 +1,6 @@
-"""Tests of how the benchmark runner assigns runs to the shares of the
-machine."""
+"""
+Tests of how the benchmark runner assigns runs to the shares of the machine.
+"""
 
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from experiments.circuit_learning.methods import LearningMethod
 from experiments.circuit_learning.records import BenchmarkRun, RunKind
 from experiments.circuit_learning.runner import BenchmarkRunner
 from experiments.circuit_learning.settings import ComputationSetting
-from probabilistic_model.learning.jax_circuit_parameter_learning import (
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
     CompilerOption,
     CompilerVariable,
 )
@@ -61,8 +62,9 @@ def runner_without_graphics_processor(*, cache: Path) -> BenchmarkRunner:
 def test_runs_without_graphics_processor_stay_on_processor_cores(
     prepared_cache: Path,
 ):
-    """Without a share of the GPU, every method trains in a setting on the
-    processor cores."""
+    """
+    Without a share of the GPU, every method trains in a setting on the processor cores.
+    """
     runs = runner_without_graphics_processor(cache=prepared_cache).runs()
     assert {run.method for run in runs if run.kind is RunKind.TRAINING} == set(
         LearningMethod
@@ -71,8 +73,9 @@ def test_runs_without_graphics_processor_stay_on_processor_cores(
 
 
 def test_run_without_a_share_fails(prepared_cache: Path):
-    """A run on the GPU fails at once when the machine has no share of the
-    GPU."""
+    """
+    A run on the GPU fails at once when the machine has no share of the GPU.
+    """
     run = BenchmarkRun(
         kind=RunKind.TRAINING,
         dataset=DatasetName.NLTCS,
@@ -107,8 +110,10 @@ def compiler_options_of_share(*, cache: Path, device: Device) -> list[str]:
 def test_a_run_on_processor_cores_gets_a_jax_device_per_power_of_two_cores(
     prepared_cache: Path,
 ):
-    """A run on a share of 25 processor cores computes with jax on 16 CPU
-    devices, the largest power of two of at most 25."""
+    """
+    A run on a share of 25 processor cores computes with jax on 16 CPU devices, the
+    largest power of two of at most 25.
+    """
     assert CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(
         value=16
     ) in compiler_options_of_share(
@@ -119,8 +124,9 @@ def test_a_run_on_processor_cores_gets_a_jax_device_per_power_of_two_cores(
 def test_a_run_on_the_graphics_processor_keeps_one_jax_host_device(
     prepared_cache: Path,
 ):
-    """A run on a share of the GPU leaves the number of CPU devices of jax
-    alone."""
+    """
+    A run on a share of the GPU leaves the number of CPU devices of jax alone.
+    """
     options = compiler_options_of_share(
         cache=prepared_cache, device=Device.GRAPHICS_PROCESSOR
     )

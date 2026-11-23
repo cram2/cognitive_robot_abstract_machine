@@ -47,7 +47,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-
 @dataclass(eq=False, repr=False)
 class HasLocationAndScale:
     """
@@ -152,9 +151,7 @@ class HasLocationAndScale:
 
 
 @dataclass(eq=False, repr=False)
-class GaussianLayer(
-    HasLocationAndScale, ContinuousLayerWithDensity
-):
+class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
     """
     A layer of Gaussian distributions over one continuous variable.
     """

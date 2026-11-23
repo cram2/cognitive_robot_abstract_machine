@@ -73,7 +73,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.utils import (
 )
 
 
-
 @dataclass(eq=False, repr=False)
 class SumLayer(HasParameterArrays, InnerLayer):
     """

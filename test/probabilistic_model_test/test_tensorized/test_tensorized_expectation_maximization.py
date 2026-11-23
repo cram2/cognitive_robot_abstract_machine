@@ -30,19 +30,24 @@ from sortedcontainers import SortedSet
 from probabilistic_model.adapters.circuit_representations import (
     CircuitRepresentations,
 )
-from probabilistic_model.learning.exceptions import UnsupportedLayerError
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    UnsupportedLayerError,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     LearnableUnits,
 )
-from probabilistic_model.learning.jax_expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.jax_expectation_maximization import (
     JaxExpectationMaximization,
 )
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
-from probabilistic_model.learning.tensorized_expectation_maximization import (
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.parameters.expectation_maximization.tensorized_expectation_maximization import (
     TensorizedExpectationMaximization,
 )
-from probabilistic_model.learning.training_schedule import Convergence, MiniBatches
+from probabilistic_model.learning.parameters.training_schedule import (
+    Convergence,
+    MiniBatches,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
@@ -213,7 +218,7 @@ def learner_of(
     if namespace is jnp:
         return JaxExpectationMaximization(layer=layer, **settings)
     torch_expectation_maximization = pytest.importorskip(
-        "probabilistic_model.learning.torch_expectation_maximization"
+        "probabilistic_model.learning.parameters.expectation_maximization.torch_expectation_maximization"
     )
     return torch_expectation_maximization.TorchExpectationMaximization(
         layer=layer, **settings
@@ -531,7 +536,7 @@ def torch_parameters_after_learning(
     """
     torch = pytest.importorskip("torch")
     torch_expectation_maximization = pytest.importorskip(
-        "probabilistic_model.learning.torch_expectation_maximization"
+        "probabilistic_model.learning.parameters.expectation_maximization.torch_expectation_maximization"
     )
     np.random.seed(0)
     host = case.circuit(np, edge_matrix_type)

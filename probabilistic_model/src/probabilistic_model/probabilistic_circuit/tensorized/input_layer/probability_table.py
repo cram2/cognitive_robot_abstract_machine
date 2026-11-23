@@ -297,9 +297,7 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
 
 
 @dataclass(eq=False)
-class DenseProbabilityTable(
-    ProbabilityTable[NodeStateValues]
-):
+class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
     """
     A probability table stored as one dense array of log-probabilities.
 

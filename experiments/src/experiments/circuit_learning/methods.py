@@ -27,27 +27,35 @@ from experiments.circuit_learning.settings import (
     EdgeRepresentation,
 )
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationTraining,
     LearnableUnits,
 )
-from probabilistic_model.learning.circuit_parameter_learning import (
+from probabilistic_model.learning.parameters.circuit_parameter_learning import (
     CircuitParameterLearning,
 )
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_expectation_maximization import (
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.jax_expectation_maximization import (
     JaxExpectationMaximization,
 )
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
-from probabilistic_model.learning.torch_expectation_maximization import (
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.parameters.expectation_maximization.torch_expectation_maximization import (
     TorchExpectationMaximization,
 )
-from probabilistic_model.learning.torch_gradient_descent import TorchGradientDescent
-from probabilistic_model.learning.training_schedule import (
+from probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent import (
+    TorchGradientDescent,
+)
+from probabilistic_model.learning.parameters.training_schedule import (
     Convergence,
     ConvergenceHistory,
     LearningRatePlateau,

@@ -31,9 +31,9 @@ from krrood.patterns.field_metadata import JSONMetadata
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.query.match import Match
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LearningMethod
-from probabilistic_model.learning.jpt.variables import (
+from probabilistic_model.learning.structure.jpt.variables import (
     infer_variables_from_dataframe,
 )
 from probabilistic_model.probabilistic_model import PartialPointType

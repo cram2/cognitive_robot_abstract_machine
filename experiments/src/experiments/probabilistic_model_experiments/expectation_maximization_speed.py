@@ -28,7 +28,7 @@ from experiments.probabilistic_circuit_experiments.gaussian_mixture_benchmark im
 from experiments.probabilistic_model_experiments.layered_circuit_speed import (
     TimedCall,
 )
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationLearning,
 )

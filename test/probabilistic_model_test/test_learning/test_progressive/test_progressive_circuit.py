@@ -19,18 +19,18 @@ from probabilistic_model.distributions.gaussian import (
 )
 from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.learning.exceptions import UnsupportedLeafDistributionError
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
 )
-from probabilistic_model.learning.progressive.exceptions import (
+from probabilistic_model.learning.structure.progressive.exceptions import (
     ColumnStructureMismatchError,
     EarlierColumnShareOutOfRangeError,
     UnregisteredColumnError,
 )
-from probabilistic_model.learning.progressive.expectation_maximization import (
+from probabilistic_model.learning.structure.progressive.expectation_maximization import (
     ProgressiveExpectationMaximization,
 )
-from probabilistic_model.learning.progressive.progressive_circuit import (
+from probabilistic_model.learning.structure.progressive.progressive_circuit import (
     AlignedUnits,
     CircuitColumn,
     ProgressiveProbabilisticCircuit,

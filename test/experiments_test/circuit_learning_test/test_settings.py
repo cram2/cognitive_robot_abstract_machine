@@ -18,7 +18,7 @@ from experiments.circuit_learning.settings import (
     ComputationSetting,
     EdgeRepresentation,
 )
-from probabilistic_model.learning.training_schedule import Convergence
+from probabilistic_model.learning.parameters.training_schedule import Convergence
 from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     InnerLayer,

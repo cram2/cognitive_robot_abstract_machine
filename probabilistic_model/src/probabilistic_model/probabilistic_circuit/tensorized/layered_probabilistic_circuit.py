@@ -32,7 +32,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleArray,
     SampleValues,
 )
-from probabilistic_model.learning.gradient_descent import (
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
     AverageNegativeLogLikelihood,
     Loss,
 )
@@ -362,7 +362,9 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :return: This circuit.
         """
         # jax is optional, see the core boundary in pyproject.toml
-        from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+        from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+            JaxGradientDescent,
+        )
 
         self.root = JaxGradientDescent(
             layer=self.root,

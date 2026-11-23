@@ -25,7 +25,7 @@ from probabilistic_model.distributions.binomial import (
     TruncatedBinomialDistribution,
 )
 from probabilistic_model.exceptions import SuccessProbabilityOutsideUnitIntervalError
-from probabilistic_model.learning.row_kernel_mixture import RowKernelMixture
+from probabilistic_model.learning.structure.row_kernel_mixture import RowKernelMixture
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
     BinomialLayer,
     TruncatedBinomialLayer,

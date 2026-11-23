@@ -64,8 +64,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding impo
 from probabilistic_model.utils import MissingDict
 
 
-
-
 @dataclass(eq=False, repr=False)
 class DiscreteLayer(UnivariateInputLayer, ABC):
     """

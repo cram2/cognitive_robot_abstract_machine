@@ -13,15 +13,22 @@ from array_api_compat import array_namespace
 
 from krrood_compute_resources.memory import HostMemory
 
-from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
-from probabilistic_model.learning.exceptions import (
+from probabilistic_model.learning.parameters.step_memory import (
+    ProbeMeasurement,
+    StepMemory,
+)
+from probabilistic_model.learning.parameters.exceptions import (
     NotEnoughMemoryError,
     UnmeasurableHostStepMemoryError,
     UnmeasurableStepMemoryError,
 )
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
-from probabilistic_model.learning.training_schedule import MiniBatches
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 
 from ...krrood_compute_resources_test.dataset.memory import FixedFreeMemory
 # %% memory of a step
@@ -121,18 +128,18 @@ def torch_trainer(mixture_of_products_case, request):
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
     torch_circuit_parameter_learning = pytest.importorskip(
-        "probabilistic_model.learning.torch_circuit_parameter_learning"
+        "probabilistic_model.learning.parameters.torch_circuit_parameter_learning"
     )
     device = torch.device(request.param)
     if (
         device.type
         == torch_circuit_parameter_learning.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+        and not torch.cuda.is_available()
     ):
-        if not torch.cuda.is_available():
-            pytest.skip("no CUDA device")
+        pytest.skip("no CUDA device")
     case = mixture_of_products_case
     np.random.seed(0)
     namespace = array_namespace(torch.zeros(0))

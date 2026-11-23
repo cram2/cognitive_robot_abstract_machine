@@ -12,8 +12,10 @@ from random_events.interval import closed
 from random_events.variable import Continuous
 
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     LeafUnit,
     ProbabilisticCircuit,

@@ -21,7 +21,7 @@ from experiments.circuit_learning.settings import (
     EdgeRepresentation,
     FloatingPointType,
 )
-from probabilistic_model.learning.training_schedule import Convergence
+from probabilistic_model.learning.parameters.training_schedule import Convergence
 
 # %% settings
 

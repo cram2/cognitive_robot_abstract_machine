@@ -16,8 +16,12 @@ from array_api_compat import array_namespace
 from scipy.special import logsumexp
 from typing_extensions import Any
 
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
 )
@@ -278,7 +282,7 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
 
     case = mixture_of_products_case
