@@ -25,7 +25,6 @@ from krrood_spatial_math.exceptions import (
 from krrood_spatial_math.space import EuclideanSpace, Space
 
 if TYPE_CHECKING:
-    from krrood_spatial_math.point import Point
     from krrood_spatial_math.vector import GenericVector, Vector
 
 # %% what coordinates are given in
@@ -104,27 +103,6 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
         :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
         """
         raise FrameMeasuresNoLengthsError(frame_kind=cls)
-
-    @classmethod
-    def norm(cls, *, vector: Vector) -> GenericCoordinate:
-        """
-        :param vector: A vector given in a frame of this kind.
-        :return: The length of ``vector``: the square root of its inner product with
-            itself.
-        :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
-        """
-        return cls.inner_product(first=vector, second=vector) ** 0.5
-
-    @classmethod
-    def distance(cls, *, first: Point, second: Point) -> GenericCoordinate:
-        """
-        :param first: A point given in a frame of this kind.
-        :param second: A point given in the same frame.
-        :return: The straight-line distance between both points: the length of their
-            difference.
-        :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
-        """
-        return cls.norm(vector=first - second)
 
     @classmethod
     def cross_product(

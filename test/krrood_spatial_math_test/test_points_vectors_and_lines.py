@@ -303,11 +303,12 @@ def test_a_line_segment_lies_on_the_line_from_its_start_to_its_end():
 # %% the metric of a Cartesian frame kind
 
 
-def test_a_cartesian_frame_kind_measures_a_vectors_length_without_a_frame():
-    assert (
-        float(CartesianFrame3Dimensional.norm(vector=Vector3Dimensional(3, 4, 0)))
-        == 5.0
-    )
+def test_a_vectors_length_is_the_square_root_of_its_inner_product_with_itself():
+    """
+    A vector is as long as the norm its inner product with itself induces.
+    """
+    vector = Vector3Dimensional(3, 4, 0)
+    assert float(vector.norm()) == float(vector.dot(vector)) ** 0.5 == 5.0
 
 
 def test_a_cartesian_frame_kind_measures_the_angle_between_two_vectors():
@@ -317,39 +318,20 @@ def test_a_cartesian_frame_kind_measures_the_angle_between_two_vectors():
     assert float(product) == 32.0
 
 
-def test_a_cartesian_frame_kind_measures_the_distance_between_two_points():
+def test_the_distance_between_two_points_is_the_length_of_their_difference():
     """
-    A Cartesian kind of frame measures distances without a frame instance.
+    Two points are as far apart as the vector between them is long.
     """
-    distance = CartesianFrame3Dimensional.distance(
-        first=Point3Dimensional(1, 2, 3),
-        second=Point3Dimensional(4, 6, 3),
+    first, second = Point3Dimensional(4, 6, 3), Point3Dimensional(1, 2, 3)
+    assert (
+        float(first.euclidean_distance(second)) == float((first - second).norm()) == 5.0
     )
-    assert float(distance) == 5.0
-
-
-def test_a_vectors_length_is_the_one_its_frame_kind_measures():
-    vector = Vector3Dimensional(1, 2, 2)
-    assert float(vector.norm()) == float(CartesianFrame3Dimensional.norm(vector=vector))
 
 
 def test_a_vectors_inner_product_is_the_one_its_frame_kind_measures():
     first, second = Vector3Dimensional(1, 0, 2), Vector3Dimensional(3, 1, 1)
     assert float(first.dot(second)) == float(
         CartesianFrame3Dimensional.inner_product(first=first, second=second)
-    )
-
-
-def test_a_points_distance_is_the_one_its_frame_kind_measures():
-    """
-    A point measures its distance with the metric of its kind of frame.
-    """
-    first, second = (
-        Point3Dimensional(0, 0, 0),
-        Point3Dimensional(1, 2, 2),
-    )
-    assert float(first.euclidean_distance(second)) == float(
-        CartesianFrame3Dimensional.distance(first=first, second=second)
     )
 
 

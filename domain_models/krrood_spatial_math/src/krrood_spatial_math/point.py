@@ -86,10 +86,11 @@ class Point(AxisCoordinates, Generic[GenericVector]):
     def euclidean_distance(self, other: Self) -> GenericCoordinate:
         """
         :param other: A point given in the same frame.
-        :return: The straight-line distance between this point and ``other``.
+        :return: The straight-line distance between this point and ``other``: the
+            length of their difference.
         :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
-        return self.frame_kind.distance(first=self, second=other)
+        return (self - other).norm()
 
 
 GenericPoint = TypeVar("GenericPoint", bound=Point)

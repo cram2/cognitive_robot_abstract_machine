@@ -84,10 +84,11 @@ class Vector(
 
     def norm(self) -> GenericCoordinate:
         """
-        :return: The length of this vector.
+        :return: The length of this vector: the square root of its inner product with
+            itself.
         :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
-        return self.frame_kind.norm(vector=self)
+        return self.dot(self) ** 0.5
 
     def dot(self, other: Self) -> GenericCoordinate:
         """

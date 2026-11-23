@@ -13,8 +13,8 @@ coordinate system. Its base depends on `krrood` alone.
 - `krrood_spatial_math.coordinate_system`: `CoordinateSystem`, what coordinates on one
   space are given in; `AffineFrame`, one with an origin and straight axes, and
   `CartesianFrame`, an affine frame whose axes are perpendicular and of unit length,
-  whose kind measures the length of a vector, the inner product of two and the distance
-  between two points;
+  whose kind measures the inner product of two vectors, from which the length of a
+  vector and the distance between two points follow;
   `CoordinateRepresentation`, a point, direction or orientation given by its
   coordinates in a coordinate system, which `apply_transformation` re-expresses in the
   target coordinate system of a change;
