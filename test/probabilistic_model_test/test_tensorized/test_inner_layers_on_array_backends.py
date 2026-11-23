@@ -40,6 +40,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     EdgeMatrix,
+    EdgeWeighting,
     RowReduction,
     SparseEdgeMatrix,
     SparseEntries,
@@ -375,5 +376,43 @@ def test_reduce_by_row_on_every_backend(
             reduction=reduction,
         ),
         reduced_by_definition(values, edges, reduction),
+        array_backend,
+    )
+
+
+@pytest.mark.parametrize("reduction", list(RowReduction))
+@pytest.mark.parametrize("combination", [RowReduction.SUM, RowReduction.PRODUCT])
+def test_reduce_weighted_child_values_by_row_on_every_backend(
+    uneven_rows, edge_matrix_type, reduction, combination, array_backend
+):
+    """
+    Reducing the values of the children of every row, each joined with the value of its
+    edge, gives an array of the backend of the values that matches joining and reducing
+    one row at a time.
+    """
+    edges = edge_matrix_type.from_edge_positions(
+        rows=uneven_rows.rows, columns=uneven_rows.columns, shape=uneven_rows.shape
+    )
+    values = np.array(
+        [[0.5, -1.0, 2.0, 0.25, -0.5, 1.5], [1.0, 2.0, -3.0, 0.5, 0.75, -0.25]]
+    )
+    edge_values = np.array([0.3, -0.7, 1.1, 0.2, -0.4, 0.9])
+    stored = edges.stored_values(
+        entries=SparseEntries(
+            array_backend.asarray(edge_values), uneven_rows.rows, uneven_rows.columns
+        ),
+        padding=0.0,
+    )
+    weighted_by_edge = np.zeros((2, uneven_rows.shape.number_of_columns))
+    weighted_by_edge[:, uneven_rows.columns] = combination.combine(
+        np, values[:, uneven_rows.columns], edge_values
+    )
+    assert_result_of_backend_equals(
+        edges.reduce_child_values_by_row(
+            values=array_backend.asarray(values),
+            reduction=reduction,
+            weighting=EdgeWeighting(stored=stored, combination=combination),
+        ),
+        reduced_by_definition(weighted_by_edge, edges, reduction),
         array_backend,
     )
