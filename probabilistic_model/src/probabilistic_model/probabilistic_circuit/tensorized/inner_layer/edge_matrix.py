@@ -234,10 +234,6 @@ class EdgeMatrix(ABC):
 
     The edges are structure, fixed once constructed. Values along the edges are laid out
     as the subclass stores them, which only the methods of the subclass read.
-
-    .. note::
-        Values are gathered by indexing with numpy integer arrays, which numpy, jax and
-        torch support although the Array API standard does not require it.
     """
 
     @property
@@ -531,15 +527,14 @@ class SparseEdgeMatrix(EdgeMatrix):
         # would copy an array with one entry per event per column for nothing
         if self.stores_every_column_once_in_order:
             return values
-        return values[
-            ...,
-            self.structure_array_copies.placed(array=self.edge_columns, values=values),
-        ]
+        return self.structure_array_copies.values_at_positions(
+            values=values, positions=self.edge_columns
+        )
 
     def values_of_rows(self, *, values: NodeValues) -> BackendArray:
-        return values[
-            ..., self.structure_array_copies.placed(array=self.edge_rows, values=values)
-        ]
+        return self.structure_array_copies.values_at_positions(
+            values=values, positions=self.edge_rows
+        )
 
     def reduce_by_row(
         self, *, values: BackendArray, reduction: RowReduction
@@ -553,9 +548,9 @@ class SparseEdgeMatrix(EdgeMatrix):
             device=array_api_compat.device(values),
         )
         for positions in reversed(self.entry_positions_by_rank):
-            entries = values[
-                ..., self.structure_array_copies.placed(array=positions, values=values)
-            ]
+            entries = self.structure_array_copies.values_at_positions(
+                values=values, positions=positions
+            )
             number_of_reduced_rows = result.shape[-1]
             result = namespace.concat(
                 [
@@ -573,12 +568,9 @@ class SparseEdgeMatrix(EdgeMatrix):
             device=array_api_compat.device(values),
         )
         result = namespace.concat([result, rows_without_edges], axis=-1)
-        return result[
-            ...,
-            self.structure_array_copies.placed(
-                array=self.entry_count_ranks, values=result
-            ),
-        ]
+        return self.structure_array_copies.values_at_positions(
+            values=result, positions=self.entry_count_ranks
+        )
 
 
 @dataclass(eq=False)
@@ -920,17 +912,19 @@ class EdgeBlockStack:
         :return: The values of the columns of every block, an array of the backend of
             ``values`` with shape (..., #blocks, #columns of a block).
         """
+        namespace = array_namespace(values)
+        block_shape = tuple(values.shape[:-1]) + self.block_columns.shape
         if not self.has_contiguous_columns:
-            return values[
-                ...,
-                self.structure_array_copies.placed(
-                    array=self.block_columns, values=values
+            return namespace.reshape(
+                self.structure_array_copies.values_at_positions(
+                    values=values, positions=self.block_columns
                 ),
-            ]
+                block_shape,
+            )
         first_column = int(self.block_columns[0, 0])
-        return array_namespace(values).reshape(
+        return namespace.reshape(
             values[..., first_column : first_column + self.block_columns.size],
-            tuple(values.shape[:-1]) + self.block_columns.shape,
+            block_shape,
         )
 
     @functools.cached_property
@@ -1213,14 +1207,14 @@ class BlockEdgeMatrix(EdgeMatrix):
         return stored
 
     def values_of_columns(self, *, values: BackendArray) -> BackendArray:
-        return values[
-            ..., self.structure_array_copies.placed(array=self.columns, values=values)
-        ]
+        return self.structure_array_copies.values_at_positions(
+            values=values, positions=self.columns
+        )
 
     def values_of_rows(self, *, values: NodeValues) -> BackendArray:
-        return values[
-            ..., self.structure_array_copies.placed(array=self.rows, values=values)
-        ]
+        return self.structure_array_copies.values_at_positions(
+            values=values, positions=self.rows
+        )
 
     def reduce_by_row(
         self, *, values: BackendArray, reduction: RowReduction
@@ -1311,9 +1305,6 @@ class BlockEdgeMatrix(EdgeMatrix):
         result = reduced[0] if len(reduced) == 1 else namespace.concat(reduced, axis=-1)
         if self.reduces_nodes_in_order:
             return result
-        return result[
-            ...,
-            self.structure_array_copies.placed(
-                array=self.node_positions, values=result
-            ),
-        ]
+        return self.structure_array_copies.values_at_positions(
+            values=result, positions=self.node_positions
+        )
