@@ -1,45 +1,84 @@
-#!/usr/bin/env python
 """
-Launch Giskard in standalone kinematic simulation mode for the TIAGo robot.
+Robot interface configurations for the TIAGo robot in ROS 2.
 """
 
 from __future__ import annotations
 
-from datetime import timedelta
+from dataclasses import dataclass
 
-from rclpy.node import Node
+from giskardpy.middleware.ros2.robot_interface_config import (
+    ClosedLoopRobotInterfaceConfig,
+)
+from semantic_digital_twin.robots.tiago import TiagoJoint
+from semantic_digital_twin.world_description.connections import (
+    Connection6DoF,
+    DifferentialDrive,
+)
 
-from giskardpy.middleware.ros2.giskard import Giskard
-from giskardpy.qp.qp_controller_config import QPControllerConfig
-from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.specifications.worlds import WorldSpecification
 
-
-def create_giskard(node: Node) -> Giskard:
+@dataclass(kw_only=True)
+class TiagoVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
-    Build a standalone Giskard instance configured for the TIAGo robot.
-
-    :param node: The ROS 2 node Giskard runs on.
-    :return: Configured standalone Giskard instance.
+    Commands the dual arms and mobile base of TIAGo through their velocity controllers.
     """
-    return Giskard.standalone(
-        world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(Tiago)]
-        ),
-        qp_controller_config=QPControllerConfig(
-            target_frequency=25,
-            braking_time=timedelta(seconds=1.15),
-        ),
-    )
 
+    @staticmethod
+    def left_arm_velocity_joint_names() -> list[TiagoJoint]:
+        """
+        Joints driven by /arm_left_velocity_controller/command.
 
-def main() -> None:
-    """
-    Run the Giskard built by :func:`create_giskard` as a ROS 2 node until shutdown.
-    """
-    Giskard.launch(create_giskard=create_giskard)
+        Their order matches the controller's YAML command layout, so it is significant.
+        """
+        return [
+            TiagoJoint.LEFT_ARM_1,
+            TiagoJoint.LEFT_ARM_2,
+            TiagoJoint.LEFT_ARM_3,
+            TiagoJoint.LEFT_ARM_4,
+            TiagoJoint.LEFT_ARM_5,
+            TiagoJoint.LEFT_ARM_6,
+            TiagoJoint.LEFT_ARM_7,
+        ]
 
+    @staticmethod
+    def right_arm_velocity_joint_names() -> list[TiagoJoint]:
+        """
+        Joints driven by /arm_right_velocity_controller/command.
 
-if __name__ == "__main__":
-    main()
+        Their order matches the controller's YAML command layout, so it is significant.
+        """
+        return [
+            TiagoJoint.RIGHT_ARM_1,
+            TiagoJoint.RIGHT_ARM_2,
+            TiagoJoint.RIGHT_ARM_3,
+            TiagoJoint.RIGHT_ARM_4,
+            TiagoJoint.RIGHT_ARM_5,
+            TiagoJoint.RIGHT_ARM_6,
+            TiagoJoint.RIGHT_ARM_7,
+        ]
+
+    def setup(self) -> None:
+        self.sync_6dof_joint_with_tf_frame(
+            joint=self.world.get_connections_by_type(Connection6DoF)[0],
+            tf_parent_frame="map",
+            tf_child_frame=self.robot.mobile_base.odometry_body_name,
+        )
+
+        self.sync_robot_parts()
+
+        diff_drive = self.world.get_connections_by_type(DifferentialDrive)[0]
+        self.add_drive_velocity_command_topic(
+            command_topic="/cmd_vel",
+            drive=diff_drive,
+        )
+
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/arm_left_velocity_controller/command",
+            connections=self.left_arm_velocity_joint_names(),
+            minimum_valid_velocity=0.0,
+        )
+
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/arm_right_velocity_controller/command",
+            connections=self.right_arm_velocity_joint_names(),
+            minimum_valid_velocity=0.0,
+        )

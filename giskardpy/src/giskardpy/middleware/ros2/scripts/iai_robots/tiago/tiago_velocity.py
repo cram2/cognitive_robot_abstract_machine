@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from rclpy.node import Node
-
+import re
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.tiago.configs import (
     TiagoVelocityInterface,
@@ -29,13 +29,14 @@ def create_giskard(node: Node) -> Giskard:
     :param node: The node Giskard runs on, which reads the robot description.
     :return: Configured closed-loop Giskard instance.
     """
+    urdf = re.sub(
+        r"(meshes/arm/[^\"<]+)\.dae",
+        r"\1.stl",
+        RosGraph(node).robot_description(),
+    )
     return Giskard(
         world_source=WorldSpecification(
-            robots=[
-                RobotSpecification.specify_real_robot(
-                    Tiago, urdf=RosGraph(node).robot_description()
-                )
-            ]
+            robots=[RobotSpecification.specify_real_robot(Tiago, urdf=urdf)]
         ),
         robot_interface_config=TiagoVelocityInterface(),
         server_config=GiskardServerConfig(),
