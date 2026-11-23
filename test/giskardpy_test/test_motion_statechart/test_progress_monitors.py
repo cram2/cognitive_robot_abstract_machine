@@ -178,7 +178,9 @@ class TestStallDetection:
 
         assert goal.unique_name in str(exception_info.value)
 
-    def test_a_task_jittering_in_place_stalls(self, *, cylinder_bot_world: World):
+    def test_a_task_jittering_in_place_stalls(
+        self, *, cylinder_bot_world: World
+    ) -> None:
         """
         A task pushed back every cycle, as an arm held off by a collision is, keeps
         moving without getting any closer to its goal, so the motion is cancelled with a
@@ -1169,7 +1171,7 @@ class TestPositionLimitsReached:
     Which position limits a degree of freedom counts as lying at.
     """
 
-    def test_a_locked_degree_of_freedom_lies_at_both_limits(self):
+    def test_a_locked_degree_of_freedom_lies_at_both_limits(self) -> None:
         """
         A degree of freedom whose two limits coincide lies at both of them, so a task
         pushing it either way is caught.
@@ -1187,7 +1189,7 @@ class TestPositionLimitsReached:
             PositionLimit(degree_of_freedom=locked, side=PositionLimitSide.UPPER),
         ]
 
-    def test_a_degree_of_freedom_missing_a_limit_lies_at_none(self):
+    def test_a_degree_of_freedom_missing_a_limit_lies_at_none(self) -> None:
         """
         Without both limits there is no range to measure closeness by, so a degree of
         freedom missing one lies at neither.
@@ -1213,7 +1215,7 @@ class TestErrorGradientBlocking:
 
     def test_a_slope_into_a_limit_blocks_it(
         self, *, bot_position_task: CartesianPosition
-    ):
+    ) -> None:
         """
         A degree of freedom at its upper limit whose error falls by moving it further up
         is blocked there.
@@ -1233,7 +1235,7 @@ class TestErrorGradientBlocking:
 
     def test_a_round_off_slope_does_not_block(
         self, *, bot_position_task: CartesianPosition
-    ):
+    ) -> None:
         """
         A slope that is only round-off next to the steepest one does not count as
         driving its degree of freedom into a limit.

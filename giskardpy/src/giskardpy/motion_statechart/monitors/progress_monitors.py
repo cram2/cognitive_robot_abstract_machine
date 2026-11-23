@@ -457,9 +457,9 @@ class PositionLimit:
         :param degree_of_freedom: The degree of freedom whose position limits are
             checked.
         :param position: Its position.
-        :param range_fraction: How close to a limit `position` counts as at that limit,
+        :param range_fraction: How close to a limit ``position`` counts as at that limit,
             as a fraction of the range between the two limits.
-        :return: Every limit `position` lies at, none if a limit is missing.
+        :return: Every limit ``position`` lies at, none if a limit is missing.
         """
         lower = degree_of_freedom.limits.lower.position
         upper = degree_of_freedom.limits.upper.position
@@ -518,7 +518,7 @@ class ErrorGradient:
         :param reached_limits: Position limits that their degrees of freedom lie at.
         :param negligible_slope_fraction: Fraction of the steepest slope at or below
             which a slope counts as zero.
-        :return: Every limit in `reached_limits` whose crossing would make the error
+        :return: Every limit in ``reached_limits`` whose crossing would make the error
             fall.
         """
         negligible_slope = negligible_slope_fraction * max(
@@ -617,7 +617,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
     def find_blocked_position_limits(
         self,
         *,
-        range_fraction: float = 0.005,
+        range_fraction: float = 0.001,
         negligible_slope_fraction: float = 1e-3,
     ) -> list[BlockedPositionLimit]:
         """
@@ -666,7 +666,7 @@ class StillProgressing(EndedByOwner, CompositeNode):
         :param tasks: Tasks of this node.
         :param degrees_of_freedom: Degrees of freedom of the world this node runs in.
         :return: The gradient of each task's error with respect to the positions of
-            `degrees_of_freedom`, at the world's current state.
+            ``degrees_of_freedom``, at the world's current state.
         """
         world = self.context.world
         float_variable_data = self.context.float_variable_data
