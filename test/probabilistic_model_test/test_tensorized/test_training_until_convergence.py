@@ -11,19 +11,25 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
+from enum import IntEnum
 from datetime import timedelta
 from pathlib import Path
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import optax
 import pytest
 from array_api_compat import array_namespace
+from random_events.set import Set
+from random_events.variable import Symbolic
+from sortedcontainers import SortedSet
 from krrood.adapters.json_serializer import DataclassJSONSerializer
 
 from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
 from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
+from probabilistic_model.learning.region_graph.region_graph import RegionGraph
 from probabilistic_model.learning.jax_gradient_descent import (
     CompilerOption,
     CompilerVariable,
@@ -39,6 +45,9 @@ from probabilistic_model.learning.training_schedule import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
 )
 
 from .test_circuit_parameters_and_training import (
@@ -451,15 +460,13 @@ def test_a_torch_step_reports_its_loss_as_a_tensor(mixture_of_products_case):
 
 def torch_parameters_after_training(
     *,
-    case,
-    edge_matrix_type: type,
+    host: LayeredProbabilisticCircuit,
     device: str,
     records_cuda_graphs: bool,
     takes_steps_one_by_one: bool,
-) -> list[np.ndarray]:
+) -> list[npt.NDArray[np.float64]]:
     """
-    :param case: The circuit to train and to sample the data from.
-    :param edge_matrix_type: The type of matrix every inner layer stores its edges in.
+    :param host: The circuit with numpy parameters to train and to sample the data from.
     :param device: The torch device to train on.
     :param records_cuda_graphs: Whether the steps may be recorded as CUDA graphs.
     :param takes_steps_one_by_one: Whether every step is taken by
@@ -473,7 +480,6 @@ def torch_parameters_after_training(
         "probabilistic_model.learning.torch_gradient_descent"
     )
     np.random.seed(0)
-    host = case.circuit(np, edge_matrix_type)
     namespace = array_namespace(torch.zeros(0))
     circuit = host.to_namespace(namespace, device=device)
     data = namespace.asarray(host.sample(450), device=device)
@@ -530,8 +536,57 @@ def test_steps_recorded_as_cuda_graphs_train_as_steps_taken_one_by_one(
         pytest.skip("needs a CUDA device")
     recorded, taken = (
         torch_parameters_after_training(
-            case=mixture_of_products_case,
-            edge_matrix_type=edge_matrix_type,
+            host=mixture_of_products_case.circuit(np, edge_matrix_type),
+            device="cuda",
+            records_cuda_graphs=True,
+            takes_steps_one_by_one=one_by_one,
+        )
+        for one_by_one in (False, True)
+    )
+    for recorded_parameter, taken_parameter in zip(recorded, taken):
+        np.testing.assert_array_equal(recorded_parameter, taken_parameter)
+
+
+class Bit(IntEnum):
+    """
+    The values of a binary symbolic variable.
+    """
+
+    ZERO = 0
+    ONE = 1
+
+
+@pytest.fixture
+def circuit_with_symbolic_leaves() -> LayeredProbabilisticCircuit:
+    """
+    A RAT-SPN over eight binary symbolic variables, whose leaves are symbolic layers.
+    """
+    variables = SortedSet(
+        [
+            Symbolic(name=f"bit_{index}", domain=Set.from_iterable(Bit))
+            for index in range(8)
+        ]
+    )
+    region_graph = RegionGraph(
+        variables=variables, depth=2, repetitions=2, seed=0
+    ).create_random_region_graph()
+    np.random.seed(0)
+    return region_graph.to_probabilistic_circuit(input_units=4, sum_units=4)
+
+
+def test_steps_recorded_as_cuda_graphs_train_symbolic_leaves_as_steps_taken_one_by_one(
+    circuit_with_symbolic_leaves,
+):
+    """
+    Recording the steps of a circuit with symbolic leaves as CUDA graphs and replaying
+    them gives the parameters that taking every step on its own gives.
+    """
+    torch = pytest.importorskip("torch")
+    if not torch.cuda.is_available():
+        pytest.skip("needs a CUDA device")
+    recorded, taken = (
+        torch_parameters_after_training(
+            host=circuit_with_symbolic_leaves,
             device="cuda",
             records_cuda_graphs=True,
             takes_steps_one_by_one=one_by_one,
@@ -551,8 +606,7 @@ def test_steps_on_the_cpu_are_taken_one_by_one_even_if_cuda_graphs_are_asked_for
     """
     asked, not_asked = (
         torch_parameters_after_training(
-            case=mixture_of_products_case,
-            edge_matrix_type=edge_matrix_type,
+            host=mixture_of_products_case.circuit(np, edge_matrix_type),
             device="cpu",
             records_cuda_graphs=records,
             takes_steps_one_by_one=False,
