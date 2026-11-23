@@ -12,10 +12,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
-from krrood.adapters.json_serializer import (
-    DataclassJSONSerializer,
-    SubclassJSONSerializer,
-)
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
@@ -70,7 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
+class Layer(DataclassDeepcopyMixin, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
@@ -758,23 +754,6 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.number_of_nodes})"
-
-    # %% serialization
-
-    def to_json(self, **kwargs) -> dict[str, Any]:
-        """
-        Serialize the fields this layer's constructor takes, except those marked
-        :class:`~krrood.patterns.field_metadata.JSONMetadata` with ``serialize=False``.
-        """
-        return DataclassJSONSerializer.to_json(instance=self, **kwargs)
-
-    @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        """
-        Construct the layer from the fields :meth:`to_json` serialized; the fields it
-        leaves out take their defaults.
-        """
-        return DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
 
 
 @dataclass(eq=False, repr=False)
