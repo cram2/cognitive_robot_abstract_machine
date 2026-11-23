@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.base import SequentialAction
+from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from cramph.composites import Parallel
 from giskardpy.motion_statechart.mixins import HasGoalPoseParameter
 from coraplex.robot_plans.mixins import (
@@ -134,6 +135,23 @@ class PlaceAction(
     @property
     def variable_poses(self) -> list[Pose]:
         return self._tool_goals.poses
+
+    def handed_over_from(self) -> list[StatechartNode]:
+        """
+        :return: The latest pick-up of :attr:`graspable` by :attr:`arm` before this
+            place, whose grasp this place releases; empty if there is none.
+        """
+        return next(
+            (
+                [pick_up]
+                for pick_up in self.statechart.get_preceding_nodes_by_type(
+                    node=self, node_type=PickUpAction
+                )
+                if pick_up.arm is self.arm
+                and pick_up.grasp_candidate.graspable is self.graspable
+            ),
+            [],
+        )
 
     def on_start(self) -> None:
         """

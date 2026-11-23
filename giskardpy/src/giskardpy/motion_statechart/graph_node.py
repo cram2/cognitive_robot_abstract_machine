@@ -52,6 +52,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 from cramph.node import NodeArtifacts, StatechartNode, EndStatechart
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
+from cramph.world_access import WorldAccess, degrees_of_freedom_in
 
 
 @dataclass(kw_only=True)
@@ -173,6 +174,32 @@ class MotionStatechartNode(StatechartNode):
             directly affect the motion to return empty artifacts.
         """
         return MotionNodeArtifacts()
+
+    def world_access(self) -> WorldAccess:
+        """
+        :return: What :meth:`~cramph.node.StatechartNode.world_access` returns, with the
+            degrees of freedom its error reads and those its constraints move.
+        """
+        artifacts = self.artifacts
+        return (
+            super()
+            .world_access()
+            .merged_with(
+                other=WorldAccess(
+                    moved=frozenset(
+                        degree_of_freedom
+                        for constraint in [
+                            *artifacts.constraints.equality_constraints,
+                            *artifacts.constraints.inequality_constraints,
+                        ]
+                        for degree_of_freedom in degrees_of_freedom_in(
+                            constraint.expression
+                        )
+                    ),
+                    read=degrees_of_freedom_in(artifacts.error),
+                )
+            )
+        )
 
     @property
     def constraint_collection(self) -> ConstraintCollection:
@@ -385,6 +412,14 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
     :attr:`goal_reference_frame`.
     """
 
+    _goal_binding_access: WorldAccess = field(
+        default_factory=WorldAccess, init=False, repr=False
+    )
+    """
+    The degrees of freedom and frames the latest binding of the goal reference frame
+    read.
+    """
+
     @property
     @abstractmethod
     def goal_reference_frame(self) -> KinematicStructureEntity:
@@ -430,7 +465,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
             root_T_tip=self._root_T_goal_reference_frame_to_bind(),
         )
         self.root_T_goal_reference_frame = self._goal_reference_frame_binding.root_T_tip
-        self._goal_reference_frame_binding.bind(world=self.context.world)
+        self._bind_goal_reference_frame()
 
     def on_start(self) -> None:
         """
@@ -440,7 +475,39 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
         """
         super().on_start()
         if self.goal_binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._goal_reference_frame_binding.bind(world=self.context.world)
+            self._bind_goal_reference_frame()
+
+    def _bind_goal_reference_frame(self) -> None:
+        """
+        Fix :attr:`root_T_goal_reference_frame` to where the goal reference frame lies
+        now, and remember the degrees of freedom and frames between
+        :attr:`goal_binding_root` and :attr:`goal_reference_frame` that this read.
+        """
+        self._goal_reference_frame_binding.bind(world=self.context.world)
+        root_chain, tip_chain = self.context.world.compute_split_chain_of_connections(
+            self.goal_binding_root, self.goal_reference_frame
+        )
+        chain = [*root_chain, *tip_chain]
+        self._goal_binding_access = WorldAccess(
+            read=frozenset(
+                degree_of_freedom
+                for connection in chain
+                for degree_of_freedom in connection.dofs
+            ),
+            read_frames=frozenset(
+                frame
+                for connection in chain
+                for frame in (connection.parent, connection.child)
+            ),
+        )
+
+    def world_access(self) -> WorldAccess:
+        """
+        :return: What :meth:`~cramph.node.StatechartNode.world_access` returns, with the
+            degrees of freedom and frames the latest binding of the goal reference frame
+            read.
+        """
+        return super().world_access().merged_with(other=self._goal_binding_access)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

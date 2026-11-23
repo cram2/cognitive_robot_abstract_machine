@@ -129,6 +129,13 @@ class Action(CompositeNode, ABC):
             extension_type=RobotAccess
         ).controlled_root
 
+    def handed_over_from(self) -> list[StatechartNode]:
+        """
+        :return: The nodes of the plan whose result this action takes over and acts on,
+            beyond what it is given as parameters; none here.
+        """
+        return []
+
     def keep_base_still(self) -> list[MotionStatechartNode]:
         """
         :return: The task holding the robot's base where it stands, empty when the robot
