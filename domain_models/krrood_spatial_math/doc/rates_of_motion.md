@@ -103,6 +103,10 @@ and a translational part, given along the axes of the same reference frame.
 | `Twist` | the angular velocity $\omega$ | the velocity $v$ of the point of the body at the frame's origin | time, usually |
 | `ScrewAxis` | the angle $\omega$ the body turns by about each axis per unit of position | how far $v$ the point of the body at the frame's origin moves per unit of position | a position, such as a joint's |
 
+`Displacement` means a *rigid-body displacement*, a rotation and a translation together
+{cite}`lynch2017modern` (section 3.1), not the translation alone that the word means in
+everyday use.
+
 For both kinds of rate, $\omega$ names the rotational part and $v$ the translational
 part. They differ in what the change of the pose is measured against:
 
@@ -278,6 +282,174 @@ moving at the twist for $\pi$ seconds gives the same displacement as the quarter
 ```{code-cell} ipython3
 same_turn = twist.to_displacement(duration=math.pi)
 assert np.allclose(same_turn, quarter_turn)
+```
+
+### The three types side by side
+
+The figure moves two bodies along the screw axis of the first figure, at
+$\dot\theta = 0.5$ and $1$ rad/s:
+
+- The **screw axis** (yellow) and its helix are the same for both: they don't depend on
+  the speed.
+- The **twist**, drawn at the frame's origin as $\omega$ (0.2 m per rad/s) and $v$ (as
+  far as one second takes it), is the screw axis times the speed: twice as long for the
+  faster body, and constant over time.
+- The **displacement** is how far each body has got by the time $t$: its translation is
+  the black line, its rotation vector is above each panel. The line is straight because a
+  displacement keeps where the origin ended up, not the path it took.
+
+The faster body reaches each displacement in half the time: the quarter turn at
+$t = \pi/2$ s instead of $\pi$ s, as in the cell above.
+
+```{code-cell} ipython3
+:tags: [hide-input]
+
+speeds = (0.5, 1.0)
+times = np.linspace(0, 2 * math.pi, 49)
+twists = [screw.to_twist(position_velocity=speed) for speed in speeds]
+moved = [
+    [twist.to_displacement(duration=float(time)) for time in times]
+    for twist in twists
+]
+quarter_turn_step = 12
+assert np.allclose(moved[0][2 * quarter_turn_step], moved[1][quarter_turn_step])
+assert np.isclose(times[quarter_turn_step], math.pi / 2)
+
+helix = np.array(
+    [
+        np.asarray(screw.to_displacement(position=float(p)).translation[:3])
+        for p in np.linspace(0, 2 * math.pi, 145)
+    ]
+)
+axis_colors = (("#d62728", "x"), ("#2ca02c", "y"), ("#1f77b4", "z"))
+
+
+def line(start, end, color, width, name, panel, tip=True):
+    return go.Scatter3d(
+        x=[start[0], end[0]],
+        y=[start[1], end[1]],
+        z=[start[2], end[2]],
+        mode="lines+markers" if tip else "lines",
+        line=dict(color=color, width=width),
+        marker=dict(size=[0, 5], color=color),
+        legendgroup=name,
+        showlegend=panel == 0,
+        name=name,
+    )
+
+
+def body_traces(displacement, panel):
+    origin = np.asarray(displacement.translation[:3]).astype(float)
+    orientation = Rotation.from_rotvec(
+        np.asarray(displacement.rotation_vector[:3]).astype(float)
+    ).as_matrix()
+    traces = [
+        line(
+            np.zeros(3), origin, "#333333", 6, "displacement: translation", panel
+        )
+    ]
+    for axis, (color, name) in enumerate(axis_colors):
+        traces.append(
+            line(
+                origin,
+                origin + 0.1 * orientation[:, axis],
+                color,
+                8,
+                f"body's {name} axis",
+                panel,
+                tip=False,
+            )
+        )
+    return traces
+
+
+def three_types_title(step, panel):
+    displacement = moved[panel][step]
+    return (
+        f"θ̇ = {speeds[panel]} rad/s, θ = θ̇t = {speeds[panel] * times[step]:.2f} rad"
+        f"<br>rotation vector {numbers(*np.asarray(displacement.rotation_vector[:3]))}"
+    )
+
+
+def three_types_state(step):
+    traces = [
+        trace
+        for panel in range(2)
+        for trace in body_traces(moved[panel][step], panel)
+    ]
+    titles = {
+        f"annotations[{panel}].text": three_types_title(step, panel)
+        for panel in range(2)
+    }
+    return traces, titles
+
+
+three_types_figure = make_subplots(
+    rows=1,
+    cols=2,
+    specs=[[{"type": "scene"}, {"type": "scene"}]],
+    subplot_titles=[three_types_title(0, panel) for panel in range(2)],
+    horizontal_spacing=0.02,
+)
+for panel, twist in enumerate(twists):
+    column = panel + 1
+    angular = np.asarray(twist.angular_velocity[:3]).astype(float)
+    linear = np.asarray(twist.linear_velocity[:3]).astype(float)
+    static = [
+        go.Scatter3d(
+            x=[0.3, 0.3],
+            y=[0, 0],
+            z=[-0.1, 0.75],
+            mode="lines",
+            line=dict(color="#e0a800", width=6),
+            legendgroup="screw axis",
+            showlegend=panel == 0,
+            name="screw axis",
+        ),
+        go.Scatter3d(
+            x=helix[:, 0],
+            y=helix[:, 1],
+            z=helix[:, 2],
+            mode="lines",
+            line=dict(color="#bbbbbb", width=2),
+            legendgroup="helix",
+            showlegend=panel == 0,
+            name="the helix the origin follows",
+        ),
+        line(np.zeros(3), 0.2 * angular, "#9467bd", 6, "twist: ω", panel),
+        line(np.zeros(3), linear, "#ff7f0e", 6, "twist: v", panel),
+    ]
+    for trace in static:
+        three_types_figure.add_trace(trace, row=1, col=column)
+for index, trace in enumerate(three_types_state(0)[0]):
+    three_types_figure.add_trace(trace, row=1, col=index // 4 + 1)
+scene = dict(
+    xaxis=dict(range=[-0.15, 0.75], title="x (m)"),
+    yaxis=dict(range=[-0.45, 0.45], title="y (m)"),
+    zaxis=dict(range=[-0.15, 0.75], title="z (m)"),
+    aspectmode="cube",
+    camera=dict(eye=dict(x=1.5, y=-1.5, z=0.8)),
+)
+three_types_figure.update_annotations(font=dict(size=12))
+three_types_figure.update_layout(
+    template="plotly_white",
+    height=620,
+    margin=dict(l=0, r=0, t=110, b=0),
+    scene=scene,
+    scene2=scene,
+    legend=dict(orientation="h", x=0, y=1.13, yanchor="bottom"),
+    uirevision="three types",
+    sliders=[
+        slider(
+            [f"{time:.2f}" for time in times],
+            "time t (s): ",
+            active=0,
+            states=[three_types_state(step) for step in range(len(times))],
+            traces=list(range(8, 16)),
+        )
+    ],
+)
+show(three_types_figure)
 ```
 
 ## From a rate to a displacement
