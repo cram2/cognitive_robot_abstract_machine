@@ -118,6 +118,14 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
         raise NotImplementedError
 
     @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :return: Whether looking up the log-probabilities of states during a training
+            step copies nothing from the host to the device of the table.
+        """
+        return False
+
+    @property
     @abstractmethod
     def number_of_states(self) -> int:
         """
@@ -438,6 +446,13 @@ class DenseProbabilityTable(
         return self.log_probabilities.shape[1]
 
     @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`ProbabilityTable.trains_without_host_copies` for dense tables, which do.
+        """
+        return True
+
+    @property
     def number_of_stored_entries(self) -> int:
         return int(self.log_probabilities.size)
 
@@ -467,11 +482,9 @@ class DenseProbabilityTable(
         if columns.ndim == 1:
             return self.namespace.take(padded, columns, axis=1).T
         # the entry of node n and column c sits at n * (#states + 1) + c of the flat table
-        node_offsets = self.namespace.asarray(
-            np.arange(self.number_of_nodes) * (self.number_of_states + 1),
-            dtype=columns.dtype,
-            device=self.device,
-        )
+        node_offsets = self.namespace.arange(
+            self.number_of_nodes, dtype=columns.dtype, device=self.device
+        ) * (self.number_of_states + 1)
         flat = self.namespace.take(
             self.namespace.reshape(padded, (-1,)),
             self.namespace.reshape(columns + node_offsets, (-1,)),

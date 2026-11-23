@@ -1,0 +1,15 @@
+# Members depending on each other in a chain (base, middle, top), one depending on none
+# (side), and a family whose members nest in its directory and share its test directory.
+[project]
+name = "dependent-workspace"
+
+[tool.uv.workspace]
+members = [
+    "base",
+    "middle",
+    "top",
+    "side",
+    "family",
+    "family/family-core",
+    "family/family-extra",
+]

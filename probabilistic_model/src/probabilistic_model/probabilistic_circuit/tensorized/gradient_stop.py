@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from types import ModuleType
 
 from array_api_compat import array_namespace, is_jax_namespace, is_torch_namespace
-from typing_extensions import Self
+from typing_extensions import Collection, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
@@ -32,7 +32,7 @@ class GradientStop:
     """
 
     @classmethod
-    def from_arrays(cls, *arrays: BackendArray) -> Self:
+    def from_arrays(cls, *, arrays: Collection[BackendArray]) -> Self:
         """
         :param arrays: Arrays of one backend.
         :return: The gradient stop of the subclass that supports that backend, this

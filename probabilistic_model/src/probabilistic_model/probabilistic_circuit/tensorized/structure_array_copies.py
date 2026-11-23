@@ -9,10 +9,11 @@ from __future__ import annotations
 # %% imports
 from dataclasses import dataclass, field
 
-import numpy as np
 from array_api_compat import array_namespace, is_torch_array
+from typing_extensions import Any, Self
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    ArraySelection,
     BackendArray,
 )
 
@@ -42,7 +43,7 @@ class StructureArrayCopy:
     A numpy array of a structure and its copy on a device.
     """
 
-    original: np.ndarray
+    original: ArraySelection
     """
     The numpy array, kept so that its identity stays unique while the copy is used.
     """
@@ -67,7 +68,14 @@ class StructureArrayCopies:
     The copies made so far, by the array they copy and their device.
     """
 
-    def placed(self, *, array: np.ndarray, values: BackendArray) -> BackendArray:
+    def __deepcopy__(self, memo: dict[int, Any]) -> Self:
+        """
+        :return: Copies of no arrays, since a deep copy of a structure has arrays of its
+            own, which no copy made so far is of.
+        """
+        return type(self)()
+
+    def placed(self, *, array: ArraySelection, values: BackendArray) -> BackendArray:
         """
         :param array: An array of the structure, such as positions that index
             ``values``.

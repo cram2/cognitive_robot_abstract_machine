@@ -311,6 +311,13 @@ class SumLayer(HasParameterArrays, ExpectationMaximizationParameters, InnerLayer
         return self.edges.number_of_edges
 
     @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` for sum layers, which do.
+        """
+        return True
+
+    @property
     def parameters(self) -> list[BackendArray]:
         return [self.log_weights]
 

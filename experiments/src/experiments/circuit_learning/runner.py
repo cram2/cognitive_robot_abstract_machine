@@ -1,7 +1,7 @@
-"""
-Runs the circuit learning benchmark: every method on every dataset in every setting it
-supports, and the queries of every circuit learned in a method's first setting, each run
-in a process of its own on a share of the GPU or the processor cores.
+"""Runs the circuit learning benchmark: every method on every dataset in every
+setting it supports, and the queries of every circuit learned in a method's
+first setting, each run in a process of its own on a share of the GPU or the
+processor cores.
 
 A restarted benchmark resumes after the runs its database records.
 """
@@ -56,43 +56,20 @@ from experiments.circuit_learning.settings import (
     ComputationSetting,
     Device,
 )
-from probabilistic_model.learning.torch_gradient_descent import TorchDeviceType
+from probabilistic_model.learning.jax_circuit_parameter_learning import (
+    CompilerOption,
+    CompilerVariable,
+)
+from probabilistic_model.learning.torch_circuit_parameter_learning import (
+    TorchDeviceType,
+)
 from probabilistic_model.learning.training_schedule import Convergence
 
 # %% names
 
 
-class CompilerVariable(StrEnum):
-    """
-    The environment variables that configure the compilers of a run.
-    """
-
-    ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
-    """
-    The options of the XLA compiler.
-    """
-
-
-class CompilerOption(StrEnum):
-    """
-    The options of the XLA compiler a run is given.
-    """
-
-    GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL = "--xla_gpu_autotune_level"
-    """
-    How much XLA tunes the kernels it compiles for the GPU.
-    """
-
-    HOST_PLATFORM_DEVICE_COUNT = "--xla_force_host_platform_device_count"
-    """
-    The number of devices jax divides the processor cores into.
-    """
-
-
 class OutputFile(StrEnum):
-    """
-    The files and directories of a benchmark's output directory.
-    """
+    """The files and directories of a benchmark's output directory."""
 
     DATABASE = "results.sqlite"
     LOGS = "logs"
@@ -103,37 +80,25 @@ class OutputFile(StrEnum):
 
 @dataclass(kw_only=True)
 class RunLimits:
-    """
-    The limits every run of a benchmark keeps to.
-    """
+    """The limits every run of a benchmark keeps to."""
 
     training_duration: timedelta = timedelta(hours=1)
-    """
-    The time after which iterative training starts no further epoch.
-    """
+    """The time after which iterative training starts no further epoch."""
 
     query_duration: timedelta = timedelta(hours=1)
-    """
-    The time after which a run of queries is stopped.
-    """
+    """The time after which a run of queries is stopped."""
 
     evaluation_allowance: timedelta = timedelta(minutes=30)
-    """
-    The time a training run has beyond its training, for building the structure and
-    evaluating the circuit.
-    """
+    """The time a training run has beyond its training, for building the
+    structure and evaluating the circuit."""
 
     training_timeout_factor: float = 2.0
-    """
-    The multiple of :attr:`training_duration` a training run may train before it is
-    stopped, since the epoch that is running when :attr:`training_duration` passes still
-    finishes.
-    """
+    """The multiple of :attr:`training_duration` a training run may train
+    before it is stopped, since the epoch that is running when
+    :attr:`training_duration` passes still finishes."""
 
     memory_budget_bytes: int = 0
-    """
-    The most memory of its device a training step may allocate.
-    """
+    """The most memory of its device a training step may allocate."""
 
     @property
     def training_timeout(self) -> timedelta:
@@ -151,35 +116,24 @@ class RunLimits:
 
 @dataclass(kw_only=True)
 class RunExecution:
-    """
-    Carries out one run in the current process and stores what it measured.
-    """
+    """Carries out one run in the current process and stores what it
+    measured."""
 
     run: BenchmarkRun
-    """
-    The run.
-    """
+    """The run."""
 
     database: BenchmarkDatabase
-    """
-    The database of the benchmark.
-    """
+    """The database of the benchmark."""
 
     cache_directory: Path
-    """
-    The directory of the downloaded and prepared datasets.
-    """
+    """The directory of the downloaded and prepared datasets."""
 
     limits: RunLimits
-    """
-    The limits of the run.
-    """
+    """The limits of the run."""
 
     def execute(self) -> None:
-        """
-        Measure, and store the rows, and the learned circuit of a training run, in one
-        transaction.
-        """
+        """Measure, and store the rows, and the learned circuit of a training
+        run, in one transaction."""
         jax.config.update("jax_enable_x64", True)
         dataset = PreparedDatasets(cache_directory=self.cache_directory).load(
             name=self.run.dataset
@@ -224,34 +178,22 @@ class RunExecution:
 
 @dataclass(kw_only=True)
 class RunInProgress:
-    """
-    A run and the process carrying it out.
-    """
+    """A run and the process carrying it out."""
 
     run: BenchmarkRun
-    """
-    The run.
-    """
+    """The run."""
 
     process: subprocess.Popen
-    """
-    Its process.
-    """
+    """Its process."""
 
     share: MachineShare
-    """
-    The share of the machine it uses.
-    """
+    """The share of the machine it uses."""
 
     start: float
-    """
-    When it started, as :func:`time.perf_counter` reads it.
-    """
+    """When it started, as :func:`time.perf_counter` reads it."""
 
     timeout: timedelta
-    """
-    The time after which it is stopped.
-    """
+    """The time after which it is stopped."""
 
     @property
     def elapsed(self) -> timedelta:
@@ -263,59 +205,40 @@ class RunInProgress:
 
 @dataclass(kw_only=True)
 class BenchmarkRunner:
-    """
-    Runs every run on the shares of the machine, the most informative first.
-    """
+    """Runs every run on the shares of the machine, the most informative
+    first."""
 
     datasets: list[DatasetName]
-    """
-    The datasets, smallest first.
-    """
+    """The datasets, smallest first."""
 
     methods: list[LearningMethod]
-    """
-    The methods.
-    """
+    """The methods."""
 
     output: Path
-    """
-    The output directory.
-    """
+    """The output directory."""
 
     cache_directory: Path
-    """
-    The directory of the downloaded and prepared datasets.
-    """
+    """The directory of the downloaded and prepared datasets."""
 
     limits: RunLimits = field(default_factory=RunLimits)
-    """
-    The limits of every run, its memory budget replaced by that of the share it runs on.
-    """
+    """The limits of every run, its memory budget replaced by that of the share
+    it runs on."""
 
     division: MachineDivision = field(default_factory=MachineDivision)
-    """
-    How the machine is divided among the runs.
-    """
+    """How the machine is divided among the runs."""
 
     poll_interval: timedelta = timedelta(seconds=5)
-    """
-    How often running runs are checked.
-    """
+    """How often running runs are checked."""
 
     log_tail_characters: int = 3000
-    """
-    How much of the end of a failed run's output its record keeps.
-    """
+    """How much of the end of a failed run's output its record keeps."""
 
     first_settings_only: bool = False
-    """
-    Whether only the trainings in each method's first setting and their queries run.
-    """
+    """Whether only the trainings in each method's first setting and their
+    queries run."""
 
     finished: dict[str, RunStatus] = field(default_factory=dict)
-    """
-    The status of every run that ended, by its key.
-    """
+    """The status of every run that ended, by its key."""
 
     @functools.cached_property
     def database(self) -> BenchmarkDatabase:
@@ -431,9 +354,7 @@ class BenchmarkRunner:
     def record(
         self, *, run: BenchmarkRun, status: RunStatus, duration: timedelta
     ) -> None:
-        """
-        Store how a run ended.
-        """
+        """Store how a run ended."""
         self.finished[run.key] = status
         log = self.log_file(run=run)
         log_tail = None
@@ -455,11 +376,13 @@ class BenchmarkRunner:
         """
         environment = share.process_environment(environment=dict(os.environ))
         # autotuning makes compiling a step take minutes on large batches
-        options = [f"{CompilerOption.GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL}=0"]
+        options = [CompilerOption.GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL.to_flag(value=0)]
         if share.device is Device.CENTRAL_PROCESSOR:
             # a power of two splits the batch sizes of the methods evenly
             devices = 2 ** int(math.log2(len(share.processor_cores)))
-            options.append(f"{CompilerOption.HOST_PLATFORM_DEVICE_COUNT}={devices}")
+            options.append(
+                CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(value=devices)
+            )
         environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = " ".join(
             options
         )
@@ -531,9 +454,7 @@ class BenchmarkRunner:
         return None
 
     def run(self) -> None:
-        """
-        Run every run that has not ended in an earlier start.
-        """
+        """Run every run that has not ended in an earlier start."""
         self.run_pending(runs=self.runs())
 
     def run_pending(self, *, runs: list[BenchmarkRun]) -> None:
@@ -587,18 +508,14 @@ class BenchmarkRunner:
 
 
 class Command(StrEnum):
-    """
-    The commands of the command line.
-    """
+    """The commands of the command line."""
 
     RUN = "run"
     EXECUTE = "execute"
 
 
 def main() -> None:
-    """
-    Parse the command line and run the benchmark or one of its runs.
-    """
+    """Parse the command line and run the benchmark or one of its runs."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=list(Command))
     parser.add_argument("--output", type=Path, required=True)

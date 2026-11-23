@@ -1,8 +1,6 @@
-"""
-Learning the parameters of a layered circuit with torch: the parameter arrays are leaf
-tensors that every step updates in place, and a step on a CUDA device may be recorded as
-a CUDA graph and replayed.
-"""
+"""Learning the parameters of a layered circuit with torch: the parameter
+arrays are leaf tensors that every step updates in place, and a step on a CUDA
+device may be recorded as a CUDA graph and replayed."""
 
 from __future__ import annotations
 
@@ -29,28 +27,23 @@ from probabilistic_model.learning.circuit_parameter_learning import (
 
 @dataclass(kw_only=True)
 class TorchCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
-    """
-    Learns the parameters of a circuit with torch parameters, updating copies of them in
-    place.
-    """
+    """Learns the parameters of a circuit with torch parameters, updating
+    copies of them in place."""
 
     records_cuda_graphs: bool = False
-    """
-    Whether training on a CUDA device records the step on batches of every shape as a
-    CUDA graph and replays it.
+    """Whether training on a CUDA device records the step on batches of every
+    shape as a CUDA graph and replays it.
 
-    The numeric queries of the circuit must not copy from the host.
+    A circuit with a layer that does not train without host copies takes
+    every step one by one.
     """
 
     parameters: list[torch.Tensor] = field(init=False)
-    """
-    The leaf tensors that training updates, copies of the parameters of the circuit.
-    """
+    """The leaf tensors that training updates, copies of the parameters of the
+    circuit."""
 
     def __post_init__(self) -> None:
-        """
-        Copy the parameters of the circuit into the trained leaf tensors.
-        """
+        """Copy the parameters of the circuit into the trained leaf tensors."""
         super().__post_init__()
         self.parameters = [
             parameter.detach().clone().requires_grad_(True)
@@ -61,12 +54,16 @@ class TorchCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
     def replays_recorded_steps(self) -> bool:
         """
         :return: Whether steps are recorded as CUDA graphs and replayed, which needs
-            :attr:`records_cuda_graphs` and parameters on a CUDA device.
+            :attr:`records_cuda_graphs`, parameters on a CUDA device and a circuit whose
+            every layer trains without host copies.
         """
         return (
             self.records_cuda_graphs
             and self.parameters[0].device.type
             == TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+            and all(
+                layer.trains_without_host_copies for layer in self.layer.all_layers()
+            )
         )
 
     def device_memory(self) -> PeakTrackingMemory:
@@ -81,23 +78,19 @@ class TorchCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
 
 @dataclass(kw_only=True)
 class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
-    """
-    Mini-batch training by a :class:`TorchCircuitParameterLearning`, its step on batches
-    of every shape replayed from a CUDA graph if it records them.
-    """
+    """Mini-batch training by a :class:`TorchCircuitParameterLearning`, its
+    step on batches of every shape replayed from a CUDA graph if it records
+    them."""
 
     replays_recorded_steps: bool = False
-    """
-    Whether steps are recorded as CUDA graphs and replayed, see
-    :attr:`TorchCircuitParameterLearning.replays_recorded_steps`.
-    """
+    """Whether steps are recorded as CUDA graphs and replayed, see
+    :attr:`TorchCircuitParameterLearning.replays_recorded_steps`."""
 
     recorded_steps: dict[RecordedStepKey, RecordedTrainingStep] = field(
         default_factory=dict, init=False
     )
-    """
-    Every step on batches of every shape, if :attr:`replays_recorded_steps`.
-    """
+    """Every step on batches of every shape, if
+    :attr:`replays_recorded_steps`."""
 
     def take_step_or_replay(
         self,
@@ -105,13 +98,13 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
         step: MethodType,
         batch: tuple[torch.Tensor, ...],
     ) -> torch.Tensor:
-        """
-        Take a step on a batch, replayed from its recording for batches of its shape if
-        :attr:`replays_recorded_steps`.
+        """Take a step on a batch, replayed from its recording for batches of
+        its shape if :attr:`replays_recorded_steps`.
 
-        :param step: The step operation by operation, a method of this training called
-            with ``batch=`` and returning the loss of the batch before the step, a
-            scalar tensor without a gradient on the device of the parameters.
+        :param step: The step operation by operation, a method of this
+            training called with ``batch=`` and returning the loss of
+            the batch before the step, a scalar tensor without a
+            gradient on the device of the parameters.
         :param batch: The same rows of every training array.
         :return: The loss of the batch before the step.
         """
@@ -132,14 +125,11 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
 
 @dataclass(kw_only=True, frozen=True)
 class BatchShape:
-    """
-    The shapes of the arrays of a batch, which a recorded step only takes batches of.
-    """
+    """The shapes of the arrays of a batch, which a recorded step only takes
+    batches of."""
 
     array_shapes: tuple[torch.Size, ...]
-    """
-    The shape of every array of the batch, in the order of the batch.
-    """
+    """The shape of every array of the batch, in the order of the batch."""
 
     @classmethod
     def from_batch(cls, *, batch: tuple[torch.Tensor, ...]) -> BatchShape:
@@ -152,54 +142,37 @@ class BatchShape:
 
 @dataclass(kw_only=True, frozen=True)
 class RecordedStepKey:
-    """
-    Which step, on batches of which shape, a recording replays.
-    """
+    """Which step, on batches of which shape, a recording replays."""
 
     step_function: Callable[..., torch.Tensor]
-    """
-    The function of the method that takes the step operation by operation, unbound from
-    the training.
-    """
+    """The function of the method that takes the step operation by operation,
+    unbound from the training."""
 
     batch_shape: BatchShape
-    """
-    The shape of the batches it takes.
-    """
+    """The shape of the batches it takes."""
 
 
 @dataclass(kw_only=True)
 class RecordedTrainingStep:
-    """
-    The training step on batches of one shape, taken operation by operation for
-    :attr:`warm_up_steps` steps, then recorded as a CUDA graph and replayed.
-    """
+    """The training step on batches of one shape, taken operation by operation
+    for :attr:`warm_up_steps` steps, then recorded as a CUDA graph and
+    replayed."""
 
     warm_up_steps: int = 3
-    """
-    The steps taken operation by operation before the step is recorded, which lets torch
-    and the optimizer create their lazily created state.
-    """
+    """The steps taken operation by operation before the step is recorded,
+    which lets torch and the optimizer create their lazily created state."""
 
     steps_taken: int = 0
-    """
-    The steps taken operation by operation so far.
-    """
+    """The steps taken operation by operation so far."""
 
     graph: torch.cuda.CUDAGraph | None = None
-    """
-    The recorded step, ``None`` before it is recorded.
-    """
+    """The recorded step, ``None`` before it is recorded."""
 
     batch: tuple[torch.Tensor, ...] = ()
-    """
-    The arrays the recorded step reads its batch from.
-    """
+    """The arrays the recorded step reads its batch from."""
 
     loss: torch.Tensor | None = None
-    """
-    The tensor the recorded step writes the loss of its batch to.
-    """
+    """The tensor the recorded step writes the loss of its batch to."""
 
     def take(
         self,
@@ -229,9 +202,8 @@ class RecordedTrainingStep:
         step: Callable[..., torch.Tensor],
         batch: tuple[torch.Tensor, ...],
     ) -> torch.Tensor:
-        """
-        Take the step operation by operation on a stream of its own, as recording a CUDA
-        graph needs of the steps before it.
+        """Take the step operation by operation on a stream of its own, as
+        recording a CUDA graph needs of the steps before it.
 
         :return: The loss of the batch before the step.
         """
@@ -248,10 +220,8 @@ class RecordedTrainingStep:
         step: Callable[..., torch.Tensor],
         batch: tuple[torch.Tensor, ...],
     ) -> None:
-        """
-        Record the step on copies of the arrays of a batch as :attr:`graph`, without
-        taking it.
-        """
+        """Record the step on copies of the arrays of a batch as :attr:`graph`,
+        without taking it."""
         self.batch = tuple(array.clone() for array in batch)
         self.graph = torch.cuda.CUDAGraph()
         # A collection that frees another recorded graph during the recording would
@@ -262,20 +232,15 @@ class RecordedTrainingStep:
 
 @dataclass(kw_only=True)
 class PausedGarbageCollection:
-    """
-    Keeps the garbage collector from running automatically inside the context, and lets
-    it run afterwards if it did before.
-    """
+    """Keeps the garbage collector from running automatically inside the
+    context, and lets it run afterwards if it did before."""
 
     was_enabled: bool = field(default=False, init=False)
-    """
-    Whether the garbage collector ran automatically before the context was entered.
-    """
+    """Whether the garbage collector ran automatically before the context was
+    entered."""
 
     def __enter__(self) -> PausedGarbageCollection:
-        """
-        Stop the garbage collector from running automatically.
-        """
+        """Stop the garbage collector from running automatically."""
         self.was_enabled = gc.isenabled()
         gc.disable()
         return self
@@ -286,9 +251,8 @@ class PausedGarbageCollection:
         exception: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """
-        Let the garbage collector run automatically again if it did before.
-        """
+        """Let the garbage collector run automatically again if it did
+        before."""
         if self.was_enabled:
             gc.enable()
 
@@ -297,8 +261,6 @@ class PausedGarbageCollection:
 
 
 class TorchDeviceType(StrEnum):
-    """
-    The types of torch devices that are told apart.
-    """
+    """The types of torch devices that are told apart."""
 
     COMPUTE_UNIFIED_DEVICE_ARCHITECTURE = "cuda"

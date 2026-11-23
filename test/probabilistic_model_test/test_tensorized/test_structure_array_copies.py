@@ -1,14 +1,18 @@
 """
 Tests that numpy arrays of a structure are copied to the device of the torch tensors
-they are used with once, and handed to numpy and jax as they are.
+they are used with once, handed to numpy and jax as they are, and left out of the deep
+copies and the JSON of an input layer.
 """
 
 from __future__ import annotations
 
 # %% imports
+import copy
+
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from krrood.adapters.json_serializer import from_json, to_json
 
 from probabilistic_model.probabilistic_circuit.tensorized.structure_array_copies import (
     StructureArrayCopies,
@@ -68,3 +72,56 @@ def test_copies_of_an_input_layer_share_its_structure_array_copies():
     copy = layer.copy_with_parameters(parameters=[torch.ones(3), torch.zeros(3)])
 
     assert copy.structure_array_copies is layer.structure_array_copies
+
+
+# %% deep copies and JSON
+
+
+@pytest.fixture
+def layer_queried_with_torch() -> GaussianLayer:
+    """
+    A Gaussian layer over two variables whose node variables were copied to the device
+    of torch events.
+    """
+    torch = pytest.importorskip("torch")
+    layer = GaussianLayer(
+        np.array([0, 0, 1]),
+        torch.zeros(3, dtype=torch.float64),
+        torch.zeros(3, dtype=torch.float64),
+    )
+    layer.column_of(events=torch.zeros((4, 2), dtype=torch.float64))
+    return layer
+
+
+def test_a_deep_copy_of_an_input_layer_starts_without_structure_array_copies(
+    layer_queried_with_torch,
+):
+    """
+    A deep copy of an input layer has structure array copies of its own, with no copies
+    made yet.
+    """
+    deep_copy = copy.deepcopy(layer_queried_with_torch)
+
+    assert (
+        deep_copy.structure_array_copies
+        is not layer_queried_with_torch.structure_array_copies
+    )
+    assert deep_copy.structure_array_copies.copies == {}
+
+
+def test_a_layer_copied_back_from_torch_round_trips_through_json(
+    layer_queried_with_torch,
+):
+    """
+    A numpy copy of an input layer that was queried with torch serializes, although it
+    shares the torch copies of its structure arrays, and comes back with none of them.
+    """
+    host = layer_queried_with_torch.copy_with_parameters(
+        parameters=[np.arange(3.0), np.zeros(3)]
+    )
+
+    restored = from_json(to_json(host))
+
+    np.testing.assert_array_equal(restored.node_variables, host.node_variables)
+    np.testing.assert_array_equal(restored.location, host.location)
+    assert restored.structure_array_copies.copies == {}

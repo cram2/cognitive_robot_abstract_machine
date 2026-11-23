@@ -204,6 +204,13 @@ class ProductLayer(InnerLayer):
         return 0
 
     @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` for product layers, which do.
+        """
+        return True
+
+    @property
     def scope_width(self) -> int:
         """
         :return: The number of variables up to the largest index in the scope of this

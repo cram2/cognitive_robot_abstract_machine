@@ -1,7 +1,5 @@
-"""
-Learning the parameters of a layered circuit with jax: one compiled step per batch,
-whose rows are split across the devices of the parameters' platform.
-"""
+"""Learning the parameters of a layered circuit with jax: one compiled step per
+batch, whose rows are split across the devices of the parameters' platform."""
 
 from __future__ import annotations
 
@@ -25,30 +23,21 @@ from probabilistic_model.learning.circuit_parameter_learning import (
 )
 
 TrainingStateType = TypeVar("TrainingStateType")
-"""
-The type of the pytree that one compiled step reads and returns.
-"""
-
+"""The type of the pytree that one compiled step reads and returns."""
 
 # %% learning
 
 
 @dataclass(kw_only=True)
 class JaxCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
-    """
-    Learns the parameters of a circuit with jax parameters by one compiled step per
-    batch on every device of the parameters' platform.
-    """
+    """Learns the parameters of a circuit with jax parameters by one compiled
+    step per batch on every device of the parameters' platform."""
 
     initial_parameters: list[jax.Array] = field(init=False)
-    """
-    The parameter arrays of the circuit before training.
-    """
+    """The parameter arrays of the circuit before training."""
 
     def __post_init__(self) -> None:
-        """
-        Record the parameters before training.
-        """
+        """Record the parameters before training."""
         super().__post_init__()
         self.initial_parameters = list(self.layer.circuit_parameters)
 
@@ -109,10 +98,8 @@ class JaxCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
         return jax.devices(self.parameter_device.platform)
 
     def largest_even_batch_size(self, *, rows: int) -> int:
-        """
-        A multiple of the number of :attr:`training_devices`, see
-        :meth:`CircuitParameterLearning.largest_even_batch_size`.
-        """
+        """A multiple of the number of :attr:`training_devices`, see
+        :meth:`CircuitParameterLearning.largest_even_batch_size`."""
         number_of_devices = len(self.training_devices)
         if rows < number_of_devices:
             return rows
@@ -145,15 +132,11 @@ class JaxCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
 
 @dataclass(kw_only=True)
 class BatchSplitDevices:
-    """
-    The devices that the rows of every batch are split across and the training state is
-    copied to.
-    """
+    """The devices that the rows of every batch are split across and the
+    training state is copied to."""
 
     mesh: Mesh
-    """
-    The devices, arranged along the axis :attr:`BatchSplitAxis.ROWS`.
-    """
+    """The devices, arranged along the axis :attr:`BatchSplitAxis.ROWS`."""
 
     @classmethod
     def from_devices(cls, *, devices: list[jax.Device]) -> Self | None:
@@ -188,22 +171,39 @@ class BatchSplitDevices:
 
 
 class BatchSplitAxis(StrEnum):
-    """
-    The named axes of the arrangement of devices that training splits batches across.
-    """
+    """The named axes of the arrangement of devices that training splits
+    batches across."""
 
     ROWS = "rows"
-    """
-    The axis the rows of a batch are split along.
-    """
+    """The axis the rows of a batch are split along."""
+
+# %% compiler options
+
+
+class CompilerVariable(StrEnum):
+    """The environment variables that configure the compilers of a process."""
+
+    ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
+    """The options of the XLA compiler."""
+
+class CompilerOption(StrEnum):
+    """The options of the XLA compiler a process is given."""
+    GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL = "--xla_gpu_autotune_level"
+    """How much XLA tunes the kernels it compiles for the GPU."""
+    HOST_PLATFORM_DEVICE_COUNT = "--xla_force_host_platform_device_count"
+    """The number of devices jax divides the processor cores into."""
+    def to_flag(self, *, value: int) -> str:
+        """
+        :param value: The value of this option.
+        :return: This option set to ``value``, as one of the options in
+            :attr:`CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS`.
+        """
+        return f"{self}={value}"
 
 
 # %% device memory
 
 
 class JaxPlatform(StrEnum):
-    """
-    The platforms of jax devices that are told apart.
-    """
-
+    """The platforms of jax devices that are told apart."""
     CPU = "cpu"
