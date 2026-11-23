@@ -470,6 +470,49 @@ def test_a_step_size_blends_the_weights_and_moments_toward_the_full_update(
             )
 
 
+def test_steps_on_rows_learn_what_steps_on_the_batches_of_those_rows_learn(
+    random_sum_product_network, differentiable_backend
+):
+    """
+    Stepping on rows of the training array, updating after every second step, learns
+    the parameters of stepping on the batches of those rows.
+    """
+    case = random_sum_product_network
+    circuit = case.layered(
+        host=case.host,
+        namespace=differentiable_backend,
+        edge_matrix_type=BlockEdgeMatrix,
+    )
+    data = differentiable_backend.asarray(circuit.encoded(case.rows))
+    row_indices = list(
+        MiniBatches(batch_size=16, seed=0).row_indices_of_epoch(
+            number_of_rows=data.shape[0]
+        )
+    )
+
+    def trained_parameters(steps_on_rows: bool) -> list[np.ndarray]:
+        """
+        :param steps_on_rows: Whether every step is given rows instead of their batch.
+        :return: The parameters after one step on each of the row indices.
+        """
+        training = learner_of(
+            layer=circuit.root, namespace=differentiable_backend, batches_per_update=2
+        ).start_training(arguments=(data,), mini_batches=MiniBatches())
+        for rows in row_indices:
+            if steps_on_rows:
+                training.step_on_rows(rows=rows)
+            else:
+                training.step_on_batch(
+                    batch=(data[differentiable_backend.asarray(rows)],)
+                )
+        return comparable_parameters(training.trained_root())
+
+    for on_rows, on_batches in zip(
+        trained_parameters(True), trained_parameters(False), strict=True
+    ):
+        np.testing.assert_allclose(on_rows, on_batches, rtol=1e-10, atol=1e-13)
+
+
 # %% steps recorded as CUDA graphs
 
 

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 from krrood.patterns.called_positionally import called_positionally
 from typing_extensions import Callable
@@ -161,6 +162,12 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
     :meth:`JaxGradientDescent.step`, compiled once for every shape of batch.
     """
 
+    compiled_step_on_rows: Callable[..., TrainingState] = field(init=False)
+    """
+    :meth:`JaxGradientDescent.step` on the rows the indices pick out of the training
+    arrays, compiled once for every number of rows.
+    """
+
     state: TrainingState = field(init=False)
     """
     The state after the last step.
@@ -186,6 +193,9 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
             learning rate cannot be changed.
         """
         self.compiled_step = jax.jit(self.gradient_descent.step)
+        self.compiled_step_on_rows = jax.jit(
+            self.gradient_descent.row_gathering_step(step=self.gradient_descent.step)
+        )
         self.state = self.gradient_descent.initial_state()
         self.batch_split_devices = BatchSplitDevices.from_devices(
             devices=self.gradient_descent.training_devices
@@ -212,6 +222,16 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
         if self.batch_split_devices is not None:
             batch = self.batch_split_devices.placed_batch(batch=batch)
         self.state = self.compiled_step(self.state, *batch)
+        return self.state.loss
+
+    def step_on_rows(self, *, rows: np.ndarray) -> jax.Array:
+        """
+        On a single training device, the rows are gathered by the compiled step itself,
+        see :meth:`MiniBatchTraining.step_on_rows`.
+        """
+        if self.batch_split_devices is not None:
+            return super().step_on_rows(rows=rows)
+        self.state = self.compiled_step_on_rows(self.state, rows, *self.arguments)
         return self.state.loss
 
     def trained_root(self) -> LayerType:

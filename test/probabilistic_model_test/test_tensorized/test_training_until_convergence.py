@@ -380,6 +380,95 @@ def test_without_a_batch_size_an_epoch_is_one_batch_of_every_row():
     assert sorted(batches[0][0]) == list(rows)
 
 
+def test_the_row_indices_of_an_epoch_select_the_rows_of_its_batches():
+    """
+    The row indices of an epoch pick out the rows of the batches of an epoch shuffled by
+    the same seed, batch by batch.
+    """
+    data = np.arange(10.0)
+    labels = np.arange(10.0) * 2
+
+    row_indices = MiniBatches(batch_size=4, seed=0).row_indices_of_epoch(
+        number_of_rows=10
+    )
+    batches = MiniBatches(batch_size=4, seed=0).batches_of_epoch(
+        arguments=(data, labels)
+    )
+
+    for rows, (batch_data, batch_labels) in zip(row_indices, batches, strict=True):
+        np.testing.assert_array_equal(batch_data, data[rows])
+        np.testing.assert_array_equal(batch_labels, labels[rows])
+
+
+@dataclass(kw_only=True)
+class BatchRecordingTraining(MiniBatchTraining):
+    """
+    Training whose steps record the batch they are given and report no loss.
+    """
+
+    batches: list[tuple[np.ndarray, ...]]
+    """
+    The batch of every step so far, in order.
+    """
+
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+        self.batches.append(batch)
+        return 0.0
+
+
+def test_a_step_on_rows_steps_on_the_batch_of_those_rows_of_every_argument():
+    """
+    A step on some rows is a step on the batch holding those rows of every training
+    array, in the order of the rows.
+    """
+    data = np.arange(10.0)
+    labels = np.arange(10.0) * 2
+    rows = np.asarray([7, 2, 5])
+    training = BatchRecordingTraining(
+        arguments=(data, labels), mini_batches=MiniBatches(), batches=[]
+    )
+
+    training.step_on_rows(rows=rows)
+
+    [(batch_data, batch_labels)] = training.batches
+    np.testing.assert_array_equal(batch_data, data[rows])
+    np.testing.assert_array_equal(batch_labels, labels[rows])
+
+
+def test_a_jax_step_on_rows_learns_what_a_step_on_the_batch_of_those_rows_learns(
+    mixture_of_products_case, jax_circuit
+):
+    """
+    Jax gradient descent stepping on rows of its training array learns the parameters of
+    stepping on the batches of those rows.
+    """
+    np.random.seed(0)
+    data = jnp.asarray(mixture_of_products_case.circuit(np).sample(12))
+    row_indices = [np.asarray([3, 0, 7, 11]), np.asarray([5, 1]), np.asarray([9])]
+
+    def trained_parameters(steps_on_rows: bool) -> list[np.ndarray]:
+        """
+        :param steps_on_rows: Whether every step is given rows instead of their batch.
+        :return: The parameters after one step on each of the rows.
+        """
+        training = JaxGradientDescent(
+            layer=jax_circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adam(1e-2),
+        ).start_training(arguments=(data,), mini_batches=MiniBatches())
+        for rows in row_indices:
+            if steps_on_rows:
+                training.step_on_rows(rows=rows)
+            else:
+                training.step_on_batch(batch=(data[rows],))
+        return [np.asarray(parameter) for parameter in training.state.parameters]
+
+    for on_rows, on_batches in zip(
+        trained_parameters(True), trained_parameters(False), strict=True
+    ):
+        np.testing.assert_allclose(on_rows, on_batches, rtol=1e-6, atol=1e-7)
+
+
 # %% losses of an epoch
 
 

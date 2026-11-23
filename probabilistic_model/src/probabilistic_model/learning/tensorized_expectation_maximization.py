@@ -244,12 +244,23 @@ class TensorizedExpectationMaximizationTraining(
         """
         raise NotImplementedError
 
-    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> BackendArray:
+    def count_batch_toward_update(self) -> bool:
+        """
+        Count one more batch since the last update.
+
+        :return: Whether the parameters are updated after this batch, from which the
+            count starts anew.
+        """
         self.batches_since_update += 1
         if self.batches_since_update != self.batches_per_update:
-            return self.accumulate_statistics(batch=batch)
+            return False
         self.batches_since_update = 0
-        return self.accumulate_statistics_and_update(batch=batch)
+        return True
+
+    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> BackendArray:
+        if self.count_batch_toward_update():
+            return self.accumulate_statistics_and_update(batch=batch)
+        return self.accumulate_statistics(batch=batch)
 
     def finish_epoch(self, *, average_loss: float) -> None:
         """

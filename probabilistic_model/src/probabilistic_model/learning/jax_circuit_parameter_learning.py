@@ -11,12 +11,13 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
 from krrood.patterns.called_positionally import called_positionally
 from krrood_compute_resources.jax_memory import JaxDeviceMemory
 from krrood_compute_resources.memory import DeviceMemory, HostMemory
-from typing_extensions import Any, Self, TypeVar
+from typing_extensions import Any, Callable, Self, TypeVar
 
 from probabilistic_model.learning.circuit_parameter_learning import (
     CircuitParameterLearning,
@@ -61,6 +62,28 @@ class JaxCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
             batch before the step.
         """
         raise NotImplementedError
+
+    @staticmethod
+    def row_gathering_step(*, step: Callable[..., Any]) -> Callable[..., Any]:
+        """
+        :param step: A function of the training state and a batch, such as
+            :meth:`step`.
+        :return: The same function of the training state, the indices of the rows of
+            the batch and the training arrays, which compiles into one program.
+        """
+
+        def step_on_rows(state: Any, rows: jax.Array, *arguments: jax.Array) -> Any:
+            """
+            :param state: The training state before the step.
+            :param rows: The indices of the rows of the batch.
+            :param arguments: The training arrays, one row per training example each.
+            :return: The training state after the step on those rows.
+            """
+            return step(
+                state, *(jnp.take(argument, rows, axis=0) for argument in arguments)
+            )
+
+        return step_on_rows
 
     @abstractmethod
     def initial_state(self) -> Any:

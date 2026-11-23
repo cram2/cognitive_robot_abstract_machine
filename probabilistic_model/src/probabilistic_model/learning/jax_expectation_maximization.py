@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 from krrood.patterns.called_positionally import called_positionally
 from typing_extensions import Callable
 
@@ -222,6 +223,22 @@ class JaxExpectationMaximizationTraining(
     batch.
     """
 
+    compiled_step_on_rows: Callable[..., ExpectationMaximizationState] = field(
+        init=False
+    )
+    """
+    :meth:`JaxExpectationMaximization.step` on the rows the indices pick out of the
+    training arrays, compiled once for every number of rows.
+    """
+
+    compiled_step_and_update_on_rows: Callable[..., ExpectationMaximizationState] = (
+        field(init=False)
+    )
+    """
+    :meth:`JaxExpectationMaximization.step_and_update` on the rows the indices pick out
+    of the training arrays, compiled once for every number of rows.
+    """
+
     compiled_update: Callable[..., ExpectationMaximizationState] = field(init=False)
     """
     :meth:`JaxExpectationMaximization.update`, compiled.
@@ -248,6 +265,16 @@ class JaxExpectationMaximizationTraining(
             self.expectation_maximization.step_and_update
         )
         self.compiled_update = jax.jit(self.expectation_maximization.update)
+        self.compiled_step_on_rows = jax.jit(
+            self.expectation_maximization.row_gathering_step(
+                step=self.expectation_maximization.step
+            )
+        )
+        self.compiled_step_and_update_on_rows = jax.jit(
+            self.expectation_maximization.row_gathering_step(
+                step=self.expectation_maximization.step_and_update
+            )
+        )
         self.state = self.expectation_maximization.initial_state()
         self.batch_split_devices = BatchSplitDevices.from_devices(
             devices=self.expectation_maximization.training_devices
@@ -265,6 +292,21 @@ class JaxExpectationMaximizationTraining(
         self.state = self.compiled_step_and_update(
             self.state, *self.placed_batch(batch=batch)
         )
+        return self.state.loss
+
+    def step_on_rows(self, *, rows: np.ndarray) -> jax.Array:
+        """
+        On a single training device, the rows are gathered by the compiled step itself,
+        see :meth:`MiniBatchTraining.step_on_rows`.
+        """
+        if self.batch_split_devices is not None:
+            return super().step_on_rows(rows=rows)
+        step = (
+            self.compiled_step_and_update_on_rows
+            if self.count_batch_toward_update()
+            else self.compiled_step_on_rows
+        )
+        self.state = step(self.state, rows, *self.arguments)
         return self.state.loss
 
     def placed_batch(self, *, batch: tuple[jax.Array, ...]) -> tuple[jax.Array, ...]:

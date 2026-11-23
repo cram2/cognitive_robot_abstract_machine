@@ -295,6 +295,17 @@ class MiniBatches:
             )
         return cls(batch_size=batch_size, seed=seed)
 
+    def row_indices_of_epoch(self, *, number_of_rows: int) -> Iterator[np.ndarray]:
+        """
+        :param number_of_rows: The number of rows of every training array.
+        :return: The indices of the rows of every batch of one epoch, together every
+            row once.
+        """
+        order = self.random_number_generator.permutation(number_of_rows)
+        step = number_of_rows if self.batch_size is None else self.batch_size
+        for start in range(0, number_of_rows, step):
+            yield order[start : start + step]
+
     def batches_of_epoch(
         self, *, arguments: tuple[BackendArray, ...]
     ) -> Iterator[tuple[BackendArray, ...]]:
@@ -302,19 +313,26 @@ class MiniBatches:
         :param arguments: The training arrays, one row per training example each.
         :return: The batches of one epoch, each holding the same rows of every array.
         """
-        number_of_rows = arguments[0].shape[0]
-        order = self.random_number_generator.permutation(number_of_rows)
-        step = number_of_rows if self.batch_size is None else self.batch_size
-        for start in range(0, number_of_rows, step):
-            rows = order[start : start + step]
-            yield tuple(
-                array_namespace(argument).take(
-                    argument,
-                    array_namespace(argument).asarray(rows, device=device(argument)),
-                    axis=0,
-                )
-                for argument in arguments
+        for rows in self.row_indices_of_epoch(number_of_rows=arguments[0].shape[0]):
+            yield self.selected_rows(arguments=arguments, rows=rows)
+
+    @staticmethod
+    def selected_rows(
+        *, arguments: tuple[BackendArray, ...], rows: np.ndarray
+    ) -> tuple[BackendArray, ...]:
+        """
+        :param arguments: The training arrays, one row per training example each.
+        :param rows: The indices of some rows.
+        :return: Those rows of every array, in the order of the indices.
+        """
+        return tuple(
+            array_namespace(argument).take(
+                argument,
+                array_namespace(argument).asarray(rows, device=device(argument)),
+                axis=0,
             )
+            for argument in arguments
+        )
 
 
 # %% training on mini-batches
@@ -346,6 +364,18 @@ class MiniBatchTraining(ABC):
             backend that may still be computed on its device.
         """
 
+    def step_on_rows(self, *, rows: np.ndarray) -> float | BackendArray:
+        """
+        Update the parameters by one step on the batch of some rows of every training
+        array, see :meth:`step_on_batch`.
+
+        :param rows: The indices of the rows of the batch.
+        :return: The loss of the batch before the step.
+        """
+        return self.step_on_batch(
+            batch=self.mini_batches.selected_rows(arguments=self.arguments, rows=rows)
+        )
+
     def finish_epoch(self, *, average_loss: float) -> None:
         """
         React to the end of an epoch, nothing by default.
@@ -366,8 +396,10 @@ class MiniBatchTraining(ABC):
         :return: The average loss over the rows of the epoch.
         """
         total_loss = 0.0
-        for batch in self.mini_batches.batches_of_epoch(arguments=self.arguments):
-            total_loss += self.step_on_batch(batch=batch) * batch[0].shape[0]
+        for rows in self.mini_batches.row_indices_of_epoch(
+            number_of_rows=self.arguments[0].shape[0]
+        ):
+            total_loss += self.step_on_rows(rows=rows) * rows.shape[0]
         return float(total_loss) / self.arguments[0].shape[0]
 
 
