@@ -60,6 +60,11 @@ class CircuitParameterTraining(
     :class:`CircuitParameterLearning`.
     """
 
+    learning: CircuitParameterLearning[LayerType]
+    """
+    The learning whose steps are taken and whose circuit is trained.
+    """
+
     @abstractmethod
     def trained_root(self) -> LayerType:
         """

@@ -31,10 +31,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     StateValues,
     TableEntryValues,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
-    ExpectationMaximizationParameters,
-    SufficientStatistics,
-)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     RowReduction,
 )
@@ -42,10 +38,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
     HasParameterArrays,
 )
 
-if TYPE_CHECKING:
-    from probabilistic_model.learning.expectation_maximization import (
-        MaximizationRegularization,
-    )
 
 StoredLogProbabilities = TypeVar("StoredLogProbabilities")
 """
@@ -304,31 +296,9 @@ class ProbabilityTable(HasParameterArrays, Generic[StoredLogProbabilities], ABC)
         return np.where(has_mass, columns[np.maximum(entry, 0)], -1)
 
 
-@dataclass(kw_only=True)
-class StateCounts(SufficientStatistics):
-    """
-    The expected number of rows with every state that every node of a probability table
-    explains.
-    """
-
-    counts: NodeStateValues
-    """
-    The expected count of every state for every node.
-    """
-
-    @property
-    def arrays(self) -> list[BackendArray]:
-        return [self.counts]
-
-    @classmethod
-    def from_arrays(cls, *, arrays: list[BackendArray]) -> Self:
-        [counts] = arrays
-        return cls(counts=counts)
-
-
 @dataclass(eq=False)
 class DenseProbabilityTable(
-    ProbabilityTable[NodeStateValues], ExpectationMaximizationParameters
+    ProbabilityTable[NodeStateValues]
 ):
     """
     A probability table stored as one dense array of log-probabilities.
@@ -382,43 +352,6 @@ class DenseProbabilityTable(
         return self.namespace.where(
             self.namespace.isfinite(normalized), self.namespace.exp(normalized), 0.0
         )
-
-    def expected_statistics(
-        self, *, parameter_gradients: list[BackendArray], node_counts: NodeValues
-    ) -> StateCounts:
-        # the log-likelihood normalizes the log-probabilities per node, whose derivative
-        # takes the probability times the node count off every state count
-        [log_probability_gradient] = parameter_gradients
-        return StateCounts(
-            counts=log_probability_gradient
-            + self.normalized_probabilities
-            * self.namespace.expand_dims(node_counts, axis=1)
-        )
-
-    def maximized_parameters(
-        self,
-        *,
-        statistics: StateCounts,
-        regularization: MaximizationRegularization,
-        step_size: float,
-    ) -> list[BackendArray]:
-        # the probabilities become the state counts in proportion, unsmoothed as the
-        # host expectation maximization fits them
-        counts = self.namespace.clip(statistics.counts, min=0.0)
-        totals = self.namespace.sum(counts, axis=1, keepdims=True)
-        is_reached = totals > 0
-        probabilities = (1.0 - step_size) * self.normalized_probabilities + (
-            step_size * counts / self.namespace.where(is_reached, totals, 1.0)
-        )
-        is_possible = probabilities > 0
-        log_probabilities = self.namespace.where(
-            is_possible,
-            self.namespace.log(self.namespace.where(is_possible, probabilities, 1.0)),
-            -np.inf,
-        )
-        return [
-            self.namespace.where(is_reached, log_probabilities, self.log_probabilities)
-        ]
 
     @classmethod
     def from_entries(

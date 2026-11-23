@@ -10,6 +10,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from array_api_compat import array_namespace
 from typing_extensions import Any
 
 from probabilistic_model.learning.circuit_parameter_learning import (
@@ -17,18 +18,18 @@ from probabilistic_model.learning.circuit_parameter_learning import (
     CircuitParameterTraining,
     LayerType,
 )
-from probabilistic_model.learning.exceptions import UnsupportedLayerError
 from probabilistic_model.learning.expectation_maximization import (
     MaximizationRegularization,
+)
+from probabilistic_model.learning.layer_maximization import (
+    LayerMaximization,
+    SufficientStatistics,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
     SampleArray,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
-    ExpectationMaximizationParameters,
-    SufficientStatistics,
-)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
     QueryCacheKey,
@@ -64,9 +65,7 @@ class NodeCountQueryCache(QueryCache):
 
 
 @dataclass(kw_only=True)
-class TensorizedExpectationMaximization(
-    CircuitParameterLearning[LayerType], MaximizationRegularization, ABC
-):
+class TensorizedExpectationMaximization(CircuitParameterLearning[LayerType], ABC):
     """
     Expectation maximization of every parameter of a circuit, accumulating the
     sufficient statistics of every batch and updating after :attr:`batches_per_update`
@@ -85,26 +84,72 @@ class TensorizedExpectationMaximization(
     moves, one for full updates and less for online expectation maximization.
     """
 
+    regularization: MaximizationRegularization = field(
+        default_factory=MaximizationRegularization
+    )
+    """
+    How the maximization step keeps the learned weights and variances away from zero.
+    """
+
+    layer_maximization_types: list[type[LayerMaximization]] = field(init=False)
+    """
+    The rule of every learned layer, in the order of :meth:`learned_layers`.
+    """
+
     def __post_init__(self) -> None:
         """
+        Find the rule of every learned layer.
+
         :raises UnsupportedLayerError: If a layer of the circuit has parameters that
             expectation maximization cannot learn.
         """
         super().__post_init__()
-        for layer in self.layer.all_layers():
-            if layer.parameters and not (
-                isinstance(layer, ExpectationMaximizationParameters)
-                and layer.learns_by_expectation_maximization
-            ):
-                raise UnsupportedLayerError(layer_type=type(layer))
+        self.layer_maximization_types = [
+            type(LayerMaximization.from_layer(layer=layer))
+            for layer in self.learned_layers(root=self.layer)
+        ]
 
     @staticmethod
-    def learned_layers(*, root: Any) -> list[ExpectationMaximizationParameters]:
+    def learned_layers(*, root: Layer) -> list[Layer]:
         """
         :param root: The root of the circuit or of a copy of it.
         :return: The layers with parameters, in the order of ``all_layers``.
         """
         return [layer for layer in root.all_layers() if layer.parameters]
+
+    def layer_maximizations(self, *, root: Layer) -> list[LayerMaximization]:
+        """
+        :param root: The root of a copy of the circuit.
+        :return: The rule of every learned layer of the copy.
+        """
+        return [
+            layer_maximization_type(layer=layer)
+            for layer_maximization_type, layer in zip(
+                self.layer_maximization_types, self.learned_layers(root=root)
+            )
+        ]
+
+    @abstractmethod
+    def zero_node_counts(self) -> list[BackendArray]:
+        """
+        :return: A zero for every node of every learned layer, on the device and in the
+            floating point type of the parameters.
+        """
+        raise NotImplementedError
+
+    def zero_statistics(
+        self, *, parameters: list[BackendArray]
+    ) -> list[SufficientStatistics]:
+        """
+        :param parameters: Arrays in the order of the circuit's parameters.
+        :return: The statistics of no rows, for every learned layer.
+        """
+        namespace = array_namespace(*parameters)
+        return self.statistics_from_gradients(
+            parameters=parameters,
+            parameter_gradients=[namespace.zeros_like(parameter) for parameter in parameters],
+            node_counts=self.zero_node_counts(),
+        )
 
     def total_log_likelihood(
         self,
@@ -154,9 +199,11 @@ class TensorizedExpectationMaximization(
             if gradients
         ]
         return [
-            layer.expected_statistics(parameter_gradients=gradients, node_counts=counts)
-            for layer, gradients, counts in zip(
-                self.learned_layers(root=root), gradients_by_layer, node_counts
+            layer_maximization.expected_statistics(
+                parameter_gradients=gradients, node_counts=counts
+            )
+            for layer_maximization, gradients, counts in zip(
+                self.layer_maximizations(root=root), gradients_by_layer, node_counts
             )
         ]
 
@@ -176,12 +223,12 @@ class TensorizedExpectationMaximization(
         root = self.layer.copy_with_circuit_parameters(parameters=parameters)
         return [
             parameter
-            for layer, layer_statistics in zip(
-                self.learned_layers(root=root), statistics
+            for layer_maximization, layer_statistics in zip(
+                self.layer_maximizations(root=root), statistics
             )
-            for parameter in layer.maximized_parameters(
+            for parameter in layer_maximization.maximized_parameters(
                 statistics=layer_statistics,
-                regularization=self,
+                regularization=self.regularization,
                 step_size=self.step_size,
             )
         ]

@@ -21,6 +21,7 @@ from probabilistic_model.learning.circuit_parameter_learning import (
     CircuitParameterTraining,
     LayerType,
 )
+from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
 
 # %% learning
 
@@ -72,6 +73,31 @@ class TorchCircuitParameterLearning(CircuitParameterLearning[LayerType], ABC):
             return TorchDeviceMemory(device=device)
         return HostMemory()
 
+    @abstractmethod
+    def compute_step_without_update(self, *, batch: tuple[torch.Tensor, ...]) -> None:
+        """
+        Compute everything a step on the batch computes, leaving the parameters and the
+        training state unchanged.
+
+        :param batch: The same rows of every training array.
+        """
+        raise NotImplementedError
+
+    def probe_step_bytes(self, *, batch: tuple[torch.Tensor, ...]) -> int:
+        """
+        :return: The most bytes :meth:`compute_step_without_update` had in use beyond
+            what was in use before.
+        :raises UnmeasurableHostStepMemoryError: If the parameters are on the CPU.
+        """
+        device = self.parameters[0].device
+        if device.type != TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
+            raise UnmeasurableHostStepMemoryError()
+        memory = TorchDeviceMemory(device=device)
+        memory.reset_peak()
+        before = memory.in_use_bytes()
+        self.compute_step_without_update(batch=batch)
+        return memory.peak_bytes() - before
+
 
 # %% training on mini-batches
 
@@ -81,6 +107,9 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
     """Mini-batch training by a :class:`TorchCircuitParameterLearning`, its
     step on batches of every shape replayed from a CUDA graph if it records
     them."""
+
+    learning: TorchCircuitParameterLearning[LayerType]
+    """The learning whose parameters are updated in place."""
 
     replays_recorded_steps: bool = False
     """Whether steps are recorded as CUDA graphs and replayed, see
@@ -118,6 +147,11 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
         if key not in self.recorded_steps:
             self.recorded_steps[key] = RecordedTrainingStep()
         return self.recorded_steps[key].take(step=step, batch=batch)
+
+    def trained_root(self) -> LayerType:
+        return self.learning.layer.copy_with_circuit_parameters(
+            parameters=[parameter.detach() for parameter in self.learning.parameters]
+        )
 
 
 # %% steps recorded as CUDA graphs

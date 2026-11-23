@@ -9,10 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import torch
-from krrood_compute_resources.torch_memory import TorchDeviceMemory
 
 from probabilistic_model.learning.circuit_parameter_learning import LayerType
-from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
 from probabilistic_model.learning.gradient_descent import (
     GradientDescent,
     GradientDescentTraining,
@@ -20,7 +18,6 @@ from probabilistic_model.learning.gradient_descent import (
 from probabilistic_model.learning.torch_circuit_parameter_learning import (
     TorchCircuitParameterLearning,
     TorchCircuitParameterTraining,
-    TorchDeviceType,
 )
 from probabilistic_model.learning.training_schedule import (
     LearningRatePlateau,
@@ -63,7 +60,7 @@ class TorchGradientDescent(
         return TorchGradientDescentTraining(
             arguments=arguments,
             mini_batches=mini_batches,
-            gradient_descent=self,
+            learning=self,
             replays_recorded_steps=self.replays_recorded_steps,
             optimizer=(
                 self.optimizer_type(
@@ -81,25 +78,17 @@ class TorchGradientDescent(
             learning_rate_plateau=learning_rate_plateau,
         )
 
-    def probe_step_bytes(self, *, batch: tuple[torch.Tensor, ...]) -> int:
+    def compute_step_without_update(self, *, batch: tuple[torch.Tensor, ...]) -> None:
         """
-        :return: The most bytes the loss and its gradient on the batch had in use
-            beyond what was in use before; the gradient is discarded afterwards.
-        :raises UnmeasurableHostStepMemoryError: If the parameters are on the CPU.
+        The loss and its gradient on the batch, see
+        :meth:`TorchCircuitParameterLearning.compute_step_without_update`; the gradient
+        is discarded afterwards.
         """
-        device = self.parameters[0].device
-        if device.type != TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
-            raise UnmeasurableHostStepMemoryError()
-        memory = TorchDeviceMemory(device=device)
-        memory.reset_peak()
-        before = memory.in_use_bytes()
         self.loss.evaluate(
             self.layer.copy_with_circuit_parameters(parameters=self.parameters), *batch
         ).backward()
-        peak = memory.peak_bytes()
         for parameter in self.parameters:
             parameter.grad = None
-        return peak - before
 
     def step(
         self, *, optimizer: torch.optim.Optimizer, arguments: tuple[torch.Tensor, ...]
@@ -144,14 +133,14 @@ class TorchGradientDescentTraining(
     Mini-batch training by :class:`TorchGradientDescent`, one optimizer step per batch.
     """
 
-    gradient_descent: TorchGradientDescent[LayerType]
+    learning: TorchGradientDescent[LayerType]
     """
     The gradient descent whose parameters are updated.
     """
 
     optimizer: torch.optim.Optimizer
     """
-    The optimizer of the parameters of :attr:`gradient_descent`.
+    The optimizer of the parameters of :attr:`learning`.
     """
 
     def take_step(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
@@ -159,23 +148,16 @@ class TorchGradientDescentTraining(
         :param batch: The same rows of every training array.
         :return: The loss of the batch before one optimizer step on it.
         """
-        return self.gradient_descent.step(optimizer=self.optimizer, arguments=batch)
+        return self.learning.step(optimizer=self.optimizer, arguments=batch)
 
     def step_on_batch(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         return self.take_step_or_replay(step=self.take_step, batch=batch)
 
     def scale_learning_rate(self, *, scale: float) -> None:
-        learning_rate = self.gradient_descent.learning_rate * scale
+        learning_rate = self.learning.learning_rate * scale
         for group in self.optimizer.param_groups:
             if isinstance(group["lr"], torch.Tensor):
                 # a recorded step reads the learning rate from this tensor
                 group["lr"].fill_(learning_rate)
             else:
                 group["lr"] = learning_rate
-
-    def trained_root(self) -> LayerType:
-        return self.gradient_descent.layer.copy_with_circuit_parameters(
-            parameters=[
-                parameter.detach() for parameter in self.gradient_descent.parameters
-            ]
-        )

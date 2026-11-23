@@ -123,10 +123,13 @@ def torch_trainer(mixture_of_products_case, request):
     torch_gradient_descent = pytest.importorskip(
         "probabilistic_model.learning.torch_gradient_descent"
     )
+    torch_circuit_parameter_learning = pytest.importorskip(
+        "probabilistic_model.learning.torch_circuit_parameter_learning"
+    )
     device = torch.device(request.param)
     if (
         device.type
-        == torch_gradient_descent.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+        == torch_circuit_parameter_learning.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
     ):
         if not torch.cuda.is_available():
             pytest.skip("no CUDA device")

@@ -10,10 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import torch
-from krrood_compute_resources.torch_memory import TorchDeviceMemory
 
 from probabilistic_model.learning.circuit_parameter_learning import LayerType
-from probabilistic_model.learning.exceptions import UnmeasurableHostStepMemoryError
 from probabilistic_model.learning.tensorized_expectation_maximization import (
     TensorizedExpectationMaximization,
     TensorizedExpectationMaximizationTraining,
@@ -21,15 +19,12 @@ from probabilistic_model.learning.tensorized_expectation_maximization import (
 from probabilistic_model.learning.torch_circuit_parameter_learning import (
     TorchCircuitParameterLearning,
     TorchCircuitParameterTraining,
-    TorchDeviceType,
 )
 from probabilistic_model.learning.training_schedule import (
     LearningRatePlateau,
     MiniBatches,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
-    SufficientStatistics,
-)
+from probabilistic_model.learning.layer_maximization import SufficientStatistics
 
 # %% statistics of a batch
 
@@ -64,16 +59,11 @@ class TorchExpectationMaximization(
     """
 
     def zero_node_counts(self) -> list[torch.Tensor]:
-        """
-        :return: A zero for every node of every learned layer, on the device and in the
-            floating point type of the parameters, differentiable.
-        """
         return [
             torch.zeros(
                 layer.number_of_nodes,
                 dtype=self.parameters[0].dtype,
                 device=self.parameters[0].device,
-                requires_grad=True,
             )
             for layer in self.learned_layers(root=self.layer)
         ]
@@ -83,7 +73,7 @@ class TorchExpectationMaximization(
         :param data: The rows of a batch.
         :return: What the circuit with the current parameters learns about the rows.
         """
-        node_offsets = self.zero_node_counts()
+        node_offsets = [counts.requires_grad_() for counts in self.zero_node_counts()]
         total = self.total_log_likelihood(
             parameters=self.parameters, node_offsets=node_offsets, data=data
         )
@@ -98,21 +88,9 @@ class TorchExpectationMaximization(
                 ),
             )
 
-    def probe_step_bytes(self, *, batch: tuple[torch.Tensor, ...]) -> int:
-        """
-        :return: The most bytes the statistics of the batch had in use beyond what was
-            in use before.
-        :raises UnmeasurableHostStepMemoryError: If the parameters are on the CPU.
-        """
-        device = self.parameters[0].device
-        if device.type != TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE:
-            raise UnmeasurableHostStepMemoryError()
-        memory = TorchDeviceMemory(device=device)
-        memory.reset_peak()
-        before = memory.in_use_bytes()
+    def compute_step_without_update(self, *, batch: tuple[torch.Tensor, ...]) -> None:
         [data] = batch
         self.batch_statistics(data=data)
-        return memory.peak_bytes() - before
 
     def start_training(
         self,
@@ -126,7 +104,7 @@ class TorchExpectationMaximization(
             mini_batches=mini_batches,
             batches_per_update=self.batches_per_update,
             replays_recorded_steps=self.replays_recorded_steps,
-            expectation_maximization=self,
+            learning=self,
         )
 
 
@@ -143,7 +121,7 @@ class TorchExpectationMaximizationTraining(
     parameters updated in place.
     """
 
-    expectation_maximization: TorchExpectationMaximization[LayerType]
+    learning: TorchExpectationMaximization[LayerType]
     """
     The expectation maximization whose parameters are updated.
     """
@@ -158,19 +136,8 @@ class TorchExpectationMaximizationTraining(
         Start without statistics.
         """
         with torch.no_grad():
-            parameters = [
-                parameter.detach()
-                for parameter in self.expectation_maximization.parameters
-            ]
-            self.statistics = self.expectation_maximization.statistics_from_gradients(
-                parameters=parameters,
-                parameter_gradients=[
-                    torch.zeros_like(parameter) for parameter in parameters
-                ],
-                node_counts=[
-                    counts.detach()
-                    for counts in self.expectation_maximization.zero_node_counts()
-                ],
+            self.statistics = self.learning.zero_statistics(
+                parameters=[parameter.detach() for parameter in self.learning.parameters]
             )
 
     def take_step(self, *, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
@@ -180,7 +147,7 @@ class TorchExpectationMaximizationTraining(
             :attr:`statistics`.
         """
         [data] = batch
-        batch_statistics = self.expectation_maximization.batch_statistics(data=data)
+        batch_statistics = self.learning.batch_statistics(data=data)
         with torch.no_grad():
             for accumulated, added in zip(self.statistics, batch_statistics.statistics):
                 for accumulated_array, added_array in zip(
@@ -208,9 +175,9 @@ class TorchExpectationMaximizationTraining(
         return self.take_step_or_replay(step=self.take_step_and_update, batch=batch)
 
     def update_parameters(self) -> None:
-        parameters = self.expectation_maximization.parameters
+        parameters = self.learning.parameters
         with torch.no_grad():
-            maximized = self.expectation_maximization.maximized_circuit_parameters(
+            maximized = self.learning.maximized_circuit_parameters(
                 parameters=[parameter.detach() for parameter in parameters],
                 statistics=self.statistics,
             )
@@ -219,11 +186,3 @@ class TorchExpectationMaximizationTraining(
             for statistics in self.statistics:
                 for array in statistics.arrays:
                     array.zero_()
-
-    def trained_root(self) -> LayerType:
-        return self.expectation_maximization.layer.copy_with_circuit_parameters(
-            parameters=[
-                parameter.detach()
-                for parameter in self.expectation_maximization.parameters
-            ]
-        )

@@ -414,24 +414,19 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
     def learner(
         self, *, root: Layer, setting: ComputationSetting
     ) -> CircuitParameterLearning:
-        regularization = self.expectation_maximization
         if setting.array_library is ArrayLibrary.TORCH:
             return TorchExpectationMaximization(
                 layer=root,
                 batches_per_update=self.batches_per_update,
                 step_size=self.step_size,
-                smoothing=regularization.smoothing,
-                minimum_mixture_proportion=regularization.minimum_mixture_proportion,
-                minimum_gaussian_variance=regularization.minimum_gaussian_variance,
+                regularization=self.expectation_maximization,
                 records_cuda_graphs=True,
             )
         return JaxExpectationMaximization(
             layer=root,
             batches_per_update=self.batches_per_update,
             step_size=self.step_size,
-            smoothing=regularization.smoothing,
-            minimum_mixture_proportion=regularization.minimum_mixture_proportion,
-            minimum_gaussian_variance=regularization.minimum_gaussian_variance,
+            regularization=self.expectation_maximization,
         )
 
     def learn(

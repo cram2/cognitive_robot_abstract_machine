@@ -34,10 +34,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     NonPositiveScaleError,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
-    ExpectationMaximizationParameters,
-    SufficientStatistics,
-)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.continuous_layer_with_density import (
     ContinuousLayerWithDensity,
@@ -50,10 +46,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
     LayerWithLogProbabilities,
 )
 
-if TYPE_CHECKING:
-    from probabilistic_model.learning.expectation_maximization import (
-        MaximizationRegularization,
-    )
 
 
 @dataclass(eq=False, repr=False)
@@ -159,95 +151,13 @@ class HasLocationAndScale:
         )
 
 
-@dataclass(kw_only=True)
-class GaussianStatistics(SufficientStatistics):
-    """
-    The expected number of rows of every Gaussian of a layer, and their first two
-    moments about the location the statistics were computed with.
-    """
-
-    counts: NodeValues
-    """
-    The node count of every node.
-    """
-
-    centered_sums: NodeValues
-    """
-    The sum of the deviations of the rows from the location, each weighted by the node's
-    share of it, for every node.
-    """
-
-    centered_squared_sums: NodeValues
-    """
-    The weighted sum of the squared deviations of the rows from the location, for every
-    node.
-    """
-
-    @property
-    def arrays(self) -> list[BackendArray]:
-        return [self.counts, self.centered_sums, self.centered_squared_sums]
-
-    @classmethod
-    def from_arrays(cls, *, arrays: list[BackendArray]) -> Self:
-        counts, centered_sums, centered_squared_sums = arrays
-        return cls(
-            counts=counts,
-            centered_sums=centered_sums,
-            centered_squared_sums=centered_squared_sums,
-        )
-
-
 @dataclass(eq=False, repr=False)
 class GaussianLayer(
-    HasLocationAndScale, ExpectationMaximizationParameters, ContinuousLayerWithDensity
+    HasLocationAndScale, ContinuousLayerWithDensity
 ):
     """
     A layer of Gaussian distributions over one continuous variable.
     """
-
-    # %% expectation maximization
-
-    def expected_statistics(
-        self, *, parameter_gradients: list[BackendArray], node_counts: NodeValues
-    ) -> GaussianStatistics:
-        # the log-density derives by the location to the deviation over the variance,
-        # and by the log-scale to the squared deviation over the variance minus one
-        location_gradient, log_scale_gradient = parameter_gradients
-        variance = self.scale**2
-        return GaussianStatistics(
-            counts=node_counts,
-            centered_sums=variance * location_gradient,
-            centered_squared_sums=variance * (log_scale_gradient + node_counts),
-        )
-
-    def maximized_parameters(
-        self,
-        *,
-        statistics: GaussianStatistics,
-        regularization: MaximizationRegularization,
-        step_size: float,
-    ) -> list[BackendArray]:
-        # a step blends the mean and the second moment, as Einsum Networks do
-        is_reached = statistics.counts > 0
-        counts = self.namespace.where(is_reached, statistics.counts, 1.0)
-        shift = statistics.centered_sums / counts
-        variance = self.namespace.clip(
-            statistics.centered_squared_sums / counts - shift**2,
-            min=regularization.minimum_gaussian_variance,
-        )
-        blended_variance = (
-            (1.0 - step_size) * self.scale**2
-            + step_size * variance
-            + step_size * (1.0 - step_size) * shift**2
-        )
-        return [
-            self.namespace.where(
-                is_reached, self.location + step_size * shift, self.location
-            ),
-            self.namespace.where(
-                is_reached, 0.5 * self.namespace.log(blended_variance), self.log_scale
-            ),
-        ]
 
     @property
     def number_of_nodes(self) -> int:

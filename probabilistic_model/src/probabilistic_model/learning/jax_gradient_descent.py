@@ -13,8 +13,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from krrood.patterns.called_positionally import called_positionally
-from typing_extensions import Callable
 
 from probabilistic_model.learning.circuit_parameter_learning import LayerType
 from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
@@ -23,8 +21,10 @@ from probabilistic_model.learning.gradient_descent import (
     GradientDescentTraining,
 )
 from probabilistic_model.learning.jax_circuit_parameter_learning import (
-    BatchSplitDevices,
+    CompiledStep,
     JaxCircuitParameterLearning,
+    JaxCircuitParameterTraining,
+    JaxTrainingState,
 )
 from probabilistic_model.learning.training_schedule import (
     LearningRatePlateau,
@@ -36,24 +36,14 @@ from probabilistic_model.learning.training_schedule import (
 
 @jax.tree_util.register_dataclass
 @dataclass(kw_only=True)
-class TrainingState:
+class TrainingState(JaxTrainingState):
     """
-    The values one compiled training step reads and returns.
-    """
-
-    parameters: list[jax.Array]
-    """
-    The parameter arrays of the circuit, in the order of its ``circuit_parameters``.
+    The values one compiled gradient descent step reads and returns.
     """
 
     optimizer_state: optax.OptState
     """
     The state of the optimizer after the last step.
-    """
-
-    loss: jax.Array
-    """
-    The loss of the parameters before the last step.
     """
 
 
@@ -84,24 +74,26 @@ class JaxGradientDescent(
         if self.optimizer is None:
             self.optimizer = optax.adam(1e-3)
 
-    @called_positionally
     def loss_of_parameters(
-        self, parameters: list[jax.Array], *arguments: jax.Array
+        self, *, parameters: list[jax.Array], arguments: tuple[jax.Array, ...]
     ) -> jax.Array:
         """
         :param parameters: Arrays in the order of :attr:`initial_parameters`.
-        :param arguments: The arrays passed to :meth:`minimize`.
+        :param arguments: The arrays the :attr:`loss` takes after the circuit.
         :return: The :attr:`loss` of the circuit with these parameter arrays.
         """
         return self.loss.evaluate(
             self.layer.copy_with_circuit_parameters(parameters=parameters), *arguments
         )
 
-    @called_positionally
-    def step(self, state: TrainingState, *arguments: jax.Array) -> TrainingState:
-        loss, gradients = jax.value_and_grad(self.loss_of_parameters)(
-            state.parameters, *arguments
-        )
+    def step(
+        self, *, state: TrainingState, batch: tuple[jax.Array, ...]
+    ) -> TrainingState:
+        loss, gradients = jax.value_and_grad(
+            lambda parameters: self.loss_of_parameters(
+                parameters=parameters, arguments=batch
+            )
+        )(state.parameters)
         updates, optimizer_state = self.optimizer.update(
             gradients, state.optimizer_state, state.parameters
         )
@@ -127,7 +119,7 @@ class JaxGradientDescent(
         return JaxGradientDescentTraining(
             arguments=arguments,
             mini_batches=mini_batches,
-            gradient_descent=self,
+            learning=self,
             learning_rate_plateau=learning_rate_plateau,
         )
 
@@ -139,7 +131,7 @@ class JaxGradientDescent(
         return TrainingState(
             parameters=self.initial_parameters,
             optimizer_state=self.optimizer.init(self.initial_parameters),
-            loss=jnp.full((), jnp.nan, jnp.result_type(*self.initial_parameters)),
+            loss=self.loss_before_any_step(),
         )
 
 
@@ -147,30 +139,21 @@ class JaxGradientDescent(
 
 
 @dataclass(kw_only=True)
-class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
+class JaxGradientDescentTraining(
+    GradientDescentTraining[LayerType], JaxCircuitParameterTraining[LayerType]
+):
     """
     Mini-batch training by :class:`JaxGradientDescent`, one compiled step per batch.
     """
 
-    gradient_descent: JaxGradientDescent[LayerType]
+    learning: JaxGradientDescent[LayerType]
     """
     The gradient descent whose steps are taken.
     """
 
-    compiled_step: Callable[..., TrainingState] = field(init=False)
+    compiled_step: CompiledStep = field(init=False)
     """
-    :meth:`JaxGradientDescent.step`, compiled once for every shape of batch.
-    """
-
-    compiled_step_on_rows: Callable[..., TrainingState] = field(init=False)
-    """
-    :meth:`JaxGradientDescent.step` on the rows the indices pick out of the training
-    arrays, compiled once for every number of rows.
-    """
-
-    state: TrainingState = field(init=False)
-    """
-    The state after the last step.
+    :meth:`JaxGradientDescent.step`, compiled.
     """
 
     initial_learning_rate: jax.Array | None = field(init=False, default=None)
@@ -178,30 +161,15 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
     The learning rate before any reduction, ``None`` without a schedule.
     """
 
-    batch_split_devices: BatchSplitDevices | None = field(init=False, default=None)
-    """
-    The :attr:`JaxGradientDescent.training_devices` that the rows of a batch are split
-    across and the state is copied to, ``None`` if there is only one.
-    """
-
     def __post_init__(self) -> None:
         """
-        Compile the step and start from the state before training, copied to every
-        training device.
+        Compile the step.
 
         :raises UnscheduledOptimizerError: If a schedule is given for an optimizer whose
             learning rate cannot be changed.
         """
-        self.compiled_step = jax.jit(self.gradient_descent.step)
-        self.compiled_step_on_rows = jax.jit(
-            self.gradient_descent.row_gathering_step(step=self.gradient_descent.step)
-        )
-        self.state = self.gradient_descent.initial_state()
-        self.batch_split_devices = BatchSplitDevices.from_devices(
-            devices=self.gradient_descent.training_devices
-        )
-        if self.batch_split_devices is not None:
-            self.state = self.batch_split_devices.replicated(state=self.state)
+        super().__post_init__()
+        self.compiled_step = CompiledStep.from_step(step=self.learning.step)
         if self.learning_rate_plateau is None:
             return
         if not isinstance(
@@ -219,24 +187,11 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
         )
 
     def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> jax.Array:
-        if self.batch_split_devices is not None:
-            batch = self.batch_split_devices.placed_batch(batch=batch)
-        self.state = self.compiled_step(self.state, *batch)
-        return self.state.loss
+        return self.take_compiled_step(step=self.compiled_step, batch=batch)
 
     def step_on_rows(self, *, rows: np.ndarray) -> jax.Array:
         """
         On a single training device, the rows are gathered by the compiled step itself,
         see :meth:`MiniBatchTraining.step_on_rows`.
         """
-        if self.batch_split_devices is not None:
-            return super().step_on_rows(rows=rows)
-        self.state = self.compiled_step_on_rows(self.state, rows, *self.arguments)
-        return self.state.loss
-
-    def trained_root(self) -> LayerType:
-        return self.gradient_descent.layer.copy_with_circuit_parameters(
-            parameters=jax.device_put(
-                self.state.parameters, self.gradient_descent.parameter_device
-            )
-        )
+        return self.take_compiled_step_on_rows(step=self.compiled_step, rows=rows)

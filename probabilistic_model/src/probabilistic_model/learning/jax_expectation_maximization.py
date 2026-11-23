@@ -11,13 +11,14 @@ from dataclasses import dataclass, field
 import jax
 import jax.numpy as jnp
 import numpy as np
-from krrood.patterns.called_positionally import called_positionally
 from typing_extensions import Callable
 
 from probabilistic_model.learning.circuit_parameter_learning import LayerType
 from probabilistic_model.learning.jax_circuit_parameter_learning import (
-    BatchSplitDevices,
+    CompiledStep,
     JaxCircuitParameterLearning,
+    JaxCircuitParameterTraining,
+    JaxTrainingState,
 )
 from probabilistic_model.learning.tensorized_expectation_maximization import (
     TensorizedExpectationMaximization,
@@ -27,33 +28,22 @@ from probabilistic_model.learning.training_schedule import (
     LearningRatePlateau,
     MiniBatches,
 )
-from probabilistic_model.probabilistic_circuit.tensorized.expectation_maximization_parameters import (
-    SufficientStatistics,
-)
+from probabilistic_model.learning.layer_maximization import SufficientStatistics
 
 # %% training state
 
 
 @jax.tree_util.register_dataclass
 @dataclass(kw_only=True)
-class ExpectationMaximizationState:
+class ExpectationMaximizationState(JaxTrainingState):
     """
-    The values one compiled step of expectation maximization reads and returns.
-    """
-
-    parameters: list[jax.Array]
-    """
-    The parameter arrays of the circuit, in the order of its ``circuit_parameters``.
+    The values one compiled step of expectation maximization reads and returns, its loss
+    the negative average log-likelihood of the last batch.
     """
 
     statistics: list[SufficientStatistics]
     """
     The sufficient statistics of every learned layer since the last update.
-    """
-
-    loss: jax.Array
-    """
-    The negative average log-likelihood of the last batch before its step.
     """
 
 
@@ -102,22 +92,8 @@ class JaxExpectationMaximization(
             for layer in self.learned_layers(root=self.layer)
         ]
 
-    def zero_statistics(
-        self, *, parameters: list[jax.Array]
-    ) -> list[SufficientStatistics]:
-        """
-        :param parameters: Arrays in the order of the circuit's parameters.
-        :return: The statistics of no rows, for every learned layer.
-        """
-        return self.statistics_from_gradients(
-            parameters=parameters,
-            parameter_gradients=[jnp.zeros_like(parameter) for parameter in parameters],
-            node_counts=self.zero_node_counts(),
-        )
-
-    @called_positionally
     def step(
-        self, state: ExpectationMaximizationState, *batch: jax.Array
+        self, *, state: ExpectationMaximizationState, batch: tuple[jax.Array, ...]
     ) -> ExpectationMaximizationState:
         [data] = batch
         total, (parameter_gradients, node_counts) = jax.value_and_grad(
@@ -140,9 +116,8 @@ class JaxExpectationMaximization(
             loss=-total / data.shape[0],
         )
 
-    @called_positionally
     def update(
-        self, state: ExpectationMaximizationState
+        self, *, state: ExpectationMaximizationState
     ) -> ExpectationMaximizationState:
         """
         :param state: The state after the last step.
@@ -156,16 +131,15 @@ class JaxExpectationMaximization(
             loss=state.loss,
         )
 
-    @called_positionally
     def step_and_update(
-        self, state: ExpectationMaximizationState, *batch: jax.Array
+        self, *, state: ExpectationMaximizationState, batch: tuple[jax.Array, ...]
     ) -> ExpectationMaximizationState:
         """
         :param state: The state before the step.
         :param batch: The same rows of every training array.
         :return: The state after :meth:`step` on the batch and :meth:`update`.
         """
-        return self.update(self.step(state, *batch))
+        return self.update(state=self.step(state=state, batch=batch))
 
     def initial_state(self) -> ExpectationMaximizationState:
         """
@@ -175,7 +149,7 @@ class JaxExpectationMaximization(
         return ExpectationMaximizationState(
             parameters=self.initial_parameters,
             statistics=self.zero_statistics(parameters=self.initial_parameters),
-            loss=jnp.full((), jnp.nan, jnp.result_type(*self.initial_parameters)),
+            loss=self.loss_before_any_step(),
         )
 
     def start_training(
@@ -189,7 +163,7 @@ class JaxExpectationMaximization(
             arguments=arguments,
             mini_batches=mini_batches,
             batches_per_update=self.batches_per_update,
-            expectation_maximization=self,
+            learning=self,
         )
 
 
@@ -198,45 +172,27 @@ class JaxExpectationMaximization(
 
 @dataclass(kw_only=True)
 class JaxExpectationMaximizationTraining(
-    TensorizedExpectationMaximizationTraining[LayerType]
+    TensorizedExpectationMaximizationTraining[LayerType],
+    JaxCircuitParameterTraining[LayerType],
 ):
     """
     Mini-batch training by :class:`JaxExpectationMaximization`, one compiled step per
     batch and one compiled update.
     """
 
-    expectation_maximization: JaxExpectationMaximization[LayerType]
+    learning: JaxExpectationMaximization[LayerType]
     """
     The expectation maximization whose steps are taken.
     """
 
-    compiled_step: Callable[..., ExpectationMaximizationState] = field(init=False)
+    compiled_step: CompiledStep = field(init=False)
     """
-    :meth:`JaxExpectationMaximization.step`, compiled once for every shape of batch.
-    """
-
-    compiled_step_and_update: Callable[..., ExpectationMaximizationState] = field(
-        init=False
-    )
-    """
-    :meth:`JaxExpectationMaximization.step_and_update`, compiled once for every shape of
-    batch.
+    :meth:`JaxExpectationMaximization.step`, compiled.
     """
 
-    compiled_step_on_rows: Callable[..., ExpectationMaximizationState] = field(
-        init=False
-    )
+    compiled_step_and_update: CompiledStep = field(init=False)
     """
-    :meth:`JaxExpectationMaximization.step` on the rows the indices pick out of the
-    training arrays, compiled once for every number of rows.
-    """
-
-    compiled_step_and_update_on_rows: Callable[..., ExpectationMaximizationState] = (
-        field(init=False)
-    )
-    """
-    :meth:`JaxExpectationMaximization.step_and_update` on the rows the indices pick out
-    of the training arrays, compiled once for every number of rows.
+    :meth:`JaxExpectationMaximization.step_and_update`, compiled.
     """
 
     compiled_update: Callable[..., ExpectationMaximizationState] = field(init=False)
@@ -244,87 +200,38 @@ class JaxExpectationMaximizationTraining(
     :meth:`JaxExpectationMaximization.update`, compiled.
     """
 
-    state: ExpectationMaximizationState = field(init=False)
-    """
-    The state after the last step or update.
-    """
-
-    batch_split_devices: BatchSplitDevices | None = field(init=False, default=None)
-    """
-    The devices that the rows of a batch are split across and the state is copied to,
-    ``None`` if there is only one.
-    """
-
     def __post_init__(self) -> None:
         """
-        Compile the step and the update and start from the state before training, copied
-        to every training device.
+        Compile the steps and the update.
         """
-        self.compiled_step = jax.jit(self.expectation_maximization.step)
-        self.compiled_step_and_update = jax.jit(
-            self.expectation_maximization.step_and_update
+        super().__post_init__()
+        self.compiled_step = CompiledStep.from_step(step=self.learning.step)
+        self.compiled_step_and_update = CompiledStep.from_step(
+            step=self.learning.step_and_update
         )
-        self.compiled_update = jax.jit(self.expectation_maximization.update)
-        self.compiled_step_on_rows = jax.jit(
-            self.expectation_maximization.row_gathering_step(
-                step=self.expectation_maximization.step
-            )
-        )
-        self.compiled_step_and_update_on_rows = jax.jit(
-            self.expectation_maximization.row_gathering_step(
-                step=self.expectation_maximization.step_and_update
-            )
-        )
-        self.state = self.expectation_maximization.initial_state()
-        self.batch_split_devices = BatchSplitDevices.from_devices(
-            devices=self.expectation_maximization.training_devices
-        )
-        if self.batch_split_devices is not None:
-            self.state = self.batch_split_devices.replicated(state=self.state)
+        self.compiled_update = jax.jit(self.learning.update)
 
     def accumulate_statistics(self, *, batch: tuple[jax.Array, ...]) -> jax.Array:
-        self.state = self.compiled_step(self.state, *self.placed_batch(batch=batch))
-        return self.state.loss
+        return self.take_compiled_step(step=self.compiled_step, batch=batch)
 
     def accumulate_statistics_and_update(
         self, *, batch: tuple[jax.Array, ...]
     ) -> jax.Array:
-        self.state = self.compiled_step_and_update(
-            self.state, *self.placed_batch(batch=batch)
-        )
-        return self.state.loss
+        return self.take_compiled_step(step=self.compiled_step_and_update, batch=batch)
 
     def step_on_rows(self, *, rows: np.ndarray) -> jax.Array:
         """
         On a single training device, the rows are gathered by the compiled step itself,
         see :meth:`MiniBatchTraining.step_on_rows`.
         """
-        if self.batch_split_devices is not None:
-            return super().step_on_rows(rows=rows)
-        step = (
-            self.compiled_step_and_update_on_rows
-            if self.count_batch_toward_update()
-            else self.compiled_step_on_rows
+        return self.take_compiled_step_on_rows(
+            step=(
+                self.compiled_step_and_update
+                if self.count_batch_toward_update()
+                else self.compiled_step
+            ),
+            rows=rows,
         )
-        self.state = step(self.state, rows, *self.arguments)
-        return self.state.loss
-
-    def placed_batch(self, *, batch: tuple[jax.Array, ...]) -> tuple[jax.Array, ...]:
-        """
-        :param batch: The same rows of every training array.
-        :return: The batch as :attr:`batch_split_devices` place it, as it is without
-            them.
-        """
-        if self.batch_split_devices is None:
-            return batch
-        return self.batch_split_devices.placed_batch(batch=batch)
 
     def update_parameters(self) -> None:
-        self.state = self.compiled_update(self.state)
-
-    def trained_root(self) -> LayerType:
-        return self.expectation_maximization.layer.copy_with_circuit_parameters(
-            parameters=jax.device_put(
-                self.state.parameters, self.expectation_maximization.parameter_device
-            )
-        )
+        self.state = self.compiled_update(state=self.state)
