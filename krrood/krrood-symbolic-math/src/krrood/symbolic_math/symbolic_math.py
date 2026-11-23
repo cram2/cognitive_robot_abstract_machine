@@ -52,6 +52,7 @@ from krrood.symbolic_math.exceptions import (
     NotScalerError,
     NotColumnVectorError,
     NotEnoughArgumentsError,
+    MathematicalOperation,
     UnsupportedOperationError,
     WrongDimensionsError,
     CannotConvertToStringError,
@@ -1588,7 +1589,9 @@ class Vector(SerializableSymbolicMathType):
             return Scalar.from_casadi_sx(
                 casadi_sx=ca.mtimes(to_sx(self).T, to_sx(other))
             )
-        raise UnsupportedOperationError(operation="dot", left=self, right=other)
+        raise UnsupportedOperationError(
+            operation=MathematicalOperation.DOT_PRODUCT, left=self, right=other
+        )
 
     def __matmul__(self, other: GenericSymbolicType) -> GenericSymbolicType:
         return self.dot(other=other)

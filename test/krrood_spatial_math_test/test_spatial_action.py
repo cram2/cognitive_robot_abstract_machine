@@ -10,6 +10,10 @@ import math
 import numpy as np
 import pytest
 
+from krrood.symbolic_math.exceptions import (
+    MathematicalOperation,
+    UnsupportedOperationError,
+)
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
@@ -22,6 +26,8 @@ from krrood_spatial_math.spatial_types_2_dimensional import (
     Point2Dimensional,
     HomogeneousTransformationMatrix2Dimensional,
 )
+
+from .dataset.mounted_frames import MountedFrame, MountFrame
 
 
 # %% a rotation acting on a point
@@ -100,6 +106,26 @@ def test_a_transformation_refuses_a_value_outside_its_child_frame(
         table_T_camera @ Point3Dimensional(reference_frame=gripper_frame)
 
 
+@pytest.mark.parametrize(
+    "transformation, value",
+    [
+        (HomogeneousTransformationMatrix3Dimensional(), Point2Dimensional()),
+        (HomogeneousTransformationMatrix2Dimensional(), Point3Dimensional()),
+    ],
+)
+def test_a_transformation_names_matrix_multiplication_when_it_refuses_a_value(
+    transformation, value
+):
+    """
+    Applying a transformation is matrix multiplication, whether written with ``@`` or
+    with ``dot``.
+    """
+    with pytest.raises(UnsupportedOperationError) as refusal:
+        transformation @ value
+
+    assert refusal.value.operation is MathematicalOperation.MATRIX_MULTIPLICATION
+
+
 def test_a_transformation_composes_only_with_a_change_into_its_child_frame(
     table_frame, camera_frame, gripper_frame
 ):
@@ -129,12 +155,18 @@ def test_a_transformation_accepts_a_value_without_a_frame(table_frame, camera_fr
     assert (table_T_camera @ Vector3Dimensional.X()).reference_frame is table_frame
 
 
-def test_a_planar_transformation_refuses_a_point_on_another_plane(
-    table_frame, camera_frame, gripper_frame
-):
+def test_a_planar_transformation_refuses_a_point_on_another_plane(room, gripper_frame):
     """
     A planar transformation only applies to a point on the plane of its child frame.
     """
+    table_frame = MountFrame("table", space=room)
+    camera_frame = MountedFrame(
+        "camera",
+        space=room,
+        mount_T_self=HomogeneousTransformationMatrix3Dimensional(
+            reference_frame=table_frame
+        ),
+    )
     table_T_camera = HomogeneousTransformationMatrix2Dimensional(
         reference_frame=table_frame, child_frame=camera_frame
     )

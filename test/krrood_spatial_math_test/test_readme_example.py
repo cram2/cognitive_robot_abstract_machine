@@ -66,7 +66,7 @@ def test_points_of_two_pixel_frames_have_no_difference(adding_a_space_example):
 
 def test_a_pixel_vector_has_no_length(adding_a_space_example):
     """
-    Pixels may not be square, so a pixel frame measures no lengths.
+    Pixels may not be square, so pixel coordinates alone give no lengths.
     """
     with pytest.raises(FrameMeasuresNoLengthsError):
         adding_a_space_example.box_width.norm()

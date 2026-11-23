@@ -40,12 +40,12 @@ coordinate system. Its base depends on `krrood` alone.
   the kind of frame, and an affine one that is not Cartesian raises
   `FrameMeasuresNoLengthsError`. Its `cross` is the kind of frame's too: only a
   `CartesianFrame3Dimensional` has a cross product, and any other kind raises
-  `FrameHasNoCrossProductError`. A change of frame maps its axes but never shifts it, as
-  homogeneous coordinates with weight 0.
+  `FrameHasNoCrossProductError`. A change of frame maps its axes but never shifts it: its
+  homogeneous coordinates end in 0.
 - `krrood_spatial_math.point`: `Point[vector]`, a point of an affine space, given in the
   kind of frame of its vector type and measured by it in the same way. The difference
   of two points is a vector, and a point moved by a vector is a point. A change of frame
-  also shifts it, as homogeneous coordinates with weight 1, and its change type, like
+  also shifts it, since its homogeneous coordinates end in 1, and its change type, like
   its kind of frame, is read from its vector type.
 - `krrood_spatial_math.pose`: `Pose` and `Orientation`, a frame given in another, with
   and without its position. Each is the value of a rigid change, and a change of frame
@@ -98,9 +98,9 @@ https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math.
 ## Adding a space
 
 This example adds the pixels of camera images. A camera's image plane is a plane, but
-its pixels need not be square, so its pixel frames are affine, not Cartesian: they
-measure no lengths or angles. Cropping and resizing an image changes the pixel frame,
-which is an affine change. A new space needs five things:
+its pixels need not be square, so its pixel frames are affine, not Cartesian: pixel
+coordinates alone give no lengths or angles. Cropping and resizing an image changes the
+pixel frame, which is an affine change. A new space needs five things:
 
 1. the space, here `ImagePlane`;
 2. a kind of frame on it that names its axes, here `PixelFrame` with the axes u and v;
@@ -189,11 +189,11 @@ class CropAndResize(AffineCoordinateChange[PixelFrame, float]):
     def apply_to_homogeneous_coordinates(
         self, *, homogeneous_coordinates: tuple[float, ...]
     ) -> tuple[float, ...]:
-        u, v, weight = homogeneous_coordinates
+        u, v, has_position = homogeneous_coordinates
         return (
-            self.scale_u * (u - self.crop_u * weight),
-            self.scale_v * (v - self.crop_v * weight),
-            weight,
+            self.scale_u * (u - self.crop_u * has_position),
+            self.scale_v * (v - self.crop_v * has_position),
+            has_position,
         )
 
     def inverse(self) -> Self:
@@ -258,9 +258,9 @@ thumbnail_keypoint = PixelPoint(u=1, v=1, coordinate_system=thumbnail)
 What the interfaces refuse, each where it is first possible:
 
 - `keypoint - thumbnail_keypoint`, points of two frames, raises `ReferenceFrameMismatchError`.
-- `box_width.norm()` raises `FrameMeasuresNoLengthsError`: pixels may not be square, so a
-  pixel frame measures no lengths. Measuring needs a camera model that maps pixels to
-  the Cartesian frame of the camera.
+- `box_width.norm()` raises `FrameMeasuresNoLengthsError`: pixels may not be square, so
+  pixel coordinates alone give no lengths. Measuring needs a camera model that maps
+  pixels to the Cartesian frame of the camera.
 - `box_width.cross(other=box_width)` raises `FrameHasNoCrossProductError`.
 - A `PixelPoint` declared with fields `x` and `y` instead of `u` and `v` raises
   `MissingAxisCoordinatesError` where the class is defined.

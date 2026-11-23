@@ -9,7 +9,10 @@ from dataclasses import dataclass
 from typing_extensions import Generic, Self, TypeVar
 
 from krrood.patterns.classproperty import classproperty
-from krrood.symbolic_math.exceptions import UnsupportedOperationError
+from krrood.symbolic_math.exceptions import (
+    MathematicalOperation,
+    UnsupportedOperationError,
+)
 from krrood_spatial_math.coordinate_system import (
     AxisCoordinates,
     GenericAffineFrame,
@@ -96,7 +99,9 @@ class Vector(
         :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
         if not isinstance(other, type(self)):
-            raise UnsupportedOperationError(operation="dot", left=self, right=other)
+            raise UnsupportedOperationError(
+                operation=MathematicalOperation.DOT_PRODUCT, left=self, right=other
+            )
         self.ensure_same_coordinate_system(other=other, context="the multiplied vector")
         return self.frame_kind.inner_product(first=self, second=other)
 
@@ -113,7 +118,9 @@ class Vector(
             three-dimensional Cartesian frame.
         """
         if not isinstance(other, type(self)):
-            raise UnsupportedOperationError(operation="cross", left=self, right=other)
+            raise UnsupportedOperationError(
+                operation=MathematicalOperation.CROSS_PRODUCT, left=self, right=other
+            )
         self.ensure_same_coordinate_system(other=other, context="the crossed vector")
         return self.frame_kind.cross_product(first=self, second=other)
 

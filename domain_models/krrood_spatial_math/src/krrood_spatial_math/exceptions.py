@@ -115,7 +115,10 @@ class FrameMeasuresNoLengthsError(SpatialTypesError):
     """
 
     def error_message(self) -> str:
-        return f"{self.frame_kind.__name__} measures no lengths or angles."
+        return (
+            f"{self.frame_kind.__name__} does not fix the lengths of its axes or the "
+            f"angles between them, so its coordinates alone give no lengths or angles."
+        )
 
     def suggest_correction(self) -> str:
         return (
@@ -307,6 +310,26 @@ class MirroredPlaneFramesError(NoPlanarTransformationError):
         return (
             "relate frames whose z-axes point the same way, for instance by turning one "
             "of them half a turn about its x-axis."
+        )
+
+
+@dataclass(kw_only=True)
+class UnknownEmbeddedPlaneRelationError(NoPlanarTransformationError):
+    """
+    Raised when nothing tells whether two frames span one x-y plane: a frame charts no
+    known space, or the change between them is not constant and names no child frame.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"It is not known whether {self.child_frame} and {self.reference_frame} "
+            f"span one x-y plane."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "give both frames the space they chart, or name the child frame of a "
+            "change that is not constant."
         )
 
 

@@ -260,11 +260,11 @@ class AxisScalingChange(ScalingChange):
     def apply_to_homogeneous_coordinates(
         self, *, homogeneous_coordinates: tuple[float, ...]
     ) -> tuple[float, ...]:
-        x, y, weight = homogeneous_coordinates
+        x, y, has_position = homogeneous_coordinates
         return (
-            self.x_scale * x + self.x_shift * weight,
-            self.y_scale * y + self.y_shift * weight,
-            weight,
+            self.x_scale * x + self.x_shift * has_position,
+            self.y_scale * y + self.y_shift * has_position,
+            has_position,
         )
 
     def inverse(self) -> Self:

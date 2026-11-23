@@ -27,6 +27,7 @@ from krrood_spatial_math.exceptions import (
     FramesOnDifferentPlanesError,
     MirroredPlaneFramesError,
     ReferenceFrameMismatchError,
+    UnknownEmbeddedPlaneRelationError,
     XAxisNormalToPlaneError,
 )
 from krrood_spatial_math.space_map import OrthogonalProjection
@@ -79,6 +80,8 @@ class HomogeneousTransformationMatrix2Dimensional(
             different planes.
         :raises MirroredPlaneFramesError: If both frames are given and span one plane
             with z-axes pointing in opposite directions.
+        :raises UnknownEmbeddedPlaneRelationError: If both frames are given and it is not
+            known whether they span one plane.
         """
         if reference_frame is not None and child_frame is not None:
             self._ensure_rigid_change_on_one_plane(
@@ -153,22 +156,27 @@ class HomogeneousTransformationMatrix2Dimensional(
         cls, *, transformation: HomogeneousTransformationMatrix3Dimensional
     ) -> HomogeneousTransformationMatrix2Dimensional:
         """
-        Overrides :meth:`~krrood_spatial_math.spatial_types.SymbolicSpatialChange.from_t
-        ransformation` for frames that span one x-y plane and whose z-axes point the
-        same way.
+        Overrides :meth:`SymbolicSpatialChange.from_transformation` for frames that span
+        one x-y plane with z-axes pointing the same way, which is read from the
+        transformation when it is constant and from its frames otherwise.
 
-        :raises FramesOnDifferentPlanesError: If the transformation is constant, or its
-            frames are known, and its frames span different planes.
-        :raises MirroredPlaneFramesError: If the transformation is constant, or its
-            frames are known, and its frames span one plane with z-axes pointing in
-            opposite directions.
-
-        .. note::
-            A transformation that is not constant, between frames whose planes are not
-            known, is taken to be planar unchecked.
+        :raises FramesOnDifferentPlanesError: If its frames span different planes.
+        :raises MirroredPlaneFramesError: If its frames span one plane with z-axes
+            pointing in opposite directions.
+        :raises UnknownEmbeddedPlaneRelationError: If neither the transformation nor its
+            frames tell whether its frames span one plane.
         """
+        relation = transformation.embedded_plane_relation
+        if (
+            relation is EmbeddedPlaneRelation.UNKNOWN
+            and transformation.reference_frame is not None
+            and transformation.child_frame is not None
+        ):
+            relation = transformation.reference_frame.compare_embedded_plane(
+                frame=transformation.child_frame
+            )
         cls._ensure_rigid_change_on_one_plane(
-            relation=transformation.embedded_plane_relation,
+            relation=relation,
             reference_frame=transformation.reference_frame,
             child_frame=transformation.child_frame,
         )
@@ -196,7 +204,13 @@ class HomogeneousTransformationMatrix2Dimensional(
         :raises FramesOnDifferentPlanesError: If the frames span different planes.
         :raises MirroredPlaneFramesError: If the frames span one plane with z-axes
             pointing in opposite directions.
+        :raises UnknownEmbeddedPlaneRelationError: If it is not known whether the frames
+            span one plane.
         """
+        if relation is EmbeddedPlaneRelation.UNKNOWN:
+            raise UnknownEmbeddedPlaneRelationError(
+                reference_frame=reference_frame, child_frame=child_frame
+            )
         if relation is EmbeddedPlaneRelation.DIFFERENT_PLANES:
             raise FramesOnDifferentPlanesError(
                 reference_frame=reference_frame, child_frame=child_frame
@@ -261,7 +275,7 @@ class HomogeneousTransformationMatrix2Dimensional(
         :raises ReferenceFrameMismatchError: If ``other`` is given in a frame other than
             this change's child frame.
         """
-        self.ensure_acts_on(operand=other, operation="@")
+        self.ensure_acts_on(operand=other)
         return other.apply_transformation(transformation=self)
 
     def inverse(self) -> HomogeneousTransformationMatrix2Dimensional:

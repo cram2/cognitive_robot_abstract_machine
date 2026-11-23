@@ -23,6 +23,7 @@ from krrood_spatial_math.exceptions import (
     FramesOnDifferentPlanesError,
     MirroredPlaneFramesError,
     ReferenceFrameMismatchError,
+    UnknownEmbeddedPlaneRelationError,
     XAxisNormalToPlaneError,
 )
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
@@ -520,17 +521,52 @@ def test_a_change_to_a_frame_facing_the_other_side_of_a_plane_has_no_planar_tran
         )
 
 
-def test_a_symbolic_change_becomes_a_planar_transformation_unchecked(floor_frame):
+def test_a_planar_transformation_refuses_frames_whose_planes_are_not_known(
+    floor_frame,
+):
+    """
+    A frame that charts no known space cannot be shown to share the other frame's plane.
+    """
+    with pytest.raises(UnknownEmbeddedPlaneRelationError):
+        HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
+            reference_frame=floor_frame, child_frame=NamedFrame("nowhere")
+        )
+
+
+def test_a_symbolic_change_between_frames_on_one_plane_becomes_a_planar_transformation(
+    floor_frame, robot_base_frame
+):
+    """
+    Whether a change that is not constant stays on one plane is read from its frames.
+    """
+    distance = sm.FloatVariable(name="distance")
+    floor_T_robot_base = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=distance, reference_frame=floor_frame, child_frame=robot_base_frame
+    )
+
+    planar_floor_T_robot_base = (
+        HomogeneousTransformationMatrix2Dimensional.from_transformation(
+            transformation=floor_T_robot_base,
+        )
+    )
+
+    assert planar_floor_T_robot_base.x.equivalent(other=distance)
+
+
+def test_a_symbolic_change_from_no_frame_has_no_planar_transformation(floor_frame):
+    """
+    A change that is not constant and has no child frame cannot be shown to stay on one
+    plane.
+    """
     height = sm.FloatVariable(name="height")
     lifted = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, z=height, reference_frame=floor_frame
     )
 
-    floor_T_lifted = HomogeneousTransformationMatrix2Dimensional.from_transformation(
-        transformation=lifted,
-    )
-
-    assert np.allclose(floor_T_lifted.x.to_np(), [1])
+    with pytest.raises(UnknownEmbeddedPlaneRelationError):
+        HomogeneousTransformationMatrix2Dimensional.from_transformation(
+            transformation=lifted,
+        )
 
 
 def test_a_planar_transformation_moves_a_point_into_its_reference_frame(

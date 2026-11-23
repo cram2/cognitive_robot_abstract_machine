@@ -25,6 +25,7 @@ from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import DerivedGenericParameter
 from krrood.symbolic_math.exceptions import (
     WrongDimensionsError,
+    MathematicalOperation,
     UnsupportedOperationError,
 )
 from krrood.symbolic_math.symbolic_math import Matrix, to_sx
@@ -399,10 +400,9 @@ class SymbolicSpatialChange(
             child_frame=self.child_frame,
         )
 
-    def ensure_acts_on(self, *, operand: Any, operation: str) -> None:
+    def ensure_acts_on(self, *, operand: Any) -> None:
         """
         :param operand: A value or change this change is applied to.
-        :param operation: The operator applying it, for the error message.
         :raises UnsupportedOperationError: If ``operand`` is neither a value nor a
             change, or is given in another kind of frame than this change's.
         :raises ReferenceFrameMismatchError: If ``operand`` is given in a frame other
@@ -414,7 +414,9 @@ class SymbolicSpatialChange(
             is self.get_type_of_generic_parameter(parameter=GenericCoordinateSystem)
         ):
             raise UnsupportedOperationError(
-                operation=operation, left=self, right=operand
+                operation=MathematicalOperation.MATRIX_MULTIPLICATION,
+                left=self,
+                right=operand,
             )
         self.ensure_operand_in_child_frame(operand)
 
@@ -796,7 +798,7 @@ class HomogeneousTransformationMatrix3Dimensional(
         :raises ReferenceFrameMismatchError: If ``other`` is given in a frame other than
             this transformation's child frame.
         """
-        self.ensure_acts_on(operand=other, operation="dot")
+        self.ensure_acts_on(operand=other)
         return other.apply_transformation(transformation=self)
 
     def __matmul__(self, other: GenericSpatialType) -> GenericSpatialType:

@@ -411,7 +411,8 @@ def test_a_vectors_cross_product_is_the_one_its_frame_kind_gives():
 
 def test_a_vector_of_a_frame_that_is_not_cartesian_has_no_cross_product():
     """
-    An affine kind of frame has no cross product, as it measures no lengths or angles.
+    An affine kind of frame has no cross product, as its coordinates alone give no
+    lengths or angles.
     """
     vector = ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
 

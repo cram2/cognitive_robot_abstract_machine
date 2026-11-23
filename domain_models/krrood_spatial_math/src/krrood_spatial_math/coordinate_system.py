@@ -26,7 +26,7 @@ from krrood_spatial_math.space import EuclideanSpace, Space
 
 if TYPE_CHECKING:
     from krrood_spatial_math.point import Point
-    from krrood_spatial_math.vector import Vector
+    from krrood_spatial_math.vector import GenericVector, Vector
 
 # %% what coordinates are given in
 
@@ -83,8 +83,8 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
     A coordinate system given by an origin and linearly independent, straight axes; the
     coordinates of a point are its amounts along the axes from the origin.
 
-    The axes may differ in length and need not be perpendicular, as the axes of an
-    image's pixels may, so an affine frame measures no lengths or angles.
+    The axes may differ in length and need not be perpendicular, as an image's pixels
+    may, so its coordinates alone give no lengths or angles.
     """
 
     @classproperty
@@ -109,7 +109,8 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
     def norm(cls, *, vector: Vector) -> GenericCoordinate:
         """
         :param vector: A vector given in a frame of this kind.
-        :return: The length of ``vector``.
+        :return: The length of ``vector``: the square root of its inner product with
+            itself.
         :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
         """
         return cls.inner_product(first=vector, second=vector) ** 0.5
@@ -119,13 +120,16 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
         """
         :param first: A point given in a frame of this kind.
         :param second: A point given in the same frame.
-        :return: The straight-line distance between both points.
+        :return: The straight-line distance between both points: the length of their
+            difference.
         :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
         """
         return cls.norm(vector=first - second)
 
     @classmethod
-    def cross_product(cls, *, first: Vector, second: Vector) -> Vector:
+    def cross_product(
+        cls, *, first: GenericVector, second: GenericVector
+    ) -> GenericVector:
         """
         :param first: A vector given in a frame of this kind.
         :param second: A vector given in the same frame.
@@ -335,7 +339,8 @@ class AxisCoordinates(
     def has_position(cls) -> bool:
         """
         Whether a value of this type is a position, which an affine change shifts along
-        with the origin, rather than an offset, which it only turns or scales.
+        with the origin, rather than an offset, which it only turns or scales; the last
+        of its homogeneous coordinates, 1 or 0.
         """
 
     def apply_transformation(
@@ -415,11 +420,11 @@ class AffineCoordinateChange(
     ) -> tuple[GenericCoordinate, ...]:
         """
         :param homogeneous_coordinates: The coordinates of a value in the source
-            coordinate system, followed by its weight: 1 if it
-            :attr:`~AxisCoordinates.has_position`, 0 if not.
+            coordinate system, followed by 1 if the value
+            :attr:`~AxisCoordinates.has_position` and 0 if not.
         :return: The same coordinates in the target coordinate system, followed by the
-            unchanged weight: the axes are mapped, and the shift between the origins is
-            added as many times as the weight says.
+            same last entry: the axes are mapped, and the shift between the origins is
+            added only to a value that has a position.
         """
 
 

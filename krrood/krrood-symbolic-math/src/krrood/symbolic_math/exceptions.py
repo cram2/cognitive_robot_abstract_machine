@@ -5,6 +5,7 @@ The errors symbolic math raises.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from typing_extensions import TYPE_CHECKING, Any
 
@@ -21,15 +22,37 @@ class SymbolicMathError(DataclassException):
     """
 
 
+class MathematicalOperation(StrEnum):
+    """
+    An operation between two values that the types of its operands may not support,
+    rendered as Python writes it.
+    """
+
+    MATRIX_MULTIPLICATION = "@"
+    """
+    Applying a matrix or a change to a value, ``left @ right``.
+    """
+
+    DOT_PRODUCT = "dot"
+    """
+    The inner product of two vectors.
+    """
+
+    CROSS_PRODUCT = "cross"
+    """
+    The vector perpendicular to two vectors.
+    """
+
+
 @dataclass(kw_only=True)
 class UnsupportedOperationError(SymbolicMathError, TypeError):
     """
     Represents an error for unsupported operations between incompatible types.
     """
 
-    operation: str
+    operation: MathematicalOperation
     """
-    The name of the operation that was attempted (e.g., '+', '-', etc.).
+    The operation that was attempted.
     """
 
     left: Any
