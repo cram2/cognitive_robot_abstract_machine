@@ -7,20 +7,19 @@ from __future__ import annotations
 import operator
 from dataclasses import dataclass
 
-from typing_extensions import Any
+from typing_extensions import Any, Iterable, Mapping
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.variable import InstantiatedVariable, Literal
-from krrood.entity_query_language.factories import set_of
 from krrood.entity_query_language.ground_term import GroundTerm, GroundTermExpression
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import Not
 from krrood.entity_query_language.predicate import Predicate
 from krrood.planning.exceptions import (
+    AssignedValueHasWrongType,
     AssignmentBypassesSetter,
     ComparisonIsNotAnEquality,
     ConditionIsNotAFact,
-    FactValueIsNotConstant,
     MissingGroundTerm,
 )
 
@@ -41,7 +40,8 @@ class Fact:
 
     value: Any
     """
-    The value every ground term of :attr:`expression` has.
+    The value every ground term of :attr:`expression` has, or the expression whose value
+    under each binding is the value of the ground term under that binding.
     """
 
     @classmethod
@@ -54,8 +54,6 @@ class Fact:
         :raises ComparisonIsNotAnEquality: If *condition* compares a ground term by other
             than equality.
         :raises ConditionIsNotAFact: If *condition* has none of these forms.
-        :raises FactValueIsNotConstant: If *condition* compares with an expression
-            instead of a value.
         """
         if cls._is_predicate(condition=condition):
             return cls(expression=condition, value=True)
@@ -70,9 +68,9 @@ class Fact:
             raise ConditionIsNotAFact(condition=condition)
         if condition.operation is not operator.eq:
             raise ComparisonIsNotAnEquality(condition=condition)
-        if not isinstance(condition.right, Literal):
-            raise FactValueIsNotConstant(condition=condition)
-        return cls(expression=condition.left, value=condition.right._value_)
+        if isinstance(condition.right, Literal):
+            return cls(expression=condition.left, value=condition.right._value_)
+        return cls(expression=condition.left, value=condition.right)
 
     @staticmethod
     def _is_predicate(*, condition: SymbolicExpression) -> bool:
@@ -86,23 +84,46 @@ class Fact:
             and issubclass(condition._type_, Predicate)
         )
 
-    def assignments(self) -> dict[GroundTerm, Any]:
+    @property
+    def selected_expressions(self) -> tuple[SymbolicExpression, ...]:
         """
-        :return: :attr:`value` for the ground term :attr:`expression` reads under each
-            binding of its operands.
+        :return: The expressions whose values a binding of this fact gives: the operands
+            of :attr:`expression`, and :attr:`value` where it is an expression.
+        """
+        operands = self.expression._ground_term_operands_
+        if isinstance(self.value, SymbolicExpression):
+            return (*operands, self.value)
+        return operands
+
+    def assignments(
+        self, *, bindings: Iterable[Mapping[SymbolicExpression, Any]]
+    ) -> dict[GroundTerm, Any]:
+        """
+        :param bindings: Values of :attr:`selected_expressions`.
+        :return: The value of :attr:`value` under each of *bindings*, for the ground term
+            :attr:`expression` reads under it.
         :raises MissingGroundTerm: If one of these ground terms does not exist.
         :raises AssignmentBypassesSetter: If live objects set one of these ground terms
             through code of their own class.
+        :raises AssignedValueHasWrongType: If a value is not of the type the class
+            diagram declares for its ground term.
         """
         operands = self.expression._ground_term_operands_
         assignments = {}
-        for row in set_of(*operands).tolist():
+        for binding in bindings:
             term = self.expression._ground_term_(
-                operand_values=tuple(row[operand] for operand in operands)
+                operand_values=tuple(binding[operand] for operand in operands)
+            )
+            value = (
+                binding[self.value]
+                if isinstance(self.value, SymbolicExpression)
+                else self.value
             )
             if not term.has_live_value():
                 raise MissingGroundTerm(term=term)
             if term.setting_runs_code():
                 raise AssignmentBypassesSetter(term=term)
-            assignments[term] = self.value
+            if not term.accepts_value(value=value):
+                raise AssignedValueHasWrongType(term=term, value=value)
+            assignments[term] = value
         return assignments

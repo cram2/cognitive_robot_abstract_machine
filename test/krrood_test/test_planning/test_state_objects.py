@@ -198,7 +198,7 @@ def test_removed_object_leaves_the_collections_the_state_assigns(
     state = (
         State()
         .with_objects_added(planned)
-        .with_facts(literal(world).connections == [*world.connections, planned])
+        .add_facts(literal(world).connections == [*world.connections, planned])
         .with_objects_removed(removed)
     )
 
@@ -266,7 +266,7 @@ def test_world_collection_reads_the_collection_the_state_assigns(
     state = (
         State()
         .with_objects_added(planned)
-        .with_facts(literal(world).connections == [*world.connections, planned])
+        .add_facts(literal(world).connections == [*world.connections, planned])
     )
 
     result = (

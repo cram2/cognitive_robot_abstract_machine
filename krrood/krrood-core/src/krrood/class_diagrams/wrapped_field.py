@@ -243,6 +243,33 @@ class WrappedField:
             return get_args(self.resolved_type)
         return (self.resolved_type,)
 
+    def accepts_value(self, *, value: Any) -> bool:
+        """
+        :param value: A value the field may be given.
+        :return: Whether *value* is an instance of a member of the field's annotation, an
+            ``int`` standing for a ``float``. A member no instance check can decide, such
+            as a type variable or ``Any``, accepts every value.
+        """
+        return any(
+            self._annotation_accepts_value_(annotation=annotation, value=value)
+            for annotation in self._union_members_
+        )
+
+    @staticmethod
+    def _annotation_accepts_value_(*, annotation: Any, value: Any) -> bool:
+        """
+        :param annotation: One member of a field's annotation.
+        :param value: A value the field may be given.
+        :return: Whether *value* is an instance of the class *annotation* names, or
+            ``True`` when it names none.
+        """
+        annotated_class = get_origin(annotation) or annotation
+        if not isinstance(annotated_class, type):
+            return True
+        if annotated_class is float:
+            return isinstance(value, (float, int))
+        return isinstance(value, annotated_class)
+
     @cached_property
     def container_type(self) -> type | None:
         if not self.is_container:

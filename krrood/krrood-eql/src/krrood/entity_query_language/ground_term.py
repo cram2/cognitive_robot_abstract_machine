@@ -27,6 +27,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
+from krrood.entity_query_language.class_diagram_lookup import get_wrapped_field
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import T
 from krrood.patterns.interface import Interface
@@ -161,6 +162,14 @@ class GroundTerm(ABC):
         """
         return False
 
+    def accepts_value(self, *, value: Any) -> bool:
+        """
+        :param value: A value this ground term may be given.
+        :return: Whether *value* is of the type the class diagram declares for this
+            ground term, ``True`` where it declares none.
+        """
+        return True
+
     @abstractmethod
     def live_value(self) -> Any:
         """
@@ -219,6 +228,14 @@ class AttributeTerm(GroundTerm):
         if isinstance(descriptor, property):
             return descriptor.fset is not None
         return hasattr(type(descriptor), "__set__")
+
+    def accepts_value(self, *, value: Any) -> bool:
+        """
+        :meth:`GroundTerm.accepts_value`, with the type the class diagram declares for
+        the field of this attribute.
+        """
+        wrapped_field = get_wrapped_field(type(self.instance), self.attribute_name)
+        return wrapped_field is None or wrapped_field.accepts_value(value=value)
 
     def live_value(self) -> Any:
         return getattr(self.instance, self.attribute_name)

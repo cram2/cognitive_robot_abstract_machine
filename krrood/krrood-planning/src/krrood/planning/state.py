@@ -19,7 +19,7 @@ from krrood.entity_query_language.ground_term import (
     TermValue,
 )
 from krrood.entity_query_language.utils import T
-from krrood.planning.fact import Fact
+from krrood.planning.effect import Assignment, StateChange
 
 # %% states
 
@@ -27,14 +27,10 @@ from krrood.planning.fact import Fact
 @dataclass(kw_only=True, frozen=True)
 class State(TermReader):
     """
-    A valuation of ground terms that differs from the live objects only where it assigns a
-    value.
-
-    A *fluent* is a ground term
-    (:class:`~krrood.entity_query_language.ground_term.GroundTerm`) whose value a state
-    can change, and the :class:`~krrood.entity_query_language.ground_term.FunctionKey` it
-    applies is its fluent symbol. A query evaluated with this state reads the assigned
-    value of every assigned fluent and the live value of every other.
+    A valuation of *fluents*: ground terms whose value a state can change, each with its
+    :class:`~krrood.entity_query_language.ground_term.FunctionKey` as fluent symbol. An
+    unassigned derived fluent follows the state only where its value comes from EQL, and
+    an assigned one keeps its value even after the fluents it derives from change.
 
     >>> from dataclasses import dataclass
     >>> from krrood.entity_query_language.factories import a, literal
@@ -42,20 +38,11 @@ class State(TermReader):
     ... class Box:
     ...     color: str
     >>> box = Box("red")
-    >>> state = State().with_facts(literal(box).color == "blue")
+    >>> state = State().add_facts(literal(box).color == "blue")
     >>> a(Box).from_(domain=[box]).color.tolist(state=state)
     ['blue']
     >>> box.color
     'red'
-
-    .. note:: An unassigned derived ground term follows the state only where its value comes
-        from EQL: a body that is itself an EQL query, or inputs passed to it as EQL
-        arguments, as in ``is_table(block.support)``. A Python body that reads an
-        attribute directly, such as ``self.block.support``, reads the live value.
-
-    .. warning:: An assigned ground term keeps its value even where it is derived from other
-        ground terms, so assigning a predicate overrides what it would compute from the
-        ground terms it reads, also after those change.
     """
 
     assignments: dict[GroundTerm, Any] = field(default_factory=dict)
@@ -99,21 +86,34 @@ class State(TermReader):
         """
         return frozenset(term.function_key for term in self.assignments)
 
-    def with_facts(self, *facts: SymbolicExpression) -> State:
+    def add_facts(self, *facts: SymbolicExpression) -> State:
         """
         :param facts: Conditions that each fix the value of ground terms, as
             :meth:`~krrood.planning.fact.Fact.from_condition` reads them. A fact whose
             expression has variables fixes the ground term for every binding of them.
         :return: A new state that assigns the values *facts* state on top of this
             state's own assignments, a later value winning where two assign a ground term.
+            Each fact reads its bindings and values in the state the facts before it
+            build.
         """
-        assignments = dict(self.assignments)
+        state = self
         for fact in facts:
-            assignments |= Fact.from_condition(condition=fact).assignments()
-        return State(
-            assignments=assignments,
-            added_objects=self.added_objects,
-            removed_objects=self.removed_objects,
+            state = state.apply_change(change=Assignment(fact=fact).change(state=state))
+        return state
+
+    def apply_change(self, *, change: StateChange) -> State:
+        """
+        :param change: What an effect changes.
+        :return: A new state that makes *change* on top of this state.
+        """
+        return (
+            State(
+                assignments=self.assignments | change.assignments,
+                added_objects=self.added_objects,
+                removed_objects=self.removed_objects,
+            )
+            .with_objects_added(*change.added_objects)
+            .with_objects_removed(*change.removed_objects)
         )
 
     def with_objects_added(self, *objects: Any) -> State:

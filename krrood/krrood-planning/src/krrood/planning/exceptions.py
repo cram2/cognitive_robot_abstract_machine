@@ -1,16 +1,20 @@
 """
-Errors raised while building states.
+Errors raised while building states and applying actions to them.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import Any
+from typing_extensions import TYPE_CHECKING, Any
 
+from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.ground_term import GroundTerm
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.exceptions import DataclassException
+
+if TYPE_CHECKING:
+    from krrood.planning.action_schema import ActionSchema
 
 # %% facts
 
@@ -63,24 +67,6 @@ class ComparisonIsNotAnEquality(ConditionIsNotAFact):
 
 
 @dataclass(kw_only=True)
-class FactValueIsNotConstant(DataclassException):
-    """
-    A fact compares a ground term with an expression instead of with a value.
-    """
-
-    condition: Any
-    """
-    The fact whose value is an expression.
-    """
-
-    def error_message(self) -> str:
-        return f"The value {self.condition} gives its ground term is not a constant."
-
-    def suggest_correction(self) -> str:
-        return "Compare the ground term with a plain value."
-
-
-@dataclass(kw_only=True)
 class MissingGroundTerm(DataclassException):
     """
     A fact gives a value to a ground term that does not exist, such as an attribute the
@@ -121,4 +107,88 @@ class AssignmentBypassesSetter(DataclassException):
         return (
             "Assign the plain fields the setter stores, and state what else it changes "
             "as derived ground terms (EQL rules or symbolic functions) or as further facts."
+        )
+
+
+@dataclass(kw_only=True)
+class AssignedValueHasWrongType(DataclassException):
+    """
+    A fact or effect gives a ground term a value of another type than the class diagram
+    declares for it.
+    """
+
+    term: GroundTerm
+    """
+    The ground term that was given the value.
+    """
+
+    value: Any
+    """
+    The value it was given.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.term} was given {self.value!r} of type {type(self.value).__name__}, "
+            "which its declared type does not admit."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Give the ground term a value of the type its field declares."
+
+
+# %% effects
+
+
+@dataclass(kw_only=True)
+class ValueIsNotACollection(DataclassException):
+    """
+    An effect inserts an element into a ground term whose value is not a collection of
+    elements.
+    """
+
+    collection: SymbolicExpression
+    """
+    The expression the effect inserts into.
+    """
+
+    value: Any
+    """
+    The value of the expression, which is not a collection.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.collection} has the value {self.value!r}, which is not a "
+            "collection an element can be inserted into."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Insert only into lists, tuples and sets; assign any other value with an "
+            "assignment instead."
+        )
+
+
+# %% actions
+
+
+@dataclass(kw_only=True)
+class ActionIsNotApplicable(DataclassException):
+    """
+    A ground action was applied in a state that does not satisfy its precondition.
+    """
+
+    action: ActionSchema
+    """
+    The action that was applied.
+    """
+
+    def error_message(self) -> str:
+        return f"The precondition of {self.action} does not hold in the state."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Apply only actions whose is_applicable holds in the state, such as those "
+            "applicable_actions returns."
         )
