@@ -1,0 +1,58 @@
+# Book settings
+# Learn more at https://jupyterbook.org/customize/config.html
+
+title: krrood_spatial_math
+author: AICOR Institute for Artificial Intelligence
+
+# Force re-execution of notebooks on each build.
+# See https://jupyterbook.org/content/execute.html
+execute:
+  execute_notebooks: force
+  # a cell that raises fails the build instead of only logging a warning
+  raise_on_error: true
+
+# Define the name of the latex output file for PDF builds
+latex:
+  latex_documents:
+    targetname: book.tex
+
+# Add a bibtex file so that we can create citations
+bibtex_bibfiles:
+  - references.bib
+
+sphinx:
+  extra_extensions:
+    - myst_nb
+    - sphinxcontrib.bibtex
+    - autoapi.extension
+    - 'sphinx.ext.autodoc'
+  config:
+    bibtex_bibfiles:
+      - references.bib
+    autoapi_type: python
+    autoapi_dirs:
+      - ../src
+    autoapi_options:
+      - members
+      - undoc-members
+      - show-inheritance
+      - show-module-summary
+    autoapi_add_toctree_entry: True
+
+parse:
+  myst_enable_extensions:
+    - amsmath
+    - dollarmath
+    - html_image
+
+# Information about where the book exists on the web
+repository:
+  url: https://github.com/cram2/cognitive_robot_abstract_machine
+  path_to_book: domain_models/krrood_spatial_math/doc
+  branch: main
+
+# Add GitHub buttons to your book
+# See https://jupyterbook.org/customize/config.html#add-a-link-to-your-repository
+html:
+  use_issues_button: true
+  use_repository_button: true
