@@ -30,6 +30,11 @@ from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segments the tabletop objects in images rendered from the
+    ``world_semdt_raytracer_tabletop`` world descriptor and puts them into the world.
+    """
+
     def name(self) -> str:
         return "semdt_raytracer_demo"
 

@@ -1,3 +1,9 @@
+"""
+Analysis engine segmenting tabletop objects in camera data replayed from MongoDB.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_pose_bb import ClusterPoseBBAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator

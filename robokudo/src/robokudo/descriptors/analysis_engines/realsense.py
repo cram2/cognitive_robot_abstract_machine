@@ -1,3 +1,9 @@
+"""
+Analysis engine segmenting tabletop objects in RealSense camera data.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -13,6 +19,10 @@ from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segments the tabletop objects in RealSense camera data and puts them into the world.
+    """
+
     def name(self) -> str:
         return "realsense"
 

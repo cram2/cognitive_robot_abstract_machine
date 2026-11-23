@@ -1,3 +1,10 @@
+"""
+Analysis engine localizing tabletop objects in Kinect data with the tabletop object
+localization subtree.
+"""
+
+from __future__ import annotations
+
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
 from robokudo.annotators.cluster_position import ClusterPositionAnnotator
@@ -17,6 +24,11 @@ from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segments the tabletop objects in Kinect data read without TF, annotates their color,
+    color histogram and position, and puts them into the world.
+    """
+
     def name(self) -> str:
         return "demo_subtree"
 

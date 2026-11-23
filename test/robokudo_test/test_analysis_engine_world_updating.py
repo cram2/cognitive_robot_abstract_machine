@@ -23,6 +23,9 @@ from .test_analysis_engine_query_composition import (
 def test_analysis_engine_updates_the_world(
     module_name: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """
+    The pipeline of every analysis engine puts the objects it perceives into the world.
+    """
     pipeline = built_analysis_engine_pipeline(module_name, monkeypatch)
 
     assert any(
@@ -35,6 +38,10 @@ def test_analysis_engine_updates_the_world(
 def test_analysis_engine_updates_the_world_right_before_answering_a_query(
     module_name: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """
+    Every query answer of an analysis engine directly follows a world update, so the
+    answer reflects what the pass perceived.
+    """
     pipeline = built_analysis_engine_pipeline(module_name, monkeypatch)
     query_answers = [
         node

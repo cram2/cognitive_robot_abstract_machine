@@ -1,3 +1,9 @@
+"""
+Analysis engine putting the tabletop objects it segments in Kinect data into the world.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
@@ -19,6 +25,11 @@ from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segments the tabletop objects in Kinect data, annotates their color, color histogram
+    and bounding box, and puts them into the world.
+    """
+
     def name(self) -> str:
         return "semdt_demo"
 

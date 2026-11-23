@@ -202,10 +202,9 @@ def built_analysis_engine_pipeline(
     """
     The pipeline the ``AnalysisEngine`` of ``module_name`` builds, without live cameras.
 
-    Modules that fail to import, that define no ``AnalysisEngine``, or whose
-    ``implementation()`` needs resources this test does not provide (for example a
-    running storage backend) skip the test rather than fail it, since that is a missing
-    fixture or an unrelated environment issue, not evidence about a composition rule.
+    Skips the test for a module that fails to import, defines no ``AnalysisEngine``, or
+    whose ``implementation()`` needs resources the test does not provide, such as a
+    running storage backend.
 
     :param module_name: The fully qualified name of the analysis engine module.
     :param monkeypatch: Replaces the collection reader descriptors for the build.

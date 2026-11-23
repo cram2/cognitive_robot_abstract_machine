@@ -1,3 +1,9 @@
+"""
+Analysis engine answering a query with the tabletop objects it segments in Kinect data.
+"""
+
+from __future__ import annotations
+
 from py_trees.common import Status
 from py_trees.composites import Selector, Sequence
 from py_trees.decorators import Inverter
@@ -24,6 +30,11 @@ from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Answers a query with the tabletop objects it segments in Kinect data and annotates
+    with their color, and puts them into the world, unless the query is preempted.
+    """
+
     def name(self) -> str:
         return "query_complex"
 

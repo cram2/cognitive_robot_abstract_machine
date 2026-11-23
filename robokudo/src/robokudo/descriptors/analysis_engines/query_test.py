@@ -95,6 +95,11 @@ class CheckQueryType(BaseAnnotator):
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Answers a query of type ``numbers`` by counting, reporting each number as feedback,
+    unless the query is preempted.
+    """
+
     def name(self) -> str:
         return "test_pipeline"
 
