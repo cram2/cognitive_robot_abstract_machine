@@ -1,15 +1,7 @@
-"""Scene representation types for Robokudo.
-
-This module provides types for representing and analyzing elements in a scene.
-It includes types for:
-
-* Analyzable scene elements
-* Object and human hypotheses
-* Region definitions
-* Part-whole relationships
-* Occupancy annotations
-
-The types support 3D point clouds, image ROIs, and nested annotations.
+"""
+Types for the elements of a scene that RoboKudo analyzes: object, human, region and part
+hypotheses and occupancy annotations, each with its point cloud, image region and nested
+annotations.
 """
 
 from __future__ import annotations
@@ -17,13 +9,22 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import open3d as o3d
-from typing_extensions import TYPE_CHECKING, Any
+from semantic_digital_twin.reasoning.queries import annotation_class_by_label
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Human,
+    UnknownObject,
+)
+from typing_extensions import TYPE_CHECKING, Any, TypeVar
 
+from robokudo.types.annotation import Classification
 from robokudo.types.core import Annotation, IdentifiableAnnotation, Nameable
 from robokudo.types.cv import ImageROI
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import Body
+
+AnnotationType = TypeVar("AnnotationType", bound=Annotation)
 
 
 @dataclass
@@ -39,73 +40,121 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
 
     annotations: list = field(default_factory=list)
     """
-    List of associated annotations
+    List of associated annotations.
     """
 
     points: o3d.geometry.PointCloud = None
     """
-    Point cloud data
+    Point cloud data.
     """
 
     point_indices: list = field(default_factory=list)
     """
-    Indices into point cloud
+    Indices into point cloud.
     """
 
     object_knowledge: Body | None = None
     """
-    A reference to an SDT Body, if present
+    A reference to an SDT Body, if present.
     """
 
     roi: ImageROI = field(default_factory=ImageROI)
     """
-    Image region of interest
+    Image region of interest.
     """
+
+    def latest_annotation_of_type(
+        self, *, annotation_type: type[AnnotationType]
+    ) -> AnnotationType | None:
+        """
+        :param annotation_type: The type of the annotation.
+        :return: The annotation of ``annotation_type`` added last to
+            :attr:`annotations`, or None if there is none.
+        """
+        for annotation in reversed(self.annotations):
+            if isinstance(annotation, annotation_type):
+                return annotation
+        return None
 
 
 @dataclass
 class ObjectHypothesis(AnalyzableAnnotation):
-    """Hypothesis about an object in the scene.
-
-    Basic object hypothesis without additional specialization.
-    Inherits all capabilities from AnalyzableAnnotation.
     """
+    Hypothesis about an object in the scene.
+
+    Basic object hypothesis without additional specialization. Inherits all capabilities
+    from AnalyzableAnnotation.
+    """
+
+    @property
+    def class_label(self) -> str | None:
+        """
+        The class name of the latest classification of this hypothesis, or None if it
+        was not classified.
+        """
+        classification = self.latest_annotation_of_type(annotation_type=Classification)
+        if classification is None or not classification.classname:
+            return None
+        return classification.classname
+
+    def determine_semantic_class(
+        self, *, minimum_class_confidence: float
+    ) -> type[IsPerceivable]:
+        """
+        :param minimum_class_confidence: How confident a classification has to be.
+        :return: The semantic annotation :attr:`class_label` names, if the latest
+            classification is at least ``minimum_class_confidence`` confident; else
+            :class:`UnknownObject`.
+        """
+        classification = self.latest_annotation_of_type(annotation_type=Classification)
+        if (
+            self.class_label is None
+            or classification.confidence < minimum_class_confidence
+        ):
+            return UnknownObject
+        semantic_class = annotation_class_by_label(self.class_label)
+        if semantic_class is None:
+            return UnknownObject
+        return semantic_class
 
 
 @dataclass
 class HumanHypothesis(ObjectHypothesis):
-    """Hypothesis about a human in the scene.
+    """
+    Hypothesis about a human in the scene.
 
-    In contrast to ObjectHypothesis, we have many different aspects on a Object to annotate.
-    Therefore, the semantics of self.points, self.centroid and self.roi on this Hypothesis are a bit different.
-    These variables should always contain the maximum region of the person we have been able to detect so far.
-    Examples:
-      - When running only a face detection, they should be adjusted to the ROI for the face.
-      - When running a full body detection + face detection,
-        they should be adjusted to everything the full body detection and the face recognition was able to see.
-        Basically a Union over the ROIs generated for both.
-    In general, PersonHypotheses should rely more on Annotations and also annotate the individual detected features,
-    like body parts or activities.
+    Its :attr:`points` and :attr:`roi` cover the largest region of the person detected
+    so far, such as the union of a face and a full body detection. Detected features
+    such as body parts or activities are annotated individually.
     """
 
     goal: Any = None
     """
-    Goal associated with the human
+    Goal associated with the human.
     """
 
     result: Any = None
     """
-    Result of human-related processing
+    Result of human-related processing.
     """
+
+    def determine_semantic_class(
+        self, *, minimum_class_confidence: float
+    ) -> type[IsPerceivable]:
+        """
+        Unlike :meth:`ObjectHypothesis.determine_semantic_class`, :class:`Human`
+        whatever the classification says.
+        """
+        return Human
 
 
 @dataclass
 class RegionHypothesis(AnalyzableAnnotation, Nameable):
-    """Hypothesis about a region in the scene.
+    """
+    Hypothesis about a region in the scene.
 
-    A region in the scene. It doesn't necessarily focus on one specific object, but is rather used as a data structure
-    to analyze a specific part of the 3d space. Examples: A region above a sofa for free seat estimation,
-    the space of a sink to check if it is filled with water, etc.
+    A part of the 3D space to analyze that is not necessarily one object, such as the
+    region above a sofa for free seat estimation or a sink checked for water.
     """
 
     ...
@@ -113,16 +162,12 @@ class RegionHypothesis(AnalyzableAnnotation, Nameable):
 
 @dataclass
 class ParthoodHypothesis(AnalyzableAnnotation, Nameable):
-    """Base class for part-whole relationships in objects.
+    """
+    Hypothesis about a part of an object: a feature, such as a logo, or a component,
+    such as the control unit of an electrical device.
 
-    This annotation can be used to represent parts of an object.
-    We mainly refer to 'features' and 'components'.
-    A logo at a specific place on an object would be a feature, while a control unit on an electrical device is
-    a component.
-
-    Parthood Annotations are still a Hypothesis, because due to bad pose estimation we might actually not
-    refer to the correct region of the parthood. Example: Pose estimation is off by 180 degrees around the up-axis
-    and you are referring to a feature on the front face of an object.
+    An inaccurate object pose can place the part on the wrong region, for example on the
+    front face when the pose is off by 180 degrees around the up axis.
     """
 
 
@@ -132,14 +177,9 @@ class ParthoodComponentHypothesis(ParthoodHypothesis): ...
 
 @dataclass
 class ParthoodFeatureHypothesis(ParthoodHypothesis):
-    """Hypothesis about a feature part of an object.
-
-    Represents surface or visual features like:
-
-    * Logos
-    * Text
-    * Decorative elements
-    * Surface patterns
+    """
+    Hypothesis about a surface or visual feature of an object, such as a logo, text, a
+    decorative element or a surface pattern.
     """
 
     ...
@@ -147,7 +187,8 @@ class ParthoodFeatureHypothesis(ParthoodHypothesis):
 
 @dataclass
 class OccupiedAnnotation(Annotation):
-    """Annotation indicating region occupancy.
+    """
+    Annotation indicating region occupancy.
 
     This annotation can be used to indicate that a region is occupied.
     """

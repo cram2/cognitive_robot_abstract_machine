@@ -34,6 +34,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 CAMERA_CONFIG_NAME = "realsense"
 """
@@ -162,6 +163,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointcloudCropAnnotator(descriptor=crop_descriptor),
                 ImageClusterExtractor(descriptor=cluster_descriptor),
                 ClusterPoseBBAnnotator(),
+                WorldUpdatingAnnotator(),
                 # Left unconfigured so that filtering by query stays off: it compares the
                 # requested type against Classification annotations, which this pipeline
                 # does not produce, so filtering a typed query would discard every object.
