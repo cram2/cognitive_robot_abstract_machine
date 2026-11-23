@@ -755,6 +755,34 @@ def test_a_step_that_runs_out_of_candidates_below_its_limit_says_it_is_empty(
     assert type(failure.value) is EmptyUnderspecified
 
 
+def test_every_candidate_that_failed_its_trial_is_kept_with_its_statechart(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    Every candidate that failed its trial is kept with the statechart the trial ran.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    failing_attempts = [1, 2]
+    plan = StatementNode(
+        statement=a(RecordingAction)(
+            probe_key=register_probe(),
+            dof_id=world.degrees_of_freedom[0].id,
+            fail_on_attempt_number=variable_from(failing_attempts),
+        )
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(EmptyUnderspecified):
+        executor.compile(statechart=statechart_of(executor, plan))
+        executor.execute()
+
+    failed_trials = executor.child_chooser.trial.failed_trials
+    assert len(failed_trials) == len(failing_attempts)
+    for failed_trial in failed_trials:
+        assert plan in failed_trial.build.candidates
+        assert len(failed_trial.statechart.state_history) > 0
+
+
 # %% a trial copy is published while debugging
 
 
@@ -999,7 +1027,7 @@ def test_a_trial_tries_an_action_that_already_belongs_to_a_plan(
         executor=executor, trial_executor_type=KinematicallySimulatedPlanExecutor
     )
 
-    assert trial.succeeds(SubtreeRebuild(root=action, candidates={}))
+    assert trial.succeeds(rebuild=SubtreeRebuild(root=action, candidates={}))
     trial.discard()
 
 
