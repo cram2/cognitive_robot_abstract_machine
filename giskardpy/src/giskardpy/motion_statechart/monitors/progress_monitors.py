@@ -428,26 +428,52 @@ class PositionLimitSide(IntEnum):
     The upper position limit, crossed by moving in the positive direction.
     """
 
+
+@dataclass(kw_only=True)
+class PositionLimit:
+    """
+    One of the two position limits of a degree of freedom.
+    """
+
+    degree_of_freedom: DegreeOfFreedom
+    """
+    The degree of freedom the limit bounds.
+    """
+
+    side: PositionLimitSide
+    """
+    Which of its two position limits is meant.
+    """
+
     @classmethod
-    def find_reached_side(
-        cls, *, degree_of_freedom: DegreeOfFreedom, position: float, tolerance: float
-    ) -> PositionLimitSide | None:
+    def find_reached(
+        cls,
+        *,
+        degree_of_freedom: DegreeOfFreedom,
+        position: float,
+        range_fraction: float,
+    ) -> list[PositionLimit]:
         """
         :param degree_of_freedom: The degree of freedom whose position limits are
             checked.
         :param position: Its position.
-        :param tolerance: How close to a limit, in the degree of freedom's own unit,
-            `position` counts as at that limit.
-        :return: The side whose limit `position` lies at, the lower one if it lies at
-            both, or None if it lies at neither.
+        :param range_fraction: How close to a limit `position` counts as at that limit,
+            as a fraction of the range between the two limits.
+        :return: Every limit `position` lies at, none if a limit is missing.
         """
         lower = degree_of_freedom.limits.lower.position
         upper = degree_of_freedom.limits.upper.position
-        if lower is not None and position <= lower + tolerance:
-            return cls.LOWER
-        if upper is not None and position >= upper - tolerance:
-            return cls.UPPER
-        return None
+        if lower is None or upper is None:
+            return []
+        tolerance = range_fraction * (upper - lower)
+        return [
+            cls(degree_of_freedom=degree_of_freedom, side=side)
+            for side, reached in (
+                (PositionLimitSide.LOWER, position <= lower + tolerance),
+                (PositionLimitSide.UPPER, position >= upper - tolerance),
+            )
+            if reached
+        ]
 
 
 @dataclass(kw_only=True)
@@ -457,20 +483,54 @@ class BlockedPositionLimit:
     moving it further, past the limit.
     """
 
-    degree_of_freedom: DegreeOfFreedom
+    position_limit: PositionLimit
     """
-    The degree of freedom lying at its limit.
-    """
-
-    side: PositionLimitSide
-    """
-    Which of its position limits it lies at.
+    The limit the degree of freedom lies at.
     """
 
     task: ConvergingTask
     """
     The task whose error would fall by moving past the limit.
     """
+
+
+@dataclass(kw_only=True)
+class ErrorGradient:
+    """
+    The derivative of a task's error with respect to the positions of degrees of
+    freedom.
+    """
+
+    task: ConvergingTask
+    """
+    The task whose error is differentiated.
+    """
+
+    slopes: dict[DegreeOfFreedom, float]
+    """
+    The derivative of the error with respect to the position of each degree of freedom.
+    """
+
+    def find_blocked_position_limits(
+        self, *, reached_limits: list[PositionLimit], negligible_slope_fraction: float
+    ) -> list[BlockedPositionLimit]:
+        """
+        :param reached_limits: Position limits that their degrees of freedom lie at.
+        :param negligible_slope_fraction: Fraction of the steepest slope at or below
+            which a slope counts as zero.
+        :return: Every limit in `reached_limits` whose crossing would make the error
+            fall.
+        """
+        negligible_slope = negligible_slope_fraction * max(
+            (abs(slope) for slope in self.slopes.values()), default=0.0
+        )
+        return [
+            BlockedPositionLimit(position_limit=position_limit, task=self.task)
+            for position_limit in reached_limits
+            if abs(slope := self.slopes[position_limit.degree_of_freedom])
+            > negligible_slope
+            and slope * position_limit.side < 0
+        ]
 
 
 # %% watching a whole goal
@@ -555,57 +615,62 @@ class StillProgressing(EndedByOwner, CompositeNode):
         return self._not_approaching.stalled_tasks
 
     def find_blocked_position_limits(
-        self, *, tolerance: float = 0.01
+        self,
+        *,
+        range_fraction: float = 0.005,
+        negligible_slope_fraction: float = 1e-3,
     ) -> list[BlockedPositionLimit]:
         """
-        Find the position limits that the stalled tasks drive their degrees of freedom
-        into, at the world's current state.
+        Find the position limits that the stalled tasks drive the degrees of freedom
+        with a hardware interface into, at the world's current state.
 
-        :param tolerance: How close to a limit, in its degree of freedom's own unit, a
-            degree of freedom counts as at that limit.
+        :param range_fraction: See :meth:`PositionLimit.find_reached`.
+        :param negligible_slope_fraction: See
+            :meth:`ErrorGradient.find_blocked_position_limits`.
         :return: Per stalled task, every limit a degree of freedom lies at whose
             crossing would make the task's error fall.
         """
         stalled_tasks = self.stalled_tasks
         world = self.context.world
-        reached_sides = {
-            degree_of_freedom: side
+        controlled_degrees_of_freedom = [
+            degree_of_freedom
             for degree_of_freedom in world.degrees_of_freedom
-            if (
-                side := PositionLimitSide.find_reached_side(
-                    degree_of_freedom=degree_of_freedom,
-                    position=world.state[degree_of_freedom.id].position,
-                    tolerance=tolerance,
-                )
+            if degree_of_freedom.has_hardware_interface
+        ]
+        reached_limits = [
+            position_limit
+            for degree_of_freedom in controlled_degrees_of_freedom
+            for position_limit in PositionLimit.find_reached(
+                degree_of_freedom=degree_of_freedom,
+                position=world.state[degree_of_freedom.id].position,
+                range_fraction=range_fraction,
             )
-            is not None
-        }
-        if not stalled_tasks or not reached_sides:
+        ]
+        if not stalled_tasks or not reached_limits:
             return []
-        error_gradients = self._error_gradients(
-            tasks=stalled_tasks, degrees_of_freedom=list(reached_sides)
-        )
         return [
-            BlockedPositionLimit(
-                degree_of_freedom=degree_of_freedom, side=side, task=task
+            blocked_position_limit
+            for error_gradient in self._error_gradients(
+                tasks=stalled_tasks, degrees_of_freedom=controlled_degrees_of_freedom
             )
-            for task, gradient in zip(stalled_tasks, error_gradients)
-            for (degree_of_freedom, side), slope in zip(reached_sides.items(), gradient)
-            if slope * side < 0
+            for blocked_position_limit in error_gradient.find_blocked_position_limits(
+                reached_limits=reached_limits,
+                negligible_slope_fraction=negligible_slope_fraction,
+            )
         ]
 
     def _error_gradients(
         self, *, tasks: list[ConvergingTask], degrees_of_freedom: list[DegreeOfFreedom]
-    ) -> NDArray[np.float64]:
+    ) -> list[ErrorGradient]:
         """
         :param tasks: Tasks of this node.
         :param degrees_of_freedom: Degrees of freedom of the world this node runs in.
-        :return: The derivative of each task's error with respect to the position of
-            each degree of freedom, at the world's current state, with one row per task.
+        :return: The gradient of each task's error with respect to the positions of
+            `degrees_of_freedom`, at the world's current state.
         """
         world = self.context.world
         float_variable_data = self.context.float_variable_data
-        gradients = (
+        jacobian = (
             sm.Vector([task.error_signal for task in tasks])
             .jacobian(
                 variables=[
@@ -621,9 +686,13 @@ class StillProgressing(EndedByOwner, CompositeNode):
                 sparse=False,
             )
         )
-        return np.asarray(
-            gradients(world.state.positions, float_variable_data.data), dtype=float
+        slopes = np.asarray(
+            jacobian(world.state.positions, float_variable_data.data), dtype=float
         ).reshape(len(tasks), len(degrees_of_freedom))
+        return [
+            ErrorGradient(task=task, slopes=dict(zip(degrees_of_freedom, row.tolist())))
+            for task, row in zip(tasks, slopes)
+        ]
 
     def cancel_motion(self) -> CancelStatechart:
         """

@@ -22,7 +22,11 @@ from cramph.node import NodeArtifacts
 from cramph.monitors import CountSimulationTimeSeconds
 from giskardpy.motion_statechart.monitors.progress_monitors import (
     AnyMonitoredTaskShortOfItsGoal,
+    BlockedPositionLimit,
+    ErrorGradient,
     NoMonitoredTaskApproachingItsGoal,
+    PositionLimit,
+    PositionLimitSide,
     StillProgressing,
 )
 from cramph.statechart import Statechart
@@ -44,6 +48,10 @@ from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 from semantic_digital_twin.world_description.connections import OmniDrive
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    DegreeOfFreedomLimits,
+)
 from giskardpy.motion_statechart.context import MotionControlContext
 from ..motion_control_context import add_to_statechart_with_motion_control
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
@@ -104,46 +112,6 @@ def tick_until_end_recording(
         if motion_statechart.is_ended():
             return recorded
     raise TimeoutError("motion never ended")
-
-
-def jitter_bot_until_cancelled(*, world: World) -> None:
-    """
-    Drive the cylinder bot toward a goal while putting it back between
-    :data:`JITTER_POSITIONS` every cycle, under a stall monitor that cancels the motion.
-
-    :raises NoProgressError: Once the stall monitor gives up on the goal.
-    """
-    goal = CartesianPosition(
-        kinematic_chain=KinematicChain(
-            root=world.root,
-            tip=world.get_kinematic_structure_entity_by_name("bot"),
-        ),
-        goal_point=Point3(1, 0, 0, reference_frame=world.root),
-    )
-    progressing = StillProgressing(monitored_node=goal, timeout=STALL_TIMEOUT)
-    motion_control = MotionControl()
-    executor = StatechartExecutor(
-        context=StatechartContext(world=world),
-        extensions=[motion_control],
-    )
-    motion_statechart = Statechart(context=executor.context)
-    motion_statechart.add_nodes(nodes=[goal, progressing])
-    motion_statechart.add_node(node=EndMotion.when_true(node=goal))
-    motion_statechart.add_node(node=progressing.cancel_motion())
-
-    executor.compile(statechart=motion_statechart)
-    drive = world.get_connections_by_type(OmniDrive)[0]
-    cycles = 4 * ceil(
-        STALL_TIMEOUT.total_seconds()
-        / motion_control.qp_controller_config.control_time_step.total_seconds()
-    )
-
-    for cycle in range(cycles):
-        executor.tick()
-        world.state[drive.x.id].position = JITTER_POSITIONS[
-            cycle % len(JITTER_POSITIONS)
-        ]
-        world.notify_state_change()
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -210,21 +178,42 @@ class TestStallDetection:
     def test_a_task_jittering_in_place_stalls(self, *, cylinder_bot_world: World):
         """
         A task pushed back every cycle, as an arm held off by a collision is, keeps
-        moving without getting any closer to its goal, so the motion is cancelled.
+        moving without getting any closer to its goal, so the motion is cancelled with a
+        plain :class:`NoProgressError`, since no degree of freedom is at a position
+        limit.
         """
-        with pytest.raises(NoProgressError):
-            jitter_bot_until_cancelled(world=cylinder_bot_world)
+        goal = CartesianPosition(
+            kinematic_chain=KinematicChain(
+                root=cylinder_bot_world.root,
+                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+            ),
+            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+        )
+        progressing = StillProgressing(monitored_node=goal, timeout=STALL_TIMEOUT)
+        motion_control = MotionControl()
+        executor = StatechartExecutor(
+            context=StatechartContext(world=cylinder_bot_world),
+            extensions=[motion_control],
+        )
+        motion_statechart = Statechart(context=executor.context)
+        motion_statechart.add_nodes(nodes=[goal, progressing])
+        motion_statechart.add_node(node=EndMotion.when_true(node=goal))
+        motion_statechart.add_node(node=progressing.cancel_motion())
 
-    def test_a_stall_away_from_position_limits_is_a_plain_stall(
-        self, *, cylinder_bot_world: World
-    ):
-        """
-        A motion stalled with no degree of freedom at a position limit is cancelled with
-        a :class:`NoProgressError`, not with the more specific
-        :class:`PositionLimitBlockedError`.
-        """
+        executor.compile(statechart=motion_statechart)
+        drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
+        cycles = 4 * ceil(
+            STALL_TIMEOUT.total_seconds()
+            / motion_control.qp_controller_config.control_time_step.total_seconds()
+        )
+
         with pytest.raises(NoProgressError) as exception_info:
-            jitter_bot_until_cancelled(world=cylinder_bot_world)
+            for cycle in range(cycles):
+                executor.tick()
+                cylinder_bot_world.state[drive.x.id].position = JITTER_POSITIONS[
+                    cycle % len(JITTER_POSITIONS)
+                ]
+                cylinder_bot_world.notify_state_change()
 
         assert type(exception_info.value) is NoProgressError
 
@@ -1152,3 +1141,114 @@ class TestTrajectoryProgress:
 
         recorded = tick_until_end_recording(executor, motion_statechart, [progressing])
         assert ObservationStateValue.FALSE not in recorded[progressing]
+
+
+# %% position limits blocking a stalled task
+
+
+@pytest.fixture()
+def bot_position_task(cylinder_bot_world: World) -> CartesianPosition:
+    """
+    :return: A task moving the cylinder bot, which only stands in for the task an
+        :class:`ErrorGradient` belongs to.
+    """
+    return CartesianPosition(
+        kinematic_chain=KinematicChain(
+            root=cylinder_bot_world.root,
+            tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+        ),
+        goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
+    )
+
+
+class TestPositionLimitsReached:
+    """
+    Which position limits a degree of freedom counts as lying at.
+    """
+
+    def test_a_locked_degree_of_freedom_lies_at_both_limits(self):
+        """
+        A degree of freedom whose two limits coincide lies at both of them, so a task
+        pushing it either way is caught.
+        """
+        locked = DegreeOfFreedom(
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                lower_position=0.3, upper_position=0.3, maximum_speed=1.0
+            )
+        )
+
+        assert PositionLimit.find_reached(
+            degree_of_freedom=locked, position=0.3, range_fraction=0.005
+        ) == [
+            PositionLimit(degree_of_freedom=locked, side=PositionLimitSide.LOWER),
+            PositionLimit(degree_of_freedom=locked, side=PositionLimitSide.UPPER),
+        ]
+
+    def test_a_degree_of_freedom_missing_a_limit_lies_at_none(self):
+        """
+        Without both limits there is no range to measure closeness by, so a degree of
+        freedom missing one lies at neither.
+        """
+        half_bounded = DegreeOfFreedom(
+            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
+                upper_position=1.0, maximum_speed=1.0
+            )
+        )
+
+        assert (
+            PositionLimit.find_reached(
+                degree_of_freedom=half_bounded, position=1.0, range_fraction=0.005
+            )
+            == []
+        )
+
+
+class TestErrorGradientBlocking:
+    """
+    Which reached position limits a task's error gradient counts as blocking.
+    """
+
+    def test_a_slope_into_a_limit_blocks_it(
+        self, *, bot_position_task: CartesianPosition
+    ):
+        """
+        A degree of freedom at its upper limit whose error falls by moving it further up
+        is blocked there.
+        """
+        free = DegreeOfFreedom()
+        at_upper_limit = DegreeOfFreedom()
+        upper_limit = PositionLimit(
+            degree_of_freedom=at_upper_limit, side=PositionLimitSide.UPPER
+        )
+        gradient = ErrorGradient(
+            task=bot_position_task, slopes={free: 1.0, at_upper_limit: -0.5}
+        )
+
+        assert gradient.find_blocked_position_limits(
+            reached_limits=[upper_limit], negligible_slope_fraction=1e-3
+        ) == [BlockedPositionLimit(position_limit=upper_limit, task=bot_position_task)]
+
+    def test_a_round_off_slope_does_not_block(
+        self, *, bot_position_task: CartesianPosition
+    ):
+        """
+        A slope that is only round-off next to the steepest one does not count as
+        driving its degree of freedom into a limit.
+        """
+        free = DegreeOfFreedom()
+        at_upper_limit = DegreeOfFreedom()
+        gradient = ErrorGradient(
+            task=bot_position_task, slopes={free: 1.0, at_upper_limit: -1e-16}
+        )
+
+        assert (
+            gradient.find_blocked_position_limits(
+                reached_limits=[
+                    PositionLimit(
+                        degree_of_freedom=at_upper_limit, side=PositionLimitSide.UPPER
+                    )
+                ],
+                negligible_slope_fraction=1e-3,
+            )
+            == []
+        )
