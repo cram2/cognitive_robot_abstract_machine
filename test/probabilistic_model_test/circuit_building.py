@@ -55,8 +55,8 @@ def uniform_layer_of(
     :return: A layer of one uniform distribution per interval.
     """
     return UniformLayer.from_distributions(
-        variable_index,
-        [
+        variable_index=variable_index,
+        distributions=[
             UniformDistribution(
                 variable=Continuous("placeholder"),
                 interval=closed(lower, upper).simple_sets[0],

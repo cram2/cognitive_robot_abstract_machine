@@ -35,6 +35,7 @@ The example below shows such a query.
 from random_events.set import SetElement, Set
 from random_events.variable import Symbolic, Continuous, Integer
 from random_events.product_algebra import Event, SimpleEvent
+from random_events.plotting import EventPlotter
 from random_events.interval import *
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -432,7 +433,7 @@ We can now calculate the probability that $x_1 \in (0.5, 1.)
 event = SimpleEvent.from_data({x1: closed(0.25, 1.), x2: closed(0., 1.)}).as_composite_set()
 monte_carlo_probability = sum([event.contains(sample) for sample in samples]) / len(samples)
 
-fig.add_traces(event.plot())
+fig.add_traces(EventPlotter(event).plot())
 fig.show()
 
 print("Monte Carlo Probability:", monte_carlo_probability)
@@ -473,7 +474,7 @@ center_island = SimpleEvent.from_data({x: closed(2, 4), y: closed(3, 5)}).as_com
 
 occupied_spaces = refrigerator | top_kitchen_island | left_cabinets | center_island
 free_space = kitchen - occupied_spaces
-fig = go.Figure(free_space.plot(), free_space.plotly_layout())
+fig = go.Figure(EventPlotter(free_space).plot(), EventPlotter(free_space).plotly_layout())
 fig.show()
 ```
 

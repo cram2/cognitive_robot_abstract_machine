@@ -64,7 +64,7 @@ class AverageNegativeLogLikelihood(Loss[LayerType]):
     """
 
     def evaluate(self, layer: LayerType, data: BackendArray) -> BackendArray:
-        log_likelihoods = layer.log_likelihood_of_nodes(data)
+        log_likelihoods = layer.log_likelihood_of_nodes(events=data)
         return -array_namespace(log_likelihoods).mean(log_likelihoods)
 
 
@@ -103,7 +103,7 @@ class CrossEntropy(Loss[LayerType]):
         )
 
     def evaluate(self, layer: LayerType, data: BackendArray) -> BackendArray:
-        log_likelihoods = layer.log_likelihood_of_nodes(data)[:, 0]
+        log_likelihoods = layer.log_likelihood_of_nodes(events=data)[:, 0]
         namespace = array_namespace(log_likelihoods)
         data = namespace.asarray(data, device=array_api_compat.device(log_likelihoods))
         is_predicted_column = (
@@ -112,7 +112,7 @@ class CrossEntropy(Loss[LayerType]):
         )
         log_likelihoods_of_categories = [
             layer.log_likelihood_of_nodes(
-                namespace.where(
+                events=namespace.where(
                     is_predicted_column, namespace.full_like(data, category), data
                 )
             )[:, 0]

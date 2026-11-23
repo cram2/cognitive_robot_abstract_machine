@@ -12,17 +12,23 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from array_api_compat import array_namespace
+from random_events.variable import Continuous
 
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    BlockEdgeMatrix,
     DenseEdgeMatrix,
     EdgeMatrix,
     SparseEdgeMatrix,
 )
 
 from ..circuit_building import mixture_of_products_of_mixtures, uniform_leaf
+from .test_inner_layers_on_array_backends import MixtureOfProductsCase
 
 # %% circuits
 
@@ -42,6 +48,14 @@ def shared_children_circuit(x, y) -> ProbabilisticCircuit:
     )
 
 
+@pytest.fixture
+def mixture_of_products_case() -> MixtureOfProductsCase:
+    """
+    The circuit whose queries are compared across backends.
+    """
+    return MixtureOfProductsCase(Continuous("x"), Continuous("y"))
+
+
 # %% sparsity
 
 
@@ -51,11 +65,16 @@ def uneven_rows() -> SparseEdgeMatrix:
     Four rows holding two, one, three and no stored entries, stored out of row order.
     """
     return SparseEdgeMatrix(
-        np.array([2, 0, 2, 1, 2, 0]), np.array([0, 1, 2, 3, 4, 5]), (4, 6)
+        np.array([2, 0, 2, 1, 2, 0]),
+        np.array([0, 1, 2, 3, 4, 5]),
+        MatrixShape2D(number_of_rows=4, number_of_columns=6),
     )
 
 
-@pytest.fixture(params=[SparseEdgeMatrix, DenseEdgeMatrix], ids=["sparse", "dense"])
+@pytest.fixture(
+    params=[SparseEdgeMatrix, DenseEdgeMatrix, BlockEdgeMatrix],
+    ids=["sparse", "dense", "block"],
+)
 def edge_matrix_type(request) -> type[EdgeMatrix]:
     """
     Every type of edge matrix.

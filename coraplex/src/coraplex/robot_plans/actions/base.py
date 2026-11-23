@@ -34,6 +34,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -144,7 +145,10 @@ class Action(CompositeNode, ABC):
         ):
             return []
         return [
-            HoldPose(name="hold base", root_link=self.world.root, tip_link=robot.root)
+            HoldPose(
+                name="hold base",
+                kinematic_chain=KinematicChain(root=self.world.root, tip=robot.root),
+            )
         ]
 
     def expand(self) -> None:

@@ -44,7 +44,7 @@ executor = KinematicallySimulatedPlanExecutor(
     context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)])
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(node=NavigateAction(target_location=pose))
+statechart.add_node(node=NavigateAction(planar_goal_pose=pose))
 executor.compile(statechart=statechart)
 executor.execute()
 ```

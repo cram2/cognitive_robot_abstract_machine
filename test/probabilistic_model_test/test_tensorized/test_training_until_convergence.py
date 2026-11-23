@@ -21,6 +21,7 @@ from probabilistic_model.learning.gradient_descent import AverageNegativeLogLike
 from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
 from probabilistic_model.learning.training_schedule import (
     Convergence,
+    ConvergenceHistory,
     LearningRatePlateau,
     MiniBatches,
     MiniBatchTraining,
@@ -34,8 +35,6 @@ from .test_circuit_parameters_and_training import (
     minimum_improvement,
     parameters_shifted,
 )
-from .test_inner_layers_on_array_backends import mixture_of_products_case
-
 # %% convergence criterion
 
 
@@ -135,6 +134,58 @@ def test_an_elapsed_time_limit_starts_no_further_epoch(convergence):
 
     assert not history.converged
     assert history.epochs == 0
+
+
+def test_every_epoch_records_its_duration(convergence):
+    """
+    Training records one duration per epoch, which together take no longer than the
+    whole training.
+    """
+    history = convergence.history_until_converged(
+        training=scripted_training([1.0] * convergence.maximum_epochs)
+    )
+
+    assert len(history.epoch_durations) == history.epochs
+    assert sum(history.epoch_durations, timedelta()) <= history.duration
+
+
+def test_the_average_epoch_duration_leaves_out_the_first_epoch():
+    """
+    The average duration of an epoch is that of the epochs after the first, which also
+    compiles the training step.
+    """
+    history = ConvergenceHistory(
+        epoch_losses=[3.0, 2.0, 1.0],
+        converged=True,
+        epoch_durations=[
+            timedelta(seconds=10),
+            timedelta(seconds=1),
+            timedelta(seconds=3),
+        ],
+    )
+
+    assert history.average_epoch_duration == timedelta(seconds=2)
+
+
+def test_a_single_epoch_is_its_own_average_duration():
+    """
+    With a single epoch, the average duration of an epoch is its duration.
+    """
+    history = ConvergenceHistory(
+        epoch_losses=[1.0], converged=False, epoch_durations=[timedelta(seconds=4)]
+    )
+
+    assert history.average_epoch_duration == timedelta(seconds=4)
+
+
+def test_no_epoch_has_no_average_duration():
+    """
+    A training that ran no epoch has no average epoch duration.
+    """
+    assert (
+        ConvergenceHistory(epoch_losses=[], converged=False).average_epoch_duration
+        is None
+    )
 
 
 # %% learning rate plateau
@@ -347,10 +398,10 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
     start = case.circuit(np)
     with jax.enable_x64(True):
         circuit = start.copy_with_parameters(
-            parameters_shifted(start, GaussianLayer, 1.5)
+            parameters=parameters_shifted(start, GaussianLayer, 1.5)
         ).to_namespace(jnp)
         events = jnp.asarray(data)
-        before = float(jnp.mean(circuit.log_likelihood(events)))
+        before = float(jnp.mean(circuit.log_likelihood(events=events)))
         run = JaxGradientDescent(
             circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
         ).minimize_until_converged(
@@ -358,7 +409,9 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
             convergence=training_convergence,
             mini_batches=MiniBatches(batch_size=100),
         )
-        after = float(jnp.mean(run.trained_root.log_likelihood_of_nodes(events)[:, 0]))
+        after = float(
+            jnp.mean(run.trained_root.log_likelihood_of_nodes(events=events)[:, 0])
+        )
     assert after > before + minimum_improvement
 
 
@@ -380,10 +433,10 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     start = case.circuit(np)
     namespace = array_namespace(torch.zeros(0))
     circuit = start.copy_with_parameters(
-        parameters_shifted(start, GaussianLayer, 1.5)
+        parameters=parameters_shifted(start, GaussianLayer, 1.5)
     ).to_namespace(namespace)
     events = namespace.asarray(data)
-    before = float(circuit.log_likelihood(events).mean())
+    before = float(circuit.log_likelihood(events=events).mean())
     run = torch_gradient_descent.TorchGradientDescent(
         circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize_until_converged(
@@ -391,5 +444,5 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
         convergence=training_convergence,
         mini_batches=MiniBatches(batch_size=100),
     )
-    after = float(run.trained_root.log_likelihood_of_nodes(events)[:, 0].mean())
+    after = float(run.trained_root.log_likelihood_of_nodes(events=events)[:, 0].mean())
     assert after > before + minimum_improvement

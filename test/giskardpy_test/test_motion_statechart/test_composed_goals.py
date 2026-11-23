@@ -24,6 +24,7 @@ from giskardpy.motion_statechart.graph_node import EndMotion
 from semantic_digital_twin.robots.robot_parts import MobileBase
 from krrood_spatial_math.spatial_types import Pose
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% goals that are a parallel of their tasks
 
@@ -40,14 +41,16 @@ def _create_executor(world: World) -> StatechartExecutor:
 def test_cartesian_pose_is_a_parallel_of_its_position_and_orientation(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A pose goal is a parallel of a position and an orientation task, in that order.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=(
             pose := CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -75,11 +78,12 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     pose = CartesianPose(
-        root_link=cylinder_bot_world.root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
         goal_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=cylinder_bot_world.root),
     )
-    hold_orientation = HoldOrientation(root_link=cylinder_bot_world.root, tip_link=tip)
+    hold_orientation = HoldOrientation(
+        kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip)
+    )
     pose.add_node(node=hold_orientation)
     statechart.add_node(node=pose)
     statechart.add_node(node=EndMotion.when_true(node=pose))
@@ -98,14 +102,16 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
 def test_cartesian_pose_observes_its_goal_reached(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A pose goal observes true once both its tasks do.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=(
             pose := CartesianPose(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
@@ -125,14 +131,17 @@ def test_cartesian_pose_observes_its_goal_reached(
 def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A straight-line pose goal is a parallel of a straight-line position task and an
+    orientation task, in that order.
+    """
     tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=(
             pose := CartesianPoseStraight(
-                root_link=cylinder_bot_world.root,
-                tip_link=tip,
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
                 goal_pose=Pose.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),

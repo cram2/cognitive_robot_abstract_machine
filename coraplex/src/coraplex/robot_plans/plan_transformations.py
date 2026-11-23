@@ -65,12 +65,12 @@ from krrood.entity_query_language.query.match import Match
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
 
@@ -122,7 +122,7 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
         """
         return any(
             isinstance(node, CartesianTask)
-            and node.tip_link is arm.end_effector.tool_frame
+            and node.kinematic_chain.tip is arm.end_effector.tool_frame
             for node in [step, *step.descendants]
         )
 
@@ -131,13 +131,15 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
 
     def nodes_to_insert(self, plan_node: ReachAction) -> list[StatechartNode]:
         approached_pose = plan_node.grasp_pose_sequence(
-            plan_node.grasp.grasp_pose, plan_node.arm.end_effector, plan_node.grasp
+            reference_T_grasp=plan_node.grasp_candidate.grasp_pose,
+            end_effector=plan_node.arm.end_effector,
+            grasp_candidate=plan_node.grasp_candidate,
         ).grasp
         return [
-            LookAtAction(target=approached_pose),
+            LookAtAction(look_target=approached_pose),
             DetectAction(
                 technique=DetectionTechnique.TYPES,
-                object_sem_annotation=type(plan_node.grasp.graspable),
+                object_sem_annotation=type(plan_node.grasp_candidate.graspable),
                 accept_first_if_multiple=True,
             ),
         ]
@@ -220,17 +222,19 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
 
     def is_applicable(self, plan_node: PickUpAction) -> bool:
         return bool(
-            self._closed_drawers_containing(plan_node.grasp.graspable, plan_node.world)
+            self._closed_drawers_containing(
+                plan_node.grasp_candidate.graspable, plan_node.world
+            )
         )
 
     def nodes_to_insert(self, plan_node: PickUpAction) -> list[StatechartNode]:
-        graspable = plan_node.grasp.graspable
+        graspable = plan_node.grasp_candidate.graspable
         nodes = []
         for drawer in self._closed_drawers_containing(graspable, plan_node.world):
             nodes.extend(self.opening_nodes(drawer, plan_node.arm, plan_node.context))
         drive_to_the_object = a(NavigateAction)(
-            target_location=variable(
-                Pose,
+            planar_goal_pose=variable(
+                Pose2D,
                 # A location samples its poses only once the drive is grounded, by
                 # which time the drawers this rewrite opens stand open.
                 domain=ReachabilityLocation(
@@ -255,7 +259,7 @@ class PickUpTarget:
     The object a pick-up takes hold of, and the arm it takes hold with.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object that is picked up.
     """
@@ -318,7 +322,9 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         if isinstance(plan_node, StatementNode):
             return self._pick_up_target_shared_by_candidates_of(plan_node.statement)
         pick_up = plan_node.pick_up
-        return PickUpTarget(graspable=pick_up.grasp.graspable, arm=pick_up.arm)
+        return PickUpTarget(
+            graspable=pick_up.grasp_candidate.graspable, arm=pick_up.arm
+        )
 
     @staticmethod
     def _pick_up_target_shared_by_candidates_of(
@@ -330,7 +336,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
             ``None`` if they are not the same for all of them, or not known before
             grounding.
         """
-        grasp = move_and_pick_up.pick_up.grasp.apply_mapping_on_external_root(
+        grasp = move_and_pick_up.pick_up.grasp_candidate.apply_mapping_on_external_root(
             instance=move_and_pick_up
         )
         arm = move_and_pick_up.pick_up.arm.apply_mapping_on_external_root(
@@ -467,7 +473,7 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
             isinstance(gripper, HasTwoFingers)
             and gripper.fingers_are_modelled_like_the_real_ones
             and issubclass(plan_node.gripper_goal_type, MoveFingers)
-            and plan_node.grasp.graspable.root.has_collision()
+            and plan_node.grasp_candidate.graspable.root.has_collision()
         )
 
     def apply(self, plan_node: GraspingAction) -> None:
@@ -476,8 +482,8 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
             node=closing_step,
             replacement=plan_node.closing_step(
                 MoveFingersToWidthAction(
-                    gripper=plan_node.arm.end_effector,
-                    width=plan_node.grasp.width_along_closing_axis,
+                    two_finger_gripper=plan_node.arm.end_effector,
+                    width=plan_node.grasp_candidate.width_along_closing_axis,
                     squeeze=self.squeeze,
                 )
             ),

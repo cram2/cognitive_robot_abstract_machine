@@ -1,3 +1,7 @@
+"""
+Tests of the layered circuits of the uniform measure over an event.
+"""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -20,6 +24,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.factories import (
 
 # %% events over intervals
 def test_the_uniform_measure_of_a_box_has_its_volume_as_inverse_density() -> None:
+    """
+    The uniform measure of a box has the inverse of its volume as its density.
+    """
     x, y = Continuous("x"), Continuous("y")
     event = SimpleEvent.from_data(
         {x: closed(0.0, 2.0), y: closed(1.0, 5.0)}
@@ -27,7 +34,7 @@ def test_the_uniform_measure_of_a_box_has_its_volume_as_inverse_density() -> Non
 
     model = uniform_measure_of_event(event)
 
-    assert np.exp(model.log_likelihood(np.array([[1.0, 2.0]]))) == pytest.approx(
+    assert np.exp(model.log_likelihood(events=np.array([[1.0, 2.0]]))) == pytest.approx(
         [1 / 8]
     )
 
@@ -137,6 +144,10 @@ class Colour(Enum):
 
 
 def test_the_uniform_measure_draws_every_allowed_integer_equally_often() -> None:
+    """
+    The uniform measure of an event over an integer draws every integer the event allows
+    about equally often.
+    """
     number = Integer("number")
     allowed = [1, 3, 4]
     event = SimpleEvent.from_data(
@@ -146,10 +157,10 @@ def test_the_uniform_measure_draws_every_allowed_integer_equally_often() -> None
     model = uniform_measure_of_event(event)
 
     for value in allowed:
-        assert np.exp(model.log_likelihood(np.array([[value]]))) == pytest.approx(
-            [1 / len(allowed)]
-        )
-    assert np.exp(model.log_likelihood(np.array([[2]]))) == pytest.approx([0.0])
+        assert np.exp(
+            model.log_likelihood(events=np.array([[value]]))
+        ) == pytest.approx([1 / len(allowed)])
+    assert np.exp(model.log_likelihood(events=np.array([[2]]))) == pytest.approx([0.0])
 
 
 def test_the_uniform_measure_draws_every_allowed_symbol_equally_often() -> None:
