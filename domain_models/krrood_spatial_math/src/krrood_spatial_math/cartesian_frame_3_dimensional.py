@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 from uuid import UUID
 
 from typing_extensions import TYPE_CHECKING, Any
@@ -31,52 +30,8 @@ from krrood_spatial_math.exceptions import (
 from krrood_spatial_math.space import EuclideanSpace
 
 if TYPE_CHECKING:
+    from krrood_spatial_math.embedded_plane import EmbeddedPlane
     from krrood_spatial_math.vector import Vector
-
-# %% how the embedded planes of two frames lie
-
-
-class EmbeddedPlaneRelation(Enum):
-    """
-    How the :class:`~krrood_spatial_math.embedded_plane.EmbeddedPlane` of one Cartesian
-    frame, its x-y plane, lies relative to that of another.
-    """
-
-    SAME_PLANE_SAME_NORMAL = "same plane, same normal"
-    """
-    Both frames span one plane and their z-axes point to the same side of it, so a rigid
-    change on that plane relates them.
-    """
-
-    SAME_PLANE_OPPOSITE_NORMAL = "same plane, opposite normal"
-    """
-    Both frames span one plane but their z-axes point to opposite sides of it, so the
-    frames on that plane are mirror images.
-    """
-
-    DIFFERENT_PLANES = "different planes"
-    """
-    The frames span two planes: their z-axes are not parallel, one origin lies off the
-    other's plane, or they chart two spaces.
-    """
-
-    UNKNOWN = "unknown"
-    """
-    Where the frames lie relative to each other is not known, such as when one charts no
-    known space.
-    """
-
-    @property
-    def is_same_plane(self) -> bool:
-        """
-        Whether both frames are known to span one plane, whichever side their z-axes
-        point to.
-        """
-        return self in (
-            EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL,
-            EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL,
-        )
-
 
 # %% frames that positions and directions are expressed in
 
@@ -147,29 +102,13 @@ class CartesianFrame3Dimensional(CartesianFrame[EuclideanSpace, NameT], Interfac
         normal of the plane its x- and y-axes span.
         """
 
-    def compare_embedded_plane(
-        self, *, frame: CartesianFrame3Dimensional
-    ) -> EmbeddedPlaneRelation:
-        """
-        :param frame: Any Cartesian frame.
-        :return: How the embedded plane of ``frame`` lies relative to that of this frame;
-            :attr:`EmbeddedPlaneRelation.UNKNOWN` when either frame charts no known space.
-        """
-        if frame is self:
-            return EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL
-        if self.space is None or frame.space is None:
-            return EmbeddedPlaneRelation.UNKNOWN
-        if frame.space is not self.space:
-            return EmbeddedPlaneRelation.DIFFERENT_PLANES
-        return self.compare_embedded_plane_in_own_space(frame=frame)
-
+    @property
     @abstractmethod
-    def compare_embedded_plane_in_own_space(
-        self, *, frame: CartesianFrame3Dimensional
-    ) -> EmbeddedPlaneRelation:
+    def embedded_plane(self) -> EmbeddedPlane:
         """
-        :param frame: Another Cartesian frame of the space this frame charts.
-        :return: How the embedded plane of ``frame`` lies relative to that of this frame.
+        The plane this frame's x-y plane lies on, with its z-axis pointing the same way,
+        in every state of the space it charts; frames on one plane are related by a
+        rigid change on that plane.
         """
 
 

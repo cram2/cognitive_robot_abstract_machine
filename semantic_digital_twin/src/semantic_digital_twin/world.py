@@ -39,6 +39,7 @@ from typing_extensions import List
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.caching import memoize, clear_memoization_cache
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.collision_checking.collision_manager import CollisionManager
 from semantic_digital_twin.collision_checking.pybullet_collision_detector import (
@@ -1456,6 +1457,24 @@ class World(HasSimulatorProperties, EuclideanSpace):
         in the kinematic structure.
         """
         return self.kinematic_structure.get_edge_data(parent.index, child.index)
+
+    @memoize
+    def compute_embedded_plane(
+        self, *, kinematic_structure_entity: KinematicStructureEntity
+    ) -> EmbeddedPlane:
+        """
+        :param kinematic_structure_entity: An entity of this world.
+        :return: The plane the entity's x-y plane lies on in every state: its parent's,
+            if its parent connection keeps it on the parent's plane, otherwise its own.
+        """
+        if (
+            kinematic_structure_entity is self.root
+            or not kinematic_structure_entity.parent_connection.keeps_child_on_parent_plane
+        ):
+            return EmbeddedPlane(frame_3_dimensional=kinematic_structure_entity)
+        return self.compute_embedded_plane(
+            kinematic_structure_entity=kinematic_structure_entity.parent_kinematic_structure_entity
+        )
 
     @memoize
     def get_connections_by_type(

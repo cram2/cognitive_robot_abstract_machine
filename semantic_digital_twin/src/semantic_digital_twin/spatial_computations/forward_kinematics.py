@@ -1,3 +1,7 @@
+"""
+Forward kinematics of a world: where each of its entities lies relative to another.
+"""
+
 from __future__ import absolute_import, annotations
 
 from dataclasses import dataclass, field
@@ -186,7 +190,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
             KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
         return HomogeneousTransformationMatrix3Dimensional(
-            data=self.compute_np(root, tip), reference_frame=root
+            data=self.compute_np(root, tip), reference_frame=root, child_frame=tip
         )
 
     @memoize

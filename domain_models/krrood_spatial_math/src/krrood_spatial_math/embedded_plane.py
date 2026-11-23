@@ -22,12 +22,11 @@ if TYPE_CHECKING:
 @dataclass(frozen=True, kw_only=True, eq=False)
 class EmbeddedPlane(EuclideanSpace):
     """
-    A plane lying in a known three-dimensional Euclidean space: the x-y plane of
+    An oriented plane in a three-dimensional Euclidean space: the x-y plane of
     :attr:`frame_3_dimensional`, whose :attr:`normal` is that frame's z-axis.
 
-    Every plane is the x-y plane of some frame, so a vertical or tilted plane is the x-y
-    plane of a frame turned to lie in it. Two planes are equal when they lie in one
-    space and share their points, whichever side their frames' z-axes point to.
+    It is the :attr:`~CartesianFrame3Dimensional.embedded_plane` of every frame that
+    lies on it in every state, so two planes are equal when their frames are one frame.
     """
 
     frame_3_dimensional: CartesianFrame3Dimensional
@@ -48,17 +47,16 @@ class EmbeddedPlane(EuclideanSpace):
 
     def __eq__(self, other: object) -> bool:
         """
-        :return: Whether ``other`` is a plane known to lie in this plane's space and share
-            its points; :data:`NotImplemented` for anything that is not a plane.
+        :return: Whether ``other`` is the x-y plane of the same frame;
+            :data:`NotImplemented` for anything that is not a plane.
         """
         if not isinstance(other, EmbeddedPlane):
             return NotImplemented
-        return self.frame_3_dimensional.compare_embedded_plane(
-            frame=other.frame_3_dimensional
-        ).is_same_plane
+        return other.frame_3_dimensional is self.frame_3_dimensional
 
     def __hash__(self) -> int:
-        space = self.frame_3_dimensional.space
-        if space is None:
-            return hash(self.frame_3_dimensional)
-        return id(space)
+        """
+        :return: The hash of the identity of :attr:`frame_3_dimensional`, which equal
+            planes share.
+        """
+        return id(self.frame_3_dimensional)

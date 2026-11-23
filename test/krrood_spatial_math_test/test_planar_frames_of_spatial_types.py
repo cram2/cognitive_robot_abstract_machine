@@ -12,7 +12,6 @@ from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.vector import GenericVector, Vector
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
-from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.coordinate_system import (
     CartesianFrame,
     GenericCoordinateSystem,
@@ -21,9 +20,7 @@ from krrood_spatial_math.coordinate_system import (
 )
 from krrood_spatial_math.exceptions import (
     FramesOnDifferentPlanesError,
-    MirroredPlaneFramesError,
     ReferenceFrameMismatchError,
-    UnknownEmbeddedPlaneRelationError,
     XAxisNormalToPlaneError,
 )
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
@@ -114,87 +111,104 @@ def test_a_frames_xy_plane_is_a_euclidean_space():
 
 
 def test_the_planes_of_one_frame_are_one_plane(floor_frame):
-    plane = EmbeddedPlane(frame_3_dimensional=floor_frame)
-    plane_copy = EmbeddedPlane(frame_3_dimensional=floor_frame)
+    """
+    A frame lies on one plane, however often it is asked for.
+    """
+    assert floor_frame.embedded_plane == floor_frame.embedded_plane
+    assert hash(floor_frame.embedded_plane) == hash(floor_frame.embedded_plane)
 
-    assert plane == plane_copy
-    assert hash(plane) == hash(plane_copy)
 
-
-def test_the_planes_of_two_frames_on_one_floor_are_one_plane(
+def test_a_frame_moved_on_the_floor_lies_on_the_floors_plane(
     floor_frame, robot_base_frame
 ):
-    floor_plane = EmbeddedPlane(frame_3_dimensional=floor_frame)
-    robot_base_plane = EmbeddedPlane(frame_3_dimensional=robot_base_frame)
-
-    assert (floor_plane == robot_base_plane, robot_base_plane == floor_plane) == (
-        True,
-        True,
-    )
-    assert hash(floor_plane) == hash(robot_base_plane)
-
-
-def test_a_frame_facing_the_other_side_of_a_plane_spans_that_plane(
-    floor_frame, upside_down_frame
-):
-    assert EmbeddedPlane(frame_3_dimensional=upside_down_frame) == EmbeddedPlane(
-        frame_3_dimensional=floor_frame
-    )
-
-
-@pytest.mark.parametrize("frame_off_the_floor", ["shelf_frame", "wall_frame"])
-def test_a_frame_off_the_floor_spans_another_plane(
-    frame_off_the_floor, floor_frame, request
-):
-    floor_plane = EmbeddedPlane(frame_3_dimensional=floor_frame)
-    other_plane = EmbeddedPlane(
-        frame_3_dimensional=request.getfixturevalue(frame_off_the_floor)
-    )
-
-    assert (floor_plane != other_plane, other_plane != floor_plane) == (True, True)
-
-
-def test_the_planes_of_frames_in_two_rooms_are_two_planes(floor_frame):
-    floor_of_another_room = MountFrame("floor", space=Room())
-
-    assert EmbeddedPlane(frame_3_dimensional=floor_frame) != EmbeddedPlane(
-        frame_3_dimensional=floor_of_another_room
-    )
+    """
+    A frame fixed on the floor by a change on the floor shares the floor's plane.
+    """
+    assert robot_base_frame.embedded_plane == floor_frame.embedded_plane
+    assert hash(robot_base_frame.embedded_plane) == hash(floor_frame.embedded_plane)
 
 
 @pytest.mark.parametrize(
-    "frame_on_the_floor, relation",
-    [
-        ("floor_frame", EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL),
-        ("robot_base_frame", EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL),
-        ("upside_down_frame", EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL),
-        ("shelf_frame", EmbeddedPlaneRelation.DIFFERENT_PLANES),
-        ("wall_frame", EmbeddedPlaneRelation.DIFFERENT_PLANES),
-    ],
+    "frame_off_the_floor", ["shelf_frame", "wall_frame", "upside_down_frame"]
 )
-def test_a_frame_compares_its_embedded_plane_with_that_of_a_frame_on_the_floor(
-    frame_on_the_floor, relation, floor_frame, request
+def test_a_frame_lifted_tilted_or_turned_over_lies_on_another_plane(
+    frame_off_the_floor, floor_frame, request
 ):
     """
-    A frame on the floor spans the floor's plane, facing either side of it; a frame off
-    the floor spans another plane.
+    A frame lies on the floor's plane only with its z-axis pointing the same way, so a
+    frame facing the other side of the floor lies on a plane of its own as well.
     """
+    other_plane = request.getfixturevalue(frame_off_the_floor).embedded_plane
+
     assert (
-        floor_frame.compare_embedded_plane(
-            frame=request.getfixturevalue(frame_on_the_floor)
-        )
-        is relation
-    )
+        floor_frame.embedded_plane != other_plane,
+        other_plane != floor_frame.embedded_plane,
+    ) == (True, True)
 
 
-def test_the_plane_of_a_frame_in_no_space_is_not_known_to_be_any_other(floor_frame):
+def test_the_planes_of_frames_in_two_rooms_are_two_planes(floor_frame):
     """
-    A frame that charts no known space cannot be placed relative to any other frame.
+    Frames of two spaces share no plane.
     """
+    floor_of_another_room = MountFrame("floor", space=Room())
+
+    assert floor_frame.embedded_plane != floor_of_another_room.embedded_plane
+
+
+def test_a_frame_in_no_space_lies_only_on_its_own_plane(floor_frame):
+    """
+    A frame that charts no known space shares its plane with no other frame.
+    """
+    nowhere = NamedFrame("nowhere")
+
     assert (
-        floor_frame.compare_embedded_plane(frame=NamedFrame("nowhere"))
-        is EmbeddedPlaneRelation.UNKNOWN
+        nowhere.embedded_plane == nowhere.embedded_plane,
+        nowhere.embedded_plane != floor_frame.embedded_plane,
+    ) == (True, True)
+
+
+@pytest.mark.parametrize(
+    "motion_on_the_floor", [{"x": "x"}, {"y": "y"}, {"yaw": "yaw"}]
+)
+def test_a_frame_moving_on_the_floor_lies_on_its_plane_in_every_state(
+    floor_frame, motion_on_the_floor
+):
+    """
+    Whether a frame lies on the floor's plane follows from how it moves, not from where
+    it is now.
+    """
+    moving = mounted_on(
+        floor_frame,
+        "moving",
+        **{
+            coordinate: sm.FloatVariable(name=variable_name)
+            for coordinate, variable_name in motion_on_the_floor.items()
+        },
     )
+
+    assert moving.embedded_plane == floor_frame.embedded_plane
+
+
+@pytest.mark.parametrize(
+    "motion_off_the_floor", [{"z": "z"}, {"roll": "roll"}, {"pitch": "pitch"}]
+)
+def test_a_frame_that_may_leave_the_floor_lies_on_its_own_plane(
+    floor_frame, motion_off_the_floor
+):
+    """
+    A frame that some state lifts or tilts off the floor does not share its plane, even
+    in the state where it is on the floor.
+    """
+    moving = mounted_on(
+        floor_frame,
+        "moving",
+        **{
+            coordinate: sm.FloatVariable(name=variable_name)
+            for coordinate, variable_name in motion_off_the_floor.items()
+        },
+    )
+
+    assert moving.embedded_plane != floor_frame.embedded_plane
 
 
 # %% the normal of a frame's plane
@@ -238,10 +252,14 @@ def test_a_plane_frame_is_a_cartesian_frame():
     assert issubclass(CartesianFrame2Dimensional, CartesianFrame)
 
 
-def test_a_plane_frame_lies_on_the_xy_plane_of_its_frame(floor_frame):
-    assert CartesianFrame2Dimensional(
-        frame_3_dimensional=floor_frame
-    ).space == EmbeddedPlane(frame_3_dimensional=floor_frame)
+def test_a_plane_frame_lies_on_the_plane_of_its_frame(floor_frame, robot_base_frame):
+    """
+    The frame on a robot base's x-y plane lies on the floor the base moves on.
+    """
+    assert (
+        CartesianFrame2Dimensional(frame_3_dimensional=robot_base_frame).space
+        == floor_frame.embedded_plane
+    )
 
 
 def test_a_plane_frame_is_called_like_its_frame(floor_frame):
@@ -423,6 +441,55 @@ def test_the_dot_product_of_perpendicular_vectors_on_a_plane_is_zero():
     assert float(Vector2Dimensional(1, 2).dot(Vector2Dimensional(-2, 1))) == 0.0
 
 
+# %% changes that keep a frame's plane
+
+
+@pytest.mark.parametrize(
+    "motion", [{"x": 1.0, "y": -2.0, "yaw": 0.3}, {"z": 1e-12}, {"roll": 2 * np.pi}]
+)
+def test_a_change_that_moves_only_on_the_plane_keeps_it(motion):
+    """
+    A constant change keeps the x-y plane within the tolerance of its numbers.
+    """
+    assert HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        **motion
+    ).keeps_x_y_plane
+
+
+@pytest.mark.parametrize("motion", [{"z": 0.1}, {"pitch": 1e-5}, {"roll": np.pi}])
+def test_a_change_that_lifts_tilts_or_turns_over_does_not_keep_the_plane(motion):
+    """
+    A constant change that lifts, tilts or turns over its child, however little, does
+    not keep the plane.
+    """
+    assert not HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        **motion
+    ).keeps_x_y_plane
+
+
+def test_a_change_by_variables_of_planar_motion_keeps_the_plane():
+    """
+    A change keeps the plane for every value of its variables when they only move it on
+    the plane.
+    """
+    x, y, yaw = (sm.FloatVariable(name=name) for name in ("x", "y", "yaw"))
+
+    assert HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=x, y=y, yaw=yaw
+    ).keeps_x_y_plane
+
+
+@pytest.mark.parametrize("coordinate", ["z", "roll", "pitch"])
+def test_a_change_by_a_variable_that_may_leave_the_plane_does_not_keep_it(coordinate):
+    """
+    A change by a variable that can lift or tilt its child does not keep the plane, as
+    some value of the variable leaves it.
+    """
+    assert not HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        **{coordinate: sm.FloatVariable(name=coordinate)}
+    ).keeps_x_y_plane
+
+
 # %% rigid changes between frames on one plane
 
 
@@ -480,10 +547,15 @@ def test_a_change_within_one_plane_becomes_the_planar_transformation_of_its_moti
     )
 
 
-@pytest.mark.parametrize("frame_off_the_floor", ["shelf_frame", "wall_frame"])
+@pytest.mark.parametrize(
+    "frame_off_the_floor", ["shelf_frame", "wall_frame", "upside_down_frame"]
+)
 def test_a_change_between_two_planes_has_no_planar_transformation(
     frame_off_the_floor, request
 ):
+    """
+    A change into a frame that is not on the floor's plane has no planar counterpart.
+    """
     frame = request.getfixturevalue(frame_off_the_floor)
 
     with pytest.raises(FramesOnDifferentPlanesError):
@@ -492,10 +564,15 @@ def test_a_change_between_two_planes_has_no_planar_transformation(
         )
 
 
-@pytest.mark.parametrize("frame_off_the_floor", ["shelf_frame", "wall_frame"])
+@pytest.mark.parametrize(
+    "frame_off_the_floor", ["shelf_frame", "wall_frame", "upside_down_frame"]
+)
 def test_a_planar_transformation_refuses_frames_on_two_planes(
     frame_off_the_floor, floor_frame, request
 ):
+    """
+    A planar transformation is built only between frames on one plane.
+    """
     with pytest.raises(FramesOnDifferentPlanesError):
         HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
             reference_frame=floor_frame,
@@ -503,31 +580,11 @@ def test_a_planar_transformation_refuses_frames_on_two_planes(
         )
 
 
-def test_a_planar_transformation_refuses_frames_facing_opposite_sides_of_a_plane(
-    floor_frame, upside_down_frame
-):
-    with pytest.raises(MirroredPlaneFramesError):
-        HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
-            reference_frame=floor_frame, child_frame=upside_down_frame
-        )
-
-
-def test_a_change_to_a_frame_facing_the_other_side_of_a_plane_has_no_planar_transformation(
-    upside_down_frame,
-):
-    with pytest.raises(MirroredPlaneFramesError):
-        HomogeneousTransformationMatrix2Dimensional.from_transformation(
-            transformation=upside_down_frame.mount_T_self,
-        )
-
-
-def test_a_planar_transformation_refuses_frames_whose_planes_are_not_known(
-    floor_frame,
-):
+def test_a_planar_transformation_refuses_a_frame_in_no_space(floor_frame):
     """
-    A frame that charts no known space cannot be shown to share the other frame's plane.
+    A frame that charts no known space shares no other frame's plane.
     """
-    with pytest.raises(UnknownEmbeddedPlaneRelationError):
+    with pytest.raises(FramesOnDifferentPlanesError):
         HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
             reference_frame=floor_frame, child_frame=NamedFrame("nowhere")
         )
@@ -553,20 +610,39 @@ def test_a_symbolic_change_between_frames_on_one_plane_becomes_a_planar_transfor
     assert planar_floor_T_robot_base.x.equivalent(other=distance)
 
 
-def test_a_symbolic_change_from_no_frame_has_no_planar_transformation(floor_frame):
+def test_a_change_from_no_frame_that_may_leave_the_plane_has_no_planar_transformation(
+    floor_frame,
+):
     """
-    A change that is not constant and has no child frame cannot be shown to stay on one
-    plane.
+    Without a child frame, a change becomes planar only if its expression keeps the x-y
+    plane for every value of its variables.
     """
     height = sm.FloatVariable(name="height")
     lifted = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, z=height, reference_frame=floor_frame
     )
 
-    with pytest.raises(UnknownEmbeddedPlaneRelationError):
+    with pytest.raises(FramesOnDifferentPlanesError):
         HomogeneousTransformationMatrix2Dimensional.from_transformation(
             transformation=lifted,
         )
+
+
+def test_a_change_from_no_frame_that_keeps_the_plane_becomes_planar(floor_frame):
+    """
+    Without a child frame, a change whose expression keeps the x-y plane becomes the
+    planar change of its motion.
+    """
+    distance = sm.FloatVariable(name="distance")
+    moved = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=distance, yaw=0.5, reference_frame=floor_frame
+    )
+
+    planar = HomogeneousTransformationMatrix2Dimensional.from_transformation(
+        transformation=moved
+    )
+
+    assert planar.x.equivalent(other=distance)
 
 
 def test_a_planar_transformation_moves_a_point_into_its_reference_frame(

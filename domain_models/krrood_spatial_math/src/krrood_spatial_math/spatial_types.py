@@ -32,7 +32,6 @@ from krrood.symbolic_math.symbolic_math import Matrix, to_sx
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     CartesianFrame3DimensionalReference,
-    EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import (
     GenericAxisCoordinates,
@@ -126,12 +125,8 @@ class SymbolicSpatialType(sm.SymbolicMathType, SubclassJSONSerializer, ABC):
         :param target_frame_T_reference_frame: The transformation from this object's
             reference frame to the frame it should be expressed in.
         :return: The object in the transformation's reference frame.
-        :raises FramesOnDifferentPlanesError: If this object is given on a plane, and
-            the transformation is constant or its frames are known, and its frames span
-            different planes, parallel ones included.
-        :raises MirroredPlaneFramesError: If this object is given on a plane, and the
-            transformation is constant or its frames are known, and its frames span one
-            plane with z-axes pointing in opposite directions.
+        :raises FramesOnDifferentPlanesError: If this object is given on a plane and
+            the transformation's frames do not lie on one plane in every state.
         """
         return (
             self.get_change_type().from_transformation(
@@ -936,21 +931,22 @@ class HomogeneousTransformationMatrix3Dimensional(
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
 
     @property
-    def embedded_plane_relation(self) -> EmbeddedPlaneRelation:
+    def keeps_x_y_plane(self) -> bool:
         """
-        How the x-y plane of the child frame lies relative to that of the reference
-        frame; :attr:`EmbeddedPlaneRelation.UNKNOWN` for a transformation that is not constant.
+        Whether this change maps the x-y plane of its child frame onto that of its
+        reference frame, z-axes pointing the same way, for every value of its variables:
+        the child's z-axis is the reference's and its origin lies at height zero.
         """
-        if not self.is_constant():
-            return EmbeddedPlaneRelation.UNKNOWN
-        child_z_axis = self.rotation_matrix.to_np()[:3, 2]
-        if not (
-            np.isclose(self.z.to_np(), 0).all() and np.allclose(child_z_axis[:2], 0)
-        ):
-            return EmbeddedPlaneRelation.DIFFERENT_PLANES
-        if child_z_axis[2] < 0:
-            return EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL
-        return EmbeddedPlaneRelation.SAME_PLANE_SAME_NORMAL
+        child_z_axis = self.casadi_sx[:3, 2]
+        origin_height = self.casadi_sx[2, 3]
+        if not (child_z_axis.is_constant() and origin_height.is_constant()):
+            return False
+        return bool(
+            np.allclose(
+                ca.DM(child_z_axis).full().ravel(), Vector3Dimensional.Z().to_np()[:3]
+            )
+            and np.isclose(float(origin_height), 0)
+        )
 
     @property
     def pose(self) -> Pose3Dimensional:

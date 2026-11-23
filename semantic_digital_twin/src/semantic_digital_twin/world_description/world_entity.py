@@ -38,8 +38,8 @@ from krrood.utils import get_full_class_name
 from krrood.patterns.identifier_and_name import HasID, HasName
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
-    EmbeddedPlaneRelation,
 )
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityReference,
     WorldEntityWithIDKwargsTracker,
@@ -434,12 +434,11 @@ class KinematicStructureEntity(
     def z_axis(self) -> Vector3Dimensional:
         return Vector3Dimensional.Z(reference_frame=self)
 
-    def compare_embedded_plane_in_own_space(
-        self, *, frame: CartesianFrame3Dimensional
-    ) -> EmbeddedPlaneRelation:
-        return self._world.transform(
-            HomogeneousTransformationMatrix3Dimensional(reference_frame=frame), self
-        ).embedded_plane_relation
+    @property
+    def embedded_plane(self) -> EmbeddedPlane:
+        if self._world is None:
+            return EmbeddedPlane(frame_3_dimensional=self)
+        return self._world.compute_embedded_plane(kinematic_structure_entity=self)
 
     @property
     @abstractmethod
@@ -1155,6 +1154,14 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
             @ self._kinematics
             @ self.connection_T_child_expression
         )
+
+    @property
+    def keeps_child_on_parent_plane(self) -> bool:
+        """
+        Whether the child's x-y plane lies on the parent's, z-axes pointing the same way,
+        in every state of this connection.
+        """
+        return self.origin_expression.keeps_x_y_plane
 
     @property
     def reference_origin_expression(

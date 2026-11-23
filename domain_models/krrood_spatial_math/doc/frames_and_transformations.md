@@ -36,8 +36,8 @@ from scipy.spatial.transform import Rotation
 
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
-    EmbeddedPlaneRelation,
 )
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
@@ -204,8 +204,9 @@ class Frame(CartesianFrame3Dimensional[str]):
     def z_axis(self):
         return Vector3Dimensional.Z(reference_frame=self)
 
-    def compare_embedded_plane_in_own_space(self, *, frame):
-        return EmbeddedPlaneRelation.UNKNOWN
+    @property
+    def embedded_plane(self):
+        return EmbeddedPlane(frame_3_dimensional=self)
 
 
 a, b, c = Frame("a"), Frame("b"), Frame("c")

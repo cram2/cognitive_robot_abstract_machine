@@ -27,8 +27,7 @@ class CartesianFrame2Dimensional(CartesianFrame[EmbeddedPlane, NameT]):
     :attr:`frame_3_dimensional`, with that frame's origin, x-axis and y-axis.
 
     Seen from the side the z-axis of :attr:`frame_3_dimensional` points to, the y-axis
-    is a quarter turn counterclockwise from the x-axis, so frames on one plane are
-    related by a rigid change only when their z-axes point the same way.
+    is a quarter turn counterclockwise from the x-axis.
     """
 
     frame_3_dimensional: CartesianFrame3Dimensional
@@ -51,9 +50,9 @@ class CartesianFrame2Dimensional(CartesianFrame[EmbeddedPlane, NameT]):
     @property
     def space(self) -> EmbeddedPlane:
         """
-        The x-y plane of :attr:`frame_3_dimensional`.
+        The plane the x-y plane of :attr:`frame_3_dimensional` lies on in every state.
         """
-        return EmbeddedPlane(frame_3_dimensional=self.frame_3_dimensional)
+        return self.frame_3_dimensional.embedded_plane
 
     @property
     def name(self) -> NameT:

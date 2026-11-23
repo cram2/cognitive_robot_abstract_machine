@@ -1,3 +1,8 @@
+"""
+The kinds of connection between two kinematic structure entities of a world, and the
+degrees of freedom that move them.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -619,6 +624,17 @@ class WheeledDrive(ActiveConnection, HasUpdateState, ABC):
     """
     Active DoF describing rotation around the robot's z-axis.
     """
+
+    @property
+    def keeps_child_on_parent_plane(self) -> bool:
+        """
+        Always, unlike :attr:`~semantic_digital_twin.world_description.world_entity.Conn
+        ection.keeps_child_on_parent_plane`:
+
+        a drive moves its child on its parent's plane, and the roll and pitch it
+        measures tilt the child without moving it off that plane.
+        """
+        return True
 
     @property
     def origin(self) -> HomogeneousTransformationMatrix3Dimensional:

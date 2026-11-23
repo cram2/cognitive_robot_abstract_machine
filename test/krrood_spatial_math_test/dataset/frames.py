@@ -12,9 +12,9 @@ from krrood.patterns.identifier_and_name import HasID, HasName
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
     CartesianFrame3DimensionalResolver,
-    EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import GenericCoordinateRepresentation
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types import Vector3Dimensional
@@ -67,10 +67,12 @@ class NamedFrame(CartesianFrame3Dimensional[str]):
     def z_axis(self) -> Vector3Dimensional:
         return Vector3Dimensional.Z(reference_frame=self)
 
-    def compare_embedded_plane_in_own_space(
-        self, *, frame: CartesianFrame3Dimensional
-    ) -> EmbeddedPlaneRelation:
-        return EmbeddedPlaneRelation.UNKNOWN
+    @property
+    def embedded_plane(self) -> EmbeddedPlane:
+        """
+        The x-y plane of this frame itself, as it knows of no frame it moves with.
+        """
+        return EmbeddedPlane(frame_3_dimensional=self)
 
 
 # %% finding frames while deserializing

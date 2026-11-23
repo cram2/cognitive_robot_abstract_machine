@@ -273,62 +273,21 @@ class NoPlanarTransformationError(SpatialTypesError):
 @dataclass(kw_only=True)
 class FramesOnDifferentPlanesError(NoPlanarTransformationError):
     """
-    Raised when the x-y planes of two frames are different planes, so no change between
-    frames on one plane relates them.
+    Raised when two frames do not lie on one plane, with their z-axes pointing the same
+    way, in every state of their space, so no change on one plane relates them.
     """
 
     def error_message(self) -> str:
         return (
-            f"The x-y plane of {self.child_frame} is not the x-y plane of "
-            f"{self.reference_frame}: their z-axes are not parallel, or the child's "
-            f"origin is off the reference frame's plane."
+            f"{self.child_frame} and {self.reference_frame} do not lie on one plane in "
+            f"every state: one may leave the other's plane, faces its other side, or "
+            f"charts another space."
         )
 
     def suggest_correction(self) -> str:
         return (
             "project the values onto one plane with an EmbeddedPlaneProjection instead of "
             "changing their coordinates."
-        )
-
-
-@dataclass(kw_only=True)
-class MirroredPlaneFramesError(NoPlanarTransformationError):
-    """
-    Raised when two frames span one plane but their z-axes point to opposite sides of
-    it, so the frames on that plane have opposite handedness and the change between them
-    is a reflection, not a rigid change.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{self.child_frame} and {self.reference_frame} span one x-y plane, but "
-            f"their z-axes point in opposite directions."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "relate frames whose z-axes point the same way, for instance by turning one "
-            "of them half a turn about its x-axis."
-        )
-
-
-@dataclass(kw_only=True)
-class UnknownEmbeddedPlaneRelationError(NoPlanarTransformationError):
-    """
-    Raised when nothing tells whether two frames span one x-y plane: a frame charts no
-    known space, or the change between them is not constant and names no child frame.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"It is not known whether {self.child_frame} and {self.reference_frame} "
-            f"span one x-y plane."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "give both frames the space they chart, or name the child frame of a "
-            "change that is not constant."
         )
 
 

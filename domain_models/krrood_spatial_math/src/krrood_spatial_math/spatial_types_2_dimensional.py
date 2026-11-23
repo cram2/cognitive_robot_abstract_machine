@@ -17,7 +17,6 @@ from krrood.symbolic_math.exceptions import (
 from krrood_spatial_math.cartesian_frame_2_dimensional import CartesianFrame2Dimensional
 from krrood_spatial_math.cartesian_frame_3_dimensional import (
     CartesianFrame3Dimensional,
-    EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.pose import Pose
@@ -25,9 +24,7 @@ from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import (
     FramesOnDifferentPlanesError,
-    MirroredPlaneFramesError,
     ReferenceFrameMismatchError,
-    UnknownEmbeddedPlaneRelationError,
     XAxisNormalToPlaneError,
 )
 from krrood_spatial_math.space_map import OrthogonalProjection
@@ -77,18 +74,16 @@ class HomogeneousTransformationMatrix2Dimensional(
         :param data: A rigid 3x3 homogeneous matrix. Defaults to the identity.
         :param reference_frame: The frame on whose plane the change ends.
         :param child_frame: The frame on whose plane the change starts.
-        :raises FramesOnDifferentPlanesError: If both frames are given and span
-            different planes.
-        :raises MirroredPlaneFramesError: If both frames are given and span one plane
-            with z-axes pointing in opposite directions.
-        :raises UnknownEmbeddedPlaneRelationError: If both frames are given and it is not
-            known whether they span one plane.
+        :raises FramesOnDifferentPlanesError: If both frames are given and do not lie on
+            one plane in every state.
         """
-        if reference_frame is not None and child_frame is not None:
-            self._ensure_rigid_change_on_one_plane(
-                relation=reference_frame.compare_embedded_plane(frame=child_frame),
-                reference_frame=reference_frame,
-                child_frame=child_frame,
+        if (
+            reference_frame is not None
+            and child_frame is not None
+            and reference_frame.embedded_plane != child_frame.embedded_plane
+        ):
+            raise FramesOnDifferentPlanesError(
+                reference_frame=reference_frame, child_frame=child_frame
             )
         self.reference_frame = reference_frame
         self.child_frame = child_frame
@@ -157,69 +152,31 @@ class HomogeneousTransformationMatrix2Dimensional(
         cls, *, transformation: HomogeneousTransformationMatrix3Dimensional
     ) -> HomogeneousTransformationMatrix2Dimensional:
         """
-        Overrides :meth:`SymbolicSpatialChange.from_transformation` for frames that span
-        one x-y plane with z-axes pointing the same way, which is read from the
-        transformation when it is constant and from its frames otherwise.
+        Overrides :meth:`SymbolicSpatialChange.from_transformation` for a change that
+        stays on one plane: between frames that lie on one plane in every state, or,
+        without both frames, whose expression keeps the x-y plane.
 
-        :raises FramesOnDifferentPlanesError: If its frames span different planes.
-        :raises MirroredPlaneFramesError: If its frames span one plane with z-axes
-            pointing in opposite directions.
-        :raises UnknownEmbeddedPlaneRelationError: If neither the transformation nor its
-            frames tell whether its frames span one plane.
+        :raises FramesOnDifferentPlanesError: If its frames do not lie on one plane in
+            every state, or, without both frames, its expression may leave the plane.
         """
-        relation = transformation.embedded_plane_relation
+        reference_frame = transformation.reference_frame
+        child_frame = transformation.child_frame
+        frames_are_known = reference_frame is not None and child_frame is not None
         if (
-            relation is EmbeddedPlaneRelation.UNKNOWN
-            and transformation.reference_frame is not None
-            and transformation.child_frame is not None
-        ):
-            relation = transformation.reference_frame.compare_embedded_plane(
-                frame=transformation.child_frame
+            frames_are_known
+            and reference_frame.embedded_plane != child_frame.embedded_plane
+        ) or (not frames_are_known and not transformation.keeps_x_y_plane):
+            raise FramesOnDifferentPlanesError(
+                reference_frame=reference_frame, child_frame=child_frame
             )
-        cls._ensure_rigid_change_on_one_plane(
-            relation=relation,
-            reference_frame=transformation.reference_frame,
-            child_frame=transformation.child_frame,
-        )
         rotation = transformation.rotation_matrix
         return cls.from_xy_yaw(
             x=transformation.x,
             y=transformation.y,
             yaw=sm.atan2(rotation[1, 0], rotation[0, 0]),
-            reference_frame=transformation.reference_frame,
-            child_frame=transformation.child_frame,
+            reference_frame=reference_frame,
+            child_frame=child_frame,
         )
-
-    @staticmethod
-    def _ensure_rigid_change_on_one_plane(
-        *,
-        relation: EmbeddedPlaneRelation,
-        reference_frame: CartesianFrame3Dimensional | None,
-        child_frame: CartesianFrame3Dimensional | None,
-    ) -> None:
-        """
-        :param relation: How the x-y plane of ``child_frame`` lies relative to that of
-            ``reference_frame``.
-        :param reference_frame: The frame on whose plane the change ends.
-        :param child_frame: The frame on whose plane the change starts.
-        :raises FramesOnDifferentPlanesError: If the frames span different planes.
-        :raises MirroredPlaneFramesError: If the frames span one plane with z-axes
-            pointing in opposite directions.
-        :raises UnknownEmbeddedPlaneRelationError: If it is not known whether the frames
-            span one plane.
-        """
-        if relation is EmbeddedPlaneRelation.UNKNOWN:
-            raise UnknownEmbeddedPlaneRelationError(
-                reference_frame=reference_frame, child_frame=child_frame
-            )
-        if relation is EmbeddedPlaneRelation.DIFFERENT_PLANES:
-            raise FramesOnDifferentPlanesError(
-                reference_frame=reference_frame, child_frame=child_frame
-            )
-        if relation is EmbeddedPlaneRelation.SAME_PLANE_OPPOSITE_NORMAL:
-            raise MirroredPlaneFramesError(
-                reference_frame=reference_frame, child_frame=child_frame
-            )
 
     # %% motion
 

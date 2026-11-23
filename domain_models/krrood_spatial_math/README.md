@@ -26,13 +26,18 @@ coordinate system. Its base depends on `krrood` alone.
 - `krrood_spatial_math.cartesian_frame_3_dimensional`: `CartesianFrame3Dimensional`, the right-handed
   Cartesian frame of physical space that positions and directions are expressed in,
   and how serialized values refer to one.
-- `krrood_spatial_math.embedded_plane`: `EmbeddedPlane`, a plane lying in a known
+- `krrood_spatial_math.embedded_plane`: `EmbeddedPlane`, an oriented plane in a
   three-dimensional space: the x-y plane of a `CartesianFrame3Dimensional`, whose
-  `normal` is that frame's `z_axis`. A plane with another normal is the x-y plane of a
-  frame whose z-axis is that normal.
+  `normal` is that frame's `z_axis`. Every frame states the `embedded_plane` its x-y
+  plane lies on in every state of its space, with its z-axis pointing the same way, so
+  two frames share a plane by identity, never by where they happen to be now. A
+  semantic_digital_twin body lies on its parent's plane when the connection between
+  them keeps it there for every joint state, as a drive or a joint about the z-axis
+  does.
 - `krrood_spatial_math.cartesian_frame_2_dimensional`: `CartesianFrame2Dimensional`, the
-  right-handed Cartesian frame on the `EmbeddedPlane` of a `CartesianFrame3Dimensional`,
-  with that frame's origin, x-axis and y-axis, that values on the plane are given in.
+  right-handed Cartesian frame on the x-y plane of a `CartesianFrame3Dimensional`, with
+  that frame's origin, x-axis and y-axis, that values on the plane are given in; its
+  space is that frame's `embedded_plane`.
 - `krrood_spatial_math.vector`: `Vector[frame, coordinate]`, a translation of an affine
   space given by its coordinates in an affine frame, one per axis that frame's kind
   names in its `axes`, held in the field or property of that name, each of the
@@ -74,10 +79,11 @@ coordinate system. Its base depends on `krrood` alone.
   `RotationMatrix` is the transformation without translation, SO(3) within SE(3).
 - `krrood_spatial_math.spatial_types_2_dimensional`, with the same extra: their
   counterparts on a plane, `Point2Dimensional`, `Vector2Dimensional` and
-  `Pose2Dimensional`, which lie on the x-y plane of their reference frame, an
-  `EmbeddedPlane`, and are given in its `CartesianFrame2Dimensional`. They are
-  re-expressed only in frames on that plane; reaching another plane, even a parallel
-  one, is an `EmbeddedPlaneProjection`.
+  `Pose2Dimensional`, which lie on the x-y plane of their reference frame and are
+  given in its `CartesianFrame2Dimensional`. They are re-expressed only in frames on
+  the same `EmbeddedPlane`, which a planar change checks by comparing the two planes,
+  as a 3D change compares spaces; reaching another plane, even a parallel one, is an
+  `EmbeddedPlaneProjection`.
   `HomogeneousTransformationMatrix2Dimensional` is the rigid change between two frames
   on one plane, and `EmbeddedPlaneProjection` the orthogonal projection onto a frame's
   plane. Their change type is `HomogeneousTransformationMatrix2Dimensional`, and they

@@ -45,7 +45,6 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Drawer,
 )
-from krrood_spatial_math.cartesian_frame_3_dimensional import EmbeddedPlaneRelation
 from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import FramesOfDifferentSpacesError
 from krrood_spatial_math.space import EuclideanSpace
@@ -614,7 +613,7 @@ def test_a_body_cannot_express_a_value_of_another_worlds_body(world_setup):
         l1.express_in_own_frame(value=Vector3Dimensional.X(reference_frame=other_body))
 
 
-def test_two_bodies_sliding_along_their_x_axes_span_one_plane(world_setup):
+def test_two_bodies_sliding_along_their_x_axes_lie_on_one_plane(world_setup):  # noqa: F811
     """
     A prismatic connection along the x-axis keeps both bodies on one x-y plane, wherever
     it has moved the child.
@@ -624,12 +623,30 @@ def test_two_bodies_sliding_along_their_x_axes_span_one_plane(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    assert EmbeddedPlane(frame_3_dimensional=l1) == EmbeddedPlane(
-        frame_3_dimensional=l2
-    )
+    assert l2.embedded_plane == l1.embedded_plane
 
 
-def test_bodies_of_two_worlds_span_two_planes(world_setup):
+def test_bodies_fixed_on_one_body_and_turning_about_z_lie_on_its_plane(world_setup):  # noqa: F811
+    """
+    Bodies fixed on one body, and bodies turning about their z-axes on them, share that
+    body's plane, however far apart in the tree.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    assert {body.embedded_plane for body in (l1, l2, r1, r2)} == {bf.embedded_plane}
+
+
+def test_a_body_free_to_move_in_space_lies_on_its_own_plane(world_setup):  # noqa: F811
+    """
+    A connection with six degrees of freedom may tilt or lift its child, so the child
+    does not share its parent's plane.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    assert bf.embedded_plane != world.root.embedded_plane
+
+
+def test_bodies_of_two_worlds_lie_on_two_planes(world_setup):  # noqa: F811
     """
     Two worlds are two spaces, so the planes of their bodies have no point in common.
     """
@@ -639,10 +656,75 @@ def test_bodies_of_two_worlds_span_two_planes(world_setup):
     with other_world.modify_world():
         other_world.add_kinematic_structure_entity(other_body)
 
-    assert (
-        l1.compare_embedded_plane(frame=other_body)
-        is EmbeddedPlaneRelation.DIFFERENT_PLANES
+    assert l1.embedded_plane != other_body.embedded_plane
+
+
+@pytest.fixture
+def driven_arm_world() -> tuple[World, OmniDrive, RevoluteConnection]:
+    """
+    :return: A world whose base is driven on the map and carries an arm turning about
+        the base's x-axis, with the drive and the arm's joint.
+    """
+    world = World()
+    with world.modify_world():
+        map_body, base, arm = (
+            Body(name=PrefixedName(name)) for name in ("map", "base", "arm")
+        )
+        world.add_kinematic_structure_entity(map_body)
+        drive = OmniDrive.create_with_dofs(world=world, parent=map_body, child=base)
+        world.add_connection(drive)
+        joint = RevoluteConnection.create_with_dofs(
+            world=world, parent=base, child=arm, axis=Vector3Dimensional.X()
+        )
+        world.add_connection(joint)
+    return world, drive, joint
+
+
+@pytest.mark.parametrize("measured_pitch", [0.0, 1e-5, 0.01])
+def test_a_driven_base_lies_on_the_map_plane_however_its_imu_tilts(
+    driven_arm_world, measured_pitch
+):
+    """
+    A drive moves its base on the plane of the map; the roll and pitch an IMU measures
+    are no motion off it, so planar values relate the base and the map.
+    """
+    world, drive, joint = driven_arm_world
+    world.state[drive.pitch.id].position = measured_pitch
+    world.notify_state_change()
+
+    planar_pose = Pose2Dimensional.from_xy_yaw(
+        x=1, y=2, yaw=0.3, reference_frame=drive.child
     )
+
+    assert drive.child.embedded_plane == drive.parent.embedded_plane
+    assert world.transform(planar_pose, drive.parent).reference_frame is drive.parent
+
+
+@pytest.mark.parametrize("joint_position", [0.0, 1e-9, 0.3])
+def test_a_body_turning_about_an_x_axis_never_lies_on_its_parents_plane(
+    driven_arm_world, joint_position
+):
+    """
+    A joint about the x-axis may tilt its child off the parent's plane, so the child
+    does not share it, even in the states where it lies on it.
+    """
+    world, drive, joint = driven_arm_world
+    joint.position = joint_position
+
+    assert joint.child.embedded_plane != joint.parent.embedded_plane
+
+
+def test_a_body_added_on_another_lies_on_its_plane(driven_arm_world):
+    """
+    A body fixed on another after the other's plane was asked for lies on that plane.
+    """
+    world, drive, joint = driven_arm_world
+    base_plane = drive.child.embedded_plane
+    tray = Body(name=PrefixedName("tray"))
+    with world.modify_world():
+        world.add_connection(FixedConnection(parent=drive.child, child=tray))
+
+    assert tray.embedded_plane == base_plane
 
 
 def test_a_body_states_its_z_axis_in_itself(world_setup):

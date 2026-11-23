@@ -6,44 +6,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from krrood_spatial_math.cartesian_frame_3_dimensional import (
-    CartesianFrame3Dimensional,
-    EmbeddedPlaneRelation,
-)
 from krrood_spatial_math.coordinate_system import GenericCoordinateRepresentation
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
 from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
-    Pose3Dimensional,
 )
 
 from .frames import NamedFrame
-
-# %% frames that express the values of the frames they are related to
-
-
-@dataclass(eq=False, kw_only=True)
-class ExpressingFrame(NamedFrame):
-    """
-    A Cartesian frame that compares its x-y plane with that of another frame by
-    expressing where that frame lies.
-    """
-
-    def compare_embedded_plane_in_own_space(
-        self, *, frame: CartesianFrame3Dimensional
-    ) -> EmbeddedPlaneRelation:
-        return (
-            self.express_in_own_frame(value=Pose3Dimensional(reference_frame=frame))
-            .to_coordinate_change()
-            .embedded_plane_relation
-        )
-
 
 # %% frames other frames are fixed on
 
 
 @dataclass(eq=False, kw_only=True)
-class MountFrame(ExpressingFrame):
+class MountFrame(NamedFrame):
     """
     A Cartesian frame that other frames are fixed on, so it expresses values given in
     itself or in any :class:`MountedFrame` fixed on it.
@@ -69,7 +45,7 @@ class MountFrame(ExpressingFrame):
 
 
 @dataclass(eq=False)
-class MountedFrame(ExpressingFrame):
+class MountedFrame(NamedFrame):
     """
     A Cartesian frame fixed on another frame, so it expresses values given in itself, in
     that frame, or in another frame fixed on that frame.
@@ -85,6 +61,16 @@ class MountedFrame(ExpressingFrame):
         self.mount_T_self = self.mount_T_self.copy_with_new_reference_frames(
             self.mount_T_self.reference_frame, self
         )
+
+    @property
+    def embedded_plane(self) -> EmbeddedPlane:
+        """
+        The plane of the frame it is fixed on if the change it is fixed by keeps that
+        plane, otherwise its own x-y plane, unlike :attr:`NamedFrame.embedded_plane`.
+        """
+        if self.mount_T_self.keeps_x_y_plane:
+            return self.mount_T_self.reference_frame.embedded_plane
+        return EmbeddedPlane(frame_3_dimensional=self)
 
     def transform_into_own_frame(
         self, *, value: GenericCoordinateRepresentation
