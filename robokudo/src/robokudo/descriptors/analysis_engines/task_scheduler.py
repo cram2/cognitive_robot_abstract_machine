@@ -1,3 +1,9 @@
+"""
+Analysis engine scheduling two perception task trees that share annotators.
+"""
+
+from __future__ import annotations
+
 from py_trees.composites import Sequence
 
 from robokudo.analysis_engine import AnalysisEngineInterface
@@ -11,9 +17,15 @@ from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.pipeline import Pipeline
 from robokudo.tree_components.task_scheduler import IterativeTaskScheduler
 from robokudo.utils.tree import add_children_to_parent
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Runs two perception task trees that share annotators, scheduled by
+    :class:`IterativeTaskScheduler`, and puts the objects they perceive into the world.
+    """
+
     def name(self) -> str:
         return "job_scheduler"
 
@@ -56,6 +68,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClearAnnotatorOutputs(),
                 EmptyAnnotator(),
                 task_scheduling,
+                WorldUpdatingAnnotator(),
             ]
         )
 
