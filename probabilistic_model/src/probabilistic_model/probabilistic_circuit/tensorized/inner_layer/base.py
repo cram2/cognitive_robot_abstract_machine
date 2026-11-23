@@ -117,6 +117,15 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         """
         raise NotImplementedError
 
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :return: Whether a training step through this layer copies nothing from the
+            host to the device of its parameters, as recording the step as a CUDA graph
+            requires.
+        """
+        return False
+
     def validate(self):
         """
         Check that the parameter arrays of this layer and all its descendants have

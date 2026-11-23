@@ -164,6 +164,13 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
     def number_of_own_parameters(self) -> int:
         return 2 * self.number_of_nodes
 
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` for Gaussian layers, which do.
+        """
+        return True
+
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
     ) -> SampleNodeValues:

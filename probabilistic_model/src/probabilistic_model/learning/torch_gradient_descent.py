@@ -50,8 +50,8 @@ class TorchGradientDescent(GradientDescent[LayerType]):
     Whether training on a CUDA device records the step on batches of every shape as a
     CUDA graph and replays it.
 
-    The optimizer has to accept ``capturable``, and the numeric queries of the circuit
-    must not copy from the host.
+    The optimizer has to accept ``capturable``. A circuit with a layer that does not
+    train without host copies takes every step one by one.
     """
 
     parameters: list[torch.Tensor] = field(init=False)
@@ -100,12 +100,16 @@ class TorchGradientDescent(GradientDescent[LayerType]):
     def replays_recorded_steps(self) -> bool:
         """
         :return: Whether steps are recorded as CUDA graphs and replayed, which needs
-            :attr:`records_cuda_graphs` and parameters on a CUDA device.
+            :attr:`records_cuda_graphs`, parameters on a CUDA device and a circuit whose
+            every layer trains without host copies.
         """
         return (
             self.records_cuda_graphs
             and self.parameters[0].device.type
             == TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+            and all(
+                layer.trains_without_host_copies for layer in self.layer.all_layers()
+            )
         )
 
     def device_memory(self) -> PeakTrackingMemory:

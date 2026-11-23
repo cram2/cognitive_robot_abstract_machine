@@ -23,7 +23,7 @@ import optax
 import pytest
 from array_api_compat import array_namespace
 from random_events.set import Set
-from random_events.variable import Symbolic
+from random_events.variable import Continuous, Integer, Symbolic
 from sortedcontainers import SortedSet
 from krrood.adapters.json_serializer import DataclassJSONSerializer
 
@@ -43,8 +43,18 @@ from probabilistic_model.learning.training_schedule import (
     MiniBatchTraining,
     PlateauScheduledTraining,
 )
+from probabilistic_model.distributions.binomial import BinomialDistribution
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
+    BinomialLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    SymbolicLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
+    SparseProbabilityTable,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
@@ -559,13 +569,15 @@ class Bit(IntEnum):
 @pytest.fixture
 def circuit_with_symbolic_leaves() -> LayeredProbabilisticCircuit:
     """
-    A RAT-SPN over eight binary symbolic variables, whose leaves are symbolic layers.
+    A RAT-SPN over four binary symbolic and four continuous variables, whose leaves are
+    symbolic and Gaussian layers.
     """
     variables = SortedSet(
         [
             Symbolic(name=f"bit_{index}", domain=Set.from_iterable(Bit))
-            for index in range(8)
+            for index in range(4)
         ]
+        + [Continuous(f"x_{index}") for index in range(4)]
     )
     region_graph = RegionGraph(
         variables=variables, depth=2, repetitions=2, seed=0
@@ -578,8 +590,10 @@ def test_steps_recorded_as_cuda_graphs_train_symbolic_leaves_as_steps_taken_one_
     circuit_with_symbolic_leaves,
 ):
     """
-    Recording the steps of a circuit with symbolic leaves as CUDA graphs and replaying
-    them gives the parameters that taking every step on its own gives.
+    Recording the steps of a circuit with symbolic and Gaussian leaves as CUDA graphs
+    and replaying them gives the parameters that taking every step on its own gives, up
+    to the rounding of the gradient of the symbolic lookup, which the GPU accumulates in
+    no fixed order.
     """
     torch = pytest.importorskip("torch")
     if not torch.cuda.is_available():
@@ -594,7 +608,71 @@ def test_steps_recorded_as_cuda_graphs_train_symbolic_leaves_as_steps_taken_one_
         for one_by_one in (False, True)
     )
     for recorded_parameter, taken_parameter in zip(recorded, taken):
-        np.testing.assert_array_equal(recorded_parameter, taken_parameter)
+        np.testing.assert_allclose(
+            recorded_parameter, taken_parameter, rtol=0.0, atol=1e-12
+        )
+
+
+def test_every_layer_of_a_rat_spn_trains_without_host_copies(
+    circuit_with_symbolic_leaves,
+):
+    """
+    The sum, product, symbolic and Gaussian layers of a RAT-SPN all train without host
+    copies, so its steps can be recorded.
+    """
+    assert all(
+        layer.trains_without_host_copies
+        for layer in circuit_with_symbolic_leaves.root.all_layers()
+    )
+
+
+def test_a_symbolic_layer_with_a_sparse_table_does_not_train_without_host_copies(
+    circuit_with_symbolic_leaves,
+):
+    """
+    A symbolic layer whose probabilities are stored in a sparse table looks them up on
+    the host.
+    """
+    symbolic_layer = next(
+        layer
+        for layer in circuit_with_symbolic_leaves.root.all_layers()
+        if isinstance(layer, SymbolicLayer)
+    )
+
+    assert not symbolic_layer.stored_as(
+        SparseProbabilityTable
+    ).trains_without_host_copies
+
+
+def test_a_circuit_with_a_layer_that_copies_from_the_host_takes_its_steps_one_by_one():
+    """
+    Asking for CUDA graphs on a circuit with a binomial layer, which copies from the
+    host, takes every step one by one instead of recording it.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.torch_gradient_descent"
+    )
+    if not torch.cuda.is_available():
+        pytest.skip("needs a CUDA device")
+    count = Integer(name="count")
+    layer = BinomialLayer.from_distributions(
+        variable_index=0,
+        distributions=[
+            BinomialDistribution(
+                variable=count, number_of_trials=4, success_probability=0.3, offset=0
+            )
+        ],
+    )
+    circuit = LayeredProbabilisticCircuit(SortedSet([count]), layer).to_namespace(
+        array_namespace(torch.zeros(0)), device="cuda"
+    )
+
+    trainer = torch_gradient_descent.TorchGradientDescent(
+        circuit.root, AverageNegativeLogLikelihood(), records_cuda_graphs=True
+    )
+
+    assert not trainer.replays_recorded_steps
 
 
 def test_steps_on_the_cpu_are_taken_one_by_one_even_if_cuda_graphs_are_asked_for(
