@@ -7,9 +7,11 @@ a CUDA graph and replayed.
 from __future__ import annotations
 
 # %% imports
+import gc
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MethodType, TracebackType
 
 import torch
 from krrood_compute_resources.memory import HostMemory, PeakTrackingMemory
@@ -100,22 +102,26 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
     def take_step_or_replay(
         self,
         *,
-        step: Callable[..., torch.Tensor],
+        step: MethodType,
         batch: tuple[torch.Tensor, ...],
     ) -> torch.Tensor:
         """
         Take a step on a batch, replayed from its recording for batches of its shape if
         :attr:`replays_recorded_steps`.
 
-        :param step: The step operation by operation, called with ``batch=`` and
-            returning the loss of the batch before the step, a scalar tensor without a
-            gradient on the device of the parameters.
+        :param step: The step operation by operation, a method of this training called
+            with ``batch=`` and returning the loss of the batch before the step, a
+            scalar tensor without a gradient on the device of the parameters.
         :param batch: The same rows of every training array.
         :return: The loss of the batch before the step.
         """
         if not self.replays_recorded_steps:
             return step(batch=batch)
-        key = RecordedStepKey(step=step, batch_shape=BatchShape.from_batch(batch=batch))
+        # Keyed by the unbound function, so that no reference cycle keeps a finished
+        # training and its recorded graphs alive until the next collection.
+        key = RecordedStepKey(
+            step_function=step.__func__, batch_shape=BatchShape.from_batch(batch=batch)
+        )
         if key not in self.recorded_steps:
             self.recorded_steps[key] = RecordedTrainingStep()
         return self.recorded_steps[key].take(step=step, batch=batch)
@@ -150,9 +156,10 @@ class RecordedStepKey:
     Which step, on batches of which shape, a recording replays.
     """
 
-    step: Callable[..., torch.Tensor]
+    step_function: Callable[..., torch.Tensor]
     """
-    The step operation by operation.
+    The function of the method that takes the step operation by operation, unbound from
+    the training.
     """
 
     batch_shape: BatchShape
@@ -247,8 +254,43 @@ class RecordedTrainingStep:
         """
         self.batch = tuple(array.clone() for array in batch)
         self.graph = torch.cuda.CUDAGraph()
-        with torch.cuda.graph(self.graph):
+        # A collection that frees another recorded graph during the recording would
+        # invalidate it.
+        with PausedGarbageCollection(), torch.cuda.graph(self.graph):
             self.loss = step(batch=self.batch)
+
+
+@dataclass(kw_only=True)
+class PausedGarbageCollection:
+    """
+    Keeps the garbage collector from running automatically inside the context, and lets
+    it run afterwards if it did before.
+    """
+
+    was_enabled: bool = field(default=False, init=False)
+    """
+    Whether the garbage collector ran automatically before the context was entered.
+    """
+
+    def __enter__(self) -> PausedGarbageCollection:
+        """
+        Stop the garbage collector from running automatically.
+        """
+        self.was_enabled = gc.isenabled()
+        gc.disable()
+        return self
+
+    def __exit__(
+        self,
+        exception_type: type[BaseException] | None,
+        exception: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """
+        Let the garbage collector run automatically again if it did before.
+        """
+        if self.was_enabled:
+            gc.enable()
 
 
 # %% device memory
