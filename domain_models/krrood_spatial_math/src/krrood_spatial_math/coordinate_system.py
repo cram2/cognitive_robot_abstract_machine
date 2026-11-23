@@ -17,8 +17,6 @@ from krrood.patterns.identifier_and_name import HasID, HasName, NameT
 from krrood.patterns.interface import Interface
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood_spatial_math.exceptions import (
-    FrameHasNoCrossProductError,
-    FrameMeasuresNoLengthsError,
     MissingAxisCoordinatesError,
     ReferenceFrameMismatchError,
 )
@@ -26,7 +24,7 @@ from krrood_spatial_math.space import EuclideanSpace, Space
 
 if TYPE_CHECKING:
     from krrood_spatial_math.pose import GenericPose
-    from krrood_spatial_math.vector import GenericVector, Vector
+    from krrood_spatial_math.vector import Vector
 
 # %% what coordinates are given in
 
@@ -51,6 +49,13 @@ class CoordinateSystem(
     """
     The space this coordinate system charts; ``None`` where it is not known.
     """
+
+    @classproperty
+    def space_kind(cls) -> type[GenericSpace]:
+        """
+        The kind of space coordinate systems of this kind chart.
+        """
+        return cls.get_type_of_generic_parameter(parameter=GenericSpace)
 
 
 # %% frames: coordinate systems with straight axes
@@ -95,30 +100,14 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
         its coordinate along each axis in the attribute named after it.
         """
 
-    @classmethod
-    def inner_product(cls, *, first: Vector, second: Vector) -> GenericCoordinate:
+    @classproperty
+    def gram_matrix(cls) -> tuple[tuple[float, ...], ...] | None:
         """
-        :param first: A vector given in a frame of this kind.
-        :param second: A vector given in the same frame.
-        :return: The product of both lengths and the cosine of the angle between them.
-        :raises FrameMeasuresNoLengthsError: If this kind of frame measures no lengths.
+        The inner products of the axis vectors of this kind of frame with each other, one
+        coordinate unit long each, in the order of the axes; ``None`` where their lengths
+        and the angles between them are not known.
         """
-        raise FrameMeasuresNoLengthsError(frame_kind=cls)
-
-    @classmethod
-    def cross_product(
-        cls, *, first: GenericVector, second: GenericVector
-    ) -> GenericVector:
-        """
-        :param first: A vector given in a frame of this kind.
-        :param second: A vector given in the same frame.
-        :return: The vector perpendicular to both, as long as the area of the
-            parallelogram they span, such that ``first``, ``second`` and the result are
-            right-handed.
-        :raises FrameHasNoCrossProductError: If this kind of frame is not an oriented
-            three-dimensional Cartesian frame.
-        """
-        raise FrameHasNoCrossProductError(frame_kind=cls)
+        return None
 
 
 GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
@@ -138,20 +127,17 @@ class CartesianFrame(AffineFrame[GenericEuclideanSpace, NameT], Interface):
     An affine frame whose axes are perpendicular and one unit of its Euclidean space
     long, so it measures lengths and angles.
 
-    Every Cartesian frame measures them the same way, so the metric belongs to the kind
-    of frame and needs no frame instance.
     """
 
-    @classmethod
-    def inner_product(cls, *, first: Vector, second: Vector) -> GenericCoordinate:
+    @classproperty
+    def gram_matrix(cls) -> tuple[tuple[float, ...], ...]:
         """
-        The sum of the products of the coordinates, unlike :meth:`AffineFrame.inner_product`.
+        The identity, unlike :attr:`AffineFrame.gram_matrix`: the axes are one unit
+        long and perpendicular.
         """
-        return sum(
-            first_coordinate * second_coordinate
-            for first_coordinate, second_coordinate in zip(
-                first.coordinates, second.coordinates, strict=True
-            )
+        return tuple(
+            tuple(float(row == column) for column in range(len(cls.axes)))
+            for row in range(len(cls.axes))
         )
 
 

@@ -105,26 +105,47 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 @dataclass(kw_only=True)
 class FrameMeasuresNoLengthsError(SpatialTypesError):
     """
-    Raised when a length, an angle or a distance is asked of a kind of frame that is not
-    Cartesian, such as an affine pixel frame.
+    Raised when a length, an angle or a distance is asked of values given in a kind of
+    frame whose Gram matrix is not known, such as a pixel frame of unknown pixel size.
     """
 
     frame_kind: type
     """
-    The kind of frame that was asked to measure.
+    The kind of frame the values are given in.
     """
 
     def error_message(self) -> str:
         return (
-            f"{self.frame_kind.__name__} does not fix the lengths of its axes or the "
+            f"{self.frame_kind.__name__} does not know the lengths of its axes or the "
             f"angles between them, so its coordinates alone give no lengths or angles."
         )
 
     def suggest_correction(self) -> str:
         return (
-            "change the values into a Cartesian frame first, or give their type a kind "
-            "of frame that subclasses CartesianFrame."
+            "change the values into a Cartesian frame first, or give their kind of "
+            "frame a gram_matrix."
         )
+
+
+@dataclass(kw_only=True)
+class SpaceMeasuresNoLengthsError(SpatialTypesError):
+    """
+    Raised when a length, an angle or a distance is asked of values of a space that is
+    not Euclidean, which has no inner product.
+    """
+
+    space_kind: type
+    """
+    The kind of space the values belong to.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.space_kind.__name__} has no inner product, so no lengths or angles."
+        )
+
+    def suggest_correction(self) -> str:
+        return "derive the space from EuclideanSpace if it has lengths and angles."
 
 
 @dataclass(kw_only=True)
@@ -152,28 +173,6 @@ class MissingAxisCoordinatesError(SpatialTypesError):
         return (
             "declare a field or property named after each axis of the frame kind, as "
             "its axes classproperty names them."
-        )
-
-
-@dataclass(kw_only=True)
-class FrameHasNoCrossProductError(SpatialTypesError):
-    """
-    Raised when a cross product is asked of a kind of frame that is not an oriented
-    three-dimensional Cartesian frame, such as a planar or an affine pixel frame.
-    """
-
-    frame_kind: type
-    """
-    The kind of frame that was asked for the cross product.
-    """
-
-    def error_message(self) -> str:
-        return f"{self.frame_kind.__name__} has no cross product."
-
-    def suggest_correction(self) -> str:
-        return (
-            "lift the vectors into a three-dimensional Cartesian frame first, or give "
-            "their type a kind of frame that subclasses CartesianFrame3Dimensional."
         )
 
 

@@ -88,7 +88,10 @@ class Point(AxisCoordinates, Generic[GenericVector]):
         :param other: A point given in the same frame.
         :return: The straight-line distance between this point and ``other``: the
             length of their difference.
-        :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
+        :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
+            not Euclidean.
+        :raises FrameMeasuresNoLengthsError: If the Gram matrix of its kind of frame is
+            not known.
         """
         return (self - other).norm()
 

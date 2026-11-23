@@ -42,6 +42,7 @@ from krrood_spatial_math.spatial_types import (
     SpatialFrameKey,
     SymbolicSpatialChange,
     SymbolicSpatialValue,
+    SymbolicSpatialVector,
     Vector3Dimensional,
 )
 
@@ -326,8 +327,7 @@ class HomogeneousTransformationMatrix2Dimensional(
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class Vector2Dimensional(
-    SymbolicSpatialValue[HomogeneousTransformationMatrix2Dimensional],
-    Vector,
+    SymbolicSpatialVector[HomogeneousTransformationMatrix2Dimensional],
 ):
     """
     A translation within the x-y plane of its reference frame, given in the :class:`~krr
@@ -418,14 +418,11 @@ class Point2Dimensional(
     Point[Vector2Dimensional],
 ):
     """
-    Represents a 2D point with reference frame handling.
+    A point on the x-y plane of its reference frame, stored as a 2×1 symbolic vector
+    ``[x, y]`` like :class:`Pose2Dimensional`.
 
-    Stored as a bare 2×1 symbolic vector ``[x, y]``, with no homogeneous augmentation --
-    the same convention :class:`Pose2Dimensional` uses. The point lies on its reference
-    frame's own x-y plane and has no height; it relates to 3D space only through an
-    :class:`EmbeddedPlaneProjection` onto that plane, which
-    :meth:`from_point_3_dimensional`, :meth:`from_pose` and
-    :meth:`to_point_3_dimensional` apply.
+    It has no height and relates to 3D space only through an
+    :class:`EmbeddedPlaneProjection` onto its plane.
     """
 
     def __init__(

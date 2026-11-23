@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing_extensions import assert_type
 
 from krrood.symbolic_math import symbolic_math as sm
-from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from krrood_spatial_math.coordinate_system import (
     AffineCoordinateChange,
     CoordinateSystem,
@@ -130,10 +129,6 @@ def check_symbolic_point_and_vector_arithmetic(
     assert_type(point - point, Vector3Dimensional)
     assert_type(point + vector, Point3Dimensional)
     assert_type(vector.cross(other=vector), Vector3Dimensional)
-    assert_type(
-        CartesianFrame3Dimensional.cross_product(first=vector, second=vector),
-        Vector3Dimensional,
-    )
     assert_type(planar_point - planar_point, Vector2Dimensional)
 
 

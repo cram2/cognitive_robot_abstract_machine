@@ -36,11 +36,13 @@ coordinate system. Its base depends on `krrood` alone.
 - `krrood_spatial_math.vector`: `Vector[frame, coordinate]`, a translation of an affine
   space given by its coordinates in an affine frame, one per axis that frame's kind
   names in its `axes`, held in the field or property of that name, each of the
-  coordinate type, such as `float` or `sm.Scalar`. Its `norm` and `dot` are measured by
-  the kind of frame, and an affine one that is not Cartesian raises
-  `FrameMeasuresNoLengthsError`. Its `cross` is the kind of frame's too: only a
-  `CartesianFrame3Dimensional` has a cross product, and any other kind raises
-  `FrameHasNoCrossProductError`. A change of frame maps its axes but never shifts it: its
+  coordinate type, such as `float` or `sm.Scalar`. Its `dot` and `norm` are the inner
+  product of its Euclidean space, `EuclideanSpace.inner_product`, which multiplies the
+  coordinates through the `gram_matrix` of its kind of frame: the identity for a
+  `CartesianFrame`, and not known for another affine frame, which raises
+  `FrameMeasuresNoLengthsError`. A vector of a space that is not Euclidean raises
+  `SpaceMeasuresNoLengthsError`. Only a three-dimensional vector, `Vector3Dimensional`,
+  has a `cross` product. A change of frame maps its axes but never shifts it: its
   homogeneous coordinates end in 0.
 - `krrood_spatial_math.point`: `Point[vector]`, a point of an affine space, given in the
   kind of frame of its vector type and measured by it in the same way. The difference
@@ -50,9 +52,6 @@ coordinate system. Its base depends on `krrood` alone.
 - `krrood_spatial_math.pose`: `Pose` and `Orientation`, a frame given in another, with
   and without its position. Each is the value of a rigid change, and a change of frame
   moves it by composing with that change, an orientation with the rotation only.
-- `krrood_spatial_math.motion_vector_pair`: `MotionVectorPair[vector]`, a rigid motion
-  as how a body turns and how the point at the frame's origin moves, which a change of
-  frame moves by its adjoint action.
 - `krrood_spatial_math.line`: `Line[point]`, the points `point + direction * t` for every
   number `t`, running along its point type's vector type, and `LineSegment[line]`, the
   part of a line between two of its points.
@@ -70,7 +69,8 @@ coordinate system. Its base depends on `krrood` alone.
   kind of frame and coordinate type, and `transform` takes a transformation as a change of
   that type. How a change moves a value comes from its kind of value: the vector and
   point are a `Vector` and a `Point`, the pose a `Pose`, `Quaternion` and `AxisAngle` an
-  `Orientation`, and `Displacement`, `Twist` and `ScrewAxis` a `MotionVectorPair`. A
+  `Orientation`, and `Displacement`, `Twist` and `ScrewAxis` a `VectorPair`, two
+  three-dimensional vectors that a change of frame moves by its adjoint action. A
   `RotationMatrix` is the transformation without translation, SO(3) within SE(3).
 - `krrood_spatial_math.spatial_types_2_dimensional`, with the same extra: their
   counterparts on a plane, `Point2Dimensional`, `Vector2Dimensional` and
@@ -244,11 +244,12 @@ assert box_width.apply_transformation(
 ) == PixelVector(u=20, v=0, coordinate_system=thumbnail)
 
 # the change back returns the keypoint
-assert keypoint.apply_transformation(
-    transformation=thumbnail_from_camera_image
-).apply_transformation(
-    transformation=thumbnail_from_camera_image.inverse()
-) == keypoint
+assert (
+    keypoint.apply_transformation(
+        transformation=thumbnail_from_camera_image
+    ).apply_transformation(transformation=thumbnail_from_camera_image.inverse())
+    == keypoint
+)
 
 # arithmetic stays within one frame
 assert keypoint + box_width == PixelPoint(u=340, v=250, coordinate_system=camera_image)
@@ -259,9 +260,10 @@ What the interfaces refuse, each where it is first possible:
 
 - `keypoint - thumbnail_keypoint`, points of two frames, raises `ReferenceFrameMismatchError`.
 - `box_width.norm()` raises `FrameMeasuresNoLengthsError`: pixels may not be square, so
-  pixel coordinates alone give no lengths. Measuring needs a camera model that maps
-  pixels to the Cartesian frame of the camera.
-- `box_width.cross(other=box_width)` raises `FrameHasNoCrossProductError`.
+  `PixelFrame` gives no `gram_matrix` and pixel coordinates alone give no lengths.
+  Measuring needs the pixel size, or a camera model that maps pixels to the Cartesian
+  frame of the camera.
+- `box_width` has no `cross`: only a three-dimensional vector has a cross product.
 - A `PixelPoint` declared with fields `x` and `y` instead of `u` and `v` raises
   `MissingAxisCoordinatesError` where the class is defined.
 
@@ -299,7 +301,9 @@ class OpenCoordinatePixelPoint(
 
 column = sm.FloatVariable(name="column")
 row = sm.FloatVariable(name="row")
-symbolic_keypoint = OpenCoordinatePixelPoint(u=column, v=row, coordinate_system=camera_image)
+symbolic_keypoint = OpenCoordinatePixelPoint(
+    u=column, v=row, coordinate_system=camera_image
+)
 
 moved_keypoint = symbolic_keypoint.apply_transformation(
     transformation=thumbnail_from_camera_image

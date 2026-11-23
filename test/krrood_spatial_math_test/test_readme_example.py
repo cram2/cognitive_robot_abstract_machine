@@ -12,7 +12,6 @@ from types import ModuleType
 import pytest
 
 from krrood_spatial_math.exceptions import (
-    FrameHasNoCrossProductError,
     FrameMeasuresNoLengthsError,
     MissingAxisCoordinatesError,
     ReferenceFrameMismatchError,
@@ -74,12 +73,9 @@ def test_a_pixel_vector_has_no_length(adding_a_space_example):
 
 def test_a_pixel_vector_has_no_cross_product(adding_a_space_example):
     """
-    A pixel frame is neither Cartesian nor three-dimensional.
+    A pixel vector is not a three-dimensional vector, so it has no cross product.
     """
-    box_width = adding_a_space_example.box_width
-
-    with pytest.raises(FrameHasNoCrossProductError):
-        box_width.cross(other=box_width)
+    assert not hasattr(adding_a_space_example.box_width, "cross")
 
 
 def test_a_pixel_point_named_after_other_axes_is_refused_where_it_is_defined(

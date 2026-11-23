@@ -15,7 +15,6 @@ from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
     RigidCoordinateChange,
 )
-from krrood_spatial_math.motion_vector_pair import MotionVectorPair
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.pose import Orientation, Pose
 from krrood_spatial_math.spatial_types import (
@@ -30,6 +29,7 @@ from krrood_spatial_math.spatial_types import (
     SymbolicSpatialChange,
     SymbolicSpatialValue,
     Twist,
+    VectorPair,
     Vector3Dimensional,
 )
 from krrood_spatial_math.spatial_types_2_dimensional import (
@@ -109,9 +109,9 @@ def test_an_affine_change_never_shifts_a_vector_of_a_new_space(sheet_to_poster):
         (Pose2Dimensional, Pose),
         (Quaternion, Orientation),
         (AxisAngle, Orientation),
-        (Twist, MotionVectorPair),
-        (ScrewAxis, MotionVectorPair),
-        (Displacement, MotionVectorPair),
+        (Twist, VectorPair),
+        (ScrewAxis, VectorPair),
+        (Displacement, VectorPair),
     ],
 )
 def test_a_symbolic_value_is_moved_as_its_kind_of_value_says(

@@ -31,7 +31,7 @@ from krrood_spatial_math.exceptions import (
 from krrood_spatial_math.space import EuclideanSpace
 
 if TYPE_CHECKING:
-    from krrood_spatial_math.vector import GenericVector, Vector
+    from krrood_spatial_math.vector import Vector
 
 # %% how the embedded planes of two frames lie
 
@@ -90,25 +90,6 @@ class CartesianFrame3Dimensional(CartesianFrame[EuclideanSpace, NameT], Interfac
     @classproperty
     def axes(cls) -> tuple[FrameAxis, ...]:
         return (FrameAxis.X, FrameAxis.Y, FrameAxis.Z)
-
-    @classmethod
-    def cross_product(
-        cls, *, first: GenericVector, second: GenericVector
-    ) -> GenericVector:
-        """
-        Computed from the coordinates and given in the frame of ``first``, unlike
-        :meth:`~krrood_spatial_math.coordinate_system.AffineFrame.cross_product`.
-        """
-        (first_x, first_y, first_z) = first.coordinates
-        (second_x, second_y, second_z) = second.coordinates
-        return first.from_coordinates(
-            coordinates=(
-                first_y * second_z - first_z * second_y,
-                first_z * second_x - first_x * second_z,
-                first_x * second_y - first_y * second_x,
-            ),
-            coordinate_system=first.coordinate_system,
-        )
 
     @classmethod
     def from_frame_3_dimensional(

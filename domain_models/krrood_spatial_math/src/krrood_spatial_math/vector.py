@@ -19,6 +19,8 @@ from krrood_spatial_math.coordinate_system import (
     GenericCoordinate,
     GenericCoordinateSystem,
 )
+from krrood_spatial_math.exceptions import SpaceMeasuresNoLengthsError
+from krrood_spatial_math.space import EuclideanSpace
 
 # %% vectors given in an affine frame
 
@@ -86,44 +88,45 @@ class Vector(
         """
         :return: The length of this vector: the square root of its inner product with
             itself.
-        :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
+        :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
+            not Euclidean.
+        :raises FrameMeasuresNoLengthsError: If the Gram matrix of its kind of frame is
+            not known.
         """
         return self.dot(self) ** 0.5
 
     def dot(self, other: Self) -> GenericCoordinate:
         """
         :param other: A vector given in the same frame.
-        :return: The product of both lengths and the cosine of the angle between them.
+        :return: The product of both lengths and the cosine of the angle between them,
+            as the Euclidean space of its kind of frame measures it.
         :raises UnsupportedOperationError: If ``other`` is not a vector of this type.
         :raises ReferenceFrameMismatchError: If both vectors are given in a frame and the
             frames differ.
-        :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
+        :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
+            not Euclidean.
+        :raises FrameMeasuresNoLengthsError: If the Gram matrix of its kind of frame is
+            not known.
         """
         if not isinstance(other, type(self)):
             raise UnsupportedOperationError(
                 operation=MathematicalOperation.DOT_PRODUCT, left=self, right=other
             )
         self.ensure_same_coordinate_system(other=other, context="the multiplied vector")
-        return self.frame_kind.inner_product(first=self, second=other)
+        return self._measure_inner_product(other=other)
 
-    def cross(self, *, other: Self) -> Self:
+    def _measure_inner_product(self, *, other: Self) -> GenericCoordinate:
         """
-        :param other: A vector given in the same frame.
-        :return: The vector perpendicular to both, as long as the area of the
-            parallelogram they span, such that this vector, ``other`` and the result
-            are right-handed.
-        :raises UnsupportedOperationError: If ``other`` is not a vector of this type.
-        :raises ReferenceFrameMismatchError: If both vectors are given in a frame and the
-            frames differ.
-        :raises FrameHasNoCrossProductError: If its kind of frame is not an oriented
-            three-dimensional Cartesian frame.
+        :param other: A vector of this type, given in the same frame.
+        :return: The inner product of this vector and ``other``, which
+            :meth:`dot` checks the operands of.
+        :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
+            not Euclidean.
         """
-        if not isinstance(other, type(self)):
-            raise UnsupportedOperationError(
-                operation=MathematicalOperation.CROSS_PRODUCT, left=self, right=other
-            )
-        self.ensure_same_coordinate_system(other=other, context="the crossed vector")
-        return self.frame_kind.cross_product(first=self, second=other)
+        space_kind = self.frame_kind.space_kind
+        if not issubclass(space_kind, EuclideanSpace):
+            raise SpaceMeasuresNoLengthsError(space_kind=space_kind)
+        return space_kind.inner_product(first=self, second=other)
 
 
 GenericVector = TypeVar("GenericVector", bound=Vector)

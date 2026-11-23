@@ -23,7 +23,7 @@ from krrood_spatial_math.coordinate_system import (
     GenericCoordinate,
     RigidCoordinateChange,
 )
-from krrood_spatial_math.space import Space
+from krrood_spatial_math.space import EuclideanSpace, Space
 
 # %% a plane whose frames differ by scaling each axis
 
@@ -104,6 +104,45 @@ class ScalablePlanePoint(Point[ScalablePlaneVector]):
     y: float
     """
     The second coordinate.
+    """
+
+
+# %% a Euclidean plane charted by a frame whose axes are not one unit long
+
+
+class StretchedAxesFrame(AffineFrame[EuclideanSpace, str], Interface):
+    """
+    A kind of frame on a Euclidean plane whose perpendicular axes are two and three
+    units long, so its coordinates measure lengths only through its Gram matrix.
+    """
+
+    @classproperty
+    def axes(cls) -> tuple[FrameAxis, ...]:
+        return (FrameAxis.X, FrameAxis.Y)
+
+    @classproperty
+    def gram_matrix(cls) -> tuple[tuple[float, ...], ...]:
+        """
+        The squared lengths of the two perpendicular axes on the diagonal, unlike
+        :attr:`~krrood_spatial_math.coordinate_system.AffineFrame.gram_matrix`.
+        """
+        return ((4.0, 0.0), (0.0, 9.0))
+
+
+@dataclass(kw_only=True)
+class StretchedAxesVector(Vector[StretchedAxesFrame, float]):
+    """
+    A vector given in a frame whose axes are two and three units long.
+    """
+
+    x: float
+    """
+    The amount along the first axis, in lengths of that axis.
+    """
+
+    y: float
+    """
+    The amount along the second axis, in lengths of that axis.
     """
 
 

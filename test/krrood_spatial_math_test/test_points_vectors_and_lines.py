@@ -5,6 +5,7 @@ implement them.
 
 from __future__ import annotations
 
+import math
 from dataclasses import fields
 
 import numpy as np
@@ -21,23 +22,23 @@ from krrood_spatial_math.coordinate_system import (
     GenericCoordinateSystem,
 )
 from krrood_spatial_math.exceptions import (
-    FrameHasNoCrossProductError,
-    FrameMeasuresNoLengthsError,
     ReferenceFrameMismatchError,
+    SpaceMeasuresNoLengthsError,
 )
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.motion_vector_pair import MotionVectorPair
 from krrood_spatial_math.point import Point, GenericPoint
 from krrood_spatial_math.spatial_types import (
     Point3Dimensional,
     Vector3Dimensional,
 )
+from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types_2_dimensional import Vector2Dimensional
 from krrood_spatial_math.vector import Vector, GenericVector
 
 from .dataset.frames import NamedFrame
 from .dataset.spaces import (
     AxisScalingChange,
+    FloatCoordinateVector3Dimensional,
     OpenCoordinateScalablePlanePoint,
     OpenCoordinateScalablePlaneVector,
     ScalablePlaneFrame,
@@ -45,6 +46,8 @@ from .dataset.spaces import (
     StoredScalablePlaneLineSegment,
     ScalablePlanePoint,
     ScalablePlaneVector,
+    StretchedAxesFrame,
+    StretchedAxesVector,
 )
 
 # %% points and vectors given in an affine frame
@@ -91,23 +94,23 @@ def test_a_point_type_binds_only_the_vector_type_it_is_moved_by():
     assert vector_parameter.__bound__ is Vector
 
 
-def test_a_vector_of_a_frame_that_is_not_cartesian_has_no_length():
+def test_a_vector_of_a_space_that_is_not_euclidean_has_no_length():
     """
-    Only a Cartesian kind of frame measures lengths; an affine one is refused.
+    Only a Euclidean space has lengths; a vector of any other space is refused.
     """
     vector = ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
 
-    with pytest.raises(FrameMeasuresNoLengthsError):
+    with pytest.raises(SpaceMeasuresNoLengthsError):
         vector.norm()
 
 
-def test_points_of_a_frame_that_is_not_cartesian_have_no_distance():
+def test_points_of_a_space_that_is_not_euclidean_have_no_distance():
     """
-    Only a Cartesian kind of frame measures distances; an affine one is refused.
+    Only a Euclidean space has distances; points of any other space are refused.
     """
     point = ScalablePlanePoint(x=1.0, y=2.0, coordinate_system=None)
 
-    with pytest.raises(FrameMeasuresNoLengthsError):
+    with pytest.raises(SpaceMeasuresNoLengthsError):
         point.euclidean_distance(point)
 
 
@@ -300,7 +303,7 @@ def test_a_line_segment_lies_on_the_line_from_its_start_to_its_end():
     )
 
 
-# %% the metric of a Cartesian frame kind
+# %% the inner product of a Euclidean space
 
 
 def test_a_vectors_length_is_the_square_root_of_its_inner_product_with_itself():
@@ -311,11 +314,56 @@ def test_a_vectors_length_is_the_square_root_of_its_inner_product_with_itself():
     assert float(vector.norm()) == float(vector.dot(vector)) ** 0.5 == 5.0
 
 
-def test_a_cartesian_frame_kind_measures_the_angle_between_two_vectors():
-    product = CartesianFrame3Dimensional.inner_product(
-        first=Vector3Dimensional(1, 2, 3), second=Vector3Dimensional(4, 5, 6)
+def test_a_euclidean_space_multiplies_the_coordinates_of_a_cartesian_frame():
+    """
+    In a Cartesian frame, whose Gram matrix is the identity, the inner product is the
+    sum of the products of the coordinates.
+    """
+    product = EuclideanSpace.inner_product(
+        first=FloatCoordinateVector3Dimensional(x=1, y=2, z=3, coordinate_system=None),
+        second=FloatCoordinateVector3Dimensional(x=4, y=5, z=6, coordinate_system=None),
     )
-    assert float(product) == 32.0
+    assert product == 32.0
+
+
+def test_a_euclidean_space_measures_a_frame_with_long_axes_by_its_gram_matrix():
+    """
+    One unit along each axis of a frame whose axes are two and three units long is the
+    diagonal of a two by three rectangle.
+    """
+    vector = StretchedAxesVector(x=1.0, y=1.0, coordinate_system=None)
+
+    assert vector.norm() == math.sqrt(
+        sum(entry for row in StretchedAxesFrame.gram_matrix for entry in row)
+    )
+
+
+def test_a_symbolic_vectors_inner_product_is_its_euclidean_spaces():
+    """
+    A symbolic vector computes the same inner product its Euclidean space does.
+    """
+    first, second = Vector3Dimensional(1, 0, 2), Vector3Dimensional(3, 1, 1)
+    assert float(first.dot(second)) == float(
+        EuclideanSpace.inner_product(first=first, second=second)
+    )
+
+
+@pytest.mark.parametrize("product_name", ["inner_product", "cross_product"])
+def test_a_frame_computes_no_product_of_vectors(product_name):
+    """
+    A frame only supplies how its axes measure; products of vectors are not its.
+    """
+    assert not any(
+        product_name in vars(frame_kind)
+        for frame_kind in CartesianFrame3Dimensional.__mro__
+    )
+
+
+def test_vectors_of_two_frames_have_no_inner_product():
+    first = Vector3Dimensional(1, 0, 0, reference_frame=NamedFrame(name="table"))
+    second = Vector3Dimensional(1, 0, 0, reference_frame=NamedFrame(name="gripper"))
+    with pytest.raises(ReferenceFrameMismatchError):
+        first.dot(second)
 
 
 def test_the_distance_between_two_points_is_the_length_of_their_difference():
@@ -328,32 +376,16 @@ def test_the_distance_between_two_points_is_the_length_of_their_difference():
     )
 
 
-def test_a_vectors_inner_product_is_the_one_its_frame_kind_measures():
-    first, second = Vector3Dimensional(1, 0, 2), Vector3Dimensional(3, 1, 1)
-    assert float(first.dot(second)) == float(
-        CartesianFrame3Dimensional.inner_product(first=first, second=second)
-    )
+# %% the cross product of three-dimensional vectors
 
 
-def test_vectors_of_two_frames_have_no_inner_product():
-    first = Vector3Dimensional(1, 0, 0, reference_frame=NamedFrame(name="table"))
-    second = Vector3Dimensional(1, 0, 0, reference_frame=NamedFrame(name="gripper"))
-    with pytest.raises(ReferenceFrameMismatchError):
-        first.dot(second)
-
-
-# %% the cross product of an oriented three-dimensional Cartesian frame kind
-
-
-def test_a_three_dimensional_cartesian_frame_kind_crosses_two_vectors():
+def test_two_three_dimensional_vectors_are_crossed_right_handed():
     """
-    The cross product is computed from the coordinates, right-handed, without a frame.
+    The cross product of two three-dimensional vectors is the right-handed one.
     """
     first, second = (1.0, 2.0, 3.0), (4.0, 5.0, 6.0)
 
-    product = CartesianFrame3Dimensional.cross_product(
-        first=Vector3Dimensional(*first), second=Vector3Dimensional(*second)
-    )
+    product = Vector3Dimensional(*first).cross(other=Vector3Dimensional(*second))
 
     assert [float(coordinate) for coordinate in product.coordinates] == list(
         np.cross(first, second)
@@ -366,50 +398,21 @@ def test_the_cross_product_is_given_in_the_frame_of_the_crossed_vectors():
     """
     table = NamedFrame(name="table")
 
-    product = CartesianFrame3Dimensional.cross_product(
-        first=Vector3Dimensional(1, 0, 0, reference_frame=table),
-        second=Vector3Dimensional(0, 1, 0, reference_frame=table),
+    product = Vector3Dimensional(1, 0, 0, reference_frame=table).cross(
+        other=Vector3Dimensional(0, 1, 0, reference_frame=table)
     )
 
     assert product.reference_frame is table
 
 
-def test_a_vectors_cross_product_is_the_one_its_frame_kind_gives():
+@pytest.mark.parametrize(
+    "vector_type", [Vector, Vector2Dimensional, ScalablePlaneVector]
+)
+def test_only_a_three_dimensional_vector_has_a_cross_product(vector_type):
     """
-    A symbolic vector's casadi cross product agrees with the one its frame kind
-    computes.
+    A cross product exists only in three dimensions, so no other vector has one.
     """
-    first, second = Vector3Dimensional(1, 0, 2), Vector3Dimensional(3, 1, 1)
-
-    assert [
-        float(coordinate) for coordinate in first.cross(other=second).coordinates
-    ] == [
-        float(coordinate)
-        for coordinate in CartesianFrame3Dimensional.cross_product(
-            first=first, second=second
-        ).coordinates
-    ]
-
-
-def test_a_vector_of_a_frame_that_is_not_cartesian_has_no_cross_product():
-    """
-    An affine kind of frame has no cross product, as its coordinates alone give no
-    lengths or angles.
-    """
-    vector = ScalablePlaneVector(x=3.0, y=4.0, coordinate_system=None)
-
-    with pytest.raises(FrameHasNoCrossProductError):
-        vector.cross(other=vector)
-
-
-def test_a_vector_of_a_planar_cartesian_frame_has_no_cross_product():
-    """
-    A Cartesian frame has a cross product only when it is three-dimensional.
-    """
-    vector = Vector2Dimensional(1, 2)
-
-    with pytest.raises(FrameHasNoCrossProductError):
-        vector.cross(other=vector)
+    assert not hasattr(vector_type, "cross")
 
 
 def test_vectors_of_two_frames_have_no_cross_product():
@@ -421,13 +424,3 @@ def test_vectors_of_two_frames_have_no_cross_product():
 
     with pytest.raises(ReferenceFrameMismatchError):
         first.cross(other=second)
-
-
-def test_a_motion_vector_pair_is_built_from_plain_vectors():
-    """
-    The vectors of a rigid motion need no interface of their own: their frame kind gives
-    the cross product the adjoint action uses.
-    """
-    (vector_parameter,) = MotionVectorPair.__parameters__
-
-    assert vector_parameter.__bound__ is Vector

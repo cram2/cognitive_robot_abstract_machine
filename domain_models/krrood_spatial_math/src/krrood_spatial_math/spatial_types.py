@@ -45,7 +45,6 @@ from krrood_spatial_math.coordinate_system import (
     RigidCoordinateChange,
 )
 from krrood_spatial_math.line import Line, LineSegment
-from krrood_spatial_math.motion_vector_pair import MotionVectorPair
 from krrood_spatial_math.point import Point
 from krrood_spatial_math.pose import GenericPose, Orientation, Pose
 from krrood_spatial_math.vector import Vector
@@ -545,6 +544,31 @@ class SymbolicSpatialValue(
             ),
             **constructor_arguments,
         )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class SymbolicSpatialVector(SymbolicSpatialValue[GenericCoordinateChange], Vector, ABC):
+    """
+    A vector, as a symbolic column of its coordinates, given in a Cartesian frame of the
+    kind its change type changes.
+    """
+
+    def _measure_inner_product(self, *, other: Self) -> sm.Scalar:
+        """
+        The inner product of its Euclidean space, as one symbolic expression of both
+        columns, which :meth:`~krrood_spatial_math.vector.Vector._measure_inner_product`
+        builds coordinate by coordinate.
+        """
+        return sm.Scalar.from_casadi_sx(
+            casadi_sx=ca.dot(self.casadi_sx, other.casadi_sx)
+        )
+
+    def norm(self) -> sm.Scalar:
+        """
+        The length :meth:`~krrood_spatial_math.vector.Vector.norm` gives, as one symbolic
+        expression of the column.
+        """
+        return sm.Scalar.from_casadi_sx(casadi_sx=ca.norm_2(self.casadi_sx))
 
 
 @dataclass(eq=False, init=False, repr=False)
@@ -1364,8 +1388,7 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
 
 @dataclass(eq=False, init=False, repr=False)
 class Vector3Dimensional(
-    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
-    Vector,
+    SymbolicSpatialVector[HomogeneousTransformationMatrix3Dimensional],
 ):
     """
     A vector in 3D space, given in a reference frame.
@@ -1630,7 +1653,12 @@ class Vector3Dimensional(
 
     def cross(self, *, other: Vector3Dimensional) -> Vector3Dimensional:
         """
-        Computed on the casadi matrices, unlike :meth:`~krrood_spatial_math.vector.Vector.cross`.
+        :param other: A vector given in the same frame.
+        :return: The vector perpendicular to both, as long as the area of the
+            parallelogram they span, such that this vector, ``other`` and the result
+            are right-handed, as the frame is.
+        :raises ReferenceFrameMismatchError: If both vectors are given in a frame and the
+            frames differ.
         """
         self.ensure_same_coordinate_system(other=other, context="the crossed vector")
         result = ca.cross(self.casadi_sx[:3], other.casadi_sx[:3])
@@ -2533,7 +2561,6 @@ class AxisAngle(
 @dataclass(eq=False, init=False, repr=False, kw_only=True)
 class VectorPair(
     SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
-    MotionVectorPair[Vector3Dimensional],
     ABC,
 ):
     """
@@ -2624,12 +2651,18 @@ class VectorPair(
 
     @property
     def rotational_part(self) -> Vector3Dimensional:
+        """
+        How the body turns.
+        """
         return Vector3Dimensional(
             x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
         )
 
     @property
     def translational_part(self) -> Vector3Dimensional:
+        """
+        How the point of the body at the origin of the reference frame moves.
+        """
         return Vector3Dimensional(
             x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
         )
@@ -2641,12 +2674,37 @@ class VectorPair(
         rotational_part: Vector3Dimensional,
         translational_part: Vector3Dimensional,
     ) -> Self:
+        """
+        :param rotational_part: How the body turns.
+        :param translational_part: How the point of the body at the origin of the frame
+            both parts are given in moves.
+        :return: The motion with these parts, given in their frame.
+        """
         return cls(
             **{
                 cls._rotational_part_name: rotational_part,
                 cls._translational_part_name: translational_part,
             },
             reference_frame=rotational_part.reference_frame,
+        )
+
+    def apply_transformation(
+        self, *, transformation: HomogeneousTransformationMatrix3Dimensional
+    ) -> Self:
+        """
+        :param transformation: A rigid change whose child frame is this motion's frame.
+        :return: The same motion, given in the target frame of ``transformation``: both
+            parts turn, and the moved origin's motion gains the turn crossed with the
+            shift between the origins, the adjoint action.
+        """
+        rotational_part = self.rotational_part.apply_transformation(
+            transformation=transformation
+        )
+        translational_part = self.translational_part.apply_transformation(
+            transformation=transformation
+        ) + transformation.translation.cross(other=rotational_part)
+        return self.from_parts(
+            rotational_part=rotational_part, translational_part=translational_part
         )
 
 
