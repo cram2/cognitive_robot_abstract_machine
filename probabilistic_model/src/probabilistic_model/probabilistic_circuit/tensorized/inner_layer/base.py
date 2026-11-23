@@ -12,9 +12,10 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
-from krrood.patterns.field_metadata import JSONMetadata
-from krrood.adapters import json_serializer
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.adapters.json_serializer import (
+    DataclassJSONSerializer,
+    SubclassJSONSerializer,
+)
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
@@ -751,47 +752,20 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     # %% serialization
 
-    @classmethod
-    def serialized_fields(cls) -> list[dataclasses.Field]:
-        """
-        :return: The dataclass fields that describe a layer: the ones its constructor
-            takes, except those whose :class:`JSONMetadata` says not to serialize them.
-        """
-        return [
-            field_
-            for field_ in dataclasses.fields(cls)
-            if field_.init
-            and field_.metadata.get(JSONMetadata, JSONMetadata()).serialize
-        ]
-
     def to_json(self, **kwargs) -> dict[str, Any]:
         """
-        Serialize this layer through the fields it declares.
-
-        The parameter arrays, the child layers and the sparse edge and weight blocks are
-        all types that :mod:`krrood.adapters.json_serializer` serializes generically, so
-        a layer type is serializable by declaring its fields and none of them has to
-        write a method per field.
-
-        :param kwargs: Keyword arguments to hand on to the nested ``to_json`` calls.
-        :return: The JSON dict.
+        Serialize the fields this layer's constructor takes, except those marked
+        :class:`~krrood.patterns.field_metadata.JSONMetadata` with ``serialize=False``.
         """
-        result = super().to_json(**kwargs)
-        for field_ in self.serialized_fields():
-            result[field_.name] = json_serializer.to_json(
-                getattr(self, field_.name), **kwargs
-            )
-        return result
+        return DataclassJSONSerializer.to_json(instance=self, **kwargs)
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        return cls(
-            **{
-                field_.name: json_serializer.from_json(data[field_.name], **kwargs)
-                for field_ in cls.serialized_fields()
-                if field_.name in data
-            }
-        )
+        """
+        Construct the layer from the fields :meth:`to_json` serialized; the fields it
+        leaves out take their defaults.
+        """
+        return DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
 
 
 @dataclass(eq=False, repr=False)
