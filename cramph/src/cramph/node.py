@@ -1094,6 +1094,13 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             ancestor = ancestor.parent_node
         return ancestors
 
+    def holds_or_is_held_by(self, *, other: StatechartNode) -> bool:
+        """
+        :param other: Another node.
+        :return: Whether this node is `other`, holds it or is held by it.
+        """
+        return self is other or self in other.path or other in self.path
+
     def find_upwards(
         self, *, predicate: Callable[[StatechartNode], bool]
     ) -> StatechartNode | None:
