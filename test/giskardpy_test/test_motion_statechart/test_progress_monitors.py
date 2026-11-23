@@ -106,6 +106,46 @@ def tick_until_end_recording(
     raise TimeoutError("motion never ended")
 
 
+def jitter_bot_until_cancelled(*, world: World) -> None:
+    """
+    Drive the cylinder bot toward a goal while putting it back between
+    :data:`JITTER_POSITIONS` every cycle, under a stall monitor that cancels the motion.
+
+    :raises NoProgressError: Once the stall monitor gives up on the goal.
+    """
+    goal = CartesianPosition(
+        kinematic_chain=KinematicChain(
+            root=world.root,
+            tip=world.get_kinematic_structure_entity_by_name("bot"),
+        ),
+        goal_point=Point3(1, 0, 0, reference_frame=world.root),
+    )
+    progressing = StillProgressing(monitored_node=goal, timeout=STALL_TIMEOUT)
+    motion_control = MotionControl()
+    executor = StatechartExecutor(
+        context=StatechartContext(world=world),
+        extensions=[motion_control],
+    )
+    motion_statechart = Statechart(context=executor.context)
+    motion_statechart.add_nodes(nodes=[goal, progressing])
+    motion_statechart.add_node(node=EndMotion.when_true(node=goal))
+    motion_statechart.add_node(node=progressing.cancel_motion())
+
+    executor.compile(statechart=motion_statechart)
+    drive = world.get_connections_by_type(OmniDrive)[0]
+    cycles = 4 * ceil(
+        STALL_TIMEOUT.total_seconds()
+        / motion_control.qp_controller_config.control_time_step.total_seconds()
+    )
+
+    for cycle in range(cycles):
+        executor.tick()
+        world.state[drive.x.id].position = JITTER_POSITIONS[
+            cycle % len(JITTER_POSITIONS)
+        ]
+        world.notify_state_change()
+
+
 @dataclass(eq=False, repr=False, kw_only=True)
 class NodeWithDeclaredDependencies(EndedByOwner, MotionStatechartNode):
     """
@@ -172,38 +212,21 @@ class TestStallDetection:
         A task pushed back every cycle, as an arm held off by a collision is, keeps
         moving without getting any closer to its goal, so the motion is cancelled.
         """
-        goal = CartesianPosition(
-            kinematic_chain=KinematicChain(
-                root=cylinder_bot_world.root,
-                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
-            ),
-            goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
-        )
-        progressing = StillProgressing(monitored_node=goal, timeout=STALL_TIMEOUT)
-        motion_control = MotionControl()
-        executor = StatechartExecutor(
-            context=StatechartContext(world=cylinder_bot_world),
-            extensions=[motion_control],
-        )
-        motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes(nodes=[goal, progressing])
-        motion_statechart.add_node(node=EndMotion.when_true(node=goal))
-        motion_statechart.add_node(node=progressing.cancel_motion())
-
-        executor.compile(statechart=motion_statechart)
-        drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
-        cycles = 4 * ceil(
-            STALL_TIMEOUT.total_seconds()
-            / motion_control.qp_controller_config.control_time_step.total_seconds()
-        )
-
         with pytest.raises(NoProgressError):
-            for cycle in range(cycles):
-                executor.tick()
-                cylinder_bot_world.state[drive.x.id].position = JITTER_POSITIONS[
-                    cycle % len(JITTER_POSITIONS)
-                ]
-                cylinder_bot_world.notify_state_change()
+            jitter_bot_until_cancelled(world=cylinder_bot_world)
+
+    def test_a_stall_away_from_position_limits_is_a_plain_stall(
+        self, *, cylinder_bot_world: World
+    ):
+        """
+        A motion stalled with no degree of freedom at a position limit is cancelled with
+        a :class:`NoProgressError`, not with the more specific
+        :class:`PositionLimitBlockedError`.
+        """
+        with pytest.raises(NoProgressError) as exception_info:
+            jitter_bot_until_cancelled(world=cylinder_bot_world)
+
+        assert type(exception_info.value) is NoProgressError
 
     def test_reachable_goal_is_never_reported_as_stalled(
         self, *, cylinder_bot_world: World
