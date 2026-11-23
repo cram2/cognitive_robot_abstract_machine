@@ -130,23 +130,16 @@ class Action(CompositeNode, ABC):
         ).controlled_root
 
     @classmethod
-    def innermost_holding(cls, *, node: StatechartNode) -> Action | None:
+    def enclosing(cls, *, node: StatechartNode) -> Action | None:
         """
         :param node: A node of a plan.
-        :return: The innermost action holding `node`, `node` itself included; None if
-            no action holds it.
+        :return: The action nearest above `node` in the plan tree, `node` itself if it
+            is an action; None if no action holds it.
         """
         return next(
             (ancestor for ancestor in [node, *node.path] if isinstance(ancestor, cls)),
             None,
         )
-
-    def handed_over_from(self) -> list[StatechartNode]:
-        """
-        :return: The nodes of the plan whose result this action takes over and acts on,
-            beyond what it is given as parameters; none here.
-        """
-        return []
 
     def keep_base_still(self) -> list[MotionStatechartNode]:
         """

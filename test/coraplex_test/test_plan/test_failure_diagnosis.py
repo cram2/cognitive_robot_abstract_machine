@@ -12,16 +12,16 @@ import pytest
 
 from coraplex.datastructures.enums import InsertionPosition
 from coraplex.exceptions import MotionDidNotFinish
-from coraplex.plans.failure_diagnosis.causal_graph import (
-    HandOverEdge,
-    NodeCausalGraph,
-)
+from coraplex.plans.failure_diagnosis.causal_graph import NodeCausalGraph
 from coraplex.plans.failure_diagnosis.counterfactual import StallCounterfactual
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
-from coraplex.plans.failure_diagnosis.diagnosis import (
-    FailureDiagnoser,
+from coraplex.plans.failure_diagnosis.diagnosis import FailureDiagnoser
+from coraplex.plans.failure_diagnosis.exceptions import (
     FailureDiagnosis,
-    OriginFailure,
+    NodeFailedByACondition,
+    NodeFailedOnItsOwn,
+    StatementRanOutOfCandidates,
+    TaskStalled,
     Verdict,
 )
 from coraplex.plans.failures import EmptyUnderspecified, MotionMadeNoProgress
@@ -39,11 +39,13 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
     SetGripperAction,
 )
+from cramph.causal_edges import WorldEdge
 from cramph.composites import Parallel, Sequence, StatementNode
 from cramph.data_types import LifeCycleValue
 from cramph.failure_handling import HandledOnFailure, LimitedRecovery, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
 from cramph.statechart import Statechart
+from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
@@ -145,9 +147,7 @@ class RecoveryByRootCause(LimitedRecovery):
         ).diagnose_node(node=failed_node)
         self.diagnoses.append(diagnosis)
         for root in diagnosis.root_causes:
-            repair = self.repairs.get(
-                type(Action.innermost_holding(node=root.run.node))
-            )
+            repair = self.repairs.get(type(Action.enclosing(node=root.run.node)))
             if repair is not None:
                 repair.recover(failed_node=failed_node)
                 return
@@ -205,9 +205,7 @@ def causing_actions(diagnosis: FailureDiagnosis) -> list[Action | None]:
     """
     :return: The action holding each root cause of `diagnosis`, in rank order.
     """
-    return [
-        Action.innermost_holding(node=root.run.node) for root in diagnosis.root_causes
-    ]
+    return [Action.enclosing(node=root.run.node) for root in diagnosis.root_causes]
 
 
 # %% a pick-up stalls because navigation left the base where the arm cannot reach
@@ -245,12 +243,12 @@ def test_a_stalled_reach_is_blamed_on_the_navigation_that_placed_the_base(
     report("stalled reach after a bad navigation", diagnoses)
 
     for diagnosis in diagnoses:
-        assert diagnosis.origin_failure == OriginFailure.STALLED
+        assert isinstance(diagnosis, TaskStalled)
         assert diagnosis.counterfactual == StallCounterfactual.REACHED
         assert diagnosis.verdict == Verdict.ONE_CAUSING_NODE
         [root] = diagnosis.root_causes
         assert isinstance(root.run.node, SetOdometry)
-        assert Action.innermost_holding(node=root.run.node) is navigate
+        assert Action.enclosing(node=root.run.node) is navigate
 
 
 # %% a check fails because an earlier action closed the gripper it reads
@@ -284,7 +282,7 @@ def test_a_failed_gripper_check_is_blamed_on_the_action_that_closed_that_gripper
 
     [diagnosis] = diagnoses
     assert diagnosis.origin.node is check
-    assert diagnosis.origin_failure == OriginFailure.FAILED_ON_ITS_OWN
+    assert isinstance(diagnosis, NodeFailedOnItsOwn)
     assert diagnosis.verdict == Verdict.ONE_CAUSING_NODE
     assert causing_actions(diagnosis) == [closing]
 
@@ -389,7 +387,7 @@ def test_a_task_failed_by_a_condition_is_blamed_on_what_its_condition_read(
 
     [diagnosis] = diagnoses
     assert diagnosis.origin.node is lift
-    assert diagnosis.origin_failure == OriginFailure.FAILED_BY_A_CONDITION
+    assert isinstance(diagnosis, NodeFailedByACondition)
     assert causing_actions(diagnosis) == [closing]
     [root] = diagnosis.root_causes
     assert [edge.effect.node for edge in root.chain] == [check, lift]
@@ -516,7 +514,7 @@ def test_a_goal_out_of_reach_from_anywhere_is_blamed_on_no_other_node(
 
     assert diagnoses
     for diagnosis in diagnoses:
-        assert diagnosis.origin_failure == OriginFailure.STALLED
+        assert isinstance(diagnosis, TaskStalled)
         assert diagnosis.counterfactual == StallCounterfactual.STILL_STALLED
         assert diagnosis.verdict == Verdict.NO_OTHER_NODE
 
@@ -553,19 +551,19 @@ def test_a_pick_up_out_of_candidates_is_blamed_on_the_navigation_they_share(
     report("underspecified pick-up out of candidates after a bad navigation", diagnoses)
 
     [diagnosis] = diagnoses
-    assert diagnosis.origin_failure == OriginFailure.RAN_OUT_OF_CANDIDATES
+    assert isinstance(diagnosis, StatementRanOutOfCandidates)
     assert causing_actions(diagnosis) == [navigate]
 
 
-# %% a place takes over the grasp of the pick-up before it
+# %% a place releases the grasp the pick-up before it left
 
 
-def test_a_place_is_acted_on_by_the_pick_up_whose_grasp_it_releases(
+def test_a_place_depends_on_the_pick_up_that_attached_its_object(
     pr2_apartment_context,
 ) -> None:
     """
-    The causal graph holds a hand-over from the pick-up to the place that releases its
-    grasp.
+    The causal graph holds an edge from the pick-up that attached the milk to the
+    gripper to the place that releases it, through where the milk is attached.
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
@@ -595,8 +593,14 @@ def test_a_place_is_acted_on_by_the_pick_up_whose_grasp_it_releases(
 
     graph = NodeCausalGraph.from_statechart(statechart=executor.statechart)
     assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
-    [hand_over] = [edge for edge in graph.edges if isinstance(edge, HandOverEdge)]
-    assert (hand_over.cause.node, hand_over.effect.node) == (pick_up, place)
+    [attached] = [
+        edge
+        for edge in graph.edges
+        if isinstance(edge, WorldEdge) and edge.effect.node is place
+    ]
+    assert isinstance(attached.cause.node, MoveBranch)
+    assert Action.enclosing(node=attached.cause.node) is pick_up
+    assert attached.frames == {milk.root}
 
 
 # %% the same diagnoses in physics

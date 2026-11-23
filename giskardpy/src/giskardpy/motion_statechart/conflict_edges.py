@@ -12,13 +12,7 @@ from cramph.causal_edges import CausalEdgeSource, RunEdge, WorldAccessIndex
 from cramph.node import StatechartNode
 from cramph.node_runs import StatechartRuns
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
-from giskardpy.motion_statechart.mixins import (
-    HasGoalOrientationParameter,
-    HasGoalPointParameter,
-    HasGoalPointsParameter,
-    HasGoalPoseParameter,
-    HasGoalStateParameter,
-)
+from giskardpy.motion_statechart.goal_concept import HasGoal
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 # %% two tasks driving one degree of freedom at once
@@ -91,14 +85,4 @@ class ConflictEdges(CausalEdgeSource):
         :return: Whether `node` is a motion node or takes a goal, and so belongs to the
             goal of the tasks below it.
         """
-        return isinstance(
-            node,
-            (
-                MotionStatechartNode,
-                HasGoalPoseParameter,
-                HasGoalPointParameter,
-                HasGoalPointsParameter,
-                HasGoalOrientationParameter,
-                HasGoalStateParameter,
-            ),
-        )
+        return isinstance(node, (MotionStatechartNode, HasGoal))

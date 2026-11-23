@@ -15,7 +15,8 @@ from typing_extensions import Iterable
 
 from cramph.data_types import TransitionKind
 from cramph.node import StatechartNode
-from cramph.node_runs import NodeRun, StatechartRuns
+from cramph.node_runs import StatechartRuns
+from cramph.state_history import NodeRun
 from cramph.world_access import WorldAccess
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import (
@@ -61,17 +62,17 @@ class WorldAccessIndex:
 @dataclass(frozen=True, kw_only=True)
 class RunEdge(ABC):
     """
-    Says that the outcome of :attr:`cause` can decide the outcome of :attr:`effect`.
+    Says that the outcome of :attr:`effect` depends on the outcome of :attr:`cause`.
     """
 
     cause: NodeRun
     """
-    The run whose outcome acts on the other.
+    The run whose outcome the outcome of :attr:`effect` depends on.
     """
 
     effect: NodeRun
     """
-    The run acted on.
+    The run whose outcome depends on the outcome of :attr:`cause`.
     """
 
     @abstractmethod

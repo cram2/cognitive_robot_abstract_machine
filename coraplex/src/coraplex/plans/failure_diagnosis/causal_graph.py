@@ -1,7 +1,7 @@
 """
 The causal graph whose vertices are the runs of a plan's nodes: the edges
-:mod:`cramph.causal_edges` reads from the statechart, the conflicts between motion
-tasks, and the results the plan's actions hand over.
+:mod:`cramph.causal_edges` reads from the statechart and the conflicts between motion
+tasks.
 """
 
 from __future__ import annotations
@@ -25,7 +25,8 @@ from cramph.causal_edges import (
 )
 from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
-from cramph.node_runs import NodeRun, StatechartRuns
+from cramph.node_runs import StatechartRuns
+from cramph.state_history import NodeRun
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge, ConflictEdges
 from probabilistic_model.causal_structure.graph import (
@@ -34,42 +35,6 @@ from probabilistic_model.causal_structure.graph import (
     GraphNode,
     NodeLevel,
 )
-
-# %% results actions hand over
-
-
-@dataclass(frozen=True, kw_only=True)
-class HandOverEdge(RunEdge):
-    """
-    The effect takes over the result of the cause, see
-    :meth:`~coraplex.robot_plans.actions.base.Action.handed_over_from`.
-    """
-
-    def describe(self) -> str:
-        return "hands its result over to"
-
-
-@dataclass(kw_only=True)
-class HandOverEdges(CausalEdgeSource):
-    """
-    Each run of an action is acted on by the latest runs of the nodes whose result it
-    takes over.
-    """
-
-    def edges(self, *, runs: StatechartRuns, access: WorldAccessIndex) -> list[RunEdge]:
-        edges = []
-        for node, node_runs in runs.runs_of_node.items():
-            if not isinstance(node, Action) or not node_runs:
-                continue
-            for source in node.handed_over_from():
-                for run in node_runs:
-                    source_run = runs.latest_run_started_by(
-                        node=source, tick=run.start_tick
-                    )
-                    if source_run is not None:
-                        edges.append(HandOverEdge(cause=source_run, effect=run))
-        return edges
-
 
 # %% conflicts between the tasks of different actions
 
@@ -83,9 +48,8 @@ class PlanConflictEdges(ConflictEdges):
 
     def is_part_of_a_goal(self, *, node: StatechartNode) -> bool:
         """
-        Differs from :meth:`~giskardpy.motion_statechart.conflict_edges.ConflictEdges.is
-        _part_of_a_goal` in that an action is never part of a goal, even one that takes
-        a goal pose.
+        Differs from :meth:`ConflictEdges.is_part_of_a_goal` in that an action is never
+        part of a goal, even one that takes a goal pose.
         """
         return not isinstance(node, Action) and super().is_part_of_a_goal(node=node)
 
@@ -133,7 +97,6 @@ class NodeCausalGraph:
             [
                 ContainmentEdges(),
                 ControlEdges(),
-                HandOverEdges(),
                 WorldEdges(),
                 PlanConflictEdges(),
             ]
@@ -211,3 +174,24 @@ class NodeCausalGraph:
             self.run_of_vertex[vertex]
             for vertex in self.graph.possible_ancestors(self.vertex_of_run[run])
         ]
+
+
+# %% a path to the run where a failure started
+
+
+@dataclass(frozen=True, kw_only=True)
+class RootCause:
+    """
+    A run that caused a failure, and the edges from it to the run where the failure
+    started.
+    """
+
+    run: NodeRun
+    """
+    The run that caused the failure.
+    """
+
+    chain: tuple[RunEdge, ...]
+    """
+    The edges from :attr:`run` to the run where the failure started, in order.
+    """

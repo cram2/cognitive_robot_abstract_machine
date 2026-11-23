@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.base import SequentialAction
-from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from cramph.composites import Parallel
+from cramph.world_access import WorldAccess
 from giskardpy.motion_statechart.mixins import HasGoalPoseParameter
 from coraplex.robot_plans.mixins import (
     GraspPoseSequence,
@@ -136,21 +136,18 @@ class PlaceAction(
     def variable_poses(self) -> list[Pose]:
         return self._tool_goals.poses
 
-    def handed_over_from(self) -> list[StatechartNode]:
+    def world_access(self) -> WorldAccess:
         """
-        :return: The latest pick-up of :attr:`graspable` by :attr:`arm` before this
-            place, whose grasp this place releases; empty if there is none.
+        Differs from :meth:`~cramph.node.StatechartNode.world_access` in also reading
+        where :attr:`graspable` is attached, since the grasp it releases is measured
+        there when it starts.
         """
-        return next(
-            (
-                [pick_up]
-                for pick_up in self.statechart.get_preceding_nodes_by_type(
-                    node=self, node_type=PickUpAction
-                )
-                if pick_up.arm is self.arm
-                and pick_up.grasp_candidate.graspable is self.graspable
-            ),
-            [],
+        return (
+            super()
+            .world_access()
+            .merged_with(
+                other=WorldAccess(read_frames=frozenset({self.graspable.root}))
+            )
         )
 
     def on_start(self) -> None:

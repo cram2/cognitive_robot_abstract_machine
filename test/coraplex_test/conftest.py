@@ -33,11 +33,11 @@ from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from krrood_spatial_math.spatial_types import Pose
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-from semantic_digital_twin.adapters.multi_sim import MujocoSim
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.world_description.world_entity import Body
-from typing_extensions import Iterator
+from semantic_digital_twin.adapters.multi_sim import MujocoSim  # noqa: E402
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName  # noqa: E402
+from semantic_digital_twin.specifications.robots import RobotSpecification  # noqa: E402
+from semantic_digital_twin.world_description.world_entity import Body  # noqa: E402
+from typing_extensions import Iterator  # noqa: E402
 
 try:
     import rclpy

@@ -6,16 +6,20 @@ statechart.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
 from functools import singledispatchmethod
 
-from coraplex.plans.failure_diagnosis.causal_graph import (
-    HandOverEdge,
-    NodeCausalGraph,
-)
+from coraplex.plans.failure_diagnosis.causal_graph import NodeCausalGraph, RootCause
 from coraplex.plans.failure_diagnosis.counterfactual import (
     StallCounterfactual,
     try_stalled_task_freed,
+)
+from coraplex.plans.failure_diagnosis.exceptions import (
+    FailureDiagnosis,
+    NodeFailedByACondition,
+    NodeFailedOnItsOwn,
+    StatementRanOutOfCandidates,
+    TaskCollided,
+    TaskStalled,
 )
 from coraplex.plans.failures import (
     EmptyUnderspecified,
@@ -28,137 +32,17 @@ from coraplex.plans.underspecified import (
     SubtreeRebuild,
     UnderspecifiedChildChooser,
 )
-from coraplex.robot_plans.actions.base import Action
 from cramph.causal_edges import ControlEdge, RunEdge, WorldEdge
 from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.data_types import TransitionKind
 from cramph.node import StatechartNode
-from cramph.node_runs import NodeRun, StatechartRuns
+from cramph.node_runs import StatechartRuns
+from cramph.state_history import NodeRun
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
 from krrood.patterns.called_positionally import called_positionally
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body
-
-# %% what a diagnosis says
-
-
-class OriginFailure(StrEnum):
-    """
-    How the run where a failure started failed.
-    """
-
-    STALLED = "stopped approaching its goal"
-    COLLIDED = "brought bodies closer than collision avoidance allows"
-    FAILED_BY_A_CONDITION = "was failed by a condition reading another node"
-    FAILED_ON_ITS_OWN = "failed on what it observed itself"
-    RAN_OUT_OF_CANDIDATES = "ran out of candidates to try"
-
-
-class Verdict(StrEnum):
-    """
-    What a diagnosis could say about the cause.
-    """
-
-    ONE_CAUSING_NODE = "one other node caused it"
-    SEVERAL_CANDIDATES = "one of several other nodes caused it"
-    NO_OTHER_NODE = "no other node explains it"
-
-
-@dataclass(frozen=True, kw_only=True)
-class RootCause:
-    """
-    A run that caused a failure, and the edges from it to the run where the failure
-    started.
-    """
-
-    run: NodeRun
-    """
-    The run that caused the failure.
-    """
-
-    chain: tuple[RunEdge, ...]
-    """
-    The edges from :attr:`run` to the run where the failure started, in order.
-    """
-
-
-@dataclass(kw_only=True)
-class FailureDiagnosis:
-    """
-    Why a run failed, in terms of other runs.
-    """
-
-    symptom: NodeRun
-    """
-    The run the failure was reported for.
-    """
-
-    origin: NodeRun
-    """
-    The run where the failure started.
-    """
-
-    origin_failure: OriginFailure
-    """
-    How :attr:`origin` failed.
-    """
-
-    root_causes: list[RootCause]
-    """
-    The runs that caused the failure, the most likely first.
-    """
-
-    counterfactual: StallCounterfactual | None = None
-    """
-    What trying a stalled origin again, free to move what an earlier node left, showed;
-    None for an origin that did not stall.
-    """
-
-    @property
-    def verdict(self) -> Verdict:
-        """
-        :return: What this diagnosis could say about the cause.
-        """
-        causing_nodes = {root.run.node for root in self.root_causes}
-        if not causing_nodes:
-            return Verdict.NO_OTHER_NODE
-        if len(causing_nodes) == 1:
-            return Verdict.ONE_CAUSING_NODE
-        return Verdict.SEVERAL_CANDIDATES
-
-    @staticmethod
-    def described(*, run: NodeRun) -> str:
-        """
-        :param run: A run.
-        :return: `run`, with the action holding its node if that is another node.
-        """
-        action = Action.innermost_holding(node=run.node)
-        if action is None or action is run.node:
-            return str(run)
-        return f"{run} in {action.name}"
-
-    def __str__(self) -> str:
-        """
-        :return: The symptom, the origin and how it failed, the verdict and each cause
-            with the edges from it to the origin, one per line.
-        """
-        lines = [
-            f"symptom  {self.described(run=self.symptom)}",
-            f"origin   {self.described(run=self.origin)} {self.origin_failure.value}",
-        ]
-        if self.counterfactual is not None:
-            lines.append(f"trial    {self.counterfactual.value}")
-        lines.append(f"verdict  {self.verdict.value}")
-        for rank, root in enumerate(self.root_causes, start=1):
-            lines.append(f"cause {rank}  {self.described(run=root.run)}")
-            lines.extend(
-                f"           {edge.cause.node.name} {edge.describe()} "
-                f"{edge.effect.node.name}"
-                for edge in root.chain
-            )
-        return "\n".join(lines)
-
 
 # %% diagnosing
 
@@ -193,6 +77,19 @@ class FailureDiagnoser:
     colliding_bodies: set[Body] = field(default_factory=set, init=False)
     """
     The bodies a motion failure reported as too close to each other.
+    """
+
+    diagnosis_kinds: list[type[FailureDiagnosis]] = field(
+        default_factory=lambda: [
+            TaskStalled,
+            TaskCollided,
+            StatementRanOutOfCandidates,
+            NodeFailedByACondition,
+        ]
+    )
+    """
+    The ways an origin can fail, tried in order; an origin that fails none of these ways
+    failed on its own, see :class:`NodeFailedOnItsOwn`.
     """
 
     @classmethod
@@ -326,10 +223,10 @@ class FailureDiagnoser:
         """
         :param bodies: Bodies that came too close to each other.
         :return: The runs active at the newest tick that move a degree of freedom
-            between the root of the world and one of `bodies`, or every active run that
-            moves anything if none does.
+            moving one of `bodies`, or every active run that moves anything if none
+            does.
         """
-        chain = self.degrees_of_freedom_placing(bodies=bodies)
+        chain = self.degrees_of_freedom_moving(bodies=bodies)
         active = [
             run
             for run in self.runs.all_runs
@@ -341,11 +238,12 @@ class FailureDiagnoser:
         ]
         return moving or active
 
-    def degrees_of_freedom_placing(
+    def degrees_of_freedom_moving(
         self, *, bodies: set[Body]
     ) -> frozenset[DegreeOfFreedom]:
         """
-        :return: The degrees of freedom between the root of the world and `bodies`.
+        :return: The degrees of freedom that move one of `bodies` relative to the root
+            of the world.
         """
         world = self.runs.statechart.context.world
         return frozenset(
@@ -373,60 +271,17 @@ class FailureDiagnoser:
     def diagnose_run(self, *, symptom: NodeRun) -> FailureDiagnosis:
         """
         :param symptom: A run the failure is reported for.
-        :return: Why it failed.
+        :return: Why it failed, by the first of :attr:`diagnosis_kinds` its origin
+            failed in.
         """
         origin = self.origin_of(run=symptom)
-        origin_failure = self.origin_failure_of(origin=origin)
-        if origin_failure == OriginFailure.STALLED:
-            root_causes, counterfactual = self.causes_of_stall(stalled=origin)
-            return FailureDiagnosis(
-                symptom=symptom,
-                origin=origin,
-                origin_failure=origin_failure,
-                root_causes=root_causes,
-                counterfactual=counterfactual,
-            )
-        return FailureDiagnosis(
-            symptom=symptom,
-            origin=origin,
-            origin_failure=origin_failure,
-            root_causes=self.root_causes_of(
-                origin=origin, origin_failure=origin_failure
-            ),
+        for kind in self.diagnosis_kinds:
+            diagnosis = kind.found_at(symptom=symptom, origin=origin, diagnoser=self)
+            if diagnosis is not None:
+                return diagnosis
+        return NodeFailedOnItsOwn.found_at(
+            symptom=symptom, origin=origin, diagnoser=self
         )
-
-    def origin_failure_of(self, *, origin: NodeRun) -> OriginFailure:
-        """
-        :param origin: The run where a failure started.
-        :return: How it failed.
-        """
-        if origin.node in self.stalled_nodes:
-            return OriginFailure.STALLED
-        if origin.node in self.colliding_nodes:
-            return OriginFailure.COLLIDED
-        if isinstance(origin.node, StatementNode):
-            return OriginFailure.RAN_OUT_OF_CANDIDATES
-        if self.failing_conditions_into(run=origin):
-            return OriginFailure.FAILED_BY_A_CONDITION
-        return OriginFailure.FAILED_ON_ITS_OWN
-
-    def root_causes_of(
-        self, *, origin: NodeRun, origin_failure: OriginFailure
-    ) -> list[RootCause]:
-        """
-        :param origin: The run where a failure started, which did not stall.
-        :param origin_failure: How it failed.
-        :return: The runs that caused the failure, the most likely first.
-        """
-        match origin_failure:
-            case OriginFailure.COLLIDED:
-                return self.causes_of_collision(colliding=origin)
-            case OriginFailure.FAILED_BY_A_CONDITION:
-                return self.causes_of_failing_condition(run=origin)
-            case OriginFailure.RAN_OUT_OF_CANDIDATES:
-                return self.causes_shared_by_candidates(statement=origin)
-            case _:
-                return self.causes_of_observation(run=origin)
 
     def failing_conditions_into(self, *, run: NodeRun) -> list[ControlEdge]:
         """
@@ -482,26 +337,24 @@ class FailureDiagnoser:
     def causes_of_collision(self, *, colliding: NodeRun) -> list[RootCause]:
         """
         :param colliding: A run moving a body that came too close to another.
-        :return: The last runs before it that moved a degree of freedom placing one of
+        :return: The last runs before it that moved a degree of freedom moving one of
             the bodies that came too close, among those it does not drive itself.
         """
-        placing = self.degrees_of_freedom_placing(bodies=self.colliding_bodies)
+        moving = self.degrees_of_freedom_moving(bodies=self.colliding_bodies)
         return self.plan_runs_leaving(
-            degrees_of_freedom=placing
-            - self.causal_graph.access[colliding.node].driven,
+            degrees_of_freedom=moving - self.causal_graph.access[colliding.node].driven,
             statement=colliding,
         )
 
     def causes_of_observation(self, *, run: NodeRun) -> list[RootCause]:
         """
         :param run: A run that failed on what it observed or aimed for.
-        :return: The runs that left what it read where it was, and those whose result
-            it took over, the latest first.
+        :return: The runs that left what it read where it was, the latest first.
         """
         return [
             RootCause(run=edge.cause, chain=(edge,))
             for edge in self.latest_first(edges=self.causal_graph.edges_into(run=run))
-            if isinstance(edge, (WorldEdge, HandOverEdge))
+            if isinstance(edge, WorldEdge)
         ]
 
     def causes_of_failing_condition(self, *, run: NodeRun) -> list[RootCause]:
@@ -568,7 +421,8 @@ class FailureDiagnoser:
     ) -> list[RootCause]:
         """
         A trial starts from the world the plan left, so what it read and no node of its
-        own changed was left by the plan's runs before the statement.
+        own changed was left by the plan's runs before the statement. Only the recorded
+        history of the trial is read; no trial runs again.
 
         :param failed_trial: A failed trial of a candidate of `statement`.
         :param statement: The run of the statement.
@@ -578,32 +432,20 @@ class FailureDiagnoser:
         trial_diagnoser = FailureDiagnoser(
             causal_graph=NodeCausalGraph.from_statechart(
                 statechart=failed_trial.statechart
-            ),
-            trial=self.trial,
+            )
         )
         root_causes = []
         for diagnosis in trial_diagnoser.diagnose_failure(failed_trial.failure):
-            if diagnosis.root_causes or (
-                diagnosis.counterfactual == StallCounterfactual.STILL_STALLED
-            ):
+            if diagnosis.root_causes:
                 continue
+            access = trial_diagnoser.causal_graph.access[diagnosis.origin.node]
             root_causes.extend(
                 self.plan_runs_leaving(
-                    degrees_of_freedom=trial_diagnoser.inputs_of(diagnosis=diagnosis),
+                    degrees_of_freedom=diagnosis.inputs_from_before(access=access),
                     statement=statement,
                 )
             )
         return root_causes
-
-    def inputs_of(self, *, diagnosis: FailureDiagnosis) -> frozenset[DegreeOfFreedom]:
-        """
-        :return: What the origin of `diagnosis` read and no node of its statechart
-            changed before it: for a stall, only what it cannot move itself.
-        """
-        access = self.causal_graph.access[diagnosis.origin.node]
-        if diagnosis.origin_failure == OriginFailure.STALLED:
-            return access.read - access.driven
-        return access.read
 
     def plan_runs_leaving(
         self, *, degrees_of_freedom: frozenset[DegreeOfFreedom], statement: NodeRun
