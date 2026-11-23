@@ -35,6 +35,7 @@ from krrood_spatial_math.cartesian_frame_3_dimensional import (
     EmbeddedPlaneRelation,
 )
 from krrood_spatial_math.coordinate_system import (
+    GenericAxisCoordinates,
     GenericCartesianFrame,
     GenericCoordinate,
     GenericCoordinateChange,
@@ -46,7 +47,7 @@ from krrood_spatial_math.coordinate_system import (
 from krrood_spatial_math.line import Line, LineSegment
 from krrood_spatial_math.motion_vector_pair import MotionVectorPair
 from krrood_spatial_math.point import Point
-from krrood_spatial_math.pose import Orientation, Pose
+from krrood_spatial_math.pose import GenericPose, Orientation, Pose
 from krrood_spatial_math.vector import Vector
 from krrood_spatial_math.exceptions import (
     InsufficientVectorsError,
@@ -382,6 +383,43 @@ class SymbolicSpatialChange(
             for row in range(moved.shape[0])
         )
 
+    def express_axis_coordinates(
+        self, *, value: GenericAxisCoordinates
+    ) -> GenericAxisCoordinates:
+        """
+        Multiplies a symbolic value's stored coordinates as one matrix product, unlike
+        :meth:`~krrood_spatial_math.coordinate_system.AffineCoordinateChange.express_axis_coordinates`.
+        """
+        if not isinstance(value, SymbolicSpatialValue):
+            return super().express_axis_coordinates(value=value)
+        stored = value.casadi_sx
+        stored_rows = stored.size1()
+        if stored_rows == self.casadi_sx.size1():
+            moved = ca.mtimes(self.casadi_sx, stored)
+        else:
+            moved = ca.mtimes(
+                self.casadi_sx, ca.vertcat(stored, int(value.has_position))
+            )[:stored_rows]
+        result = type(value).from_casadi_sx(casadi_sx=moved)
+        result.reference_frame = self.reference_frame
+        return result
+
+    def express_pose(self, *, value: GenericPose) -> GenericPose:
+        """
+        Multiplies a symbolic pose stored as this change's matrix in one product, unlike
+        :meth:`~krrood_spatial_math.coordinate_system.RigidCoordinateChange.express_pose`.
+        """
+        if not (
+            isinstance(value, SymbolicSpatialValue)
+            and value.casadi_sx.shape == self.casadi_sx.shape
+        ):
+            return super().express_pose(value=value)
+        result = type(value).from_casadi_sx(
+            casadi_sx=ca.mtimes(self.casadi_sx, value.casadi_sx)
+        )
+        result.reference_frame = self.reference_frame
+        return result
+
     def apply_transformation(self, *, transformation: SymbolicSpatialChange) -> Self:
         """
         :param transformation: A change of this kind whose child frame is this change's
@@ -394,11 +432,12 @@ class SymbolicSpatialChange(
             if isinstance(transformation, type(self))
             else type(transformation)
         )
-        return composed_type(
-            ca.mtimes(transformation.casadi_sx, self.casadi_sx),
-            reference_frame=transformation.reference_frame,
-            child_frame=self.child_frame,
+        result = composed_type.from_casadi_sx(
+            casadi_sx=ca.mtimes(transformation.casadi_sx, self.casadi_sx)
         )
+        result.reference_frame = transformation.reference_frame
+        result.child_frame = self.child_frame
+        return result
 
     def ensure_acts_on(self, *, operand: Any) -> None:
         """
@@ -418,22 +457,20 @@ class SymbolicSpatialChange(
                 left=self,
                 right=operand,
             )
-        self.ensure_operand_in_child_frame(operand)
-
-    def ensure_operand_in_child_frame(self, operand: SymbolicSpatialType) -> None:
-        """
-        :param operand: A value or change this change is applied to.
-        :raises ReferenceFrameMismatchError: If both this change's child frame and the
-            operand's reference frame are set and differ.
-        """
+        if isinstance(operand, SymbolicSpatialType):
+            operand_frame = operand.reference_frame
+        elif operand.coordinate_system is not None:
+            operand_frame = operand.coordinate_system.frame_3_dimensional
+        else:
+            operand_frame = None
         if (
             self.child_frame is not None
-            and operand.reference_frame is not None
-            and operand.reference_frame is not self.child_frame
+            and operand_frame is not None
+            and operand_frame is not self.child_frame
         ):
             raise ReferenceFrameMismatchError(
                 expected_frame=self.child_frame,
-                actual_frame=operand.reference_frame,
+                actual_frame=operand_frame,
                 context=f"the {type(operand).__name__} this change is applied to",
             )
 

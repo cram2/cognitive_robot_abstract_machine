@@ -107,6 +107,55 @@ class ScalablePlanePoint(Point[ScalablePlaneVector]):
     """
 
 
+# %% points and vectors of a three-dimensional Cartesian frame, given by numbers
+
+
+@dataclass(kw_only=True)
+class FloatCoordinateVector3Dimensional(Vector[CartesianFrame3Dimensional, float]):
+    """
+    A vector of a three-dimensional Cartesian frame whose coordinates are numbers, not
+    symbolic expressions.
+    """
+
+    x: float
+    """
+    The amount along the x-axis.
+    """
+
+    y: float
+    """
+    The amount along the y-axis.
+    """
+
+    z: float
+    """
+    The amount along the z-axis.
+    """
+
+
+@dataclass(kw_only=True)
+class FloatCoordinatePoint3Dimensional(Point[FloatCoordinateVector3Dimensional]):
+    """
+    A point of a three-dimensional Cartesian frame whose coordinates are numbers, not
+    symbolic expressions.
+    """
+
+    x: float
+    """
+    The x-coordinate.
+    """
+
+    y: float
+    """
+    The y-coordinate.
+    """
+
+    z: float
+    """
+    The z-coordinate.
+    """
+
+
 # %% points and vectors of a scalable plane, of any coordinate type
 
 

@@ -28,6 +28,7 @@ from krrood_spatial_math.spatial_types_2_dimensional import (
 )
 
 from .dataset.mounted_frames import MountedFrame, MountFrame
+from .dataset.spaces import FloatCoordinatePoint3Dimensional
 
 
 # %% a rotation acting on a point
@@ -86,6 +87,40 @@ def test_a_transformation_turns_an_axis_angle(table_frame, camera_frame):
         turned.to_coordinate_change().to_np(),
         (table_T_camera.rotation_matrix @ turn_about_x.to_coordinate_change()).to_np(),
         atol=1e-12,
+    )
+
+
+@pytest.mark.parametrize("coordinates", [(1.0, 2.0, 3.0), (-0.5, 0.0, 4.0)])
+def test_a_transformation_moves_a_point_given_by_numbers_as_its_own_point(
+    table_frame, camera_frame, coordinates
+):
+    """
+    A transformation moves a point whose coordinates are numbers, not symbolic
+    expressions, to where it moves its own point of the same coordinates.
+    """
+    table_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1,
+        y=2,
+        z=3,
+        roll=0.1,
+        pitch=0.2,
+        yaw=0.3,
+        reference_frame=table_frame,
+        child_frame=camera_frame,
+    )
+    x, y, z = coordinates
+    point = FloatCoordinatePoint3Dimensional(
+        x=x, y=y, z=z, coordinate_system=camera_frame
+    )
+
+    moved = table_T_camera @ point
+
+    expected = table_T_camera @ Point3Dimensional(x, y, z, reference_frame=camera_frame)
+    assert type(moved) is FloatCoordinatePoint3Dimensional
+    assert moved.coordinate_system is table_frame
+    assert np.allclose(
+        [float(coordinate) for coordinate in moved.coordinates],
+        expected.to_np()[:3],
     )
 
 

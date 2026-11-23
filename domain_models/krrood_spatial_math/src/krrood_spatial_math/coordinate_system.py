@@ -25,6 +25,7 @@ from krrood_spatial_math.exceptions import (
 from krrood_spatial_math.space import EuclideanSpace, Space
 
 if TYPE_CHECKING:
+    from krrood_spatial_math.pose import GenericPose
     from krrood_spatial_math.vector import GenericVector, Vector
 
 # %% what coordinates are given in
@@ -324,13 +325,13 @@ class AxisCoordinates(
     def apply_transformation(
         self, *, transformation: AffineCoordinateChange[GenericAffineFrame, Any]
     ) -> Self:
-        moved = transformation.apply_to_homogeneous_coordinates(
-            homogeneous_coordinates=(*self.coordinates, int(self.has_position))
-        )
-        return self.from_coordinates(
-            coordinates=moved[:-1],
-            coordinate_system=transformation.target_coordinate_system,
-        )
+        return transformation.express_axis_coordinates(value=self)
+
+
+GenericAxisCoordinates = TypeVar("GenericAxisCoordinates", bound=AxisCoordinates)
+"""
+The kind of value given by one coordinate per axis of its frame.
+"""
 
 
 # %% changing coordinates within one space
@@ -405,6 +406,20 @@ class AffineCoordinateChange(
             added only to a value that has a position.
         """
 
+    def express_axis_coordinates(
+        self, *, value: GenericAxisCoordinates
+    ) -> GenericAxisCoordinates:
+        """
+        :param value: A point or vector given in the source coordinate system.
+        :return: The same point or vector, given in the target coordinate system.
+        """
+        moved = self.apply_to_homogeneous_coordinates(
+            homogeneous_coordinates=(*value.coordinates, int(value.has_position))
+        )
+        return value.from_coordinates(
+            coordinates=moved[:-1], coordinate_system=self.target_coordinate_system
+        )
+
 
 GenericCartesianFrame = TypeVar("GenericCartesianFrame", bound=CartesianFrame)
 """
@@ -435,3 +450,10 @@ class RigidCoordinateChange(
         """
         Where the source origin lies, along the axes of the target coordinate system.
         """
+
+    def express_pose(self, *, value: GenericPose) -> GenericPose:
+        """
+        :param value: A pose given in the source coordinate system.
+        :return: The same pose, given in the target coordinate system.
+        """
+        return value.from_coordinate_change(change=self @ value.to_coordinate_change())

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from typing_extensions import Self
+from typing_extensions import Self, TypeVar
 
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
@@ -39,9 +39,13 @@ class Pose(CoordinateRepresentation, ABC):
         """
 
     def apply_transformation(self, *, transformation: RigidCoordinateChange) -> Self:
-        return self.from_coordinate_change(
-            change=transformation @ self.to_coordinate_change()
-        )
+        return transformation.express_pose(value=self)
+
+
+GenericPose = TypeVar("GenericPose", bound=Pose)
+"""
+The kind of pose a rigid change re-expresses.
+"""
 
 
 # %% which way a frame faces
