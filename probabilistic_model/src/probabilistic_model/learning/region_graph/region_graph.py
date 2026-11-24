@@ -17,6 +17,7 @@ from typing_extensions import Iterable, Self
 
 from probabilistic_model.graph import DirectedAcyclicGraph
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import Layer
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     DenseEdgeMatrix,
     SparseEntries,
@@ -38,9 +39,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probabilit
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
-)
-from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding import (
-    SymbolicEncoding,
 )
 from probabilistic_model.learning.region_graph.exceptions import (
     MultipleRootsError,
@@ -266,10 +264,10 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         predicted_variable: Symbolic | None = None,
     ) -> LayeredProbabilisticCircuit:
         """
-        Convert the region graph to a randomly initialized RAT-SPN with numpy parameters.
-        With a predicted variable, the root region has one sum unit per category of it
-        and the root mixes them, each multiplied by the indicator of its category, so
-        that the circuit classifies; without one, the root region has a single sum unit.
+        Convert the region graph to a folded, randomly initialized RAT-SPN on the host.
+        With a predicted variable, the root mixes one sum unit per category of it, each
+        multiplied by the indicator of its category, so that the circuit classifies;
+        without one, the root region has a single sum unit.
 
         :param input_units: The number of input distributions of each leaf region.
         :param sum_units: The number of sum units of each inner region.
@@ -324,7 +322,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
                 predicted_variable=predicted_variable,
                 variables=variables,
             )
-        return LayeredProbabilisticCircuit(variables, root)
+        return LayeredProbabilisticCircuit(
+            variables, LayerFolding(root=root).folded_root()
+        )
 
     def fully_connected_sum_layer(
         self, *, children: list[RegionGraphNode], number_of_nodes: int
@@ -390,16 +390,18 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         variable_index = variables.index(variable)
         if isinstance(variable, Continuous):
             return GaussianLayer(
-                variable_index,
+                np.full(input_units, variable_index, dtype=np.int64),
                 self.random_number_generator.uniform(
                     self.initial_location_range.lower,
                     self.initial_location_range.upper,
                     input_units,
                 ),
-                self.random_number_generator.uniform(
-                    self.initial_scale_range.lower,
-                    self.initial_scale_range.upper,
-                    input_units,
+                np.log(
+                    self.random_number_generator.uniform(
+                        self.initial_scale_range.lower,
+                        self.initial_scale_range.upper,
+                        input_units,
+                    )
                 ),
             )
         if isinstance(variable, Symbolic):
@@ -411,10 +413,9 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             )
             probabilities /= probabilities.sum(axis=1, keepdims=True)
             return SymbolicLayer(
-                variable_index,
+                np.full(input_units, variable_index, dtype=np.int64),
                 np.arange(number_of_states),
                 DenseProbabilityTable(np.log(probabilities)),
-                SymbolicEncoding(variable).hashes,
             )
         raise UnsupportedRegionVariableError(variable=variable)
 
@@ -436,10 +437,13 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
         number_of_categories = len(predicted_variable.domain.simple_sets)
         with np.errstate(divide="ignore"):
             indicators = SymbolicLayer(
-                variables.index(predicted_variable),
+                np.full(
+                    number_of_categories,
+                    variables.index(predicted_variable),
+                    dtype=np.int64,
+                ),
                 np.arange(number_of_categories),
                 DenseProbabilityTable(np.log(np.eye(number_of_categories))),
-                SymbolicEncoding(predicted_variable).hashes,
             )
         products = ProductLayer.node_wise_product_of(
             [category_conditionals, indicators]

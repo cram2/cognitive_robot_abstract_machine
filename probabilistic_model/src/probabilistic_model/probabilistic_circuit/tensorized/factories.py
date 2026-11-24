@@ -1,3 +1,7 @@
+"""
+Layered circuits of the uniform measure over an event.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -105,8 +109,8 @@ def uniform_layer_of_assignment(
     """
     if isinstance(variable, Symbolic):
         return SymbolicLayer.from_distributions(
-            variable_index,
-            [
+            variable_index=variable_index,
+            distributions=[
                 SymbolicDistribution(
                     variable=variable,
                     probabilities=MissingDict(
@@ -121,8 +125,8 @@ def uniform_layer_of_assignment(
         )
     if isinstance(variable, Integer):
         return IntegerLayer.from_distributions(
-            variable_index,
-            [
+            variable_index=variable_index,
+            distributions=[
                 IntegerDistribution(
                     variable=variable,
                     probabilities=MissingDict(
@@ -143,8 +147,8 @@ def uniform_layer_of_assignment(
     pieces = list(assignment)
     if all(piece.is_singleton() for piece in pieces):
         pieces_layer = DiracDeltaLayer.from_distributions(
-            variable_index,
-            [
+            variable_index=variable_index,
+            distributions=[
                 DiracDeltaDistribution(
                     variable=variable, location=piece.lower, density_cap=1.0
                 )
@@ -154,8 +158,8 @@ def uniform_layer_of_assignment(
         log_weights = np.zeros(len(pieces))
     else:
         pieces_layer = UniformLayer.from_distributions(
-            variable_index,
-            [
+            variable_index=variable_index,
+            distributions=[
                 UniformDistribution(variable=variable, interval=piece)
                 for piece in pieces
             ],

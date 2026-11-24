@@ -12,7 +12,9 @@ from enum import StrEnum
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
+from jax.sharding import Mesh, NamedSharding, PartitionSpec
 from krrood_compute_resources.jax_memory import JaxDeviceMemory
 from typing_extensions import Callable
 from krrood_compute_resources.memory import DeviceMemory, HostMemory
@@ -135,8 +137,34 @@ class JaxGradientDescent(GradientDescent[LayerType]):
             learning_rate_plateau=learning_rate_plateau,
         )
 
-    def device_memory(self) -> DeviceMemory:
+    @property
+    def parameter_device(self) -> jax.Device:
+        """
+        :return: The device the parameters of the circuit are stored on.
+        """
         [device] = self.initial_parameters[0].devices()
+        return device
+
+    @property
+    def training_devices(self) -> list[jax.Device]:
+        """
+        :return: The devices of the platform of the parameters, which every step
+            computes on.
+        """
+        return jax.devices(self.parameter_device.platform)
+
+    def largest_even_batch_size(self, *, rows: int) -> int:
+        """
+        A multiple of the number of :attr:`training_devices`, see
+        :meth:`GradientDescent.largest_even_batch_size`.
+        """
+        number_of_devices = len(self.training_devices)
+        if rows < number_of_devices:
+            return rows
+        return rows - rows % number_of_devices
+
+    def device_memory(self) -> DeviceMemory:
+        device = self.parameter_device
         if device.platform == JaxPlatform.CPU:
             return HostMemory()
         return JaxDeviceMemory(device=device)
@@ -197,15 +225,28 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
     The learning rate before any reduction, ``None`` without a schedule.
     """
 
+    batch_split_devices: Mesh | None = field(init=False, default=None)
+    """
+    The :attr:`JaxGradientDescent.training_devices` that the rows of a batch are split
+    across and the state is copied to, ``None`` if there is only one.
+    """
+
     def __post_init__(self) -> None:
         """
-        Compile the step and start from the state before training.
+        Compile the step and start from the state before training, copied to every
+        training device.
 
         :raises UnscheduledOptimizerError: If a schedule is given for an optimizer whose
             learning rate cannot be changed.
         """
         self.compiled_step = jax.jit(self.gradient_descent.step)
         self.state = self.gradient_descent.initial_state()
+        devices = self.gradient_descent.training_devices
+        if len(devices) > 1:
+            self.batch_split_devices = Mesh(np.array(devices), (BatchSplitAxis.ROWS,))
+            self.state = jax.device_put(
+                self.state, NamedSharding(self.batch_split_devices, PartitionSpec())
+            )
         if self.learning_rate_plateau is None:
             return
         if not isinstance(
@@ -222,14 +263,85 @@ class JaxGradientDescentTraining(GradientDescentTraining[LayerType]):
             self.initial_learning_rate * scale
         )
 
-    def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> float:
-        self.state = self.compiled_step(self.state, *batch)
-        return float(self.state.loss)
+    def step_on_batch(self, *, batch: tuple[jax.Array, ...]) -> jax.Array:
+        self.state = self.compiled_step(self.state, *self.placed_batch(batch=batch))
+        return self.state.loss
+
+    def placed_batch(self, *, batch: tuple[jax.Array, ...]) -> tuple[jax.Array, ...]:
+        """
+        :param batch: The same rows of every training array.
+        :return: The batch split by rows across :attr:`batch_split_devices` if they
+            split the rows evenly, whole on every one of them otherwise, and as it is
+            without them.
+        """
+        if self.batch_split_devices is None:
+            return batch
+        rows = batch[0].shape[0]
+        partition = (
+            PartitionSpec(BatchSplitAxis.ROWS)
+            if rows % self.batch_split_devices.size == 0
+            else PartitionSpec()
+        )
+        return jax.device_put(batch, NamedSharding(self.batch_split_devices, partition))
 
     def trained_root(self) -> LayerType:
         return self.gradient_descent.layer.copy_with_circuit_parameters(
-            self.state.parameters
+            jax.device_put(
+                self.state.parameters, self.gradient_descent.parameter_device
+            )
         )
+
+
+# %% batch split across devices
+
+
+class BatchSplitAxis(StrEnum):
+    """
+    The named axes of the arrangement of devices that training splits batches across.
+    """
+
+    ROWS = "rows"
+    """
+    The axis the rows of a batch are split along.
+    """
+
+
+# %% compiler options
+
+
+class CompilerVariable(StrEnum):
+    """
+    The environment variables that configure the compilers of a process.
+    """
+
+    ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
+    """
+    The options of the XLA compiler.
+    """
+
+
+class CompilerOption(StrEnum):
+    """
+    The options of the XLA compiler a process is given.
+    """
+
+    GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL = "--xla_gpu_autotune_level"
+    """
+    How much XLA tunes the kernels it compiles for the GPU.
+    """
+
+    HOST_PLATFORM_DEVICE_COUNT = "--xla_force_host_platform_device_count"
+    """
+    The number of devices jax divides the processor cores into.
+    """
+
+    def to_flag(self, *, value: int) -> str:
+        """
+        :param value: The value of this option.
+        :return: This option set to ``value``, as one of the options in
+            :attr:`CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS`.
+        """
+        return f"{self}={value}"
 
 
 # %% device memory

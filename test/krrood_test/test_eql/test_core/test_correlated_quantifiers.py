@@ -42,6 +42,8 @@ from krrood.entity_query_language.rules.conclusion import Add
 from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import Symbol
 
+from ...dataset.rule_tree_domains import Birth, Voter
+
 
 @dataclass(kw_only=True, eq=False)
 class Academic(Symbol):
@@ -662,3 +664,26 @@ def test_correlated_for_all_in_an_alternative_condition(university):
         ("Carol", "alternative"),
         ("Dave", "alternative"),
     }
+
+
+# %% one variable quantified by two quantifiers
+
+
+def test_a_variable_quantified_by_two_exists_is_local_to_each_of_them():
+    """
+    A variable two quantifiers quantify occurs outside neither of them.
+    """
+    alice = Voter(name="alice")
+    voter = variable(Voter, domain=[alice])
+    birth = variable(Birth, domain=[])
+
+    query = an(
+        entity(voter).where(
+            or_(
+                exists(birth, birth.voter == voter),
+                not_(exists(birth, birth.voter == voter)),
+            )
+        )
+    )
+
+    assert query.tolist() == [alice]

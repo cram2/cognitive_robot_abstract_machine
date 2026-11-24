@@ -64,7 +64,7 @@ class AverageNegativeLogLikelihood(Loss[LayerType]):
     """
 
     def evaluate(self, layer: LayerType, data: BackendArray) -> BackendArray:
-        log_likelihoods = layer.log_likelihood_of_nodes(data)
+        log_likelihoods = layer.log_likelihood_of_nodes(events=data)
         return -array_namespace(log_likelihoods).mean(log_likelihoods)
 
 
@@ -103,7 +103,7 @@ class CrossEntropy(Loss[LayerType]):
         )
 
     def evaluate(self, layer: LayerType, data: BackendArray) -> BackendArray:
-        log_likelihoods = layer.log_likelihood_of_nodes(data)[:, 0]
+        log_likelihoods = layer.log_likelihood_of_nodes(events=data)[:, 0]
         namespace = array_namespace(log_likelihoods)
         data = namespace.asarray(data, device=array_api_compat.device(log_likelihoods))
         is_predicted_column = (
@@ -112,7 +112,7 @@ class CrossEntropy(Loss[LayerType]):
         )
         log_likelihoods_of_categories = [
             layer.log_likelihood_of_nodes(
-                namespace.where(
+                events=namespace.where(
                     is_predicted_column, namespace.full_like(data, category), data
                 )
             )[:, 0]
@@ -221,6 +221,14 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         """
         raise NotImplementedError
 
+    def largest_even_batch_size(self, *, rows: int) -> int:
+        """
+        :param rows: The most rows a batch may have.
+        :return: The most rows of at most ``rows`` that a step splits evenly across the
+            devices it computes on, ``rows`` itself on one device.
+        """
+        return rows
+
     @abstractmethod
     def probe_step_bytes(self, *, batch: tuple[BackendArray, ...]) -> int:
         """
@@ -239,7 +247,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         training = self.start_training(arguments=arguments, mini_batches=MiniBatches())
         progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
         for _ in progress_bar:
-            loss = training.step_on_batch(batch=arguments)
+            loss = float(training.step_on_batch(batch=arguments))
             progress_bar.set_postfix_str(f"Loss: {loss}")
         return training.trained_root()
 

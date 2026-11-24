@@ -33,32 +33,50 @@ jobs:
         run: |
           echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
 
+  select_test_jobs:
+    # a draft pull request runs no CI; marking it ready for review starts the run
+    if: ${{ !github.event.pull_request.draft }}
+    # A pull request runs only the tests its change can affect; every other event runs them
+    # all. The libraries that share a job are listed in .github/continuous_integration_jobs.toml.
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A pull request is checked out as its merge commit, whose first parent is the base.
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install what the selection imports
+        run: pip install packaging typing_extensions
+      - id: select
+        name: Select the test jobs
+        env:
+          # The selection loads with krrood-core alone, so the job needs no install of the
+          # workspace.
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/krrood/krrood-core/src:${{ github.workspace }}/krrood/krrood-development-tools/src
+        run: |
+          since=()
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            since=(--since HEAD^1)
+          fi
+          python scripts/select_continuous_integration_jobs.py "${since[@]}"
+          cat "$GITHUB_OUTPUT"
+
   test_each_lib:
-    needs: [to-lowercase]
+    needs: [to-lowercase, select_test_jobs]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: giskardpy
-          - name: cramph
-          - name: krrood
-          - name: semantic_digital_twin
-          - name: coraplex
-          - name: probabilistic_model
-          - name: robokudo
-          - name: segmind
-          - name: experiments
-          # Libraries whose tests take a minute or less share one job, which would otherwise
-          # spend most of its time setting up the container and take a runner from the others.
-          - name: small_packages
-            libs: '["random_events", "physics_simulators", "krrood_spatial_math", "krrood_compute_resources", "krrood_synchronization", "version", "cognitive_robot_abstract_machine"]'
-            check_rules: true
+      matrix: ${{ fromJSON(needs.select_test_jobs.outputs.matrix) }}
     uses: ./.github/workflows/ci_reusable.yml
     with:
       name: ${{ matrix.name }}
-      libs: ${{ matrix.libs || format('["{0}"]', matrix.name) }}
+      libraries: ${{ matrix.libraries }}
+      test_paths: ${{ matrix.test_paths }}
       repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}
-      check_rules: ${{ matrix.check_rules || false }}
+      check_rules: ${{ matrix.check_rules }}
 
   check_generated_orm_interfaces_are_untracked:
     # a draft pull request runs no CI; marking it ready for review starts the run

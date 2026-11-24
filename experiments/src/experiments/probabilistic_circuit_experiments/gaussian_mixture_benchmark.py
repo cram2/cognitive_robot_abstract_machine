@@ -294,7 +294,7 @@ def log_likelihood(circuit: ProbabilisticCircuit, data: pd.DataFrame) -> np.ndar
     :return: The log-likelihood of every row under the circuit.
     """
     columns = [variable.name for variable in circuit.variables]
-    return circuit.log_likelihood(data[columns].to_numpy())
+    return circuit.log_likelihood(events=data[columns].to_numpy())
 
 
 def benchmark(
