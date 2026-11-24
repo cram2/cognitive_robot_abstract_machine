@@ -27,10 +27,7 @@ def create_giskard(node: Node) -> Giskard:
         world_source=WorldSpecification(
             robots=[RobotSpecification.specify_real_robot(Tiago)]
         ),
-        qp_controller_config=QPControllerConfig(
-            target_frequency=25,
-            braking_time=timedelta(seconds=1.15),
-        ),
+        qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )
 
 
