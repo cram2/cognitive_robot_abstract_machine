@@ -1,4 +1,9 @@
-from semantic_digital_twin.world_description.connections import ScrewAxisConnection
+"""
+Reading ProcTHOR houses into worlds.
+"""
+
+from __future__ import annotations
+
 import json
 import logging
 import math
@@ -12,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.adapters.procthor.exceptions import (
     ProcthorDoorWallNotFound,
     UnpairedProcthorWalls,

@@ -1,3 +1,8 @@
+"""
+The scenes of the SAGE-10k dataset as its JSON files describe them, and building worlds
+from them.
+"""
+
 from __future__ import annotations
 
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection

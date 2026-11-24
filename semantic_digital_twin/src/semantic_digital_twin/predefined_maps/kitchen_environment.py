@@ -1,3 +1,7 @@
+"""
+A predefined kitchen environment and the parts it is built from, such as its window walls and sofa.
+"""
+
 from __future__ import annotations
 
 # %% Imports

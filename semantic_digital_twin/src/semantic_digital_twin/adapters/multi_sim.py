@@ -1733,7 +1733,7 @@ class MujocoScrewAxisJointConverter(
     """
 
     def _post_convert(
-        self, entity: ScrewAxisConnection, joint_props: dict[str, Any], **kwargs
+        self, entity: ScrewAxisConnection, joint_props: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]:
         """
         :raises ScrewJointUnsupportedByMujocoError: if the connection rotates and
@@ -3914,6 +3914,9 @@ class MujocoScrewAxisJointSpawner(MujocoConnectionSpawner, ConnectionScrewAxisSp
     mujoco_joint_converter: ClassVar[type[MujocoJointConverter]] = (
         MujocoScrewAxisJointConverter
     )
+    """
+    The converter that turns the connection into a MuJoCo joint.
+    """
 
 
 @dataclass

@@ -1,3 +1,7 @@
+"""
+Exceptions of the adapters that read worlds from files and export them to simulators.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

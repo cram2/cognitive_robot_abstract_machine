@@ -36,6 +36,11 @@ class JointPositionReached(EndedByOwner, MotionStatechartNode, HasThresholdParam
     """
 
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: The observation that the connection is within the threshold of the
+            target position, measured along the shortest angle for a revolute connection
+            without position limits.
+        """
         current = self.connection.dof.variables.position
         if (
             isinstance(self.connection, ScrewAxisConnection)

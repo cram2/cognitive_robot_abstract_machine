@@ -1,3 +1,8 @@
+"""
+The articulated objects of the ArtVIP dataset: their categories and how each is
+described.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

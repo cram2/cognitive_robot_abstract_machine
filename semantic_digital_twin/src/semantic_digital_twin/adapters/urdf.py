@@ -1,3 +1,7 @@
+"""
+Reading URDF files into worlds.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -1,3 +1,8 @@
+"""
+The connections between kinematic structure entities: fixed ones, ones that move their
+child along a screw axis, ones with six degrees of freedom, and wheeled drives.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -225,27 +230,22 @@ class ActiveConnection1DOF(ActiveConnection, ABC):
 class ScrewAxisConnection(ActiveConnection1DOF):
     """
     Moves the child along a screw axis, in proportion to the position, so revolute,
-    prismatic and helical connections differ only in their :attr:`screw_axis`.
-
-    The screw axis may lie anywhere in the connection frame. Parsed joints put it
-    through the frame's origin, so that :attr:`parent_T_connection_expression` places
-    the axis; :meth:`move_connection_frame_onto_axis` brings any connection into that
-    form.
+    prismatic and helical connections differ only in their :attr:`screw_axis`, which may
+    lie anywhere in the connection frame, as `Screw axis connections
+    <https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/examples/screw_axis_connections.html>`__ explains.
     """
 
     screw_axis: ScrewAxis
     """
     How the child's pose changes per unit of position, in the connection frame,
-    normalized as Lynch and Park define a screw axis (`Modern Robotics, Definition 3.24
-    <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122>`__). For why it is
-    normalized, see `Why the screw axis is normalized
-    <https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/examples/screw_axis_connections.html#why-the-screw-axis-is-normalized>`__.
+    `normalized <https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/examples/screw_axis_connections.html#why-the-screw-axis-is-normalized>`__
+    as in `Modern Robotics, Definition 3.24 <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122>`__.
 
     .. warning:: Set it only before the connection is added to a world: a later
         assignment is not recorded, published or rolled back. Replace the connection.
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         :raises UnnormalizedScrewAxisError: if :attr:`screw_axis` is not normalized,
             see :attr:`~krrood_spatial_math.spatial_types.ScrewAxis.is_normalized`.

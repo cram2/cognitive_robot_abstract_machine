@@ -1,3 +1,9 @@
+"""
+Fixtures and helpers that the tests of semantic_digital_twin share.
+"""
+
+from __future__ import annotations
+
 import os
 
 import pytest
@@ -72,6 +78,11 @@ def world_setup() -> tuple[
     Body,
     Body,
 ]:
+    """
+    :return: A world whose root carries a free-floating base, from which two branches
+        hang: ``l1`` with ``l2`` on a slider, and ``r1`` with ``r2`` on a hinge; and
+        the bodies ``l1``, ``l2``, the base, ``r1`` and ``r2``.
+    """
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     l1 = Body(name=PrefixedName("l1"))

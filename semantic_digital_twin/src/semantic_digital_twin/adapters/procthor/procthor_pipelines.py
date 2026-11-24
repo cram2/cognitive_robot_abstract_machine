@@ -1,8 +1,14 @@
-from semantic_digital_twin.world_description.connections import ScrewAxisConnection
+"""
+Building the drawers, doors and dressers of ProcTHOR houses from their bodies.
+"""
+
+from __future__ import annotations
+
 import re
 
 import numpy as np
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
 )

@@ -1,3 +1,7 @@
+"""
+Reading USD stages into worlds.
+"""
+
 from __future__ import annotations
 
 import logging

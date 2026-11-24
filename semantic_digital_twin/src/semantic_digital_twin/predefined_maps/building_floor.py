@@ -1,3 +1,7 @@
+"""
+A predefined floor of a building: rooms, each with a single door.
+"""
+
 from __future__ import annotations
 
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
