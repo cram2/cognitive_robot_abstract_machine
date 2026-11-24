@@ -76,7 +76,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
-        sod = StaticObjectDetectorAnnotator.Descriptor()
+        sod = StaticObjectDetectorAnnotator.descriptor_type()
         sod.parameters.bounding_box_x = 40
         sod.parameters.bounding_box_y = 40
         sod.parameters.bounding_box_width = 100

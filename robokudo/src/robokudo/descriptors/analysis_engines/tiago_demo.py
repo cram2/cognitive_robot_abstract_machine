@@ -88,7 +88,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         tiago_config = CollectionReaderDescriptorFactory.create_descriptor("tiago")
 
-        # pc_crop_config = PointcloudCropAnnotator.Descriptor()
+        # pc_crop_config = PointcloudCropAnnotator.descriptor_type()
         # pc_crop_config.parameters.
 
         seq = Pipeline("ContPipeline")

@@ -52,7 +52,7 @@ def test_replacing_annotator_configuration_initializes_a_new_tree_node(
     """
     A dataclass copy retains its descriptor and obtains independent tree state.
     """
-    descriptor = annotator_type.Descriptor()
+    descriptor = annotator_type.descriptor_type()
     if annotator_type is YoloAnnotator:
         descriptor.parameters.pretrained_model = "yolov8n.pt"
     original = annotator_type(descriptor=descriptor)
@@ -88,9 +88,9 @@ def test_default_descriptors_and_runtime_collections_belong_to_each_annotator() 
     """
     Constructing a second detector does not share mutable model metadata.
     """
-    first_descriptor = YoloAnnotator.Descriptor()
+    first_descriptor = YoloAnnotator.descriptor_type()
     first_descriptor.parameters.pretrained_model = "yolov8n.pt"
-    second_descriptor = YoloAnnotator.Descriptor()
+    second_descriptor = YoloAnnotator.descriptor_type()
     second_descriptor.parameters.pretrained_model = (
         first_descriptor.parameters.pretrained_model
     )

@@ -45,7 +45,7 @@ class CupScene(BlackWallScene):
 
     class_names: dict[int, str] = field(
         default_factory=lambda: {
-            0: YoloAnnotator.Descriptor.Parameters().person_class_name,
+            0: YoloAnnotator.descriptor_type.Parameters().person_class_name,
             41: "cup",
             46: "banana",
         }
@@ -83,7 +83,7 @@ class CupScene(BlackWallScene):
         """
         :return: A descriptor loading the pretrained model and ignoring depth.
         """
-        descriptor = YoloAnnotator.Descriptor()
+        descriptor = YoloAnnotator.descriptor_type()
         descriptor.parameters.models_directory = self.models_directory
         descriptor.parameters.pretrained_model = self.pretrained_model
         descriptor.parameters.threshold = 0.5
@@ -179,7 +179,10 @@ def _hypothesis_at(x: int, y: int, width: int, height: int) -> ObjectHypothesis:
 
 
 def test_models_directory_defaults_to_models_folder_of_robokudo_package():
-    parameters = YoloAnnotator.Descriptor.Parameters()
+    """
+    Default model paths resolve to the models directory in the RoboKudo package.
+    """
+    parameters = YoloAnnotator.descriptor_type.Parameters()
 
     assert parameters.models_directory == Path(robokudo.__file__).parent / "models"
 

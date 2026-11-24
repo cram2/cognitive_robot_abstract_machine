@@ -21,7 +21,7 @@ def cluster_extractor() -> ImageClusterExtractor:
     """
     Provide an extractor with independent threshold and filtering parameters.
     """
-    descriptor = ImageClusterExtractor.Descriptor()
+    descriptor = ImageClusterExtractor.descriptor_type()
     descriptor.parameters = descriptor.Parameters()
     descriptor.parameters.outlier_removal = False
     descriptor.parameters.erosion_iterations = 0

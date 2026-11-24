@@ -69,7 +69,7 @@ def _plane_annotator_in_pipeline(random_seed: int | None) -> PlaneAnnotator:
     :return: A plane annotator over a fresh noisy cloud, wired up with just enough
         pipeline state to run.
     """
-    descriptor = PlaneAnnotator.Descriptor()
+    descriptor = PlaneAnnotator.descriptor_type()
     descriptor.parameters.visualize_plane_model = False
     descriptor.parameters.random_seed = random_seed
     pipeline = Pipeline("TestPipeline")
@@ -105,4 +105,7 @@ def test_a_seeded_annotator_finds_the_same_plane_every_time() -> None:
 
 
 def test_the_seed_is_off_by_default() -> None:
-    assert PlaneAnnotator.Descriptor().parameters.random_seed is None
+    """
+    Default plane detection leaves the random generator seed unspecified.
+    """
+    assert PlaneAnnotator.descriptor_type().parameters.random_seed is None

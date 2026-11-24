@@ -91,7 +91,7 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     """Logger for annotator processing and lifecycle messages."""
 
     @classproperty
-    def Descriptor(cls) -> type[DescriptorType]:
+    def descriptor_type(cls) -> type[DescriptorType]:
         """Configuration constructor selected by the annotator's generic binding."""
         if all(
             isinstance(parameter, TypeVar)
@@ -117,7 +117,7 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
         """
         super().__init__(name)
         if descriptor is None:
-            descriptor = self.Descriptor()
+            descriptor = self.descriptor_type()
 
         self.rk_logger = logging.getLogger(ros_package_name)
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)

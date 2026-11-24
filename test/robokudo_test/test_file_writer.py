@@ -1,3 +1,7 @@
+"""
+Validate camera metadata preservation across file recording and replay.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -71,7 +75,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
         world_T_camera=world_T_camera,
         timestamp_nanoseconds=timestamp_nanoseconds,
     )
-    descriptor = FileWriter.Descriptor()
+    descriptor = FileWriter.descriptor_type()
     descriptor.parameters.target_directory = str(tmp_path)
     writer = FileWriter(descriptor=descriptor)
     monkeypatch.setattr(writer, "get_cas", lambda: cas)

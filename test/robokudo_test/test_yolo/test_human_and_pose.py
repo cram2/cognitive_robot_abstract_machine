@@ -51,7 +51,7 @@ class PersonScene(BlackWallScene):
 
     person_class_name: str = field(
         default_factory=lambda: (
-            HumanAndPoseAnnotator.Descriptor.Parameters().person_class_name
+            HumanAndPoseAnnotator.descriptor_type.Parameters().person_class_name
         )
     )
     """
@@ -143,7 +143,7 @@ class PersonScene(BlackWallScene):
         :return: A descriptor loading the model from the scene's models directory,
             ignoring depth and skipping the warmup.
         """
-        descriptor = HumanAndPoseAnnotator.Descriptor()
+        descriptor = HumanAndPoseAnnotator.descriptor_type()
         descriptor.parameters.models_directory = self.models_directory
         descriptor.parameters.warmup_annotator = False
         descriptor.parameters.global_with_depth = False
@@ -242,7 +242,10 @@ def _area(box: Rect) -> int:
 
 
 def test_models_directory_defaults_to_models_folder_of_robokudo_package():
-    parameters = HumanAndPoseAnnotator.Descriptor.Parameters()
+    """
+    Default model paths resolve to the models directory in the RoboKudo package.
+    """
+    parameters = HumanAndPoseAnnotator.descriptor_type.Parameters()
 
     assert parameters.models_directory == Path(robokudo.__file__).parent / "models"
 

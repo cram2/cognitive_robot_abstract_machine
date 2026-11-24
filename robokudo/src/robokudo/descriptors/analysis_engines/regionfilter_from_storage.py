@@ -89,7 +89,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             debugging and development.
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
-        bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
+        bootstrap = WorldDescriptorBootstrapAnnotator.descriptor_type()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 
         seq = Pipeline("StoragePipeline")

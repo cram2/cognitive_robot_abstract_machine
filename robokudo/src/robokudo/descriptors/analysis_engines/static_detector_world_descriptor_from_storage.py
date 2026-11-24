@@ -39,16 +39,16 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
-        bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
+        bootstrap = WorldDescriptorBootstrapAnnotator.descriptor_type()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 
-        sod = StaticObjectDetectorAnnotator.Descriptor()
+        sod = StaticObjectDetectorAnnotator.descriptor_type()
         sod.parameters.mode = StaticObjectMode.WORLD_DESCRIPTOR
         sod.parameters.class_names = ["cereal", "milk"]
         sod.parameters.create_bounding_box_annotation = True
         sod.parameters.create_pose_annotation = True
 
-        oh_vis = ObjectHypothesisVisualizer.Descriptor()
+        oh_vis = ObjectHypothesisVisualizer.descriptor_type()
         oh_vis.parameters.visualize_full_cloud = True
 
         seq = robokudo.pipeline.Pipeline("StoragePipeline")

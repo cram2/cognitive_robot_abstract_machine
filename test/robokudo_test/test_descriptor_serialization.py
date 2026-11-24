@@ -96,13 +96,13 @@ def test_descriptor_discovery_returns_module_level_class() -> None:
     """
     The familiar annotator entry point returns an importable dataclass.
     """
-    assert YoloAnnotator.Descriptor is YoloDescriptor
+    assert YoloAnnotator.descriptor_type is YoloDescriptor
     assert (
         resolve_class_from_full_name(get_full_class_name(YoloDescriptor))
         is YoloDescriptor
     )
-    assert is_dataclass(YoloAnnotator.Descriptor)
-    assert is_dataclass(YoloAnnotator.Descriptor().parameters)
+    assert is_dataclass(YoloAnnotator.descriptor_type)
+    assert is_dataclass(YoloAnnotator.descriptor_type().parameters)
 
 
 def test_descriptor_parameters_are_concrete_fields() -> None:
@@ -177,8 +177,8 @@ def test_local_global_override_does_not_change_other_descriptors() -> None:
     """
     An AnalysisEngine can override one annotator's effective global value.
     """
-    first = BlurAnnotator.Descriptor()
-    second = BlurAnnotator.Descriptor()
+    first = BlurAnnotator.descriptor_type()
+    second = BlurAnnotator.descriptor_type()
     first.parameters.global_with_depth = not second.parameters.global_with_depth
     assert (
         second.parameters.global_with_depth

@@ -51,10 +51,10 @@ class AnalysisEngine(AnalysisEngineInterface):
                 descriptor_name="world_semdt_raytracer_tabletop"
             ),
         )
-        plane_desc = PlaneAnnotator.Descriptor()
+        plane_desc = PlaneAnnotator.descriptor_type()
         plane_desc.parameters.distance_threshold = 0.01
 
-        query_result_desc = GenerateQueryResult.Descriptor()
+        query_result_desc = GenerateQueryResult.descriptor_type()
         query_result_desc.parameters.filter_by_query = True
 
         seq = Pipeline("SemDTRayTracerPipeline")

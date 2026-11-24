@@ -1,3 +1,7 @@
+"""
+Validate stored sensor data and semantic world restoration through replay pipelines.
+"""
+
 from __future__ import annotations
 
 import json
@@ -36,6 +40,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def _build_writer_pipeline(database_name: str, recording_directory: Path) -> Pipeline:
+    """
+    Create a pipeline that records file observations and their configured camera pose.
+    """
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=False,
@@ -56,7 +63,7 @@ def _build_writer_pipeline(database_name: str, recording_directory: Path) -> Pip
         )
     )
 
-    writer_descriptor = StorageWriter.Descriptor()
+    writer_descriptor = StorageWriter.descriptor_type()
     writer_descriptor.parameters.database_name = database_name
     writer_descriptor.parameters.drop_database_on_storage = True
 

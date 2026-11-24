@@ -1,3 +1,5 @@
+"""Validate camera acquisition, effective calibration, and observation frame binding."""
+
 from __future__ import annotations
 
 # %% Imports
@@ -352,7 +354,7 @@ def test_static_pose_uses_observation_camera_without_reparenting_robot(
         modalities=(CameraModality.COLOR,),
         world_T_camera=None,
     )
-    descriptor = StaticCameraTransformAnnotator.Descriptor()
+    descriptor = StaticCameraTransformAnnotator.descriptor_type()
     descriptor.parameters.world_frame = "map"
     descriptor.parameters.world_T_camera = (
         HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -408,7 +410,7 @@ def test_static_pose_creates_isolated_world_reference(
         quat_z=0.0,
         quat_w=1.0,
     )
-    descriptor = StaticCameraTransformAnnotator.Descriptor()
+    descriptor = StaticCameraTransformAnnotator.descriptor_type()
     descriptor.parameters.world_T_camera = numeric_pose
     annotator = StaticCameraTransformAnnotator(descriptor=descriptor)
     monkeypatch.setattr(annotator, "get_cas", lambda: cas)

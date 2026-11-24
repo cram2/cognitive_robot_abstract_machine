@@ -108,7 +108,7 @@ def crop_annotator_in_pipeline(cas_with_cloud_at_world_origin: CAS):
     A ``PointcloudCropAnnotator`` configured to crop relative to the world frame, wired
     up with just enough pipeline/blackboard state for ``update()`` to run.
     """
-    descriptor = PointcloudCropAnnotator.Descriptor()
+    descriptor = PointcloudCropAnnotator.descriptor_type()
     descriptor.parameters.relative_to_world = True
     descriptor.parameters.minimum_x = -1.0
     descriptor.parameters.maximum_x = 1.0

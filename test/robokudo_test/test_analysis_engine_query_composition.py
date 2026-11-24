@@ -119,7 +119,7 @@ def create_fake_collection_reader_descriptor(
     """
     Create a collection-reader descriptor without live ROS subscriptions.
     """
-    return CollectionReaderAnnotator.Descriptor(
+    return CollectionReaderAnnotator.descriptor_type(
         parameters=CollectionReaderParameters.from_defaults(
             camera_configuration=FakeCameraConfig(),
             camera_interface_type=FakeCameraInterface,

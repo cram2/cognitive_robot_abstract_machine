@@ -37,7 +37,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
-        yolo_descriptor = YoloAnnotator.Descriptor()
+        yolo_descriptor = YoloAnnotator.descriptor_type()
         yolo_descriptor.parameters.pretrained_model = "yolov8m.pt"
         yolo_descriptor.parameters.threshold = 0.2
         yolo_descriptor.parameters.precision_mode = True

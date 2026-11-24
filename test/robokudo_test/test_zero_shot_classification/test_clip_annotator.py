@@ -217,7 +217,7 @@ def _color_descriptor() -> CLIPDescriptor:
     """
     :return: A descriptor classifying against the color vocabulary on the CPU.
     """
-    descriptor = CLIPAnnotator.Descriptor()
+    descriptor = CLIPAnnotator.descriptor_type()
     descriptor.parameters.device = torch.device("cpu")
     descriptor.parameters.vocabulary = COLOR_VOCABULARY
     descriptor.parameters.maximum_saved_classifications = len(COLOR_VOCABULARY)
@@ -242,7 +242,7 @@ def test_annotator_without_descriptor_indexes_default_vocabulary(
     """
     An annotator built without a descriptor falls back to the default parameters.
     """
-    default_vocabulary = CLIPAnnotator.Descriptor().parameters.vocabulary
+    default_vocabulary = CLIPAnnotator.descriptor_type().parameters.vocabulary
 
     annotator = CLIPAnnotator()
 

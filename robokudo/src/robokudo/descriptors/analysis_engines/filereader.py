@@ -95,7 +95,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         )
 
         # Restrict FOV of pointcloud to robustly get only one object
-        pc_crop_config = PointcloudCropAnnotator.Descriptor()
+        pc_crop_config = PointcloudCropAnnotator.descriptor_type()
         pc_crop_config.parameters.minimum_x = -0.3
         pc_crop_config.parameters.maximum_x = 0.3
 

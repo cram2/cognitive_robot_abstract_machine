@@ -50,7 +50,7 @@ def reader_pipeline() -> ReaderPipeline:
     Construct a single-reader pipeline without external camera services.
     """
     camera_interface = Mock(spec=CameraInterface)
-    descriptor = CollectionReaderAnnotator.Descriptor(
+    descriptor = CollectionReaderAnnotator.descriptor_type(
         parameters=CollectionReaderParameters.from_defaults(
             camera_configuration=BaseCameraConfig(interface_type="test"),
             camera_interface_type=CameraInterface,

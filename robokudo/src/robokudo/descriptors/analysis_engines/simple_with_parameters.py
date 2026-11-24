@@ -73,7 +73,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
 
-        image_preprocessor_config = ImagePreprocessorAnnotator.Descriptor()
+        image_preprocessor_config = ImagePreprocessorAnnotator.descriptor_type()
         image_preprocessor_config.parameters.depth_truncation = 4.5
 
         seq = Pipeline("RWPipeline")

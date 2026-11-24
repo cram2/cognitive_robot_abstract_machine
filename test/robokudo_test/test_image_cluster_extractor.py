@@ -39,7 +39,7 @@ def test_presets_use_normalized_hue_saturation_value() -> None:
     Configured defaults and color presets contain named hue, saturation, and value
     values.
     """
-    parameters = ImageClusterExtractor.Descriptor.Parameters()
+    parameters = ImageClusterExtractor.descriptor_type.Parameters()
 
     assert type(parameters.minimum_hue_saturation_value) is Color
     assert type(parameters.maximum_hue_saturation_value) is Color
@@ -52,7 +52,7 @@ def test_preset_bounds_use_enum_keys() -> None:
     """
     Each preset identifies its lower and upper bounds with enum members.
     """
-    parameters = ImageClusterExtractor.Descriptor.Parameters()
+    parameters = ImageClusterExtractor.descriptor_type.Parameters()
 
     for bounds in parameters.color_ranges.values():
         assert set(bounds) == set(ColorRangeBound)

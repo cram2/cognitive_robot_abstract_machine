@@ -84,10 +84,10 @@ class AnalysisEngine(AnalysisEngineInterface):
         :return: The configured pipeline for object detection and visualization
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
-        bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
+        bootstrap = WorldDescriptorBootstrapAnnotator.descriptor_type()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 
-        sod = StaticObjectDetectorAnnotator.Descriptor()
+        sod = StaticObjectDetectorAnnotator.descriptor_type()
         sod.parameters.bounding_box_x = 397
         sod.parameters.bounding_box_y = 126
         sod.parameters.bounding_box_width = 49

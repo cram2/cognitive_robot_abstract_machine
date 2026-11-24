@@ -113,7 +113,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         # wide RealSense field of view also picks up the other shelf layers, and the
         # query answers with an untyped candidate per layer instead of just the one
         # this engine is meant to find.
-        crop_descriptor = PointcloudCropAnnotator.Descriptor()
+        crop_descriptor = PointcloudCropAnnotator.descriptor_type()
         crop_descriptor.parameters.relative_to_world = True
         crop_descriptor.parameters.minimum_x = TARGET_SHELF_MIN_WORLD_X
         crop_descriptor.parameters.maximum_x = TARGET_SHELF_MAX_WORLD_X
@@ -129,7 +129,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         # depth, so a hole in the box's depth just means fewer 3D points within an
         # already-correctly-shaped region. Hardcoded to red for now, matching the one
         # object this pipeline currently targets.
-        cluster_descriptor = ImageClusterExtractor.Descriptor()
+        cluster_descriptor = ImageClusterExtractor.descriptor_type()
         cluster_descriptor.parameters.minimum_hue_saturation_value = (
             cluster_descriptor.parameters.color_ranges[ColorName.RED][
                 ColorRangeBound.LOWER

@@ -76,9 +76,7 @@ class TestFullAEExecution(object):
         )
 
         # Restrict FOV of pointcloud to robustly get only one object
-        pc_crop_config = (
-            robokudo.annotators.pointcloud_crop.PointcloudCropAnnotator.Descriptor()
-        )
+        pc_crop_config = robokudo.annotators.pointcloud_crop.PointcloudCropAnnotator.descriptor_type()
         pc_crop_config.parameters.minimum_x = -0.3
         pc_crop_config.parameters.maximum_x = 0.3
 
@@ -116,9 +114,7 @@ class TestFullAEExecution(object):
             static_world_frame="map",
         )
 
-        pc_crop_config = (
-            robokudo.annotators.pointcloud_crop.PointcloudCropAnnotator.Descriptor()
-        )
+        pc_crop_config = robokudo.annotators.pointcloud_crop.PointcloudCropAnnotator.descriptor_type()
         pc_crop_config.parameters.minimum_x = -0.3
         pc_crop_config.parameters.maximum_x = 0.3
 
@@ -269,17 +265,17 @@ class TestFullAEExecution(object):
             ),
         )
 
-        plane_desc = PlaneAnnotator.Descriptor()
+        plane_desc = PlaneAnnotator.descriptor_type()
         plane_desc.parameters.distance_threshold = 0.01
         plane_desc.parameters.random_seed = 0
 
-        cluster_desc = PointCloudClusterExtractor.Descriptor()
+        cluster_desc = PointCloudClusterExtractor.descriptor_type()
         cluster_desc.parameters.clustering_minimum_point_count = 8
         cluster_desc.parameters.minimum_cluster_point_count = 20
         cluster_desc.parameters.minimum_on_plane_point_count = 10
         cluster_desc.parameters.clustering_epsilon = 0.05
 
-        shape_desc = ShapeEstimatorAnnotator.Descriptor()
+        shape_desc = ShapeEstimatorAnnotator.descriptor_type()
         shape_desc.parameters.minimum_point_count = 20
         shape_desc.parameters.distance_threshold = 0.015
         shape_desc.parameters.cylinder_minimum_inlier_ratio = 0.5
@@ -359,11 +355,11 @@ class TestFullAEExecution(object):
             ),
         )
 
-        plane_desc = PlaneAnnotator.Descriptor()
+        plane_desc = PlaneAnnotator.descriptor_type()
         plane_desc.parameters.distance_threshold = 0.01
         plane_desc.parameters.random_seed = 0
 
-        cluster_desc = PointCloudClusterExtractor.Descriptor()
+        cluster_desc = PointCloudClusterExtractor.descriptor_type()
         cluster_desc.parameters.clustering_minimum_point_count = 8
         cluster_desc.parameters.minimum_cluster_point_count = 20
         cluster_desc.parameters.minimum_on_plane_point_count = 10

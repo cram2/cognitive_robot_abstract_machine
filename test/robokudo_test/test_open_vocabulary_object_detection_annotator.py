@@ -48,7 +48,7 @@ def numpy_image_annotator(
     monkeypatch.setattr(
         Owlv2ForObjectDetection, "from_pretrained", MagicMock(return_value=MagicMock())
     )
-    descriptor = OpenVocabularyObjectDetectionAnnotator.Descriptor()
+    descriptor = OpenVocabularyObjectDetectionAnnotator.descriptor_type()
     descriptor.parameters = descriptor.Parameters()
     descriptor.parameters.global_with_depth = False
     annotator = OpenVocabularyObjectDetectionAnnotator(descriptor=descriptor)
@@ -385,7 +385,7 @@ def test_precision_mode_loads_segmentation_model(
         "robokudo.annotators.open_vocabulary_object_detection_annotator.SegmentAnythingModel",
         constructor,
     )
-    descriptor = OpenVocabularyObjectDetectionAnnotator.Descriptor()
+    descriptor = OpenVocabularyObjectDetectionAnnotator.descriptor_type()
     descriptor.parameters.precision_mode = True
     annotator = OpenVocabularyObjectDetectionAnnotator(
         name=numpy_image_annotator.name, descriptor=descriptor

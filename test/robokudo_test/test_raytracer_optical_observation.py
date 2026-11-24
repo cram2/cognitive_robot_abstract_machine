@@ -175,7 +175,7 @@ def test_static_optical_pose_binds_camera_root(
     )
     cas = CAS()
     optical_interface.set_data(cas)
-    descriptor = StaticCameraTransformAnnotator.Descriptor()
+    descriptor = StaticCameraTransformAnnotator.descriptor_type()
     descriptor.parameters = descriptor.Parameters()
     descriptor.parameters.world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=2.0, z=3.0, pitch=0.1, yaw=0.2
