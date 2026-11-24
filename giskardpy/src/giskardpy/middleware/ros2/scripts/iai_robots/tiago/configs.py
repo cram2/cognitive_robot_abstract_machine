@@ -19,7 +19,8 @@ from semantic_digital_twin.world_description.connections import (
 @dataclass(kw_only=True)
 class TiagoVelocityInterface(ClosedLoopRobotInterfaceConfig):
     """
-    Commands the dual arms and mobile base of TIAGo through their velocity controllers.
+    Commands the dual arms, torso, head, and mobile base of TIAGo through their velocity
+    controllers.
     """
 
     @staticmethod
@@ -56,6 +57,29 @@ class TiagoVelocityInterface(ClosedLoopRobotInterfaceConfig):
             TiagoJoint.RIGHT_ARM_7,
         ]
 
+    @staticmethod
+    def torso_velocity_joint_names() -> list[TiagoJoint]:
+        """
+        Joints driven by /torso_velocity_controller/command.
+
+        Their order matches the controller's YAML command layout, so it is significant.
+        """
+        return [
+            TiagoJoint.TORSO_LIFT,
+        ]
+
+    @staticmethod
+    def head_velocity_joint_names() -> list[TiagoJoint]:
+        """
+        Joints driven by /head_velocity_controller/command.
+
+        Their order matches the controller's YAML command layout, so it is significant.
+        """
+        return [
+            TiagoJoint.HEAD_1,
+            TiagoJoint.HEAD_2,
+        ]
+
     def setup(self) -> None:
         self.sync_6dof_joint_with_tf_frame(
             joint=self.world.get_connections_by_type(Connection6DoF)[0],
@@ -80,5 +104,17 @@ class TiagoVelocityInterface(ClosedLoopRobotInterfaceConfig):
         self.add_joint_group_velocity_command_topic(
             command_topic="/arm_right_velocity_controller/command",
             connections=self.right_arm_velocity_joint_names(),
+            minimum_valid_velocity=0.0,
+        )
+
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/torso_velocity_controller/command",
+            connections=self.torso_velocity_joint_names(),
+            minimum_valid_velocity=0.0,
+        )
+
+        self.add_joint_group_velocity_command_topic(
+            command_topic="/head_velocity_controller/command",
+            connections=self.head_velocity_joint_names(),
             minimum_valid_velocity=0.0,
         )
