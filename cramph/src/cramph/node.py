@@ -883,6 +883,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
     The name is not unique, use :attr:`unique_name`, if you need a unique identifier.
     """
 
+    # to_json writes it as a plain name, since a serialized enum member would make the
+    # reader import the enum the ticking framework names itself with
     ticking_framework: str | None = field(
         default=None, metadata=JSONMetadata(serialize=False).as_dict()
     )
