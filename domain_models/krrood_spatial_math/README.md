@@ -30,10 +30,7 @@ coordinate system. Its base depends on `krrood` alone.
   three-dimensional space: the x-y plane of a `CartesianFrame3Dimensional`, whose
   `normal` is that frame's `z_axis`. Every frame states the `embedded_plane` its x-y
   plane lies on in every state of its space, with its z-axis pointing the same way, so
-  two frames share a plane by identity, never by where they happen to be now. A
-  semantic_digital_twin body lies on its parent's plane when the connection between
-  them keeps it there for every joint state, as a drive or a joint about the z-axis
-  does.
+  two frames share a plane by identity, never by where they happen to be now.
 - `krrood_spatial_math.cartesian_frame_2_dimensional`: `CartesianFrame2Dimensional`, the
   right-handed Cartesian frame on the x-y plane of a `CartesianFrame3Dimensional`, with
   that frame's origin, x-axis and y-axis, that values on the plane are given in; its

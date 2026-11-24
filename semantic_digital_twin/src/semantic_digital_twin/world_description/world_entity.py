@@ -1030,6 +1030,12 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
     """
 
     def __post_init__(self):
+        """
+        Name the connection and keep its own copies of both constant offsets, given
+        between its parent and its child, leaving the offsets it was given unchanged.
+
+        :raises ReferenceFrameMismatchError: If an offset is given in other frames.
+        """
         self.id = uuid.uuid5(self.parent.id, str(self.child.id))
         self.name = self.name or self._generate_default_name(
             parent=self.parent, child=self.child
@@ -1057,7 +1063,12 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
         self._validate_parent_T_connection_frame(
             parent_T_connection=self.parent_T_connection_expression
         )
-        self.parent_T_connection_expression.reference_frame = self.parent
+        self.parent_T_connection_expression = (
+            self.parent_T_connection_expression.copy_with_new_reference_frames(
+                new_reference_frame=self.parent,
+                new_child_frame=self.parent_T_connection_expression.child_frame,
+            )
+        )
         if (
             self.connection_T_child_expression.child_frame is not None
             and self.connection_T_child_expression.child_frame != self.child
@@ -1068,7 +1079,12 @@ class Connection(WorldEntityWithSimulatorProperties, ABC):
                 context=f"child frame of connection_T_child_expression of connection '{self.name}'",
             )
 
-        self.connection_T_child_expression.child_frame = self.child
+        self.connection_T_child_expression = (
+            self.connection_T_child_expression.copy_with_new_reference_frames(
+                new_reference_frame=self.connection_T_child_expression.reference_frame,
+                new_child_frame=self.child,
+            )
+        )
 
     @synchronized_attribute_modification
     def update_parent_T_connection(

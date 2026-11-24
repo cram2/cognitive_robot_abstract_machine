@@ -38,7 +38,10 @@ class Vector(
     A translation of an affine space, given by its amounts along the axes of an affine
     frame, one per axis its kind of frame names, such as ``u`` and ``v``.
 
-    A vector has no position: a change of frame turns its axes but never shifts it.
+    .. note::
+        A vector has no position: it says how far and which way, not from where. A
+        change of frame turns it into the new axes but ignores where the two origins
+        are, so moving a frame's origin moves the points given in it, never the vectors.
 
     .. note::
         The type parameters are, in order, the kind of frame and the coordinate type.

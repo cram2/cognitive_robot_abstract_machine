@@ -2104,6 +2104,35 @@ def test_a_connection_and_its_copy_in_another_world_share_an_id(world_setup):
     assert connection_copy.id == connection.id
 
 
+def test_a_connection_leaves_the_offset_it_is_given_without_frames(
+    world_setup,  # noqa: F811
+):
+    """
+    One offset can place bodies under several parents, so the connection keeps the
+    frames it stamps on a copy and never on the offset it was given.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        0.1, 0.2, 0.3
+    )
+    connection_T_child = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        0.3, 0.2, 0.1
+    )
+
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=bf,
+                child=Body(name=PrefixedName("placed_by_a_shared_offset")),
+                parent_T_connection_expression=parent_T_connection,
+                connection_T_child_expression=connection_T_child,
+            )
+        )
+
+    assert parent_T_connection.reference_frame is None
+    assert connection_T_child.child_frame is None
+
+
 def test_connections_between_different_entities_have_different_ids(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
 

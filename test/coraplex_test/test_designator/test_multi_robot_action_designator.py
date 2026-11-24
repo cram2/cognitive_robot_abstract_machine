@@ -484,6 +484,10 @@ def test_reach_action_multi(multiple_robot_apartment_context):
 
 
 def test_follow_tcp_path_multi(multiple_robot_apartment_context):
+    """
+    Each robot's tool center point follows a path to the milk, turned about the milk's
+    own y-axis for a gripper that approaches along its z-axis.
+    """
     world, robot, extensions = multiple_robot_apartment_context
 
     if isinstance(robot, (Tiago)):
@@ -509,13 +513,14 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
     left_arm = left_or_only_arm(robot)
     approach_axis = left_arm.end_effector.approach_axis.to_np()
 
-    pose_T = world.get_body_by_name("milk.stl").global_transform
+    milk = world.get_body_by_name("milk.stl")
+    pose_T = milk.global_transform
     pose = pose_T.pose
     if np.allclose(approach_axis, Vector3Dimensional.Z().to_np()):
         offset_T = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
             axis=Vector3Dimensional.Y(),
             angle=np.pi / 2,
-            reference_frame=world.root,
+            reference_frame=milk,
         )
         target_pose = (pose_T @ offset_T).pose
     else:
