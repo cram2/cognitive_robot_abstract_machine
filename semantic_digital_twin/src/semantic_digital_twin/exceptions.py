@@ -820,16 +820,18 @@ class MissingConnectionParentError(UsageError):
 class ScrewJointUnsupportedByMujocoError(UsageError):
     """
     Raised when a connection that rotates and translates at once is exported to MuJoCo,
-    which has hinge and slide joints but no screw joint.
+    which has hinge and slide joints but no helical joint.
     """
 
     connection_name: PrefixedName
     """
-    The name of the screw connection that was exported.
+    The name of the helical connection that was exported.
     """
 
     def error_message(self) -> str:
-        return f"MuJoCo has no joint for the screw connection '{self.connection_name}'."
+        return (
+            f"MuJoCo has no joint for the helical connection '{self.connection_name}'."
+        )
 
     def suggest_correction(self) -> str:
         return (

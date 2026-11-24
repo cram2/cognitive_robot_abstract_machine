@@ -8,6 +8,8 @@ from uuid import UUID
 import numpy as np
 from typing_extensions import TYPE_CHECKING, Self
 
+from krrood.patterns.classproperty import classproperty
+
 from semantic_digital_twin.world_description.connection_properties import (
     JointDynamics,
 )
@@ -374,40 +376,80 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         )
         return distance / float(translation_per_position)
 
+    @classproperty
+    def smallest_rotation_per_unit_position(cls) -> float:
+        """
+        Radians per unit of position below which the child counts as not rotating.
+
+        A normalized screw axis rotates the child by one radian per unit of position or
+        not at all, so this only absorbs rounding errors.
+        """
+        return 1e-9
+
+    @classproperty
+    def smallest_advance_per_radian(cls) -> float:
+        """
+        Meters per radian below which a rotating child counts as not advancing along the
+        axis: a micrometer, about 6 micrometers per revolution, far below the pitch of any
+        thread and far above rounding errors, such as those of a screw axis estimated
+        from observed poses.
+        """
+        return 1e-6
+
     @property
     def behaves_like_a_revolute_connection(self) -> bool:
         """
-        Whether the child only rotates about the axis.
+        Whether the child only rotates about the axis, advancing along it by less than
+        :attr:`smallest_advance_per_radian`.
         """
         return self._rotates_child and not self._translates_child
 
     @property
     def behaves_like_a_prismatic_connection(self) -> bool:
         """
-        Whether the child only translates along the axis.
+        Whether the child only translates along the axis, rotating by less than
+        :attr:`smallest_rotation_per_unit_position`.
         """
         return not self._rotates_child
 
     @property
-    def behaves_like_a_screw_connection(self) -> bool:
+    def behaves_like_a_helical_connection(self) -> bool:
         """
-        Whether the child rotates about the axis and translates along it at once.
+        Whether the child rotates about the axis and advances along it at once, by at
+        least :attr:`smallest_advance_per_radian`, as a thread does.
         """
         return self._rotates_child and self._translates_child
 
     @property
     def _rotates_child(self) -> bool:
         """
-        Whether the position rotates the child.
+        Whether the position rotates the child by at least
+        :attr:`smallest_rotation_per_unit_position`.
         """
-        return bool(np.any(self.screw_axis.rotation_per_unit_position))
+        rotation = np.asarray(self.screw_axis.rotation_per_unit_position[:3]).astype(
+            float
+        )
+        return bool(
+            np.linalg.norm(rotation) >= self.smallest_rotation_per_unit_position
+        )
 
     @property
     def _translates_child(self) -> bool:
         """
-        Whether the position translates the child.
+        Whether the position translates the child: for a rotating child, whether it
+        advances along the axis by at least :attr:`smallest_advance_per_radian`; a child
+        that does not rotate translates, since its screw axis is normalized.
         """
-        return bool(np.any(self.screw_axis.translation_per_unit_position))
+        if not self._rotates_child:
+            return True
+        rotation = np.asarray(self.screw_axis.rotation_per_unit_position[:3]).astype(
+            float
+        )
+        translation = np.asarray(
+            self.screw_axis.translation_per_unit_position[:3]
+        ).astype(float)
+        advance_per_radian = abs(rotation @ translation) / (rotation @ rotation)
+        return bool(advance_per_radian >= self.smallest_advance_per_radian)
 
 
 @dataclass(eq=False)

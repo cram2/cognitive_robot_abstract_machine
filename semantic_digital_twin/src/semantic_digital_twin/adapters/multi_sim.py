@@ -1733,7 +1733,7 @@ class MujocoScrewAxisJointConverter(
         :raises ScrewJointUnsupportedByMujocoError: if the connection rotates and
             translates at once.
         """
-        if entity.behaves_like_a_screw_connection:
+        if entity.behaves_like_a_helical_connection:
             raise ScrewJointUnsupportedByMujocoError(connection_name=entity.name)
         joint_props = super()._post_convert(entity, joint_props, **kwargs)
         if entity.behaves_like_a_prismatic_connection:

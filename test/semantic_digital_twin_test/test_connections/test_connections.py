@@ -225,7 +225,7 @@ def test_has_hardware_interface_reflects_any_active_dof(
     assert connection.has_hardware_interface
 
 
-# %% screw connection
+# %% helical connection
 
 
 def _add_screw_connection(
@@ -235,7 +235,7 @@ def _add_screw_connection(
     parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
 ) -> ScrewAxisConnection:
     """
-    Creates a screw connection about the z-axis and adds it to the world.
+    Creates a helical connection about the z-axis and adds it to the world.
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
@@ -368,7 +368,7 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
     world_with_two_bodies,
 ):
     """
-    Re-parenting a screw connection keeps its screw axis and degree of freedom.
+    Re-parenting a helical connection keeps its screw axis and degree of freedom.
     """
     world, parent, child = world_with_two_bodies
     screw_pitch = 0.01
@@ -820,8 +820,12 @@ def test_screw_axis_connection_places_the_child_along_its_screw_axis(
     [
         pytest.param(1.0, 0.0, (True, False, False), id="revolute"),
         pytest.param(0.0, 1.0, (False, True, False), id="prismatic"),
-        pytest.param(1.0, 0.04, (False, False, True), id="screw"),
-        pytest.param(1.0, -0.04, (False, False, True), id="left-handed screw"),
+        pytest.param(1.0, 0.04, (False, False, True), id="helical"),
+        pytest.param(1.0, -0.04, (False, False, True), id="left-handed helical"),
+        pytest.param(
+            1.0, 1e-15, (True, False, False), id="rounding error of an advance"
+        ),
+        pytest.param(1.0, 2e-6, (False, False, True), id="finer than any thread"),
     ],
 )
 def test_screw_axis_connection_behaves_like_the_connection_its_screw_axis_describes(
@@ -848,7 +852,7 @@ def test_screw_axis_connection_behaves_like_the_connection_its_screw_axis_descri
     assert (
         connection.behaves_like_a_revolute_connection,
         connection.behaves_like_a_prismatic_connection,
-        connection.behaves_like_a_screw_connection,
+        connection.behaves_like_a_helical_connection,
     ) == expected_behaviour
 
 

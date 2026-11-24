@@ -222,7 +222,7 @@ class TestFactories(unittest.TestCase):
                     ),
                 ),
             )
-        assert bottle_cap.movable_joint.behaves_like_a_screw_connection
+        assert bottle_cap.movable_joint.behaves_like_a_helical_connection
         assert np.allclose(
             bottle_cap.movable_joint.screw_axis.translation_per_unit_position,
             bottle_cap.movable_joint.screw_axis.rotation_per_unit_position

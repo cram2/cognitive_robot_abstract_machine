@@ -287,7 +287,11 @@ print(door_connection.behaves_like_a_revolute_connection)
 ```
 
 Code that has to tell revolute and prismatic connections apart asks
-`behaves_like_a_revolute_connection` and `behaves_like_a_prismatic_connection`.
+`behaves_like_a_revolute_connection` and `behaves_like_a_prismatic_connection`, and
+`behaves_like_a_helical_connection` for the helical connections of the next section. They read the kind
+off the screw axis with a tolerance in physical units: a child that advances along the axis by less than
+`ScrewAxisConnection.smallest_advance_per_radian`, a micrometer per radian, does not advance, so that the
+rounding errors of a screw axis computed from measurements do not make a door helical.
 
 ## Beyond revolute and prismatic connections
 
