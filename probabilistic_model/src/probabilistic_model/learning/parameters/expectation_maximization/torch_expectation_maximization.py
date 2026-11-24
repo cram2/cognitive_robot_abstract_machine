@@ -20,10 +20,7 @@ from probabilistic_model.learning.parameters.torch_circuit_parameter_learning im
     TorchCircuitParameterLearning,
     TorchCircuitParameterTraining,
 )
-from probabilistic_model.learning.parameters.training_schedule import (
-    LearningRatePlateau,
-    MiniBatches,
-)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 from probabilistic_model.learning.parameters.expectation_maximization.layer_maximization import (
     SufficientStatistics,
 )
@@ -99,7 +96,6 @@ class TorchExpectationMaximization(
         *,
         arguments: tuple[torch.Tensor, ...],
         mini_batches: MiniBatches,
-        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TorchExpectationMaximizationTraining[LayerType]:
         return TorchExpectationMaximizationTraining(
             arguments=arguments,

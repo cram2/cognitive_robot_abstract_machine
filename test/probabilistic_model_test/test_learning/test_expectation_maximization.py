@@ -19,7 +19,9 @@ from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
 )
-from probabilistic_model.learning.exceptions import UnsupportedLeafDistributionError
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    UnsupportedLeafDistributionError,
+)
 from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
     StartingCircuitVariablesMismatchError,
 )

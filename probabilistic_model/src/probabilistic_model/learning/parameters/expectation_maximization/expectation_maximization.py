@@ -21,9 +21,9 @@ from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
 )
-from probabilistic_model.learning.exceptions import UnsupportedLeafDistributionError
 from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
     StartingCircuitVariablesMismatchError,
+    UnsupportedLeafDistributionError,
 )
 from probabilistic_model.learning.learning_method import LearningMethod
 from probabilistic_model.learning.parameters.training_schedule import MiniBatchTraining
@@ -78,7 +78,9 @@ class LearnableUnits:
         leaf_units = frozenset(unit for unit in units if isinstance(unit, LeafUnit))
         for leaf_unit in leaf_units:
             if not cls._can_fit(leaf_unit.distribution):
-                raise UnsupportedLeafDistributionError(leaf_unit.distribution)
+                raise UnsupportedLeafDistributionError(
+                    distribution=leaf_unit.distribution
+                )
         sum_units = frozenset(unit for unit in units if isinstance(unit, SumUnit))
         return cls(sum_units=sum_units, leaf_units=leaf_units)
 

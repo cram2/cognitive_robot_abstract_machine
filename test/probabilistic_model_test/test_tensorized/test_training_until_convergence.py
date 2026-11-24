@@ -308,13 +308,37 @@ def test_a_plateau_needs_an_optimizer_whose_learning_rate_can_change(jax_circuit
         layer=jax_circuit.root,
         loss=AverageNegativeLogLikelihood(),
         optimizer=optax.adam(1e-2),
+        learning_rate_plateau=LearningRatePlateau(),
     )
     with pytest.raises(UnscheduledOptimizerError):
         trainer.start_training(
             arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
             mini_batches=MiniBatches(),
-            learning_rate_plateau=LearningRatePlateau(),
         )
+
+
+def test_every_gradient_descent_training_records_epochs_in_its_own_plateau(
+    jax_circuit,
+):
+    """
+    A training starts from a fresh copy of the plateau of its gradient descent, so an
+    epoch it records changes neither the learner's plateau nor that of another training.
+    """
+    plateau = LearningRatePlateau(patience=0)
+    trainer = JaxGradientDescent(
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.inject_hyperparams(optax.adam)(learning_rate=0.1),
+        learning_rate_plateau=plateau,
+    )
+    arguments = (jnp.zeros((1, len(jax_circuit.variables))),)
+    first = trainer.start_training(arguments=arguments, mini_batches=MiniBatches())
+    first.finish_epoch(average_loss=1.0)
+    second = trainer.start_training(arguments=arguments, mini_batches=MiniBatches())
+
+    assert first.learning_rate_plateau.best_loss == 1.0
+    assert second.learning_rate_plateau == plateau
+    assert second.learning_rate_plateau is not plateau
 
 
 def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
@@ -326,10 +350,10 @@ def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
         layer=jax_circuit.root,
         loss=AverageNegativeLogLikelihood(),
         optimizer=optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
+        learning_rate_plateau=LearningRatePlateau(),
     ).start_training(
         arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
         mini_batches=MiniBatches(),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     training.scale_learning_rate(scale=0.5)
 
@@ -352,12 +376,14 @@ def test_torch_training_scales_the_learning_rate_of_its_optimizer(
         array_namespace(torch.zeros(0))
     )
     trainer = torch_gradient_descent.TorchGradientDescent(
-        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=0.1
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        learning_rate=0.1,
+        learning_rate_plateau=LearningRatePlateau(),
     )
     training = trainer.start_training(
         arguments=(torch.zeros((1, len(circuit.variables))),),
         mini_batches=MiniBatches(),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     training.scale_learning_rate(scale=0.5)
 
@@ -597,11 +623,11 @@ def torch_parameters_after_training(
         loss=AverageNegativeLogLikelihood(),
         learning_rate=0.05,
         records_cuda_graphs=records_cuda_graphs,
+        learning_rate_plateau=LearningRatePlateau(),
     )
     training = trainer.start_training(
         arguments=(data,),
         mini_batches=MiniBatches(batch_size=100, seed=0),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     for epoch in range(4):
         if epoch == 3:

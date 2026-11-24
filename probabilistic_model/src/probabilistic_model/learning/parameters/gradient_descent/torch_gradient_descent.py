@@ -19,10 +19,7 @@ from probabilistic_model.learning.parameters.torch_circuit_parameter_learning im
     TorchCircuitParameterLearning,
     TorchCircuitParameterTraining,
 )
-from probabilistic_model.learning.parameters.training_schedule import (
-    LearningRatePlateau,
-    MiniBatches,
-)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 
 
 # %% gradient descent
@@ -55,7 +52,6 @@ class TorchGradientDescent(
         *,
         arguments: tuple[torch.Tensor, ...],
         mini_batches: MiniBatches,
-        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TorchGradientDescentTraining[LayerType]:
         return TorchGradientDescentTraining(
             arguments=arguments,
@@ -75,7 +71,7 @@ class TorchGradientDescent(
                 if self.replays_recorded_steps
                 else self.optimizer_type(self.parameters, lr=self.learning_rate)
             ),
-            learning_rate_plateau=learning_rate_plateau,
+            learning_rate_plateau=self.copied_learning_rate_plateau(),
         )
 
     def compute_step_without_update(self, *, batch: tuple[torch.Tensor, ...]) -> None:

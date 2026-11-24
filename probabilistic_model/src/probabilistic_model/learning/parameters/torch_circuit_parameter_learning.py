@@ -155,8 +155,7 @@ class TorchCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
         """
         if not self.replays_recorded_steps:
             return step(batch=batch)
-        # Keyed by the unbound function, so that no reference cycle keeps a finished
-        # training and its recorded graphs alive until the next collection.
+        # the unbound function keeps the training out of a reference cycle
         key = RecordedStepKey(
             step_function=step.__func__, batch_shape=BatchShape.from_batch(batch=batch)
         )
@@ -297,8 +296,7 @@ class RecordedTrainingStep:
         """
         self.batch = tuple(array.clone() for array in batch)
         self.graph = torch.cuda.CUDAGraph()
-        # A collection that frees another recorded graph during the recording would
-        # invalidate it.
+        # freeing another recorded graph during the recording invalidates it
         with PausedGarbageCollection(), torch.cuda.graph(self.graph):
             self.loss = step(batch=self.batch)
 

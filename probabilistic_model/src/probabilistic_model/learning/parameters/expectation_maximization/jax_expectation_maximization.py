@@ -23,10 +23,7 @@ from probabilistic_model.learning.parameters.expectation_maximization.tensorized
     TensorizedExpectationMaximization,
     TensorizedExpectationMaximizationTraining,
 )
-from probabilistic_model.learning.parameters.training_schedule import (
-    LearningRatePlateau,
-    MiniBatches,
-)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 from probabilistic_model.learning.parameters.expectation_maximization.layer_maximization import (
     SufficientStatistics,
 )
@@ -159,7 +156,6 @@ class JaxExpectationMaximization(
         *,
         arguments: tuple[jax.Array, ...],
         mini_batches: MiniBatches,
-        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> JaxExpectationMaximizationTraining[LayerType]:
         return JaxExpectationMaximizationTraining(
             arguments=arguments,

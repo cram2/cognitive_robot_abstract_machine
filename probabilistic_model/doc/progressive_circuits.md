@@ -57,7 +57,7 @@ What is progressive:
   learned from.
 
 Untruncated Gaussian, discrete and symbolic leaves can be learned; any other leaf raises
-an {py:class}`~probabilistic_model.learning.exceptions.UnsupportedLeafDistributionError`.
+an {py:class}`~probabilistic_model.learning.parameters.expectation_maximization.exceptions.UnsupportedLeafDistributionError`.
 
 ```{warning}
 Later columns read from earlier ones, so learning an earlier column again also changes

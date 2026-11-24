@@ -247,8 +247,6 @@ class SumLayerMaximization(LayerMaximization[SumLayer]):
     def expected_statistics(
         self, *, parameter_gradients: list[BackendArray], node_counts: NodeValues
     ) -> EdgeCounts:
-        # the log-likelihood subtracts the log normalization constants, whose derivative
-        # takes the normalized weight times the node count off every edge count
         [log_weight_gradient] = parameter_gradients
         return EdgeCounts(
             counts=log_weight_gradient
@@ -263,7 +261,6 @@ class SumLayerMaximization(LayerMaximization[SumLayer]):
         regularization: MaximizationRegularization,
         step_size: float,
     ) -> list[BackendArray]:
-        # edges of weight zero keep it, as gradient descent keeps it
         layer = self.layer
         namespace = layer.namespace
         is_edge = namespace.isfinite(layer.log_weights)
@@ -295,8 +292,6 @@ class GaussianLayerMaximization(LayerMaximization[GaussianLayer]):
     def expected_statistics(
         self, *, parameter_gradients: list[BackendArray], node_counts: NodeValues
     ) -> GaussianStatistics:
-        # the log-density derives by the location to the deviation over the variance,
-        # and by the log-scale to the squared deviation over the variance minus one
         location_gradient, log_scale_gradient = parameter_gradients
         variance = self.layer.scale**2
         return GaussianStatistics(
@@ -312,7 +307,6 @@ class GaussianLayerMaximization(LayerMaximization[GaussianLayer]):
         regularization: MaximizationRegularization,
         step_size: float,
     ) -> list[BackendArray]:
-        # a step blends the mean and the second moment, as Einsum Networks do
         layer = self.layer
         namespace = layer.namespace
         is_reached = statistics.counts > 0
@@ -354,8 +348,6 @@ class DiscreteLayerMaximization(LayerMaximization[DiscreteLayer]):
     def expected_statistics(
         self, *, parameter_gradients: list[BackendArray], node_counts: NodeValues
     ) -> StateCounts:
-        # the log-likelihood normalizes the log-probabilities per node, whose derivative
-        # takes the probability times the node count off every state count
         [log_probability_gradient] = parameter_gradients
         table = self.layer.table
         return StateCounts(
@@ -371,8 +363,6 @@ class DiscreteLayerMaximization(LayerMaximization[DiscreteLayer]):
         regularization: MaximizationRegularization,
         step_size: float,
     ) -> list[BackendArray]:
-        # the probabilities become the state counts in proportion, unsmoothed as the
-        # host expectation maximization fits them
         table = self.layer.table
         namespace = table.namespace
         counts = namespace.clip(statistics.counts, min=0.0)

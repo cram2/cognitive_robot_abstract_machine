@@ -7,6 +7,7 @@ pure function of the parameter arrays, on any array library that a subclass of
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import dataclasses
 import functools
 from dataclasses import dataclass, field
 
@@ -141,6 +142,12 @@ class GradientDescent(CircuitParameterLearning[LayerType], ABC):
     The loss to minimize.
     """
 
+    learning_rate_plateau: LearningRatePlateau | None = None
+    """
+    The schedule of the learning rate, copied for every training, a constant learning
+    rate if ``None``.
+    """
+
     zero_probability_entries: list[BackendArray] = field(init=False)
     """
     Where every parameter array is ``-inf`` before training, a log-probability or log-
@@ -163,13 +170,21 @@ class GradientDescent(CircuitParameterLearning[LayerType], ABC):
         *,
         arguments: tuple[BackendArray, ...],
         mini_batches: MiniBatches,
-        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> GradientDescentTraining[LayerType]:
         """
         Like :meth:`CircuitParameterLearning.start_training`, with the arrays the
         :attr:`loss` takes after the circuit as ``arguments``.
         """
         raise NotImplementedError
+
+    def copied_learning_rate_plateau(self) -> LearningRatePlateau | None:
+        """
+        :return: A copy of :attr:`learning_rate_plateau` that no epoch was recorded in
+            yet, ``None`` for a constant learning rate.
+        """
+        if self.learning_rate_plateau is None:
+            return None
+        return dataclasses.replace(self.learning_rate_plateau)
 
     def minimize(self, *arguments: BackendArray, epochs: int) -> LayerType:
         """

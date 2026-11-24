@@ -288,13 +288,6 @@ class RandomTensorizedSumProductNetworkByMiniBatches(
         """
         raise NotImplementedError
 
-    def copied_learning_rate_plateau(self) -> LearningRatePlateau | None:
-        """
-        :return: A fresh schedule of the learning rate for one training, ``None`` for a
-            learner without a learning rate.
-        """
-        return None
-
     def learn(
         self,
         *,
@@ -319,7 +312,6 @@ class RandomTensorizedSumProductNetworkByMiniBatches(
             setting.asarray(rows=circuit.encoded(rows)),
             convergence=context.convergence,
             mini_batches=mini_batches,
-            learning_rate_plateau=self.copied_learning_rate_plateau(),
         )
         circuit.root = run.trained_root
         return LearnedCircuit(circuit=circuit, history=run.history)
@@ -344,7 +336,7 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
         default_factory=LearningRatePlateau
     )
     """
-    The schedule of the learning rate, copied for every training.
+    The schedule of the learning rate.
     """
 
     @property
@@ -364,6 +356,7 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
                 layer=root,
                 loss=AverageNegativeLogLikelihood(),
                 learning_rate=self.learning_rate,
+                learning_rate_plateau=self.learning_rate_plateau,
                 records_cuda_graphs=True,
             )
         return JaxGradientDescent(
@@ -372,14 +365,8 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
             optimizer=optax.inject_hyperparams(optax.adam)(
                 learning_rate=self.learning_rate
             ),
+            learning_rate_plateau=self.learning_rate_plateau,
         )
-
-    def copied_learning_rate_plateau(self) -> LearningRatePlateau:
-        """
-        A copy of :attr:`learning_rate_plateau`, see :meth:`RandomTensorizedSumProductNe
-        tworkByMiniBatches.copied_learning_rate_plateau`.
-        """
-        return dataclasses.replace(self.learning_rate_plateau)
 
 
 @dataclass(kw_only=True)

@@ -8,8 +8,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from random_events.variable import Variable
+from typing_extensions import TYPE_CHECKING
 
 from probabilistic_model.exceptions import ProbabilisticModelException
+
+if TYPE_CHECKING:
+    from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 
 # %% exceptions
@@ -70,3 +74,24 @@ class UnsupportedLayerError(ProbabilisticModelException, TypeError):
             "Learn circuits whose layers with parameters are sum and Gaussian layers, "
             "or train the circuit by gradient descent."
         )
+
+
+@dataclass(kw_only=True)
+class UnsupportedLeafDistributionError(ProbabilisticModelException, TypeError):
+    """
+    Exception raised when a leaf distribution cannot be learned from weighted rows.
+    """
+
+    distribution: ProbabilisticModel
+    """
+    The distribution that cannot be learned.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Leaf distributions of type {type(self.distribution).__name__} cannot be "
+            f"learned from weighted rows."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Use untruncated Gaussian, discrete or symbolic leaf distributions."

@@ -27,10 +27,7 @@ from probabilistic_model.learning.parameters.jax_circuit_parameter_learning impo
     JaxCircuitParameterTraining,
     JaxTrainingState,
 )
-from probabilistic_model.learning.parameters.training_schedule import (
-    LearningRatePlateau,
-    MiniBatches,
-)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import SampleRows
 
 # %% training state
@@ -116,13 +113,12 @@ class JaxGradientDescent(
         *,
         arguments: tuple[jax.Array, ...],
         mini_batches: MiniBatches,
-        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> JaxGradientDescentTraining[LayerType]:
         return JaxGradientDescentTraining(
             arguments=arguments,
             mini_batches=mini_batches,
             learning=self,
-            learning_rate_plateau=learning_rate_plateau,
+            learning_rate_plateau=self.copied_learning_rate_plateau(),
         )
 
     def initial_state(self) -> TrainingState:

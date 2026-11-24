@@ -18,7 +18,9 @@ from probabilistic_model.distributions.gaussian import (
     TruncatedGaussianDistribution,
 )
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.learning.exceptions import UnsupportedLeafDistributionError
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    UnsupportedLeafDistributionError,
+)
 from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     MaximizationRegularization,

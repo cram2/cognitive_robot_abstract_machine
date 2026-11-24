@@ -20,7 +20,6 @@ from probabilistic_model.learning.parameters.step_memory import (
 from probabilistic_model.learning.parameters.training_schedule import (
     Convergence,
     ConvergenceHistory,
-    LearningRatePlateau,
     MiniBatches,
     MiniBatchTraining,
 )
@@ -104,13 +103,10 @@ class CircuitParameterLearning(Generic[LayerType], SubClassSafeGeneric, ABC):
         *,
         arguments: tuple[BackendArray, ...],
         mini_batches: MiniBatches,
-        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> CircuitParameterTraining[LayerType]:
         """
         :param arguments: The training arrays, one row per training example each.
         :param mini_batches: How the rows are split into the batches of every epoch.
-        :param learning_rate_plateau: The schedule of the learning rate, a constant
-            learning rate if ``None``; a learner without a learning rate ignores it.
         :return: Training that starts from the parameters of the circuit.
         """
         raise NotImplementedError
@@ -144,7 +140,6 @@ class CircuitParameterLearning(Generic[LayerType], SubClassSafeGeneric, ABC):
         *arguments: BackendArray,
         convergence: Convergence | None = None,
         mini_batches: MiniBatches | None = None,
-        learning_rate_plateau: LearningRatePlateau | None = None,
     ) -> TrainingRun[LayerType]:
         """
         Train on shuffled mini-batches, one step per batch, until the average loss of an
@@ -155,14 +150,11 @@ class CircuitParameterLearning(Generic[LayerType], SubClassSafeGeneric, ABC):
             if ``None``.
         :param mini_batches: How the rows are split into the batches of every epoch,
             :class:`MiniBatches` with its defaults, one batch of all rows, if ``None``.
-        :param learning_rate_plateau: The schedule of the learning rate, a constant
-            learning rate if ``None``.
         :return: The trained circuit and the losses of its epochs.
         """
         training = self.start_training(
             arguments=arguments,
             mini_batches=MiniBatches() if mini_batches is None else mini_batches,
-            learning_rate_plateau=learning_rate_plateau,
         )
         history = (
             Convergence() if convergence is None else convergence
