@@ -39,7 +39,6 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.geometry import Scale
     from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
     from semantic_digital_twin.world_description.world_entity import (
-        Body,
         Connection,
         SemanticAnnotation,
         WorldEntity,
@@ -2043,24 +2042,6 @@ class CollisionCheckingError(DataclassException):
     """
     Base class for errors during collision checking.
     """
-
-
-@dataclass
-class NoExternalCollisionRuleError(CollisionCheckingError):
-    """
-    Raised when no rule keeps a body away from the bodies outside its robot.
-    """
-
-    body: Body
-    """
-    The body asked about.
-    """
-
-    def error_message(self) -> str:
-        return f"No rule keeps {self.body.name} away from the bodies outside its robot."
-
-    def suggest_correction(self) -> str:
-        return "Ask about a body of a robot whose collision rules avoid external collisions."
 
 
 @dataclass

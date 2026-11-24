@@ -1,4 +1,3 @@
-import pytest
 import numpy as np
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -23,8 +22,6 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     ExternalCollisionVariableManager,
     SelfCollisionVariableManager,
 )
-from semantic_digital_twin.exceptions import NoExternalCollisionRuleError
-from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.world import World
@@ -440,7 +437,7 @@ def test_robot_is_not_in_collision_when_nothing_is_checked(cylinder_bot_world):
     assert not robot.is_in_collision
 
 
-# %% whether a robot keeps out of its buffer zones
+# %% whether a robot keeps out of its buffer zones around the environment
 
 
 def test_robot_within_a_buffer_zone_is_not_yet_in_collision(cylinder_bot_world):
@@ -465,7 +462,7 @@ def test_robot_within_a_buffer_zone_is_not_yet_in_collision(cylinder_bot_world):
     )
     collision_manager.update_collision_matrix()
 
-    assert robot.is_within_a_buffer_zone
+    assert robot.is_within_an_external_buffer_zone
     assert not robot.is_in_collision
 
 
@@ -509,7 +506,30 @@ def test_robot_is_not_within_a_buffer_zone_exactly_at_its_distance(
     )
     collision_manager.update_collision_matrix()
 
-    assert not robot.is_within_a_buffer_zone
+    assert not robot.is_within_an_external_buffer_zone
+
+
+def test_robot_close_to_itself_is_not_within_an_external_buffer_zone(
+    self_collision_bot_world,
+):
+    """
+    Only a body outside the robot puts it within an external buffer zone, however close
+    its own bodies come to each other.
+    """
+    robot = self_collision_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    collision_manager = self_collision_bot_world.collision_manager
+    collision_manager.extend_temporary_rule(
+        [
+            AllowAllCollisions(),
+            AvoidSelfCollisions(
+                buffer_zone_distance=10, violated_distance=0.0, robot=robot
+            ),
+        ]
+    )
+    collision_manager.update_collision_matrix()
+    assert collision_manager.compute_collisions().contacts
+
+    assert not robot.is_within_an_external_buffer_zone
 
 
 # %% consumers stay out of the serialized model
@@ -549,35 +569,3 @@ def test_a_consumer_does_not_have_to_be_serializable(pr2_world_copy):
     collision_manager.add_collision_consumer(ConsumerHoldingSomethingUnserializable())
 
     assert "collision_consumers" not in collision_manager.to_json()
-
-
-# %% the rule that keeps a robot body away from the environment
-
-
-def test_a_body_is_kept_from_the_environment_by_its_own_rule(hsr_world_copy):
-    """
-    The HSR keeps its base farther from the environment than the rest of its bodies.
-    """
-    robot = hsr_world_copy.get_semantic_annotations_by_type(HSRB)[0]
-    collision_manager = hsr_world_copy.collision_manager
-    [everything_rule, base_rule] = [
-        rule
-        for rule in collision_manager.default_rules
-        if isinstance(rule, AvoidExternalCollisions)
-    ]
-    [base] = base_rule.body_subset
-    hand = hsr_world_copy.get_body_in_branch_by_name(robot.root, "hand_palm_link")
-
-    assert collision_manager.external_collision_rule(body=base) is base_rule
-    assert collision_manager.external_collision_rule(body=hand) is everything_rule
-
-
-def test_a_body_outside_every_robot_has_no_external_collision_rule(
-    cylinder_bot_world,
-):
-    environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
-        "environment"
-    )
-
-    with pytest.raises(NoExternalCollisionRuleError):
-        cylinder_bot_world.collision_manager.external_collision_rule(body=environment)

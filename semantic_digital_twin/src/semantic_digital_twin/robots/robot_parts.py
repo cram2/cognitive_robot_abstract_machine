@@ -139,9 +139,6 @@ from semantic_digital_twin.world_description.world_modification import (
 if TYPE_CHECKING:
     from rclpy.node import Node
 
-    from semantic_digital_twin.collision_checking.collision_detector import (
-        ClosestPoints,
-    )
     from semantic_digital_twin.specifications.connections import ConnectionSpecification
     from semantic_digital_twin.specifications.kinematic_structure_entities import (
         BodySpecification,
@@ -1290,36 +1287,29 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         :return: Whether any body of this robot is below the violated distance the
             active collision rules set for it.
         """
+        own_bodies = set(self.bodies_with_collision)
         collision_manager = self._world.collision_manager
         return any(
             contact.distance
             < collision_manager.get_violated_distance(contact.body_a, contact.body_b)
-            for contact in self._own_contacts()
+            for contact in collision_manager.compute_collisions().contacts
+            if contact.body_a in own_bodies or contact.body_b in own_bodies
         )
 
     @property
-    def is_within_a_buffer_zone(self) -> bool:
+    def is_within_an_external_buffer_zone(self) -> bool:
         """
-        :return: Whether any body of this robot is closer than the buffer-zone distance
-            the active collision rules keep it at.
+        :return: Whether any body of this robot is closer to a body outside it than the
+            buffer-zone distance the active collision rules keep between the two.
         """
+        own_bodies = set(self.bodies_with_collision)
         collision_manager = self._world.collision_manager
         return any(
             contact.distance
             < collision_manager.get_buffer_zone_distance(contact.body_a, contact.body_b)
-            for contact in self._own_contacts()
+            for contact in collision_manager.compute_collisions().contacts
+            if (contact.body_a in own_bodies) != (contact.body_b in own_bodies)
         )
-
-    def _own_contacts(self) -> list[ClosestPoints]:
-        """
-        :return: The contacts the collision manager computes for a body of this robot.
-        """
-        own_bodies = set(self.bodies_with_collision)
-        return [
-            contact
-            for contact in self._world.collision_manager.compute_collisions().contacts
-            if contact.body_a in own_bodies or contact.body_b in own_bodies
-        ]
 
     @classmethod
     @abstractmethod
