@@ -1,3 +1,8 @@
+"""
+The context the nodes of a statechart are built and ticked in, and the extensions
+frameworks add to it.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -58,6 +63,15 @@ class StatechartContext:
     tick_duration: float | None = None
     """
     How many seconds one tick stands for, None if ticks do not stand for a fixed time.
+    """
+
+    framework_name: str | None = None
+    """
+    The name of the framework the statecharts of this context run in, None if it names
+    none.
+
+    It changes the children only of the composite nodes it owns, see
+    :attr:`~cramph.node.CompositeNode.structure_owner`.
     """
 
     tick_variable: FloatVariable = field(init=False)
