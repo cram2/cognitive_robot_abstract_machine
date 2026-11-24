@@ -15,15 +15,14 @@ on:
     types: [ completed ]
     branches: [ main ]
 
-# a new push to a pull request cancels the run still going for its previous commit, so
-# the runners only ever test the commit that can still be merged
+# a new push cancels the outdated run
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   to-lowercase:
-    # a draft pull request runs no CI; marking it ready for review starts the run
+    # drafts run no CI
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     outputs:
@@ -34,21 +33,17 @@ jobs:
           echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
 
   run_examples_and_demos:
-    # Every example and demo runs in this one job: each takes a few minutes, while setting
-    # up the container, the workspace and the ORM takes about five.
+    # One job for all scripts, so the setup runs once
     needs: [to-lowercase]
     runs-on: ubuntu-latest
-    # Fails a job that is still running after an hour. A runner that runs out of disk or memory
-    # stops responding, and its job would otherwise only end at GitHub's six-hour limit.
+    # A runner out of disk or memory hangs instead of failing
     timeout-minutes: 60
     container:
       image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
-      # The host's root, so free_runner_disk.sh can delete what the runner image installs and
-      # show_runner_resources.sh can measure the disk the job shares with it. Writable, since
-      # the runner's machine is discarded after the job.
+      # The host's root, for free_runner_disk.sh and show_runner_resources.sh
       options: --volume /:/host
     env:
-      # The CPU only torch build, as in ci_reusable.yml: the CUDA build exhausts the runner disk.
+      # CPU-only torch; the CUDA build fills the disk
       UV_INDEX: https://download.pytorch.org/whl/cpu
       UV_INDEX_STRATEGY: unsafe-best-match
     steps:
@@ -65,11 +60,7 @@ jobs:
 
       - name: Install dependencies
         env:
-          # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
-          # hardlink packages into site-packages instead of full-copying them. The default cache
-          # (~/.cache/uv under the mounted /github/home volume) is a different filesystem, which
-          # forces a full copy of every wheel and stores each package twice -- exhausting the runner
-          # disk ("No space left on device") during install.
+          # Same filesystem as the venv, so uv hardlinks instead of copying and fills no disk
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
           cd cognitive_robot_abstract_machine
@@ -88,11 +79,7 @@ jobs:
             ${{ runner.os }}-demo-cache-
 
       - name: Build ORM
-        # ormatic_interface.py files are not tracked (see AGENTS.md), so the full
-        # dependency chain (semantic_digital_twin -> giskardpy -> segmind -> coraplex ->
-        # experiments, see scripts/regenerate_all_orm.py) must be regenerated before any
-        # example or demo that touches the database can run. Every script this job runs
-        # lives under coraplex, semantic_digital_twin, or experiments, so this always applies.
+        # The ORM interfaces are not tracked, and the demos use the database
         run: |
           cd cognitive_robot_abstract_machine
           source /opt/ros/overlay_ws/install/setup.bash
@@ -103,7 +90,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
           LIBGL_ALWAYS_SOFTWARE: 1
-          # A script that hangs fails on its own instead of using up the job's time.
+          # a hanging script fails instead of using up the job
           SCRIPT_TIMEOUT: 15m
         run: |
           cd cognitive_robot_abstract_machine
@@ -122,7 +109,7 @@ jobs:
             experiments/src/experiments/real_stretch_apartment_demo/test_demo.py
             experiments/src/experiments/daisy_gripper_demo/test_demo.py
           )
-          # Every script runs, even after another one failed; the step fails at the end.
+          # run every script, fail at the end
           failed=0
           {
             echo "| Script | Result | Minutes |"
@@ -147,7 +134,7 @@ jobs:
           exit "$failed"
 
       - name: Show runner resources after the job
-        # Runs after a failure too, so a job that ran out of disk shows what filled it.
+        # also after a failure, to show what filled the disk
         if: always()
         run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
