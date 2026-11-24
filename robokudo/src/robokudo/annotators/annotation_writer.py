@@ -12,7 +12,6 @@ import shutil
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from rclpy.publisher import Publisher
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
@@ -55,7 +54,7 @@ class AnnotationStorageWriterDescriptor(
 # %% AnnotationStorageWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AnnotationStorageWriter(BaseAnnotator[AnnotationStorageWriterDescriptor]):
     """Annotator for writing annotations to storage in JSON format.
 
@@ -66,18 +65,8 @@ class AnnotationStorageWriter(BaseAnnotator[AnnotationStorageWriterDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: AnnotationStorageWriterDescriptor = field(
-        default_factory=AnnotationStorageWriterDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     counter: int = field(default=-1, init=False, repr=False)
     """Counter for generating sequential filenames"""
-
-    @classproperty
-    def Descriptor(cls) -> type[AnnotationStorageWriterDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return AnnotationStorageWriterDescriptor
 
     def update(self) -> Status:
         """Write current CAS annotations to storage.
@@ -142,7 +131,7 @@ class AnnotationPublisherWriterDescriptor(
 # %% AnnotationPublisherWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescriptor]):
     """Annotator for publishing annotations via ROS topics.
 
@@ -153,18 +142,8 @@ class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescripto
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: AnnotationPublisherWriterDescriptor = field(
-        default_factory=AnnotationPublisherWriterDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     publisher: Publisher | None = field(default=None, init=False, repr=False)
     """ROS publisher for annotations"""
-
-    @classproperty
-    def Descriptor(cls) -> type[AnnotationPublisherWriterDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return AnnotationPublisherWriterDescriptor
 
     def setup(self, timeout: float) -> None:
         """Set up the ROS2 publisher for annotation messages.

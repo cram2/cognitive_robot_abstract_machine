@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 from uuid import UUID
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Any
 
@@ -101,7 +100,7 @@ class WorldDescriptorBootstrapDescriptor(
 # %% WorldDescriptorBootstrap annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class WorldDescriptorBootstrapAnnotator(
     BaseAnnotator[WorldDescriptorBootstrapDescriptor]
 ):
@@ -112,11 +111,6 @@ class WorldDescriptorBootstrapAnnotator(
     name: str = "WorldDescriptorBootstrap"
     """Name of this node in the behaviour tree."""
 
-    descriptor: WorldDescriptorBootstrapDescriptor = field(
-        default_factory=WorldDescriptorBootstrapDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     _last_augmented_world_id: int | None = field(default=None, init=False, repr=False)
     """Identity of the world most recently augmented with descriptor entities."""
 
@@ -124,11 +118,6 @@ class WorldDescriptorBootstrapAnnotator(
         init=False, repr=False
     )
     """Descriptor entities retained for replacing a previous augmentation."""
-
-    @classproperty
-    def Descriptor(cls) -> type[WorldDescriptorBootstrapDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return WorldDescriptorBootstrapDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""

@@ -24,10 +24,10 @@ The pipeline implements the following functionality:
     error handling and recovery mechanisms.
 """
 
-from py_trees.composites import Sequence
-from py_trees.decorators import Inverter, Condition
 from py_trees.behaviours import SuccessEveryN
 from py_trees.common import Status
+from py_trees.composites import Sequence
+from py_trees.decorators import Condition, Inverter
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -36,11 +36,10 @@ from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.query import QueryAnnotator
-
 from robokudo.annotators.vis import Redraw
 from robokudo.behaviours.action_server_checks import (
-    ActionServerNoPreemptRequest,
     AbortGoal,
+    ActionServerNoPreemptRequest,
 )
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
@@ -115,7 +114,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         processing_sequence.add_children(
             [
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

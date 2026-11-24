@@ -10,7 +10,6 @@ from enum import Enum
 import cv2
 import numpy as np
 import open3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING, Any
 
@@ -100,7 +99,7 @@ class TSDFDescriptor(AnnotatorDescriptor[TSDFParameters]):
 # %% TSDF annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
     """
     Annotator for per-object TSDF volume integration.
@@ -113,9 +112,6 @@ class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: TSDFDescriptor = field(default_factory=TSDFDescriptor)
-    """Configuration supplied to this annotator instance."""
-
     translation_comparator: TranslationComparator = field(init=False, repr=False)
     """Translation comparator for comparing world positions between pipeline iterations."""
 
@@ -123,11 +119,6 @@ class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
         default_factory=list, init=False, repr=False
     )
     """A list of tracked object data, including the bounding box and the TSDF volume."""
-
-    @classproperty
-    def Descriptor(cls) -> type[TSDFDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return TSDFDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""

@@ -82,7 +82,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=tiago_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 StorageWriter(),
             ]
         )

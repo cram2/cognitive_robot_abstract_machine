@@ -15,7 +15,6 @@ from timeit import default_timer
 import cv2
 import open3d as o3d
 import trimesh
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body
@@ -80,7 +79,7 @@ class ObjectHypothesisVisualizerDescriptor(
 # %% ObjectHypothesisVisualizer annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ObjectHypothesisVisualizer(BaseAnnotator[ObjectHypothesisVisualizerDescriptor]):
     """Annotator for visualizing object hypotheses in the CAS.
 
@@ -94,20 +93,10 @@ class ObjectHypothesisVisualizer(BaseAnnotator[ObjectHypothesisVisualizerDescrip
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: ObjectHypothesisVisualizerDescriptor = field(
-        default_factory=ObjectHypothesisVisualizerDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     _mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = field(
         default_factory=dict, init=False, repr=False
     )
     """Reusable visualization meshes indexed by geometry properties."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ObjectHypothesisVisualizerDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ObjectHypothesisVisualizerDescriptor
 
     def _iter_mesh_visuals(self, body: Body) -> list[Mesh]:
         """Return mesh-based visual shapes for a body."""

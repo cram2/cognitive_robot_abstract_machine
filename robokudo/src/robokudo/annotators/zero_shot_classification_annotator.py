@@ -17,7 +17,9 @@ from typing_extensions import TYPE_CHECKING, Callable, Generic, TypeVar
 
 from robokudo.annotators.core import ThreadedAnnotator
 from robokudo.cas import CASViews
-from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
+from robokudo.datastructures.annotator_descriptor import (
+    AnnotatorDescriptor,
+)
 from robokudo.datastructures.annotator_parameters import AnnotatorParameters
 from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
@@ -63,10 +65,11 @@ class ZeroShotClassificationParameters(AnnotatorParameters):
 
 # %% ZeroShotClassification descriptor
 
-ClassificationParametersType = TypeVar(
-    "ClassificationParametersType", bound=ZeroShotClassificationParameters
+ZeroShotClassificationDescriptorType = TypeVar(
+    "ZeroShotClassificationDescriptorType",
+    bound=AnnotatorDescriptor[ZeroShotClassificationParameters],
 )
-"""Concrete vocabulary and model settings handled by a classification annotator."""
+"""Concrete configuration handled by a classification annotator."""
 
 
 @dataclass(kw_only=True)
@@ -84,21 +87,16 @@ class ZeroShotClassificationDescriptor(
 # %% ZeroShotClassification annotator
 
 
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class ZeroShotClassificationAnnotator(
-    ThreadedAnnotator[AnnotatorDescriptor[ClassificationParametersType]],
-    Generic[ClassificationParametersType],
+    ThreadedAnnotator[ZeroShotClassificationDescriptorType],
+    Generic[ZeroShotClassificationDescriptorType],
     ABC,
 ):
     """
     Classifies the whole image or each object hypothesis against a freely chosen
     vocabulary of class names, without training on those classes.
     """
-
-    @classproperty
-    def Descriptor(cls) -> type[AnnotatorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ZeroShotClassificationDescriptor
 
     @classproperty
     def visualization_font(cls) -> int:

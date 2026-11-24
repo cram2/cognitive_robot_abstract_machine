@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from rclpy.time import Time
 from scipy.optimize import linear_sum_assignment
@@ -61,7 +60,7 @@ class SemanticDigitalTwinConnectorDescriptor(
 # %% SemanticDigitalTwinConnector annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SemanticDigitalTwinConnector(
     ThreadedAnnotator[SemanticDigitalTwinConnectorDescriptor]
 ):
@@ -72,18 +71,8 @@ class SemanticDigitalTwinConnector(
     name: str = "SemanticDigitalTwinSynchronization"
     """Name of this node in the behaviour tree."""
 
-    descriptor: SemanticDigitalTwinConnectorDescriptor = field(
-        default_factory=SemanticDigitalTwinConnectorDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     object_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
     """Compares perception hypotheses with semantic-world objects."""
-
-    @classproperty
-    def Descriptor(cls) -> type[SemanticDigitalTwinConnectorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return SemanticDigitalTwinConnectorDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""

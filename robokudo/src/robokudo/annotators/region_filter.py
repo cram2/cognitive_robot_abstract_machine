@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
 
@@ -64,7 +63,7 @@ class RegionFilterDescriptor(AnnotatorDescriptor[RegionFilterParameters]):
 # %% RegionFilter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     """Point cloud filtering using world regions.
 
@@ -75,19 +74,11 @@ class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: RegionFilterDescriptor = field(default_factory=RegionFilterDescriptor)
-    """Configuration supplied to this annotator instance."""
-
     world_frame_name: str = field(init=False, repr=False)
     """Name of the world coordinate frame read from parameters"""
 
     active_region: str = field(init=False, repr=False)
     """Name of the active region to filter read from parameters"""
-
-    @classproperty
-    def Descriptor(cls) -> type[RegionFilterDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return RegionFilterDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""

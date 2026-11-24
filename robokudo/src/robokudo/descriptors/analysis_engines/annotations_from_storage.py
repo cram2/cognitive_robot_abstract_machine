@@ -17,14 +17,14 @@ The pipeline implements the following functionality:
 """
 
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.idioms import pipeline_init
-from robokudo.pipeline import Pipeline
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVisualizer
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.idioms import pipeline_init
+from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -77,7 +77,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 ObjectHypothesisVisualizer(),
             ]
         )

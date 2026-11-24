@@ -30,7 +30,6 @@ from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import ThreadedAnnotator
@@ -77,7 +76,7 @@ class ICPPoseRefinementDescriptor(AnnotatorDescriptor[ICPPoseRefinementParameter
 # %% ICPPoseRefinement annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor]):
     """Pose refinement using iterative closest point (ICP).
 
@@ -100,11 +99,6 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor])
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: ICPPoseRefinementDescriptor = field(
-        default_factory=ICPPoseRefinementDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     class_name_to_ply_model: dict[str, o3d.geometry.PointCloud] = field(
         init=False, repr=False
     )
@@ -112,11 +106,6 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor])
 
     annotator_deactivated: bool = field(init=False, repr=False)
     """Whether unavailable model data prevents pose refinement."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ICPPoseRefinementDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ICPPoseRefinementDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""

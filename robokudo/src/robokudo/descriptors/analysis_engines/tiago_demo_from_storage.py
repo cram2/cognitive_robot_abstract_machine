@@ -23,20 +23,19 @@ The pipeline implements the following functionality:
 from py_trees.composites import Sequence
 
 from robokudo.analysis_engine import AnalysisEngineInterface
+from robokudo.annotators.cluster_color import ClusterColorAnnotator
+from robokudo.annotators.cluster_pose_pca import ClusterPosePCAAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.cluster_pose_pca import ClusterPosePCAAnnotator
-from robokudo.annotators.cluster_color import ClusterColorAnnotator
-from robokudo.idioms import pipeline_init
-from robokudo.pipeline import Pipeline
-from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
-
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.idioms import pipeline_init
+from robokudo.pipeline import Pipeline
+from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -103,7 +102,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         pre.add_children(
             [
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
             ]
         )
 

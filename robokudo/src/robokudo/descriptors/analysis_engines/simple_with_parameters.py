@@ -82,7 +82,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
                 ImagePreprocessorAnnotator(
-                    "ImagePreprocessor", descriptor=image_preprocessor_config
+                    name="ImagePreprocessor", descriptor=image_preprocessor_config
                 ),
                 SlowAnnotator("SlowAnnotator"),
             ]

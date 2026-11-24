@@ -1,15 +1,17 @@
+"""
+Validate normalized color presets and segmentation across the hue seam.
+"""
+
 from __future__ import annotations
 
 # %% Imports
-
 import numpy as np
-from semantic_digital_twin.world_description.geometry import Color
-
 from robokudo.annotators.image_cluster_extractor import (
     ColorName,
     ColorRangeBound,
     ImageClusterExtractor,
 )
+from semantic_digital_twin.world_description.geometry import Color
 
 # %% Normalized color bounds
 
@@ -71,7 +73,7 @@ class TestHueThresholds:
     """
 
     def annotator(self) -> ImageClusterExtractor:
-        return ImageClusterExtractor("test")
+        return ImageClusterExtractor(name="test")
 
     def image_with_hues(self, hue_values: list[int]) -> np.ndarray:
         """

@@ -29,7 +29,6 @@ from timeit import default_timer
 import cv2
 import numpy.linalg
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
@@ -85,7 +84,7 @@ class ClusterPoseBoundingBoxDescriptor(
 # %% ClusterPoseBoundingBox annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescriptor]):
     """3D pose estimation using oriented bounding boxes.
 
@@ -103,16 +102,6 @@ class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescri
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: ClusterPoseBoundingBoxDescriptor = field(
-        default_factory=ClusterPoseBoundingBoxDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ClusterPoseBoundingBoxDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ClusterPoseBoundingBoxDescriptor
 
     def adjust_bb_orientation_by_bb_size(
         self, pose_orientation: npt.NDArray, bounding_box_extents: list

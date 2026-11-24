@@ -24,7 +24,6 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import open3d
-from krrood.ormatic.utils import classproperty
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from scipy.spatial.transform import Rotation as R
@@ -188,7 +187,7 @@ class PointCloudClusterExtractorDescriptor(
 # %% PointCloudClusterExtractor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PointCloudClusterExtractor(
     ThreadedAnnotator[PointCloudClusterExtractorDescriptor]
 ):
@@ -206,16 +205,6 @@ class PointCloudClusterExtractor(
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: PointCloudClusterExtractorDescriptor = field(
-        default_factory=PointCloudClusterExtractorDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[PointCloudClusterExtractorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return PointCloudClusterExtractorDescriptor
 
     def points_and_indices_from_plane(
         self,
@@ -521,7 +510,7 @@ class NaivePointCloudClusterExtractorDescriptor(
 # %% NaivePointCloudClusterExtractor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class NaivePointCloudClusterExtractor(
     ThreadedAnnotator[NaivePointCloudClusterExtractorDescriptor]
 ):
@@ -534,16 +523,6 @@ class NaivePointCloudClusterExtractor(
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: NaivePointCloudClusterExtractorDescriptor = field(
-        default_factory=NaivePointCloudClusterExtractorDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[NaivePointCloudClusterExtractorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return NaivePointCloudClusterExtractorDescriptor
 
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:

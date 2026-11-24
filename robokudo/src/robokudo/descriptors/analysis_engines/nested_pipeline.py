@@ -17,21 +17,21 @@ The pipeline implements the following functionality:
     processing flows using nested pipelines and conditional execution.
 """
 
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
-from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
-from robokudo.pipeline import Pipeline
 from py_trees.behaviours import SuccessEveryN, TickCounter
 from py_trees.common import Status
-from py_trees.decorators import Condition
 from py_trees.composites import Sequence
+from py_trees.decorators import Condition
 
+from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.testing import SlowAnnotator
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.gui import SetPipelineRedraw
+from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -109,7 +109,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         for annotator in [
             ClearAnnotatorOutputs(),
             CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
+            ImagePreprocessorAnnotator(name="ImagePreprocessor"),
             SlowAnnotator("SlowAnnotator"),
         ]:
             seq.add_child(annotator)

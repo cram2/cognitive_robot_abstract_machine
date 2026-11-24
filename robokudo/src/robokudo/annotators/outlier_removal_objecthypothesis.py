@@ -25,7 +25,6 @@ from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.parameter import Parameter
@@ -103,7 +102,7 @@ class OutlierRemovalOnObjectHypothesisDescriptor(
 # %% OutlierRemovalOnObjectHypothesis annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class OutlierRemovalOnObjectHypothesisAnnotator(
     BaseAnnotator[OutlierRemovalOnObjectHypothesisDescriptor]
 ):
@@ -123,18 +122,8 @@ class OutlierRemovalOnObjectHypothesisAnnotator(
     name: str = "OutlierRemovalOnObjectHypothesis"
     """Name of this node in the behaviour tree."""
 
-    descriptor: OutlierRemovalOnObjectHypothesisDescriptor = field(
-        default_factory=OutlierRemovalOnObjectHypothesisDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     node: Node = field(init=False, repr=False)
     """ROS node owning the annotator parameter declarations."""
-
-    @classproperty
-    def Descriptor(cls) -> type[OutlierRemovalOnObjectHypothesisDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return OutlierRemovalOnObjectHypothesisDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""

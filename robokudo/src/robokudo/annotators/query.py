@@ -29,7 +29,6 @@ from threading import Event
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
-from krrood.ormatic.utils import classproperty
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.action import CancelResponse, GoalResponse
@@ -295,7 +294,7 @@ class GenerateQueryResultDescriptor(AnnotatorDescriptor[GenerateQueryResultParam
 # %% GenerateQueryResult annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
     """
     This class reads in the annotations done by the previous Annotators and generates
@@ -307,11 +306,6 @@ class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: GenerateQueryResultDescriptor = field(
-        default_factory=GenerateQueryResultDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
 
     color_converter: SemanticColor2ODConverter = field(init=False, repr=False)
     """Converts semantic colors into query result properties."""
@@ -358,11 +352,6 @@ class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
 
     query_matcher: ObjectHypothesisQueryMatcher = field(init=False, repr=False)
     """Matches object hypotheses against the active query."""
-
-    @classproperty
-    def Descriptor(cls) -> type[GenerateQueryResultDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return GenerateQueryResultDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""

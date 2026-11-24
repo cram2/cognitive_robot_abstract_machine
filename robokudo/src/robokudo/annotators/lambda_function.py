@@ -22,7 +22,6 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass, field
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Callable
 
@@ -63,7 +62,7 @@ class LambdaFunctionDescriptor(AnnotatorDescriptor[LambdaFunctionParameters]):
 # %% LambdaFunction annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
     """
     Annotator for executing arbitrary functions.
@@ -74,16 +73,6 @@ class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: LambdaFunctionDescriptor = field(
-        default_factory=LambdaFunctionDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[LambdaFunctionDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return LambdaFunctionDescriptor
 
     def update(self) -> Status:
         """

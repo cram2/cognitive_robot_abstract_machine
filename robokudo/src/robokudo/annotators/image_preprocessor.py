@@ -22,7 +22,6 @@ from timeit import default_timer
 import cv2
 import numpy
 import open3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
@@ -64,7 +63,7 @@ class ImagePreprocessorDescriptor(AnnotatorDescriptor[ImagePreprocessorParameter
 # %% ImagePreprocessor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
     """
     RGB-D image preprocessor and point cloud generator.
@@ -83,11 +82,6 @@ class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
     name: str = "ImagePreprocessor"
     """Name of this node in the behaviour tree."""
 
-    descriptor: ImagePreprocessorDescriptor = field(
-        default_factory=ImagePreprocessorDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """Optional color image currently being worked with"""
 
@@ -104,11 +98,6 @@ class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
 
         COLOR = "color"
         DEPTH = "depth"
-
-    @classproperty
-    def Descriptor(cls) -> type[ImagePreprocessorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ImagePreprocessorDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""

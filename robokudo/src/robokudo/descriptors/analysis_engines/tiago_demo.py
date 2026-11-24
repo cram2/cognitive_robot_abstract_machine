@@ -97,7 +97,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=tiago_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

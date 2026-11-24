@@ -26,7 +26,6 @@ import json
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from typing_extensions import Any
@@ -67,7 +66,7 @@ class StorageWriterDescriptor(AnnotatorDescriptor[StorageWriterParameters]):
 # %% StorageWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     """
     Annotator for storing sensor data in MongoDB.
@@ -79,19 +78,11 @@ class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: StorageWriterDescriptor = field(default_factory=StorageWriterDescriptor)
-    """Configuration supplied to this annotator instance."""
-
     storage: Storage = field(init=False, repr=False)
     """Storage connection used to persist pipeline data."""
 
     storage_preparation_completed: bool = field(default=False, init=False, repr=False)
     """Whether storage setup has already run for this writer."""
-
-    @classproperty
-    def Descriptor(cls) -> type[StorageWriterDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return StorageWriterDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""

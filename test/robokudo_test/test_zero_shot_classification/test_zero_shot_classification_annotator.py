@@ -13,7 +13,6 @@ from py_trees.common import Status
 from robokudo.annotators.zero_shot_classification_annotator import (
     ZeroShotClassificationAnnotator,
     ZeroShotClassificationDescriptor,
-    ZeroShotClassificationParameters,
 )
 from robokudo.cas import CASViews
 from robokudo.pipeline import Pipeline
@@ -36,7 +35,7 @@ pytestmark = pytest.mark.usefixtures("annotator_output_buffer")
 
 
 class ChannelMeanClassificationAnnotator(
-    ZeroShotClassificationAnnotator[ZeroShotClassificationParameters]
+    ZeroShotClassificationAnnotator[ZeroShotClassificationDescriptor]
 ):
     """
     Ranks each color word of the vocabulary by how strongly the image shows the color it
@@ -71,7 +70,7 @@ def _color_descriptor() -> ZeroShotClassificationDescriptor:
     """
     :return: A descriptor classifying against the color vocabulary.
     """
-    descriptor = ZeroShotClassificationAnnotator.Descriptor()
+    descriptor = ZeroShotClassificationDescriptor()
     descriptor.parameters.vocabulary = COLOR_VOCABULARY
     descriptor.parameters.maximum_saved_classifications = len(COLOR_VOCABULARY)
     return descriptor

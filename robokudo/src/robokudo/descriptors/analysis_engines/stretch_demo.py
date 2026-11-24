@@ -160,7 +160,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=camera_descriptor),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=crop_descriptor),
                 ImageClusterExtractor(descriptor=cluster_descriptor),
                 ClusterPoseBoundingBoxAnnotator(),

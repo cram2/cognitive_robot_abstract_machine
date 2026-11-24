@@ -1,3 +1,7 @@
+"""
+Validate complete perception pipelines and their semantic world updates.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -6,9 +10,7 @@ from pathlib import Path
 import numpy as np
 import py_trees
 import pytest
-
-from robokudo.types.cv import ColorToDepthRatio
-from robokudo import world as rk_world
+import robokudo.behaviours.clear_annotator_outputs
 import robokudo.cas
 import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
@@ -16,7 +18,6 @@ import robokudo.descriptors.camera_configs.config_mongodb_playback
 import robokudo.io.file_reader_interface
 import robokudo.io.ray_tracing_camera_interface
 import robokudo.io.storage_reader_interface
-import robokudo.behaviours.clear_annotator_outputs
 import robokudo.pipeline
 import robokudo.types.annotation
 import robokudo.types.scene
@@ -39,7 +40,10 @@ from robokudo.descriptors.camera_configs.config_ray_tracing import (
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.types.cv import ColorToDepthRatio
 from semantic_digital_twin.robots.robot_parts import Camera
+
+from robokudo import world as rk_world
 
 
 @pytest.fixture
@@ -52,6 +56,10 @@ def clean_semantic_world():
 
 
 class TestFullAEExecution(object):
+    """
+    Verify pipeline results across recorded and rendered camera observations.
+    """
+
     def test_run_simple_ae_successfully(
         self, node, cup_on_counter_directory: Path
     ) -> None:
@@ -79,7 +87,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_fr_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
@@ -119,7 +127,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_fr_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
@@ -284,7 +292,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(descriptor=cluster_desc),
@@ -366,7 +374,7 @@ class TestFullAEExecution(object):
             [
                 robokudo.behaviours.clear_annotator_outputs.ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(descriptor=cluster_desc),

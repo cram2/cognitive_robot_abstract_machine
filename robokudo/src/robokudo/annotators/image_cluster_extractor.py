@@ -11,7 +11,6 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import open3d
-from krrood.ormatic.utils import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Color
@@ -184,7 +183,7 @@ class ImageClusterExtractorDescriptor(
 # %% ImageClusterExtractor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
     """
     Extract object clusters from images using color segmentation.
@@ -203,11 +202,6 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: ImageClusterExtractorDescriptor = field(
-        default_factory=ImageClusterExtractorDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
 
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """Color image retained for the current computation."""
@@ -240,11 +234,6 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
         """
         Show depth mask of detected objects.
         """
-
-    @classproperty
-    def Descriptor(cls) -> type[ImageClusterExtractorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ImageClusterExtractorDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""

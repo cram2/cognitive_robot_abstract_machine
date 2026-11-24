@@ -1,3 +1,8 @@
+"""
+Segment tabletop objects from stored camera observations.
+"""
+
+# %% Imports
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
@@ -21,6 +26,7 @@ from robokudo.pipeline import Pipeline
 from robokudo.world import world_instance
 
 
+# %% Analysis engine
 class AnalysisEngine(AnalysisEngineInterface):
     """
     Analysis engine for demonstrating tabletop segmentation from stored data.
@@ -58,7 +64,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

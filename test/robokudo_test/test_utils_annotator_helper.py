@@ -1,37 +1,38 @@
+"""
+Validate camera models, image access, masks, and annotation frame conversions.
+"""
+
 from __future__ import annotations
 
 # %% Imports
-
 import copy
 
 import numpy as np
 import open3d
 import pytest
-
-from robokudo.types.cv import ColorToDepthRatio
 import robokudo.types.tf
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.pipeline import Pipeline
 from robokudo.types.annotation import PoseAnnotation
 from robokudo.types.camera import CameraObservation
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.annotator_helper import (
+    draw_bounding_boxes_from_object_hypotheses,
+    generate_source_name,
+    get_camera_to_world_transform_matrix,
+    get_color_image,
+    get_world_to_camera_transform_matrix,
+    resize_mask,
+    scale_camera_intrinsics,
+    transform_cloud_from_camera_to_world,
+    transform_cloud_from_world_to_camera,
     transform_pose_from_camera_to_world,
     transform_pose_from_world_to_camera,
-    transform_cloud_from_world_to_camera,
-    transform_cloud_from_camera_to_world,
-    get_camera_to_world_transform_matrix,
-    get_world_to_camera_transform_matrix,
-    draw_bounding_boxes_from_object_hypotheses,
-    get_color_image,
-    scale_camera_intrinsics,
-    resize_mask,
-    generate_source_name,
 )
-from krrood_spatial_math.spatial_types import Point2
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -70,10 +71,14 @@ def _camera_observation(
 
 
 class TestUtilsAnnotatorHelper(object):
+    """
+    Check camera-dependent image operations and camera-to-world annotation transforms.
+    """
+
     @pytest.fixture()
     def annotator_in_pipeline(self) -> BaseAnnotator:
         root = Pipeline("Sequence")
-        annotator = ImagePreprocessorAnnotator("1")
+        annotator = ImagePreprocessorAnnotator(name="1")
         root.add_child(annotator)
         return annotator
 

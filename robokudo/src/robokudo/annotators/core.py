@@ -33,7 +33,7 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.time import Time
 from sensor_msgs.msg import JointState
-from typing_extensions import Any, Callable, Generic, TypeVar
+from typing_extensions import Any, Callable, Generic, TypeVar, cast
 
 import robokudo.pipeline  # Work around circular import
 from robokudo.annotators.exceptions import EmptyAnalysisScope
@@ -64,7 +64,7 @@ DescriptorType = TypeVar("DescriptorType", bound=AnnotatorDescriptor)
 
 
 # %% Base annotator
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     """
     Base class for all RoboKudo annotators.
@@ -83,17 +83,22 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     """Name of this node in the behaviour tree."""
 
     descriptor: DescriptorType = field(
-        default_factory=BaseAnnotatorDescriptor, init=False, repr=False
+        default=cast(DescriptorType, None), kw_only=True, repr=False
     )
-    """Configuration supplied to this annotator instance."""
+    """Effective configuration, populated before initialization completes."""
 
     rk_logger: logging.Logger = field(init=False, repr=False)
     """Logger for annotator processing and lifecycle messages."""
 
     @classproperty
-    def Descriptor(cls) -> type[AnnotatorDescriptor]:
-        """Configuration constructor for annotators with common parameters only."""
-        return BaseAnnotatorDescriptor
+    def Descriptor(cls) -> type[DescriptorType]:
+        """Configuration constructor selected by the annotator's generic binding."""
+        if all(
+            isinstance(parameter, TypeVar)
+            for parameter in cls.get_generic_type_parameters()
+        ):
+            return cast(type[DescriptorType], BaseAnnotatorDescriptor)
+        return cls.get_type_of_generic_parameter(parameter=DescriptorType)
 
     def __init__(
         self,
@@ -114,13 +119,9 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
         if descriptor is None:
             descriptor = self.Descriptor()
 
-        # self.rk_logger = get_logger(ros_package_name)
         self.rk_logger = logging.getLogger(ros_package_name)
-
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        # self.rk_logger.debug("%s" % (get_line_context(self)))
         self.descriptor = descriptor
-        """Concrete configuration supplied to this annotator instance."""
 
     def __post_init__(self) -> None:
         """Initialize behaviour-tree identity and the annotator logger."""
@@ -466,7 +467,7 @@ class Worker(object):
 
 
 # %% Threaded annotator
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     """
     Base class for annotators that perform long-running operations.

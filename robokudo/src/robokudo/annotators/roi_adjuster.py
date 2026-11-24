@@ -11,7 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
@@ -55,7 +54,7 @@ class ROIAdjusterDescriptor(AnnotatorDescriptor[ROIAdjusterParameters]):
 # %% ROIAdjuster annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ROIAdjusterAnnotator(BaseAnnotator[ROIAdjusterDescriptor]):
     """Annotator for adjusting ROI sizes of object hypotheses.
 
@@ -66,14 +65,6 @@ class ROIAdjusterAnnotator(BaseAnnotator[ROIAdjusterDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: ROIAdjusterDescriptor = field(default_factory=ROIAdjusterDescriptor)
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ROIAdjusterDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ROIAdjusterDescriptor
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

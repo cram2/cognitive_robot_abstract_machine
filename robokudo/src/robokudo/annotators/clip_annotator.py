@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 import faiss
 import numpy as np
 import torch
-from krrood.ormatic.utils import classproperty
 from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 from typing_extensions import TYPE_CHECKING
@@ -66,8 +65,8 @@ class CLIPDescriptor(AnnotatorDescriptor[CLIPParameters]):
 # %% CLIP annotator
 
 
-@dataclass(eq=False)
-class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
+@dataclass(kw_only=True, eq=False)
+class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPDescriptor]):
     """
     Zero-shot classification by the similarity of CLIP's image embedding to the CLIP
     text embedding of each vocabulary entry.
@@ -75,9 +74,6 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: CLIPDescriptor = field(default_factory=CLIPDescriptor)
-    """Configuration supplied to this annotator instance."""
 
     clip_model: CLIPModel = field(init=False, repr=False)
     """CLIP model used for feature extraction."""
@@ -90,11 +86,6 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPParameters]):
 
     vocabulary_index: faiss.IndexFlatIP = field(init=False, repr=False)
     """A faiss index for text features used in similarity search."""
-
-    @classproperty
-    def Descriptor(cls) -> type[CLIPDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return CLIPDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""

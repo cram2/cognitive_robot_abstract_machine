@@ -117,7 +117,7 @@ class ClusterColorDescriptor(AnnotatorDescriptor[ClusterColorParameters]):
 # %% ClusterColor annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     """
     Calculate the semantic color for every Object Hypothesis (cluster) that has a RGB
@@ -140,9 +140,6 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: ClusterColorDescriptor = field(default_factory=ClusterColorDescriptor)
-    """Configuration supplied to this annotator instance."""
-
     color_hue_positions: dict[Color, float] = field(init=False, repr=False)
     """Representative hue of each named color."""
 
@@ -155,11 +152,6 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
         default_factory=list, init=False, repr=False
     )
     """Image regions used for the current color calculation."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ClusterColorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ClusterColorDescriptor
 
     @classproperty
     def color_name_to_bgr_values(cls) -> dict[Color, tuple[int, ...]]:

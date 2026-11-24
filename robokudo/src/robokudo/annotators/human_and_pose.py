@@ -246,7 +246,7 @@ class HumanAndPoseDescriptor(AnnotatorDescriptor[HumanAndPoseParameters]):
 # %% HumanAndPose annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
     """
     Detects humans with a YOLO pose model and annotates them with their keypoints.
@@ -255,16 +255,8 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: HumanAndPoseDescriptor = field(default_factory=HumanAndPoseDescriptor)
-    """Configuration supplied to this annotator instance."""
-
     model: YOLO | None = field(default=None, init=False, repr=False)
     """The YOLO pose model, loaded during setup."""
-
-    @classproperty
-    def Descriptor(cls) -> type[HumanAndPoseDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return HumanAndPoseDescriptor
 
     def setup(self, **kwargs: Any) -> bool:
         """

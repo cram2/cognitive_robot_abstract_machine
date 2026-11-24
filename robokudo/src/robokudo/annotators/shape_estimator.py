@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Any
 
@@ -202,7 +201,7 @@ class ShapeEstimatorDescriptor(AnnotatorDescriptor[ShapeEstimatorParameters]):
 # %% ShapeEstimator annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
     """Estimate one primitive shape per object hypothesis point cloud.
 
@@ -240,16 +239,6 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: ShapeEstimatorDescriptor = field(
-        default_factory=ShapeEstimatorDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ShapeEstimatorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ShapeEstimatorDescriptor
 
     def compute(self) -> Status:
         """Estimate shapes and publish annotations and 3D visualizations."""

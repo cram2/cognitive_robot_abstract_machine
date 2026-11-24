@@ -24,7 +24,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
 from typing_extensions import TYPE_CHECKING
@@ -78,7 +77,7 @@ class LocationDescriptor(AnnotatorDescriptor[LocationParameters]):
 # %% Location annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class LocationAnnotator(ThreadedAnnotator[LocationDescriptor]):
     """Determine object locations within semantic regions.
 
@@ -97,14 +96,6 @@ class LocationAnnotator(ThreadedAnnotator[LocationDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: LocationDescriptor = field(default_factory=LocationDescriptor)
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[LocationDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return LocationDescriptor
 
     def add_location_in_object_hypotheses(
         self,

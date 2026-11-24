@@ -19,7 +19,7 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
+from robokudo.annotators.query import GenerateQueryResult, QueryAnnotator
 from robokudo.behaviours.action_server_checks import ActionServerCheck
 from robokudo.descriptors.camera_configs.config_ray_tracing import (
     RayTracingCameraConfiguration,
@@ -33,10 +33,18 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Answer perception queries about tabletop objects rendered from a world descriptor.
+    """
+
     def name(self) -> str:
         return "semdt_raytracer_query_demo"
 
     def implementation(self) -> Pipeline:
+        """
+        Build :meth:`AnalysisEngineInterface.implementation` with query filtering for
+        rendered objects.
+        """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
@@ -55,7 +63,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(),

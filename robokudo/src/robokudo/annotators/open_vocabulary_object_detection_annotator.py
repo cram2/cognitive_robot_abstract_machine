@@ -13,7 +13,6 @@ import cv2
 import numpy
 import py_trees
 import torch
-from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.world_description.geometry import Color
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 from typing_extensions import TYPE_CHECKING
@@ -142,7 +141,7 @@ class OpenVocabularyObjectDetectionDescriptor(
 # %% OpenVocabularyObjectDetection annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class OpenVocabularyObjectDetectionAnnotator(
     robokudo.annotators.core.ThreadedAnnotator[OpenVocabularyObjectDetectionDescriptor]
 ):
@@ -150,21 +149,9 @@ class OpenVocabularyObjectDetectionAnnotator(
     Detect configured text classes and optionally segment their image regions.
     """
 
-    @classproperty
-    def Descriptor(cls) -> type[OpenVocabularyObjectDetectionDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return OpenVocabularyObjectDetectionDescriptor
-
     name: str = __qualname__
     """
     Name of the behaviour-tree node.
-    """
-
-    descriptor: OpenVocabularyObjectDetectionDescriptor = field(
-        default_factory=OpenVocabularyObjectDetectionDescriptor
-    )
-    """
-    Detection and segmentation configuration.
     """
 
     classes: list[str] = field(init=False)

@@ -99,7 +99,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             PipelineTrigger(),
             ClearAnnotatorOutputs(),
             CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
+            ImagePreprocessorAnnotator(name="ImagePreprocessor"),
             SlowAnnotator("FastAnnotator", sleep_duration_seconds=1),
             parallel,
             SlowAnnotator("Slow3Annotator", sleep_duration_seconds=2),

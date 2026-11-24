@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from py_trees.common import Status
 
@@ -53,7 +52,7 @@ class StaticCameraTransformDescriptor(
 # %% StaticCameraTransform annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StaticCameraTransformAnnotator(BaseAnnotator[StaticCameraTransformDescriptor]):
     """
     Write a fixed camera-to-world transform to the current CAS.
@@ -61,16 +60,6 @@ class StaticCameraTransformAnnotator(BaseAnnotator[StaticCameraTransformDescript
 
     name: str = "StaticCameraTransform"
     """Name of this node in the behaviour tree."""
-
-    descriptor: StaticCameraTransformDescriptor = field(
-        default_factory=StaticCameraTransformDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[StaticCameraTransformDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return StaticCameraTransformDescriptor
 
     def update(self) -> Status:
         """

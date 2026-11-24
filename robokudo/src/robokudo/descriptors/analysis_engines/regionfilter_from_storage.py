@@ -99,7 +99,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 WorldDescriptorBootstrapAnnotator(descriptor=bootstrap),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 RegionFilter(),
                 # CameraViewpointVisualizer(),
             ]

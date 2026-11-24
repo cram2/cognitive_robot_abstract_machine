@@ -22,7 +22,6 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass, field
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import Callable
 
@@ -61,7 +60,7 @@ class FilterDescriptor(AnnotatorDescriptor[FilterParameters]):
 # %% Filter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
     """
     Annotator for applying filter conditions to annotations.
@@ -72,14 +71,6 @@ class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: FilterDescriptor = field(default_factory=FilterDescriptor)
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[FilterDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return FilterDescriptor
 
     def update(self) -> Status:
         """

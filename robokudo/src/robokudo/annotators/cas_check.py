@@ -24,6 +24,7 @@ from typing_extensions import Callable
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS
+from robokudo.datastructures.annotator_descriptor import BaseAnnotatorDescriptor
 from robokudo.exceptions import CASCheckConfigurationError, CASCheckFailed
 from robokudo.types.scene import ObjectHypothesis
 
@@ -95,7 +96,7 @@ def any_of_type_present(annotation_type: type, cas: CAS) -> bool:
     return len(annotations) > 0
 
 
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class CASCheckAnnotationTypeExists(CASCheckFunction):
     """
     Check for existence of specific annotation types.
@@ -132,12 +133,15 @@ class CASCheckAnnotationTypeExists(CASCheckFunction):
         name: str = __qualname__,
         annotation_type: type | None = None,
         raise_with_str: str = "",
+        *,
+        descriptor: BaseAnnotatorDescriptor | None = None,
     ) -> None:
         """
         Initialize annotation type checker.
 
         :param name: Name of this node in the behavior tree
         :param annotation_type: Type of annotation to check for
+        :param descriptor: Configuration retained by the checker
         :param raise_with_str: Error message to raise on failure, empty string disables
             raising. This is useful in scenarios where you want to raise an error which
             will be sent via the Query Interface to the caller.
@@ -145,11 +149,14 @@ class CASCheckAnnotationTypeExists(CASCheckFunction):
         self.annotation_type = annotation_type
         function = functools.partial(any_of_type_present, annotation_type)
         super(CASCheckAnnotationTypeExists, self).__init__(
-            name=name, function=function, raise_with_str=raise_with_str
+            name=name,
+            function=function,
+            raise_with_str=raise_with_str,
+            descriptor=descriptor,
         )
 
 
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class CASCheckObjectHypothesisExists(CASCheckAnnotationTypeExists):
     """
     Check for existence of ObjectHypothesis annotations.
@@ -181,14 +188,24 @@ class CASCheckObjectHypothesisExists(CASCheckAnnotationTypeExists):
     Object-hypothesis annotation required by this checker.
     """
 
-    def __init__(self, name: str = __qualname__, raise_with_str: str = "") -> None:
+    def __init__(
+        self,
+        name: str = __qualname__,
+        raise_with_str: str = "",
+        *,
+        descriptor: BaseAnnotatorDescriptor | None = None,
+    ) -> None:
         """
         Initialize ObjectHypothesis checker.
 
         :param name: Name of this node in the behavior tree
+        :param descriptor: Configuration retained by the checker
         :param raise_with_str: Error message to raise on failure, empty string disables
             raising
         """
         super(CASCheckObjectHypothesisExists, self).__init__(
-            name=name, annotation_type=ObjectHypothesis, raise_with_str=raise_with_str
+            name=name,
+            annotation_type=ObjectHypothesis,
+            raise_with_str=raise_with_str,
+            descriptor=descriptor,
         )

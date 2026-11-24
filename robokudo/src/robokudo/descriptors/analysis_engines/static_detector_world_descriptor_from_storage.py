@@ -1,3 +1,8 @@
+"""
+Detect predefined objects in stored camera observations using a world descriptor.
+"""
+
+# %% Imports
 import robokudo.analysis_engine
 import robokudo.behaviours.clear_errors
 import robokudo.descriptors.camera_configs.config_mongodb_playback
@@ -5,7 +10,6 @@ import robokudo.idioms
 import robokudo.io.storage_reader_interface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
-from robokudo.annotators.location import LocationAnnotator
 from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVisualizer
 from robokudo.annotators.static_object_detector import (
     StaticObjectDetectorAnnotator,
@@ -19,11 +23,20 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 
 
+# %% Analysis engine
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
+    """
+    Match stored camera observations against objects defined by a world descriptor.
+    """
+
     def name(self):
         return "static_detector_world_descriptor_from_storage"
 
     def implementation(self):
+        """
+        Build :meth:`robokudo.analysis_engine.AnalysisEngineInterface.implementation`
+        for stored scenes with predefined objects.
+        """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
 
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
@@ -44,7 +57,7 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 robokudo.idioms.pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 WorldDescriptorBootstrapAnnotator(descriptor=bootstrap),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 StaticObjectDetectorAnnotator(descriptor=sod),
                 ObjectHypothesisVisualizer(descriptor=oh_vis),
             ]

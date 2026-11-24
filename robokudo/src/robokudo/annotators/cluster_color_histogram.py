@@ -27,7 +27,6 @@ from timeit import default_timer
 
 import cv2
 import numpy as np
-from krrood.ormatic.utils import classproperty
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
@@ -78,7 +77,7 @@ class ClusterColorHistogramDescriptor(
 # %% ClusterColorHistogram annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescriptor]):
     """Hue and saturation histogram analysis for object hypotheses with RGB ROI and Mask.
 
@@ -95,16 +94,6 @@ class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescript
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: ClusterColorHistogramDescriptor = field(
-        default_factory=ClusterColorHistogramDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ClusterColorHistogramDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ClusterColorHistogramDescriptor
 
     def update(self) -> Status:
         """Process object hypotheses and calculate color histograms.

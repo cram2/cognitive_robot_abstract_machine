@@ -29,7 +29,6 @@ from timeit import default_timer
 
 import numpy as np
 import open3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import ThreadedAnnotator
@@ -98,7 +97,7 @@ class PlaneDescriptor(AnnotatorDescriptor[PlaneParameters]):
 # %% Plane annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PlaneAnnotator(ThreadedAnnotator[PlaneDescriptor]):
     """
     Plane detector and visualizer for point clouds.
@@ -116,14 +115,6 @@ class PlaneAnnotator(ThreadedAnnotator[PlaneDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: PlaneDescriptor = field(default_factory=PlaneDescriptor)
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[PlaneDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return PlaneDescriptor
 
     def compute(self) -> Status:
         """

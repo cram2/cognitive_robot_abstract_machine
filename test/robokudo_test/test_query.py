@@ -1,20 +1,15 @@
+"""
+Validate query gating and perception results through the ROS action interface.
+"""
+
 # %% Imports
 import logging
-
-
-from robokudo.types.cv import ColorToDepthRatio
-from robokudo.descriptors.factories.cr_descriptor_factory import (
-    CollectionReaderDescriptorFactory,
-)
 import multiprocessing
 import threading
 from pathlib import Path
 
 import py_trees
 import pytest
-
-from action_msgs.msg import GoalStatus
-
 import robokudo.cas
 import robokudo.defs
 import robokudo.descriptors.camera_configs.config_filereader_playback
@@ -23,18 +18,22 @@ import robokudo.garden
 import robokudo.idioms
 import robokudo.io.file_reader_interface
 import robokudo.io.storage_reader_interface
+import robokudo.scripts.query_test_client
 import robokudo.types.annotation
 import robokudo.types.scene
 import robokudo.utils.tree_execution
+from action_msgs.msg import GoalStatus
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
-from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
+from robokudo.annotators.query import GenerateQueryResult, QueryAnnotator
+from robokudo.descriptors.factories.cr_descriptor_factory import (
+    CollectionReaderDescriptorFactory,
+)
 from robokudo.pipeline import Pipeline
-
-import robokudo.scripts.query_test_client
+from robokudo.types.cv import ColorToDepthRatio
 
 
 # %% Query execution
@@ -50,6 +49,10 @@ class QueryWorkerThread(threading.Thread):
 
 
 def query_simple_pipeline(node, recording_directory: Path):
+    """
+    Run stored tabletop observations through the query gate and return the pipeline and
+    its final status.
+    """
     cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
         "file_reader",
         loop=True,
@@ -68,7 +71,7 @@ def query_simple_pipeline(node, recording_directory: Path):
             robokudo.idioms.pipeline_init(),
             QueryAnnotator(),
             CollectionReaderAnnotator(descriptor=cr_fr_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
+            ImagePreprocessorAnnotator(name="ImagePreprocessor"),
             PointcloudCropAnnotator(descriptor=pc_crop_config),
             PlaneAnnotator(),
             PointCloudClusterExtractor(),

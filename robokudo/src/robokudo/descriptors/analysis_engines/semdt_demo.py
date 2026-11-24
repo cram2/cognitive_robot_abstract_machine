@@ -1,3 +1,8 @@
+"""
+Synchronize tabletop objects observed by a Kinect with the semantic world.
+"""
+
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
@@ -15,12 +20,14 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
-from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
-    VizMarkerPublisher,
-)
 
 
+# %% Analysis engine
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Annotate live Kinect tabletop objects and synchronize their semantic world state.
+    """
+
     def name(self) -> str:
         return "semdt_demo"
 
@@ -36,7 +43,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

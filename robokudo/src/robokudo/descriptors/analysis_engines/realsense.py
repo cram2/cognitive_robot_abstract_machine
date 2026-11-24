@@ -1,3 +1,8 @@
+"""
+Segment tabletop objects from a RealSense camera stream.
+"""
+
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -11,7 +16,12 @@ from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
+# %% Analysis engine
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Acquire RealSense observations and extract objects above the dominant plane.
+    """
+
     def name(self) -> str:
         return "realsense"
 
@@ -27,7 +37,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 # PipelineTrigger(),
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

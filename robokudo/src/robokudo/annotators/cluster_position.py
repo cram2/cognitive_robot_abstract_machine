@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
@@ -67,7 +66,7 @@ class ClusterPositionDescriptor(AnnotatorDescriptor[ClusterPositionParameters]):
 # %% ClusterPosition annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterPositionAnnotator(BaseAnnotator[ClusterPositionDescriptor]):
     """
     3D position estimation for object hypotheses.
@@ -86,16 +85,6 @@ class ClusterPositionAnnotator(BaseAnnotator[ClusterPositionDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: ClusterPositionDescriptor = field(
-        default_factory=ClusterPositionDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ClusterPositionDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ClusterPositionDescriptor
 
     def update(self) -> Status:
         """

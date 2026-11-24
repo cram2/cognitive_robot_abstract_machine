@@ -25,7 +25,6 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d as o3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
@@ -71,7 +70,7 @@ class PointcloudCheckDescriptor(AnnotatorDescriptor[PointcloudCheckParameters]):
 # %% PointcloudCheck annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PointcloudCheckAnnotator(BaseAnnotator[PointcloudCheckDescriptor]):
     """Check if the CASViews.Cloud contains more than X points.
 
@@ -81,16 +80,6 @@ class PointcloudCheckAnnotator(BaseAnnotator[PointcloudCheckDescriptor]):
 
     name: str = "PointcloudcloudCheckAnnotator"
     """Name of this node in the behaviour tree."""
-
-    descriptor: PointcloudCheckDescriptor = field(
-        default_factory=PointcloudCheckDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[PointcloudCheckDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return PointcloudCheckDescriptor
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

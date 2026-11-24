@@ -13,7 +13,6 @@ from timeit import default_timer
 import numpy as np
 import open3d
 import py_trees
-from krrood.ormatic.utils import classproperty
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 import robokudo.annotators.core
@@ -57,24 +56,16 @@ class WorldVisualizerDescriptor(AnnotatorDescriptor[WorldVisualizerParameters]):
 # %% WorldVisualizer annotator
 
 
-@dataclass(eq=False)
-class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
+@dataclass(kw_only=True, eq=False)
+class WorldVisualizer(
+    robokudo.annotators.core.ThreadedAnnotator[WorldVisualizerDescriptor]
+):
     """
     Visualize predefined objects and regions from the shared world.
     """
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: WorldVisualizerDescriptor = field(
-        default_factory=WorldVisualizerDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[WorldVisualizerDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return WorldVisualizerDescriptor
 
     @staticmethod
     def _body_size(body: Body) -> np.ndarray | None:

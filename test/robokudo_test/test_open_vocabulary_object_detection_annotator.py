@@ -10,9 +10,6 @@ import numpy
 import pytest
 import torch
 from py_trees.common import Status
-from semantic_digital_twin.world_description.geometry import Color
-
-from robokudo.types.cv import ColorToDepthRatio
 from robokudo.annotators.open_vocabulary_object_detection_annotator import (
     DetectionResultField,
     OpenVocabularyObjectDetectionAnnotator,
@@ -22,8 +19,10 @@ from robokudo.annotators.open_vocabulary_object_detection_annotator import (
 from robokudo.cas import CASViews
 from robokudo.pipeline import Pipeline
 from robokudo.types.annotation import Classification
+from robokudo.types.cv import ColorToDepthRatio
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.cv_helper import crop_image_roi
+from semantic_digital_twin.world_description.geometry import Color
 
 # %% NumPy image inputs
 
@@ -389,7 +388,7 @@ def test_precision_mode_loads_segmentation_model(
     descriptor = OpenVocabularyObjectDetectionAnnotator.Descriptor()
     descriptor.parameters.precision_mode = True
     annotator = OpenVocabularyObjectDetectionAnnotator(
-        numpy_image_annotator.name, descriptor
+        name=numpy_image_annotator.name, descriptor=descriptor
     )
     assert annotator.name == numpy_image_annotator.name
     assert annotator.descriptor is descriptor

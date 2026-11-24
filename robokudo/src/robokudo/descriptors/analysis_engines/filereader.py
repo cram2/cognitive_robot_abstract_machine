@@ -26,19 +26,17 @@ from __future__ import annotations
 
 # %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
-
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
-
-from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
-from robokudo.pipeline import Pipeline
-from robokudo.types.cv import ColorToDepthRatio
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
+from robokudo.behaviours.clear_annotator_outputs import ClearAnnotatorOutputs
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.pipeline import Pipeline
+from robokudo.types.cv import ColorToDepthRatio
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -106,7 +104,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 ClearAnnotatorOutputs(),
                 CollectionReaderAnnotator(descriptor=cr_fr_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

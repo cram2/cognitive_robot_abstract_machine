@@ -189,7 +189,7 @@ class YoloDescriptor(AnnotatorDescriptor[YoloParameters]):
 # %% Yolo annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
     """
     Detects objects with a YOLO model and annotates them as classified hypotheses.
@@ -197,9 +197,6 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: YoloDescriptor = field(default_factory=YoloDescriptor)
-    """Configuration supplied to this annotator instance."""
 
     model_location: str = field(init=False, repr=False)
     """Where the YOLO model is loaded from."""
@@ -220,11 +217,6 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
 
     image_region_comparator: RoiComparator = field(init=False, repr=False)
     """Comparator measuring how much a detection overlaps an existing hypothesis."""
-
-    @classproperty
-    def Descriptor(cls) -> type[YoloDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return YoloDescriptor
 
     @classproperty
     def mask_foreground(cls) -> int:

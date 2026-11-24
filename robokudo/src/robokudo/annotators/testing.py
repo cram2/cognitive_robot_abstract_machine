@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-from krrood.ormatic.utils import classproperty
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
@@ -312,7 +311,7 @@ class ScopedDescriptor(AnnotatorDescriptor[ScopedParameters]):
 # %% Scoped annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ScopedAnnotator(BaseAnnotator[ScopedDescriptor]):
     """
     Demonstrates the usage of analysis scopes in annotators.
@@ -335,14 +334,6 @@ class ScopedAnnotator(BaseAnnotator[ScopedDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: ScopedDescriptor = field(default_factory=ScopedDescriptor)
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[ScopedDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return ScopedDescriptor
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

@@ -1,10 +1,13 @@
+"""
+Serve tabletop perception queries with preemption checks and progress feedback.
+"""
+
+# %% Imports
 from py_trees.common import Status
 from py_trees.composites import Selector, Sequence
 from py_trees.decorators import Inverter
 
 from robokudo.analysis_engine import AnalysisEngineInterface
-from robokudo.idioms import pipeline_init
-from robokudo.pipeline import Pipeline
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -12,17 +15,24 @@ from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.query import (
-    QueryFeedbackAndCount,
-    QueryAnnotator,
     GenerateQueryResult,
+    QueryAnnotator,
+    QueryFeedbackAndCount,
 )
 from robokudo.behaviours.action_server_checks import ActionServerNoPreemptRequest
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.idioms import pipeline_init
+from robokudo.pipeline import Pipeline
 
 
+# %% Analysis engine
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Handle query preemption while annotating tabletop objects and reporting progress.
+    """
+
     def name(self) -> str:
         return "query_complex"
 
@@ -38,7 +48,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         task_sequence.add_children(
             [
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

@@ -19,7 +19,6 @@ from timeit import default_timer
 
 import cv2
 import numpy as np
-from krrood.ormatic.utils import classproperty
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Body
@@ -126,7 +125,7 @@ class StaticObjectDetectorDescriptor(
 # %% StaticObjectDetector annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor]):
     """
     Find a cluster based on a preconfigured Bounding Box, Pose and Class name.
@@ -145,11 +144,6 @@ class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor
 
     name: str = "StaticObjectDetector"
     """Name of this node in the behaviour tree."""
-
-    descriptor: StaticObjectDetectorDescriptor = field(
-        default_factory=StaticObjectDetectorDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
 
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """Color image retained for the current computation."""
@@ -174,11 +168,6 @@ class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor
         default_factory=dict, init=False, repr=False
     )
     """Semantic-world bodies retained by configured object name."""
-
-    @classproperty
-    def Descriptor(cls) -> type[StaticObjectDetectorDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return StaticObjectDetectorDescriptor
 
     def detect_from_bb_descriptor(self, color_rgb: npt.NDArray) -> ObjectHypothesis:
         """

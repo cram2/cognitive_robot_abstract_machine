@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
@@ -60,7 +59,7 @@ class BlurDescriptor(AnnotatorDescriptor[BlurParameters]):
 # %% Blur annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class BlurAnnotator(BaseAnnotator[BlurDescriptor]):
     """Annotator for calculating and visualizing image blur metrics.
 
@@ -77,14 +76,6 @@ class BlurAnnotator(BaseAnnotator[BlurDescriptor]):
 
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
-
-    descriptor: BlurDescriptor = field(default_factory=BlurDescriptor)
-    """Configuration supplied to this annotator instance."""
-
-    @classproperty
-    def Descriptor(cls) -> type[BlurDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return BlurDescriptor
 
     def compute_bluriness(self, img: npt.NDArray) -> float:
         """Compute the blur metric for an image.

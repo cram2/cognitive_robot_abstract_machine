@@ -20,7 +20,6 @@ from timeit import default_timer
 
 import cv2
 import open3d
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 
@@ -84,7 +83,7 @@ class PointcloudCropDescriptor(AnnotatorDescriptor[PointcloudCropParameters]):
 # %% PointcloudCrop annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
     """
     Point cloud cropping using axis-aligned bounding boxes.
@@ -99,18 +98,8 @@ class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: PointcloudCropDescriptor = field(
-        default_factory=PointcloudCropDescriptor
-    )
-    """Configuration supplied to this annotator instance."""
-
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """A copy of the color image currently being worked with."""
-
-    @classproperty
-    def Descriptor(cls) -> type[PointcloudCropDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return PointcloudCropDescriptor
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

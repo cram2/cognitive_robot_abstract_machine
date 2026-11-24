@@ -1,12 +1,16 @@
-from robokudo.annotators.cluster_pose_bounding_box import (
-    ClusterPoseBoundingBoxAnnotator,
-)
-from robokudo.world import world_instance
+"""
+Synchronize objects segmented from stored observations with the semantic world.
+"""
+
+# %% Imports
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
+from robokudo.annotators.cluster_pose_bounding_box import (
+    ClusterPoseBoundingBoxAnnotator,
+)
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.outlier_removal_objecthypothesis import (
@@ -21,9 +25,15 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.world import world_instance
 
 
+# %% Analysis engine
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segment stored tabletop observations and synchronize the detected objects.
+    """
+
     def name(self) -> str:
         return "semdt_demo_from_storage"
 
@@ -42,7 +52,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),

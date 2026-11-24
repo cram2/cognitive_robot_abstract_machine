@@ -1,3 +1,8 @@
+"""
+Detect and segment stored camera observations with YOLO.
+"""
+
+# %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -10,6 +15,7 @@ from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
+# %% Analysis engine
 class AnalysisEngine(AnalysisEngineInterface):
     """
     Analysis engine detecting objects in stored camera data with YOLO.
@@ -41,7 +47,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 YoloAnnotator(descriptor=yolo_descriptor),
                 ClusterColorAnnotator(),
             ]

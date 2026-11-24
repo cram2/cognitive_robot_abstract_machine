@@ -29,7 +29,6 @@ from timeit import default_timer
 
 import cv2
 from krrood.adapters.json_serializer import to_json
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
@@ -67,7 +66,7 @@ class FileWriterDescriptor(AnnotatorDescriptor[FileWriterParameters]):
 # %% FileWriter annotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FileWriter(BaseAnnotator[FileWriterDescriptor]):
     """
     Sensor data storage to filesystem.
@@ -83,19 +82,11 @@ class FileWriter(BaseAnnotator[FileWriterDescriptor]):
     name: str = __qualname__
     """Name of this node in the behaviour tree."""
 
-    descriptor: FileWriterDescriptor = field(default_factory=FileWriterDescriptor)
-    """Configuration supplied to this annotator instance."""
-
     initialized: bool = field(default=False, init=False, repr=False)
     """Whether the configured output directory is available."""
 
     target_directory_path: Path = field(init=False, repr=False)
     """Resolved directory receiving the generated files."""
-
-    @classproperty
-    def Descriptor(cls) -> type[FileWriterDescriptor]:
-        """Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`."""
-        return FileWriterDescriptor
 
     def __post_init__(self) -> None:
         """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""

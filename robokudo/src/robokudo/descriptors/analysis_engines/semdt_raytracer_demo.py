@@ -31,10 +31,18 @@ from robokudo.pipeline import Pipeline
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segment and annotate tabletop objects rendered from a world descriptor.
+    """
+
     def name(self) -> str:
         return "semdt_raytracer_demo"
 
     def implementation(self) -> Pipeline:
+        """
+        Build :meth:`AnalysisEngineInterface.implementation` for rendered tabletop
+        observations.
+        """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
             RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
@@ -49,7 +57,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=raytracer_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(descriptor=plane_desc),
                 PointCloudClusterExtractor(),

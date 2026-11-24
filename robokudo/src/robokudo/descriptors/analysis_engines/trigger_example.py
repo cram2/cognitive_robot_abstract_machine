@@ -83,7 +83,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             PipelineTrigger(),
             pipeline_init(),
             CollectionReaderAnnotator(descriptor=kinect_config),
-            ImagePreprocessorAnnotator("ImagePreprocessor"),
+            ImagePreprocessorAnnotator(name="ImagePreprocessor"),
             SlowAnnotator("SlowAnnotator"),
         ]:
             seq.add_child(annotator)

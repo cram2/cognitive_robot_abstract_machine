@@ -18,17 +18,15 @@ The pipeline implements the following functionality:
 """
 
 from robokudo.analysis_engine import AnalysisEngineInterface
-
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.query import QueryAnnotator, QueryReply
-from robokudo.pipeline import Pipeline
-
-from robokudo.idioms import pipeline_init
 from robokudo.behaviours.action_server_checks import ActionServerCheck
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.idioms import pipeline_init
+from robokudo.pipeline import Pipeline
 from robokudo.utils.tree import add_children_to_parent
 
 
@@ -91,7 +89,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
-                ImagePreprocessorAnnotator("ImagePreprocessor"),
+                ImagePreprocessorAnnotator(name="ImagePreprocessor"),
                 QueryReply(),
                 ActionServerCheck(),
             ],

@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from timeit import default_timer
 
-from krrood.ormatic.utils import classproperty
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree
@@ -49,17 +48,12 @@ class CollectionReaderDescriptor(AnnotatorDescriptor[CollectionReaderParameters]
 
 
 # %% Collection reader annotator
-@dataclass(init=False, eq=False)
+@dataclass(kw_only=True, init=False, eq=False)
 class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     """
     Acquire sensor data and share it with other annotators.
 
     It is typically the first annotator in the pipeline.
-    """
-
-    descriptor: CollectionReaderDescriptor
-    """
-    Configuration supplied to this annotator instance.
     """
 
     name: str = "CollectionReader"
@@ -86,13 +80,6 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     """
     Number of waiting ticks between camera availability warnings.
     """
-
-    @classproperty
-    def Descriptor(cls) -> type[CollectionReaderDescriptor]:
-        """
-        Specialize :meth:`robokudo.annotators.core.BaseAnnotator.Descriptor`.
-        """
-        return CollectionReaderDescriptor
 
     def __init__(
         self,
