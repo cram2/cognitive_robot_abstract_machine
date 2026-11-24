@@ -75,7 +75,7 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator):
         """
         super().__init__(name=name, descriptor=descriptor)
 
-        logger.debug(f"Starting to init {self.__class__.__name__}")
+        logger.debug(f"Starting to initialize {self.__class__.__name__}")
 
         self.clip_model = CLIPModel.from_pretrained(
             self.descriptor.parameters.model_name

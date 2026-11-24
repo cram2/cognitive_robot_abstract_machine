@@ -91,7 +91,9 @@ class ByteTrackAnnotator(BaseAnnotator):
             ]
         )
         if len(rois_xyxy) == 0:
-            logger.debug(f"No ROI found in {len(object_hypotheses)} object hypothesis.")
+            logger.debug(
+                f"No region of interest found in {len(object_hypotheses)} object hypothesis."
+            )
             return Status.FAILURE
 
         detections = {
@@ -141,7 +143,7 @@ class ByteTrackAnnotator(BaseAnnotator):
                 detections["data"][CLASS_NAME_DATA_FIELD] = cls.classname
 
             logger.debug(
-                f"Using {len(object_hypotheses)} class ids for object tracking."
+                f"Using {len(object_hypotheses)} class identifiers for object tracking."
             )
 
         detections = sv.Detections(**detections)

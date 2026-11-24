@@ -623,7 +623,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         logger.info(
             f"{self.name} stabilized cylinder axis: "
             f"source={selected_candidate.source}, "
-            f"deviation={axis_deviation_degrees:.2f}deg, "
+            f"deviation={axis_deviation_degrees:.2f} degrees, "
             f"score_before={original_fit.score:.3f}, "
             f"score_after={selected_candidate.fit.score:.3f}"
         )

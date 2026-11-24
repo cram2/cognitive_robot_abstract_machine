@@ -131,7 +131,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
             if hasattr(self.descriptor.parameters, param.name):
                 setattr(self.descriptor.parameters, param.name, param.value)
 
-        logger.info("Received reconf call: " + str(params))
+        logger.info("Received reconfiguration call: " + str(params))
         return SetParametersResult(successful=True)
 
     @catch_and_raise_to_blackboard

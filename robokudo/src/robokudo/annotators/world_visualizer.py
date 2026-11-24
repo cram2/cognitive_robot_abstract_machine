@@ -76,7 +76,9 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 )
             )
         except KeyError as err:
-            logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(
+                f"Couldn't find viewpoint in the common analysis structure: {err}"
+            )
             return py_trees.common.Status.FAILURE
 
         visualized_geometries = []

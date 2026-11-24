@@ -406,7 +406,7 @@ class GenerateQueryResult(BaseAnnotator):
 
                 converter.convert(oh_annotation, cas, object_designator)
                 logger.info(
-                    f"converted {type(oh_annotation)} on OH {object_hypotheses_count}"
+                    f"converted {type(oh_annotation)} on object hypothesis {object_hypotheses_count}"
                 )
 
             query_result.append(object_designator)
@@ -547,7 +547,9 @@ class QueryActionServer(Node):
             # to properly shutdown.
             preempt_acknowledge = Blackboard().get(BBIdentifier.QUERY_PREEMPT_ACK)
             if goal_handle.is_cancel_requested and preempt_acknowledge:
-                self.logger.info("Goal cancel acknowledged by PPT.")
+                self.logger.info(
+                    "Goal cancel acknowledged by the perception pipeline tree."
+                )
                 goal_handle.canceled()
                 cancel_result = Query.Result()
                 cancel_result.text_result = "Canceled"

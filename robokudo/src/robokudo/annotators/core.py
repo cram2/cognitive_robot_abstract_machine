@@ -277,7 +277,7 @@ class BaseAnnotator(Behaviour):
         # not been in the tree during the setup() of it.
         if self.name not in annotator_outputs.outputs:
             logger.debug(
-                f"Annotator {self.name} was not in AnnotatorOutput struct. Adding it now."
+                f"Annotator {self.name} was not in AnnotatorOutput structure. Adding it now."
             )
             self.add_self_to_annotator_output_struct()
         return self.get_annotator_outputs().outputs[self.name]

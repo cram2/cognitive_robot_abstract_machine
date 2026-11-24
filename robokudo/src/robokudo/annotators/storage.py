@@ -143,7 +143,9 @@ class StorageWriter(BaseAnnotator):
         del flat_cas["views"]
         result = self.storage.store_cas_dict(flat_cas)
         if not result.acknowledged:
-            logger.error(f"mongo db error when trying to store cas")
+            logger.error(
+                "MongoDB error when trying to store the common analysis structure"
+            )
             return Status.FAILURE
 
         end_timer = default_timer()

@@ -273,7 +273,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
 
         if rect_outside_image(corner_points, image_width, image_height):
             logger.info(
-                f"ROI of object {self._body_name(body)} would be completely out of camera frame. Skipping ..."
+                f"Region of interest of object {self._body_name(body)} would be completely out of camera frame. Skipping ..."
             )
             return None
 
@@ -402,7 +402,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         if world_frame_required:
             observation = self.get_cas().camera_observation
             if observation is None or observation.world_T_camera is None:
-                logger.warning("Could not find world-to-camera transform in the CAS")
+                logger.warning(
+                    "Could not find world-to-camera transform in the common analysis structure"
+                )
                 return Status.FAILURE
             camera_T_world = observation.camera_T_world
 

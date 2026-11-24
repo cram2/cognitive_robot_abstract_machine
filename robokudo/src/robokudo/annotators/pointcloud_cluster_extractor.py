@@ -329,7 +329,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
         """
         start_timer = default_timer()
-        logger.info("PCE Start")
+        logger.info("Point cloud cluster extraction start")
         cloud = self.get_cas().get(CASViews.CLOUD)
         color_to_depth_ratio = self.get_cas().color_to_depth_ratio
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
@@ -461,7 +461,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
-        logger.info("PCE Done")
+        logger.info("Point cloud cluster extraction done")
         return Status.SUCCESS
 
 
@@ -641,5 +641,5 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
-        logger.info("PCE Stop")
+        logger.info("Point cloud cluster extraction stop")
         return Status.SUCCESS

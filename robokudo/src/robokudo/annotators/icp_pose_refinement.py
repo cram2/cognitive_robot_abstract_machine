@@ -170,7 +170,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
             error_message = (
                 f"{type(self).__name__} couldn't find model files and is deactivated."
             )
-            logger.warn(error_message)
+            logger.warning(error_message)
             self.feedback_message = error_message
             return Status.SUCCESS  # Don't fail the whole pipeline
 

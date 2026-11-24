@@ -129,7 +129,9 @@ class RegionFilter(ThreadedAnnotator):
                 self.get_cas()
             )
         except KeyError as err:
-            logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(
+                f"Couldn't find viewpoint in the common analysis structure: {err}"
+            )
             return Status.FAILURE
 
         for key, region in active_regions.items():

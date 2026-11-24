@@ -56,7 +56,9 @@ class CameraViewpointVisualizer(BaseAnnotator):
                 )
             )
         except KeyError as err:
-            logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(
+                f"Couldn't find viewpoint in the common analysis structure: {err}"
+            )
             return Status.FAILURE
 
         cloud = self.get_cas().get(CASViews.CLOUD)

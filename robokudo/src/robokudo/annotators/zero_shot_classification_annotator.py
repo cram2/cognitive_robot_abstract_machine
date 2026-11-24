@@ -164,7 +164,7 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
             ohs, self.classify(cropped_images)
         ):
             logger.info(
-                f"Classification results for Object hypothesis ID: '{object_hypothesis.id}'"
+                f"Classification results for object hypothesis identifier: '{object_hypothesis.id}'"
             )
 
             best_classification = classifications[0]

@@ -539,7 +539,7 @@ class Sphere2ODConverter(Annotation2ODConverter[Sphere]):
         size = ShapeSize(radius=annotation.geometry.radius)
 
         logger.info(
-            "The center point of the Sphere annotation is currently not converted to OD."
+            "The center point of the Sphere annotation is currently not converted to the object designator."
         )
 
         object_designator.shape_size.append(size)

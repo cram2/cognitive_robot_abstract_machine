@@ -94,7 +94,7 @@ class SizeBBAnnotator(BaseAnnotator):
                 )
             except Exception as e:
                 logger.warning(
-                    f"Couldn't find camera viewpoint in the CAS.Fail. Error: {e}"
+                    f"Couldn't find camera viewpoint in the common analysis structure. Error: {e}"
                 )
                 return Status.FAILURE
 

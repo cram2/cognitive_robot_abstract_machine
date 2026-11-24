@@ -139,7 +139,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
             f"Got sensor data... Waited for {time_difference} seconds"
         )
         logger.debug(
-            "New CAS id=%s after waiting %f seconds",
+            "New common analysis structure identifier=%s after waiting %f seconds",
             pipeline.cas.cas_id,
             time_difference,
         )
