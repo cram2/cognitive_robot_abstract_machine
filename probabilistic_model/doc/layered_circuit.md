@@ -150,7 +150,7 @@ point type; the queries then compute in that library and type.
 import jax.numpy as jnp
 
 jax_model = numpy_model.to_namespace(jnp)
-print(jax_model.log_likelihood(jnp.asarray([[0.5], [1.5]])))
+print(jax_model.log_likelihood(events=jnp.asarray([[0.5], [1.5]])))
 ```
 
 Under `jax.jit` the log-likelihood compiles into a single function. Structural queries

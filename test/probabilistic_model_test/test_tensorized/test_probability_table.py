@@ -12,6 +12,9 @@ import pytest
 
 from krrood.adapters import json_serializer
 from krrood.adapters.json_field import JSONField
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
     DenseProbabilityTable,
     ProbabilityTable,
@@ -57,7 +60,13 @@ def table_of(
     """
     rows, columns = np.nonzero(probabilities)
     return table_type.from_entries(
-        rows, columns, probabilities[rows, columns], probabilities.shape
+        rows,
+        columns,
+        probabilities[rows, columns],
+        MatrixShape2D(
+            number_of_rows=probabilities.shape[0],
+            number_of_columns=probabilities.shape[1],
+        ),
     )
 
 
@@ -86,10 +95,16 @@ def test_shape(table, probabilities):
 
 
 def test_log_probabilities_of_states(table, probabilities):
+    """
+    Every table reads the log-probability of each state index, and minus infinity for
+    an index that is no state.
+    """
     indices = np.array([2, 3, -1, 0, 2, 4])
     expected = log_of(probabilities)[:, np.where(indices >= 0, indices, 0)].T
     expected[indices < 0] = -np.inf
-    np.testing.assert_allclose(table.log_probabilities_of_states(indices), expected)
+    np.testing.assert_allclose(
+        table.log_probabilities_of_states(indices=indices), expected
+    )
 
 
 def test_probability_of_states(table, probabilities):
@@ -118,8 +133,11 @@ def test_a_node_without_mass_stays_without_mass(table):
 
 
 def test_select_nodes_and_concatenate(table, table_type, probabilities):
+    """
+    Selecting nodes of a table and joining tables keep the probabilities of the nodes.
+    """
     mask = np.array([True, False, True])
-    selected = table.select_nodes(mask)
+    selected = table.select_nodes(mask=mask)
     np.testing.assert_allclose(selected.dense_probabilities(), probabilities[mask])
     joined = table_type.concatenate([selected, table])
     np.testing.assert_allclose(
@@ -190,7 +208,10 @@ def test_json_round_trip(table, table_type, probabilities):
     "target", [DenseProbabilityTable, SparseProbabilityTable], ids=lambda t: t.__name__
 )
 def test_conversion_between_the_types(table, target, probabilities):
-    converted = target.of(table)
+    """
+    A table converted to another type of table keeps its probabilities.
+    """
+    converted = target.from_table(table=table)
     assert isinstance(converted, target)
     np.testing.assert_allclose(converted.dense_probabilities(), probabilities)
 
@@ -234,7 +255,7 @@ def test_sparse_table_keeps_a_state_with_probability_one(derive, probabilities):
     """
     only_certain_node = np.array([False, True, False])
     selected = table_of(SparseProbabilityTable, probabilities).select_nodes(
-        only_certain_node
+        mask=only_certain_node
     )
     derived = derive(selected)
     assert derived.number_of_stored_entries == 1

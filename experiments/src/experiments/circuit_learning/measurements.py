@@ -117,7 +117,7 @@ class ChunkedLogLikelihoodEvaluation:
             )
             return np.asarray(
                 HasParameterArrays.host_copy(
-                    self.circuit.root.log_likelihood_of_nodes(data)[:, 0]
+                    self.circuit.root.log_likelihood_of_nodes(events=data)[:, 0]
                 )
             )
         padded = np.pad(encoded, ((0, self.chunk_rows - len(chunk)), (0, 0)), "edge")
@@ -210,6 +210,11 @@ class TrainingMeasurement:
                 None if learned.history is None else learned.history.epochs
             ),
             converged=None if learned.history is None else learned.history.converged,
+            average_epoch_duration=(
+                None
+                if learned.history is None
+                else learned.history.average_epoch_duration
+            ),
             peak_memory_bytes=peak_memory_bytes,
             number_of_parameters=int(circuit.number_of_parameters),
             number_of_edges=int(

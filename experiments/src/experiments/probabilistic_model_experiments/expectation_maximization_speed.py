@@ -217,7 +217,7 @@ class ExpectationMaximizationSpeedComparison:
             expectation_maximization_duration=expectation_maximization_call.duration,
             scikit_learn_duration=scikit_learn_call.duration,
             expectation_maximization_average_log_likelihood=float(
-                np.mean(circuit.log_likelihood(circuit_data.to_numpy()))
+                np.mean(circuit.log_likelihood(events=circuit_data.to_numpy()))
             ),
             scikit_learn_average_log_likelihood=float(
                 scikit_learn_mixture.score(data.to_numpy())

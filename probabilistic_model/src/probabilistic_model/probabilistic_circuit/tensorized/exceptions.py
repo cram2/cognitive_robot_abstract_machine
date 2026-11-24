@@ -1,3 +1,7 @@
+"""
+Exceptions raised by layered circuits and their layers.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +10,9 @@ import numpy as np
 from typing_extensions import TYPE_CHECKING
 
 from probabilistic_model.exceptions import ProbabilisticModelException
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    VariableIndices,
+)
 
 if TYPE_CHECKING:
     from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
@@ -163,4 +170,49 @@ class HostOnlyQueryError(ProbabilisticModelException, TypeError):
         return (
             "Convert the circuit to numpy first, with "
             "LayeredProbabilisticCircuit.to_namespace(numpy)."
+        )
+
+
+@dataclass(kw_only=True)
+class LayerOverSeveralVariablesError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when the single variable of a leaf layer is asked of a layer whose
+    nodes are over several variables.
+    """
+
+    variables: VariableIndices
+    """
+    The indices of the variables of the nodes of the layer.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The nodes of the layer are over the variables {self.variables.tolist()}, "
+            f"not over one variable."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Ask the variable of every node from node_variables instead."
+
+
+@dataclass(kw_only=True)
+class UnsortedNodeVariablesError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when the nodes of a leaf layer are not sorted by their variable.
+    """
+
+    node_variables: VariableIndices
+    """
+    The index of the variable of every node of the layer.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The variables of the nodes {self.node_variables.tolist()} are not sorted."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Order the nodes of the layer by their variable, and the edges of its "
+            "parents with them."
         )

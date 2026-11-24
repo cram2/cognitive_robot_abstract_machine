@@ -47,6 +47,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -125,6 +126,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                     name="Fail after 30 iterations",
                     child=SuccessEveryN("Fail Sim after 30 iter", n=30),
                 ),
+                WorldUpdatingAnnotator(),
             ]
         )
 

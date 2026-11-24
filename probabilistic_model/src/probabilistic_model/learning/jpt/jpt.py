@@ -1,3 +1,10 @@
+"""
+Joint probability trees, learned by splitting the data where the variables become most
+independent.
+"""
+
+from __future__ import annotations
+
 import math
 from collections import deque
 from dataclasses import dataclass, field
@@ -405,7 +412,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
                         other_data[:, index],
                         distribution.tolerance_at_extremes,
                     )
-                distribution = distribution.fit(data[:, index])
+                distribution = distribution.fit(data=data[:, index])
 
                 if isinstance(
                     distribution.root, UnivariateContinuousLeaf
@@ -436,7 +443,7 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
                     variable=annotated_variable.variable,
                     probabilities=MissingDict(float),
                 )
-                distribution.fit(data[:, index])
+                distribution.fit(data=data[:, index])
                 distribution = UnivariateDiscreteLeaf(
                     distribution, probabilistic_circuit=self.probabilistic_circuit
                 )
