@@ -319,7 +319,7 @@ def test_the_translation_per_radian_is_the_part_of_the_translation_along_the_rot
         translation_per_unit_position=Vector3(*translation),
     )
 
-    assert float(screw_axis.translation_per_radian.to_np()) == pytest.approx(
+    assert float(screw_axis.translation_per_radian) == pytest.approx(
         translation_per_radian
     )
 
