@@ -955,8 +955,10 @@ class WrappedTable(TableLike):
         :param wrapped_field: The field to get the information from.
         """
         # create foreign key
-        fk_name = f"_{wrapped_field.field.name}{self.ormatic.foreign_key_postfix}"
-        fk_type = (
+        foreign_key_name = (
+            f"_{wrapped_field.field.name}{self.ormatic.foreign_key_postfix}"
+        )
+        foreign_key_type = (
             f"Mapped[{module_and_class_name(Optional)}[{module_and_class_name(int)}]]"
             if wrapped_field.is_optional
             else "Mapped[int]"
@@ -968,17 +970,19 @@ class WrappedTable(TableLike):
         )
 
         # columns have to be nullable and use_alter=True since the insertion order might be incorrect otherwise
-        fk_column_constructor = f"mapped_column(ForeignKey('{target_wrapped_table.full_primary_key_name}', use_alter=True), nullable=True, use_existing_column=True)"
+        foreign_key_column_constructor = f"mapped_column(ForeignKey('{target_wrapped_table.full_primary_key_name}', use_alter=True), nullable=True, use_existing_column=True)"
 
         self.foreign_keys.append(
             ColumnConstructor(
-                name=fk_name, type=fk_type, constructor=fk_column_constructor
+                name=foreign_key_name,
+                type=foreign_key_type,
+                constructor=foreign_key_column_constructor,
             )
         )
 
         # create relationship to remote side
-        rel_name = f"{wrapped_field.field.name}"
-        own_foreign_key = f"{self.tablename}.{fk_name}"
+        relationship_name = wrapped_field.field.name
+        own_foreign_key = f"{self.tablename}.{foreign_key_name}"
         # relationships have to be post updated since since it won't work in the case of subclasses with another ref otherwise
         # they also stay lazy: eager selectin would cascade through many-to-one
         # cycles at query time; from_dao resolves them via the identity map instead
@@ -987,8 +991,8 @@ class WrappedTable(TableLike):
             self.ormatic.imported_modules.add(
                 target_wrapped_table.domain_class.__module__
             )
-            rel_type = f"Mapped[{root}]"
-            rel_arguments = (
+            relationship_type = f"Mapped[{root}]"
+            relationship_arguments = (
                 f"{root}, uselist=False, "
                 f"primaryjoin=lambda: {own_foreign_key} == {root}.database_id, "
                 f"foreign_keys=lambda: [{own_foreign_key}], post_update=True, "
@@ -996,16 +1000,16 @@ class WrappedTable(TableLike):
                 f"{module_and_class_name(target_wrapped_table.domain_class)}}}"
             )
         else:
-            rel_type = f"Mapped[{target_wrapped_table.tablename}]"
-            rel_arguments = (
+            relationship_type = f"Mapped[{target_wrapped_table.tablename}]"
+            relationship_arguments = (
                 f"'{target_wrapped_table.tablename}', uselist=False, "
                 f"foreign_keys=lambda: [{own_foreign_key}], post_update=True"
             )
         self.add_relationship(
             column_constructor=ColumnConstructor(
-                name=rel_name,
-                type=rel_type,
-                constructor=f"relationship({rel_arguments})",
+                name=relationship_name,
+                type=relationship_type,
+                constructor=f"relationship({relationship_arguments})",
             )
         )
 
@@ -1045,10 +1049,10 @@ class WrappedTable(TableLike):
         # create foreign key names for the association table
         # Always disambiguate sides using source_/target_ prefixes to avoid
         # duplicated column names in self-referential relationships
-        left_fk_name = (
+        left_foreign_key_name = (
             f"_source_{self.tablename.lower()}{self.ormatic.foreign_key_postfix}"
         )
-        right_fk_name = f"_target_{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
+        right_foreign_key_name = f"_target_{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
 
         # create association table metadata
         target_is_open = target_wrapped_table.domain_class in self.ormatic.open_classes
@@ -1059,10 +1063,10 @@ class WrappedTable(TableLike):
         association_table = AssociationObject(
             name=association_table_name,
             left_table_name=self.tablename,
-            left_foreign_key=left_fk_name,
+            left_foreign_key=left_foreign_key_name,
             left_primary_key=self.full_primary_key_name,
             right_table_name=target_wrapped_table.tablename,
-            right_foreign_key=right_fk_name,
+            right_foreign_key=right_foreign_key_name,
             right_primary_key=target_wrapped_table.full_primary_key_name,
             primary_key_name="database_id",
             declared_type_reference=(
@@ -1076,7 +1080,7 @@ class WrappedTable(TableLike):
         self.ormatic.association_objects.append(association_table)
 
         # create a relationship
-        rel_name = f"{wrapped_field.field.name}"
+        relationship_name = wrapped_field.field.name
 
         # SQLAlchemy instruments a collection class in place (it needs an appender
         # method), which an immutable domain container such as tuple cannot provide.
@@ -1091,8 +1095,8 @@ class WrappedTable(TableLike):
         container_name = module_and_class_name(collection_class_type)
 
         # Association Object pattern
-        rel_type = f"Mapped[{container_name}[{association_table.name}]]"
-        rel_constructor = (
+        relationship_type = f"Mapped[{container_name}[{association_table.name}]]"
+        relationship_constructor = (
             f"relationship('{association_table.name}', "
             f"collection_class={container_name}, "
             f"cascade='all, delete-orphan', "
@@ -1102,7 +1106,9 @@ class WrappedTable(TableLike):
 
         self.add_relationship(
             column_constructor=ColumnConstructor(
-                name=rel_name, type=rel_type, constructor=rel_constructor
+                name=relationship_name,
+                type=relationship_type,
+                constructor=relationship_constructor,
             )
         )
 

@@ -237,3 +237,34 @@ class StoredObjectTableNotUniqueError(DataclassException, LookupError):
             "Import krrood.ormatic.stored_object, which every generated ORM interface "
             "imports, and map the table with no other class."
         )
+
+
+@dataclass(kw_only=True)
+class PartOfDetachedObjectNotLoadedError(DataclassException, LookupError):
+    """
+    Raised when a DAO outside any session is asked for a part it never loaded, so the
+    fields of that secondary base cannot be read.
+    """
+
+    data_access_object: Any
+    """
+    The DAO asked for the part.
+    """
+
+    part_class: type
+    """
+    The class of the part that was never loaded.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.data_access_object).__name__} with id "
+            f"{self.data_access_object.database_id} is not in a session and never "
+            f"loaded its {self.part_class.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Convert or read the DAO while its session is open, or add it to a session "
+            "again before asking for its parts."
+        )

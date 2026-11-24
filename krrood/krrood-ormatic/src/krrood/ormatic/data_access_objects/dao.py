@@ -46,6 +46,7 @@ from krrood.ormatic.data_access_objects.helper import (
 from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
 from krrood.ormatic.exceptions import (
     NoDAOFoundDuringParsingError,
+    PartOfDetachedObjectNotLoadedError,
     QueryCannotBePersisted,
     StoredObjectTableNotUniqueError,
 )
@@ -1399,10 +1400,17 @@ class DataAccessObject(HasGeneric[T]):
         """
         :param part_class: The class of one of the parts of this DAO's class.
         :return: The part of this DAO's object of that class, if the object has one.
+        :raises PartOfDetachedObjectNotLoadedError: If this DAO was loaded, left its
+            session and never loaded that part.
         """
         if self.parts_in_memory is not None and part_class in self.parts_in_memory:
             return self.parts_in_memory[part_class]
-        session = sqlalchemy.orm.object_session(self)
+        instance_state = sqlalchemy.inspect(self)
+        if instance_state.detached:
+            raise PartOfDetachedObjectNotLoadedError(
+                data_access_object=self, part_class=part_class
+            )
+        session = instance_state.session
         if session is None:
             return None
         owners = session.info.get(_SessionInfoKey.OWNERS_OF_UNLOADED_PARTS, {}).pop(
@@ -1740,14 +1748,14 @@ class StoredObjectRow:
         """
         Before a session flushes, add the DAOs and parts that its new objects hold in
         memory, insert the rows of all new objects, give their DAOs and parts the rows'
-        ids, and delete the parts of the objects it deletes.
+        ids, and delete the other rows of the objects it deletes.
 
         :param session: The session about to flush.
         :param flush_context: The flush's unit of work.
         :param instances: The objects the flush was asked for.
         """
         cls._add_objects_held_in_memory(session=session)
-        cls._delete_parts_of_deleted_objects(session=session)
+        cls._delete_rows_of_deleted_objects(session=session)
         new_daos = [
             dao
             for dao in session.new
@@ -1844,19 +1852,25 @@ class StoredObjectRow:
         return []
 
     @staticmethod
-    def _delete_parts_of_deleted_objects(*, session: sqlalchemy.orm.Session) -> None:
+    def _delete_rows_of_deleted_objects(*, session: sqlalchemy.orm.Session) -> None:
         """
-        Delete the stored parts of the DAOs a session is about to delete.
+        Delete the rows that the objects of the DAOs a session is about to delete have
+        in the table of every stored object and in the tables of their secondary bases.
 
         :param session: The session about to flush.
         """
         for dao in list(session.deleted):
             if not isinstance(dao, DataAccessObject):
                 continue
-            for part_class in get_dao_schema(type(dao)).part_classes:
-                part = dao.part(part_class=part_class)
-                if part is not None and sqlalchemy.inspect(part).persistent:
-                    session.delete(part)
+            schema = get_dao_schema(type(dao))
+            if not schema.shares_id_with_stored_object:
+                continue
+            rows = [dao.stored_object] + [
+                dao.part(part_class=part_class) for part_class in schema.part_classes
+            ]
+            for row in rows:
+                if row is not None and sqlalchemy.inspect(row).persistent:
+                    session.delete(row)
 
 
 event.listen(

@@ -5,10 +5,12 @@ table of every one of them, and comes back through a field typed with any of the
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy import func, inspect, select
 
 from krrood.entity_query_language.factories import an, entity, variable
 from krrood.ormatic.data_access_objects.dao import StoredObjectRow
+from krrood.ormatic.exceptions import PartOfDetachedObjectNotLoadedError
 from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
@@ -192,6 +194,70 @@ def test_only_one_row_is_kept_per_object_of_the_root_table(session, database):
     session.commit()
 
     assert session.scalar(select(func.count()).select_from(StoredObjectDAO)) == 2
+
+
+# %% detached data access objects
+
+
+def test_a_detached_dao_refuses_to_convert_without_its_parts(session, database):
+    """
+    A loaded DAO whose session is gone cannot load the parts holding the fields of its
+    secondary bases, and says so instead of converting without them.
+    """
+    from ..dataset.ormatic_interface import ClosetDAO
+
+    session.add(
+        to_dao(
+            Closet(
+                label="bedroom",
+                leg_count=4,
+                shelf_count=3,
+                hinge_count=4,
+                hinges=[Hinge(stiffness=1.5)],
+            )
+        )
+    )
+    session.commit()
+    session.expunge_all()
+    dao = session.scalars(select(ClosetDAO)).one()
+    session.expunge(dao)
+
+    with pytest.raises(PartOfDetachedObjectNotLoadedError):
+        dao.from_dao()
+
+
+# %% deletion
+
+
+def test_deleting_an_object_deletes_its_rows_in_every_table(session, database):
+    """
+    Deleting an object's DAO removes the object's rows from the table of every stored
+    object and from the tables of all its mapped base classes.
+    """
+    from ..dataset.ormatic_interface import (
+        HasHingesDAO,
+        InspectedDAO,
+        InventoryItemDAO,
+        ClosetDAO,
+    )
+
+    session.add(
+        to_dao(
+            InspectedCloset(label="hall", leg_count=4, shelf_count=2, inspector="Ada")
+        )
+    )
+    session.commit()
+    session.expunge_all()
+
+    session.delete(session.scalars(select(ClosetDAO)).one())
+    session.commit()
+
+    tables = [StoredObjectDAO, InventoryItemDAO, HasHingesDAO, InspectedDAO, ClosetDAO]
+    row_counts = {
+        table.__name__: session.scalar(select(func.count()).select_from(table))
+        for table in tables
+    }
+    assert row_counts == {table.__name__: 0 for table in tables}
 
 
 # %% queries
