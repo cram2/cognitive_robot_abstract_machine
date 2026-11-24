@@ -6,7 +6,9 @@ statechart rebuilt from the payloads a server reports it in.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
+import pytest
 from typing_extensions import Any
 
 from cramph.composites import (
@@ -59,23 +61,47 @@ def test_states_reported_before_any_structure_are_ignored(
     assert reported_statechart.statechart is None
 
 
-def test_the_copy_holds_the_children_chosen_while_the_statechart_runs(
+@dataclass(kw_only=True)
+class ChoiceReportedWhileRunning:
+    """
+    A statechart whose node chose its child while it ran, and the copy rebuilt from the
+    structure reported at compile time and the change blocks reported afterwards.
+    """
+
+    statechart: Statechart
+    """
+    The statechart that ran.
+    """
+
+    choosing_node: CompositeNodeChoosingItsChild
+    """
+    The node of :attr:`statechart` that chose its child.
+    """
+
+    reported_statechart: ReportedStatechart
+    """
+    The copy rebuilt from the payloads.
+    """
+
+
+@pytest.fixture
+def choice_reported_while_running(
     statechart_context: StatechartContext,
     statechart_executor: StatechartExecutor,
-) -> None:
+) -> ChoiceReportedWhileRunning:
+    """
+    A node that chooses its child once a delay ended, reported before and after it
+    chose.
+    """
     statechart_context.add_extension(
         extension=ChildChooserAccess(
             choosers=[ChooserAnsweringInTurn(children=[ConstTrueNode(name="chosen")])]
         )
     )
     statechart = Statechart(context=statechart_context)
+    choosing_node = CompositeNodeChoosingItsChild(name="statement")
     statechart.add_node(
-        node=Sequence(
-            nodes=[
-                CountTicks(name="delay", ticks=2),
-                CompositeNodeChoosingItsChild(name="statement"),
-            ]
-        )
+        node=Sequence(nodes=[CountTicks(name="delay", ticks=2), choosing_node])
     )
     statechart_executor.compile(statechart=statechart)
     reported_statechart = ReportedStatechart()
@@ -87,22 +113,40 @@ def test_the_copy_holds_the_children_chosen_while_the_statechart_runs(
             ),
         }
     )
-    reported_node_count = len(statechart.nodes)
+    reported_block_count = len(statechart.structure_change_recorder.change_blocks)
 
     for _ in range(4):
         statechart_executor.tick()
     reported_statechart.take_over(
         payload={
             **_states_payload(statechart_executor),
-            StatechartPayloadKey.JOINED_NODES: json.loads(
+            StatechartPayloadKey.CHANGE_BLOCKS: json.loads(
                 json.dumps(
-                    statechart.create_structure_copy().nodes_from_to_json(
-                        first_node_index=reported_node_count
-                    )
+                    [
+                        block.create_structure_copy().to_json()
+                        for block in statechart.structure_change_recorder.change_blocks[
+                            reported_block_count:
+                        ]
+                    ]
                 )
             ),
         }
     )
+    return ChoiceReportedWhileRunning(
+        statechart=statechart,
+        choosing_node=choosing_node,
+        reported_statechart=reported_statechart,
+    )
+
+
+def test_the_copy_holds_the_children_chosen_while_the_statechart_runs(
+    choice_reported_while_running: ChoiceReportedWhileRunning,
+) -> None:
+    """
+    The child joined after the structure was reported, and its states follow.
+    """
+    statechart = choice_reported_while_running.statechart
+    reported_statechart = choice_reported_while_running.reported_statechart
 
     assert [node.name for node in reported_statechart.statechart.nodes] == [
         node.name for node in statechart.nodes
@@ -110,3 +154,22 @@ def test_the_copy_holds_the_children_chosen_while_the_statechart_runs(
     assert (
         reported_statechart.statechart.life_cycle_state == statechart.life_cycle_state
     )
+
+
+def test_the_copy_reads_the_conditions_a_choice_gave_its_node(
+    choice_reported_while_running: ChoiceReportedWhileRunning,
+) -> None:
+    """
+    The node that chose succeeds once its child succeeds, although it joined the copy
+    before it chose.
+    """
+    choosing_node = choice_reported_while_running.choosing_node
+    reported_node = (
+        choice_reported_while_running.reported_statechart.statechart.get_node_by_index(
+            index=choosing_node.index
+        )
+    )
+
+    assert [str(condition) for condition in reported_node.conditions] == [
+        str(condition) for condition in choosing_node.conditions
+    ]

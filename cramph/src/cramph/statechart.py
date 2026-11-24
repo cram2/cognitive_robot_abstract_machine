@@ -5,7 +5,6 @@ The statechart: a graph of nodes that is compiled and ticked to run them.
 from __future__ import annotations
 
 import logging
-from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -337,8 +336,8 @@ class Statechart(SubclassJSONSerializer):
     def create_structure_copy(self) -> Statechart:
         """
         Creates a copy of the statechart, where every node is an instance of the base
-        class of its kind, see
-        :meth:`~cramph.node.StatechartNode.create_structure_copy`.
+        class of its kind with the id of the node it copies, see
+        :meth:`~cramph.node.StatechartNode.create_structure_counterpart`.
 
         This is useful if only the structure of the statechart is needed, for example,
         for visualization.
@@ -352,13 +351,13 @@ class Statechart(SubclassJSONSerializer):
 
     def _copy_structure_into(self, *, statechart_copy: Statechart) -> None:
         """
-        Registers a structure copy of every node of this statechart in
+        Registers the structure counterpart of every node of this statechart in
         `statechart_copy`, which is empty, with the children and the conditions of the
         node it copies.
         """
         # copy nodes in order to make sure index is correct
         for node in self.nodes:
-            statechart_copy._register_node(node=node.create_structure_copy())
+            statechart_copy._register_node(node=node.create_structure_counterpart())
         # link parent/child
         for node in self.get_nodes_by_type(node_type=CompositeNode):
             goal_copy: CompositeNode = statechart_copy.get_node_by_index(
@@ -371,10 +370,9 @@ class Statechart(SubclassJSONSerializer):
             for child_node_copy in children_copies:
                 child_node_copy.parent_node_index = node.index
             goal_copy.set_children(children=[*goal_copy.nodes, *children_copies])
-        # copy conditions and plot specs
+        # copy conditions
         for node in self.nodes:
             node_copy = statechart_copy.get_node_by_index(index=node.index)
-            node_copy.plot_specifications = deepcopy(node.plot_specifications)
             for transition_kind in TransitionKind:
                 node_copy.set_condition(
                     transition_kind=transition_kind,

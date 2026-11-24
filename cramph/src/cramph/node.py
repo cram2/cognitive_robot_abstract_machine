@@ -10,6 +10,7 @@ import logging
 import threading
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
+from copy import deepcopy
 from dataclasses import MISSING, field, dataclass, fields
 from enum import StrEnum
 
@@ -1593,6 +1594,17 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             :meth:`~cramph.statechart.Statechart.create_structure_copy`.
         """
         return StructureCopyNode(name=self.name)
+
+    def create_structure_counterpart(self) -> StatechartNode:
+        """
+        :return: The structure copy of this node, see :meth:`create_structure_copy`,
+            with the id and the plot specifications of this node, so that a document
+            naming this node by its id names the copy too.
+        """
+        counterpart = self.create_structure_copy()
+        counterpart._take_over_node_id(node_id=self._node_id)
+        counterpart.plot_specifications = deepcopy(self.plot_specifications)
+        return counterpart
 
     def set_up(self) -> None:
         """
