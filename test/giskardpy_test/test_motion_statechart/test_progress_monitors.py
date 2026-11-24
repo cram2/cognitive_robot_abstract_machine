@@ -25,11 +25,7 @@ from cramph.node import NodeArtifacts
 from cramph.monitors import CountSimulationTimeSeconds
 from giskardpy.motion_statechart.monitors.progress_monitors import (
     AnyMonitoredTaskShortOfItsGoal,
-    BlockedPositionLimit,
-    ErrorGradient,
     NoMonitoredTaskApproachingItsGoal,
-    PositionLimit,
-    PositionLimitSide,
     StillProgressing,
 )
 from cramph.statechart import Statechart
@@ -51,10 +47,6 @@ from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 from semantic_digital_twin.world_description.connections import OmniDrive
-from semantic_digital_twin.world_description.degree_of_freedom import (
-    DegreeOfFreedom,
-    DegreeOfFreedomLimits,
-)
 from giskardpy.motion_statechart.context import MotionControlContext
 from ..motion_control_context import add_to_statechart_with_motion_control
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
@@ -1146,114 +1138,3 @@ class TestTrajectoryProgress:
 
         recorded = tick_until_end_recording(executor, motion_statechart, [progressing])
         assert ObservationStateValue.FALSE not in recorded[progressing]
-
-
-# %% position limits blocking a stalled task
-
-
-@pytest.fixture()
-def bot_position_task(cylinder_bot_world: World) -> CartesianPosition:
-    """
-    :return: A task moving the cylinder bot, which only stands in for the task an
-        :class:`ErrorGradient` belongs to.
-    """
-    return CartesianPosition(
-        kinematic_chain=KinematicChain(
-            root=cylinder_bot_world.root,
-            tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
-        ),
-        goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
-    )
-
-
-class TestPositionLimitsReached:
-    """
-    Which position limits a degree of freedom counts as lying at.
-    """
-
-    def test_a_locked_degree_of_freedom_lies_at_both_limits(self) -> None:
-        """
-        A degree of freedom whose two limits coincide lies at both of them, so a task
-        pushing it either way is caught.
-        """
-        locked = DegreeOfFreedom(
-            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
-                lower_position=0.3, upper_position=0.3, maximum_speed=1.0
-            )
-        )
-
-        assert PositionLimit.find_reached(
-            degree_of_freedom=locked, position=0.3, range_fraction=0.005
-        ) == [
-            PositionLimit(degree_of_freedom=locked, side=PositionLimitSide.LOWER),
-            PositionLimit(degree_of_freedom=locked, side=PositionLimitSide.UPPER),
-        ]
-
-    def test_a_degree_of_freedom_missing_a_limit_lies_at_none(self) -> None:
-        """
-        Without both limits there is no range to measure closeness by, so a degree of
-        freedom missing one lies at neither.
-        """
-        half_bounded = DegreeOfFreedom(
-            limits=DegreeOfFreedomLimits.from_position_range_and_speed(
-                upper_position=1.0, maximum_speed=1.0
-            )
-        )
-
-        assert (
-            PositionLimit.find_reached(
-                degree_of_freedom=half_bounded, position=1.0, range_fraction=0.005
-            )
-            == []
-        )
-
-
-class TestErrorGradientBlocking:
-    """
-    Which reached position limits a task's error gradient counts as blocking.
-    """
-
-    def test_a_slope_into_a_limit_blocks_it(
-        self, *, bot_position_task: CartesianPosition
-    ) -> None:
-        """
-        A degree of freedom at its upper limit whose error falls by moving it further up
-        is blocked there.
-        """
-        free = DegreeOfFreedom()
-        at_upper_limit = DegreeOfFreedom()
-        upper_limit = PositionLimit(
-            degree_of_freedom=at_upper_limit, side=PositionLimitSide.UPPER
-        )
-        gradient = ErrorGradient(
-            task=bot_position_task, slopes={free: 1.0, at_upper_limit: -0.5}
-        )
-
-        assert gradient.find_blocked_position_limits(
-            reached_limits=[upper_limit], negligible_slope_fraction=1e-3
-        ) == [BlockedPositionLimit(position_limit=upper_limit, task=bot_position_task)]
-
-    def test_a_round_off_slope_does_not_block(
-        self, *, bot_position_task: CartesianPosition
-    ) -> None:
-        """
-        A slope that is only round-off next to the steepest one does not count as
-        driving its degree of freedom into a limit.
-        """
-        free = DegreeOfFreedom()
-        at_upper_limit = DegreeOfFreedom()
-        gradient = ErrorGradient(
-            task=bot_position_task, slopes={free: 1.0, at_upper_limit: -1e-16}
-        )
-
-        assert (
-            gradient.find_blocked_position_limits(
-                reached_limits=[
-                    PositionLimit(
-                        degree_of_freedom=at_upper_limit, side=PositionLimitSide.UPPER
-                    )
-                ],
-                negligible_slope_fraction=1e-3,
-            )
-            == []
-        )

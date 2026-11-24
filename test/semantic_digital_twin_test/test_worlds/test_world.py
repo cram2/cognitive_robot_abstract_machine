@@ -70,6 +70,7 @@ from semantic_digital_twin.world_description.connections import (
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
+    PositionLimitSide,
 )
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -1619,6 +1620,48 @@ def test_limits_from_position_range_and_speed_leave_omitted_bounds_unbounded():
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=0.7)
     assert limits.lower == DerivativeMap(velocity=-0.7)
     assert limits.upper == DerivativeMap(velocity=0.7)
+
+
+def test_a_locked_degree_of_freedom_lies_at_both_position_limits() -> None:
+    """
+    Limits whose two positions coincide count a position there as lying at both, so a
+    motion pushing it either way is caught.
+    """
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        lower_position=0.3, upper_position=0.3, maximum_speed=1.0
+    )
+
+    assert limits.reached_position_limits(position=0.3, range_fraction=0.001) == [
+        PositionLimitSide.LOWER,
+        PositionLimitSide.UPPER,
+    ]
+
+
+def test_limits_missing_a_position_limit_are_never_reached() -> None:
+    """
+    Without both position limits there is no range to measure closeness by, so a
+    position lies at neither.
+    """
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        upper_position=1.0, maximum_speed=1.0
+    )
+
+    assert limits.reached_position_limits(position=1.0, range_fraction=0.001) == []
+
+
+def test_a_position_within_the_range_fraction_of_a_limit_lies_at_it() -> None:
+    """
+    A position counts as at a position limit within the given fraction of the range from
+    it, and as at neither limit further inside the range.
+    """
+    limits = DegreeOfFreedomLimits.from_position_range_and_speed(
+        lower_position=-1.0, upper_position=1.0, maximum_speed=1.0
+    )
+
+    assert limits.reached_position_limits(position=0.99, range_fraction=0.01) == [
+        PositionLimitSide.UPPER
+    ]
+    assert limits.reached_position_limits(position=0.97, range_fraction=0.01) == []
 
 
 def test_overwrite_dof_limits(world_setup):

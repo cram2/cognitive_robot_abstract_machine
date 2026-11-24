@@ -238,8 +238,8 @@ class PositionLimitBlockedError(NoProgressError):
         """
         blocked = "; ".join(
             f"{blocked_limit.task.unique_name} drives "
-            f"{blocked_limit.position_limit.degree_of_freedom.name} into its "
-            f"{blocked_limit.position_limit.side.name.lower()} position limit"
+            f"{blocked_limit.degree_of_freedom.name} into its "
+            f"{blocked_limit.side.name.lower()} position limit"
             for blocked_limit in self.blocked_position_limits
         )
         return f"{super().error_message()} Blocked: {blocked}."

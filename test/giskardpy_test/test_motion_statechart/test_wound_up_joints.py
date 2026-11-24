@@ -26,8 +26,6 @@ from giskardpy.motion_statechart.exceptions import (
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.monitors.progress_monitors import (
     BlockedPositionLimit,
-    PositionLimit,
-    PositionLimitSide,
     StillProgressing,
 )
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
@@ -38,6 +36,7 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 from krrood_spatial_math.spatial_types import Pose, Vector3
 from semantic_digital_twin.robots.tracy import TracyJoint
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.degree_of_freedom import PositionLimitSide
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% starts of the wrist
@@ -82,6 +81,11 @@ class WatchedWristTurn:
     The pose goal that turns the tool.
     """
 
+    progressing: StillProgressing
+    """
+    The stall monitor watching :attr:`goal`.
+    """
+
     @classmethod
     def from_winding(
         cls,
@@ -117,7 +121,7 @@ class WatchedWristTurn:
         motion_statechart.add_node(node=EndMotion.when_true(node=goal))
         motion_statechart.add_node(node=progressing.cancel_motion())
         executor.compile(statechart=motion_statechart)
-        return cls(executor=executor, goal=goal)
+        return cls(executor=executor, goal=goal, progressing=progressing)
 
 
 # %% pose goals from a wound up wrist
@@ -157,12 +161,32 @@ def test_wrist_turn_from_a_wound_up_wrist_names_the_blocked_limit(
 
     assert exception_info.value.blocked_position_limits == [
         BlockedPositionLimit(
-            position_limit=PositionLimit(
-                degree_of_freedom=wrist.raw_dof, side=PositionLimitSide.UPPER
-            ),
+            degree_of_freedom=wrist.raw_dof,
+            side=PositionLimitSide.UPPER,
             task=orientation_task,
         )
     ]
+
+
+def test_a_slope_no_steeper_than_the_negligible_fraction_does_not_block(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    At the stall from :attr:`WristWinding.WOUND_UP`, a slope counts as zero up to the
+    given fraction of the task's steepest slope, so a fraction of one blames no limit.
+    """
+    wrist_turn = WatchedWristTurn.from_winding(
+        world=tracy_world_copy, winding=WristWinding.WOUND_UP, arm_pose=tracy_arm_pose
+    )
+    with pytest.raises(PositionLimitBlockedError):
+        wrist_turn.executor.tick_until_end(timeout=1_000)
+
+    assert (
+        wrist_turn.progressing.find_blocked_position_limits(
+            negligible_slope_fraction=1.0
+        )
+        == []
+    )
 
 
 def test_a_limit_of_a_joint_without_hardware_interface_is_not_blamed(

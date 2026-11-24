@@ -16,7 +16,6 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.custom_types import NumpyType
 from krrood.ormatic.ormatic import ORMatic
 from krrood.class_diagrams.utils import classes_of_package
-from giskardpy.motion_statechart.monitors.progress_monitors import ErrorGradient
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the giskardpy package.
@@ -24,7 +23,7 @@ from giskardpy.motion_statechart.monitors.progress_monitors import ErrorGradient
 
 
 ignored_classes = set(classes_of_package(giskardpy.qp.solvers))
-ignored_classes |= {SubclassJSONSerializer, ErrorGradient}
+ignored_classes |= {SubclassJSONSerializer}
 
 dependencies = [cramph.orm.ormatic_interface]
 
