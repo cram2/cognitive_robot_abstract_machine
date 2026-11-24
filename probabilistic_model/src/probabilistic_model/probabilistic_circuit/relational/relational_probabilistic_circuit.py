@@ -12,8 +12,9 @@ Relational probabilistic circuits.
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
+import numpy as np
 import pandas as pd
 from typing_extensions import TYPE_CHECKING, Any, Callable, Hashable
 
@@ -88,6 +89,25 @@ class PartTrainingTable:
     Per row, the position among the training instances of the instance the part belongs
     to.
     """
+
+    def one_part_per_example(self, *, seed: int) -> PartTrainingTable:
+        """
+        :param seed: The seed of the draw.
+        :return: The table of one part per training instance that has any, drawn at
+            random among its parts, in the order of the instances.
+        """
+        generator = np.random.default_rng(seed)
+        positions = pd.Series(self.example_positions)
+        drawn = [
+            int(generator.choice(rows_of_example.index.to_numpy()))
+            for _, rows_of_example in positions.groupby(positions, sort=True)
+        ]
+        return replace(
+            self,
+            part_instances=[self.part_instances[row] for row in drawn],
+            rows=self.rows.iloc[drawn].reset_index(drop=True),
+            example_positions=[self.example_positions[row] for row in drawn],
+        )
 
 
 @dataclass

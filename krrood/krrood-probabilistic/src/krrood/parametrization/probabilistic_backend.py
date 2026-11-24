@@ -58,7 +58,7 @@ from krrood.parametrization.parameterizer import (
 )
 from probabilistic_model.probabilistic_model import ProbabilisticModel
 from probabilistic_model.causal_structure.graph import (
-    CausalGraph,
+    EdgeMarkedGraph,
     GraphNode,
     NodeLevel,
     NodeReference,
@@ -352,6 +352,9 @@ class ProbabilisticBackend(GenerativeBackend):
         :raises EffectNotIdentified: If the learned graph identifies the effect by no
             set of the variables the query names; :meth:`interventional_range` answers
             an effect it identifies up to a few candidate sets.
+        :raises QuerySpansSeveralParts: If a cause, the effect and the variables marked
+            ``confounder`` reach two parts, for a structure learned one graph per
+            collection.
         """
         structure = self.causal_structures.get(parameters.queried_class)
         if structure is None or not parameters.search_cause_variables:
@@ -359,12 +362,16 @@ class ProbabilisticBackend(GenerativeBackend):
         cause_effect = self._resolve_cause_and_effect_variables(
             parameters=parameters, expression=expression
         )
-        selector = structure.selector
         for cause_variable in cause_effect.cause_variables:
             candidates = self.adjustment_candidates(
                 parameters=parameters,
                 structure=structure,
-                selector=selector,
+                selector=self._selector_for(
+                    structure=structure,
+                    parameters=parameters,
+                    cause_variable=cause_variable,
+                    effect_variable=cause_effect.effect_variable,
+                ),
                 cause_variable=cause_variable,
                 effect_variable=cause_effect.effect_variable,
             )
@@ -386,13 +393,17 @@ class ProbabilisticBackend(GenerativeBackend):
             structure, with a ``causes_effect(...)`` condition and no ``cause``.
         :param expression: The query.
         :return: The variables the query names whose node is a possible ancestor of the
-            effect's in the structure learned for the queried class, as the cause
-            candidates to rank.
+            effect's in the structure learned for the queried class, in the graph of
+            the effect's scope, as the cause candidates to rank.
         """
         effect_variable = self._resolve_cause_and_effect_variables(
             parameters=parameters, expression=expression
         ).effect_variable
-        graph = self.causal_structures[parameters.queried_class].selector.graph
+        graph = (
+            self.causal_structures[parameters.queried_class]
+            .selector_covering(variable_names=[effect_variable.name])
+            .graph
+        )
         effect = self._reference_in(graph=graph, variable=effect_variable)
         ancestors = graph.possible_ancestors(effect.node)
         return [
@@ -402,6 +413,32 @@ class ProbabilisticBackend(GenerativeBackend):
             and reference.node in ancestors
             and reference.part_index in (None, effect.part_index)
         ]
+
+    @staticmethod
+    def _selector_for(
+        *,
+        structure: LearnedCausalStructure,
+        parameters: UnderspecifiedParameters,
+        cause_variable: random_events.variable.Variable,
+        effect_variable: random_events.variable.Variable,
+    ) -> AdjustmentSelector:
+        """
+        :param structure: The structure learned for the queried class.
+        :param parameters: The query's parameters.
+        :param cause_variable: One cause.
+        :param effect_variable: The effect.
+        :return: The structure's selector of the scope the cause, the effect and the
+            variables marked ``confounder`` fall in.
+        :raises QuerySpansSeveralParts: If they reach two collections, or two parts of
+            one, of a structure learned one graph per collection.
+        """
+        return structure.selector_covering(
+            variable_names=[
+                cause_variable.name,
+                effect_variable.name,
+                *(variable.name for variable in parameters.search_confounder_variables),
+            ]
+        )
 
     def adjustment_candidates(
         self,
@@ -500,13 +537,17 @@ class ProbabilisticBackend(GenerativeBackend):
         cause_effect = self._resolve_cause_and_effect_variables(
             parameters=parameters, expression=expression
         )
-        selector = structure.selector
         candidates_by_cause = []
         for cause_variable in cause_effect.cause_variables:
             candidates = self.adjustment_candidates(
                 parameters=parameters,
                 structure=structure,
-                selector=selector,
+                selector=self._selector_for(
+                    structure=structure,
+                    parameters=parameters,
+                    cause_variable=cause_variable,
+                    effect_variable=cause_effect.effect_variable,
+                ),
                 cause_variable=cause_variable,
                 effect_variable=cause_effect.effect_variable,
             )
@@ -611,7 +652,7 @@ class ProbabilisticBackend(GenerativeBackend):
     @staticmethod
     def _eligible_references(
         *,
-        graph: CausalGraph,
+        graph: EdgeMarkedGraph,
         parameters: UnderspecifiedParameters,
         part_index: int | None,
     ) -> dict[GraphNode, NodeReference]:
@@ -636,7 +677,7 @@ class ProbabilisticBackend(GenerativeBackend):
 
     @staticmethod
     def _reference_in(
-        *, graph: CausalGraph, variable: random_events.variable.Variable
+        *, graph: EdgeMarkedGraph, variable: random_events.variable.Variable
     ) -> NodeReference:
         """
         :param graph: A learned causal graph.
