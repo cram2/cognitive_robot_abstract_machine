@@ -65,6 +65,10 @@ from krrood.symbolic_math.symbolic_math import (
     GenericSymbolicType,
     Scalar,
 )
+from cramph.structure_change_recorder import (
+    StructureChangeRecorder,
+    StructureChangeRecorderOutsideStatechart,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
@@ -180,6 +184,10 @@ class TransitionCondition(SubclassJSONSerializer):
         self._sanity_check(new_expression=new_expression)
         self.expression = new_expression
         self._child = child
+        if self.owner is not None:
+            self.owner._structure_change_recorder._record_changed_condition(
+                node=self.owner, transition_kind=self.kind
+            )
 
     def _sanity_check(self, *, new_expression: Scalar) -> None:
         """
@@ -1230,6 +1238,9 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
                 self._interrupt_condition = transition
             case _:
                 raise UnknownTransitionKindError(transition_kind=transition.kind)
+        self._structure_change_recorder._record_changed_condition(
+            node=self, transition_kind=transition.kind
+        )
 
     def create_lifecycle_transitions(
         self, *, own_transitions_allowed: sm.Scalar
@@ -1530,6 +1541,26 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param statechart: The statechart this node now belongs to.
         """
         self._statechart = statechart
+
+    @property
+    def _structure_change_recorder(self) -> StructureChangeRecorder:
+        """
+        :return: The recorder of the statechart this node belongs to, or a recorder
+            that records nothing if it belongs to none.
+        """
+        if self._statechart is None:
+            return StructureChangeRecorderOutsideStatechart()
+        return self._statechart.structure_change_recorder
+
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Records with `recorder` every part of the structure of this node that a copy of
+        its statechart has to repeat: the condition of every transition.
+        """
+        for transition_kind in TransitionKind:
+            recorder._record_changed_condition(
+                node=self, transition_kind=transition_kind
+            )
 
     @property
     def context(self) -> StatechartContext:
@@ -2377,6 +2408,52 @@ class CompositeNode(StatechartNode):
         """
         return list(self.nodes)
 
+    def set_children(self, *, children: list[StatechartNode]) -> None:
+        """
+        Holds `children` as the children of this node from now on, in that order, and
+        records the change in the statechart this node belongs to.
+
+        .. warning:: Changing :attr:`nodes` in place goes unrecorded once the
+            :meth:`~cramph.statechart.Statechart.modify` block this node joined in has
+            ended, so a copy of the statechart repeating its changes misses it.
+
+        :param children: The nodes to hold as children.
+        """
+        self.nodes = list(children)
+        self._structure_change_recorder._record_changed_children(node=self)
+
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Also records the children, see :meth:`StatechartNode._record_structure`.
+        """
+        super()._record_structure(recorder=recorder)
+        recorder._record_changed_children(node=self)
+
+    def insert_child(self, *, position: int, node: StatechartNode) -> None:
+        """
+        Lists `node` among the children at `position`, without adding it to the
+        statechart, and records the change like :meth:`set_children`. See
+        :meth:`_add_listed_child_to_statechart` for adding it.
+
+        :param position: The index among the children `node` takes.
+        :param node: The node to list as a child.
+        """
+        self.set_children(
+            children=[*self.nodes[:position], node, *self.nodes[position:]]
+        )
+
+    def remove_child(self, *, child: StatechartNode) -> None:
+        """
+        Stops listing `child` itself among the children, whatever other child it
+        compares equal to, without removing it from the statechart, and records the
+        change like :meth:`set_children`.
+
+        :param child: One of :attr:`nodes`.
+        """
+        self.set_children(
+            children=[listed for listed in self.nodes if listed is not child]
+        )
+
     @classproperty
     def context_extensions_required_to_expand(
         cls,
@@ -2397,6 +2474,18 @@ class CompositeNode(StatechartNode):
         unless overridden.
 
         Called once, when this node joins a statechart, right before :meth:`expand`.
+        """
+        return None
+
+    def check_handed_children(
+        self, *, taken_over: StatechartNode | None = None
+    ) -> None:
+        """
+        Rejects the children this node was handed that it cannot adopt, see
+        :meth:`adopt_handed_children`. Rejects none unless overridden.
+
+        :param taken_over: A handed child this node takes over before it adopts its
+            children, see :meth:`take_over`, which it can adopt then.
         """
         return None
 
@@ -2429,13 +2518,13 @@ class CompositeNode(StatechartNode):
         self._add_node_sanity_check(node=node)
         self._check_accepts_children()
         if node not in self.nodes:
-            self.nodes.append(node)
-        self._place_child_in_statechart(node=node)
+            self.insert_child(position=len(self.nodes), node=node)
+        self._add_listed_child_to_statechart(node=node)
 
-    def _place_child_in_statechart(self, *, node: StatechartNode) -> None:
+    def _add_listed_child_to_statechart(self, *, node: StatechartNode) -> None:
         """
-        Makes `node` a child of this node in the statechart this node belongs to,
-        without touching :attr:`nodes`.
+        Adds `node`, which :attr:`nodes` lists already, to the statechart this node
+        belongs to, as a child of this node, without touching :attr:`nodes`.
 
         .. note:: It does not check :meth:`_check_accepts_children`; check that before
             changing :attr:`nodes`, so a rejected node leaves this node as it was.
@@ -2501,10 +2590,11 @@ class CompositeNode(StatechartNode):
         :param child: One of :attr:`nodes`.
         :param substitute: The node to list in its place.
         """
-        position = next(
-            index for index, listed in enumerate(self.nodes) if listed is child
+        self.set_children(
+            children=[
+                substitute if listed is child else listed for listed in self.nodes
+            ]
         )
-        self.nodes[position] = substitute
 
     def take_over(self, *, node: StatechartNode) -> None:
         """
