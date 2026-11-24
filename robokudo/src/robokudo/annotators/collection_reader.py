@@ -91,7 +91,7 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
         """
         Initialize the configured camera reader and its acquisition state.
         """
-        super().__init__(name, descriptor)
+        super().__init__(name=name, descriptor=descriptor)
         self.camera_interface = (
             descriptor.parameters.camera_interface_type(
                 descriptor.parameters.camera_configuration

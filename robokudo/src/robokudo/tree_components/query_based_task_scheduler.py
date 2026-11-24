@@ -23,7 +23,8 @@ from robokudo.tree_components.task_scheduler import TaskSchedulerBase
 from robokudo.utils.tree import add_child_to_parent, setup_with_descendants_on_behavior
 
 
-@dataclass(eq=False)
+# %% Query scheduling
+@dataclass(kw_only=True, eq=False)
 class QueryBasedScheduler(
     TaskSchedulerBase,
     BaseAnnotator,
@@ -61,7 +62,7 @@ class QueryBasedScheduler(
         Initialize annotator resources after
         :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
         """
-        super().__init__(self.name)
+        super().__post_init__()
         if self.tasks is None:
             self.tasks = dict()
 

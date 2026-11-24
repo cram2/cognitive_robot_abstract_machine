@@ -64,7 +64,7 @@ DescriptorType = TypeVar("DescriptorType", bound=AnnotatorDescriptor)
 
 
 # %% Base annotator
-@dataclass(kw_only=True, init=False, eq=False)
+@dataclass(kw_only=True, eq=False)
 class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     """
     Base class for all RoboKudo annotators.
@@ -79,7 +79,7 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     context.
     """
 
-    name: str = field(init=False)
+    name: str = "Annotator"
     """Name of this node in the behaviour tree."""
 
     descriptor: DescriptorType = field(
@@ -100,32 +100,12 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
             return cast(type[DescriptorType], BaseAnnotatorDescriptor)
         return cls.get_type_of_generic_parameter(parameter=DescriptorType)
 
-    def __init__(
-        self,
-        name: str = "Annotator",
-        descriptor: DescriptorType | None = None,
-        ros_package_name: str = PACKAGE_NAME,
-    ) -> None:
-        """
-        Initialize the BaseAnnotator.
-
-        Performs minimal one-time initialization of the annotator.
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        :param ros_package_name: Name of the ROS package
-        """
-        super().__init__(name)
-        if descriptor is None:
-            descriptor = self.descriptor_type()
-
-        self.rk_logger = logging.getLogger(ros_package_name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.descriptor = descriptor
-
     def __post_init__(self) -> None:
-        """Initialize behaviour-tree identity and the annotator logger."""
-        BaseAnnotator.__init__(self, name=self.name, descriptor=self.descriptor)
+        """Initialize behaviour-tree identity, effective configuration, and logging."""
+        Behaviour.__init__(self, name=self.name)
+        if self.descriptor is None:
+            self.descriptor = self.descriptor_type()
+        self.rk_logger = logging.getLogger(PACKAGE_NAME)
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -467,7 +447,7 @@ class Worker(object):
 
 
 # %% Threaded annotator
-@dataclass(kw_only=True, init=False, eq=False)
+@dataclass(kw_only=True, eq=False)
 class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     """
     Base class for annotators that perform long-running operations.
@@ -476,6 +456,9 @@ class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     main thread. It provides functionality to run computations asynchronously and handle
     their results.
     """
+
+    name: str = __qualname__
+    """Name of this node in the behaviour tree."""
 
     compute_worker: Worker | None = field(default=None, init=False, repr=False)
     """Computation scheduled for the current processing iteration."""
@@ -487,27 +470,6 @@ class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
         default=None, init=False, repr=False
     )
     """Thread running the current computation."""
-
-    def __init__(
-        self,
-        name: str = __qualname__,
-        descriptor: DescriptorType | None = None,
-    ) -> None:
-        """
-        Initialize the ThreadedAnnotator.
-
-        :param name: Name of the annotator instance
-        :param descriptor: Configuration descriptor
-        """
-        super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.compute_worker: Worker | None = None
-        self.compute_worker_started: bool = False
-        self.compute_worker_thread: threading.Thread | None = None
-
-    def __post_init__(self) -> None:
-        """Initialize worker state in addition to :meth:`BaseAnnotator.__post_init__`."""
-        ThreadedAnnotator.__init__(self, name=self.name, descriptor=self.descriptor)
 
     def initialise(self) -> None:
         """

@@ -12,8 +12,10 @@ The module supports:
 * Tree structure validation
 """
 
+# %% Imports
 import logging
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 from py_trees.behaviour import Behaviour
 from py_trees.common import Status
@@ -28,6 +30,8 @@ from robokudo.utils.tree import (
 )
 
 
+# %% Task scheduling
+@dataclass(kw_only=True, init=False, eq=False)
 class TaskSchedulerBase(Behaviour, ABC):
     """Base class for task scheduling behaviors.
 
@@ -46,6 +50,9 @@ class TaskSchedulerBase(Behaviour, ABC):
     In order to use this class, please use one of the deriving classes.
     """
 
+    fix_parent_relationships_after_plan: bool = field(default=True, init=False)
+    """Whether planned jobs repair parent references before insertion into the tree."""
+
     def __init__(self, name: str = "TaskSchedulerBase") -> None:
         """Initialize the task scheduler.
 
@@ -57,9 +64,6 @@ class TaskSchedulerBase(Behaviour, ABC):
         """Logger for this class."""
 
         self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-
-        self.fix_parent_relationships_after_plan: bool = True
-        """Whether to fix parent relationships after planning"""
 
     def initialise(self) -> None:
         """Initialize and validate the tree structure.

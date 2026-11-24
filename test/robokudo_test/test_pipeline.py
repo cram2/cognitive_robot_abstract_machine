@@ -1,9 +1,13 @@
-import py_trees
+"""
+Validate CAS ownership and annotator traversal across nested behaviour trees.
+"""
 
+# %% Imports
+import py_trees
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.testing import (
-    FakeCollectionReaderAnnotator,
     FailingAnnotator,
+    FakeCollectionReaderAnnotator,
     SlowAnnotator,
 )
 from robokudo.pipeline import Pipeline
@@ -23,21 +27,32 @@ def create_test_tree():
     return root
 
 
+# %% Pipeline traversal
 class TestPipeline(object):
-    def test_find_cas_direct(self):
+    """
+    Check parent lookup and traversal boundaries for pipeline-owned annotators.
+    """
+
+    def test_find_cas_direct(self) -> None:
+        """
+        Direct children access the CAS belonging to their parent pipeline.
+        """
         root = Pipeline("Sequence")
-        annotator1 = BaseAnnotator("1")
-        annotator2 = BaseAnnotator("2")
+        annotator1 = BaseAnnotator(name="1")
+        annotator2 = BaseAnnotator(name="2")
         root.add_child(annotator1)
         root.add_child(annotator2)
 
         assert root.cas == annotator1.get_cas()
 
-    def test_find_cas_from_deeper_leaf(self):
+    def test_find_cas_from_deeper_leaf(self) -> None:
+        """
+        Annotators below ordinary composites still resolve their owning pipeline.
+        """
         root = Pipeline("Sequence")
-        annotator1 = BaseAnnotator("1")
-        annotator2 = BaseAnnotator("2")
-        annotatorInSelector = BaseAnnotator("annotatorInSelector")
+        annotator1 = BaseAnnotator(name="1")
+        annotator2 = BaseAnnotator(name="2")
+        annotatorInSelector = BaseAnnotator(name="annotatorInSelector")
 
         selector = py_trees.composites.Selector("Selector", memory=True)
         success_after_two = py_trees.behaviours.Dummy(
@@ -52,13 +67,16 @@ class TestPipeline(object):
 
         assert root.cas == annotatorInSelector.get_cas()
 
-    def test_get_annotators_nested(self):
+    def test_get_annotators_nested(self) -> None:
+        """
+        Annotator traversal includes leaves inside ordinary nested sequences.
+        """
         root = Pipeline("Sequence")
-        annotator1 = BaseAnnotator("1")
-        annotator3 = BaseAnnotator("3")
+        annotator1 = BaseAnnotator(name="1")
+        annotator3 = BaseAnnotator(name="3")
 
         sub_sequence = py_trees.composites.Sequence("SubSequence", memory=True)
-        annotator2 = BaseAnnotator("2")
+        annotator2 = BaseAnnotator(name="2")
         sub_sequence.add_child(annotator2)
 
         root.add_child(annotator1)
@@ -67,13 +85,16 @@ class TestPipeline(object):
 
         assert root.get_annotators() == [annotator1, annotator2, annotator3]
 
-    def test_pipeline_children1(self):
+    def test_pipeline_children1(self) -> None:
+        """
+        Child traversal includes nested composites and their annotator leaves.
+        """
         root = Pipeline("Sequence")
-        annotator1 = BaseAnnotator("1")
-        annotator3 = BaseAnnotator("3")
+        annotator1 = BaseAnnotator(name="1")
+        annotator3 = BaseAnnotator(name="3")
 
         sub_sequence = py_trees.composites.Sequence("SubSequence", memory=True)
-        annotator2 = BaseAnnotator("2")
+        annotator2 = BaseAnnotator(name="2")
         sub_sequence.add_child(annotator2)
 
         root.add_child(annotator1)
@@ -87,13 +108,16 @@ class TestPipeline(object):
             annotator3,
         ]
 
-    def test_pipeline_children2(self):
+    def test_pipeline_children2(self) -> None:
+        """
+        Child traversal excludes annotators owned by another pipeline.
+        """
         root = Pipeline("Sequence")
-        annotator1 = BaseAnnotator("1")
-        annotator3 = BaseAnnotator("3")
+        annotator1 = BaseAnnotator(name="1")
+        annotator3 = BaseAnnotator(name="3")
 
         sub_pipeline = Pipeline("Subsequence")
-        annotator2 = BaseAnnotator("2")
+        annotator2 = BaseAnnotator(name="2")
         sub_pipeline.add_child(annotator2)
 
         root.add_child(annotator1)
@@ -102,14 +126,17 @@ class TestPipeline(object):
 
         assert root.pipeline_children() == [annotator1, annotator3]
 
-    def test_pipeline_children3(self):
+    def test_pipeline_children3(self) -> None:
+        """
+        A nested pipeline is omitted regardless of its position among siblings.
+        """
         root = Pipeline("Sequence")
-        annotator1 = BaseAnnotator("1")
-        annotator3 = BaseAnnotator("3")
+        annotator1 = BaseAnnotator(name="1")
+        annotator3 = BaseAnnotator(name="3")
 
         # Pipeline children will not be fetched in nested RK Pipelines
         sub_pipeline = Pipeline("Subsequence")
-        annotator2 = BaseAnnotator("2")
+        annotator2 = BaseAnnotator(name="2")
         sub_pipeline.add_child(annotator2)
 
         root.add_child(annotator1)

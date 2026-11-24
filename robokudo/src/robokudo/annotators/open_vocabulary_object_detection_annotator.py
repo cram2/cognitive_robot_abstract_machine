@@ -178,9 +178,9 @@ class OpenVocabularyObjectDetectionAnnotator(
 
     def __post_init__(self) -> None:
         """
-        Initialize the threaded behaviour and load the configured models.
+        Load configured models after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`.
         """
-        super().__init__(self.name, self.descriptor)
+        super().__post_init__()
         self.classes = self.descriptor.parameters.classes
         self.model = Owlv2ForObjectDetection.from_pretrained(
             self.descriptor.parameters.detection_model
