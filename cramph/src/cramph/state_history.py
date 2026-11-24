@@ -70,6 +70,26 @@ class StateHistoryItem:
         """
         return node.index < len(self.life_cycle_state.data)
 
+    def life_cycle_of(self, *, node: StatechartNode) -> LifeCycleValue:
+        """
+        :param node: A node of the statechart.
+        :return: The life cycle state of `node` in this snapshot, NOT_STARTED if it had
+            not joined the statechart yet.
+        """
+        if not self.records(node=node):
+            return LifeCycleValue.NOT_STARTED
+        return self.life_cycle_state[node]
+
+    def observation_of(self, *, node: StatechartNode) -> ObservationStateValue:
+        """
+        :param node: A node of the statechart.
+        :return: What `node` observed in this snapshot, UNKNOWN if it had not joined the
+            statechart yet.
+        """
+        if not self.records(node=node):
+            return ObservationStateValue.UNKNOWN
+        return self.observation_state[node]
+
     def __eq__(self, other: StateHistoryItem) -> bool:
         """
         :param other: The item to compare against.
@@ -156,9 +176,10 @@ class NodeRun(RunTicks):
     def overlaps(self, *, other: NodeRun) -> bool:
         """
         :param other: Another run.
-        :return: Whether both runs were active at a common tick.
+        :return: Whether each run started before the other ended. A run that ends on
+            the tick the other starts ended before it.
         """
-        return self.start_tick <= other.last_tick and other.start_tick <= self.last_tick
+        return self.start_tick < other.last_tick and other.start_tick < self.last_tick
 
     def contains(self, *, other: NodeRun) -> bool:
         """
@@ -350,6 +371,31 @@ class StateHistory:
             history_item.observation_state[node]
             for history_item in self.items_recording(node=node)
         ]
+
+    def item_at(self, *, tick: int) -> StateHistoryItem:
+        """
+        :param tick: A tick the history covers.
+        :return: The state at `tick`: the last snapshot taken at or before it.
+        """
+        return [item for item in self.items if item.tick_count <= tick][-1]
+
+    def last_observation_of(
+        self, *, node: StatechartNode, tick: int
+    ) -> ObservationStateValue:
+        """
+        :param node: A node of the statechart.
+        :param tick: A tick the history covers.
+        :return: The latest observation other than UNKNOWN `node` took at or before
+            `tick`, UNKNOWN if it took none.
+        """
+        observed = [
+            observation
+            for item in self.items
+            if item.tick_count <= tick
+            and (observation := item.observation_of(node=node))
+            is not ObservationStateValue.UNKNOWN
+        ]
+        return observed[-1] if observed else ObservationStateValue.UNKNOWN
 
     def items_recording(self, *, node: StatechartNode) -> list[StateHistoryItem]:
         """

@@ -171,6 +171,16 @@ class FailedTrial:
     What the trial failed with.
     """
 
+    tried: frozenset[StatementNode]
+    """
+    The statements whose candidates the trial tried.
+    """
+
+    plan_tick: int
+    """
+    The tick of the plan's statechart the trial ran at.
+    """
+
 
 # %% rebuilding part of a plan onto a world
 
@@ -464,7 +474,7 @@ class ActionTrial:
 
     failed_trials: list[FailedTrial] = field(default_factory=list, init=False)
     """
-    Every trial that failed, in the order they ran.
+    Every trial of a statement's candidates that failed, in the order they ran.
     """
 
     @property
@@ -474,11 +484,13 @@ class ActionTrial:
         """
         return self.executor.context.world
 
-    def succeeds(self, *, rebuild: TrialBuild) -> bool:
+    def succeeds(
+        self, *, rebuild: TrialBuild, tried: frozenset[StatementNode] = frozenset()
+    ) -> bool:
         """
         Run what `rebuild` builds for a trial against the copy, see
         :meth:`TrialBuild.build_for_trial`, and restore the copy afterwards. A trial
-        that fails is kept in :attr:`failed_trials`.
+        that tries candidates of statements and fails is kept in :attr:`failed_trials`.
 
         It is rebuilt onto the copy because an action that modifies the model (attaching
         a grasped body, say) requires the entities it is given to belong to the world
@@ -487,6 +499,7 @@ class ActionTrial:
         each attempt undoes only its own modifications.
 
         :param rebuild: Builds what is tried.
+        :param tried: The statements whose candidates `rebuild` tries.
         :return: True if what `rebuild` builds runs to completion without raising an
             :class:`~cramph.exceptions.ExecutionFailure`.
         """
@@ -507,9 +520,16 @@ class ActionTrial:
                 return True
             except ExecutionFailure as failure:
                 logger.info(f"{rebuild} failed its trial: {failure}")
-                self.failed_trials.append(
-                    FailedTrial(build=rebuild, statechart=statechart, failure=failure)
-                )
+                if tried:
+                    self.failed_trials.append(
+                        FailedTrial(
+                            build=rebuild,
+                            statechart=statechart,
+                            failure=failure,
+                            tried=tried,
+                            plan_tick=self.executor.context.tick_count,
+                        )
+                    )
                 return False
             finally:
                 # Undo the model changes before leaving the reset context restores the
@@ -679,7 +699,8 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         )
         while candidate is not None:
             if self.trial.succeeds(
-                rebuild=SubtreeRebuild.unfinished_nodes(root, {node: candidate})
+                rebuild=SubtreeRebuild.unfinished_nodes(root, {node: candidate}),
+                tried=frozenset({node}),
             ):
                 return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
             candidate = node.next_candidate(
@@ -713,7 +734,8 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         )
         for combination in combinations:
             if not self.trial.succeeds(
-                rebuild=SubtreeRebuild.unfinished_nodes(root, combination)
+                rebuild=SubtreeRebuild.unfinished_nodes(root, combination),
+                tried=frozenset(combination),
             ):
                 continue
             combinations.take(combination=combination)

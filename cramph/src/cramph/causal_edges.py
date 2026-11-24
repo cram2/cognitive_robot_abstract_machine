@@ -175,7 +175,9 @@ class ContainmentEdges(CausalEdgeSource):
 class ControlEdges(CausalEdgeSource):
     """
     Each run of a node is acted on by the runs of the other nodes its written conditions
-    read, except the nodes it holds or is held by.
+    read, except the nodes it holds or is held by: for its start condition the runs that
+    had started when it started, for any other condition those that had started when it
+    ended.
     """
 
     def edges(self, *, runs: StatechartRuns, access: WorldAccessIndex) -> list[RunEdge]:
@@ -187,7 +189,12 @@ class ControlEdges(CausalEdgeSource):
                         continue
                     for run in node_runs:
                         read_run = runs.latest_run_started_by(
-                            node=read_node, tick=run.start_tick
+                            node=read_node,
+                            tick=(
+                                run.start_tick
+                                if condition.kind is TransitionKind.START
+                                else run.last_tick
+                            ),
                         )
                         if read_run is not None:
                             edges.append(

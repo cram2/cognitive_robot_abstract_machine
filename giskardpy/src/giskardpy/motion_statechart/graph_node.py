@@ -178,25 +178,29 @@ class MotionStatechartNode(StatechartNode):
     def world_access(self) -> WorldAccess:
         """
         :return: What :meth:`~cramph.node.StatechartNode.world_access` returns, with the
-            degrees of freedom its error reads and those its constraints move.
+            active degrees of freedom its constraints move, and the degrees of freedom
+            its error reads or its constraints depend on but cannot move.
         """
         artifacts = self.artifacts
+        in_constraints = frozenset(
+            degree_of_freedom
+            for constraint in [
+                *artifacts.constraints.equality_constraints,
+                *artifacts.constraints.inequality_constraints,
+            ]
+            for degree_of_freedom in WorldAccess.degrees_of_freedom_of(
+                expression=constraint.expression
+            )
+        )
+        moved = in_constraints & frozenset(self.context.world.active_degrees_of_freedom)
         return (
             super()
             .world_access()
             .merged_with(
                 other=WorldAccess(
-                    moved=frozenset(
-                        degree_of_freedom
-                        for constraint in [
-                            *artifacts.constraints.equality_constraints,
-                            *artifacts.constraints.inequality_constraints,
-                        ]
-                        for degree_of_freedom in WorldAccess.degrees_of_freedom_of(
-                            expression=constraint.expression
-                        )
-                    ),
-                    read=WorldAccess.degrees_of_freedom_of(expression=artifacts.error),
+                    moved=moved,
+                    read=WorldAccess.degrees_of_freedom_of(expression=artifacts.error)
+                    | (in_constraints - moved),
                 )
             )
         )

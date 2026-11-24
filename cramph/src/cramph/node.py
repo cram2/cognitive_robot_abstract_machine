@@ -69,6 +69,7 @@ from krrood.symbolic_math.symbolic_math import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from cramph.state_history import StateHistory
     from cramph.statechart import Statechart
     from semantic_digital_twin.world import World
 
@@ -275,6 +276,24 @@ class TransitionCondition(SubclassJSONSerializer):
             for variable in self.expression.free_variables()
             if isinstance(variable, ConditionVariable)
         ]
+
+    def held_at(self, *, history: StateHistory, tick: int) -> bool:
+        """
+        :param history: The history of the statechart the condition's nodes run in.
+        :param tick: A tick the history covers.
+        :return: Whether the condition was true in the state recorded at `tick`.
+        """
+        variables: list[DerivedConditionVariable] = self.expression.free_variables()
+        if not variables:
+            return self.expression.is_constant_true()
+        value = self.expression.substitute(
+            old_variables=variables,
+            new_variables=[
+                Scalar(float(variable.truth_value_at(history=history, tick=tick)))
+                for variable in variables
+            ],
+        )
+        return float(value.to_np()) == float(ObservationStateValue.TRUE)
 
     @property
     def node_dependencies(self) -> list[StatechartNode]:
@@ -589,6 +608,16 @@ class DerivedConditionVariable(ConditionVariable, ABC):
         """
 
     @abstractmethod
+    def truth_value_at(
+        self, *, history: StateHistory, tick: int
+    ) -> ObservationStateValue:
+        """
+        :param history: The history of the statechart this variable's node runs in.
+        :param tick: A tick the history covers.
+        :return: The value this variable held in the state recorded at `tick`.
+        """
+
+    @abstractmethod
     def for_node(self, *, node: StatechartNode) -> Self:
         """
         :param node: The node to apply this variable's test to.
@@ -677,6 +706,15 @@ class LifeCyclePredicateVariable(DerivedConditionVariable):
     def for_node(self, *, node: StatechartNode) -> Self:
         return node._life_cycle_predicate(predicate=self.predicate)
 
+    def truth_value_at(
+        self, *, history: StateHistory, tick: int
+    ) -> ObservationStateValue:
+        return self.predicate.truth_value(
+            life_cycle_value=history.item_at(tick=tick).life_cycle_of(
+                node=self.statechart_node
+            )
+        )
+
     def expression(self) -> Scalar:
         """
         :return: The truth table of this predicate over the life cycle state of its node.
@@ -728,6 +766,20 @@ class ObservationPredicateVariable(DerivedConditionVariable):
 
     def for_node(self, *, node: StatechartNode) -> Self:
         return node._observation_predicate(predicate=self.predicate)
+
+    def truth_value_at(
+        self, *, history: StateHistory, tick: int
+    ) -> ObservationStateValue:
+        match self.predicate.reading:
+            case ObservationReading.CURRENT:
+                observation = history.item_at(tick=tick).observation_of(
+                    node=self.statechart_node
+                )
+            case ObservationReading.LAST:
+                observation = history.last_observation_of(
+                    node=self.statechart_node, tick=tick
+                )
+        return self.predicate.truth_value(observation=observation)
 
     def expression(self) -> Scalar:
         """

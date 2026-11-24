@@ -1,3 +1,7 @@
+"""
+The executors that run a plan's statechart, and the outcome a run ends with.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -332,7 +336,9 @@ class PlanExecutor(Executor, ABC):
             )
         except CollisionViolatedError as violation:
             return PlanOutcome.failed_by(
-                failure=MotionViolatedCollisionAvoidance(violation=violation),
+                failure=MotionViolatedCollisionAvoidance.in_world(
+                    violation=violation, world=self.context.world
+                ),
                 cause=violation,
             )
         except InfeasibleException as infeasibility:

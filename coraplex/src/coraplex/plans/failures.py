@@ -1,9 +1,13 @@
+"""
+The failures a plan reports when it cannot go on, or when an attempt did not work.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
 
-from typing_extensions import TYPE_CHECKING
+from typing_extensions import TYPE_CHECKING, Self
 
 from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
@@ -13,10 +17,12 @@ from cramph.exceptions import ExecutionFailure
 from giskardpy.qp.exceptions import InfeasibleException
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
     from cramph.node import StatechartNode
+    from semantic_digital_twin.world import World
 
 
 @dataclass(kw_only=True)
@@ -106,6 +112,38 @@ class MotionViolatedCollisionAvoidance(PlanFailure):
     """
     The violation the motion reported, which names the body pairs that came too close.
     """
+
+    degrees_of_freedom_moving_the_bodies: frozenset[DegreeOfFreedom] = frozenset()
+    """
+    The degrees of freedom that moved one of the bodies that came too close relative to
+    the root of the world, when the violation was reported; empty if not known.
+    """
+
+    @classmethod
+    def in_world(cls, *, violation: CollisionViolatedError, world: World) -> Self:
+        """
+        :param violation: The violation a motion in `world` reported.
+        :param world: The world the motion ran in.
+        :return: The failure, with the degrees of freedom that move the bodies that came
+            too close in `world` as it is now.
+        """
+        bodies = {
+            body
+            for collision in violation.violated_collisions
+            for body in (
+                collision.closest_points.body_a,
+                collision.closest_points.body_b,
+            )
+        }
+        return cls(
+            violation=violation,
+            degrees_of_freedom_moving_the_bodies=frozenset(
+                degree_of_freedom
+                for body in bodies
+                for connection in world.compute_chain_of_connections(world.root, body)
+                for degree_of_freedom in connection.dofs
+            ),
+        )
 
     def error_message(self) -> str:
         return self.violation.error_message()

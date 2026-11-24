@@ -29,7 +29,6 @@ from coraplex.plans.failures import (
 from coraplex.plans.underspecified import (
     ActionTrial,
     FailedTrial,
-    SubtreeRebuild,
     UnderspecifiedChildChooser,
 )
 from cramph.causal_edges import ControlEdge, RunEdge, WorldEdge
@@ -42,7 +41,6 @@ from cramph.statechart import Statechart
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
 from krrood.patterns.called_positionally import called_positionally
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
-from semantic_digital_twin.world_description.world_entity import Body
 
 # %% diagnosing
 
@@ -74,9 +72,12 @@ class FailureDiagnoser:
     The nodes moving bodies a motion failure reported as too close to each other.
     """
 
-    colliding_bodies: set[Body] = field(default_factory=set, init=False)
+    colliding_degrees_of_freedom: frozenset[DegreeOfFreedom] = field(
+        default=frozenset(), init=False
+    )
     """
-    The bodies a motion failure reported as too close to each other.
+    The degrees of freedom that moved the bodies a motion failure reported as too close
+    to each other.
     """
 
     diagnosis_kinds: list[type[FailureDiagnosis]] = field(
@@ -123,9 +124,24 @@ class FailureDiagnoser:
 
     # %% where a failure is reported
 
+    def diagnose_failure(self, *, failure: Exception | None) -> list[FailureDiagnosis]:
+        """
+        Forgets what an earlier failure reported before reading `failure`.
+
+        :param failure: What the plan failed with, None if it ended without an
+            exception.
+        :return: One diagnosis per run the failure is reported for.
+        """
+        self.stalled_nodes = []
+        self.colliding_nodes = []
+        self.colliding_degrees_of_freedom = frozenset()
+        return self.diagnoses_reported_by(failure)
+
     @singledispatchmethod
     @called_positionally
-    def diagnose_failure(self, failure: Exception | None) -> list[FailureDiagnosis]:
+    def diagnoses_reported_by(
+        self, failure: Exception | None
+    ) -> list[FailureDiagnosis]:
         """
         :param failure: What the plan failed with, None if it ended without an
             exception.
@@ -133,7 +149,7 @@ class FailureDiagnoser:
         """
         return [self.diagnose_run(symptom=run) for run in self.failed_leaves()]
 
-    @diagnose_failure.register
+    @diagnoses_reported_by.register
     @called_positionally
     def _(self, failure: MotionMadeNoProgress) -> list[FailureDiagnosis]:
         """
@@ -148,30 +164,26 @@ class FailureDiagnoser:
             for node in self.stalled_nodes
         ]
 
-    @diagnose_failure.register
+    @diagnoses_reported_by.register
     @called_positionally
     def _(self, failure: MotionViolatedCollisionAvoidance) -> list[FailureDiagnosis]:
         """
         :return: One diagnosis per run moving a body the failure reports as too close
             to another.
         """
-        self.colliding_bodies = {
-            body
-            for violation in failure.violation.violated_collisions
-            for body in (
-                violation.closest_points.body_a,
-                violation.closest_points.body_b,
-            )
-        }
+        self.colliding_degrees_of_freedom = failure.degrees_of_freedom_moving_the_bodies
         self.colliding_nodes = [
-            run.node for run in self.runs_moving(bodies=self.colliding_bodies)
+            run.node
+            for run in self.runs_moving(
+                degrees_of_freedom=self.colliding_degrees_of_freedom
+            )
         ]
         return [
             self.diagnose_run(symptom=self.runs.latest_run(node=node))
             for node in self.colliding_nodes
         ]
 
-    @diagnose_failure.register
+    @diagnoses_reported_by.register
     @called_positionally
     def _(self, failure: EmptyUnderspecified) -> list[FailureDiagnosis]:
         """
@@ -219,14 +231,15 @@ class FailureDiagnoser:
             key=lambda other: other.last_tick,
         )
 
-    def runs_moving(self, *, bodies: set[Body]) -> list[NodeRun]:
+    def runs_moving(
+        self, *, degrees_of_freedom: frozenset[DegreeOfFreedom]
+    ) -> list[NodeRun]:
         """
-        :param bodies: Bodies that came too close to each other.
-        :return: The runs active at the newest tick that move a degree of freedom
-            moving one of `bodies`, or every active run that moves anything if none
-            does.
+        :param degrees_of_freedom: The degrees of freedom that moved bodies that came
+            too close to each other.
+        :return: The runs active at the newest tick that move one of them, or every
+            active run that moves anything if none does.
         """
-        chain = self.degrees_of_freedom_moving(bodies=bodies)
         active = [
             run
             for run in self.runs.all_runs
@@ -234,24 +247,11 @@ class FailureDiagnoser:
             and self.causal_graph.access[run.node].moved
         ]
         moving = [
-            run for run in active if self.causal_graph.access[run.node].moved & chain
+            run
+            for run in active
+            if self.causal_graph.access[run.node].moved & degrees_of_freedom
         ]
         return moving or active
-
-    def degrees_of_freedom_moving(
-        self, *, bodies: set[Body]
-    ) -> frozenset[DegreeOfFreedom]:
-        """
-        :return: The degrees of freedom that move one of `bodies` relative to the root
-            of the world.
-        """
-        world = self.runs.statechart.context.world
-        return frozenset(
-            degree_of_freedom
-            for body in bodies
-            for connection in world.compute_chain_of_connections(world.root, body)
-            for degree_of_freedom in connection.dofs
-        )
 
     # %% from the report to the cause
 
@@ -286,13 +286,23 @@ class FailureDiagnoser:
     def failing_conditions_into(self, *, run: NodeRun) -> list[ControlEdge]:
         """
         :param run: A run.
-        :return: The control edges into `run` from its fail and interrupt conditions.
+        :return: The control edges into `run` from its fail and interrupt conditions
+            that held on the tick it ended.
         """
+        if run.end_tick is None:
+            return []
+        fired = {
+            condition.kind
+            for condition in run.node.conditions
+            if condition.kind in (TransitionKind.FAIL, TransitionKind.INTERRUPT)
+            and condition.held_at(
+                history=self.runs.statechart.state_history, tick=run.end_tick
+            )
+        }
         return [
             edge
             for edge in self.causal_graph.edges_into(run=run)
-            if isinstance(edge, ControlEdge)
-            and edge.transition_kind in (TransitionKind.FAIL, TransitionKind.INTERRUPT)
+            if isinstance(edge, ControlEdge) and edge.transition_kind in fired
         ]
 
     # %% the causes of each kind of failure
@@ -340,9 +350,9 @@ class FailureDiagnoser:
         :return: The last runs before it that moved a degree of freedom moving one of
             the bodies that came too close, among those it does not drive itself.
         """
-        moving = self.degrees_of_freedom_moving(bodies=self.colliding_bodies)
         return self.plan_runs_leaving(
-            degrees_of_freedom=moving - self.causal_graph.access[colliding.node].driven,
+            degrees_of_freedom=self.colliding_degrees_of_freedom
+            - self.causal_graph.access[colliding.node].driven,
             statement=colliding,
         )
 
@@ -390,7 +400,7 @@ class FailureDiagnoser:
             ),
             *(
                 self.causes_of_trial(failed_trial=failed_trial, statement=statement)
-                for failed_trial in self.trials_of(statement=statement.node)
+                for failed_trial in self.trials_of(statement=statement)
             ),
         ]
         nodes_per_candidate = [
@@ -403,17 +413,19 @@ class FailureDiagnoser:
         kept = [root for root in roots if root.run.node in shared] if shared else roots
         return list({root.run: root for root in kept}.values())
 
-    def trials_of(self, *, statement: StatementNode) -> list[FailedTrial]:
+    def trials_of(self, *, statement: NodeRun) -> list[FailedTrial]:
         """
-        :return: The failed trials of candidates of `statement`.
+        :param statement: A run of a statement.
+        :return: The failed trials that tried candidates of the statement during this
+            run.
         """
         if self.trial is None:
             return []
         return [
             failed_trial
             for failed_trial in self.trial.failed_trials
-            if isinstance(failed_trial.build, SubtreeRebuild)
-            and statement in failed_trial.build.candidates
+            if statement.node in failed_trial.tried
+            and statement.start_tick <= failed_trial.plan_tick <= statement.last_tick
         ]
 
     def causes_of_trial(
@@ -435,7 +447,7 @@ class FailureDiagnoser:
             )
         )
         root_causes = []
-        for diagnosis in trial_diagnoser.diagnose_failure(failed_trial.failure):
+        for diagnosis in trial_diagnoser.diagnose_failure(failure=failed_trial.failure):
             if diagnosis.root_causes:
                 continue
             access = trial_diagnoser.causal_graph.access[diagnosis.origin.node]

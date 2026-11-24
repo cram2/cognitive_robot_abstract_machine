@@ -239,7 +239,7 @@ def test_a_stalled_reach_is_blamed_on_the_navigation_that_placed_the_base(
     statechart, failure = run_until_it_fails(plan, extensions, MotionMadeNoProgress)
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("stalled reach after a bad navigation", diagnoses)
 
     for diagnosis in diagnoses:
@@ -277,7 +277,7 @@ def test_a_failed_gripper_check_is_blamed_on_the_action_that_closed_that_gripper
     statechart, failure = run_until_it_fails(plan, extensions, MotionDidNotFinish)
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("gripper check after closing that gripper", diagnoses)
 
     [diagnosis] = diagnoses
@@ -310,7 +310,7 @@ def test_two_tasks_driving_one_joint_at_once_are_blamed_on_each_other(
     statechart, failure = run_until_it_fails(plan, extensions, MotionMadeNoProgress)
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("two tasks on the torso at once", diagnoses)
 
     blamed = {
@@ -350,7 +350,7 @@ def test_tasks_on_different_joints_at_once_are_not_in_conflict(
 
     graph = NodeCausalGraph.from_statechart(statechart=executor.statechart)
     assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
-    assert FailureDiagnoser(causal_graph=graph).diagnose_failure(None) == []
+    assert FailureDiagnoser(causal_graph=graph).diagnose_failure(failure=None) == []
     assert [edge for edge in graph.edges if isinstance(edge, ConflictEdge)] == []
 
 
@@ -382,7 +382,7 @@ def test_a_task_failed_by_a_condition_is_blamed_on_what_its_condition_read(
     statechart, failure = run_until_it_fails(plan, extensions, MotionDidNotFinish)
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("task failed by a condition reading a gripper check", diagnoses)
 
     [diagnosis] = diagnoses
@@ -430,7 +430,7 @@ def test_a_step_failing_on_its_own_inside_a_handled_pick_up_is_its_own_origin(
     )
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("step failing on its own inside a retried pick-up", diagnoses)
 
     [inserted_step] = failing_grasp.inserted_steps
@@ -509,7 +509,7 @@ def test_a_goal_out_of_reach_from_anywhere_is_blamed_on_no_other_node(
     statechart, failure = run_until_it_fails(plan, extensions, MotionMadeNoProgress)
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("goal out of reach from anywhere (negative control)", diagnoses)
 
     assert diagnoses
@@ -547,7 +547,7 @@ def test_a_pick_up_out_of_candidates_is_blamed_on_the_navigation_they_share(
     statechart, failure = run_until_it_fails(plan, extensions, EmptyUnderspecified)
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("underspecified pick-up out of candidates after a bad navigation", diagnoses)
 
     [diagnosis] = diagnoses
@@ -627,7 +627,7 @@ def test_in_physics_a_gripper_check_is_blamed_on_the_action_that_closed_it(
     )
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("physics: gripper check after closing that gripper", diagnoses)
 
     [diagnosis] = diagnoses
@@ -660,7 +660,7 @@ def test_in_physics_two_tasks_driving_one_joint_are_blamed_on_each_other(
     )
     diagnoses = FailureDiagnoser.from_statechart(
         statechart=statechart
-    ).diagnose_failure(failure)
+    ).diagnose_failure(failure=failure)
     report("physics: two tasks on the lift joint at once", diagnoses)
 
     blamed = {

@@ -9,8 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 
-from random_events.set import Set
-from random_events.variable import Symbolic
 from typing_extensions import Iterable
 
 from coraplex.robot_plans.actions.base import Action
@@ -23,18 +21,11 @@ from cramph.causal_edges import (
     WorldAccessIndex,
     WorldEdges,
 )
-from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 from cramph.node_runs import StatechartRuns
 from cramph.state_history import NodeRun
 from cramph.statechart import Statechart
-from giskardpy.motion_statechart.conflict_edges import ConflictEdge, ConflictEdges
-from probabilistic_model.causal_structure.graph import (
-    CausalGraph,
-    GraphEdge,
-    GraphNode,
-    NodeLevel,
-)
+from giskardpy.motion_statechart.conflict_edges import ConflictEdges
 
 # %% conflicts between the tasks of different actions
 
@@ -117,63 +108,12 @@ class NodeCausalGraph:
         """
         return ChangesOfTheWorld.from_runs(runs=self.runs, access=self.access)
 
-    @cached_property
-    def vertex_of_run(self) -> dict[NodeRun, GraphNode]:
-        """
-        :return: The vertex standing for each run.
-        """
-        outcomes = Set.from_iterable(LifeCycleValue)
-        return {
-            run: GraphNode(
-                variable=Symbolic(run.variable_name, domain=outcomes),
-                level=NodeLevel.EXAMPLE_ATTRIBUTE,
-            )
-            for run in self.runs.all_runs
-        }
-
-    @cached_property
-    def run_of_vertex(self) -> dict[GraphNode, NodeRun]:
-        """
-        :return: The run each vertex stands for.
-        """
-        return {vertex: run for run, vertex in self.vertex_of_run.items()}
-
-    @cached_property
-    def graph(self) -> CausalGraph:
-        """
-        :return: The causal graph over the runs, holding every edge but the conflicts.
-        """
-        pairs = {
-            (edge.cause, edge.effect)
-            for edge in self.edges
-            if not isinstance(edge, ConflictEdge)
-        }
-        return CausalGraph.from_edges(
-            list(self.vertex_of_run.values()),
-            [
-                GraphEdge.directed_edge(
-                    self.vertex_of_run[cause], self.vertex_of_run[effect]
-                )
-                for cause, effect in pairs
-            ],
-        )
-
     def edges_into(self, *, run: NodeRun) -> list[RunEdge]:
         """
         :param run: A run.
         :return: The edges whose effect is `run`.
         """
         return [edge for edge in self.edges if edge.effect == run]
-
-    def possible_causes(self, *, run: NodeRun) -> list[NodeRun]:
-        """
-        :param run: A run.
-        :return: The runs with a directed path to `run` in :attr:`graph`.
-        """
-        return [
-            self.run_of_vertex[vertex]
-            for vertex in self.graph.possible_ancestors(self.vertex_of_run[run])
-        ]
 
 
 # %% a path to the run where a failure started
