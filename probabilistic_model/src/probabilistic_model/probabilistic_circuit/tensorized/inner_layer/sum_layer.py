@@ -45,6 +45,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base impor
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     EdgeMatrix,
+    EdgeWeighting,
     RowReduction,
     SparseEdgeMatrix,
     SparseEntries,
@@ -280,6 +281,13 @@ class SumLayer(HasParameterArrays, InnerLayer):
         return self.edges.number_of_edges
 
     @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` for sum layers, which do.
+        """
+        return True
+
+    @property
     def parameters(self) -> list[BackendArray]:
         return [self.log_weights]
 
@@ -420,7 +428,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
     # %% queries
 
     def _weighted_forward(
-        self, child_results: list[SampleNodeValues]
+        self, *, child_results: list[SampleNodeValues]
     ) -> SampleNodeValues:
         """
         Combine the results of the child layers of a linear (non-logarithmic) query
@@ -429,15 +437,16 @@ class SumLayer(HasParameterArrays, InnerLayer):
         :param child_results: The result per child layer, shape (..., #child nodes).
         :return: The result for the nodes of this layer, shape (..., #nodes).
         """
-        values = self.edges.values_of_columns(
-            values=self.namespace.concat(child_results, axis=-1)
-        )
-        return self.edges.reduce_by_row(
-            values=values * self.normalized_weights, reduction=RowReduction.SUM
+        return self.edges.reduce_child_values_by_row(
+            values=self.namespace.concat(child_results, axis=-1),
+            reduction=RowReduction.SUM,
+            weighting=EdgeWeighting(
+                stored=self.normalized_weights, combination=RowReduction.PRODUCT
+            ),
         )
 
     def _weighted_forward_over_nodes(
-        self, child_results: list[NodeVariableValues]
+        self, *, child_results: list[NodeVariableValues]
     ) -> NodeVariableValues:
         """
         Combine the results of the child layers of a query whose results have the nodes
@@ -446,10 +455,12 @@ class SumLayer(HasParameterArrays, InnerLayer):
         :param child_results: The result per child layer, shape (#child nodes, ...).
         :return: The result for the nodes of this layer, shape (#nodes, ...).
         """
-        return self._weighted_forward([result.T for result in child_results]).T
+        return self._weighted_forward(
+            child_results=[result.T for result in child_results]
+        ).T
 
     def log_weighted_sum(
-        self, child_results: list[SampleNodeValues]
+        self, *, child_results: list[SampleNodeValues]
     ) -> SampleNodeValues:
         """
         Reduce the log-results of the child layers with the normalized log-weights.
@@ -458,12 +469,13 @@ class SumLayer(HasParameterArrays, InnerLayer):
             of the child layer).
         :return: The log-result of the nodes of this layer with shape (..., #nodes).
         """
-        values = self.edges.values_of_columns(
-            values=self.namespace.concat(child_results, axis=-1)
-        )
         return (
-            self.edges.reduce_by_row(
-                values=values + self.log_weights, reduction=RowReduction.LOG_SUM_EXP
+            self.edges.reduce_child_values_by_row(
+                values=self.namespace.concat(child_results, axis=-1),
+                reduction=RowReduction.LOG_SUM_EXP,
+                weighting=EdgeWeighting(
+                    stored=self.log_weights, combination=RowReduction.SUM
+                ),
             )
             - self.log_normalization_constants
         )
@@ -476,7 +488,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
             child_layer.log_likelihood_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self.log_weighted_sum(child_results)
+        return self.log_weighted_sum(child_results=child_results)
 
     @memoized
     def cumulative_distribution_of_nodes(
@@ -486,7 +498,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
             child_layer.cumulative_distribution_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self._weighted_forward(child_results)
+        return self._weighted_forward(child_results=child_results)
 
     @memoized
     def probability_of_simple_event_of_nodes(
@@ -505,7 +517,9 @@ class SumLayer(HasParameterArrays, InnerLayer):
             )
             for child_layer in self.child_layers
         ]
-        return self.namespace.reshape(self._weighted_forward(child_results), (-1,))
+        return self.namespace.reshape(
+            self._weighted_forward(child_results=child_results), (-1,)
+        )
 
     @memoized
     def support_of_nodes(
@@ -573,7 +587,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
             child_layer.moment_of_nodes(query, variables, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self._weighted_forward_over_nodes(child_results)
+        return self._weighted_forward_over_nodes(child_results=child_results)
 
     def sample_forward(
         self,

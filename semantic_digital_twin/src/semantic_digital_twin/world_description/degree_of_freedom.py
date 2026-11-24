@@ -1,8 +1,10 @@
+"""Degrees of freedom of a world, their state variables and their limits."""
+
 from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 
 from typing_extensions import Any, ClassVar, Generic, Self, TypeVar
 
@@ -114,6 +116,23 @@ class JerkVariable(DegreeOfFreedomVariable):
 T = TypeVar("T")
 
 
+class PositionLimitSide(IntEnum):
+    """
+    Which of the two position limits of a degree of freedom is meant, valued by the
+    direction of motion that crosses it.
+    """
+
+    LOWER = -1
+    """
+    The lower position limit, crossed by moving in the negative direction.
+    """
+
+    UPPER = 1
+    """
+    The upper position limit, crossed by moving in the positive direction.
+    """
+
+
 @dataclass
 class DegreeOfFreedomLimits(Generic[T]):
     """
@@ -160,6 +179,29 @@ class DegreeOfFreedomLimits(Generic[T]):
             ),
             upper=DerivativeMap(position=upper_position, velocity=maximum_speed),
         )
+
+    def reached_position_limits(
+        self, *, position: float, range_fraction: float
+    ) -> list[PositionLimitSide]:
+        """
+        :param position: A position of the degree of freedom these limits bound.
+        :param range_fraction: How close to a position limit ``position`` counts as at
+            that limit, as a fraction of the range between the two position limits.
+        :return: Every position limit ``position`` lies at, none if one is missing.
+        """
+        lower = self.lower.position
+        upper = self.upper.position
+        if lower is None or upper is None:
+            return []
+        tolerance = range_fraction * (upper - lower)
+        return [
+            side
+            for side, reached in (
+                (PositionLimitSide.LOWER, position <= lower + tolerance),
+                (PositionLimitSide.UPPER, position >= upper - tolerance),
+            )
+            if reached
+        ]
 
     def __deepcopy__(self, memo):
         return DegreeOfFreedomLimits(

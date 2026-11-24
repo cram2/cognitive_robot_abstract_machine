@@ -221,6 +221,14 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         """
         raise NotImplementedError
 
+    def largest_even_batch_size(self, *, rows: int) -> int:
+        """
+        :param rows: The most rows a batch may have.
+        :return: The most rows of at most ``rows`` that a step splits evenly across the
+            devices it computes on, ``rows`` itself on one device.
+        """
+        return rows
+
     @abstractmethod
     def probe_step_bytes(self, *, batch: tuple[BackendArray, ...]) -> int:
         """
@@ -239,7 +247,7 @@ class GradientDescent(Generic[LayerType], SubClassSafeGeneric, ABC):
         training = self.start_training(arguments=arguments, mini_batches=MiniBatches())
         progress_bar = tqdm.tqdm(range(epochs), desc="Fitting")
         for _ in progress_bar:
-            loss = training.step_on_batch(batch=arguments)
+            loss = float(training.step_on_batch(batch=arguments))
             progress_bar.set_postfix_str(f"Loss: {loss}")
         return training.trained_root()
 

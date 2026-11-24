@@ -1,3 +1,7 @@
+"""
+Exceptions raised while building, compiling, modifying and running statecharts.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -891,6 +895,34 @@ class RemovedNodeStillReferencedError(StatechartError):
         return (
             f"Rewire {self.referencing_node.name} so it no longer refers to "
             f"{self.removed_node.name} before removing it."
+        )
+
+
+@dataclass(kw_only=True)
+class StatechartBrokenByFailedModificationError(StatechartError):
+    """
+    Raised when a statechart is used after a
+    :meth:`~cramph.statechart.Statechart.modify` block of it raised once it had changed
+    the structure, which left the statechart half changed.
+    """
+
+    modification_error: BaseException
+    """
+    The error the block raised.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A modify() block of this statechart raised "
+            f"{type(self.modification_error).__name__}, see the error this one was "
+            f"raised from. The statechart stays half changed, as that block left it, "
+            f"and cannot be used any more."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Fix what made the block raise, which shows that the statechart was built "
+            "wrongly, and build the statechart anew instead of catching the error."
         )
 
 

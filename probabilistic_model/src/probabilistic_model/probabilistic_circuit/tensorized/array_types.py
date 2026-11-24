@@ -115,6 +115,12 @@ NodeSelection: TypeAlias = NodeIndices | NodeMask
 Which nodes of a layer to keep: their indices, or one flag per node.
 """
 
+ArraySelection: TypeAlias = npt.NDArray[np.int64] | npt.NDArray[np.bool_]
+"""
+Which elements of an array to keep along its last axes: their positions, or one flag per
+element.
+"""
+
 NodeIntervalBounds: TypeAlias = npt.NDArray[np.int64]
 """
 Whether the lower and upper bound of one interval per node of a layer are open or

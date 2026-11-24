@@ -6,9 +6,10 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
+from krrood.patterns.field_metadata import JSONMetadata
 from random_events.interval import Interval
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.sigma_algebra import AbstractCompositeSet
@@ -53,6 +54,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer 
 from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
     MomentQuery,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.structure_array_copies import (
+    StructureArrayCopies,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.query_cache import (
     QueryCache,
     memoized,
@@ -76,6 +80,18 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
     node_variables: VariableIndices
     """
     The index of the variable of every node, sorted ascending.
+    """
+
+    structure_array_copies: StructureArrayCopies = field(
+        default_factory=StructureArrayCopies,
+        kw_only=True,
+        repr=False,
+        metadata=JSONMetadata(serialize=False).as_dict(),
+    )
+    """
+    The copies of :attr:`node_variables` on the devices of the events it selects from,
+    shared by the copies of this layer with other parameters, but not by its deep copies
+    or its JSON.
     """
 
     @property
@@ -141,7 +157,12 @@ class UnivariateInputLayer(HasParameterArrays, LeafLayer, ABC):
         """
         if self.is_over_one_variable:
             return events[:, self.variable]
-        return events[:, self.node_variables]
+        return events[
+            :,
+            self.structure_array_copies.placed(
+                array=self.node_variables, values=events
+            ),
+        ]
 
     def float_column(self, *, values: LeafValues) -> BackendArray:
         """
