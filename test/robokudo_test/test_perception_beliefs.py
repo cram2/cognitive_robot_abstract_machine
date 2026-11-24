@@ -22,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cup,
     Human,
     Milk,
-    PerceivedObject,
+    UnknownObject,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
@@ -37,7 +37,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from robokudo.annotators.cluster_color import ClusterColorAnnotator, Color
 from robokudo.cas import CAS
 from robokudo.defs import PACKAGE_NAME
-from robokudo.exceptions import CameraPoseOutsideWorldError
+from robokudo.annotators.exceptions import CameraPoseOutsideWorldError
 from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.process import RoboKudo
 from robokudo.types.annotation import BoundingBox3DAnnotation, Cylinder, SemanticColor
@@ -258,7 +258,7 @@ class TestNewObjects:
     Beliefs no object of the world is about become objects of their own.
     """
 
-    def test_unclassified_object_becomes_a_perceived_object_at_its_world_pose(
+    def test_unclassified_object_becomes_an_unknown_object_at_its_world_pose(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         translation = (0.0, 0.5, 2.0)
@@ -270,7 +270,7 @@ class TestNewObjects:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label is None
         assert np.allclose(
             position_of(annotation.root),
@@ -348,10 +348,10 @@ class TestNewObjects:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label == class_label
 
-    def test_object_classified_without_confidence_becomes_a_perceived_object(
+    def test_object_classified_without_confidence_becomes_an_unknown_object(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         class_label = "cup"
@@ -363,7 +363,7 @@ class TestNewObjects:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label == class_label
 
     def test_new_object_takes_the_shape_fitted_to_it_at_its_pose(
@@ -476,7 +476,7 @@ class TestNewObjects:
         world_body = Body(name=PrefixedName(FrameName.WORLD, prefix="robot"))
         with world.modify_world():
             world.add_body(world_body)
-        cas = cas_seen_from(world, camera_pose(), world_frame=str(world_body.name))
+        cas = cas_seen_from(world, camera_pose(), reference_frame=str(world_body.name))
 
         put_pass_into_world(robokudo, cas, make_object_hypothesis())
 
@@ -627,13 +627,13 @@ class TestHumans:
         assert perceivable_objects(world) == [human]
         assert np.allclose(position_of(human.root), translation)
 
-    def test_perceived_object_seen_as_a_human_becomes_a_human(
+    def test_unknown_object_seen_as_a_human_becomes_a_human(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [perceived_object] = perceivable_objects(world)
+        [unknown_object] = perceivable_objects(world)
 
         put_pass_into_world(
             robokudo,
@@ -643,7 +643,7 @@ class TestHumans:
 
         [annotation] = perceivable_objects(world)
         assert type(annotation) is Human
-        assert annotation.root is perceived_object.root
+        assert annotation.root is unknown_object.root
 
 
 # %% objects seen again
@@ -660,8 +660,8 @@ class TestObjectsSeenAgain:
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [known_object] = perceivable_objects(world)
-        body = known_object.root
+        [object_in_world] = perceivable_objects(world)
+        body = object_in_world.root
         rotation_before = body.global_transform.to_np()[:3, :3]
         scales_before = [shape.scale for shape in body.visual.shapes]
         translation = (0.03, 0.0, 1.0)
@@ -686,7 +686,7 @@ class TestObjectsSeenAgain:
             cas_seen_from(world, camera_pose()),
             make_object_hypothesis(translation=translation),
         )
-        [known_object] = perceivable_objects(world)
+        [object_in_world] = perceivable_objects(world)
         # Same world pose as before, seen from a camera one meter further along x.
         same_object = make_object_hypothesis(
             roi=(10, 10, 12, 12), translation=(-1.0, 0.0, 1.0)
@@ -704,8 +704,8 @@ class TestObjectsSeenAgain:
 
         bodies = [annotation.root for annotation in perceivable_objects(world)]
         assert len(bodies) == 2
-        assert known_object.root in bodies
-        assert np.allclose(position_of(known_object.root), translation)
+        assert object_in_world.root in bodies
+        assert np.allclose(position_of(object_in_world.root), translation)
 
     def test_object_another_process_attached_rigidly_stays_where_it_is(
         self, *, robokudo: RoboKudo, world: World
@@ -713,8 +713,8 @@ class TestObjectsSeenAgain:
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [known_object] = perceivable_objects(world)
-        body = known_object.root
+        [object_in_world] = perceivable_objects(world)
+        body = object_in_world.root
         parent = body.parent_connection.parent
         parent_T_body = body.parent_connection.origin
         with world.modify_world():
@@ -772,7 +772,7 @@ class TestMatching:
             cas_seen_from(world, camera_pose()),
             make_object_hypothesis(class_label="cup"),
         )
-        [known_object] = perceivable_objects(world)
+        [object_in_world] = perceivable_objects(world)
 
         put_pass_into_world(
             robokudo,
@@ -781,7 +781,7 @@ class TestMatching:
         )
 
         assert [annotation.root for annotation in perceivable_objects(world)] == [
-            known_object.root
+            object_in_world.root
         ]
 
     def test_object_is_taken_as_the_nearby_object_of_its_own_class(
@@ -810,6 +810,32 @@ class TestMatching:
         assert len(perceivable_objects(world)) == 2
         assert np.allclose(position_of(bodies["bowl"]), bowl_translation)
         assert np.allclose(position_of(bodies["cup"]), cup_translation)
+
+    def test_object_classified_without_confidence_is_taken_as_the_nearest_object(
+        self, *, robokudo: RoboKudo, world: World
+    ) -> None:
+        bowl_translation = (0.05, 0.0, 1.0)
+        put_pass_into_world(
+            robokudo,
+            cas_seen_from(world, camera_pose()),
+            make_object_hypothesis(translation=bowl_translation, class_label="bowl"),
+        )
+        [bowl] = perceivable_objects(world)
+        milk = add_perceivable_object(world, position=(-0.05, 0.0, 1.0))
+        # Closer to the milk, but classified as a bowl without confidence.
+        translation = (-0.01, 0.0, 1.0)
+
+        put_pass_into_world(
+            robokudo,
+            cas_seen_from(world, camera_pose()),
+            make_object_hypothesis(
+                translation=translation, class_label="bowl", class_confidence=0.0
+            ),
+        )
+
+        assert len(perceivable_objects(world)) == 2
+        assert np.allclose(position_of(milk), translation)
+        assert np.allclose(position_of(bowl.root), bowl_translation)
 
     def test_object_of_a_very_different_size_gets_a_body_of_its_own(
         self, *, robokudo: RoboKudo, world: World
@@ -870,14 +896,14 @@ class TestClassificationOfObjectsSeenAgain:
     How the semantic annotation of an object seen again follows its classification.
     """
 
-    def test_perceived_object_becomes_its_semantic_annotation_once_classified(
+    def test_unknown_object_becomes_its_semantic_annotation_once_classified(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         class_label = "cup"
         put_pass_into_world(
             robokudo, cas_seen_from(world, camera_pose()), make_object_hypothesis()
         )
-        [known_object] = perceivable_objects(world)
+        [object_in_world] = perceivable_objects(world)
 
         put_pass_into_world(
             robokudo,
@@ -886,11 +912,11 @@ class TestClassificationOfObjectsSeenAgain:
         )
 
         [annotation] = perceivable_objects(world)
-        assert annotation.root is known_object.root
+        assert annotation.root is object_in_world.root
         assert type(annotation) is Cup
         assert annotation.class_label == class_label
 
-    def test_perceived_object_classified_without_confidence_stays_as_it_is(
+    def test_unknown_object_classified_without_confidence_stays_as_it_is(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
         put_pass_into_world(
@@ -904,7 +930,7 @@ class TestClassificationOfObjectsSeenAgain:
         )
 
         [annotation] = perceivable_objects(world)
-        assert type(annotation) is PerceivedObject
+        assert type(annotation) is UnknownObject
         assert annotation.class_label is None
 
     def test_semantic_annotation_keeps_its_class_when_seen_as_another(
@@ -1046,7 +1072,9 @@ class TestConcurrentChanges:
         cas = cas_seen_from(world, camera_pose())
         concurrent_change = ConcurrentChange(changed_world=world)
         matcher = MatcherFacingAConcurrentChange(concurrent_change=concurrent_change)
-        monkeypatch.setattr("robokudo.process.ObjectMatcher", lambda: matcher)
+        monkeypatch.setattr(
+            "robokudo.annotators.world_updating.ObjectMatcher", lambda: matcher
+        )
 
         put_pass_into_world(robokudo, cas, make_object_hypothesis())
 
@@ -1063,6 +1091,9 @@ class TestConcurrentChanges:
         def add_to_world_facing_a_concurrent_change(
             belief: PerceptionBelief, *, world: World
         ) -> None:
+            """
+            Add ``belief`` to ``world`` once the concurrent change has happened.
+            """
             concurrent_change.start_and_wait()
             add_to_world(belief, world=world)
 
@@ -1081,18 +1112,22 @@ class TestConcurrentChanges:
         cas = cas_seen_from(world, camera_pose())
         add_perceivable_object(world, position=(0.0, 0.0, 1.0))
         concurrent_change = ConcurrentChange(changed_world=world)
-        update_known_object = PerceptionBelief.update_known_object
+        update_object_in_world = PerceptionBelief.update_object_in_world
 
-        def update_known_object_facing_a_concurrent_change(
-            belief: PerceptionBelief, *, known_object: IsPerceivable, world: World
+        def update_object_in_world_facing_a_concurrent_change(
+            belief: PerceptionBelief, *, object_in_world: IsPerceivable, world: World
         ) -> None:
+            """
+            Update ``object_in_world`` with ``belief`` once the concurrent change has
+            happened.
+            """
             concurrent_change.start_and_wait()
-            update_known_object(belief, known_object=known_object, world=world)
+            update_object_in_world(belief, object_in_world=object_in_world, world=world)
 
         monkeypatch.setattr(
             PerceptionBelief,
-            "update_known_object",
-            update_known_object_facing_a_concurrent_change,
+            "update_object_in_world",
+            update_object_in_world_facing_a_concurrent_change,
         )
 
         put_pass_into_world(

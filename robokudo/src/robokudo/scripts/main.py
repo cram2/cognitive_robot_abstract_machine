@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+The command line program that runs a RoboKudo analysis engine as a ROS node.
+"""
+
 from __future__ import annotations
 
 # %% Imports

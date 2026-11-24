@@ -225,7 +225,7 @@ class Storage:
         :param world: The world whose entities the view refers to.
         """
         return Storage.cas_view_codecs.decode_view(
-            view_document,
+            document=view_document,
             **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
         )
 

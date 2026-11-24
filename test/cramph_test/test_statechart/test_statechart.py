@@ -1,3 +1,7 @@
+"""
+Tests of building, compiling, ticking and drawing statecharts.
+"""
+
 import json
 import logging
 import time
@@ -12,10 +16,10 @@ from cramph.node import EndedByOwner
 from cramph.executor import StatechartExecutor
 from cramph.context import StatechartContext
 from cramph.data_types import (
-    LifeCycleValues,
+    LifeCycleValue,
     LifeCyclePredicate,
     ObservationPredicate,
-    ObservationStateValues,
+    ObservationStateValue,
     TransitionKind,
 )
 from cramph.exceptions import (
@@ -150,6 +154,9 @@ def test_condition_to_str() -> None:
 
 
 def test_statechart_to_dot(tmp_path) -> None:
+    """
+    A statechart whose nodes read each other's observations can be drawn.
+    """
     msc = Statechart(context=StatechartContext(world=World()))
     node1 = ConstTrueNode()
     msc.add_node(node=node1)
@@ -159,7 +166,7 @@ def test_statechart_to_dot(tmp_path) -> None:
     msc.add_node(node=end)
     node1.success_condition = node2.observes_true
     end.start_condition = logic_and(node1.observes_true, node2.observes_true)
-    msc.draw(file_name=str(tmp_path / "muh.pdf"))
+    msc.draw(file_name=tmp_path / "muh.pdf")
 
 
 def test_print() -> None:
@@ -184,67 +191,71 @@ def test_print() -> None:
     assert len(msc.nodes) == 4
     assert len(msc.edges) == 3
 
-    assert print_node1.observation_state == ObservationStateValues.UNKNOWN
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert print_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
+    assert print_node1.observation_state == ObservationStateValue.UNKNOWN
+    assert node1.observation_state == ObservationStateValue.UNKNOWN
+    assert print_node2.observation_state == ObservationStateValue.UNKNOWN
+    assert end.observation_state == ObservationStateValue.UNKNOWN
 
-    assert print_node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert print_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert print_node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert print_node2.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert not msc.is_ended()
 
     kin_sim.tick()
-    assert print_node1.observation_state == ObservationStateValues.TRUE
-    assert node1.observation_state == ObservationStateValues.UNKNOWN
-    assert print_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
+    assert print_node1.observation_state == ObservationStateValue.TRUE
+    assert node1.observation_state == ObservationStateValue.UNKNOWN
+    assert print_node2.observation_state == ObservationStateValue.UNKNOWN
+    assert end.observation_state == ObservationStateValue.UNKNOWN
 
-    assert print_node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert print_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert print_node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert print_node2.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert not msc.is_ended()
 
     kin_sim.tick()
-    assert print_node1.observation_state == ObservationStateValues.TRUE
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert print_node2.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
+    assert print_node1.observation_state == ObservationStateValue.TRUE
+    assert node1.observation_state == ObservationStateValue.TRUE
+    assert print_node2.observation_state == ObservationStateValue.UNKNOWN
+    assert end.observation_state == ObservationStateValue.UNKNOWN
 
-    assert print_node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert print_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+    assert print_node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert print_node2.life_cycle_state == LifeCycleValue.RUNNING
+    assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
     assert not msc.is_ended()
 
     kin_sim.tick()
-    assert print_node1.observation_state == ObservationStateValues.TRUE
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert print_node2.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.UNKNOWN
+    assert print_node1.observation_state == ObservationStateValue.TRUE
+    assert node1.observation_state == ObservationStateValue.TRUE
+    assert print_node2.observation_state == ObservationStateValue.TRUE
+    assert end.observation_state == ObservationStateValue.UNKNOWN
 
-    assert print_node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert print_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert print_node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert print_node2.life_cycle_state == LifeCycleValue.RUNNING
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
     assert not msc.is_ended()
 
     kin_sim.tick()
-    assert print_node1.observation_state == ObservationStateValues.TRUE
-    assert node1.observation_state == ObservationStateValues.TRUE
-    assert print_node2.observation_state == ObservationStateValues.TRUE
-    assert end.observation_state == ObservationStateValues.TRUE
+    assert print_node1.observation_state == ObservationStateValue.TRUE
+    assert node1.observation_state == ObservationStateValue.TRUE
+    assert print_node2.observation_state == ObservationStateValue.TRUE
+    assert end.observation_state == ObservationStateValue.TRUE
 
-    assert print_node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert node1.life_cycle_state == LifeCycleValues.RUNNING
-    assert print_node2.life_cycle_state == LifeCycleValues.RUNNING
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert print_node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.RUNNING
+    assert print_node2.life_cycle_state == LifeCycleValue.RUNNING
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
     assert msc.is_ended()
 
 
 def test_draw_with_invisible_node(tmp_path) -> None:
+    """
+    A statechart can be drawn while some of its nodes, a composite node among them, are
+    hidden from the drawing.
+    """
     kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
     msc = Statechart(context=kin_sim.context)
     msc.add_nodes(
@@ -264,7 +275,7 @@ def test_draw_with_invisible_node(tmp_path) -> None:
     s2n2.plot_specifications.visible = False
 
     kin_sim.compile(statechart=msc)
-    msc.draw(file_name=str(tmp_path / "muh.pdf"))
+    msc.draw(file_name=tmp_path / "muh.pdf")
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -594,7 +605,7 @@ def test_build_delegates_to_build_artifacts() -> None:
 
     assert node.hook_calls == ["build", "build_artifacts"]
     executor.tick()
-    assert node.observation_state == ObservationStateValues.TRUE
+    assert node.observation_state == ObservationStateValue.TRUE
 
 
 def test_a_node_class_declaring_no_way_to_succeed_cannot_be_constructed() -> None:
@@ -628,7 +639,7 @@ def test_state_iteration_yields_nodes() -> None:
 @dataclass(eq=False, repr=False, kw_only=True)
 class _TestThreadMonitor(ThreadPayloadMonitor):
     delay: float = 0.05
-    return_value: float = ObservationStateValues.TRUE
+    return_value: float = ObservationStateValue.TRUE
 
     def _compute_observation(self):
         time.sleep(self.delay)
@@ -652,14 +663,14 @@ class _SucceedingThreadMonitor(ThreadPayloadMonitor):
     """
 
     def _compute_observation(self) -> float:
-        return ObservationStateValues.TRUE
+        return ObservationStateValue.TRUE
 
 
 def test_thread_payload_monitor_non_blocking_and_caching() -> None:
     msc = Statechart(context=StatechartContext(world=World()))
     mon = _TestThreadMonitor(
         delay=0.05,
-        return_value=ObservationStateValues.TRUE,
+        return_value=ObservationStateValue.TRUE,
     )
     msc.add_node(node=mon)
     # First call should be non-blocking and return Unknown until worker completes at least once
@@ -667,11 +678,11 @@ def test_thread_payload_monitor_non_blocking_and_caching() -> None:
     val0 = mon.compute_observation()
     elapsed = time.perf_counter() - start
     assert elapsed < mon.delay / 4.0
-    assert val0 == ObservationStateValues.UNKNOWN
+    assert val0 == ObservationStateValue.UNKNOWN
     # Wait for worker to finish and cache
     time.sleep(mon.delay * 2)
     val1 = mon.compute_observation()
-    assert val1 == ObservationStateValues.TRUE
+    assert val1 == ObservationStateValue.TRUE
 
 
 def test_thread_payload_monitor_cleanup_stops_worker() -> None:
@@ -707,7 +718,15 @@ def test_thread_payload_monitor_surfaces_compute_exception() -> None:
 
 
 class TestStatechartLogic:
+    """
+    How transition conditions start, pause, resume and end nodes.
+    """
+
     def test_transition_triggers(self, *, tmp_path) -> None:
+        """
+        The start, pause, interrupt and reset conditions of a node each trigger their
+        transition and its callback.
+        """
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
@@ -742,30 +761,30 @@ class TestStatechartLogic:
         assert changer.state is None
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert changer.life_cycle_state == LifeCycleValues.RUNNING
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert changer.life_cycle_state == LifeCycleValue.RUNNING
         assert changer.state == "on_start"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert changer.life_cycle_state == LifeCycleValues.PAUSED
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert changer.life_cycle_state == LifeCycleValue.PAUSED
         assert changer.state == "on_pause"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert changer.life_cycle_state == LifeCycleValues.RUNNING
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert changer.life_cycle_state == LifeCycleValue.RUNNING
         assert changer.state == "on_unpause"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
         # A node that only records callbacks never decides what it observes, so ending
         # it cannot judge it.
-        assert changer.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert changer.life_cycle_state == LifeCycleValue.INTERRUPTED
         assert changer.state == "on_end"
 
         kin_sim.tick()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert changer.life_cycle_state == LifeCycleValues.NOT_STARTED
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert changer.life_cycle_state == LifeCycleValue.NOT_STARTED
         assert changer.state == "on_reset"
 
     def test_live_state_requires_statechart_membership(self) -> None:
@@ -785,6 +804,10 @@ class TestStatechartLogic:
             _ = node.life_cycle_state
 
     def test_cancel_statechart(self, *, tmp_path) -> None:
+        """
+        :class:`CancelStatechart` raises its exception when it starts, and the cancelled
+        statechart can still be drawn.
+        """
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
         node1 = ConstTrueNode()
@@ -797,7 +820,7 @@ class TestStatechartLogic:
 
         with pytest.raises(CancellingFailure):
             kin_sim.tick()  # cancel starts, which triggers it
-        msc.draw(file_name=str(tmp_path / "cancelled.pdf"))
+        msc.draw(file_name=tmp_path / "cancelled.pdf")
 
     def test_history_records_the_tick_of_each_snapshot(self) -> None:
         """
@@ -844,66 +867,70 @@ class TestStatechartLogic:
         assert len(msc.state_history) == 5
         # %% node1
         assert msc.state_history.get_life_cycle_history_of_node(node=node1) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=node1) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
         # %% node2
         assert msc.state_history.get_life_cycle_history_of_node(node=node2) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=node2) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
         # %% node3
         assert msc.state_history.get_life_cycle_history_of_node(node=node3) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=node3) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
         # %% end
         assert msc.state_history.get_life_cycle_history_of_node(node=end) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=end) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
         ]
 
     def test_goal(self, *, tmp_path) -> None:
+        """
+        A composite node starts its chained children one after the other and observes
+        true once the last one does.
+        """
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
         msc = Statechart(context=kin_sim.context)
 
@@ -924,98 +951,98 @@ class TestStatechartLogic:
         assert len(msc.state_history) == 6
         # %% goal
         assert msc.state_history.get_life_cycle_history_of_node(node=goal) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=goal) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
         # %% node1
         assert msc.state_history.get_life_cycle_history_of_node(node=node1) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=node1) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
         # %% sub_node1
         assert msc.state_history.get_life_cycle_history_of_node(
             node=goal.sub_node1
         ) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.SUCCEEDED,
-            LifeCycleValues.SUCCEEDED,
-            LifeCycleValues.SUCCEEDED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.SUCCEEDED,
+            LifeCycleValue.SUCCEEDED,
+            LifeCycleValue.SUCCEEDED,
         ]
         assert msc.state_history.get_observation_history_of_node(
             node=goal.sub_node1
         ) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
         ]
         # %% sub_node2
         assert msc.state_history.get_life_cycle_history_of_node(
             node=goal.sub_node2
         ) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(
             node=goal.sub_node2
         ) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
         # %% sub_node2
         assert msc.state_history.get_life_cycle_history_of_node(node=end) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=end) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
         ]
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
 
     def test_reset(self, *, tmp_path) -> None:
         """
@@ -1046,60 +1073,60 @@ class TestStatechartLogic:
         )
 
         kin_sim.compile(statechart=msc)
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
+        msc.draw(file_name=tmp_path / "muh.pdf")
 
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert node2.observation_state == ObservationStateValues.UNKNOWN
-        assert end.observation_state == ObservationStateValues.UNKNOWN
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert node2.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert node2.observation_state == ObservationStateValue.UNKNOWN
+        assert end.observation_state == ObservationStateValue.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert node2.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
         assert not msc.is_ended()
 
         # node2 reaches its goal, which both ends it and resets node1.
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert node2.observation_state == ObservationStateValues.TRUE
-        assert end.observation_state == ObservationStateValues.UNKNOWN
-        assert node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert node2.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert node3.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert node2.observation_state == ObservationStateValue.TRUE
+        assert end.observation_state == ObservationStateValue.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert node2.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert node3.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
         assert not msc.is_ended()
 
         # node1 starts over with nothing observed yet, and node2 stops observing.
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.UNKNOWN
-        assert node2.observation_state == ObservationStateValues.UNKNOWN
-        assert node3.observation_state == ObservationStateValues.TRUE
-        assert end.observation_state == ObservationStateValues.UNKNOWN
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert node2.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert node3.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node1.observation_state == ObservationStateValue.UNKNOWN
+        assert node2.observation_state == ObservationStateValue.UNKNOWN
+        assert node3.observation_state == ObservationStateValue.TRUE
+        assert end.observation_state == ObservationStateValue.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert node2.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert node3.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
         assert not msc.is_ended()
 
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert node2.observation_state == ObservationStateValues.UNKNOWN
-        assert node3.observation_state == ObservationStateValues.TRUE
-        assert end.observation_state == ObservationStateValues.UNKNOWN
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert node2.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert node3.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert node2.observation_state == ObservationStateValue.UNKNOWN
+        assert node3.observation_state == ObservationStateValue.TRUE
+        assert end.observation_state == ObservationStateValue.UNKNOWN
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert node2.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert node3.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
         assert not msc.is_ended()
 
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert node2.observation_state == ObservationStateValues.UNKNOWN
-        assert node3.observation_state == ObservationStateValues.TRUE
-        assert end.observation_state == ObservationStateValues.TRUE
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert node2.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert node3.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert node2.observation_state == ObservationStateValue.UNKNOWN
+        assert node3.observation_state == ObservationStateValue.TRUE
+        assert end.observation_state == ObservationStateValue.TRUE
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert node2.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert node3.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
         assert msc.is_ended()
 
     def test_nested_goals(self) -> None:
@@ -1141,83 +1168,83 @@ class TestStatechartLogic:
         assert outer.inner.sub_node1.depth == 2
         assert outer.inner.sub_node2.depth == 2
 
-        assert node1.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.observation_state == ObservationStateValues.UNKNOWN
-        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.sub_node1.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.sub_node2.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.observation_state == ObservationStateValue.UNKNOWN
+        assert end.observation_state == ObservationStateValue.UNKNOWN
 
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert outer.inner.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert outer.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert outer.inner.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert outer.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
         assert not msc_copy.is_ended()
 
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.observation_state == ObservationStateValues.UNKNOWN
-        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.sub_node2.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.observation_state == ObservationStateValue.UNKNOWN
+        assert end.observation_state == ObservationStateValue.UNKNOWN
 
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert outer.inner.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
         assert not msc_copy.is_ended()
 
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert outer.inner.sub_node1.observation_state == ObservationStateValues.TRUE
-        assert outer.inner.sub_node2.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.observation_state == ObservationStateValues.UNKNOWN
-        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValue.TRUE
+        assert outer.inner.sub_node2.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.observation_state == ObservationStateValue.UNKNOWN
+        assert end.observation_state == ObservationStateValue.UNKNOWN
 
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
         assert not msc_copy.is_ended()
 
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
-        assert outer.inner.observation_state == ObservationStateValues.TRUE
-        assert outer.observation_state == ObservationStateValues.TRUE
-        assert end.observation_state == ObservationStateValues.UNKNOWN
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.sub_node2.observation_state == ObservationStateValue.TRUE
+        assert outer.inner.observation_state == ObservationStateValue.TRUE
+        assert outer.observation_state == ObservationStateValue.TRUE
+        assert end.observation_state == ObservationStateValue.UNKNOWN
 
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
         assert not msc_copy.is_ended()
 
         kin_sim.tick()
-        assert node1.observation_state == ObservationStateValues.TRUE
-        assert outer.inner.sub_node1.observation_state == ObservationStateValues.UNKNOWN
-        assert outer.inner.sub_node2.observation_state == ObservationStateValues.TRUE
-        assert outer.inner.observation_state == ObservationStateValues.TRUE
-        assert outer.observation_state == ObservationStateValues.TRUE
-        assert end.observation_state == ObservationStateValues.TRUE
+        assert node1.observation_state == ObservationStateValue.TRUE
+        assert outer.inner.sub_node1.observation_state == ObservationStateValue.UNKNOWN
+        assert outer.inner.sub_node2.observation_state == ObservationStateValue.TRUE
+        assert outer.inner.observation_state == ObservationStateValue.TRUE
+        assert outer.observation_state == ObservationStateValue.TRUE
+        assert end.observation_state == ObservationStateValue.TRUE
 
-        assert node1.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.inner.life_cycle_state == LifeCycleValues.RUNNING
-        assert outer.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert node1.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.sub_node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert outer.inner.sub_node2.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.inner.life_cycle_state == LifeCycleValue.RUNNING
+        assert outer.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
         assert msc_copy.is_ended()
 
 
@@ -1277,9 +1304,9 @@ def test_count_ticks() -> None:
 def test_count_ticks_returns_false_until_target() -> None:
     node = CountTicks(ticks=3)
     node.on_start()
-    assert node.on_tick() == ObservationStateValues.FALSE
-    assert node.on_tick() == ObservationStateValues.FALSE
-    assert node.on_tick() == ObservationStateValues.TRUE
+    assert node.on_tick() == ObservationStateValue.FALSE
+    assert node.on_tick() == ObservationStateValue.FALSE
+    assert node.on_tick() == ObservationStateValue.TRUE
 
 
 def test_count_simulation_time_seconds_reaches_target_on_exact_tick(
@@ -1292,8 +1319,8 @@ def test_count_simulation_time_seconds_reaches_target_on_exact_tick(
     Statechart(context=context).add_node(node=node)
     node.on_start()
     for _ in range(ticks_until_true - 1):
-        assert node.on_tick() == ObservationStateValues.FALSE
-    assert node.on_tick() == ObservationStateValues.TRUE
+        assert node.on_tick() == ObservationStateValue.FALSE
+    assert node.on_tick() == ObservationStateValue.TRUE
 
 
 def test_count_simulation_time_seconds_on_start_resets_counter(
@@ -1307,7 +1334,7 @@ def test_count_simulation_time_seconds_on_start_resets_counter(
     node.on_tick()
     node.on_tick()
     node.on_start()
-    assert node.on_tick() == ObservationStateValues.FALSE
+    assert node.on_tick() == ObservationStateValue.FALSE
 
 
 def test_count_simulation_time_seconds_with_executor(
@@ -1327,7 +1354,14 @@ def test_count_simulation_time_seconds_with_executor(
 
 
 class TestEndStatechart:
+    """
+    When :class:`EndStatechart` ends a statechart.
+    """
+
     def test_end_statechart_when_all_done1(self, *, tmp_path) -> None:
+        """
+        The statechart ends once all the given nodes observe true.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1345,10 +1379,13 @@ class TestEndStatechart:
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_end_statechart_when_all_done2(self, *, tmp_path) -> None:
+        """
+        The statechart does not end while one of the given nodes observes false.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1367,10 +1404,13 @@ class TestEndStatechart:
         kin_sim.compile(statechart=msc)
         with pytest.raises(TickLimitReachedError):
             kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_end_statechart_when_any_done1(self, *, tmp_path) -> None:
+        """
+        The statechart ends once one of the given nodes observes true.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1388,10 +1428,13 @@ class TestEndStatechart:
 
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_end_statechart_when_any_done2(self, *, tmp_path) -> None:
+        """
+        The statechart does not end while none of the given nodes observes true.
+        """
         kin_sim = StatechartExecutor(
             context=StatechartContext(
                 world=World(),
@@ -1410,8 +1453,8 @@ class TestEndStatechart:
         kin_sim.compile(statechart=msc)
         with pytest.raises(TickLimitReachedError):
             kin_sim.tick_until_end()
-        msc.draw(file_name=str(tmp_path / "muh.pdf"))
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        msc.draw(file_name=tmp_path / "muh.pdf")
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_end_statechart_when_all_true_accepts_a_single_node(self) -> None:
         """
@@ -1426,7 +1469,7 @@ class TestEndStatechart:
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
 
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_end_statechart_when_any_true_accepts_a_single_node(self) -> None:
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
@@ -1437,7 +1480,7 @@ class TestEndStatechart:
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
 
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_cancel_statechart_when_all_true_accepts_a_single_node(self) -> None:
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
@@ -1488,13 +1531,13 @@ class TestEndStatechart:
         executor.compile(statechart=msc)
         executor.tick()
 
-        assert falling_short.life_cycle_state == LifeCycleValues.RUNNING
-        assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert falling_short.life_cycle_state == LifeCycleValue.RUNNING
+        assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
 
         executor.tick()
 
-        assert falling_short.life_cycle_state == LifeCycleValues.FAILED
-        assert end.life_cycle_state == LifeCycleValues.RUNNING
+        assert falling_short.life_cycle_state == LifeCycleValue.FAILED
+        assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_cancel_statechart_when_failed_raises_once_the_node_fails(self) -> None:
         executor = StatechartExecutor(context=StatechartContext(world=World()))
@@ -1593,10 +1636,10 @@ class TestTemplates:
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
 
-        assert all(step.life_cycle_state == LifeCycleValues.SUCCEEDED for step in steps)
+        assert all(step.life_cycle_state == LifeCycleValue.SUCCEEDED for step in steps)
         starts = [
             msc.state_history.get_life_cycle_history_of_node(node=step).index(
-                LifeCycleValues.RUNNING
+                LifeCycleValue.RUNNING
             )
             for step in steps
         ]
@@ -1650,7 +1693,7 @@ class TestTemplates:
         _compile_msc(msc).tick()
 
         assert task.parent_node is sequence
-        assert task.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert task.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_a_sequence_fails_a_bare_task_that_fails_while_observing_true(self) -> None:
         """
@@ -1664,20 +1707,20 @@ class TestTemplates:
 
         _compile_msc(msc).tick()
 
-        assert task.life_cycle_state == LifeCycleValues.FAILED
+        assert task.life_cycle_state == LifeCycleValue.FAILED
 
     def test_a_sequence_runs_a_step_deciding_its_own_success_as_it_is(self) -> None:
         """
         A step that succeeds on its own needs nothing to end it.
         """
         msc = Statechart(context=StatechartContext(world=World()))
-        step = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
+        step = NodeSucceedingOnObservingTrue(observation=ObservationStateValue.TRUE)
         msc.add_node(node=(sequence := Sequence(nodes=[step])))
 
         _compile_msc(msc).tick()
 
         assert step.parent_node is sequence
-        assert step.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert step.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_a_sequence_rejects_a_step_whose_life_cycle_the_caller_wired(self) -> None:
         """
@@ -1713,8 +1756,8 @@ class TestTemplates:
         for _ in range(4):
             executor.tick()
 
-        assert sequence.nodes[0].life_cycle_state == LifeCycleValues.FAILED
-        assert sequence.last_observation_state == ObservationStateValues.FALSE
+        assert sequence.nodes[0].life_cycle_state == LifeCycleValue.FAILED
+        assert sequence.last_observation_state == ObservationStateValue.FALSE
 
     def test_parallel(self) -> None:
         kin_sim = StatechartExecutor(
@@ -1824,15 +1867,11 @@ class TestLifeCycleTransitions:
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
 
-        assert sequence.nodes[1].cancel.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert sequence.nodes[1].cancel.life_cycle_state == LifeCycleValue.NOT_STARTED
         # The goal takes its counters down with it, which interrupts them.
-        assert (
-            sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert (
-            sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert sequence.nodes[1].life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert sequence.nodes[1].life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_run_after_stop_from_pause(self) -> None:
         """
@@ -1857,19 +1896,13 @@ class TestLifeCycleTransitions:
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end()
 
-        assert sequence.nodes[1].cancel.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert sequence.nodes[1].cancel.life_cycle_state == LifeCycleValue.NOT_STARTED
         # The goal takes its counters down with it, which interrupts them.
-        assert (
-            sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert (
-            sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert (
-            sequence.nodes[1].ticking3.life_cycle_state == LifeCycleValues.INTERRUPTED
-        )
-        assert sequence.nodes[1].pulse.life_cycle_state == LifeCycleValues.INTERRUPTED
-        assert sequence.nodes[1].life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert sequence.nodes[1].ticking1.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert sequence.nodes[1].ticking2.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert sequence.nodes[1].ticking3.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert sequence.nodes[1].pulse.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert sequence.nodes[1].life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_end_before_start(self) -> None:
         """
@@ -1894,13 +1927,13 @@ class TestLifeCycleTransitions:
         kin_sim.compile(statechart=msc)
         kin_sim.tick()
 
-        assert node3.life_cycle_state == LifeCycleValues.RUNNING
-        assert node3.observation_state == ObservationStateValues.UNKNOWN
+        assert node3.life_cycle_state == LifeCycleValue.RUNNING
+        assert node3.observation_state == ObservationStateValue.UNKNOWN
 
         kin_sim.tick()
 
-        assert node3.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert node3.observation_state == ObservationStateValues.TRUE
+        assert node3.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert node3.observation_state == ObservationStateValue.TRUE
 
     def test_end_before_start_in_template(self) -> None:
         """
@@ -1916,13 +1949,13 @@ class TestLifeCycleTransitions:
         kin_sim.compile(statechart=msc)
         kin_sim.tick()
 
-        assert node.node3.life_cycle_state == LifeCycleValues.RUNNING
-        assert node.node3.observation_state == ObservationStateValues.UNKNOWN
+        assert node.node3.life_cycle_state == LifeCycleValue.RUNNING
+        assert node.node3.observation_state == ObservationStateValue.UNKNOWN
 
         kin_sim.tick()
 
-        assert node.node3.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert node.node3.observation_state == ObservationStateValues.TRUE
+        assert node.node3.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert node.node3.observation_state == ObservationStateValue.TRUE
 
     def test_intended_transitions(self) -> None:
         """
@@ -1967,142 +2000,142 @@ class TestLifeCycleTransitions:
         assert len(msc.state_history) == 14
         # %% count_node1 history
         assert msc.state_history.get_life_cycle_history_of_node(node=count_node1) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.PAUSED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.SUCCEEDED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.PAUSED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.SUCCEEDED,
-            LifeCycleValues.SUCCEEDED,
-            LifeCycleValues.SUCCEEDED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.PAUSED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.SUCCEEDED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.PAUSED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.SUCCEEDED,
+            LifeCycleValue.SUCCEEDED,
+            LifeCycleValue.SUCCEEDED,
         ]
         assert msc.state_history.get_observation_history_of_node(node=count_node1) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
         ]
 
         # %% count_node2 history
         assert msc.state_history.get_life_cycle_history_of_node(node=count_node2) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=count_node2) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
 
         # %% end_count_node1 history
         assert msc.state_history.get_life_cycle_history_of_node(
             node=end_count_node1
         ) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(
             node=end_count_node1
         ) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.TRUE,
         ]
 
         # %% end_node history
         assert msc.state_history.get_life_cycle_history_of_node(node=end_node) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=end_node) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
         ]
 
         # %% pulse_node1 history
@@ -2111,70 +2144,70 @@ class TestLifeCycleTransitions:
             node=pulse_node1
         )
         assert pulse_node1_observations == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
         ]
         assert msc.state_history.get_life_cycle_history_of_node(node=pulse_node1) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.INTERRUPTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.INTERRUPTED,
-            LifeCycleValues.INTERRUPTED,
-            LifeCycleValues.INTERRUPTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.INTERRUPTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.INTERRUPTED,
+            LifeCycleValue.INTERRUPTED,
+            LifeCycleValue.INTERRUPTED,
         ]
 
         # %% pulse_node2 history
         assert msc.state_history.get_life_cycle_history_of_node(node=pulse_node2) == [
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.NOT_STARTED,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
-            LifeCycleValues.RUNNING,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.NOT_STARTED,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
+            LifeCycleValue.RUNNING,
         ]
         assert msc.state_history.get_observation_history_of_node(node=pulse_node2) == [
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.TRUE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
-            ObservationStateValues.FALSE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.TRUE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
+            ObservationStateValue.FALSE,
         ]
 
     def test_unpause_from_parent_pause(self) -> None:
@@ -2196,10 +2229,10 @@ class TestLifeCycleTransitions:
         kin_sim.tick_until_end()
 
         # The goal takes its counter down with it, which interrupts it.
-        assert unpause.count_ticks1.life_cycle_state == LifeCycleValues.INTERRUPTED
-        assert unpause.cancel.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert unpause.count_ticks1.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert unpause.cancel.life_cycle_state == LifeCycleValue.NOT_STARTED
 
-        assert unpause.last_observation_state == ObservationStateValues.TRUE
+        assert unpause.last_observation_state == ObservationStateValue.TRUE
 
     def test_long_pause(self) -> None:
         kin_sim = StatechartExecutor(context=StatechartContext(world=World()))
@@ -2240,9 +2273,9 @@ class TestLifeCycleTransitions:
         for _ in range(3):
             kin_sim.tick()
 
-        assert undecided.observation_state == ObservationStateValues.UNKNOWN
-        assert goal.life_cycle_state == LifeCycleValues.RUNNING
-        assert goal.child.life_cycle_state == LifeCycleValues.RUNNING
+        assert undecided.observation_state == ObservationStateValue.UNKNOWN
+        assert goal.life_cycle_state == LifeCycleValue.RUNNING
+        assert goal.child.life_cycle_state == LifeCycleValue.RUNNING
 
     @pytest.mark.parametrize("transition_kind", TransitionKind.ending_kinds())
     def test_a_child_does_not_start_under_a_parent_ending_on_the_same_tick(
@@ -2268,7 +2301,7 @@ class TestLifeCycleTransitions:
             executor.tick()
 
         assert goal.life_cycle_state is transition_kind.outcome
-        assert goal.child.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert goal.child.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_a_reset_outranks_a_start(self) -> None:
         """
@@ -2282,10 +2315,10 @@ class TestLifeCycleTransitions:
 
         executor = _compile_msc(msc)
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_a_node_starts_once_its_reset_drops(self) -> None:
         """
@@ -2305,10 +2338,10 @@ class TestLifeCycleTransitions:
 
         executor = _compile_msc(msc)
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.RUNNING
+        assert node.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_a_resetting_ancestor_holds_back_a_child_that_would_start(self) -> None:
         """
@@ -2328,15 +2361,15 @@ class TestLifeCycleTransitions:
         executor.tick()
         executor.tick()
 
-        assert goal.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert goal.child.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert goal.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert goal.child.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 # %% transitions a parent forces on a node
 
 
 def _evaluate_in(
-    expression: Scalar, life_cycle_states: dict[StatechartNode, LifeCycleValues]
+    expression: Scalar, life_cycle_states: dict[StatechartNode, LifeCycleValue]
 ) -> float:
     """
     :param expression: An expression reading the life cycle states of nodes.
@@ -2357,13 +2390,13 @@ class TestLifeCycleForcedByParent:
     transitions reach once none triggered by its own conditions may happen.
     """
 
-    @pytest.mark.parametrize("parent_life_cycle_state", list(LifeCycleValues))
-    @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+    @pytest.mark.parametrize("parent_life_cycle_state", list(LifeCycleValue))
+    @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
     def test_a_child_reaches_its_transitions_without_its_own_ones(
         self,
         *,
-        life_cycle_state: LifeCycleValues,
-        parent_life_cycle_state: LifeCycleValues,
+        life_cycle_state: LifeCycleValue,
+        parent_life_cycle_state: LifeCycleValue,
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(node=(parent := Sequence(nodes=[child := ConstTrueNode()])))
@@ -2379,9 +2412,9 @@ class TestLifeCycleForcedByParent:
 
         assert forced == _evaluate_in(transitions[life_cycle_state], states)
 
-    @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+    @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
     def test_a_top_level_node_reaches_its_transitions_without_its_own_ones(
-        self, *, life_cycle_state: LifeCycleValues
+        self, *, life_cycle_state: LifeCycleValue
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(node=(node := ConstTrueNode()))
@@ -2427,8 +2460,8 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.observation_state == ObservationStateValues.FALSE
-        assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert node.observation_state == ObservationStateValue.FALSE
+        assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_an_interrupt_condition_interrupts_a_node_at_its_goal(self) -> None:
         """
@@ -2441,8 +2474,8 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.observation_state == ObservationStateValues.TRUE
-        assert node.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert node.observation_state == ObservationStateValue.TRUE
+        assert node.life_cycle_state == LifeCycleValue.INTERRUPTED
 
     def test_success_outranks_failure_on_the_same_tick(self) -> None:
         """
@@ -2456,7 +2489,7 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_failure_outranks_interruption_on_the_same_tick(self) -> None:
         """
@@ -2470,7 +2503,7 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.FAILED
+        assert node.life_cycle_state == LifeCycleValue.FAILED
 
     def test_a_nodes_own_success_outranks_an_ending_ancestor(self) -> None:
         """
@@ -2488,8 +2521,8 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert goal.life_cycle_state == LifeCycleValues.INTERRUPTED
-        assert goal.child.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert goal.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert goal.child.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     @pytest.mark.parametrize("transition_kind", TransitionKind.ending_kinds())
     def test_an_ending_ancestor_interrupts_a_child_at_its_goal(
@@ -2513,8 +2546,8 @@ class TestLifeCycleOutcomes:
         self._compile(msc=msc).tick()
 
         assert goal.life_cycle_state is transition_kind.outcome
-        assert goal.child.observation_state == ObservationStateValues.TRUE
-        assert goal.child.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert goal.child.observation_state == ObservationStateValue.TRUE
+        assert goal.child.life_cycle_state == LifeCycleValue.INTERRUPTED
 
     def test_a_success_condition_succeeds_a_node_that_has_observed_nothing(
         self,
@@ -2531,8 +2564,8 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.observation_state == ObservationStateValues.UNKNOWN
-        assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert node.observation_state == ObservationStateValue.UNKNOWN
+        assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_an_interrupted_node_observing_false_is_not_judged_to_have_failed(
         self,
@@ -2549,8 +2582,8 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.observation_state == ObservationStateValues.FALSE
-        assert node.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert node.observation_state == ObservationStateValue.FALSE
+        assert node.life_cycle_state == LifeCycleValue.INTERRUPTED
 
     def test_a_fail_condition_fails_a_node_at_its_goal(self) -> None:
         """
@@ -2563,8 +2596,8 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.observation_state == ObservationStateValues.TRUE
-        assert node.life_cycle_state == LifeCycleValues.FAILED
+        assert node.observation_state == ObservationStateValue.TRUE
+        assert node.life_cycle_state == LifeCycleValue.FAILED
 
     def test_a_node_failing_on_observing_false_fails_once_it_observes_false(
         self,
@@ -2577,14 +2610,14 @@ class TestLifeCycleOutcomes:
         msc.add_node(
             node=(
                 node := NodeFailingOnObservingFalse(
-                    observation=ObservationStateValues.FALSE
+                    observation=ObservationStateValue.FALSE
                 )
             )
         )
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.FAILED
+        assert node.life_cycle_state == LifeCycleValue.FAILED
 
     def test_a_node_deciding_its_own_success_succeeds_once_it_observes_true(
         self,
@@ -2597,14 +2630,14 @@ class TestLifeCycleOutcomes:
         msc.add_node(
             node=(
                 node := NodeSucceedingOnObservingTrue(
-                    observation=ObservationStateValues.TRUE
+                    observation=ObservationStateValue.TRUE
                 )
             )
         )
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_a_node_deciding_its_own_success_is_not_failed_by_observing_false(
         self,
@@ -2617,14 +2650,14 @@ class TestLifeCycleOutcomes:
         msc.add_node(
             node=(
                 node := NodeSucceedingOnObservingTrue(
-                    observation=ObservationStateValues.FALSE
+                    observation=ObservationStateValue.FALSE
                 )
             )
         )
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.RUNNING
+        assert node.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_a_node_failing_on_observing_false_keeps_running_while_it_observes_unknown(
         self,
@@ -2637,14 +2670,14 @@ class TestLifeCycleOutcomes:
         msc.add_node(
             node=(
                 node := NodeFailingOnObservingFalse(
-                    observation=ObservationStateValues.UNKNOWN
+                    observation=ObservationStateValue.UNKNOWN
                 )
             )
         )
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.RUNNING
+        assert node.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_a_node_failing_on_observing_false_is_not_succeeded_by_observing_true(
         self,
@@ -2656,14 +2689,14 @@ class TestLifeCycleOutcomes:
         msc.add_node(
             node=(
                 node := NodeFailingOnObservingFalse(
-                    observation=ObservationStateValues.TRUE
+                    observation=ObservationStateValue.TRUE
                 )
             )
         )
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.RUNNING
+        assert node.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_a_node_failing_on_observing_false_keeps_the_fail_condition_it_was_given(
         self,
@@ -2677,7 +2710,7 @@ class TestLifeCycleOutcomes:
             nodes=[
                 trigger := ConstTrueNode(),
                 node := NodeFailingOnObservingFalse(
-                    observation=ObservationStateValues.TRUE
+                    observation=ObservationStateValue.TRUE
                 ),
             ]
         )
@@ -2685,7 +2718,7 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert node.life_cycle_state == LifeCycleValues.FAILED
+        assert node.life_cycle_state == LifeCycleValue.FAILED
 
     def test_a_child_an_ancestor_took_down_at_its_goal_has_not_succeeded(self) -> None:
         """
@@ -2705,7 +2738,7 @@ class TestLifeCycleOutcomes:
 
         assert goal.child.is_succeeded.resolve() == (
             LifeCyclePredicate.IS_SUCCEEDED.truth_value(
-                life_cycle_value=LifeCycleValues.INTERRUPTED
+                life_cycle_value=LifeCycleValue.INTERRUPTED
             )
         )
 
@@ -2725,7 +2758,7 @@ class TestLifeCycleOutcomes:
 
         self._compile(msc=msc).tick()
 
-        assert goal.grandchild.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert goal.grandchild.life_cycle_state == LifeCycleValue.INTERRUPTED
 
     def test_a_child_ends_the_same_way_whether_a_sibling_or_its_parent_ends_it(
         self,
@@ -2771,11 +2804,11 @@ class TestLifeCycleOutcomes:
 
         executor = self._compile(msc=msc)
         executor.tick()
-        assert goal.child.life_cycle_state == LifeCycleValues.FAILED
+        assert goal.child.life_cycle_state == LifeCycleValue.FAILED
 
         executor.tick()
-        assert goal.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert goal.child.life_cycle_state == LifeCycleValues.FAILED
+        assert goal.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert goal.child.life_cycle_state == LifeCycleValue.FAILED
 
     def test_reset_leaves_succeeded(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
@@ -2791,10 +2824,10 @@ class TestLifeCycleOutcomes:
 
         executor = self._compile(msc=msc)
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_reset_leaves_failed(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
@@ -2810,10 +2843,10 @@ class TestLifeCycleOutcomes:
 
         executor = self._compile(msc=msc)
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.FAILED
+        assert node.life_cycle_state == LifeCycleValue.FAILED
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_reset_leaves_interrupted(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
@@ -2829,10 +2862,10 @@ class TestLifeCycleOutcomes:
 
         executor = self._compile(msc=msc)
         executor.tick()
-        assert goal.child.life_cycle_state == LifeCycleValues.INTERRUPTED
+        assert goal.child.life_cycle_state == LifeCycleValue.INTERRUPTED
 
         executor.tick()
-        assert goal.child.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert goal.child.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_an_ended_node_observes_nothing_and_keeps_its_outcome(self) -> None:
         """
@@ -2845,11 +2878,11 @@ class TestLifeCycleOutcomes:
 
         executor = self._compile(msc=msc)
         executor.tick()
-        assert node.observation_state == ObservationStateValues.FALSE
+        assert node.observation_state == ObservationStateValue.FALSE
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.FAILED
-        assert node.observation_state == ObservationStateValues.UNKNOWN
+        assert node.life_cycle_state == LifeCycleValue.FAILED
+        assert node.observation_state == ObservationStateValue.UNKNOWN
 
     def test_a_paused_node_keeps_the_observation_it_made(self) -> None:
         """
@@ -2862,11 +2895,11 @@ class TestLifeCycleOutcomes:
 
         executor = self._compile(msc=msc)
         executor.tick()
-        assert node.observation_state == ObservationStateValues.TRUE
+        assert node.observation_state == ObservationStateValue.TRUE
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.PAUSED
-        assert node.observation_state == ObservationStateValues.TRUE
+        assert node.life_cycle_state == LifeCycleValue.PAUSED
+        assert node.observation_state == ObservationStateValue.TRUE
 
     def test_only_the_outcome_of_an_ended_node_still_starts_a_later_node(self) -> None:
         """
@@ -2895,10 +2928,10 @@ class TestLifeCycleOutcomes:
         for _ in range(5):
             executor.tick()
 
-        assert finished.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert later.observation_state == ObservationStateValues.TRUE
-        assert on_outcome.life_cycle_state == LifeCycleValues.RUNNING
-        assert on_observation.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert finished.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert later.observation_state == ObservationStateValue.TRUE
+        assert on_outcome.life_cycle_state == LifeCycleValue.RUNNING
+        assert on_observation.life_cycle_state == LifeCycleValue.NOT_STARTED
 
 
 # %% what a composite goal reads from its children
@@ -2924,14 +2957,14 @@ class TestReadingChildrenThatEnded:
         executor.compile(statechart=msc)
         for _ in range(6):
             executor.tick()
-        assert sequence.last_observation_state == ObservationStateValues.TRUE
+        assert sequence.last_observation_state == ObservationStateValue.TRUE
 
         last_step = sequence.nodes[-1]
-        assert last_step.life_cycle_state == LifeCycleValues.SUCCEEDED
-        msc.observation_state[last_step] = ObservationStateValues.UNKNOWN
+        assert last_step.life_cycle_state == LifeCycleValue.SUCCEEDED
+        msc.observation_state[last_step] = ObservationStateValue.UNKNOWN
         executor.tick()
 
-        assert sequence.last_observation_state == ObservationStateValues.TRUE
+        assert sequence.last_observation_state == ObservationStateValue.TRUE
 
     def test_a_sequence_fails_once_a_step_ended_short_of_its_goal(self) -> None:
         """
@@ -2947,8 +2980,8 @@ class TestReadingChildrenThatEnded:
         for _ in range(5):
             executor.tick()
 
-        assert sequence.last_observation_state == ObservationStateValues.FALSE
-        assert last_step.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert sequence.last_observation_state == ObservationStateValue.FALSE
+        assert last_step.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_a_sequence_fails_once_its_last_step_ended_short_of_its_goal(self) -> None:
         """
@@ -2967,7 +3000,7 @@ class TestReadingChildrenThatEnded:
         for _ in range(5):
             executor.tick()
 
-        assert sequence.last_observation_state == ObservationStateValues.FALSE
+        assert sequence.last_observation_state == ObservationStateValue.FALSE
 
     def test_a_sequence_stays_unknown_while_a_step_is_short_of_its_goal(self) -> None:
         """
@@ -2985,7 +3018,7 @@ class TestReadingChildrenThatEnded:
 
         assert set(
             msc.state_history.get_observation_history_of_node(node=sequence)
-        ) == {ObservationStateValues.UNKNOWN}
+        ) == {ObservationStateValue.UNKNOWN}
 
     def test_a_parallel_counts_an_ended_child_and_a_running_one(self) -> None:
         """
@@ -3006,9 +3039,9 @@ class TestReadingChildrenThatEnded:
         for _ in range(4):
             executor.tick()
 
-        assert ended.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert still_running.life_cycle_state == LifeCycleValues.RUNNING
-        assert parallel.observation_state == ObservationStateValues.TRUE
+        assert ended.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert still_running.life_cycle_state == LifeCycleValue.RUNNING
+        assert parallel.observation_state == ObservationStateValue.TRUE
 
     def test_a_parallel_stops_counting_a_child_that_ended_without_succeeding(
         self,
@@ -3032,10 +3065,10 @@ class TestReadingChildrenThatEnded:
         for _ in range(4):
             executor.tick()
 
-        assert failed.life_cycle_state == LifeCycleValues.FAILED
-        assert failed.last_observation_state == ObservationStateValues.TRUE
-        assert still_trying.life_cycle_state == LifeCycleValues.RUNNING
-        assert parallel.observation_state == ObservationStateValues.FALSE
+        assert failed.life_cycle_state == LifeCycleValue.FAILED
+        assert failed.last_observation_state == ObservationStateValue.TRUE
+        assert still_trying.life_cycle_state == LifeCycleValue.RUNNING
+        assert parallel.observation_state == ObservationStateValue.FALSE
 
     def test_a_parallel_fails_once_too_few_children_can_reach_their_goals(self) -> None:
         """
@@ -3052,7 +3085,7 @@ class TestReadingChildrenThatEnded:
         for _ in range(4):
             executor.tick()
 
-        assert parallel.life_cycle_state == LifeCycleValues.FAILED
+        assert parallel.life_cycle_state == LifeCycleValue.FAILED
 
     def test_a_parallel_keeps_going_while_enough_children_can_still_reach_their_goals(
         self,
@@ -3076,10 +3109,10 @@ class TestReadingChildrenThatEnded:
         for _ in range(4):
             executor.tick()
 
-        assert failed.life_cycle_state == LifeCycleValues.FAILED
-        assert at_its_goal.life_cycle_state == LifeCycleValues.RUNNING
-        assert parallel.life_cycle_state == LifeCycleValues.RUNNING
-        assert parallel.observation_state == ObservationStateValues.TRUE
+        assert failed.life_cycle_state == LifeCycleValue.FAILED
+        assert at_its_goal.life_cycle_state == LifeCycleValue.RUNNING
+        assert parallel.life_cycle_state == LifeCycleValue.RUNNING
+        assert parallel.observation_state == ObservationStateValue.TRUE
 
     def test_a_parallel_is_not_satisfied_by_children_true_at_different_times(
         self,
@@ -3105,18 +3138,18 @@ class TestReadingChildrenThatEnded:
             executor.tick()
 
         assert (
-            ObservationStateValues.TRUE
+            ObservationStateValue.TRUE
             in msc.state_history.get_observation_history_of_node(node=drifting)
         )
         assert (
-            ObservationStateValues.TRUE
+            ObservationStateValue.TRUE
             in msc.state_history.get_observation_history_of_node(node=late)
         )
         assert set(
             msc.state_history.get_observation_history_of_node(node=parallel)
         ) == {
-            ObservationStateValues.UNKNOWN,
-            ObservationStateValues.FALSE,
+            ObservationStateValue.UNKNOWN,
+            ObservationStateValue.FALSE,
         }
 
 
@@ -3137,14 +3170,14 @@ class TestLastObservation:
         executor = _compile_msc(msc)
         executor.tick()
 
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert node.last_observation_state == ObservationStateValues.UNKNOWN
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert node.last_observation_state == ObservationStateValue.UNKNOWN
 
     @pytest.mark.parametrize(
         "node_type, expected",
         [
-            (ConstTrueNode, ObservationStateValues.TRUE),
-            (ConstFalseNode, ObservationStateValues.FALSE),
+            (ConstTrueNode, ObservationStateValue.TRUE),
+            (ConstFalseNode, ObservationStateValue.FALSE),
         ],
     )
     def test_a_running_node_reads_what_it_observes(
@@ -3156,7 +3189,7 @@ class TestLastObservation:
         executor = _compile_msc(msc)
         executor.tick()
 
-        assert node.life_cycle_state == LifeCycleValues.RUNNING
+        assert node.life_cycle_state == LifeCycleValue.RUNNING
         assert node.last_observation_state == expected
 
     def test_every_ended_node_reads_what_it_observed_whatever_its_outcome(self) -> None:
@@ -3199,22 +3232,22 @@ class TestLastObservation:
             executor.tick()
 
         assert {node: node.life_cycle_state for node in nodes} == {
-            not_started: LifeCycleValues.NOT_STARTED,
-            running: LifeCycleValues.RUNNING,
-            succeeded: LifeCycleValues.SUCCEEDED,
-            failed_observing_false: LifeCycleValues.FAILED,
-            failed_observing_true: LifeCycleValues.FAILED,
-            interrupted_observing_true: LifeCycleValues.INTERRUPTED,
-            interrupted_undecided: LifeCycleValues.INTERRUPTED,
+            not_started: LifeCycleValue.NOT_STARTED,
+            running: LifeCycleValue.RUNNING,
+            succeeded: LifeCycleValue.SUCCEEDED,
+            failed_observing_false: LifeCycleValue.FAILED,
+            failed_observing_true: LifeCycleValue.FAILED,
+            interrupted_observing_true: LifeCycleValue.INTERRUPTED,
+            interrupted_undecided: LifeCycleValue.INTERRUPTED,
         }
         assert {node: node.last_observation_state for node in nodes} == {
-            not_started: ObservationStateValues.UNKNOWN,
-            running: ObservationStateValues.TRUE,
-            succeeded: ObservationStateValues.TRUE,
-            failed_observing_false: ObservationStateValues.FALSE,
-            failed_observing_true: ObservationStateValues.TRUE,
-            interrupted_observing_true: ObservationStateValues.TRUE,
-            interrupted_undecided: ObservationStateValues.UNKNOWN,
+            not_started: ObservationStateValue.UNKNOWN,
+            running: ObservationStateValue.TRUE,
+            succeeded: ObservationStateValue.TRUE,
+            failed_observing_false: ObservationStateValue.FALSE,
+            failed_observing_true: ObservationStateValue.TRUE,
+            interrupted_observing_true: ObservationStateValue.TRUE,
+            interrupted_undecided: ObservationStateValue.UNKNOWN,
         }
 
     def test_an_ended_node_keeps_the_observation_its_ending_transition_read(
@@ -3233,12 +3266,12 @@ class TestLastObservation:
             executor.tick()
 
         assert (
-            ObservationStateValues.TRUE
+            ObservationStateValue.TRUE
             in msc.state_history.get_observation_history_of_node(node=pulse)
         )
-        assert pulse.life_cycle_state == LifeCycleValues.INTERRUPTED
-        assert pulse.observation_state == ObservationStateValues.UNKNOWN
-        assert pulse.last_observation_state == ObservationStateValues.FALSE
+        assert pulse.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert pulse.observation_state == ObservationStateValue.UNKNOWN
+        assert pulse.last_observation_state == ObservationStateValue.FALSE
 
     def test_a_reset_forgets_the_previous_run(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
@@ -3250,14 +3283,14 @@ class TestLastObservation:
         executor = _compile_msc(msc)
         for _ in range(2):
             executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert node.last_observation_state == ObservationStateValues.TRUE
+        assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert node.last_observation_state == ObservationStateValue.TRUE
 
         for _ in range(2):
             executor.tick()
 
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
-        assert node.last_observation_state == ObservationStateValues.UNKNOWN
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
+        assert node.last_observation_state == ObservationStateValue.UNKNOWN
 
     def test_a_condition_reads_it_after_the_node_ended(self) -> None:
         """
@@ -3282,8 +3315,8 @@ class TestLastObservation:
         for _ in range(3):
             executor.tick()
 
-        assert ended.life_cycle_state == LifeCycleValues.INTERRUPTED
-        assert watcher.life_cycle_state == LifeCycleValues.RUNNING
+        assert ended.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert watcher.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_an_observation_reads_it_after_the_node_ended(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
@@ -3300,8 +3333,8 @@ class TestLastObservation:
         for _ in range(3):
             executor.tick()
 
-        assert ended.life_cycle_state == LifeCycleValues.INTERRUPTED
-        assert observer.observation_state == ObservationStateValues.TRUE
+        assert ended.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert observer.observation_state == ObservationStateValue.TRUE
 
     def test_it_renders_as_one_variable(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
@@ -3329,13 +3362,13 @@ class TestLastObservation:
         executor = _compile_msc(msc)
         executor.tick()
 
-        assert watched.last_observation_state == ObservationStateValues.FALSE
-        assert observer.observation_state == ObservationStateValues.FALSE
+        assert watched.last_observation_state == ObservationStateValue.FALSE
+        assert observer.observation_state == ObservationStateValue.FALSE
 
         executor.tick()
 
-        assert watched.last_observation_state == ObservationStateValues.TRUE
-        assert observer.observation_state == ObservationStateValues.TRUE
+        assert watched.last_observation_state == ObservationStateValue.TRUE
+        assert observer.observation_state == ObservationStateValue.TRUE
 
     def test_a_condition_reads_the_current_tick(self) -> None:
         """
@@ -3355,8 +3388,8 @@ class TestLastObservation:
         for _ in range(2):
             executor.tick()
 
-        assert watched.last_observation_state == ObservationStateValues.TRUE
-        assert waiting.life_cycle_state == LifeCycleValues.RUNNING
+        assert watched.last_observation_state == ObservationStateValue.TRUE
+        assert waiting.life_cycle_state == LifeCycleValue.RUNNING
 
 
 # %% life cycle predicates
@@ -3370,9 +3403,9 @@ class TestLifeCyclePredicates:
     @pytest.mark.parametrize(
         "predicate, outcome",
         [
-            (LifeCyclePredicate.IS_SUCCEEDED, LifeCycleValues.SUCCEEDED),
-            (LifeCyclePredicate.IS_FAILED, LifeCycleValues.FAILED),
-            (LifeCyclePredicate.IS_INTERRUPTED, LifeCycleValues.INTERRUPTED),
+            (LifeCyclePredicate.IS_SUCCEEDED, LifeCycleValue.SUCCEEDED),
+            (LifeCyclePredicate.IS_FAILED, LifeCycleValue.FAILED),
+            (LifeCyclePredicate.IS_INTERRUPTED, LifeCycleValue.INTERRUPTED),
         ],
     )
     def test_an_outcome_predicate_is_true_only_in_its_own_state(
@@ -3382,11 +3415,11 @@ class TestLifeCyclePredicates:
         A node that has not ended, or ended some other way, did not end this way, so a
         outcome predicate answers in every state.
         """
-        for life_cycle_state in LifeCycleValues:
+        for life_cycle_state in LifeCycleValue:
             expected = (
-                ObservationStateValues.TRUE
+                ObservationStateValue.TRUE
                 if life_cycle_state is outcome
-                else ObservationStateValues.FALSE
+                else ObservationStateValue.FALSE
             )
             assert predicate.truth_value(life_cycle_value=life_cycle_state) == expected
 
@@ -3411,15 +3444,15 @@ class TestLifeCyclePredicates:
         executor = _compile_msc(msc)
         executor.tick()
 
-        assert watched.life_cycle_state == LifeCycleValues.INTERRUPTED
-        assert waiting.life_cycle_state == LifeCycleValues.RUNNING
+        assert watched.life_cycle_state == LifeCycleValue.INTERRUPTED
+        assert waiting.life_cycle_state == LifeCycleValue.RUNNING
 
     @pytest.mark.parametrize(
         "predicate, phase",
         [
-            (LifeCyclePredicate.IS_NOT_STARTED, LifeCycleValues.NOT_STARTED),
-            (LifeCyclePredicate.IS_RUNNING, LifeCycleValues.RUNNING),
-            (LifeCyclePredicate.IS_PAUSED, LifeCycleValues.PAUSED),
+            (LifeCyclePredicate.IS_NOT_STARTED, LifeCycleValue.NOT_STARTED),
+            (LifeCyclePredicate.IS_RUNNING, LifeCycleValue.RUNNING),
+            (LifeCyclePredicate.IS_PAUSED, LifeCycleValue.PAUSED),
         ],
     )
     def test_phase_predicate_is_binary_in_every_state(
@@ -3429,22 +3462,22 @@ class TestLifeCyclePredicates:
         Where a node is right now always has an answer, so a phase predicate is never
         unknown.
         """
-        for life_cycle_state in LifeCycleValues:
+        for life_cycle_state in LifeCycleValue:
             expected = (
-                ObservationStateValues.TRUE
+                ObservationStateValue.TRUE
                 if life_cycle_state is phase
-                else ObservationStateValues.FALSE
+                else ObservationStateValue.FALSE
             )
             assert predicate.truth_value(life_cycle_value=life_cycle_state) == expected
 
-    @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValues))
+    @pytest.mark.parametrize("life_cycle_state", list(LifeCycleValue))
     def test_is_terminated_matches_the_terminal_states(
         self, *, life_cycle_state
     ) -> None:
         expected = (
-            ObservationStateValues.TRUE
+            ObservationStateValue.TRUE
             if life_cycle_state.is_terminal
-            else ObservationStateValues.FALSE
+            else ObservationStateValue.FALSE
         )
         assert (
             LifeCyclePredicate.IS_TERMINATED.truth_value(
@@ -3471,11 +3504,11 @@ class TestLifeCyclePredicates:
         second.start_condition = first.is_succeeded
 
         executor.compile(statechart=msc)
-        assert second.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert second.life_cycle_state == LifeCycleValue.NOT_STARTED
 
         executor.tick()
-        assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
-        assert second.life_cycle_state == LifeCycleValues.RUNNING
+        assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
+        assert second.life_cycle_state == LifeCycleValue.RUNNING
 
     def test_a_predicate_follows_the_life_cycle_state_of_its_node(self) -> None:
         executor = StatechartExecutor(context=StatechartContext(world=World()))
@@ -3484,11 +3517,11 @@ class TestLifeCyclePredicates:
         node.fail_condition = trigger.observes_true
 
         executor.compile(statechart=msc)
-        assert node.is_failed.resolve() == ObservationStateValues.FALSE
+        assert node.is_failed.resolve() == ObservationStateValue.FALSE
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.FAILED
-        assert node.is_failed.resolve() == ObservationStateValues.TRUE
+        assert node.life_cycle_state == LifeCycleValue.FAILED
+        assert node.is_failed.resolve() == ObservationStateValue.TRUE
 
     def test_a_node_reset_by_its_own_outcome_is_reset_on_the_next_tick(self) -> None:
         """
@@ -3503,10 +3536,10 @@ class TestLifeCyclePredicates:
         executor = _compile_msc(msc)
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.FAILED
+        assert node.life_cycle_state == LifeCycleValue.FAILED
 
         executor.tick()
-        assert node.life_cycle_state == LifeCycleValues.NOT_STARTED
+        assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
 
     def test_a_predicate_variable_is_created_once_per_node(self) -> None:
         node = ConstTrueNode()
@@ -3543,18 +3576,18 @@ class TestLifeCyclePredicates:
     def test_an_observation_variable_resolves_to_what_its_node_observes(self) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(node=(node := ConstTrueNode()))
-        msc.observation_state[node] = ObservationStateValues.FALSE
+        msc.observation_state[node] = ObservationStateValue.FALSE
 
-        assert node.observation_variable.resolve() == ObservationStateValues.FALSE
+        assert node.observation_variable.resolve() == ObservationStateValue.FALSE
 
     def test_a_last_observation_variable_resolves_to_what_its_node_observed_last(
         self,
     ) -> None:
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(node=(node := ConstTrueNode()))
-        msc.last_observation_state[node] = ObservationStateValues.FALSE
+        msc.last_observation_state[node] = ObservationStateValue.FALSE
 
-        assert node.last_observation.resolve() == ObservationStateValues.FALSE
+        assert node.last_observation.resolve() == ObservationStateValue.FALSE
 
     def test_a_predicate_variable_resolves_to_the_value_of_its_predicate(self) -> None:
         """
@@ -3563,13 +3596,13 @@ class TestLifeCyclePredicates:
         """
         msc = Statechart(context=StatechartContext(world=World()))
         msc.add_node(node=(node := ConstTrueNode()))
-        msc.life_cycle_state[node] = LifeCycleValues.RUNNING
-        msc.observation_state[node] = ObservationStateValues.TRUE
+        msc.life_cycle_state[node] = LifeCycleValue.RUNNING
+        msc.observation_state[node] = ObservationStateValue.TRUE
 
         assert (
             node.is_succeeded.resolve()
             == LifeCyclePredicate.IS_SUCCEEDED.truth_value(
-                life_cycle_value=LifeCycleValues.RUNNING
+                life_cycle_value=LifeCycleValue.RUNNING
             )
         )
 
@@ -3603,7 +3636,7 @@ class TestIsFailedOrInterrupted:
     """
 
     @staticmethod
-    def _answer(*, life_cycle_state: LifeCycleValues) -> ObservationStateValues:
+    def _answer(*, life_cycle_state: LifeCycleValue) -> ObservationStateValue:
         """
         :param life_cycle_state: The state to evaluate the predicate in.
         :return: What the predicate answers.
@@ -3624,14 +3657,14 @@ class TestIsFailedOrInterrupted:
                 ),
             ],
         )
-        return ObservationStateValues(float(substituted))
+        return ObservationStateValue(float(substituted))
 
     @pytest.mark.parametrize(
         "life_cycle_state, expected",
         [
-            (LifeCycleValues.SUCCEEDED, ObservationStateValues.FALSE),
-            (LifeCycleValues.FAILED, ObservationStateValues.TRUE),
-            (LifeCycleValues.INTERRUPTED, ObservationStateValues.TRUE),
+            (LifeCycleValue.SUCCEEDED, ObservationStateValue.FALSE),
+            (LifeCycleValue.FAILED, ObservationStateValue.TRUE),
+            (LifeCycleValue.INTERRUPTED, ObservationStateValue.TRUE),
         ],
     )
     def test_every_way_of_ending_is_answered(
@@ -3645,7 +3678,7 @@ class TestIsFailedOrInterrupted:
 
     @pytest.mark.parametrize(
         "life_cycle_state",
-        sorted(set(LifeCycleValues) - LifeCycleValues.terminal_states()),
+        sorted(set(LifeCycleValue) - LifeCycleValue.terminal_states()),
     )
     def test_a_node_that_has_not_ended_answers_false(self, *, life_cycle_state) -> None:
         """
@@ -3653,7 +3686,7 @@ class TestIsFailedOrInterrupted:
         """
         assert (
             self._answer(life_cycle_state=life_cycle_state)
-            == ObservationStateValues.FALSE
+            == ObservationStateValue.FALSE
         )
 
 
@@ -3671,48 +3704,48 @@ class TestObservationPredicates:
         [
             (
                 ObservationPredicate.OBSERVES_TRUE,
-                ObservationStateValues.TRUE,
-                ObservationStateValues.TRUE,
+                ObservationStateValue.TRUE,
+                ObservationStateValue.TRUE,
             ),
             (
                 ObservationPredicate.OBSERVES_TRUE,
-                ObservationStateValues.UNKNOWN,
-                ObservationStateValues.FALSE,
+                ObservationStateValue.UNKNOWN,
+                ObservationStateValue.FALSE,
             ),
             (
                 ObservationPredicate.OBSERVES_TRUE,
-                ObservationStateValues.FALSE,
-                ObservationStateValues.FALSE,
+                ObservationStateValue.FALSE,
+                ObservationStateValue.FALSE,
             ),
             (
                 ObservationPredicate.OBSERVES_FALSE,
-                ObservationStateValues.TRUE,
-                ObservationStateValues.FALSE,
+                ObservationStateValue.TRUE,
+                ObservationStateValue.FALSE,
             ),
             (
                 ObservationPredicate.OBSERVES_FALSE,
-                ObservationStateValues.UNKNOWN,
-                ObservationStateValues.FALSE,
+                ObservationStateValue.UNKNOWN,
+                ObservationStateValue.FALSE,
             ),
             (
                 ObservationPredicate.OBSERVES_FALSE,
-                ObservationStateValues.FALSE,
-                ObservationStateValues.TRUE,
+                ObservationStateValue.FALSE,
+                ObservationStateValue.TRUE,
             ),
             (
                 ObservationPredicate.LAST_OBSERVED_TRUE,
-                ObservationStateValues.TRUE,
-                ObservationStateValues.TRUE,
+                ObservationStateValue.TRUE,
+                ObservationStateValue.TRUE,
             ),
             (
                 ObservationPredicate.LAST_OBSERVED_TRUE,
-                ObservationStateValues.UNKNOWN,
-                ObservationStateValues.FALSE,
+                ObservationStateValue.UNKNOWN,
+                ObservationStateValue.FALSE,
             ),
             (
                 ObservationPredicate.LAST_OBSERVED_TRUE,
-                ObservationStateValues.FALSE,
-                ObservationStateValues.FALSE,
+                ObservationStateValue.FALSE,
+                ObservationStateValue.FALSE,
             ),
         ],
     )
@@ -3728,7 +3761,7 @@ class TestObservationPredicates:
             old_variables=[variable], new_variables=[float(observation)]
         )
 
-        assert ObservationStateValues(float(answer)) == expected
+        assert ObservationStateValue(float(answer)) == expected
         assert predicate.truth_value(observation=observation) == expected
 
     @pytest.mark.parametrize(
@@ -3756,9 +3789,9 @@ class TestObservationPredicates:
     @pytest.mark.parametrize(
         "watched_type, expected",
         [
-            (ConstFalseNode, LifeCycleValues.RUNNING),
-            (NodeObservingNothingYet, LifeCycleValues.NOT_STARTED),
-            (ConstTrueNode, LifeCycleValues.NOT_STARTED),
+            (ConstFalseNode, LifeCycleValue.RUNNING),
+            (NodeObservingNothingYet, LifeCycleValue.NOT_STARTED),
+            (ConstTrueNode, LifeCycleValue.NOT_STARTED),
         ],
     )
     def test_a_node_waiting_for_another_to_observe_false_ignores_unknown(
@@ -3776,8 +3809,8 @@ class TestObservationPredicates:
     @pytest.mark.parametrize(
         "read_predicate, expected",
         [
-            (lambda node: node.last_observed_true, LifeCycleValues.RUNNING),
-            (lambda node: node.observes_true, LifeCycleValues.NOT_STARTED),
+            (lambda node: node.last_observed_true, LifeCycleValue.RUNNING),
+            (lambda node: node.observes_true, LifeCycleValue.NOT_STARTED),
         ],
         ids=["last_observed_true", "observes_true"],
     )
@@ -3808,7 +3841,7 @@ class TestObservationPredicates:
         for _ in range(3):
             executor.tick()
 
-        assert watched.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert watched.life_cycle_state == LifeCycleValue.SUCCEEDED
         assert late.life_cycle_state == expected
 
     def test_an_observation_may_read_an_observation_predicate(self) -> None:
@@ -3828,7 +3861,7 @@ class TestObservationPredicates:
         for _ in range(2):
             executor.tick()
 
-        assert observer.observation_state == ObservationStateValues.TRUE
+        assert observer.observation_state == ObservationStateValue.TRUE
 
 
 class TestEagerStateVariables:
@@ -3955,7 +3988,7 @@ class TestConditionScoping:
         kin_sim.compile(statechart=msc)
         kin_sim.tick_until_end(timeout=10)
 
-        assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
+        assert parallel.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     def test_parent_cannot_reference_grandchild(self) -> None:
         """
@@ -4034,7 +4067,7 @@ class TestWrittenConditionsSurviveCompiling:
         msc.add_node(
             node=(
                 node := NodeSucceedingOnObservingTrue(
-                    observation=ObservationStateValues.TRUE
+                    observation=ObservationStateValue.TRUE
                 )
             )
         )
@@ -4051,7 +4084,7 @@ class TestWrittenConditionsSurviveCompiling:
         msc.add_node(
             node=(
                 node := NodeFailingOnObservingFalse(
-                    observation=ObservationStateValues.FALSE
+                    observation=ObservationStateValue.FALSE
                 )
             )
         )
@@ -4080,7 +4113,7 @@ class TestWrittenConditionsSurviveCompiling:
                 parallel := Parallel(
                     nodes=[
                         NodeFailingOnObservingFalse(
-                            observation=ObservationStateValues.FALSE
+                            observation=ObservationStateValue.FALSE
                         )
                     ]
                 ),
@@ -4093,4 +4126,4 @@ class TestWrittenConditionsSurviveCompiling:
         executor.tick()
 
         assert str(parallel.fail_condition) == str(sm.Scalar(never_true.observes_true))
-        assert parallel.life_cycle_state == LifeCycleValues.FAILED
+        assert parallel.life_cycle_state == LifeCycleValue.FAILED

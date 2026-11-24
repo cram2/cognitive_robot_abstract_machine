@@ -1,3 +1,7 @@
+"""
+Tests of receiving and reading frames through :class:`KinectCameraInterface`.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -16,7 +20,7 @@ from sensor_msgs.msg import CameraInfo
 
 from robokudo.cas import CAS
 from robokudo.descriptors.camera_configs.config_kinect_robot import KinectCameraConfig
-from robokudo.exceptions import UnknownWorldFrameError
+from robokudo.exceptions import CameraDataMissing, UnknownWorldFrameError
 from robokudo.io.camera_interface import KinectCameraInterface
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 
@@ -85,8 +89,12 @@ def world_without_the_world_frame() -> World:
 
 
 class TestFailedCameraPlacement:
+    """
+    A camera whose pose could not be placed in the world.
+    """
+
     def test_camera_keeps_receiving_after_its_pose_could_not_be_placed(
-        self, camera_interface: KinectCameraInterface
+        self, *, camera_interface: KinectCameraInterface
     ) -> None:
         receive_a_frame(camera_interface)
         with pytest.raises(UnknownWorldFrameError):
@@ -99,6 +107,34 @@ class TestFailedCameraPlacement:
         receiving.join(timeout=timedelta(seconds=5).total_seconds())
 
         assert not receiving.is_alive()
+
+
+# %% frame that cannot be decoded
+
+
+class TestUndecodableFrame:
+    """
+    A frame the camera interface cannot decode is lost, and later frames still arrive.
+    """
+
+    def test_camera_keeps_receiving_after_a_frame_without_depth(
+        self, *, camera_interface: KinectCameraInterface
+    ) -> None:
+        """
+        A frame missing its depth image raises, and the next frame is received.
+        """
+        bridge = CVBridgeWorkaround()
+        with pytest.raises(CameraDataMissing):
+            camera_interface.callback(
+                bridge.cv2_to_imgmsg(np.zeros((4, 4, 3), dtype=np.uint8), "bgr8"),
+                None,
+                CameraInfo(width=4, height=4),
+            )
+        acquisition_time = Time(sec=7)
+
+        receive_a_frame(camera_interface, acquisition_time)
+
+        assert camera_interface.latest_frame.timestamp == acquisition_time
 
 
 # %% camera pose at acquisition time
@@ -158,8 +194,13 @@ def read_frame(camera_interface: KinectCameraInterface) -> CAS:
 
 
 class TestCameraPoseAtAcquisitionTime:
+    """
+    The camera pose a frame is placed at, which is the pose at the time the frame was
+    taken.
+    """
+
     def test_frame_is_placed_where_the_camera_was_when_it_was_taken(
-        self, turning_camera_interface: KinectCameraInterface
+        self, *, turning_camera_interface: KinectCameraInterface
     ) -> None:
         locate_camera(turning_camera_interface, Time(sec=1), x=1.0)
         locate_camera(turning_camera_interface, Time(sec=2), x=2.0)
@@ -172,7 +213,7 @@ class TestCameraPoseAtAcquisitionTime:
         )
 
     def test_frame_waits_for_the_camera_pose_of_its_acquisition_time(
-        self, turning_camera_interface: KinectCameraInterface
+        self, *, turning_camera_interface: KinectCameraInterface
     ) -> None:
         locate_camera(turning_camera_interface, Time(sec=1), x=1.0)
         receive_a_frame(turning_camera_interface, Time(sec=2))
@@ -192,7 +233,7 @@ class TestCameraPoseAtAcquisitionTime:
         )
 
     def test_frame_without_a_camera_pose_is_dropped(
-        self, turning_camera_interface: KinectCameraInterface
+        self, *, turning_camera_interface: KinectCameraInterface
     ) -> None:
         turning_camera_interface.camera_config.camera_pose_timeout = timedelta()
         locate_camera(turning_camera_interface, Time(sec=1), x=1.0)
@@ -201,7 +242,7 @@ class TestCameraPoseAtAcquisitionTime:
         assert not turning_camera_interface.has_new_data()
 
     def test_frame_replacing_a_checked_frame_is_placed_at_its_own_pose(
-        self, turning_camera_interface: KinectCameraInterface
+        self, *, turning_camera_interface: KinectCameraInterface
     ) -> None:
         locate_camera(turning_camera_interface, Time(sec=1), x=1.0)
         locate_camera(turning_camera_interface, Time(sec=2), x=2.0)
@@ -218,7 +259,7 @@ class TestCameraPoseAtAcquisitionTime:
         )
 
     def test_frame_arriving_while_a_frame_is_read_does_not_wait(
-        self, turning_camera_interface: KinectCameraInterface
+        self, *, turning_camera_interface: KinectCameraInterface
     ) -> None:
         with turning_camera_interface.lock:
             receiving = Thread(

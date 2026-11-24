@@ -11,12 +11,11 @@ import copy
 from dataclasses import dataclass
 
 import numpy as np
-import optax
 from array_api_compat import array_namespace, is_numpy_array
 from random_events.product_algebra import Event, SimpleEvent, VariableMap
 from random_events.variable import Symbolic, Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Iterable, Self
+from typing_extensions import TYPE_CHECKING, Any, Iterable, Self
 
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
 from probabilistic_model.distributions.distributions import (
@@ -35,7 +34,6 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.learning.gradient_descent import (
     AverageNegativeLogLikelihood,
-    JaxGradientDescent,
     Loss,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
@@ -47,6 +45,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays i
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     InnerLayer,
     Layer,
@@ -109,6 +108,9 @@ from probabilistic_model.probabilistic_model import (
     PartialPointType,
 )
 from probabilistic_model.utils import logsumexp
+
+if TYPE_CHECKING:
+    import optax
 
 
 @dataclass
@@ -286,7 +288,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         """
         for layer in self.layers:
             if isinstance(layer, DiscreteLayer):
-                layer.table = table_type.of(layer.table)
+                layer.table = table_type.from_table(table=layer.table)
         return self
 
     # %% parameters
@@ -299,7 +301,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         """
         return self.root.circuit_parameters
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
         """
         :param parameters: Arrays in the order and with the shapes of
             :attr:`parameters`, which may be traced by :func:`jax.jit`.
@@ -325,7 +327,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :return: A copy of this circuit whose parameters are arrays of that namespace.
         """
         return self.copy_with_parameters(
-            [
+            parameters=[
                 namespace.asarray(
                     HasParameterArrays.host_copy(parameter),
                     dtype=(
@@ -358,6 +360,9 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             log-likelihood if ``None``.
         :return: This circuit.
         """
+        # jax is optional, see the core boundary in pyproject.toml
+        from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+
         self.root = JaxGradientDescent(
             self.root,
             AverageNegativeLogLikelihood() if loss is None else loss,
@@ -389,15 +394,22 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
 
     # %% queries
 
-    def log_likelihood(self, events: SampleArray) -> SampleValues:
-        return self.root.log_likelihood_of_nodes(self.encoded(events))[:, 0]
+    def log_likelihood(self, *, events: SampleArray) -> SampleValues:
+        return self.root.log_likelihood_of_nodes(events=self.encoded(events))[:, 0]
 
     def cumulative_distribution_function(self, events: SampleArray) -> SampleValues:
-        return self.root.cumulative_distribution_of_nodes(self.encoded(events))[:, 0]
+        """
+        :return: The cumulative distribution function of the circuit at every event.
+        """
+        return self.root.cumulative_distribution_of_nodes(events=self.encoded(events))[
+            :, 0
+        ]
 
     def probability_of_simple_event(self, event: SimpleEvent) -> float:
         return float(
-            self.root.probability_of_simple_event_of_nodes(event, self.variables)[0]
+            self.root.probability_of_simple_event_of_nodes(
+                event=event, variables=self.variables
+            )[0]
         )
 
     @property
@@ -711,10 +723,16 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         """
         first = distributions[0]
         if isinstance(first, SymbolicDistribution):
-            return SymbolicLayer.from_distributions(variable_index, distributions)
+            return SymbolicLayer.from_distributions(
+                variable_index=variable_index, distributions=distributions
+            )
         if isinstance(first, IntegerDistribution):
-            return IntegerLayer.from_distributions(variable_index, distributions)
-        return DiracDeltaLayer.from_distributions(variable_index, distributions)
+            return IntegerLayer.from_distributions(
+                variable_index=variable_index, distributions=distributions
+            )
+        return DiracDeltaLayer.from_distributions(
+            variable_index=variable_index, distributions=distributions
+        )
 
     def restore_variables(self, variables: SortedSet):
         """
@@ -784,6 +802,15 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         self.variables = kept_variables
         return self
 
+    def folded(self) -> Self:
+        """
+        :return: A copy of this circuit whose layers of one type at one height are one
+            layer each, see :class:`LayerFolding`; it answers every query as this one.
+        """
+        self.raise_if_parameters_are_not_on_host()
+        root = LayerFolding(root=copy.deepcopy(self.root)).folded_root()
+        return self.__class__(self.variables, root)
+
     def simplify(self) -> Self:
         """
         Remove the layers that have no effect on the distribution, in place.
@@ -843,17 +870,23 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             )
         )
 
-    def apply_translation(self, translation: dict[Variable, float]):
+    def apply_translation(self, *, translation: dict[Variable, float]) -> None:
+        """
+        Translates the layers by the translation of every variable.
+        """
         values = np.zeros(len(self.variables))
         for variable, value in translation.items():
             values[self.variables.index(variable)] = value
-        self.root.apply_translation(values)
+        self.root.apply_translation(translation=values)
 
-    def apply_scaling(self, scaling: dict[Variable, float]):
+    def apply_scaling(self, *, scaling: dict[Variable, float]) -> None:
+        """
+        Scales the layers by the scaling of every variable.
+        """
         values = np.ones(len(self.variables))
         for variable, value in scaling.items():
             values[self.variables.index(variable)] = value
-        self.root.apply_scaling(values)
+        self.root.apply_scaling(scaling=values)
 
     # %% reading the mixtures
 
@@ -1005,7 +1038,11 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         cache = QueryCache()
         self.root = self.root.marginal(kept, cache=cache)
         return [
-            LayerNode(cache.result_of(ProductLayer.marginal, node.layer), node.node)
+            LayerNode(
+                cache.result_of(ProductLayer.marginal, node.layer),
+                int(np.cumsum(node.layer.nodes_over(kept=kept, cache=cache))[node.node])
+                - 1,
+            )
             for node in nodes
         ]
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters

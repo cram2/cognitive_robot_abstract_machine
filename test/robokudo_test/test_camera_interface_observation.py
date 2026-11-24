@@ -1,3 +1,8 @@
+"""
+Tests of the camera observations the camera interfaces put into the CAS, and of the
+frames they receive.
+"""
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from unittest.mock import Mock
@@ -20,11 +25,13 @@ from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraCon
 from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.exceptions import CameraPoseMissing, InvalidCameraObservation
 from robokudo.io.camera_interface import (
+    CameraFrame,
     CameraInterface,
     KinectCameraInterface,
     ROSCameraInterface,
 )
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
+from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
 from robokudo.io.camera_without_depth_interface import (
     OpenCVCameraWithoutDepthInterface,
 )
@@ -307,7 +314,7 @@ def test_tf_binding_places_robot_camera_where_tf_located_it(
 
     pose = CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
         world=runtime_world,
-        world_frame="map",
+        reference_frame="map",
         camera_frame="/color_optical_frame",
         world_T_camera=numeric_pose,
     )
@@ -340,7 +347,7 @@ def test_tf_binding_keeps_robot_camera_attached_to_the_world_frame(
 
     CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
         world=runtime_world,
-        world_frame="map",
+        reference_frame="map",
         camera_frame="color_optical_frame",
         world_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.4),
     )
@@ -506,12 +513,14 @@ def test_live_reader_rejects_tf_source_for_a_different_optical_frame(
     interface._has_new_data = True
     interface.lookup_viewpoint = True
     interface.tf_from = "another_optical_frame"
-    interface.color = np.zeros(
-        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    interface.latest_frame = CameraFrame(
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        camera_info=camera_info,
+        timestamp=Time(sec=10, nanosec=20),
     )
-    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
-    interface.camera_info = camera_info
-    interface.timestamp = Time(sec=10, nanosec=20)
     interface.lock = Lock()
 
     with pytest.raises(InvalidCameraObservation):
@@ -536,18 +545,20 @@ def test_live_reader_uses_robot_optical_body_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface.color = np.zeros(
-        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    interface.latest_frame = CameraFrame(
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        camera_info=camera_info,
+        timestamp=Time(sec=10, nanosec=20),
     )
-    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
-    interface.camera_info = camera_info
-    interface.timestamp = Time(sec=10, nanosec=20)
     interface._world_T_camera = tf_sample(
-        x=0.4, y=0.2, z=1.3, stamp=interface.timestamp
+        x=0.4, y=0.2, z=1.3, stamp=interface.latest_frame.timestamp
     )
     interface.tf_wrapper = Mock()
     interface.tf_wrapper.lookup_transform.return_value = tf_sample(
-        x=0.0, y=0.0, z=0.0, stamp=interface.timestamp
+        x=0.0, y=0.0, z=0.0, stamp=interface.latest_frame.timestamp
     )
     interface.lock = Lock()
     cas = CAS()
@@ -575,14 +586,16 @@ def test_live_reader_creates_isolated_camera_mount_for_tf_pose(
     interface.lookup_viewpoint = True
     interface.tf_from = "color_optical_frame"
     interface.tf_to = "map"
-    interface.color = np.zeros(
-        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    interface.latest_frame = CameraFrame(
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        camera_info=camera_info,
+        timestamp=Time(sec=10, nanosec=20),
     )
-    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
-    interface.camera_info = camera_info
-    interface.timestamp = Time(sec=10, nanosec=20)
     interface._world_T_camera = tf_sample(
-        x=0.4, y=0.2, z=1.3, stamp=interface.timestamp
+        x=0.4, y=0.2, z=1.3, stamp=interface.latest_frame.timestamp
     )
     interface.lock = Lock()
     cas = CAS()
@@ -611,13 +624,15 @@ def test_rgbd_reader_stores_camera_observation(
     interface.camera_config = SynchronizedImageConfiguration()
     interface._has_new_data = True
     interface.lookup_viewpoint = False
-    interface.color = np.zeros(
-        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    interface.latest_frame = CameraFrame(
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        depth_image=np.zeros((camera_info.height, camera_info.width), dtype=np.uint16),
+        camera_info=camera_info,
+        timestamp=Time(sec=10, nanosec=20),
     )
-    interface.depth = np.zeros((camera_info.height, camera_info.width), dtype=np.uint16)
-    interface.camera_info = camera_info
     interface.color_to_depth_ratio = None
-    interface.timestamp = Time(sec=10, nanosec=20)
     interface.lock = Lock()
     cas = CAS()
 
@@ -647,11 +662,13 @@ def test_rgb_only_reader_stores_camera_observation(
     interface.camera_config = LiveColorCameraConfig()
     interface._has_new_data = True
     interface.lookup_viewpoint = False
-    interface.color = np.zeros(
-        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    interface.latest_frame = CameraFrame(
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        camera_info=camera_info,
+        timestamp=Time(sec=30, nanosec=40),
     )
-    interface.camera_info = camera_info
-    interface.timestamp = Time(sec=30, nanosec=40)
     interface.lock = Lock()
     cas = CAS()
 
@@ -688,11 +705,13 @@ def test_rgb_only_rotation_updates_effective_calibration(
     )
     interface._has_new_data = True
     interface.lookup_viewpoint = False
-    interface.color = np.zeros(
-        (camera_info.height, camera_info.width, 3), dtype=np.uint8
+    interface.latest_frame = CameraFrame(
+        color_image=np.zeros(
+            (camera_info.height, camera_info.width, 3), dtype=np.uint8
+        ),
+        camera_info=camera_info,
+        timestamp=Time(sec=50, nanosec=60),
     )
-    interface.camera_info = camera_info
-    interface.timestamp = Time(sec=50, nanosec=60)
     interface.lock = Lock()
     cas = CAS()
 
@@ -749,11 +768,13 @@ def test_rgbd_high_resolution_crop_updates_effective_resolution(
     interface.camera_config = SynchronizedImageConfiguration(hi_res_mode=True)
     interface._has_new_data = True
     interface.lookup_viewpoint = False
-    interface.color = np.zeros((1024, 1280, 3), dtype=np.uint8)
-    interface.depth = np.zeros((480, 640), dtype=np.uint16)
-    interface.camera_info = camera_info
+    interface.latest_frame = CameraFrame(
+        color_image=np.zeros((1024, 1280, 3), dtype=np.uint8),
+        depth_image=np.zeros((480, 640), dtype=np.uint16),
+        camera_info=camera_info,
+        timestamp=Time(sec=70, nanosec=80),
+    )
     interface.color_to_depth_ratio = None
-    interface.timestamp = Time(sec=70, nanosec=80)
     interface.lock = Lock()
     cas = CAS()
 
@@ -828,7 +849,7 @@ def test_tf_binding_attaches_existing_camera_root_to_new_reference(
 
     pose = CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
         world=runtime_world,
-        world_frame="map",
+        reference_frame="map",
         camera_frame=str(camera_body.name),
         world_T_camera=numeric_pose,
     )
@@ -961,7 +982,7 @@ def warnings_after_comparing_with_tf(
     camera.tf_wrapper.lookup_transform.return_value = latest_tf_sample
     world_T_camera = camera.bind_world_T_camera(
         world=world,
-        world_frame=camera.tf_to,
+        reference_frame=camera.tf_to,
         camera_frame=camera.tf_from,
         world_T_camera=TransformToSemDTConverter.convert(
             data=latest_tf_sample.transform, world=world
@@ -1076,3 +1097,63 @@ def test_camera_pose_requires_a_sampled_transform(
     """A camera pose cannot be bound before its first successful TF lookup."""
     with pytest.raises(CameraPoseMissing):
         transform_camera.world_T_camera_from_tf(world=World(), timestamp=Time())
+
+
+# %% frame that cannot be decoded
+
+
+def test_rgb_only_reader_keeps_receiving_after_an_undecodable_frame() -> None:
+    """
+    A color image the RGB-only reader cannot convert raises, and leaves the reader free
+    to receive the next frame.
+    """
+    interface = object.__new__(ROSCameraWithoutDepthInterface)
+    interface.lock = Lock()
+    undecodable_color_image = CVBridgeWorkaround().cv2_to_imgmsg(
+        np.zeros((4, 4), dtype=np.float32), "32FC1"
+    )
+
+    with pytest.raises(ValueError):
+        interface.callback(undecodable_color_image, CameraInfo(width=4, height=4))
+
+    assert not interface.lock.locked()
+
+
+# %% camera frame
+
+
+class TestCameraFrameFromMessages:
+    """
+    :meth:`CameraFrame.from_messages` decodes the messages of one frame.
+    """
+
+    def test_decodes_color_and_depth_images(self, *, camera_info: CameraInfo) -> None:
+        """
+        The frame holds the images the messages carry, taken when the color image was.
+        """
+        bridge = CVBridgeWorkaround()
+        color = np.arange(48, dtype=np.uint8).reshape((4, 4, 3))
+        depth = np.arange(16, dtype=np.float32).reshape((4, 4))
+        color_data = bridge.cv2_to_imgmsg(color, "bgr8")
+        color_data.header.stamp = Time(sec=3, nanosec=4)
+
+        frame = CameraFrame.from_messages(
+            color_data=color_data,
+            depth_data=bridge.cv2_to_imgmsg(depth, "32FC1"),
+            camera_info=camera_info,
+        )
+
+        np.testing.assert_array_equal(frame.color_image, color)
+        np.testing.assert_array_equal(frame.depth_image, depth)
+        assert frame.camera_info is camera_info
+        assert frame.timestamp == color_data.header.stamp
+
+    def test_frame_without_depth_image_has_no_depth(self) -> None:
+        """
+        A camera without depth delivers a frame without a depth image.
+        """
+        color_data = CVBridgeWorkaround().cv2_to_imgmsg(
+            np.zeros((4, 4, 3), dtype=np.uint8), "bgr8"
+        )
+
+        assert CameraFrame.from_messages(color_data=color_data).depth_image is None

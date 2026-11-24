@@ -1,3 +1,10 @@
+"""
+Analysis engine putting the tabletop objects it segments and classifies with CLIP in
+camera data replayed once from MongoDB into the world.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.clip_annotator import (
     CLIPAnnotator,
@@ -15,9 +22,16 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segments the tabletop objects in camera data replayed once from MongoDB, annotates
+    their color, color histogram, bounding box and CLIP class, and puts them into the
+    world.
+    """
+
     def name(self) -> str:
         return "semdt_demo_from_storage"
 
@@ -44,6 +58,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ClusterPoseBBAnnotator(),
                 CLIPAnnotator(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

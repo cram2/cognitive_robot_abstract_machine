@@ -26,7 +26,7 @@ from semantic_digital_twin.predefined_maps.kitchen_environment import (
 )
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, RobotKinematicChain
 from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -165,9 +165,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
         world.add_kinematic_structure_entity(root)
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root,
-                obstacle_body,
+                world=world,
+                parent=root,
+                child=obstacle_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     -2.0, 0.0, 0.0, reference_frame=root
                 ),
@@ -175,9 +175,9 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
         )
         world.add_connection(
             FixedConnection.create_with_dofs(
-                world,
-                root,
-                wall_body,
+                world=world,
+                parent=root,
+                child=wall_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     2.0, 0.0, 0.0, reference_frame=root
                 ),
@@ -390,11 +390,14 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
 
 
 def test_kinematic_chain_with_root_equal_tip_has_no_connections():
+    """
+    A kinematic chain whose root is its tip has no connections.
+    """
 
     @dataclass(eq=False)
-    class ReviewKinematicChain(KinematicChain):
+    class ReviewKinematicChain(RobotKinematicChain):
         """
-        Minimal concrete KinematicChain for chain tests.
+        Minimal concrete RobotKinematicChain for chain tests.
         """
 
         def setup_hardware_interfaces(self):
@@ -704,23 +707,29 @@ def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
 # %% perceived objects
 
 
-def test_perceived_object_keeps_its_class_label_when_sent_to_another_process():
+def test_unknown_object_keeps_its_class_label_when_sent_to_another_process():
+    """
+    A perceived object keeps its class label through serialization to another process.
+    """
     world = World()
-    body = Body(name=PrefixedName("perceived_object"))
+    body = Body(name=PrefixedName("unknown_object"))
     with world.modify_world():
         world.add_body(body)
-        perceived_object = PerceivedObject(root=body, class_label="fork")
-        world.add_semantic_annotation(perceived_object)
+        unknown_object = UnknownObject(root=body, class_label="fork")
+        world.add_semantic_annotation(unknown_object)
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
 
-    received = from_json(to_json(perceived_object), **tracker.create_kwargs())
+    received = from_json(to_json(unknown_object), **tracker.create_kwargs())
 
-    assert type(received) is PerceivedObject
+    assert type(received) is UnknownObject
     assert received.root is body
-    assert received.class_label == perceived_object.class_label
+    assert received.class_label == unknown_object.class_label
 
 
 def test_human_is_found_among_the_perceivable_objects_with_its_class_label():
+    """
+    A human is a perceivable object and keeps its class label.
+    """
     world = World()
     body = Body(name=PrefixedName("human"))
     with world.modify_world():

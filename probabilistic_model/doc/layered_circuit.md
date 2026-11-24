@@ -142,7 +142,7 @@ print(truncation.probability)
 
 The numeric queries of a layered circuit (log-likelihood, cumulative distribution,
 probability of a simple event and moments) run on any array library that implements the
-Python Array API standard: NumPy, JAX and, with the optional `torch` extra, PyTorch, on
+Python Array API standard: NumPy and, with the optional `jax` and `torch` extras, JAX and PyTorch, on
 the CPU or a GPU. `to_namespace` copies a circuit to another library, device and floating
 point type; the queries then compute in that library and type.
 
@@ -150,7 +150,7 @@ point type; the queries then compute in that library and type.
 import jax.numpy as jnp
 
 jax_model = numpy_model.to_namespace(jnp)
-print(jax_model.log_likelihood(jnp.asarray([[0.5], [1.5]])))
+print(jax_model.log_likelihood(events=jnp.asarray([[0.5], [1.5]])))
 ```
 
 Under `jax.jit` the log-likelihood compiles into a single function. Structural queries
@@ -165,7 +165,8 @@ sum layers of a RAT-SPN, and much slower for sparsely connected ones;
 `store_edges_as` converts every inner layer of a circuit.
 
 A circuit with JAX parameters is trained by gradient descent with `fit`, or with
-`JaxGradientDescent` and a `Loss` from `probabilistic_model.learning.gradient_descent`; a
+`JaxGradientDescent` from `probabilistic_model.learning.jax_gradient_descent` and a `Loss`
+from `probabilistic_model.learning.gradient_descent`; a
 circuit with PyTorch parameters with `TorchGradientDescent` from
 `probabilistic_model.learning.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
 builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with NumPy

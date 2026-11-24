@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood-core"
+dynamic = ["version"]
+description = "The light core of krrood: patterns, class diagrams, the symbol graph and exceptions."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "LGPL-3.0-only"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+]
+authors = [
+    {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"},
+    {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}
+]
+dependencies = [
+    "typing-extensions>=4.12.2",
+    "rustworkx>=0.14.0",
+    "sortedcontainers",
+]
+
+[tool.krrood.core-boundary]
+# Everything krrood-core ships is core: a plain `pip install krrood-core` must be able to
+# load it on every platform. `krrood check` reports a module that loads a module of
+# another distribution, or a distribution outside `dependencies`, at module level.
+core = [
+    "krrood",
+]
+# The distributions core may load, with everything they require.
+dependencies = [
+    "typing-extensions",
+    "rustworkx",
+    "numpy",
+    "ordered-set",
+    "sortedcontainers",
+]
+
+[project.optional-dependencies]
+# The descriptors ontomatic generates are recognized only once it is installed.
+ontomatic = [
+    "krrood-ontomatic",
+]
+
+[project.urls]
+Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood*"]
+
+[tool.setuptools.package-data]
+"*" = ["templates/*.jinja", "visualization/templates/*.jinja"]
+
+[tool.setuptools.dynamic]
+version = {attr = "krrood._version.__version__"}

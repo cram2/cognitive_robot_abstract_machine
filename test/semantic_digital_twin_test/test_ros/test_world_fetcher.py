@@ -1,3 +1,10 @@
+"""
+Tests that a world served through the world fetcher service is fetched as it is, and
+that the service of a process serving a world is found.
+"""
+
+from __future__ import annotations
+
 import json
 import time
 
@@ -331,6 +338,9 @@ def test_fetched_robot_parts_keep_their_joint_states(rclpy_node, pr2_world_state
 
 
 def test_finds_the_service_of_a_process_serving_a_world(rclpy_node):
+    """
+    The service of a process serving a world is found by the suffix of its name.
+    """
     service_suffix = "world_served_to_be_found"
     server = FetchWorldServer(
         node=rclpy_node,
@@ -347,6 +357,9 @@ def test_finds_the_service_of_a_process_serving_a_world(rclpy_node):
 
 
 def test_finds_no_service_when_no_process_serves_a_world(rclpy_node):
+    """
+    Without a process serving a world, no service is found.
+    """
     assert (
         find_world_fetcher_service(
             rclpy_node, service_suffix="world_nobody_serves", timeout_seconds=0

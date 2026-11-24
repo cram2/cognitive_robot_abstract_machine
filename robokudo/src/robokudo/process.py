@@ -2,10 +2,8 @@
 The RoboKudo perception process.
 
 A :class:`RoboKudo` runs one analysis engine on the semantic digital twin perception
-perceives into. That world is the world other processes, such as the one executing robot
-motions, share, if one of them serves it; a shared world receives their changes and
-every change perception makes is published to them. Without one, perception keeps an
-empty world of its own.
+perceives into: the world another process serves, kept in sync with it in both
+directions, or else an empty world of its own.
 """
 
 from __future__ import annotations
@@ -24,8 +22,8 @@ from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.executors import SingleThreadedExecutor
 from semantic_digital_twin.adapters.ros.world_fetcher import (
-    fetch_world_from_service,
     find_world_fetcher_service,
+    join_shared_world,
 )
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher, TfFrameNames
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
@@ -41,16 +39,13 @@ import robokudo.pipeline
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.defs import LOGGING_IDENTIFIER_MAIN_EXECUTABLE, PACKAGE_NAME
 from robokudo.exceptions import (
-    CameraPoseOutsideWorldError,
     EngineRootIsNotAPipelineError,
     RoboKudoAlreadyRunningError,
 )
 from robokudo.garden import grow_tree
 from robokudo.identifier import BBIdentifier
-from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.pipeline import Pipeline
-from robokudo.types.scene import ObjectHypothesis
-from robokudo.utils.tree import setup_with_descendants_rk
+from robokudo.utils.tree import setup_with_descendants_on_behavior
 
 if TYPE_CHECKING:
     from py_trees_ros.trees import BehaviourTree
@@ -99,12 +94,6 @@ class RoboKudo:
     A shared world is published by the process serving it.
     """
 
-    minimum_class_confidence: float = 0.5
-    """
-    How confident a classification has to be for an object to be believed of the class
-    it names; a less confident one is believed a :class:`PerceivedObject`.
-    """
-
     world: World = field(init=False)
     """
     The world perception perceives into: the shared world, or an empty world of its own
@@ -130,8 +119,8 @@ class RoboKudo:
 
     pipeline: Pipeline | None = field(init=False, default=None)
     """
-    The pipeline at the root of the tree of :attr:`analysis_engine`, whose finished
-    passes are put into the world; None until :meth:`start`.
+    The pipeline at the root of the tree of :attr:`analysis_engine`; None until
+    :meth:`start`.
     """
 
     executor: SingleThreadedExecutor = field(init=False)
@@ -147,13 +136,10 @@ class RoboKudo:
     def __post_init__(self) -> None:
         """
         Serve :attr:`node` in the background and join the world a process serves,
-        keeping it in sync in both directions: changes of the other processes are applied
-        to it and changes perception makes are published. Without such a process,
-        perceive into an empty world of its own.
+        keeping it in sync in both directions, or else perceive into an empty world of
+        its own. If joining fails, :attr:`node` is no longer served.
 
         .. note:: No other executor may serve :attr:`node`.
-
-        If joining fails, :attr:`node` is no longer served.
 
         :raises TimeoutError: If the process serving a shared world does not send it
             within :attr:`world_fetch_timeout`.
@@ -175,11 +161,11 @@ class RoboKudo:
                 )
                 self.world = World()
             else:
-                self.world = fetch_world_from_service(
+                self.world = join_shared_world(
                     self.node,
                     timeout_seconds=self.world_fetch_timeout.total_seconds(),
                 )
-                self.synchronizer = WorldSynchronizer(node=self.node, _world=self.world)
+                self.synchronizer = WorldSynchronizer.of_world(self.world)
             closing_on_failure.pop_all()
 
     # %% lifecycle
@@ -218,7 +204,7 @@ class RoboKudo:
             include_gui=include_gui,
             visualizer_types=visualizer_types,
         )
-        setup_with_descendants_rk(self.tree)
+        setup_with_descendants_on_behavior(self.tree.root)
 
     def run(self, *, tick_rate: float = 5.0) -> None:
         """
@@ -230,7 +216,9 @@ class RoboKudo:
         :param tick_rate: How often to tick per second.
         """
         logger = logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE)
-        logger.info(f"Running AE named '{self.analysis_engine.name()}'...")
+        logger.info(
+            f"Running the analysis engine named '{self.analysis_engine.name()}'..."
+        )
         Blackboard().set("CAS", None)
 
         interval = 1.0 / tick_rate
@@ -259,16 +247,12 @@ class RoboKudo:
 
     def tick_tree(self) -> None:
         """
-        Tick the behaviour tree once, and put the objects found by a pass of
-        :attr:`pipeline` that finished successfully in this tick into the world.
+        Tick the behaviour tree once.
 
         Publishing a world of its own starts once it has a world frame, as
         :attr:`publishes_own_world` asks.
         """
         self.tree.tick()
-        if self.pipeline.status != Status.SUCCESS:
-            return
-        self.update_world_with_perception_beliefs(pipeline=self.pipeline)
         if (
             self.publishes_own_world
             and self.synchronizer is None
@@ -294,62 +278,6 @@ class RoboKudo:
                 frame_names=TfFrameNames(prefix=f"{PACKAGE_NAME}/"),
             ),
         )
-
-    def update_world_with_perception_beliefs(self, *, pipeline: Pipeline) -> None:
-        """
-        Form a belief about each object the last pass of ``pipeline`` found and match
-        the beliefs to the perceivable objects of :attr:`world`. A matched object is
-        updated as :meth:`PerceptionBelief.update_known_object` describes; any other
-        belief is added to :attr:`world`. The whole pass is one modification of
-        :attr:`world`: no other thread changes :attr:`world` meanwhile, and the changes
-        are published once it has ended.
-
-        A pass without a camera pose in the world is left out, with a warning logged.
-
-        :param pipeline: A pipeline whose last pass finished successfully.
-        :raises CameraPoseOutsideWorldError: If the camera pose of the pass is measured
-            against a body that is not part of :attr:`world`.
-        """
-        matcher = ObjectMatcher()
-        cas = pipeline.cas
-        observation = cas.camera_observation
-        if (
-            observation is None
-            or observation.world_T_camera is None
-            or observation.world_T_camera.reference_frame is None
-        ):
-            logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE).warning(
-                "Leaving out a pass without a camera pose in the world."
-            )
-            return
-        world_T_camera = observation.world_T_camera
-        with self.world.modify_world():
-            if (
-                world_T_camera.reference_frame
-                not in self.world.kinematic_structure_entities
-            ):
-                raise CameraPoseOutsideWorldError(
-                    reference_frame_name=str(world_T_camera.reference_frame.name)
-                )
-            beliefs = [
-                belief
-                for hypothesis in cas.filter_annotations_by_type(ObjectHypothesis)
-                if (
-                    belief := PerceptionBelief.from_hypothesis(
-                        hypothesis=hypothesis,
-                        world_T_camera=world_T_camera,
-                        minimum_class_confidence=self.minimum_class_confidence,
-                    )
-                )
-                is not None
-            ]
-            matches = matcher.match(beliefs=beliefs, world=self.world)
-            for belief in beliefs:
-                known_object = matches.get(belief)
-                if known_object is None:
-                    belief.add_to_world(world=self.world)
-                    continue
-                belief.update_known_object(known_object=known_object, world=self.world)
 
     def close(self) -> None:
         """

@@ -137,13 +137,9 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
     def set_data(self, *, cas: CAS, world: World) -> None:
         """
-        Update the Common Analysis Structure with latest frame data.
-
-        This method:
-        * Retrieves the next frame from video/camera or backup
-        * Handles looping behavior for videos and images
-        * Applies optional contrast/brightness normalization
-        * Updates the CAS with frame and camera data
+        Put the next frame of the video, camera or images and its camera data into the
+        CAS, looping over videos and images and normalizing contrast and brightness if
+        configured.
 
         :param cas: Common Analysis Structure to update
         :param world: The world perception perceives into; the camera is registered

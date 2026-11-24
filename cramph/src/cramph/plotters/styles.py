@@ -5,7 +5,7 @@ from enum import Enum, StrEnum
 
 
 from semantic_digital_twin.world_description.geometry import Color
-from cramph.data_types import ObservationStateValues, TransitionKind
+from cramph.data_types import ObservationStateValue, TransitionKind
 
 # %% fonts
 
@@ -144,7 +144,7 @@ class ObservationDrawingStyle(Enum):
     Only true and false are colors; a value with no answer yet is plain black and drawn
     thin, so it recedes instead of presenting itself as a third value color.
 
-    ..note:: These are the badge colors of :class:`ObservationStateValues` darkened for
+    ..note:: These are the badge colors of :class:`ObservationStateValue` darkened for
         drawing on the page. A badge color fills a cell behind black text and has to stay
         light, which makes it far too pale for a stroke.
     """
@@ -175,7 +175,7 @@ class ObservationDrawingStyle(Enum):
 
     @classmethod
     def of_observation(
-        cls, *, observation: ObservationStateValues
+        cls, *, observation: ObservationStateValue
     ) -> ObservationDrawingStyle:
         """
         :param observation: The trinary value to draw.

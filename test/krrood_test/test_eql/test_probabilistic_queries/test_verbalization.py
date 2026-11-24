@@ -1,3 +1,7 @@
+"""
+Verbalizing distributions and probabilities.
+"""
+
 from krrood.entity_query_language.factories import (
     a,
     and_,

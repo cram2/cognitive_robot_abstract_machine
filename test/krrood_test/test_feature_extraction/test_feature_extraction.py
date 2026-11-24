@@ -1,7 +1,11 @@
+"""
+Extracting features of entities for learning a probabilistic model.
+"""
+
 import numpy as np
 import pytest
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import DictRegistry
@@ -12,7 +16,6 @@ from probabilistic_model.probabilistic_circuit.relational.relational_probabilist
 from probabilistic_model.probabilistic_circuit.rx.helper import fully_factorized
 from random_events.set import Set
 from random_events.variable import Symbolic
-from ..dataset import ormatic_interface  # type: ignore
 from ..dataset.example_classes import (
     ApproachSceneObject,
     NestedAction,

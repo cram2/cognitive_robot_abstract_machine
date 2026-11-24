@@ -141,7 +141,7 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
             },
         )
 
-    def _remove_merged_descriptor_entities(self, runtime_world: Any) -> None:
+    def _remove_merged_descriptor_entities(self) -> None:
         """
         Remove only the entities added by the previous descriptor merge.
         """
@@ -156,30 +156,28 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         }
 
         try:
-            with runtime_world.modify_world():
-                for annotation in list(runtime_world.semantic_annotations):
+            with self.world.modify_world():
+                for annotation in list(self.world.semantic_annotations):
                     if (
                         annotation.id
                         in self._merged_descriptor_entities.semantic_annotation_ids
                     ):
-                        runtime_world.remove_semantic_annotation(annotation)
+                        self.world.remove_semantic_annotation(annotation)
 
-                for connection in reversed(list(runtime_world.connections)):
+                for connection in reversed(list(self.world.connections)):
                     if id(connection) in connection_object_ids:
-                        runtime_world.remove_connection(connection)
+                        self.world.remove_connection(connection)
 
-                for dof in list(runtime_world.degrees_of_freedom):
+                for dof in list(self.world.degrees_of_freedom):
                     if dof.id in self._merged_descriptor_entities.degree_of_freedom_ids:
-                        runtime_world.remove_degree_of_freedom(dof)
+                        self.world.remove_degree_of_freedom(dof)
 
-                for entity in reversed(
-                    list(runtime_world.kinematic_structure_entities)
-                ):
+                for entity in reversed(list(self.world.kinematic_structure_entities)):
                     if (
                         entity.id
                         in self._merged_descriptor_entities.kinematic_structure_entity_ids
                     ):
-                        runtime_world.remove_kinematic_structure_entity(entity)
+                        self.world.remove_kinematic_structure_entity(entity)
         except Exception as error:
             raise WorldDescriptorBootstrapError(
                 operation="remove previous world descriptor contribution"
@@ -191,8 +189,7 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
         """
         Merge descriptor entities into the current shared world.
         """
-        runtime_world = self.world
-        runtime_world_id = id(runtime_world)
+        runtime_world_id = id(self.world)
         reload_on_update = self.descriptor.parameters.reload_on_update
 
         if self._last_augmented_world_id == runtime_world_id and not reload_on_update:
@@ -201,13 +198,13 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
             self._merged_descriptor_entities.clear()
 
         if reload_on_update:
-            self._remove_merged_descriptor_entities(runtime_world)
+            self._remove_merged_descriptor_entities()
 
         try:
-            before = self._snapshot_world_entities(runtime_world)
-            runtime_world.merge_world(world_descriptor.world)
+            before = self._snapshot_world_entities(self.world)
+            self.world.merge_world(world_descriptor.world)
             self._merged_descriptor_entities = self._entities_added_since(
-                runtime_world, before
+                self.world, before
             )
         except Exception as error:
             raise WorldDescriptorBootstrapError(

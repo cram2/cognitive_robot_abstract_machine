@@ -1,12 +1,16 @@
+"""
+What a client sends Giskard to ask for a motion.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing_extensions import Self, Any
 
 
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood_synchronization.messages import Sender, StreamPosition
 
 from cramph.statechart import Statechart
 
@@ -33,9 +37,28 @@ class MotionGoalPayloadKey(StrEnum):
     The change of the client's world the motion statechart was built on.
     """
 
-    PUBLISHES_DEBUG_EXPRESSIONS = "publishes_debug_expressions"
+    DEBUG_OUTPUT = "debug_output"
     """
-    Whether Giskard publishes the debug markers of the goal.
+    What Giskard produces to debug the goal.
+    """
+
+
+@dataclass(frozen=True, kw_only=True)
+class DebugOutput:
+    """
+    What Giskard produces, besides the motion, to debug one goal.
+    """
+
+    publishes_expression_markers: bool = False
+    """
+    Whether Giskard publishes the spatial debug expressions of the running nodes as RViz
+    markers while it executes the goal.
+    """
+
+    plots_trajectory: bool = False
+    """
+    Whether Giskard records the trajectory of the goal and plots it to a pdf once the
+    robot stopped; the result of the goal arrives only once the plot is drawn.
     """
 
 
@@ -55,7 +78,7 @@ class MotionGoal(SubclassJSONSerializer):
     The motion statechart to execute, as json.
     """
 
-    client: MetaData
+    client: Sender
     """
     Who is waiting for this goal.
 
@@ -74,20 +97,19 @@ class MotionGoal(SubclassJSONSerializer):
     wait for.
     """
 
-    publishes_debug_expressions: bool = False
+    debug_output: DebugOutput = field(default_factory=DebugOutput)
     """
-    Whether Giskard publishes the spatial debug expressions of the running nodes as RViz
-    markers while it executes this goal.
+    What Giskard produces to debug this goal.
     """
 
     @classmethod
-    def for_motion_statechart(
+    def from_motion_statechart(
         cls,
         *,
         motion_statechart: Statechart,
-        client: MetaData,
+        client: Sender,
         required_position: StreamPosition | None = None,
-        publishes_debug_expressions: bool = False,
+        debug_output: DebugOutput = DebugOutput(),
     ) -> MotionGoal:
         """
         Build the goal that asks for the given motion statechart.
@@ -96,10 +118,14 @@ class MotionGoal(SubclassJSONSerializer):
             motion_statechart_json_data=motion_statechart.to_json(),
             client=client,
             required_position=required_position,
-            publishes_debug_expressions=publishes_debug_expressions,
+            debug_output=debug_output,
         )
 
     def to_json(self, **kwargs) -> dict[str, Any]:
+        """
+        Extends :meth:`SubclassJSONSerializer.to_json` by the fields of the goal, under
+        the keys of :class:`MotionGoalPayloadKey`.
+        """
         return {
             **super().to_json(**kwargs),
             MotionGoalPayloadKey.MOTION_STATECHART: self.motion_statechart_json_data,
@@ -109,7 +135,7 @@ class MotionGoal(SubclassJSONSerializer):
                 if self.required_position is None
                 else to_json(self.required_position, **kwargs)
             ),
-            MotionGoalPayloadKey.PUBLISHES_DEBUG_EXPRESSIONS: self.publishes_debug_expressions,
+            MotionGoalPayloadKey.DEBUG_OUTPUT: to_json(self.debug_output),
         }
 
     @classmethod
@@ -117,18 +143,18 @@ class MotionGoal(SubclassJSONSerializer):
         """
         Rebuild a goal from what a client sent.
 
-        A client that sends no :attr:`publishes_debug_expressions` gets its default.
+        A client that sends no :attr:`debug_output` gets the default one.
         """
         required_position = data.get(MotionGoalPayloadKey.REQUIRED_POSITION)
+        debug_output = data.get(MotionGoalPayloadKey.DEBUG_OUTPUT)
         return cls(
             motion_statechart_json_data=data[MotionGoalPayloadKey.MOTION_STATECHART],
             client=from_json(data[MotionGoalPayloadKey.CLIENT]),
             required_position=(
                 None if required_position is None else from_json(required_position)
             ),
-            publishes_debug_expressions=data.get(
-                MotionGoalPayloadKey.PUBLISHES_DEBUG_EXPRESSIONS,
-                cls.publishes_debug_expressions,
+            debug_output=(
+                DebugOutput() if debug_output is None else from_json(debug_output)
             ),
         )
 

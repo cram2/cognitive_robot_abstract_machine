@@ -241,13 +241,9 @@ class RGBDFileReaderInterface(FileReaderInterface):
 
     def set_data(self, *, cas: CAS, world: World) -> None:
         """
-        Set the next RGB-D data frame into the CAS.
-
-        This method:
-        * Reads the next color and depth images
-        * Reads the recorded camera frame, model, and timestamp
-        * Applies the configured static camera transform, if enabled
-        * Updates the CAS with all loaded data
+        Put the next recorded color and depth images, camera frame, camera model and
+        timestamp into the CAS, applying the configured static camera transform if
+        enabled.
 
         :param cas: Common Analysis Structure to update
         :param world: The world perception perceives into

@@ -1,3 +1,7 @@
+"""
+Tests that a pipeline reading from storage reproduces what a writing pipeline stored.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -86,6 +90,10 @@ def _build_reader_pipeline(db_name: str) -> Pipeline:
 
 
 class TestStorageRoundtripPipeline:
+    """
+    A pipeline replaying stored sensor data.
+    """
+
     def test_store_and_replay_sensor_data_roundtrip(
         self, cup_on_counter_directory: Path
     ) -> None:

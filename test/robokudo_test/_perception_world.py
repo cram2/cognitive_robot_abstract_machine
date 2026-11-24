@@ -108,18 +108,18 @@ def camera_pose(x: float = 0.0) -> HomogeneousTransformationMatrix:
 def cas_seen_from(
     world: World,
     world_T_camera: HomogeneousTransformationMatrix,
-    world_frame: str = FrameName.WORLD,
+    reference_frame: str = FrameName.WORLD,
 ) -> CAS:
     """
     A CAS whose camera is placed at ``world_T_camera`` in ``world``.
 
     :param world: The world the camera is placed in.
-    :param world_T_camera: Pose of the camera in ``world_frame``.
-    :param world_frame: The frame the camera pose is measured against.
+    :param world_T_camera: Pose of the camera in ``reference_frame``.
+    :param reference_frame: The frame the camera pose is measured against.
     :return: The CAS.
     """
     cas = CAS()
-    place_camera_of(cas, world, world_T_camera, world_frame=world_frame)
+    place_camera_of(cas, world, world_T_camera, reference_frame=reference_frame)
     return cas
 
 
@@ -163,7 +163,7 @@ def place_camera_of(
     world: World,
     world_T_camera: HomogeneousTransformationMatrix,
     interface: CameraInterface | None = None,
-    world_frame: str = FrameName.WORLD,
+    reference_frame: str = FrameName.WORLD,
     camera_frame: str = FrameName.CAMERA,
 ) -> None:
     """
@@ -172,10 +172,10 @@ def place_camera_of(
 
     :param cas: The CAS whose camera is placed.
     :param world: The world the camera is placed in.
-    :param world_T_camera: Pose of the camera in ``world_frame``.
+    :param world_T_camera: Pose of the camera in ``reference_frame``.
     :param interface: The camera interface placing the camera; a live camera located
         through TF if omitted.
-    :param world_frame: The frame the camera pose is measured against.
+    :param reference_frame: The frame the camera pose is measured against.
     :param camera_frame: The frame the camera's images are given in.
     """
     interface = (
@@ -192,7 +192,7 @@ def place_camera_of(
         modalities=(CameraModality.COLOR, CameraModality.DEPTH),
         world_T_camera=interface.bind_world_T_camera(
             world=world,
-            world_frame=world_frame,
+            reference_frame=reference_frame,
             camera_frame=camera_frame,
             world_T_camera=world_T_camera,
         ),
@@ -230,7 +230,7 @@ def world_with_a_head_camera(robot_name: str | None = None) -> World:
 # %% shared world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SharedWorld:
     """
     The world another process serves and keeps synchronized, such as the world of the
@@ -253,7 +253,7 @@ class SharedWorld:
     """
 
     @classmethod
-    def served_through(cls, node: Node, world: World) -> SharedWorld:
+    def served_through(cls, *, node: Node, world: World) -> SharedWorld:
         """
         :param node: The node of the process serving ``world``.
         :param world: The world to serve.

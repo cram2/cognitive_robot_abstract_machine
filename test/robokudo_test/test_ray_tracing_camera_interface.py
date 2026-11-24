@@ -1,3 +1,8 @@
+"""
+Tests that the ray tracing camera interface renders and publishes RGB-D frames of the
+world.
+"""
+
 from __future__ import annotations
 
 # %% Imports

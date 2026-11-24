@@ -123,7 +123,7 @@ class RayTracingCameraInterface(CameraInterface):
             modalities=camera.modalities,
             world_T_camera=self.bind_world_T_camera(
                 world=world,
-                world_frame=context.world.root.name.name,
+                reference_frame=context.world.root.name.name,
                 camera_frame=camera_frame,
                 world_T_camera=camera.root.global_transform,
             ),

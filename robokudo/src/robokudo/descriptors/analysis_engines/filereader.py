@@ -39,6 +39,7 @@ from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -110,6 +111,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointcloudCropAnnotator(descriptor=pc_crop_config),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

@@ -61,6 +61,10 @@ CRAM consists of the following sub-packages:
    Events <https://cram2.github.io/cognitive_robot_abstract_machine/random_events>`__
    is a Python library to provide a simple and flexible way to generate events that are suitable for probabilistic reasoning.
 
+-  `krrood_spatial_math <https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math>`__
+   is the spatial mathematics robot and image packages share: points,
+   vectors, rotations, poses and motions in Cartesian frames.
+
 .. image:: img/cronut.svg
     :alt: Architecture Diagram
 

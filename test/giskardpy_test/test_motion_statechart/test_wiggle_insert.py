@@ -1,9 +1,16 @@
+"""
+Tests of :class:`~giskardpy.motion_statechart.tasks.cylinder_insertion.WiggleInsert`,
+which wiggles a held object into a hole.
+"""
+
+from __future__ import annotations
+
 import random
 
 import numpy as np
 
 from cramph.executor import SimulationPacer
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.weights import DefaultWeights
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
@@ -26,6 +33,7 @@ from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 from ..motion_control_context import add_to_statechart_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def _hole_at_current_tip(world: World, tip, root) -> Point3:
@@ -36,6 +44,9 @@ def _hole_at_current_tip(world: World, tip, root) -> Point3:
 
 
 def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
+    """
+    Wiggling the PR2's gripper towards a hole right under it reaches the hole.
+    """
     VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
     random.seed(0)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
@@ -50,8 +61,7 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
     )
     statechart = Statechart(context=executor.context)
     wiggle = WiggleInsert(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         hole_point=hole_point,
         hole_normal=Vector3.Z(reference_frame=root),
         noise_translation=0.01,
@@ -65,7 +75,7 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
-    assert wiggle.observation_state == ObservationStateValues.TRUE
+    assert wiggle.observation_state == ObservationStateValue.TRUE
 
 
 def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: World):
@@ -82,8 +92,7 @@ def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: 
     hole_normal_in_tip_frame = Vector3.Z(reference_frame=tip)
 
     wiggle = WiggleInsert(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         hole_point=hole_point,
         hole_normal=hole_normal_in_tip_frame,
     )
@@ -107,6 +116,9 @@ def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: 
 
 
 def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
+    """
+    The noise wiggling the gripper changes from one control cycle to the next.
+    """
     random.seed(1)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
         "r_gripper_tool_frame"
@@ -121,8 +133,7 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
     wiggle = WiggleInsert(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         hole_point=hole_point,
         hole_normal=Vector3.Z(reference_frame=root),
         noise_translation=0.05,
@@ -144,6 +155,10 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
 
 
 def test_wiggle_insert(hsr_world_state_reset):
+    """
+    Wiggling the HSR's hand into a hole while a stronger goal pulls it elsewhere for
+    five seconds still ends at the hole, having wiggled.
+    """
     goal_state = {
         HSRBJoint.ARM_FLEX: -1.5,
         HSRBJoint.ARM_LIFT: 0.5,
@@ -178,17 +193,18 @@ def test_wiggle_insert(hsr_world_state_reset):
                         nodes=[
                             wiggle := WiggleInsert(
                                 name="wiggle",
-                                root_link=root_link,
-                                tip_link=hpl,
+                                kinematic_chain=KinematicChain(root=root_link, tip=hpl),
                                 hole_point=hole_point,
+                                hole_normal=Vector3.Z(reference_frame=root_link),
                                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
                             ),
                             barrier := Parallel(
                                 nodes=[
                                     CountSimulationTimeSeconds(seconds=5),
                                     CartesianPosition(
-                                        root_link=root_link,
-                                        tip_link=hpl,
+                                        kinematic_chain=KinematicChain(
+                                            root=root_link, tip=hpl
+                                        ),
                                         goal_point=Point3(
                                             x=0.5, z=0.4, reference_frame=root_link
                                         ),
@@ -208,5 +224,5 @@ def test_wiggle_insert(hsr_world_state_reset):
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
-    assert motion.last_observation_state == ObservationStateValues.TRUE
+    assert motion.last_observation_state == ObservationStateValue.TRUE
     assert not np.allclose(wiggle._current_vector, np.zeros(3))

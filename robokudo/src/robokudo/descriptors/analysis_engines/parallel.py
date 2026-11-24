@@ -30,6 +30,7 @@ from robokudo.pipeline import Pipeline
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -104,6 +105,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             SlowAnnotator("FastAnnotator", sleep_in_s=1),
             parallel,
             SlowAnnotator("Slow3Annotator", sleep_in_s=2),
+            WorldUpdatingAnnotator(),
         ]:
             seq.add_child(annotator)
 

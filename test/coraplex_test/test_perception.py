@@ -47,7 +47,7 @@ from coraplex.robot_plans.actions.core.misc import DetectAction
 from coraplex.robot_plans.actions.core.pick_up import PickUpAction
 from cramph.composites import TryInOrder
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import NodesMissingContextExtensionsError
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
@@ -68,6 +68,7 @@ from semantic_digital_twin.world import World
 from .conftest import motion_nodes_in_physics_of, motion_nodes_of
 from ..plan_running import robot_executor, statechart_of
 from ..plan_running import run_plan
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 PERCEIVED_MILK_POSITION = (2.6, 2.2, 1.05)
 """
@@ -445,7 +446,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     )
 
     plan = PickUpAction(
-        grasp=milk.grasp_candidates()[0],
+        grasp_candidate=milk.grasp_candidates()[0],
         arm=view.right_arm,
     )
     targets = [
@@ -773,7 +774,7 @@ def run_perception_task(task: PerceptionTask) -> None:
     :param task: The built task to run.
     """
     task.on_start()
-    assert task.on_tick() == ObservationStateValues.TRUE
+    assert task.on_tick() == ObservationStateValue.TRUE
 
 
 def test_perception_task_is_a_plain_statechart_node(
@@ -848,7 +849,7 @@ def test_a_source_that_sees_nothing_leaves_the_task_observing_false(
 
     task.on_start()
 
-    assert task.on_tick() == ObservationStateValues.FALSE
+    assert task.on_tick() == ObservationStateValue.FALSE
     np.testing.assert_allclose(milk_body.global_pose.to_np(), spawned_pose, atol=1e-9)
 
 
@@ -905,7 +906,7 @@ def test_perception_task_answers_its_query_only_once(
     build_perception_task(task, world, rclpy_node)
 
     run_perception_task(task)
-    assert task.on_tick() == ObservationStateValues.TRUE
+    assert task.on_tick() == ObservationStateValue.TRUE
 
     assert robokudo_query_server.received_types == ["milk"]
 
@@ -1052,8 +1053,9 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     query = PerceptionQuery(Milk, whole_scene_region, view, world)
     detection = PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
     reach = CartesianPosition(
-        root_link=world.root,
-        tip_link=view.right_arm.end_effector.tool_frame,
+        kinematic_chain=KinematicChain(
+            root=world.root, tip=view.right_arm.end_effector.tool_frame
+        ),
         goal_point=Point3(reference_frame=milk_body),
         name="MoveTCP",
     )
@@ -1095,8 +1097,8 @@ def test_a_detection_that_sees_nothing_lets_the_next_alternative_run(
 
     run_plan(plan, extensions)
 
-    assert not_seen.life_cycle_state == LifeCycleValues.FAILED
-    assert seen.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert not_seen.life_cycle_state == LifeCycleValue.FAILED
+    assert seen.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_detection_looks_only_inside_the_box_it_is_given(
@@ -1116,7 +1118,7 @@ def test_a_detection_looks_only_inside_the_box_it_is_given(
     with pytest.raises(MotionDidNotFinish):
         run_plan(detection, extensions)
 
-    assert detection.life_cycle_state == LifeCycleValues.FAILED
+    assert detection.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_a_detection_without_a_box_looks_as_far_to_every_side_of_the_robot(

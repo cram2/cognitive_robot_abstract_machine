@@ -1,0 +1,91 @@
+name: krrood distributions install alone
+
+# Each krrood-* distribution is installed on its own, with only what it declares, and
+# every one of its modules is imported, on Linux and on Windows.
+on:
+  pull_request:
+    paths:
+      - 'krrood/**'
+      - 'scripts/import_distribution_modules.py'
+      - '.github/workflows/krrood-distributions.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'krrood/**'
+  workflow_dispatch:
+
+jobs:
+  install-alone:
+    name: ${{ matrix.distribution }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        distribution:
+          - krrood-core
+          - krrood-serialization
+          - krrood-code-generation
+          - krrood-symbolic-math
+          - krrood-rustworkx-utils
+          - krrood-eql
+          - krrood-planning
+          - krrood-ormatic
+          - krrood-probabilistic
+          - krrood-rdr
+          - krrood-ontomatic
+          - krrood-development-tools
+        # krrood.parametrization imports probabilistic_model's relational circuits, which
+        # import jpt, and probabilistic_model installs pyjpt only on Linux.
+        exclude:
+          - os: windows-latest
+            distribution: krrood-probabilistic
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Some test files' paths are longer than Windows allows by default.
+      - name: Allow long paths on Windows
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # PyPI may already hold this release's version of a workspace package, built from
+      # older source, so every workspace name is constrained to the wheel built here.
+      - name: Build the workspace's wheels
+        run: |
+          pip install build
+          for directory in krrood/krrood-*/ random_events probabilistic_model domain_models/*/; do
+            python -m build --wheel "$directory" --outdir wheels/
+          done
+          python - > constraints.txt <<'EOF'
+          import pathlib
+          for wheel in sorted(pathlib.Path("wheels").glob("*.whl")):
+              print(f"{wheel.name.split('-')[0]} @ {wheel.resolve().as_uri()}")
+          EOF
+          cat constraints.txt
+
+      - name: Install ${{ matrix.distribution }} alone
+        run: |
+          python -m venv alone
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            interpreter=alone/Scripts/python
+          else
+            interpreter=alone/bin/python
+          fi
+          echo "INTERPRETER=$interpreter" >> "$GITHUB_ENV"
+          "$interpreter" -m pip install --constraint constraints.txt "${{ matrix.distribution }}"
+
+      - name: Import every module of ${{ matrix.distribution }}
+        run: |
+          "$INTERPRETER" scripts/import_distribution_modules.py "krrood/${{ matrix.distribution }}/src"

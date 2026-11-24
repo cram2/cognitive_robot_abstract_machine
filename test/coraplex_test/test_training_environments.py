@@ -1,13 +1,23 @@
+"""
+Tests of the training environments that generate and persist plan episodes.
+"""
+
+from __future__ import annotations
+
 from sqlalchemy import select
 
 from krrood.ormatic.data_access_objects.helper import to_dao
-from coraplex.orm.ormatic_interface import *  # type: ignore
 from coraplex.training_environments.training_environment import (
     MoveToReachTrainingEnvironment,
 )
 
 
 def test_move_to_reach(coraplex_testing_session):
+    """
+    Every action the environment tried while generating episodes is stored as a reach.
+    """
+    from coraplex.orm.ormatic_interface import MoveToReachDAO
+
     training_environment = MoveToReachTrainingEnvironment(visualize=False)
 
     training_environment.generate_episodes(2)

@@ -4,8 +4,14 @@ Tests of the object hypothesis of :mod:`robokudo.types.scene`.
 
 from __future__ import annotations
 
+from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Cup,
+    Human,
+    UnknownObject,
+)
+
 from robokudo.types.annotation import Classification, PoseAnnotation
-from robokudo.types.scene import ObjectHypothesis
+from robokudo.types.scene import HumanHypothesis, ObjectHypothesis
 
 # %% latest annotation of a type
 
@@ -43,6 +49,10 @@ class TestLatestAnnotationOfType:
 
 
 class TestClassLabel:
+    """
+    The class label of an object hypothesis.
+    """
+
     def test_is_the_class_name_of_the_latest_classification(self) -> None:
         latest = Classification(classname="cup")
         hypothesis = ObjectHypothesis(
@@ -58,3 +68,71 @@ class TestClassLabel:
         hypothesis = ObjectHypothesis(annotations=[Classification()])
 
         assert hypothesis.class_label is None
+
+
+# %% semantic class
+
+
+class TestDetermineSemanticClass:
+    """
+    The semantic annotation a hypothesis is believed to be, given how confident a
+    classification has to be.
+    """
+
+    def test_is_the_semantic_annotation_a_confident_class_label_names(self) -> None:
+        minimum_class_confidence = 0.5
+        hypothesis = ObjectHypothesis(
+            annotations=[
+                Classification(classname="cup", confidence=minimum_class_confidence)
+            ]
+        )
+
+        assert (
+            hypothesis.determine_semantic_class(
+                minimum_class_confidence=minimum_class_confidence
+            )
+            is Cup
+        )
+
+    def test_is_an_unknown_object_below_the_minimum_confidence(self) -> None:
+        hypothesis = ObjectHypothesis(
+            annotations=[Classification(classname="cup", confidence=0.4)]
+        )
+
+        assert (
+            hypothesis.determine_semantic_class(minimum_class_confidence=0.5)
+            is UnknownObject
+        )
+
+    def test_is_an_unknown_object_for_a_label_naming_no_semantic_annotation(
+        self,
+    ) -> None:
+        hypothesis = ObjectHypothesis(
+            annotations=[Classification(classname="fork", confidence=1.0)]
+        )
+
+        assert (
+            hypothesis.determine_semantic_class(minimum_class_confidence=0.5)
+            is UnknownObject
+        )
+
+    def test_is_an_unknown_object_without_a_classification(self) -> None:
+        assert (
+            ObjectHypothesis().determine_semantic_class(minimum_class_confidence=0.5)
+            is UnknownObject
+        )
+
+    def test_is_human_for_an_unclassified_human(self) -> None:
+        assert (
+            HumanHypothesis().determine_semantic_class(minimum_class_confidence=0.5)
+            is Human
+        )
+
+    def test_is_human_for_a_human_whatever_its_class_label(self) -> None:
+        hypothesis = HumanHypothesis(
+            annotations=[Classification(classname="cup", confidence=1.0)]
+        )
+
+        assert (
+            hypothesis.determine_semantic_class(minimum_class_confidence=0.5) is Human
+        )

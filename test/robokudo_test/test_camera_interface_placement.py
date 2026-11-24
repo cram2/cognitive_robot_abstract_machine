@@ -35,15 +35,15 @@ def bound_pose(
     world: World,
     world_T_camera: HomogeneousTransformationMatrix,
     located_through_tf: bool = False,
-    world_frame: str = FrameName.WORLD,
+    reference_frame: str = FrameName.WORLD,
 ) -> HomogeneousTransformationMatrix:
     """
-    :return: ``world_T_camera``, measured against ``world_frame`` for the test camera,
+    :return: ``world_T_camera``, measured against ``reference_frame`` for the test camera,
         bound to the bodies of ``world``.
     """
     return camera_interface(located_through_tf=located_through_tf).bind_world_T_camera(
         world=world,
-        world_frame=world_frame,
+        reference_frame=reference_frame,
         camera_frame=FrameName.CAMERA,
         world_T_camera=world_T_camera,
     )
@@ -167,7 +167,7 @@ class TestCameraOfTheWorld:
                 world,
                 camera_pose(),
                 located_through_tf=True,
-                world_frame="frame_unknown_to_the_world",
+                reference_frame="frame_unknown_to_the_world",
             )
 
 

@@ -1,3 +1,7 @@
+"""
+Tests that a complete analysis engine runs on recorded RGB-D frames.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -27,6 +31,7 @@ from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.annotators.shape_estimator import ShapeEstimatorAnnotator
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 from robokudo.descriptors.camera_configs.config_ray_tracing import (
     RayTracingCameraConfiguration,
     WorldDescriptorSource,
@@ -42,6 +47,10 @@ from ._perception_process import EngineRunningABehaviour, robokudo_of_its_own
 
 
 class TestFullAEExecution(object):
+    """
+    A complete analysis engine run on recorded RGB-D frames.
+    """
+
     def test_run_simple_ae_successfully(
         self, node, cup_on_counter_directory: Path
     ) -> None:
@@ -114,6 +123,7 @@ class TestFullAEExecution(object):
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 ClusterPoseBBAnnotator(),
+                WorldUpdatingAnnotator(),
             ]
         )
 
@@ -125,6 +135,10 @@ class TestFullAEExecution(object):
         body_ids_after_each_successful_cas = []
 
         def assert_current_cas_keeps_a_single_object(cas):
+            """
+            Assert that ``cas`` holds a single object hypothesis, which the pass put
+            into the world.
+            """
             object_hypotheses = cas.filter_annotations_by_type(
                 robokudo.types.scene.ObjectHypothesis
             )
@@ -132,7 +146,6 @@ class TestFullAEExecution(object):
                 "Each successful CAS should already contain the object hypothesis to be synchronized."
             )
 
-            perceiving_robokudo.update_world_with_perception_beliefs(pipeline=seq)
             [perceivable_object] = seq.world.get_semantic_annotations_by_type(
                 IsPerceivable
             )

@@ -28,6 +28,7 @@ from robokudo.cas import CASViews
 from robokudo.identifier import BBIdentifier
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class PrintNumbers(BaseAnnotator):
@@ -94,6 +95,11 @@ class CheckQueryType(BaseAnnotator):
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Answers a query of type ``numbers`` by counting, reporting each number as feedback,
+    unless the query is preempted.
+    """
+
     def name(self) -> str:
         return "test_pipeline"
 
@@ -125,6 +131,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),  # Initialize the pipeline
                 QueryAnnotator(),  # Handle incoming queries
                 conditional_selector,  # Preemption-aware task execution
+                WorldUpdatingAnnotator(),
             ]
         )
 

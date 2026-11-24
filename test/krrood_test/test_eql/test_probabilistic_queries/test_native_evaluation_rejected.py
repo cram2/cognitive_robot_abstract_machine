@@ -1,8 +1,15 @@
+"""
+Distributions cannot be evaluated without a probabilistic backend.
+"""
+
 import pytest
 
 from krrood.entity_query_language.backends import EntityQueryLanguageBackend
-from krrood.entity_query_language.exceptions import BackendCannotEvaluateProbabilisticQuery
-from krrood.entity_query_language.factories import a, distribution_of
+from krrood.entity_query_language.exceptions import (
+    BackendCannotEvaluateProbabilisticQuery,
+)
+from krrood.entity_query_language.factories import a
+from krrood.entity_query_language.factories import distribution_of
 
 from ._fixtures import Coin
 

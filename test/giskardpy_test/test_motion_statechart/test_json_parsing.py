@@ -1,10 +1,14 @@
+"""
+Tests that motion statecharts survive a round trip through JSON.
+"""
+
 import json
 
 import numpy as np
 
 from cramph.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from cramph.composites import Sequence
 from giskardpy.motion_statechart.graph_node import (
@@ -48,6 +52,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% motion nodes in JSON
 
@@ -83,10 +88,12 @@ def test_to_json_joint_position_list(mini_world):
 
 
 def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
+    """
+    A node keeps its default weight through a JSON round trip.
+    """
     root, tip = mini_world.bodies
     node = CartesianPositionStraight(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=Point3(1, 0, 0, reference_frame=root),
     )
     new_json_data = json.loads(json.dumps(to_json(node)))
@@ -96,6 +103,10 @@ def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
 
 
 def test_executing_json_parsed_statechart(tmp_path):
+    """
+    A motion statechart read back from JSON starts with no node started and runs to its
+    end.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -147,20 +158,23 @@ def test_executing_json_parsed_statechart(tmp_path):
 
     task1_copy = statechart_copy.get_node_by_index(index=task1.index)
     end_copy = statechart_copy.get_node_by_index(index=end.index)
-    assert task1_copy.observation_state == ObservationStateValues.UNKNOWN
-    assert end_copy.observation_state == ObservationStateValues.UNKNOWN
-    assert task1_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end_copy.life_cycle_state == LifeCycleValues.NOT_STARTED
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+    assert task1_copy.observation_state == ObservationStateValue.UNKNOWN
+    assert end_copy.observation_state == ObservationStateValue.UNKNOWN
+    assert task1_copy.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert end_copy.life_cycle_state == LifeCycleValue.NOT_STARTED
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     executor.tick_until_end()
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
-    assert task1_copy.observation_state == ObservationStateValues.TRUE
-    assert end_copy.observation_state == ObservationStateValues.TRUE
-    assert task1_copy.life_cycle_state == LifeCycleValues.RUNNING
-    assert end_copy.life_cycle_state == LifeCycleValues.RUNNING
+    statechart.draw(file_name=tmp_path / "muh.pdf")
+    assert task1_copy.observation_state == ObservationStateValue.TRUE
+    assert end_copy.observation_state == ObservationStateValue.TRUE
+    assert task1_copy.life_cycle_state == LifeCycleValue.RUNNING
+    assert end_copy.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_cart_goal_simple(pr2_world_state_reset: World):
+    """
+    A pose goal read back from JSON still brings the PR2's base to the goal pose.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -169,8 +183,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
 
     statechart = Statechart(context=_create_executor(pr2_world_state_reset).context)
     cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_pose=tip_goal,
     )
     statechart.add_node(node=cart_goal)
@@ -193,7 +206,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     executor.tick_until_end()
 
     fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-    assert np.allclose(fk, tip_goal, atol=cart_goal.translation_threshold)
+    assert np.allclose(fk, tip_goal, atol=cart_goal.position_threshold)
 
 
 def test_structure_copy_of_a_plain_statechart_keeps_the_motion_node_kinds(
@@ -284,7 +297,7 @@ def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round
     assert [step.name for step in goal_copy.sequence.nodes] == [
         step.name for step in goal.sequence.nodes
     ]
-    assert goal_copy.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert goal_copy.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_round_trip(
@@ -335,7 +348,7 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
     executor.compile(statechart=statechart_copy)
     executor.tick_until_end(timeout=2000)
 
-    assert second_leg_copy.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert second_leg_copy.life_cycle_state == LifeCycleValue.SUCCEEDED
     np.testing.assert_allclose(
         cylinder_bot_diff_world.compute_forward_kinematics_np(
             cylinder_bot_diff_world.root, bot

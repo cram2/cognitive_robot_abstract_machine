@@ -1,3 +1,8 @@
+"""
+The components a camera configuration combines: depth and color settings, the source of
+the camera pose and the world descriptor of a camera.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -88,14 +93,17 @@ class TfComponent:
 
     tolerated_camera_pose_distance: float = 0.05
     """
-    How far, in meters, the world may place a camera another process attached away from
-    where TF places it before a warning is logged.
+    How far, in meters, a shared world may place a camera that belongs to a robot model
+    another process serves, such as a robot's head camera, away from where TF places it
+    before a warning is logged. Perceived objects are placed with the TF pose, so beyond
+    this they may be misplaced relative to the robot in the world.
     """
 
     tolerated_camera_pose_angle: float = math.radians(5.0)
     """
-    How far, in radians, the world may turn a camera another process attached away from
-    how TF turns it before a warning is logged.
+    How far, in radians, a shared world may turn a camera that belongs to a robot model
+    another process serves away from how TF turns it before a warning is logged, as for
+    :attr:`tolerated_camera_pose_distance`.
     """
 
 

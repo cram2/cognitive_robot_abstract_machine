@@ -1,13 +1,21 @@
-from krrood.ormatic.data_access_objects.base import HasGeneric
-from krrood.ormatic.exceptions import NoGenericError
+"""
+Reading the generic argument a class binds.
+"""
+
+from krrood.patterns.exceptions import NoGenericError
+from krrood.patterns.has_generic import HasGeneric
 from ..dataset.example_classes import KRROODPosition
-from ..dataset.ormatic_interface import KRROODPositionDAO
 
 
 class NoGeneric(HasGeneric): ...
 
 
 def test_has_generic():
+    """
+    The data access object of a generic class knows the class it maps.
+    """
+    from ..dataset.ormatic_interface import KRROODPositionDAO
+
     og = KRROODPositionDAO.original_class()
     assert og is KRROODPosition
 
