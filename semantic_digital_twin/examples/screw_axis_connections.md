@@ -28,9 +28,11 @@ If the child rotates, the rotation per unit of position of the screw axis is a u
 position of a revolute connection is an angle in radians. If the child only translates, the translation
 per unit of position is a unit vector, so the position of a prismatic connection is a distance in meters.
 
-The axis passes through the origin of the *connection frame*. `parent_T_connection_expression` places
-the connection frame relative to the parent, and `connection_T_child_expression` places the child
-relative to the connection frame, so a child set off from the axis swings around it.
+The screw axis is given in the *connection frame*. `parent_T_connection_expression` places the
+connection frame relative to the parent, and `connection_T_child_expression` places the child relative
+to the connection frame, so a child set off from the axis swings around it. Joints read from robot and
+scene descriptions put the axis through the connection frame's origin, as the examples below do; the
+axis may also lie elsewhere, as {ref}`Where the axis lies <where-the-axis-lies>` explains.
 
 ## Revolute and prismatic connections
 
@@ -539,26 +541,32 @@ expression of the degrees of freedom. Stelter shows a revolute joint as a rotati
 a prismatic joint as a translation along a fixed axis, in
 [figures 4.2 and 4.3 of his thesis](https://doi.org/10.26092/elib/3743). These are the standard
 matrices of a [rotation about a coordinate axis](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=92) and of a pure translation. A screw axis
-connection describes all of its motions with one such matrix. For a position $\theta$, the connection frame moves to
+connection describes all of its motions with one such matrix. For a position $\theta$, the connection frame moves
+to the exponential of the screw axis {cite:p}`lynch2017modern`
+([Proposition 3.25](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=123)):
 
 $$
 T(\theta) =
 \begin{bmatrix}
-R(\hat{s}, |\omega|\,\theta) & v\theta \\
+R(\omega, \theta) & \theta v + (1 - \cos\theta)\,\omega \times v + (\theta - \sin\theta)\,\omega \times (\omega \times v) \\
 0 & 1
 \end{bmatrix},
+\qquad
+R(\omega, \theta) = I + \sin\theta\,[\omega]_\times + (1 - \cos\theta)[\omega]_\times^2,
 $$
 
-where $|\omega|$ is the length of $\omega$, and
-$R(\hat{s}, \varphi) = I + \sin\varphi\,[\hat{s}]_\times + (1 - \cos\varphi)[\hat{s}]_\times^2$ rotates by the angle
-$\varphi$ about the direction $\hat{s}$ of the axis, with $I$ the identity and $[\hat{s}]_\times$ the matrix that
-takes the cross product with $\hat{s}$, by
-[Rodrigues' rotation formula](https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula). The pose of
-the child relative to the parent is
+where $R(\omega, \theta)$ rotates by the angle $\theta$ about the unit vector $\omega$, with $I$ the
+identity and $[\omega]_\times$ the matrix that takes the cross product with $\omega$, by
+[Rodrigues' rotation formula](https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula). A screw axis
+that does not turn the child has $\omega = 0$: there is no rotation and the translation is $\theta v$.
+Both cases are one expression without any division, so the connection builds the same symbolic
+expression for each of them. The pose of the child relative to the parent is
 `parent_T_connection_expression` $\cdot\, T(\theta) \,\cdot$ `connection_T_child_expression`.
 
-The rotation turns about the axis direction $\hat{s}$, and the translation $v\theta$ points along it.
-For an axis along $z$, with $\hat{z}$ the unit vector along it, the three kinds of connection give:
+For an axis through the origin of the connection frame, $v = h\omega$ is parallel to $\omega$, with
+$h$ the advance per radian. Then $\omega \times v = 0$, both correction terms vanish, and the
+translation is $h\theta\,\omega$, along the axis. For an axis along $z$, with $\hat{z}$ the unit vector
+along it, the three kinds of connection give:
 
 $$
 \underbrace{\begin{bmatrix}
@@ -589,42 +597,77 @@ translation grows with the angle by the pitch $h = p / 2\pi$ per radian. For an 
 direction $\hat{s}$, a helical connection rotates about $\hat{s}$ and translates by $h\theta$ along
 $\hat{s}$, not along $z$.
 
-$T(\theta)$ is the displacement of the screw axis described above, for a screw axis through the origin of
-the connection frame. There $v$ is parallel to $\omega$, so $t = \theta\,v$ is parallel to
-$r = \theta\,\omega$, both correction terms vanish with $r \times t = 0$, and the translation is
-$v\theta$.
-
+(where-the-axis-lies)=
 ## Where the axis lies
 
-In general, a screw axis may lie anywhere in the frame it is expressed in. Its translation $v$ is
-that of the point of the child at the frame's origin, which circles an axis that misses the origin, as
+A screw axis may lie anywhere in the frame it is expressed in. Its translation $v$ is that of the point
+of the child at the frame's origin, which circles an axis that misses the origin, as
 [Displacements, twists and screw axes](https://cram2.github.io/cognitive_robot_abstract_machine/krrood_spatial_math/rates_of_motion.html#displacements-twists-and-screw-axes)
 explains. The translation therefore carries the position of the axis,
-$v = -\omega \times q + h\omega$ for a point $q$ on the axis. The
-[product of exponentials formula](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=159) uses
-this: it expresses the screw axes of all joints of a robot in one base frame, each at its own place.
+$v = -\omega \times q + h\omega$ for a point $q$ on the axis and the advance $h$ per radian.
+`ScrewAxis.axis_point_closest_to_origin` gives $q$ and `ScrewAxis.translation_per_radian` gives $h$.
+The [product of exponentials formula](https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=159)
+uses this: it expresses the screw axes of all joints of a robot in one base frame, each at its own place.
 
-A `ScrewAxisConnection` instead requires its axis to pass through the origin of its connection frame, so
-that $q = 0$ and $v = h\omega$ is parallel to $\omega$. The connection frame, placed by
-`parent_T_connection_expression`, carries the position of the axis. This has three consequences:
+A connection's motion can therefore be split between its connection frame and its screw axis in many
+ways. A [URDF joint](https://wiki.ros.org/urdf/XML/joint), and the joints of MJCF, SDF and USD, consist
+of an origin and an axis direction through it, and the parsers turn them into a connection frame at that
+origin and a screw axis through it, with $q = 0$. A connection whose axis misses its frame's origin
+moves its child just as well. `move_connection_frame_onto_axis` brings it into the parsed form: it
+replaces the connection by one whose connection frame is moved by `connection_T_frame_on_axis`, onto
+the axis's point closest to the old origin, whose child is placed relative to the moved frame, and whose
+screw axis keeps its direction and pitch through the new origin. The child moves exactly as before, and
+the name and the degree of freedom stay.
 
-- **The screw axis says how the child moves, the connection frame where.** The screw axis holds only the
-  direction of the axis in the connection frame and the pitch. Where the axis lies is held by the
-  connection frame alone.
-- **Joints from robot and scene descriptions map directly.** A
-  [URDF joint](https://wiki.ros.org/urdf/XML/joint), and the joints of MJCF, SDF and USD, consist of an
-  origin and an axis direction through it, which become the connection frame and the screw axis.
-- **The translation simplifies.** As $v$ is parallel to $\omega$, the correction terms of the
-  displacement vanish, and the translation is $v\theta$, as in the transformation matrix above.
+Below, a door hangs from a connection whose frame lies at the door's handle side, 0.8 meters from the
+hinge:
 
-A connection given a screw axis that misses the origin of its connection frame raises a
-`ScrewAxisOffConnectionOriginError`. A screw axis $(\omega, v)$ in the general form, with
-$|\omega| = 1$, is converted by moving the connection frame to the point $q = \omega \times v$
-on the axis, placing the child relative to the moved frame, and keeping the screw axis
-$(\omega, (\omega \cdot v)\,\omega)$ there.
+```{code-cell} ipython3
+from krrood_spatial_math.spatial_types import ScrewAxis
+
+hinge_world = World()
+wall = Body(name=PrefixedName("wall"))
+hinged_door = Body(name=PrefixedName("hinged_door"))
+hinge_point = np.array([-0.8, 0.0, 0.0])
+with hinge_world.modify_world():
+    hinge_world.add_body(wall)
+    hinge_world.add_body(hinged_door)
+    hinge = ScrewAxisConnection.create_with_dofs(
+        world=hinge_world,
+        parent=wall,
+        child=hinged_door,
+        screw_axis=ScrewAxis(
+            rotation_per_unit_position=Vector3.Z(),
+            translation_per_unit_position=Vector3.from_iterable(
+                -np.cross([0.0, 0.0, 1.0], hinge_point)
+            ),
+        ),
+    )
+    hinge_world.add_connection(hinge)
+
+hinge.position = np.pi / 2
+before = hinge_world.compute_forward_kinematics_np(root=wall, tip=hinged_door)
+print("axis point in the connection frame:", hinge.screw_axis.axis_point_closest_to_origin[:3].to_list())
+
+hinge = hinge.move_connection_frame_onto_axis()
+hinge.position = np.pi / 2
+after = hinge_world.compute_forward_kinematics_np(root=wall, tip=hinged_door)
+print("connection frame relative to the wall:", hinge.parent_T_connection_expression.to_np()[:3, 3].tolist())
+print("the door at a quarter turn, before and after, agrees:", np.allclose(before, after))
+```
+
+Exporters to formats whose joints sit on their axis read the axis's place from
+`connection_T_frame_on_axis` without changing the world: the MuJoCo export puts a hinge's position on
+the axis, in the child's frame.
 
 ```{code-cell} ipython3
 :tags: [remove-cell]
+
+assert np.allclose(before, after)
+assert np.allclose(hinge.parent_T_connection_expression.to_np()[:3, 3], hinge_point)
+assert np.allclose(hinge.connection_T_frame_on_axis.to_np(), np.eye(4))
+assert hinge.behaves_like_a_revolute_connection
+
 
 def distance_from_axis(point: np.ndarray) -> float:
     offset = point - axis_origin

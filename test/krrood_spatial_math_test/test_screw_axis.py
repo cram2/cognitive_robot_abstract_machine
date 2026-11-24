@@ -140,7 +140,7 @@ def test_the_direction_of_a_zero_screw_axis_is_the_zero_vector():
     np.testing.assert_allclose(ScrewAxis().unit_direction.to_np()[:3], [0.0, 0.0, 0.0])
 
 
-# %% normalization and the position of the axis
+# %% normalization
 
 
 @pytest.mark.parametrize(
@@ -193,35 +193,10 @@ def test_a_screw_axis_without_a_unit_rotation_or_only_a_unit_translation_is_not_
     assert not screw_axis.is_normalized
 
 
-@pytest.mark.parametrize(
-    "rotation, translation, passes_through_origin",
-    [
-        ((0.0, 0.0, 1.0), (0.0, 0.0, 0.5), True),
-        ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), True),
-        ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), False),
-    ],
-    ids=["helical through the origin", "prismatic", "revolute off the origin"],
-)
-def test_a_screw_axis_passes_through_the_origin_if_its_translation_is_parallel_to_its_rotation(
-    rotation, translation, passes_through_origin
-):
+def test_checking_whether_a_symbolic_screw_axis_is_normalized_raises():
     """
-    A translation across the rotation is that of the origin circling an axis elsewhere;
-    a screw axis that does not turn has no line to miss the origin.
-    """
-    screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(*rotation),
-        translation_per_unit_position=Vector3(*translation),
-    )
-
-    assert screw_axis.passes_through_origin is passes_through_origin
-
-
-@pytest.mark.parametrize("check", ["is_normalized", "passes_through_origin"])
-def test_checking_a_symbolic_screw_axis_raises(check):
-    """
-    Whether a screw axis with free variables is normalized, or passes through the
-    origin, depends on their values, so the checks refuse to answer.
+    Whether a screw axis with free variables is normalized depends on their values, so
+    the check refuses to answer.
     """
     angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
     screw_axis = ScrewAxis(
@@ -229,7 +204,117 @@ def test_checking_a_symbolic_screw_axis_raises(check):
     )
 
     with pytest.raises(HasFreeVariablesError):
-        getattr(screw_axis, check)
+        screw_axis.is_normalized
+
+
+# %% whether the body turns
+
+
+@pytest.mark.parametrize(
+    "rotation, tolerance, turns_body",
+    [
+        ((0.0, 0.0, 1.0), 0.0, True),
+        ((0.0, 0.0, 0.0), 0.0, False),
+        ((0.0, 0.0, 1e-12), 0.0, True),
+        ((0.0, 0.0, 1e-12), 1e-9, False),
+        ((0.0, 0.0, 1.0), 1e-9, True),
+    ],
+    ids=[
+        "unit rotation",
+        "no rotation",
+        "rounding error, exactly",
+        "rounding error, within the tolerance",
+        "unit rotation, beyond the tolerance",
+    ],
+)
+def test_a_screw_axis_and_its_twist_turn_the_body_if_the_rotation_exceeds_the_tolerance(
+    rotation, tolerance, turns_body
+):
+    """
+    A screw axis and a twist turn the body when their rotational part is longer than the
+    tolerance, which absorbs rounding errors.
+    """
+    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3(*rotation))
+    twist = screw_axis.to_twist(position_velocity=2)
+
+    for rate in (screw_axis, twist):
+        assert rate.turns_body(tolerance=tolerance) is turns_body
+
+
+def test_checking_whether_a_symbolic_screw_axis_turns_the_body_raises():
+    """
+    Whether a screw axis with free variables turns the body depends on their values, so
+    the check refuses to answer.
+    """
+    angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position)
+    )
+
+    with pytest.raises(HasFreeVariablesError):
+        screw_axis.turns_body()
+
+
+# %% the pitch and the line of the axis
+
+
+@pytest.mark.parametrize(
+    "rotation, translation, translation_per_radian",
+    [
+        ((0.0, 0.0, 2.0), (0.4, 0.0, 0.5), 0.25),
+        ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), 0.0),
+        ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), np.inf),
+    ],
+    ids=["helical off the origin", "revolute off the origin", "prismatic"],
+)
+def test_the_translation_per_radian_is_the_part_of_the_translation_along_the_rotation(
+    rotation, translation, translation_per_radian
+):
+    """
+    Only the translation along the axis advances the body; the translation across it is
+    the origin circling the axis.
+
+    A screw axis that does not turn advances without end.
+    """
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(*rotation),
+        translation_per_unit_position=Vector3(*translation),
+    )
+
+    assert float(screw_axis.translation_per_radian.to_np()) == pytest.approx(
+        translation_per_radian
+    )
+
+
+def test_the_axis_point_closest_to_the_origin_is_where_the_hinge_sits(table_frame):
+    """
+    A body turning about a hinge at (0.4, 0, 0) moves its point at the origin by
+    -(rotation × hinge point), and the axis point recovers the hinge, in the screw
+    axis's frame.
+    """
+    rotation = np.array([0.0, 0.0, 2.0])
+    hinge_point = np.array([0.4, 0.0, 0.0])
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(*rotation),
+        translation_per_unit_position=Vector3(
+            *(-np.cross(rotation, hinge_point) + 0.3 * rotation)
+        ),
+        reference_frame=table_frame,
+    )
+
+    axis_point = screw_axis.axis_point_closest_to_origin
+
+    np.testing.assert_allclose(axis_point[:3], hinge_point, atol=1e-12)
+    assert axis_point.reference_frame == table_frame
+
+
+def test_the_axis_point_of_a_screw_axis_that_does_not_turn_is_the_origin():
+    """
+    A screw axis that only slides has no line, and takes the origin as its point.
+    """
+    screw_axis = ScrewAxis(translation_per_unit_position=Vector3(0.3, 0.0, 0.0))
+
+    np.testing.assert_allclose(screw_axis.axis_point_closest_to_origin[:3], 0)
 
 
 # %% the twist at a given speed of the position

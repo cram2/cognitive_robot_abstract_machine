@@ -54,9 +54,9 @@ from semantic_digital_twin.exceptions import (
     MujocoEntityNotFoundError,
     SimulationAlreadyRunningError,
     SimulationNotStartedError,
-    ScrewJointUnsupportedByMujocoError,
     SnapshotDoesNotFitSimulationError,
 )
+from semantic_digital_twin.adapters.exceptions import ScrewJointUnsupportedByMujocoError
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
@@ -738,8 +738,14 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
         dofs = list(entity.dofs)
         assert len(dofs) == 1, "ActiveConnection1DOF must have exactly one DOF."
         dof = dofs[0]
-        child_T_connection_transform = entity.connection_T_child_expression.inverse()
-        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(child_T_connection_transform)
+        # MuJoCo turns a hinge about the line through the joint's position, so the joint
+        # sits on the screw axis, which need not pass through the connection frame's
+        # origin.
+        child_T_frame_on_axis = (
+            entity.connection_T_child_expression.inverse()
+            @ entity.connection_T_frame_on_axis
+        )
+        px, py, pz, qw, qx, qy, qz = cas_pose_to_list(child_T_frame_on_axis)
         joint_pos = [px, py, pz]
         joint_quat = [qw, qx, qy, qz]
         # entity.dof, not the raw dof: it applies this connection's own multiplier and

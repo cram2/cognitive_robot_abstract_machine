@@ -817,30 +817,6 @@ class MissingConnectionParentError(UsageError):
 
 
 @dataclass(kw_only=True)
-class ScrewJointUnsupportedByMujocoError(UsageError):
-    """
-    Raised when a connection that rotates and translates at once is exported to MuJoCo,
-    which has hinge and slide joints but no helical joint.
-    """
-
-    connection_name: PrefixedName
-    """
-    The name of the helical connection that was exported.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"MuJoCo has no joint for the helical connection '{self.connection_name}'."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "export only connections whose screw axis behaves like a revolute or "
-            "prismatic connection."
-        )
-
-
-@dataclass(kw_only=True)
 class UnnormalizedScrewAxisError(UsageError):
     """
     Raised when the screw axis of a screw axis connection is not normalized: one that
@@ -864,31 +840,6 @@ class UnnormalizedScrewAxisError(UsageError):
             "give a rotating screw axis a unit rotation per unit of position, and one "
             "that only translates a unit translation; use the multiplier to scale the "
             "position."
-        )
-
-
-@dataclass(kw_only=True)
-class ScrewAxisOffConnectionOriginError(UsageError):
-    """
-    Raised when the screw axis of a screw axis connection does not pass through the
-    origin of the connection frame, which places the axis.
-    """
-
-    screw_axis: ScrewAxis
-    """
-    The screw axis the connection was given.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} does not "
-            f"pass through the origin of the connection frame."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "place the axis with parent_T_connection_expression and give the screw "
-            "axis a translation parallel to its rotation."
         )
 
 

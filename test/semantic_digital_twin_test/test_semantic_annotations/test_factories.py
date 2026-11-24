@@ -1497,6 +1497,162 @@ def test_drawer_mounts_on_its_movable_joint_where_it_stands():
     )
 
 
+def door_with_handle_at(*, y: float, z: float) -> tuple[World, Door]:
+    """
+    :return: A world with a door away from the origin, turned about z, and its handle at
+        ``y`` and ``z`` in the door's frame.
+    """
+    world = _world_with_root()
+    world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=2.0, y=-1.0, z=1.0, yaw=0.4
+    )
+    with world.modify_world():
+        door = Door.create_with_new_body_in_world(
+            name="door",
+            scale=Scale(0.03, 1.0, 2.0),
+            world=world,
+            world_root_T_self=world_T_door,
+        )
+        handle = Handle.create_with_new_body_in_world(
+            name="handle",
+            world=world,
+            world_root_T_self=world_T_door
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=y, z=z),
+        )
+        door.add(handle)
+    return world, door
+
+
+def test_a_door_on_a_horizontal_hinge_swings_about_the_edge_opposite_its_handle():
+    """
+    Mounted on a hinge along its y axis, a door stays where it was and swings about its
+    top edge, opposite the handle, as the hinge turns.
+    """
+    world, door = door_with_handle_at(y=0.4, z=0.0)
+    world_T_door = door.root.global_transform
+    world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Y())
+
+    joint = door.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
+        )
+    )
+
+    np.testing.assert_allclose(
+        door.root.global_transform.to_np(), world_T_door.to_np(), atol=1e-12
+    )
+    joint.position = 0.5
+    world.notify_state_change()
+    np.testing.assert_allclose(
+        door.root.global_transform.to_np(),
+        (
+            world_T_hinge
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(pitch=0.5)
+            @ world_T_hinge.inverse()
+            @ world_T_door
+        ).to_np(),
+        atol=1e-12,
+    )
+
+
+def test_a_mounted_drawer_slides_along_its_axis():
+    """
+    A drawer mounted on a slide along its x axis moves along that axis by the joint's
+    position.
+    """
+    world = _world_with_root()
+    with world.modify_world():
+        drawer = Drawer.create_with_new_body_in_world(
+            name="drawer",
+            world=world,
+            scale=Scale(0.4, 0.5, 0.6),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=1.0, yaw=0.3
+            ),
+        )
+    world_T_drawer = drawer.root.global_transform
+
+    joint = drawer.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X())
+        )
+    )
+    joint.position = 0.2
+    world.notify_state_change()
+
+    np.testing.assert_allclose(
+        drawer.root.global_transform.to_np(),
+        (world_T_drawer @ HomogeneousTransformationMatrix.from_xyz_rpy(x=0.2)).to_np(),
+        atol=1e-12,
+    )
+
+
+def test_a_mounted_bottle_cap_advances_by_its_pitch_per_turn():
+    """
+    A bottle cap mounted on a thread of 4 millimeters advances that far along its axis,
+    and comes back to its orientation, after one full turn.
+    """
+    world = _world_with_root()
+    with world.modify_world():
+        cap = BottleCap.create_with_new_body_in_world(
+            name="cap",
+            world=world,
+            scale=Scale(0.03, 0.03, 0.02),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.5, z=0.8, roll=0.2
+            ),
+        )
+    world_T_cap = cap.root.global_transform
+
+    joint = cap.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=0.004
+            )
+        )
+    )
+    joint.position = 2 * np.pi
+    world.notify_state_change()
+
+    np.testing.assert_allclose(
+        cap.root.global_transform.to_np(),
+        (world_T_cap @ HomogeneousTransformationMatrix.from_xyz_rpy(z=0.004)).to_np(),
+        atol=1e-12,
+    )
+
+
+def test_mounting_a_door_again_replaces_its_joint_and_keeps_it_in_place():
+    """
+    Mounting a door that already hangs on a joint replaces that joint, leaving the world
+    with as many connections and the door where it was.
+    """
+    world, door = door_with_handle_at(y=0.4, z=0.0)
+    world_T_door = door.root.global_transform
+    first = door.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z())
+        )
+    )
+    connection_count = len(world.connections)
+
+    second = door.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
+        )
+    )
+
+    assert second is not first
+    assert door.root.parent_connection is second
+    assert door.movable_joint is second
+    assert len(world.connections) == connection_count
+    np.testing.assert_allclose(
+        second.screw_axis.unit_direction.to_np()[:3], [0.0, 1.0, 0.0]
+    )
+    np.testing.assert_allclose(
+        door.root.global_transform.to_np(), world_T_door.to_np(), atol=1e-12
+    )
+
+
 def test_drawer_without_a_movable_joint_has_no_opening_ratio():
     world = _world_with_root()
     with world.modify_world():
