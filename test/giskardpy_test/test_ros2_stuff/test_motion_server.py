@@ -42,7 +42,6 @@ from giskardpy.middleware.ros2.world_updates import OutgoingWorldUpdates
 from cramph.exceptions import SelfInStartConditionError
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.monitors import CountSimulationTimeSeconds
-from cramph.state import LastObservationState
 from cramph.statechart import Statechart
 from cramph.nodes_for_testing import ConstTrueNode
 from giskardpy.qp.qp_controller_config import QPControllerConfig
@@ -939,18 +938,28 @@ class TestGoalResult:
 
     def test_result_contains_the_final_states(
         self, *, motion_server: MotionServerFixture
-    ):
+    ) -> None:
+        """
+        The result reports the final life cycle and observation states of the goal.
+        """
         motion_server.action_server.goal_json = create_goal_json()
 
         motion_server.motion_server.run_idle_cycle()
 
         result = json.loads(motion_server.action_server.sent_results[0].result)
-        assert "life_cycle_state" in result
-        assert "observation_state" in result
+        reported = from_json(result[StatechartPayloadKey.NODE_STATES])
+        motion_statechart = motion_server.executor.statechart
+        assert (reported.life_cycle_values, reported.observation_values) == (
+            motion_statechart.life_cycle_state.data.tolist(),
+            motion_statechart.observation_state.data.tolist(),
+        )
 
     def test_result_contains_the_last_observation_state(
         self, *, motion_server: MotionServerFixture
     ) -> None:
+        """
+        The result reports the observation every node took most recently.
+        """
         motion_server.action_server.goal_json = create_goal_json()
 
         motion_server.motion_server.run_idle_cycle()
@@ -958,11 +967,8 @@ class TestGoalResult:
         result = json.loads(motion_server.action_server.sent_results[0].result)
         motion_statechart = motion_server.executor.statechart
         assert (
-            LastObservationState.from_json(
-                data=result[StatechartPayloadKey.LAST_OBSERVATION_STATE],
-                statechart=motion_statechart,
-            )
-            == motion_statechart.last_observation_state
+            from_json(result[StatechartPayloadKey.NODE_STATES]).last_observation_values
+            == motion_statechart.last_observation_state.data.tolist()
         )
 
 
@@ -974,6 +980,9 @@ class TestStatesOfAFailedGoal:
     def test_a_goal_failing_before_it_compiled_reports_no_states(
         self, *, motion_server: MotionServerFixture
     ) -> None:
+        """
+        A goal that never compiled has no states of its own, so it reports none.
+        """
         motion_server.action_server.goal_json = create_goal_json()
         motion_server.motion_server.run_idle_cycle()
         motion_server.action_server.goal_json = "not a goal"
@@ -981,7 +990,7 @@ class TestStatesOfAFailedGoal:
         motion_server.motion_server.run_idle_cycle()
 
         result = json.loads(motion_server.action_server.sent_results[-1].result)
-        assert StatechartPayloadKey.LIFE_CYCLE_STATE not in result
+        assert StatechartPayloadKey.NODE_STATES not in result
 
 
 class TestCleanupAfterGoal:
@@ -1235,13 +1244,16 @@ class TestStateFeedback:
     def test_the_last_feedback_carries_the_tick_the_goal_ended_on(
         self, *, motion_server: MotionServerFixture
     ) -> None:
+        """
+        The states of the last feedback were taken at the tick the goal ended on.
+        """
         motion_server.action_server.goal_json = create_goal_json()
 
         motion_server.motion_server.run_idle_cycle()
 
         last_feedback = feedback_data(motion_server.action_server.feedback_messages[-1])
         assert (
-            last_feedback[StatechartPayloadKey.TICK_COUNT]
+            from_json(last_feedback[StatechartPayloadKey.NODE_STATES]).tick_count
             == motion_server.executor.tick_count
         )
 

@@ -17,11 +17,16 @@ from cramph.composites import (
     Sequence,
 )
 from cramph.context import StatechartContext
-from cramph.reported_statechart import ReportedStatechart, StatechartPayloadKey
+from cramph.reported_statechart import (
+    ReportedNodeStates,
+    ReportedStatechart,
+    StatechartPayloadKey,
+)
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
 from cramph.nodes_for_testing import ConstTrueNode
 from cramph.statechart import Statechart
+from krrood.adapters.json_serializer import to_json
 
 from .test_composite_node_choosing_its_child import ChooserAnsweringInTurn
 
@@ -33,13 +38,13 @@ def _states_payload(executor: StatechartExecutor) -> dict[str, Any]:
     :return: The states of the statechart of `executor`, as a server reports them,
         after a trip through a JSON string.
     """
-    statechart = executor.statechart
     payload = {
         StatechartPayloadKey.GOAL_ID: 0,
-        StatechartPayloadKey.TICK_COUNT: executor.tick_count,
-        StatechartPayloadKey.LIFE_CYCLE_STATE: statechart.life_cycle_state.to_json(),
-        StatechartPayloadKey.OBSERVATION_STATE: statechart.observation_state.to_json(),
-        StatechartPayloadKey.LAST_OBSERVATION_STATE: statechart.last_observation_state.to_json(),
+        StatechartPayloadKey.NODE_STATES: to_json(
+            ReportedNodeStates.from_statechart(
+                statechart=executor.statechart, tick_count=executor.tick_count
+            )
+        ),
     }
     return json.loads(json.dumps(payload))
 

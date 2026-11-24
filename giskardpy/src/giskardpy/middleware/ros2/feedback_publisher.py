@@ -5,7 +5,7 @@ running goal.
 
 from __future__ import annotations
 
-from cramph.reported_statechart import StatechartPayloadKey
+from cramph.reported_statechart import ReportedNodeStates, StatechartPayloadKey
 import json
 import time
 from dataclasses import dataclass, field
@@ -31,7 +31,7 @@ class MotionStatechartPayloadKey(StrEnum):
 
     WAITING_FOR_CHILD = "waiting_for_child"
     """
-    The nodes waiting for the client to choose their child, by index, each with the
+    The nodes waiting for the client to choose their child, by node id, each with the
     number of children it already holds.
     """
 
@@ -167,18 +167,18 @@ class ActionFeedbackPublisher:
 
     def create_states(self) -> dict[str, Any]:
         """
-        Collect the life cycle, observation and last observation state of the motion
-        statechart, the tick they were taken at, the nodes waiting for a child, and how
-        far the changes of the goal were published.
+        Collect the states of the nodes of the motion statechart, the nodes waiting for
+        a child, and how far the changes of the goal were published.
         """
         motion_statechart = self.executor.statechart
         states = {
-            StatechartPayloadKey.TICK_COUNT: self.executor.tick_count,
-            StatechartPayloadKey.LIFE_CYCLE_STATE: motion_statechart.life_cycle_state.to_json(),
-            StatechartPayloadKey.OBSERVATION_STATE: motion_statechart.observation_state.to_json(),
-            StatechartPayloadKey.LAST_OBSERVATION_STATE: motion_statechart.last_observation_state.to_json(),
+            StatechartPayloadKey.NODE_STATES: to_json(
+                ReportedNodeStates.from_statechart(
+                    statechart=motion_statechart, tick_count=self.executor.tick_count
+                )
+            ),
             MotionStatechartPayloadKey.WAITING_FOR_CHILD: {
-                str(node.index): len(node.children)
+                node._node_id: len(node.children)
                 for node in self._nodes_waiting_for_a_child()
             },
         }

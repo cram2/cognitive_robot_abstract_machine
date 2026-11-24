@@ -37,6 +37,7 @@ from cramph.exceptions import (
     PrerequisiteNotExpandedError,
     StatechartAlreadyCompiledError,
     NotHeldByControlStructureNodeError,
+    NodeWithIdNotFoundError,
     NotInStatechartError,
     RemovedNodeStillReferencedError,
     StatechartBrokenByFailedModificationError,
@@ -773,6 +774,17 @@ class Statechart(SubclassJSONSerializer):
         :return: The node with the given index.
         """
         return self.rx_graph.get_node_data(index)
+
+    def get_node_by_id(self, *, node_id: str) -> StatechartNode:
+        """
+        :param node_id: The :attr:`~StatechartNode._node_id` of the node to look up.
+        :return: The node with the given id.
+        :raises NodeWithIdNotFoundError: If this statechart holds no node with that id.
+        """
+        for node in self.nodes:
+            if node._node_id == node_id:
+                return node
+        raise NodeWithIdNotFoundError(node_id=node_id)
 
     def check_context_holds(
         self,

@@ -495,35 +495,6 @@ class StatechartNotEndedByResultError(ExecutionException):
 
 
 @dataclass(kw_only=True)
-class StateUpdateAheadOfStatechartError(ExecutionException):
-    """
-    Raised when Giskard reports the states of more nodes than the client's copy of the
-    statechart holds.
-    """
-
-    node_count: int
-    """
-    How many nodes the client's copy holds.
-    """
-
-    reported_node_count: int
-    """
-    How many nodes Giskard reported a state for.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"Giskard reported the states of {self.reported_node_count} nodes, but the "
-            f"client's statechart holds {self.node_count}."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "Apply the states only to the statechart that was sent as the running goal."
-        )
-
-
-@dataclass(kw_only=True)
 class MotionServerThreadStillRunningError(GiskardException):
     """
     Raised when a motion server's background thread does not stop in time.

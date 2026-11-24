@@ -5,6 +5,7 @@ Executors that run a statechart on a remote Giskard over ROS.
 from __future__ import annotations
 
 from cramph.reported_statechart import StatechartPayloadKey
+from krrood.adapters.json_serializer import from_json
 import json
 from dataclasses import dataclass, field
 from time import sleep
@@ -32,7 +33,6 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from giskardpy.middleware.ros2.motion_goal import DebugOutput, MotionGoal
 from giskardpy.middleware.ros2.action_client import GiskardActionClient
-from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
 from giskardpy.middleware.ros2.world_updates import ClientWorldUpdates
 from giskardpy.motion_control import MotionControl
 from rclpy import Context, Parameter, Future
@@ -234,9 +234,9 @@ class GiskardClientExecutor(Executor):
 
         :param feedback: The feedback of the running goal.
         """
-        StatechartStateUpdate.from_json(
-            payload=feedback, statechart=self.statechart
-        ).apply()
+        from_json(feedback[StatechartPayloadKey.NODE_STATES]).apply_to(
+            statechart=self.statechart
+        )
 
     def _send_action_goal_choosing_children(
         self, *, child_chooser_access: ChildChooserAccess, goal_message: JsonAction.Goal
@@ -287,18 +287,18 @@ class GiskardClientExecutor(Executor):
         """
         result_json = json.loads(result.result.result)
         if result.status == GoalStatus.STATUS_ABORTED:
-            if StatechartPayloadKey.LIFE_CYCLE_STATE in result_json:
-                StatechartStateUpdate.from_json(
-                    payload=result_json, statechart=self.statechart
-                ).apply()
+            if StatechartPayloadKey.NODE_STATES in result_json:
+                from_json(result_json[StatechartPayloadKey.NODE_STATES]).apply_to(
+                    statechart=self.statechart
+                )
             raise self._client.create_abort_exception(
                 result=result,
                 **WorldEntityWithIDKwargsTracker.from_world(self.world).create_kwargs(),
             )
         self.world_updates.wait_for_the_changes_of_a_goal(result=result_json)
-        StatechartStateUpdate.from_json(
-            payload=result_json, statechart=self.statechart
-        ).apply()
+        from_json(result_json[StatechartPayloadKey.NODE_STATES]).apply_to(
+            statechart=self.statechart
+        )
         if not self.statechart.is_ended():
             raise StatechartNotEndedByResultError()
 

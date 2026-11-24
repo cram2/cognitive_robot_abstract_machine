@@ -283,6 +283,52 @@ class NodeNotFoundError(StatechartError):
 
 
 @dataclass(kw_only=True)
+class NodeWithIdNotFoundError(StatechartError):
+    """
+    Raised when a node is looked up by its id and the statechart has no such node.
+    """
+
+    node_id: str
+    """
+    The id that was looked up.
+    """
+
+    def error_message(self) -> str:
+        return f"The statechart holds no node with the id '{self.node_id}'."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Look the node up in the statechart it joined, or in a copy that took over "
+            "every change the node joined that statechart through."
+        )
+
+
+@dataclass(kw_only=True)
+class ReportedNodeNotInStatechartError(StatechartError):
+    """
+    Raised when a server reports the states of nodes a copy of its statechart does not
+    hold.
+    """
+
+    node_ids: list[str]
+    """
+    The ids of the reported nodes the copy does not hold.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The states of the nodes {self.node_ids} were reported, but the statechart "
+            f"holds no nodes with these ids."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Take over the states only into a copy of the reported statechart that "
+            "holds every node the server added, for example through its change blocks."
+        )
+
+
+@dataclass(kw_only=True)
 class UnknownConditionVariableError(StatechartError):
     """
     Raised when a rendered condition names a variable that no node offers.
