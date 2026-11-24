@@ -4,6 +4,8 @@ values of the variables passed to it, and a field keeps its meaning when a metho
 every variable has the same name.
 """
 
+from __future__ import annotations
+
 import datetime
 
 import pytest

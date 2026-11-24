@@ -2,6 +2,8 @@
 Tests of the explanations EQL records for the instances a query infers.
 """
 
+from __future__ import annotations
+
 import gc
 import operator
 from copy import deepcopy

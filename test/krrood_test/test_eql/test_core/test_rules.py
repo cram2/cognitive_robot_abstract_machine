@@ -3,6 +3,8 @@ Tests of rule trees: conclusions attached to conditions, refinements, alternativ
 next rules.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from krrood.entity_query_language.factories import (

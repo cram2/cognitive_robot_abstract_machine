@@ -52,10 +52,6 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 )
 from krrood.entity_query_language.predicate import HasType
 from krrood.entity_query_language.query_graph import QueryGraph
-from krrood.entity_query_language.verbalization.fragments.base import (
-    flatten_fragment_to_plain_text,
-)
-from krrood.entity_query_language.verbalization.verbalizer import EQLVerbalizer
 from krrood.symbol_graph.symbol_graph import Symbol
 
 if TYPE_CHECKING:
@@ -252,6 +248,15 @@ class ConditionAndBindings:
             right = self._operand_with_its_value_(operand=self.condition.right)
             return f"({left} {self.condition} {right})"
         if isinstance(self.condition, Not):
+            # Verbalizing loads the realization libraries, which importing an
+            # explanation must not.
+            from krrood.entity_query_language.verbalization.fragments.base import (
+                flatten_fragment_to_plain_text,
+            )
+            from krrood.entity_query_language.verbalization.verbalizer import (
+                EQLVerbalizer,
+            )
+
             return flatten_fragment_to_plain_text(
                 EQLVerbalizer().build(expression=self.condition)
             )

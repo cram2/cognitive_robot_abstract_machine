@@ -4,6 +4,8 @@ are about, and that an alternative concludes only for the values no earlier bran
 for.
 """
 
+from __future__ import annotations
+
 from krrood.entity_query_language.rules.conclusion_selector import ValueCombination
 from krrood.entity_query_language.factories import (
     add,

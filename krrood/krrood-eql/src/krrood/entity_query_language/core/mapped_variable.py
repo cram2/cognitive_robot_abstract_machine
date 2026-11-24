@@ -1009,7 +1009,7 @@ class CallWithExpressionArguments(Call[T], GroundTermExpression[CallTerm]):
     stands for an expression replaced by that expression's node in this call's graph.
     """
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         Attach the expressions among the arguments as children of this call.
         """
@@ -1121,7 +1121,7 @@ class CallWithExpressionArguments(Call[T], GroundTermExpression[CallTerm]):
 
     def _replace_child_field_(
         self, *, old_child: SymbolicExpression, new_child: SymbolicExpression
-    ):
+    ) -> None:
         """
         Extends :meth:`UnaryExpression._replace_child_field_` to the expressions among
         the arguments.
