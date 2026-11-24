@@ -783,6 +783,35 @@ def test_every_candidate_that_failed_its_trial_is_kept_with_its_statechart(
         assert len(failed_trial.statechart.state_history) > 0
 
 
+def test_a_failed_trial_records_the_statement_it_tried_and_when(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    A failed trial records the statement whose candidate it tried, at a tick of that
+    statement's run.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    failing_attempts = [1, 2]
+    plan = StatementNode(
+        statement=a(RecordingAction)(
+            probe_key=register_probe(),
+            dof_id=world.degrees_of_freedom[0].id,
+            fail_on_attempt_number=variable_from(failing_attempts),
+        )
+    )
+    executor = simulated_executor(extensions)
+
+    with pytest.raises(EmptyUnderspecified):
+        executor.compile(statechart=statechart_of(executor, plan))
+        executor.execute()
+
+    [run] = executor.statechart.state_history.get_runs_of_node(node=plan)
+    assert [
+        (failed_trial.tried, run.start_tick <= failed_trial.plan_tick <= run.last_tick)
+        for failed_trial in executor.child_chooser.trial.failed_trials
+    ] == [(frozenset({plan}), True)] * len(failing_attempts)
+
+
 # %% a trial copy is published while debugging
 
 

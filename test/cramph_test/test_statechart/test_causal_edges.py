@@ -18,6 +18,7 @@ from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
 from cramph.node import EndStatechart
 from cramph.node_runs import StatechartRuns
+from cramph.state_history import NodeRun
 from cramph.statechart import Statechart
 
 # %% running a statechart
@@ -107,6 +108,90 @@ def test_a_start_condition_reading_another_node_is_a_control_edge(
             transition_kind=TransitionKind.START,
         )
         in edges
+    )
+
+
+def interrupted_by_a_later_node(
+    *, executor: StatechartExecutor
+) -> tuple[StatechartRuns, CountTicks, CountTicks]:
+    """
+    :return: The runs of a statechart in which a waiting node is interrupted by a node
+        that started after it, the waiting node, and the interrupting node.
+    """
+    waiting, first, later = (
+        CountTicks(ticks=100),
+        CountTicks(ticks=2),
+        CountTicks(ticks=1),
+    )
+    later.start_condition = first.observes_true
+    waiting.interrupt_condition = later.observes_true
+    timer = CountTicks(ticks=10)
+    statechart = Statechart(context=executor.context)
+    statechart.add_nodes(nodes=[waiting, first, later, timer])
+    statechart.add_node(node=EndStatechart.when_true(node=timer))
+    return ran_to_its_end(executor=executor, statechart=statechart), waiting, later
+
+
+def test_an_interrupt_condition_reads_the_run_that_had_started_when_its_node_ended(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    A node interrupted by a node that started after it is acted on by that node's run.
+    """
+    runs, waiting, later = interrupted_by_a_later_node(executor=statechart_executor)
+    edges = ControlEdges().edges(runs=runs, access=WorldAccessIndex(runs=runs))
+
+    assert (
+        ControlEdge(
+            cause=runs.latest_run(node=later),
+            effect=runs.latest_run(node=waiting),
+            transition_kind=TransitionKind.INTERRUPT,
+        )
+        in edges
+    )
+
+
+def test_a_condition_held_only_at_the_ticks_its_nodes_made_it_true(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    An interrupt condition held on the tick it ended its node, not on the tick the node
+    started.
+    """
+    runs, waiting, _ = interrupted_by_a_later_node(executor=statechart_executor)
+    [condition] = [
+        condition
+        for condition in waiting.conditions
+        if condition.kind is TransitionKind.INTERRUPT
+    ]
+    run = runs.latest_run(node=waiting)
+    history = runs.statechart.state_history
+
+    assert [
+        condition.held_at(history=history, tick=tick)
+        for tick in (run.start_tick, run.end_tick)
+    ] == [False, True]
+
+
+def test_runs_that_only_touch_at_one_tick_do_not_overlap() -> None:
+    """
+    A run that ends on the tick another starts ended before it.
+    """
+    node = CountTicks(ticks=1)
+    earlier, later = (
+        NodeRun(
+            node=node,
+            number=number,
+            start_tick=start_tick,
+            end_tick=end_tick,
+            final_state=LifeCycleValue.SUCCEEDED,
+        )
+        for number, start_tick, end_tick in [(1, 0, 3), (2, 3, 5)]
+    )
+
+    assert (earlier.overlaps(other=later), later.overlaps(other=earlier)) == (
+        False,
+        False,
     )
 
 

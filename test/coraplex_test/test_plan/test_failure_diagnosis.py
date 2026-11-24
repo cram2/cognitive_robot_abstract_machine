@@ -290,12 +290,12 @@ def test_a_failed_gripper_check_is_blamed_on_the_action_that_closed_that_gripper
 # %% two tasks drive the same joint at once
 
 
-def test_two_tasks_driving_one_joint_at_once_are_blamed_on_each_other(
+def test_a_task_stalled_by_another_driving_its_joint_is_blamed_on_it(
     pr2_apartment_context,
 ) -> None:
     """
-    Two tasks of different goals that drive the torso at the same time are each blamed
-    on the other.
+    Two tasks of different goals that drive the torso at the same time: the one reported
+    as stalled is blamed on the other.
     """
     world, robot, extensions = pr2_apartment_context
     torso = world.get_connection_by_name("torso_lift_joint")
@@ -317,12 +317,7 @@ def test_two_tasks_driving_one_joint_at_once_are_blamed_on_each_other(
         diagnosis.origin.node: [root.run.node for root in diagnosis.root_causes]
         for diagnosis in diagnoses
     }
-    assert blamed == {
-        node: [other]
-        for node, other in [(lower, raise_), (raise_, lower)]
-        if node in blamed
-    }
-    assert blamed
+    assert blamed == {raise_: [lower]}
 
 
 def test_tasks_on_different_joints_at_once_are_not_in_conflict(
@@ -512,11 +507,22 @@ def test_a_goal_out_of_reach_from_anywhere_is_blamed_on_no_other_node(
     ).diagnose_failure(failure=failure)
     report("goal out of reach from anywhere (negative control)", diagnoses)
 
-    assert diagnoses
-    for diagnosis in diagnoses:
-        assert isinstance(diagnosis, TaskStalled)
-        assert diagnosis.counterfactual == StallCounterfactual.STILL_STALLED
-        assert diagnosis.verdict == Verdict.NO_OTHER_NODE
+    assert [
+        (
+            type(diagnosis),
+            diagnosis.counterfactual,
+            diagnosis.verdict,
+            diagnosis.root_causes,
+        )
+        for diagnosis in diagnoses
+    ] == [
+        (
+            TaskStalled,
+            StallCounterfactual.STILL_STALLED,
+            Verdict.NO_OTHER_NODE,
+            [],
+        )
+    ]
 
 
 # %% every candidate of an underspecified pick-up fails after a bad navigation
@@ -666,9 +672,4 @@ def test_in_physics_two_tasks_driving_one_joint_are_blamed_on_each_other(
     blamed = {
         d.origin.node: [root.run.node for root in d.root_causes] for d in diagnoses
     }
-    assert blamed
-    assert all(
-        blamed[node] == [other]
-        for node, other in [(lower, raise_), (raise_, lower)]
-        if node in blamed
-    )
+    assert blamed == {lower: [raise_], raise_: [lower]}

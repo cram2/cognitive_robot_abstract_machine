@@ -293,7 +293,7 @@ class TransitionCondition(SubclassJSONSerializer):
                 for variable in variables
             ],
         )
-        return float(value.to_np()) == float(ObservationStateValue.TRUE)
+        return value.is_constant_true()
 
     @property
     def node_dependencies(self) -> list[StatechartNode]:
