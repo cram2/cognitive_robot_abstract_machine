@@ -36,7 +36,7 @@ def create_giskard(node: Node) -> Giskard:
     )
     return Giskard(
         world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(Tiago, urdf=urdf)]
+            robots=[RobotSpecification.specify_real_robot(Tiago)]
         ),
         robot_interface_config=TiagoVelocityInterface(),
         server_config=GiskardServerConfig(),
