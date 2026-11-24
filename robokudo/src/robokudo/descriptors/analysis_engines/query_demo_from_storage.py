@@ -35,6 +35,7 @@ from robokudo.behaviours.action_server_checks import ActionServerCheck
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -103,6 +104,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 ClusterColorAnnotator(),
+                WorldUpdatingAnnotator(),
                 QueryReply(),
                 ActionServerCheck(),
             ]

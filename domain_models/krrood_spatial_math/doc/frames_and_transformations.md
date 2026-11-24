@@ -938,9 +938,10 @@ assert abs(float(q.rotational_distance(-q))) < 1e-6
 
 ## From a displacement to a transformation
 
-A `Displacement`, as described in [Rates of motion](rates_of_motion.md), says how far a
-body turned, as the rotation vector $r$, and where its origin ended up, as the
-translation $t$. A body that started at its reference frame's origin, with the axes of
+A `Displacement`, a rigid-body displacement as described in
+[Rates of motion](rates_of_motion.md), holds a rotation and a translation: how far a body
+turned, as the rotation vector $r$, and where its origin ended up, as the translation
+$t$. A body that started at its reference frame's origin, with the axes of
 that frame, therefore ends at the pose
 
 $$

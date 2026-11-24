@@ -79,12 +79,16 @@ with query:
 ```
 
 ### 3. Defining alternative conclusions using `alternative()`
-Provides a sibling branch that is only evaluated if the previous branches didn't match. It behaves like an **Else-If**.
-So in the example bellow, if the body and the handle are not connected through a fixed connection, but
-through a revolute connection, we want to deduce a `DoorWithRevoluteHandle`. The conclusion of the `alternative()`
-branch is only applied if the previous branches didn't match. So in this case, the condition when the where clause doesn't
-succeed for some combination of body and handle. There are multiple ways the condition of the `where` can be False, one 
-if fixed connection parent is not equal to body or if the fixed connection child is not equal to handle.
+Provides a sibling branch that concludes only where the previous branches didn't match. It behaves like an **Else-If**.
+So in the example below, if the body and the handle are not connected through a fixed connection, but
+through a revolute connection, we want to deduce a `DoorWithRevoluteHandle`.
+
+The branches are alternatives *for the variables every one of their conclusions is about*, here the body and the
+handle. The `alternative()` concludes for a body and a handle only if no earlier branch holds for them, however many
+fixed connections the `where` tried and failed on: a variable that only the conditions use, like the fixed connection,
+is tried the way an `exists` would be. A variable that the conclusions use but no condition binds is enumerated, so
+every one of its values reaches a conclusion. When the conclusions of the branches share no variable at all, the
+alternative is tried for every combination of values the previous branch failed for.
 
 ```python
 with query:

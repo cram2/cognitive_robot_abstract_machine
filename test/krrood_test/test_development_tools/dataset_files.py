@@ -78,6 +78,18 @@ class DatasetFile(PathEnumeration):
     The module of the repository that :attr:`PROJECT_RULES_IMPORTING_REPOSITORY` imports.
     """
 
+    DEPENDENT_WORKSPACE = Path(__file__).parent / "dataset" / "dependent_workspace"
+    """
+    A workspace whose members ``base``, ``middle`` and ``top`` depend on each other in a
+    chain, next to ``side``, which depends on none, and ``family``, whose members
+    ``family-core`` and ``family-extra`` nest in its directory.
+    """
+
+    LIBRARY_TEST_RUNS = Path(__file__).parent / "dataset" / "library_test_runs"
+    """
+    Tests a library's test run is checked with, run in a pytest process of their own.
+    """
+
     PROJECT_RULES_PACKAGE = Path(__file__).parent / "dataset" / "project_rules_package"
     """
     A package declaring a repository's own rules in several modules.

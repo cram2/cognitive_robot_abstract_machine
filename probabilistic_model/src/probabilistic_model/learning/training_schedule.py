@@ -337,12 +337,13 @@ class MiniBatchTraining(ABC):
     """
 
     @abstractmethod
-    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> float:
+    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> float | BackendArray:
         """
         Update the parameters by one step on a batch.
 
         :param batch: The same rows of every training array.
-        :return: The loss of the batch before the step.
+        :return: The loss of the batch before the step, a float or a scalar array of the
+            backend that may still be computed on its device.
         """
 
     def finish_epoch(self, *, average_loss: float) -> None:
@@ -367,7 +368,7 @@ class MiniBatchTraining(ABC):
         total_loss = 0.0
         for batch in self.mini_batches.batches_of_epoch(arguments=self.arguments):
             total_loss += self.step_on_batch(batch=batch) * batch[0].shape[0]
-        return total_loss / self.arguments[0].shape[0]
+        return float(total_loss) / self.arguments[0].shape[0]
 
 
 @dataclass(kw_only=True)

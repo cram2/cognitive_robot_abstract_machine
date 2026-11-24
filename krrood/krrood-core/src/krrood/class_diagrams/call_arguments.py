@@ -82,6 +82,19 @@ class CallArguments:
             )
         return ensure_hashable(value)
 
+    def apply_to_each_argument(
+        self, *, function: Callable[[Any], Any]
+    ) -> CallArguments:
+        """
+        :param function: What each argument is turned into.
+        :return: Arguments in the same places, each the result of *function* on the
+            argument there.
+        """
+        return CallArguments(
+            positional=tuple(function(argument) for argument in self.positional),
+            keyword={name: function(value) for name, value in self.keyword.items()},
+        )
+
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, CallArguments) and self.hashable_key == other.hashable_key

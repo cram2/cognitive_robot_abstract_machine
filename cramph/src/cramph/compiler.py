@@ -1,3 +1,7 @@
+"""
+Compiling a statechart, and the callbacks told whenever it compiles again.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -128,17 +132,17 @@ class StatechartCompiler:
 
     def compile(self) -> None:
         """
-        Compiles all components of :attr:`statechart` in its context.
+        Compiles :attr:`statechart` in its context, before it ticks.
 
-        This method must be called before the statechart ticks.
-
-        Compiling again, once nodes joined, keeps the state and the history of the
-        nodes already there: only the joined nodes are completed and built, and the
-        tick is compiled over every node. Every :class:`RecompileCallback` is told.
-        Compiling again waits until every :class:`RecompileCallback` is at rest; until
-        then the statechart goes on ticking as it compiled last, see
+        Compiling again keeps the state and history of the nodes already there and tells
+        every :class:`RecompileCallback`, once all are at rest; until then the
+        statechart ticks as it compiled last, see
         :meth:`~cramph.statechart.Statechart.tick`.
+
+        :raises StatechartBrokenByFailedModificationError: If a
+            :meth:`~cramph.statechart.Statechart.modify` block of the statechart raised.
         """
+        self.statechart.check_not_broken()
         is_recompile = self.is_compiled
         if is_recompile and not self._hold_still():
             return

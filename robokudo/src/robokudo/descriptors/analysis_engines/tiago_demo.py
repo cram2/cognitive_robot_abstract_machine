@@ -32,6 +32,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -103,6 +104,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 # ClusterPoseBBAnnotator(),
                 ClusterPosePCAAnnotator(),
+                WorldUpdatingAnnotator(),
                 GenerateQueryResult(),
             ]
         )
