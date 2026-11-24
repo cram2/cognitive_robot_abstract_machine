@@ -457,6 +457,10 @@ def test_learn_fits_gaussian_leaf_to_data_of_single_column():
 
 
 def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
+    """
+    A column learned on constant data keeps the Gaussian variance of its leaf at the
+    minimum the regularization of the expectation maximization sets.
+    """
     progressive_circuit = ProgressiveProbabilisticCircuit(
         template=_make_factorized_template("x")
     )
