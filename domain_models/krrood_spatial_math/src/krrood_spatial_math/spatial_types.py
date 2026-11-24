@@ -2940,6 +2940,20 @@ class ScrewAxis(RigidMotionRate):
         return not np.any(rotation) and bool(np.isclose(np.linalg.norm(translation), 1))
 
     @property
+    def passes_through_origin(self) -> bool:
+        """
+        :return: Whether the axis passes through the origin of the reference frame,
+            so that the translation is parallel to the rotation. A screw axis that does
+            not turn the body has no line and passes through every point.
+        :raises HasFreeVariablesError: if the screw axis has free variables.
+        """
+        if not self.is_constant():
+            raise HasFreeVariablesError(variables=self.free_variables())
+        rotation = self.rotation_per_unit_position[:3]
+        translation = self.translation_per_unit_position[:3]
+        return bool(np.allclose(np.cross(rotation, translation), 0))
+
+    @property
     def translation_per_radian(self) -> sm.Scalar:
         r"""
         :return: How far the body advances along the axis per radian it turns, in

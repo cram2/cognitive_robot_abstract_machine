@@ -193,6 +193,44 @@ def test_a_screw_axis_without_a_unit_rotation_or_only_a_unit_translation_is_not_
     assert not screw_axis.is_normalized
 
 
+@pytest.mark.parametrize(
+    "rotation, translation, passes_through_origin",
+    [
+        ((0.0, 0.0, 1.0), (0.0, 0.0, 0.5), True),
+        ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), True),
+        ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), False),
+    ],
+    ids=["helical through the origin", "prismatic", "revolute off the origin"],
+)
+def test_a_screw_axis_passes_through_the_origin_if_its_translation_is_parallel_to_its_rotation(
+    rotation, translation, passes_through_origin
+):
+    """
+    A translation across the rotation is that of the origin circling an axis elsewhere;
+    a screw axis that does not turn has no line to miss the origin.
+    """
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(*rotation),
+        translation_per_unit_position=Vector3(*translation),
+    )
+
+    assert screw_axis.passes_through_origin is passes_through_origin
+
+
+def test_checking_whether_a_symbolic_screw_axis_passes_through_the_origin_raises():
+    """
+    Whether a screw axis with free variables passes through the origin depends on their
+    values, so the check refuses to answer.
+    """
+    angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
+    screw_axis = ScrewAxis(
+        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position)
+    )
+
+    with pytest.raises(HasFreeVariablesError):
+        screw_axis.passes_through_origin
+
+
 def test_checking_whether_a_symbolic_screw_axis_is_normalized_raises():
     """
     Whether a screw axis with free variables is normalized depends on their values, so

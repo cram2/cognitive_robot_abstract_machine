@@ -431,10 +431,14 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         one does: :attr:`parent_T_connection_expression` moves by
         :attr:`connection_T_frame_on_axis`, :attr:`connection_T_child_expression` by its
         inverse, and the screw axis keeps its direction and its pitch through the moved
-        frame's origin. The replacement keeps the name and the degree of freedom.
+        frame's origin. The replacement keeps the name and the degree of freedom. A
+        connection whose screw axis already passes through its frame's origin is left as
+        it is, without a model change.
 
-        :return: The replacement.
+        :return: The replacement, or this connection if it is left as it is.
         """
+        if self.screw_axis.passes_through_origin:
+            return self
         world = self._world
         connection_T_frame_on_axis = self.connection_T_frame_on_axis
         parent_T_connection = (

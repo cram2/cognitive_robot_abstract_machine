@@ -617,7 +617,8 @@ moves its child just as well. `move_connection_frame_onto_axis` brings it into t
 replaces the connection by one whose connection frame is moved by `connection_T_frame_on_axis`, onto
 the axis's point closest to the old origin, whose child is placed relative to the moved frame, and whose
 screw axis keeps its direction and pitch through the new origin. The child moves exactly as before, and
-the name and the degree of freedom stay.
+the name and the degree of freedom stay. A connection already in that form, as
+`ScrewAxis.passes_through_origin` tells, is left as it is, without a model change.
 
 Below, a door hangs from a connection whose frame lies at the door's handle side, 0.8 meters from the
 hinge:

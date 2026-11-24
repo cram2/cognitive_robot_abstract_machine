@@ -1041,33 +1041,45 @@ def test_moving_the_connection_frame_onto_the_axis_keeps_the_motion(
         )
 
 
-def test_moving_the_connection_frame_of_a_slide_onto_its_axis_leaves_it_where_it_is(
-    world_with_two_bodies,
+@pytest.mark.parametrize(
+    "screw_axis",
+    [
+        ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        ScrewAxisConnection.create_helical_screw_axis(axis=Vector3.Z(), pitch=0.004),
+        ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X()),
+    ],
+    ids=["revolute", "helical", "prismatic"],
+)
+def test_moving_the_connection_frame_of_a_connection_already_on_its_axis_changes_nothing(
+    world_with_two_bodies, screw_axis
 ):
     """
-    A slide has no line to move onto, so its connection frame stays where it is.
+    A connection whose screw axis passes through its frame's origin, as parsed joints
+    have it, or that only slides and so has no line to move onto, is left as it is,
+    without a model change.
     """
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.2, yaw=0.7)
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=parent,
             child=child,
-            parent_T_connection_expression=parent_T_connection,
-            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.2, yaw=0.7
             ),
+            screw_axis=screw_axis,
         )
         world.add_connection(connection)
+    model_manager = world.get_world_model_manager()
+    version = model_manager.version
+    history = list(model_manager.model_modification_blocks)
 
     moved = connection.move_connection_frame_onto_axis()
 
-    assert_allclose(
-        moved.parent_T_connection_expression.to_np(),
-        parent_T_connection.to_np(),
-        atol=1e-12,
-    )
+    assert moved is connection
+    assert child.parent_connection is connection
+    assert model_manager.version == version
+    assert model_manager.model_modification_blocks == history
 
 
 # %% position for a translation along the screw axis
