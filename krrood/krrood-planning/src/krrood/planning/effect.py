@@ -4,22 +4,56 @@ Effects - what applying an action changes in a state - and the changes they comp
 
 from __future__ import annotations
 
+import collections.abc
+import copy
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import TYPE_CHECKING, Any, Mapping
+from typing_extensions import Any, Mapping
 
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.factories import ConditionType, set_of
 from krrood.entity_query_language.ground_term import GroundTerm, GroundTermExpression
+from krrood.entity_query_language.query.query import Query
 from krrood.planning.exceptions import ValueIsNotACollection
 from krrood.planning.fact import Fact
 
-if TYPE_CHECKING:
-    from krrood.planning.state import State
-
 # %% changes
+
+
+@dataclass(kw_only=True, frozen=True)
+class CollectionInsertion:
+    """
+    Elements inserted into a collection, after the elements it holds where it is ordered.
+    """
+
+    elements: tuple[Any, ...]
+    """
+    The inserted elements, in the order they were inserted.
+    """
+
+    def insert_into(self, *, collection: Any) -> Any:
+        """
+        :param collection: A collection of elements, which is left unchanged.
+        :return: A copy of *collection* with :attr:`elements` inserted by its own
+            ``append`` or ``add``, or rebuilt with them where it has neither.
+        """
+        inserted = copy.copy(collection)
+        if isinstance(inserted, collections.abc.MutableSequence):
+            inserted.extend(self.elements)
+            return inserted
+        if isinstance(inserted, collections.abc.MutableSet):
+            inserted.update(self.elements)
+            return inserted
+        return type(collection)((*collection, *self.elements))
+
+    def followed_by(self, *, later: CollectionInsertion) -> CollectionInsertion:
+        """
+        :param later: Elements inserted after these.
+        :return: The insertion of these elements and then those of *later*.
+        """
+        return CollectionInsertion(elements=(*self.elements, *later.elements))
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -31,6 +65,11 @@ class StateChange:
     assignments: dict[GroundTerm, Any] = field(default_factory=dict)
     """
     The new value of every ground term the effect assigns.
+    """
+
+    insertions: dict[GroundTerm, CollectionInsertion] = field(default_factory=dict)
+    """
+    The elements the effect inserts into the collection each ground term holds.
     """
 
     added_objects: tuple[Any, ...] = ()
@@ -60,26 +99,33 @@ class Effect(ABC):
     for it, or ``None`` for an effect that changes every binding.
     """
 
+    @property
     @abstractmethod
-    def change(self, *, state: State) -> StateChange:
+    def selected_expressions(self) -> tuple[SymbolicExpression, ...]:
         """
-        :param state: The state the action is applied in, which the effect reads.
-        :return: What the effect changes in *state*.
+        :return: The expressions whose values a binding gives :meth:`change_of_binding`.
         """
 
-    def bindings(
-        self, *, selected: tuple[SymbolicExpression, ...], state: State
-    ) -> list[Mapping[SymbolicExpression, Any]]:
+    @abstractmethod
+    def change_of_binding(
+        self, *, binding: Mapping[SymbolicExpression, Any]
+    ) -> StateChange:
         """
-        :param selected: The expressions whose values the effect needs.
-        :param state: The state the bindings are read in.
-        :return: The value of each of *selected* for every binding that satisfies
-            :attr:`condition` in *state*.
+        :param binding: The values of :attr:`selected_expressions` for one result of
+            :meth:`get_change_to_state`.
+        :return: What the effect changes for *binding*.
         """
-        query = set_of(*selected)
-        if self.condition is not None:
-            query = query.where(self.condition)
-        return query.tolist(state=state)
+
+    def get_change_to_state(self) -> Query:
+        """
+        :return: The query whose results, each evaluated in the state the action is
+            applied in, are the bindings :meth:`change_of_binding` turns into changes:
+            the values of :attr:`selected_expressions` where :attr:`condition` holds.
+        """
+        query = set_of(*self.selected_expressions)
+        if self.condition is None:
+            return query
+        return query.where(self.condition)
 
 
 @dataclass(kw_only=True)
@@ -95,11 +141,16 @@ class Assignment(Effect):
     :meth:`~krrood.planning.fact.Fact.from_condition` reads it.
     """
 
-    def change(self, *, state: State) -> StateChange:
-        fact = Fact.from_condition(condition=self.fact)
+    @property
+    def selected_expressions(self) -> tuple[SymbolicExpression, ...]:
+        return Fact.from_condition(condition=self.fact).selected_expressions
+
+    def change_of_binding(
+        self, *, binding: Mapping[SymbolicExpression, Any]
+    ) -> StateChange:
         return StateChange(
-            assignments=fact.assignments(
-                bindings=self.bindings(selected=fact.selected_expressions, state=state)
+            assignments=Fact.from_condition(condition=self.fact).assignments(
+                bindings=(binding,)
             )
         )
 
@@ -110,8 +161,9 @@ class ElementInsertion(Effect):
     Inserts an element into a collection, after the elements it already holds where it is
     ordered.
 
-    Computing its change raises :class:`~krrood.planning.exceptions.ValueIsNotACollection`
-    where a value of :attr:`collection` is not a collection of elements.
+    Turning a binding into a change raises
+    :class:`~krrood.planning.exceptions.ValueIsNotACollection` where the value of
+    :attr:`collection` is not a collection of elements.
     """
 
     collection: GroundTermExpression
@@ -124,22 +176,24 @@ class ElementInsertion(Effect):
     The expression whose value is inserted.
     """
 
-    def change(self, *, state: State) -> StateChange:
-        assignments = {}
-        selected = (
-            *self.collection._ground_term_operands_,
-            self.collection,
-            self.element,
-        )
-        for binding in self.bindings(selected=selected, state=state):
-            elements = binding[self.collection]
-            if not isinstance(elements, CollectionKind.ELEMENT_SEQUENCE.value):
-                raise ValueIsNotACollection(collection=self.collection, value=elements)
-            inserted = type(elements)((*elements, binding[self.element]))
-            assignments |= Fact(expression=self.collection, value=inserted).assignments(
-                bindings=(binding,)
+    @property
+    def selected_expressions(self) -> tuple[SymbolicExpression, ...]:
+        return (*self.collection._ground_term_operands_, self.collection, self.element)
+
+    def change_of_binding(
+        self, *, binding: Mapping[SymbolicExpression, Any]
+    ) -> StateChange:
+        elements = binding[self.collection]
+        if not isinstance(elements, CollectionKind.ELEMENT_SEQUENCE.value):
+            raise ValueIsNotACollection(collection=self.collection, value=elements)
+        term = self.collection._ground_term_(
+            operand_values=tuple(
+                binding[operand] for operand in self.collection._ground_term_operands_
             )
-        return StateChange(assignments=assignments)
+        )
+        return StateChange(
+            insertions={term: CollectionInsertion(elements=(binding[self.element],))}
+        )
 
 
 @dataclass(kw_only=True)
@@ -153,15 +207,9 @@ class ObjectsEffect(Effect, ABC):
     The expression whose values are the objects.
     """
 
-    def objects_in(self, *, state: State) -> tuple[Any, ...]:
-        """
-        :param state: The state the objects are read in.
-        :return: The value of :attr:`objects` for every binding of the effect.
-        """
-        return tuple(
-            binding[self.objects]
-            for binding in self.bindings(selected=(self.objects,), state=state)
-        )
+    @property
+    def selected_expressions(self) -> tuple[SymbolicExpression, ...]:
+        return (self.objects,)
 
 
 @dataclass(kw_only=True)
@@ -170,13 +218,14 @@ class ObjectCreation(ObjectsEffect):
     Adds the objects an expression builds, such as one made with
     :func:`~krrood.entity_query_language.factories.inference`.
 
-    .. warning:: Building an object of a class whose instances the live symbol graph
-        caches adds it to the live symbol graph too; build only objects of classes that
-        do not cache their instances.
+    .. note:: Build planned objects with ``_persist_instance_=False``, so a class whose
+        instances the live symbol graph caches leaves them out of it.
     """
 
-    def change(self, *, state: State) -> StateChange:
-        return StateChange(added_objects=self.objects_in(state=state))
+    def change_of_binding(
+        self, *, binding: Mapping[SymbolicExpression, Any]
+    ) -> StateChange:
+        return StateChange(added_objects=(binding[self.objects],))
 
 
 @dataclass(kw_only=True)
@@ -185,5 +234,7 @@ class ObjectRemoval(ObjectsEffect):
     Removes objects, which then leave every domain and collection the state reads.
     """
 
-    def change(self, *, state: State) -> StateChange:
-        return StateChange(removed_objects=self.objects_in(state=state))
+    def change_of_binding(
+        self, *, binding: Mapping[SymbolicExpression, Any]
+    ) -> StateChange:
+        return StateChange(removed_objects=(binding[self.objects],))

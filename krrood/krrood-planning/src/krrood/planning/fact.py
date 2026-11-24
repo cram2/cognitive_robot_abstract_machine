@@ -40,8 +40,11 @@ class Fact:
 
     value: Any
     """
-    The value every ground term of :attr:`expression` has, or the expression whose value
-    under each binding is the value of the ground term under that binding.
+    The value the fact gives the ground term, either a constant or an expression read
+    together with the operands.
+
+    In ``block.support.clear == True`` it is ``True`` for every block; in ``block.name
+    == block.support.name`` each block takes the name of its own support.
     """
 
     @classmethod
@@ -87,8 +90,10 @@ class Fact:
     @property
     def selected_expressions(self) -> tuple[SymbolicExpression, ...]:
         """
-        :return: The expressions whose values a binding of this fact gives: the operands
-            of :attr:`expression`, and :attr:`value` where it is an expression.
+        :return: The expressions a query selects to give :meth:`assignments` its
+            bindings: the operands of :attr:`expression`, and :attr:`value` where it is
+            an expression. A binding maps each of them to its value, so their order
+            carries no meaning.
         """
         operands = self.expression._ground_term_operands_
         if isinstance(self.value, SymbolicExpression):

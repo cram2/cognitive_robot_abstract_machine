@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from typing_extensions import ClassVar
-
 from krrood.entity_query_language.factories import ConditionType, and_, inference
 from krrood.planning.action_schema import ActionSchema
 from krrood.planning.effect import (
@@ -64,12 +62,7 @@ class StackingBlock(Surface):
 @dataclass(kw_only=True, eq=False)
 class PlannedBlock(StackingBlock):
     """
-    A block that exists only in the states that build it.
-    """
-
-    _cache_instances_: ClassVar[bool] = False
-    """
-    Constructing one leaves the live symbol graph unchanged.
+    A block that action schemas build.
     """
 
 
@@ -240,7 +233,9 @@ class BuildBlock(ActionSchema):
     def effects(self) -> list[Effect]:
         return [
             ObjectCreation(
-                objects=inference(PlannedBlock)(name=self.base.name, support=self.base)
+                objects=inference(PlannedBlock)(
+                    name=self.base.name, support=self.base, _persist_instance_=False
+                )
             ),
             Assignment(fact=self.base.clear == False),
         ]

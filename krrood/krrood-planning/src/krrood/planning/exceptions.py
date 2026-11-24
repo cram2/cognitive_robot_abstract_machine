@@ -184,11 +184,19 @@ class ActionIsNotApplicable(DataclassException):
     The action that was applied.
     """
 
+    failed_conditions: list[SymbolicExpression]
+    """
+    The parts of the precondition that do not hold in the state.
+    """
+
     def error_message(self) -> str:
-        return f"The precondition of {self.action} does not hold in the state."
+        failed = ", ".join(str(condition) for condition in self.failed_conditions)
+        return (
+            f"The precondition of {self.action} does not hold in the state: {failed}."
+        )
 
     def suggest_correction(self) -> str:
         return (
-            "Apply only actions whose is_applicable holds in the state, such as those "
-            "applicable_actions returns."
+            "Apply only actions whose precondition the state satisfies, such as the "
+            "results of applicable_actions evaluated in that state."
         )
