@@ -4,7 +4,7 @@ Executors that run a statechart on a remote Giskard over ROS.
 
 from __future__ import annotations
 
-from cramph.reported_statechart import StatechartPayloadKey
+from cramph.reported_statechart import NodeStatesReceiver, StatechartPayloadKey
 from krrood.adapters.json_serializer import from_json
 import json
 from dataclasses import dataclass, field
@@ -87,6 +87,13 @@ class GiskardClientExecutor(Executor):
     world_updates: ClientWorldUpdates = field(init=False, default=None)
     """
     Keeps this world in step with the world Giskard controls around a goal.
+    """
+
+    node_states_receiver: NodeStatesReceiver = field(
+        default_factory=NodeStatesReceiver, init=False, repr=False
+    )
+    """
+    Takes over the node states Giskard reports in its feedback and its results.
     """
 
     announces_presence: bool = field(default=False, kw_only=True)
@@ -234,8 +241,9 @@ class GiskardClientExecutor(Executor):
 
         :param feedback: The feedback of the running goal.
         """
-        from_json(feedback[StatechartPayloadKey.NODE_STATES]).apply_to(
-            statechart=self.statechart
+        self.node_states_receiver.take_over(
+            report=from_json(feedback[StatechartPayloadKey.NODE_STATES]),
+            statechart=self.statechart,
         )
 
     def _send_action_goal_choosing_children(
@@ -288,16 +296,18 @@ class GiskardClientExecutor(Executor):
         result_json = json.loads(result.result.result)
         if result.status == GoalStatus.STATUS_ABORTED:
             if StatechartPayloadKey.NODE_STATES in result_json:
-                from_json(result_json[StatechartPayloadKey.NODE_STATES]).apply_to(
-                    statechart=self.statechart
+                self.node_states_receiver.take_over(
+                    report=from_json(result_json[StatechartPayloadKey.NODE_STATES]),
+                    statechart=self.statechart,
                 )
             raise self._client.create_abort_exception(
                 result=result,
                 **WorldEntityWithIDKwargsTracker.from_world(self.world).create_kwargs(),
             )
         self.world_updates.wait_for_the_changes_of_a_goal(result=result_json)
-        from_json(result_json[StatechartPayloadKey.NODE_STATES]).apply_to(
-            statechart=self.statechart
+        self.node_states_receiver.take_over(
+            report=from_json(result_json[StatechartPayloadKey.NODE_STATES]),
+            statechart=self.statechart,
         )
         if not self.statechart.is_ended():
             raise StatechartNotEndedByResultError()

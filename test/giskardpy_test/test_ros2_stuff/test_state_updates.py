@@ -13,7 +13,7 @@ from cramph.context import StatechartContext
 from cramph.data_types import LifeCycleValue
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import StatechartNode
-from cramph.reported_statechart import StatechartPayloadKey
+from cramph.reported_statechart import NodeStatesReceiver, StatechartPayloadKey
 from cramph.state_history import StateHistory, StateHistoryObserver
 from cramph.statechart import Statechart
 from giskardpy.middleware.ros2.action_server import GoalOutcome
@@ -101,6 +101,13 @@ class ClientFollowingTheStates(InputSynchronizer):
     The server side the choices are sent to.
     """
 
+    node_states_receiver: NodeStatesReceiver = field(
+        default_factory=NodeStatesReceiver, init=False
+    )
+    """
+    Takes over the node states of the feedback, as the client of Giskard does.
+    """
+
     _read_feedback_count: int = field(default=0, init=False)
     """
     How many feedback messages were followed so far.
@@ -117,8 +124,9 @@ class ClientFollowingTheStates(InputSynchronizer):
         """
         :param feedback: One feedback of the running goal.
         """
-        from_json(feedback[StatechartPayloadKey.NODE_STATES]).apply_to(
-            statechart=self.statechart
+        self.node_states_receiver.take_over(
+            report=from_json(feedback[StatechartPayloadKey.NODE_STATES]),
+            statechart=self.statechart,
         )
         if self.child_choice_client is None:
             return

@@ -29,6 +29,7 @@ dependencies = [
     "krrood-serialization>=26.10.0",
     "krrood-symbolic-math>=26.10.0",
     "semantic_digital_twin>=26.10.0",
+    "krrood_synchronization>=26.10.0",
 ]
 license = "LGPL-3.0-only"
 
@@ -46,5 +47,6 @@ version = {attr = "cramph._version.__version__"}
 [dependency-groups]
 workspace = [
     "krrood",
+    "krrood_synchronization",
     "semantic_digital_twin",
 ]

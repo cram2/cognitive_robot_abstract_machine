@@ -5,7 +5,7 @@ running goal.
 
 from __future__ import annotations
 
-from cramph.reported_statechart import ReportedNodeStates, StatechartPayloadKey
+from cramph.reported_statechart import NodeStatesPublisher, StatechartPayloadKey
 import json
 import time
 from dataclasses import dataclass, field
@@ -62,6 +62,12 @@ class ActionFeedbackPublisher:
     outgoing_world_updates: OutgoingWorldUpdates
     """
     Tells which changes of Giskard's world the running goal published.
+    """
+
+    node_states_publisher: NodeStatesPublisher
+    """
+    Numbers the node states of every feedback and result, so that the client takes over
+    none older than one it took over.
     """
 
     child_request_repeat_period: float = 0.1
@@ -173,7 +179,7 @@ class ActionFeedbackPublisher:
         motion_statechart = self.executor.statechart
         states = {
             StatechartPayloadKey.NODE_STATES: to_json(
-                ReportedNodeStates.from_statechart(
+                self.node_states_publisher.report(
                     statechart=motion_statechart, tick_count=self.executor.tick_count
                 )
             ),

@@ -18,7 +18,7 @@ from cramph.composites import (
 )
 from cramph.context import StatechartContext
 from cramph.reported_statechart import (
-    ReportedNodeStates,
+    NodeStatesPublisher,
     ReportedStatechart,
     StatechartPayloadKey,
 )
@@ -27,26 +27,37 @@ from cramph.monitors import CountTicks
 from cramph.nodes_for_testing import ConstTrueNode
 from cramph.statechart import Statechart
 from krrood.adapters.json_serializer import to_json
+from krrood_synchronization.messages import Sender
 
 from .test_composite_node_choosing_its_child import ChooserAnsweringInTurn
 
 # %% helpers
 
 
-def _states_payload(executor: StatechartExecutor) -> dict[str, Any]:
+def _states_payload(
+    *, executor: StatechartExecutor, publisher: NodeStatesPublisher
+) -> dict[str, Any]:
     """
-    :return: The states of the statechart of `executor`, as a server reports them,
-        after a trip through a JSON string.
+    :return: The states of the statechart of `executor`, as a server reports them
+        through `publisher`, after a trip through a JSON string.
     """
     payload = {
         StatechartPayloadKey.GOAL_ID: 0,
         StatechartPayloadKey.NODE_STATES: to_json(
-            ReportedNodeStates.from_statechart(
+            publisher.report(
                 statechart=executor.statechart, tick_count=executor.tick_count
             )
         ),
     }
     return json.loads(json.dumps(payload))
+
+
+@pytest.fixture
+def publisher() -> NodeStatesPublisher:
+    """
+    :return: A publisher numbering the node states a server reports.
+    """
+    return NodeStatesPublisher(sender=Sender(node_name="server", process_id=0))
 
 
 # %% following the payloads
@@ -55,13 +66,19 @@ def _states_payload(executor: StatechartExecutor) -> dict[str, Any]:
 def test_states_reported_before_any_structure_are_ignored(
     statechart_context: StatechartContext,
     statechart_executor: StatechartExecutor,
+    publisher: NodeStatesPublisher,
 ) -> None:
+    """
+    States arriving before the structure belong to nodes the copy does not know yet.
+    """
     statechart = Statechart(context=statechart_context)
     statechart.add_node(node=ConstTrueNode(name="running"))
     statechart_executor.compile(statechart=statechart)
     reported_statechart = ReportedStatechart()
 
-    reported_statechart.take_over(payload=_states_payload(statechart_executor))
+    reported_statechart.take_over(
+        payload=_states_payload(executor=statechart_executor, publisher=publisher)
+    )
 
     assert reported_statechart.statechart is None
 
@@ -93,6 +110,7 @@ class ChoiceReportedWhileRunning:
 def choice_reported_while_running(
     statechart_context: StatechartContext,
     statechart_executor: StatechartExecutor,
+    publisher: NodeStatesPublisher,
 ) -> ChoiceReportedWhileRunning:
     """
     A node that chooses its child once a delay ended, reported before and after it
@@ -112,7 +130,7 @@ def choice_reported_while_running(
     reported_statechart = ReportedStatechart()
     reported_statechart.take_over(
         payload={
-            **_states_payload(statechart_executor),
+            **_states_payload(executor=statechart_executor, publisher=publisher),
             StatechartPayloadKey.STATECHART: json.loads(
                 json.dumps(statechart.create_structure_copy().to_json())
             ),
@@ -124,7 +142,7 @@ def choice_reported_while_running(
         statechart_executor.tick()
     reported_statechart.take_over(
         payload={
-            **_states_payload(statechart_executor),
+            **_states_payload(executor=statechart_executor, publisher=publisher),
             StatechartPayloadKey.CHANGE_BLOCKS: json.loads(
                 json.dumps(
                     [

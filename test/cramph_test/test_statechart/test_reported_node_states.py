@@ -15,10 +15,15 @@ from cramph.data_types import LifeCycleValue
 from cramph.exceptions import ReportedNodeNotInStatechartError
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
-from cramph.reported_statechart import ReportedNodeStates
+from cramph.reported_statechart import (
+    NodeStatesPublisher,
+    NodeStatesReceiver,
+    ReportedNodeStates,
+)
 from cramph.state_history import StateHistory, StateHistoryObserver
 from cramph.statechart import Statechart
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood_synchronization.messages import Sender
 from semantic_digital_twin.world import World
 
 # %% mimics
@@ -55,6 +60,15 @@ class ServerAndCopy:
     The receiver's copy, read from the structure of the server's statechart.
     """
 
+    publisher: NodeStatesPublisher = field(
+        default_factory=lambda: NodeStatesPublisher(
+            sender=Sender(node_name="server", process_id=0)
+        )
+    )
+    """
+    Numbers the reports of the server.
+    """
+
     @property
     def server_statechart(self) -> Statechart:
         """
@@ -66,7 +80,7 @@ class ServerAndCopy:
         """
         :return: The states the server reports now, after a trip through a JSON string.
         """
-        reported = ReportedNodeStates.from_statechart(
+        reported = self.publisher.report(
             statechart=self.server_statechart,
             tick_count=self.server_executor.tick_count,
         )
@@ -227,9 +241,61 @@ def test_the_same_states_reported_twice_are_recorded_once(
     A report repeating the states of the one before adds nothing to the history.
     """
     tick(executor=server_and_copy.server_executor, ticks=3)
-    report = server_and_copy.report()
 
-    report.apply_to(statechart=server_and_copy.copy)
-    report.apply_to(statechart=server_and_copy.copy)
+    server_and_copy.report().apply_to(statechart=server_and_copy.copy)
+    server_and_copy.report().apply_to(statechart=server_and_copy.copy)
 
     assert len(server_and_copy.copy.state_history.items) == 1
+
+
+# %% the order of the reports
+
+
+def test_a_report_older_than_one_taken_over_is_skipped(
+    server_and_copy: ServerAndCopy,
+) -> None:
+    """
+    A report that arrives late, such as feedback overtaken by the result of a goal, does
+    not undo the states of the later report.
+    """
+    receiver = NodeStatesReceiver()
+    older = server_and_copy.report()
+    tick(executor=server_and_copy.server_executor, ticks=3)
+    later = server_and_copy.report()
+
+    receiver.take_over(report=later, statechart=server_and_copy.copy)
+    receiver.take_over(report=older, statechart=server_and_copy.copy)
+
+    assert server_and_copy.copy.life_cycle_state.data.tolist() == (
+        later.life_cycle_values
+    )
+
+
+def test_a_report_taken_over_twice_is_recorded_once(
+    server_and_copy: ServerAndCopy,
+) -> None:
+    """
+    The receiver takes over a report it already holds no second time.
+    """
+    receiver = NodeStatesReceiver()
+    observer = ObserverRecordingTicks()
+    server_and_copy.copy.state_history.add_observer(observer=observer)
+    tick(executor=server_and_copy.server_executor, ticks=3)
+    report = server_and_copy.report()
+
+    receiver.take_over(report=report, statechart=server_and_copy.copy)
+    receiver.take_over(report=report, statechart=server_and_copy.copy)
+
+    assert observer.ticks == [report.tick_count]
+
+
+def test_every_report_of_a_publisher_takes_the_next_position(
+    server_and_copy: ServerAndCopy,
+) -> None:
+    """
+    The receiver tells a later report from an older one by its position.
+    """
+    first = server_and_copy.report()
+    second = server_and_copy.report()
+
+    assert second.position.sequence_number == first.position.sequence_number + 1

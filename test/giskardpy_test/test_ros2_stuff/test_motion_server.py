@@ -2,7 +2,7 @@
 Tests of the goal life cycle of :class:`MotionServer`.
 """
 
-from cramph.reported_statechart import StatechartPayloadKey
+from cramph.reported_statechart import NodeStatesPublisher, StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -236,6 +236,13 @@ class WorldUpdatesMimic:
     @property
     def has_pending_model_change(self) -> bool:
         return self.pending_model_change
+
+
+def giskard_node_states_publisher() -> NodeStatesPublisher:
+    """
+    :return: A publisher of the node states the feedback and the result of a goal report.
+    """
+    return NodeStatesPublisher(sender=Sender(node_name="giskard", process_id=0))
 
 
 @dataclass(kw_only=True)
@@ -726,6 +733,7 @@ def motion_server(init_background_node, tmp_path: Path) -> MotionServerFixture:
         executor=executor,
         action_server=action_server,
         outgoing_world_updates=outgoing_world_updates,
+        node_states_publisher=giskard_node_states_publisher(),
     )
     command_publisher = RecordingCommandPublisher(world=world)
     control_input = RecordingInputSynchronizer(world=world, executor=executor)

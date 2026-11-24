@@ -48,7 +48,7 @@ from krrood_synchronization.messages import MessageOrigin, Sender, StreamPositio
 from semantic_digital_twin.world import World
 
 from .test_client_presence import SteppingClock
-from .test_motion_server import PublicationProgressMimic
+from .test_motion_server import PublicationProgressMimic, giskard_node_states_publisher
 from .test_world_updates import PublishingSynchronizerMimic
 
 # %% mimics
@@ -393,6 +393,7 @@ class ClientAndRunningStatechart:
             executor=self.executor,
             action_server=self.action_server,
             outgoing_world_updates=self.outgoing_world_updates,
+            node_states_publisher=giskard_node_states_publisher(),
         )
 
         client_context = StatechartContext(world=World())
@@ -759,6 +760,9 @@ def test_the_statechart_rebuilt_from_the_feedback_reads_the_conditions_of_the_ru
 
 
 def test_the_running_side_repeats_nothing_while_no_node_waits_for_a_child() -> None:
+    """
+    Without a node waiting for a child, unchanged states are reported only once.
+    """
     action_server = ActionServerRunningOneGoal()
     executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
@@ -774,6 +778,7 @@ def test_the_running_side_repeats_nothing_while_no_node_waits_for_a_child() -> N
         outgoing_world_updates=OutgoingWorldUpdates(
             world_synchronizer=PublicationProgressMimic()
         ),
+        node_states_publisher=giskard_node_states_publisher(),
         child_request_repeat_period=0.0,
     )
 
