@@ -237,8 +237,8 @@ class CausalRelationsOfClass:
         """
         node_of = {node.name: node for node in nodes}
         return graph_class.from_edges(
-            nodes,
-            [
+            nodes=nodes,
+            edges=[
                 relation.edge_among(node_of=node_of)
                 for relation in self.relations
                 if relation.scope == scope

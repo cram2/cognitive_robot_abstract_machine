@@ -246,12 +246,12 @@ class DiscretizedTableStructureLearner(
         tested_names = [node.name for node in tested]
         levels = self.discretizer.fit_transform(rows[tested_names])
         return self.graph_class.from_edges(
-            nodes,
-            self.learn_edges(
-                levels.to_numpy(dtype=np.int64),
-                tested,
-                self.to_causal_learn_knowledge(
-                    domain_knowledge.restricted_to(tested_names)
+            nodes=nodes,
+            edges=self.learn_edges(
+                levels=levels.to_numpy(dtype=np.int64),
+                nodes=tested,
+                domain_knowledge=self.to_causal_learn_knowledge(
+                    domain_knowledge=domain_knowledge.restricted_to(tested_names)
                 ),
             )
             + [
@@ -263,6 +263,7 @@ class DiscretizedTableStructureLearner(
     @abstractmethod
     def learn_edges(
         self,
+        *,
         levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
@@ -276,6 +277,7 @@ class DiscretizedTableStructureLearner(
 
     @staticmethod
     def to_causal_learn_knowledge(
+        *,
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalLearnKnowledge:
         """
@@ -336,6 +338,7 @@ class PeterClarkStructureLearner(DiscretizedTableStructureLearner[CausalGraph]):
 
     def learn_edges(
         self,
+        *,
         levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
@@ -380,6 +383,7 @@ class GreedyEquivalenceSearchStructureLearner(
 
     def learn_edges(
         self,
+        *,
         levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
@@ -443,6 +447,7 @@ class FastCausalInferenceStructureLearner(
 
     def learn_edges(
         self,
+        *,
         levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
@@ -471,6 +476,7 @@ class FastCausalInferenceStructureLearner(
 
     @staticmethod
     def to_causal_learn_knowledge(
+        *,
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalLearnKnowledge:
         """
@@ -484,7 +490,7 @@ class FastCausalInferenceStructureLearner(
                 kind=KnowledgeKind.FORBIDDEN_EDGES
             )
         return DiscretizedTableStructureLearner.to_causal_learn_knowledge(
-            domain_knowledge
+            domain_knowledge=domain_knowledge
         )
 
 

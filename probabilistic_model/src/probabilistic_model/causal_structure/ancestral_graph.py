@@ -38,6 +38,10 @@ class AncestralGraph(EdgeMarkedGraph):
 
     @classproperty
     def is_closed_under_union(cls) -> bool:
+        """
+        :return: False, unlike :meth:`EdgeMarkedGraph.is_closed_under_union`: the edges
+            of ancestral graphs over overlapping variables may not form one.
+        """
         return False
 
     # %% possibly directed paths
@@ -108,7 +112,7 @@ class AncestralGraph(EdgeMarkedGraph):
         """
         return self.possible_descendants_of_node[node]
 
-    def possible_ancestors(self, node: GraphNode) -> set[GraphNode]:
+    def possible_ancestors(self, *, node: GraphNode) -> set[GraphNode]:
         """
         :return: The nodes, other than itself, from which a possibly directed path
             reaches it.
@@ -176,7 +180,7 @@ class AncestralGraph(EdgeMarkedGraph):
         edges = [
             self.definite_edge_of(edge=edge, position=position) for edge in self.edges()
         ]
-        representative = AncestralGraph.from_edges(self.nodes(), edges)
+        representative = AncestralGraph.from_edges(nodes=self.nodes(), edges=edges)
         if not representative.is_ancestral:
             return None
         return representative
@@ -246,7 +250,9 @@ class AncestralGraph(EdgeMarkedGraph):
                 other = other_edge.other_end(node=node)
                 if other_edge.mark_at(node=node) is not EdgeMark.ARROW:
                     continue
-                if other not in (cause, child) and not self.adjacent(other, child):
+                if other not in (cause, child) and not self.adjacent(
+                    first=other, second=child
+                ):
                     return True
                 if (
                     other_edge.is_bidirected
@@ -360,8 +366,8 @@ class AncestralGraph(EdgeMarkedGraph):
             self.directed_part.ancestors(effect) | {effect}
         )
         return AncestralGraph.from_edges(
-            self.nodes(),
-            [
+            nodes=self.nodes(),
+            edges=[
                 edge
                 for edge in self.edges()
                 if not (

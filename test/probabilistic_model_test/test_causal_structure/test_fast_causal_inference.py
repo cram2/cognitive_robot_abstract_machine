@@ -109,8 +109,8 @@ def test_pure_hidden_confounding_is_learned_with_circles_at_both_causes():
 
     assert marks_of(graph) == marks_of(
         AncestralGraph.from_edges(
-            [w, x, y],
-            [
+            nodes=[w, x, y],
+            edges=[
                 GraphEdge.partially_directed_edge(circle_end=w, arrow_end=x),
                 GraphEdge.partially_directed_edge(circle_end=y, arrow_end=x),
             ],

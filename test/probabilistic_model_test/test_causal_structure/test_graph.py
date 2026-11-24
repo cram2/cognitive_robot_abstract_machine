@@ -132,15 +132,21 @@ def test_the_edge_between_two_nodes_is_found_from_either_end():
 
 
 def test_nodes_without_an_edge_are_not_adjacent():
+    """
+    Nodes without an edge are not adjacent.
+    """
     graph = mediated()
 
-    assert not graph.adjacent(graph.node("X"), graph.node("Y"))
+    assert not graph.adjacent(first=graph.node("X"), second=graph.node("Y"))
 
 
 def test_a_node_an_undirected_edge_may_point_into_is_a_possible_ancestor():
+    """
+    A node an undirected edge may point into is a possible ancestor.
+    """
     graph = undirected_parent()
 
-    assert graph.possible_ancestors(graph.node("X")) == {graph.node("A")}
+    assert graph.possible_ancestors(node=graph.node("X")) == {graph.node("A")}
 
 
 # %% the kinds of edges
@@ -400,8 +406,11 @@ def test_part_index_of_is_none_for_a_node_of_no_part():
 
 
 def test_reference_of_a_copy_names_the_node_and_the_part():
+    """
+    The reference of a copy names the node and the part.
+    """
     node = disturbed_neighbour()
-    graph = CausalGraph.from_edges([node], [])
+    graph = CausalGraph.from_edges(nodes=[node], edges=[])
 
     reference = graph.reference_of(node.variable_of_part(3).name)
 

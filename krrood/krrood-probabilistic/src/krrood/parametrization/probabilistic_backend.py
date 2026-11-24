@@ -405,7 +405,7 @@ class ProbabilisticBackend(GenerativeBackend):
             .graph
         )
         effect = self._reference_in(graph=graph, variable=effect_variable)
-        ancestors = graph.possible_ancestors(effect.node)
+        ancestors = graph.possible_ancestors(node=effect.node)
         return [
             variable
             for name, variable in parameters.variables.items()

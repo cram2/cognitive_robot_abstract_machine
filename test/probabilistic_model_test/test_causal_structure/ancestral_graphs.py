@@ -84,8 +84,8 @@ class TrueGraph:
         :return: The graph itself, hidden nodes included, as a causal graph.
         """
         return CausalGraph.from_edges(
-            [node_named(name) for name in self.names],
-            [
+            nodes=[node_named(name) for name in self.names],
+            edges=[
                 GraphEdge.directed_edge(node_named(parent), node_named(child))
                 for parent, child in self.directed
             ],
@@ -116,7 +116,7 @@ class TrueGraph:
                     EdgeMark.TAIL if second in dag.ancestors(first) else EdgeMark.ARROW,
                 )
             )
-        return AncestralGraph.from_edges(observed, edges)
+        return AncestralGraph.from_edges(nodes=observed, edges=edges)
 
     def partial_ancestral_graph(self) -> AncestralGraph:
         """
@@ -134,8 +134,8 @@ class TrueGraph:
                 dag, islatent=[causal_learn_node_of[name] for name in self.hidden]
             )
         return AncestralGraph.from_edges(
-            [node_named(name) for name in self.observed_names],
-            [
+            nodes=[node_named(name) for name in self.observed_names],
+            edges=[
                 GraphEdge(
                     node_named(edge.get_node1().get_name()),
                     node_named(edge.get_node2().get_name()),
@@ -244,8 +244,8 @@ def declared_confounder_of_covariates() -> AncestralGraph:
     """
     v, x, c, y = (node_named(name) for name in "VXCY")
     return AncestralGraph.from_edges(
-        [v, x, c, y],
-        [
+        nodes=[v, x, c, y],
+        edges=[
             GraphEdge.directed_edge(v, x),
             GraphEdge.directed_edge(c, x),
             GraphEdge.directed_edge(c, y),
@@ -262,8 +262,8 @@ def bare_confounded() -> AncestralGraph:
     """
     c, x, y = (node_named(name) for name in "CXY")
     return AncestralGraph.from_edges(
-        [c, x, y],
-        [
+        nodes=[c, x, y],
+        edges=[
             GraphEdge.directed_edge(c, x),
             GraphEdge.directed_edge(c, y),
             GraphEdge.directed_edge(x, y),

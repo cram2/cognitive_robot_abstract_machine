@@ -470,7 +470,9 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
     """
 
     @classmethod
-    def from_edges(cls, nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]) -> Self:
+    def from_edges(
+        cls, *, nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]
+    ) -> Self:
         """
         :param nodes: The nodes, one per variable.
         :param edges: The edges between them, at most one between two nodes.
@@ -540,6 +542,9 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
         return [node.name for node in self.nodes()]
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Extends :meth:`SubclassJSONSerializer.to_json` with the nodes and the edges.
+        """
         return {
             **super().to_json(**kwargs),
             CausalGraphJSONKey.NODES: to_json(self.nodes(), **kwargs),
@@ -548,9 +553,12 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
+        """
+        :return: The graph over the nodes and the edges in *data*.
+        """
         return cls.from_edges(
-            from_json(data[CausalGraphJSONKey.NODES], **kwargs),
-            from_json(data[CausalGraphJSONKey.EDGES], **kwargs),
+            nodes=from_json(data[CausalGraphJSONKey.NODES], **kwargs),
+            edges=from_json(data[CausalGraphJSONKey.EDGES], **kwargs),
         )
 
     def edge_between(self, first: GraphNode, second: GraphNode) -> GraphEdge | None:
@@ -564,7 +572,7 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
                 return edge
         return None
 
-    def adjacent(self, first: GraphNode, second: GraphNode) -> bool:
+    def adjacent(self, *, first: GraphNode, second: GraphNode) -> bool:
         """
         :param first: A node.
         :param second: Another node.
@@ -583,7 +591,7 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
         ]
 
     @abstractmethod
-    def possible_ancestors(self, node: GraphNode) -> set[GraphNode]:
+    def possible_ancestors(self, *, node: GraphNode) -> set[GraphNode]:
         """
         :param node: A node of the graph.
         :return: The nodes, other than itself, that may cause it as far as the graph
@@ -608,6 +616,9 @@ class CausalGraph(EdgeMarkedGraph):
     """
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Extends :meth:`EdgeMarkedGraph.to_json` with :attr:`maximum_member_graphs`.
+        """
         return {
             **super().to_json(**kwargs),
             CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS: self.maximum_member_graphs,
@@ -615,11 +626,14 @@ class CausalGraph(EdgeMarkedGraph):
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
+        """
+        Extends :meth:`EdgeMarkedGraph._from_json` with :attr:`maximum_member_graphs`.
+        """
         graph = super()._from_json(data=data, **kwargs)
         graph.maximum_member_graphs = data[CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS]
         return graph
 
-    def possible_ancestors(self, node: GraphNode) -> set[GraphNode]:
+    def possible_ancestors(self, *, node: GraphNode) -> set[GraphNode]:
         """
         :return: The nodes with a directed path to it in at least one member graph.
         """
@@ -653,7 +667,7 @@ class CausalGraph(EdgeMarkedGraph):
             for first_parent, second_parent in itertools.combinations(
                 sorted(directed.predecessors(child)), 2
             )
-            if not self.adjacent(first_parent, second_parent)
+            if not self.adjacent(first=first_parent, second=second_parent)
         }
 
     def member_graphs(self) -> list[MemberGraph]:

@@ -41,8 +41,8 @@ def ancestral_graph_of(*edges: tuple[str, EdgeMark, EdgeMark, str]) -> Ancestral
     """
     names = sorted({name for edge in edges for name in (edge[0], edge[3])})
     return AncestralGraph.from_edges(
-        [node_named(name) for name in names],
-        [
+        nodes=[node_named(name) for name in names],
+        edges=[
             GraphEdge(node_named(first), node_named(second), at_first, at_second)
             for first, at_first, at_second, second in edges
         ],
@@ -67,9 +67,9 @@ def test_possible_ancestors_follow_every_mark_but_an_arrow_at_the_earlier_node()
     graph = measured_confounder().partial_ancestral_graph()
 
     assert (
-        names_of(graph.possible_ancestors(graph.node("Y"))),
+        names_of(graph.possible_ancestors(node=graph.node("Y"))),
         names_of(graph.possible_descendants(node=graph.node("X"))),
-        names_of(graph.possible_ancestors(graph.node("V"))),
+        names_of(graph.possible_ancestors(node=graph.node("V"))),
     ) == ({"C", "V", "X"}, {"Y"}, set())
 
 
@@ -80,7 +80,7 @@ def test_an_edge_into_the_cause_is_no_step_of_a_possibly_directed_path():
     graph = pure_hidden_confounding().partial_ancestral_graph()
 
     assert (
-        names_of(graph.possible_ancestors(graph.node("X"))),
+        names_of(graph.possible_ancestors(node=graph.node("X"))),
         names_of(graph.possible_descendants(node=graph.node("X"))),
     ) == ({"W", "Y"}, set())
 
@@ -115,7 +115,8 @@ def simple_possibly_directed_paths(
         for middle in itertools.permutations(others, length):
             path = (start, *middle, end)
             consecutive = all(
-                graph.adjacent(first, second) for first, second in zip(path, path[1:])
+                graph.adjacent(first=first, second=second)
+                for first, second in zip(path, path[1:])
             )
             if consecutive and not any(
                 (edge := graph.edge_between(earlier, later)) is not None

@@ -147,8 +147,8 @@ def test_a_selection_bias_edge_leaves_the_effect_unidentified():
     """
     x, y, z = (node_named(name) for name in "XYZ")
     graph = AncestralGraph.from_edges(
-        [x, y, z],
-        [
+        nodes=[x, y, z],
+        edges=[
             GraphEdge.directed_edge(x, y),
             GraphEdge(z, x, EdgeMark.TAIL, EdgeMark.TAIL),
         ],
@@ -165,8 +165,8 @@ def test_a_graph_without_a_representative_leaves_the_effect_unidentified():
     """
     a, b, x, y = (node_named(name) for name in "ABXY")
     graph = AncestralGraph.from_edges(
-        [a, b, x, y],
-        [
+        nodes=[a, b, x, y],
+        edges=[
             GraphEdge.nondirected_edge(first=x, second=a),
             GraphEdge.nondirected_edge(first=a, second=y),
             GraphEdge.nondirected_edge(first=y, second=b),
@@ -185,7 +185,7 @@ def test_a_cause_of_the_effect_only_through_a_hidden_confounder_is_no_possible_c
     """
     graph = pure_hidden_confounding().partial_ancestral_graph()
 
-    assert graph.node("X") not in graph.possible_ancestors(graph.node("Y"))
+    assert graph.node("X") not in graph.possible_ancestors(node=graph.node("Y"))
 
 
 # %% the criterion of each kind of graph
@@ -365,7 +365,10 @@ def test_some_valid_set_exists_exactly_when_the_constructive_set_is_valid():
                 for nodes in itertools.combinations(pool, size)
             )
             constructive = (
-                (graph.possible_ancestors(cause) | graph.possible_ancestors(effect))
+                (
+                    graph.possible_ancestors(node=cause)
+                    | graph.possible_ancestors(node=effect)
+                )
                 - {cause, effect}
                 - criterion.forbidden_nodes
             )
