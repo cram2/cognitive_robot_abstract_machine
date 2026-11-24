@@ -342,19 +342,11 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         )
 
     def add_to_world(self, *, world: World) -> None:
-        r"""
+        """
         Extends :meth:`WorldEntity.add_to_world` by building the motion along
-        :attr:`screw_axis` from the position, as Lynch and Park's exponential of a
-        normalized screw axis (`Modern Robotics, Proposition 3.25
-        <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=123>`__). With
-        :math:`\omega` and :math:`v` the rotation and the translation per unit of
-        position and :math:`s` the position, it turns a vector :math:`x` to
-        :math:`x + \sin s\,\omega \times x + (1 - \cos s)\,\omega \times
-        (\omega \times x)` and moves the child's origin by :math:`s v + (1 - \cos s)
-        \,\omega \times v + (s - \sin s)\,\omega \times (\omega \times v)`.
-        That holds for a screw axis that turns the child by one radian per unit of
-        position and for one that does not turn it at all, wherever the axis lies, and
-        has no division.
+        :attr:`screw_axis` from the position, as `The transformation matrix
+        <https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/examples/screw_axis_connections.html#the-transformation-matrix>`__
+        explains.
         """
         super().add_to_world(world=world)
 
@@ -363,18 +355,12 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         translation = self.screw_axis.translation_per_unit_position
         sine = sm.sin(position)
         one_minus_cosine = 1 - sm.cos(position)
-
-        def turned(vector: Vector3) -> Vector3:
-            """
-            :return: ``vector`` turned by the rotation at the position.
-            """
-            rotation_cross_vector = rotation.cross(vector)
-            return (
-                vector
-                + rotation_cross_vector * sine
-                + rotation.cross(rotation_cross_vector) * one_minus_cosine
-            )
-
+        turned_axes = [
+            axis
+            + rotation.cross(axis) * sine
+            + rotation.cross(rotation.cross(axis)) * one_minus_cosine
+            for axis in (Vector3.X(), Vector3.Y(), Vector3.Z())
+        ]
         rotation_cross_translation = rotation.cross(translation)
         connection_V_child = (
             translation * position
@@ -384,14 +370,7 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         self._kinematics = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=connection_V_child.point3,
             rotation_matrix=RotationMatrix(
-                data=sm.hstack(
-                    [
-                        turned(Vector3.X()),
-                        turned(Vector3.Y()),
-                        turned(Vector3.Z()),
-                        Point3(0, 0, 0),
-                    ]
-                )
+                data=sm.hstack([*turned_axes, Point3(0, 0, 0)])
             ),
             child_frame=self.child,
         )
