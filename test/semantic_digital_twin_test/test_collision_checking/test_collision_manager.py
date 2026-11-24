@@ -1,3 +1,10 @@
+"""
+The collision manager: the collision rules it keeps, the contacts it hands to its
+consumers, and what it tells a robot about how close it is to other bodies.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 from copy import deepcopy
 from dataclasses import dataclass, field
