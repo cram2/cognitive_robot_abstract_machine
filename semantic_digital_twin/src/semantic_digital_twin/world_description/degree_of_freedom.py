@@ -1,3 +1,5 @@
+"""Degrees of freedom of a world, their state variables and their limits."""
+
 from __future__ import annotations
 
 from copy import deepcopy
