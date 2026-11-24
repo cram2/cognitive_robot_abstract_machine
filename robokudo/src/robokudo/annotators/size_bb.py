@@ -2,6 +2,8 @@
 Size estimation of object hypotheses from 3D oriented bounding boxes.
 """
 
+from __future__ import annotations
+
 import logging
 import copy
 from timeit import default_timer

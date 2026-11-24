@@ -233,10 +233,6 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
                     {"name": "Initial Pose Estimate", "geometry": ply_model}
                 )
 
-                # evaluation = o3d.pipelines.registration.evaluate_registration(
-                #     ply_model, cluster_cloud, thresh, icp_transform_init)
-                # logger.info(evaluation)
-
                 # We'll now go through our pose variants, register them after each other and then check which has the
                 # highest fitness
                 pose_variant_registration_results = []
@@ -259,7 +255,6 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
                     pose_variant_registration_results.append(
                         (reg_p2p, pose_variant, description)
                     )
-                    # logger.info(reg_p2p)
 
                 best_registration_result = None
                 best_registration_result_idx = 0

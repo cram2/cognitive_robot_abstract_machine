@@ -217,7 +217,6 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
 
         self.collection_readers = [self.descriptor]
         """List of collection reader descriptors"""
-        # logger.debug("%s" % (get_line_context(self)))
 
     def setup(self, timeout: float) -> bool:
         """

@@ -2,6 +2,8 @@
 Tests of the annotator decorators in :mod:`robokudo.utils.decorators`.
 """
 
+from __future__ import annotations
+
 import logging
 import time
 

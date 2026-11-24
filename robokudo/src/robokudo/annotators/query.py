@@ -35,6 +35,7 @@ from robokudo_msgs.msg import ObjectDesignator
 from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.annotators.exceptions import QueryServerNotStarted
 from robokudo.cas import CASViews
 from robokudo.defs import LOGGING_IDENTIFIER_QUERY
 from robokudo.identifier import BBIdentifier
@@ -138,9 +139,8 @@ class QueryAnnotator(BaseAnnotator):
         """
         logger.debug(f"{self.__class__.__name__}.update()")
 
-        assert self.action_server is not None, (
-            "Action server should be initialized by now."
-        )
+        if self.action_server is None:
+            raise QueryServerNotStarted(annotator_name=self.name)
         query = self.action_server.new_query
         logger.debug(f"self.action_server.new_query: {query}")
 

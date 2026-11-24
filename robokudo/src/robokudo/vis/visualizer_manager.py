@@ -1,15 +1,9 @@
 """
-Visualization management for RoboKudo pipelines.
-
-This module provides a behavior tree node that manages visualization of pipeline data
-using different visualization backends. It coordinates:
-
-* OpenCV-based visualization
-* Open3D visualization
-* ROS visualization
-* Shared visualization state
-* Pipeline data synchronization
+Showing the annotator outputs of RoboKudo pipelines in the OpenCV, Open3D and ROS
+visualizers.
 """
+
+from __future__ import annotations
 
 import copy
 import logging
@@ -30,22 +24,8 @@ logger = logging.getLogger(__name__)
 
 class VisualizationManager(Behaviour):
     """
-    Behavior tree node for managing pipeline visualizations.
-
-    This class coordinates visualization of pipeline data across multiple
-    visualization backends. It handles:
-
-    * Pipeline data buffering and synchronization
-    * Visualizer creation and lifecycle management
-    * Shared visualization state
-    * Visualization timing and performance monitoring
-
-    .. note::
-        The manager operates in three phases:
-
-        1. Pre-tick: Prepare visualizers for new data
-        2. Tick: Update visualizations
-        3. Post-tick: Cleanup and synchronization
+    Behaviour tree node that gives every pipeline of its tree one visualizer of each
+    type and shows the pipeline's latest annotator outputs in them.
     """
 
     def __init__(self, name: str, visualizer_types: list[type] | None = None) -> None:
@@ -107,17 +87,11 @@ class VisualizationManager(Behaviour):
 
     def initialise(self) -> None:
         """
-        Initialize the behavior tree node.
-
-        This method:
-
-        * Clears existing pipeline references
-        * Finds all Pipeline nodes in the behavior tree
-        * Stores references to found pipelines
+        Collect the pipelines in the subtree of this node's parent.
 
         .. note::
-            The VisualizationManager should be placed one level below the top node
-            (Parallel) in the behavior tree.
+            Place the manager directly below the top node of the tree, so that it finds
+            every pipeline.
         """
         logger.debug("%s.initialise()" % self.__class__.__name__)
         self.pipelines = {}
@@ -129,21 +103,10 @@ class VisualizationManager(Behaviour):
 
     def update(self) -> Status:
         """
-        Update visualizations for all pipelines.
+        Show the latest annotator outputs of every pipeline in its visualizers, creating
+        the visualizers of a pipeline the first time it has outputs.
 
-        This method:
-
-        1. Copies new data from buffer to visualization map
-        2. Creates visualizers for new pipelines
-        3. Notifies visualizers of new data
-        4. Executes pre-tick, tick, and post-tick phases
-        5. Checks for termination signals
-
-        :returns: FAILURE if any visualizer indicates termination, RUNNING otherwise
-
-        .. note::
-            The update cycle ensures synchronized visualization across all backends
-            while maintaining separation between data buffers and visualization state.
+        :returns: FAILURE once a visualizer asks to shut down, RUNNING otherwise
         """
         logger.debug("%s.update()" % self.__class__.__name__)
         start_timer = default_timer()

@@ -3,6 +3,8 @@ Base classes of task schedulers, which arrange the behaviours of a job in a beha
 tree while it runs.
 """
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 
