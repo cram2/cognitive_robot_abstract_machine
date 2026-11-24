@@ -1,3 +1,9 @@
+"""
+Tests of the symbolic math expressions, variables, vectors and matrices.
+"""
+
+from __future__ import annotations
+
 import copy
 import gc
 import itertools
@@ -518,6 +524,10 @@ class TestIfElse:
 
 
 class TestFloatVariable:
+    """
+    Tests of :class:`~krrood.symbolic_math.symbolic_math.FloatVariable`.
+    """
+
     def test_bool_casting(self):
         v = sm.FloatVariable(name="v")
         with pytest.raises(HasFreeVariablesError):
@@ -525,16 +535,14 @@ class TestFloatVariable:
 
     def test_free_variables(self):
         """
-        Use a method to create the variable to test if the weak ref dict cleans them up.
+        An expression reports the variables it is built from, in order, while they are
+        alive.
         """
-
-        def create_variables(name: str) -> sm.FloatVariable:
-            return sm.FloatVariable(name=name)
-
-        expression = create_variables("muh") + create_variables("kikariki")
-        assert len(expression.free_variables()) == 2
-        assert expression.free_variables()[0].name == "muh"
-        assert expression.free_variables()[1].name == "kikariki"
+        muh = sm.FloatVariable(name="muh")
+        kikariki = sm.FloatVariable(name="kikariki")
+        expression = muh + kikariki
+        gc.collect()
+        assert expression.free_variables() == [muh, kikariki]
 
     def test_create_with_resolver(self):
         v = sm.FloatVariable.create_with_resolver(name="v", resolver=lambda: 42)
