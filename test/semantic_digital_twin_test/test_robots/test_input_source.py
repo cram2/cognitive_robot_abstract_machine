@@ -1,3 +1,8 @@
+"""
+Tests of where the parts of a robot read their state from: the world they stand in or
+the topics of the real robot.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -39,7 +44,7 @@ from semantic_digital_twin.robots.tracy import (
     TracyRightGripperRightFinger,
     TracyTopic,
 )
-from semantic_digital_twin.robots.robot_parts import KinematicChain
+from semantic_digital_twin.robots.robot_parts import RobotKinematicChain
 from semantic_digital_twin.world import World
 
 # %% stand-ins for the sources a part can be read from
@@ -134,7 +139,10 @@ def test_a_part_is_read_from_the_kind_of_source_it_binds():
 
 
 def test_a_chain_is_read_from_the_positions_of_its_joints():
-    assert KinematicChain.source_family() is JointPositionSource
+    """
+    A kinematic chain of a robot is read from the positions of its joints.
+    """
+    assert RobotKinematicChain.source_family() is JointPositionSource
 
 
 def test_a_mobile_base_is_read_from_its_pose():
@@ -252,8 +260,14 @@ def annotated_pr2(pr2_world_copy: World) -> PR2:
 
 
 def test_every_chain_of_an_annotated_robot_reads_the_world_it_stands_in(annotated_pr2):
+    """
+    Every chain of a robot annotated in a world reads the world it stands in, until it
+    is switched to the real robot.
+    """
     chains = [
-        part for part in annotated_pr2._robot_parts if isinstance(part, KinematicChain)
+        part
+        for part in annotated_pr2._robot_parts
+        if isinstance(part, RobotKinematicChain)
     ]
 
     assert chains

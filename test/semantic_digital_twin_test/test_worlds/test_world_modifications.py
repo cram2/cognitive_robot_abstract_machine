@@ -1,3 +1,10 @@
+"""
+Tests of applying, reverting and copying the modifications of a world.
+"""
+
+from __future__ import annotations
+
+
 import unittest
 import uuid
 from copy import deepcopy
@@ -54,6 +61,10 @@ from semantic_digital_twin.world_description.world_modification import (
 
 
 class ConnectionModificationTestCase(unittest.TestCase):
+    """
+    Tests of recording, copying and applying the modifications of connections.
+    """
+
     def test_single_modification(self):
         w = World()
 
@@ -151,7 +162,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         # copy modifications
         modifications_copy = from_json(to_json(modifications), **kwargs)
         with w2.modify_world():
-            modifications_copy.apply(w2)
+            modifications_copy.apply(world=w2)
         self.assertEqual(len(w2.bodies), 3)
         self.assertEqual(len(w2.connections), 2)
 
@@ -169,7 +180,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
 
         modifications_copy = from_json(to_json(modifications), **kwargs)
         with w2.modify_world():
-            modifications_copy.apply(w2)
+            modifications_copy.apply(world=w2)
         self.assertEqual(len(w2.bodies), 2)
         self.assertEqual(len(w2.connections), 1)
 
@@ -186,8 +197,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         self.assertNotEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
 
         with w.modify_world():
-            add_v1.apply(w)
-            add_v2.apply(w)
+            add_v1.apply(world=w)
+            add_v2.apply(world=w)
 
         self.assertEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
         self.assertEqual(v1.root, w.get_kinematic_structure_entity_by_name("b1"))
@@ -195,8 +206,8 @@ class ConnectionModificationTestCase(unittest.TestCase):
         rm_v1 = RemoveSemanticAnnotationModification(v1.id)
         rm_v2 = RemoveSemanticAnnotationModification(v2.id)
         with w.modify_world():
-            rm_v1.apply(w)
-            rm_v2.apply(w)
+            rm_v1.apply(world=w)
+            rm_v2.apply(world=w)
 
         self.assertNotEqual({v1.id, v2.id}, set(a.id for a in w.semantic_annotations))
 
@@ -229,7 +240,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
 
         w2 = World()
         with w2.modify_world():
-            modifications_copy.apply(w2)
+            modifications_copy.apply(world=w2)
         self.assertEqual(len(w2.bodies), 3)
         self.assertEqual(len(w2.connections), 2)
 
@@ -254,7 +265,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
         modifications_copy = from_json(to_json(modifications), **kwargs)
         w2 = World()
         with w2.modify_world():
-            modifications_copy.apply(w2)
+            modifications_copy.apply(world=w2)
 
         self.assertEqual(len(w2.actuators), 1)
         self.assertEqual(w2.actuators[0].id, actuator.id)
@@ -354,6 +365,9 @@ def _last_modification_block(world: World) -> WorldModelModificationBlock:
 
 
 def test_revert_add_kinematic_structure_entity():
+    """
+    Reverting the addition of a body removes it again.
+    """
     world = World()
     body = Body(name=PrefixedName("body"))
     with world.modify_world():
@@ -363,12 +377,15 @@ def test_revert_add_kinematic_structure_entity():
     assert isinstance(modification, AddKinematicStructureEntityModification)
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert not world.is_kinematic_structure_entity_in_world(body)
 
 
 def test_revert_remove_kinematic_structure_entity():
+    """
+    Reverting the removal of a body adds it back.
+    """
     world = World()
     body = Body(name=PrefixedName("body"))
     with world.modify_world():
@@ -380,12 +397,15 @@ def test_revert_remove_kinematic_structure_entity():
     assert isinstance(modification, RemoveKinematicStructureEntityModification)
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert world.is_kinematic_structure_entity_in_world(body)
 
 
 def test_revert_add_connection():
+    """
+    Reverting the addition of a connection removes it again.
+    """
     world = World()
     with world.modify_world():
         b1 = Body(name=PrefixedName("b1"))
@@ -402,7 +422,7 @@ def test_revert_add_connection():
     )
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
         # reverting the connection alone leaves b2 disconnected from the world's single
         # root, which a modify_world block may not exit with; remove it too.
         world.remove_kinematic_structure_entity(b2)
@@ -412,6 +432,9 @@ def test_revert_add_connection():
 
 
 def test_revert_remove_connection():
+    """
+    Reverting the removal of a connection adds it back.
+    """
     world = World()
     with world.modify_world():
         b1 = Body(name=PrefixedName("b1"))
@@ -433,13 +456,16 @@ def test_revert_remove_connection():
     )
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert connection in world.connections
     assert world.is_kinematic_structure_entity_in_world(b2)
 
 
 def test_revert_add_degree_of_freedom():
+    """
+    Reverting the addition of a degree of freedom removes it again.
+    """
     # A degree of freedom not used by any connection is deleted automatically as an
     # orphan when the modify_world block that adds it closes (World.delete_orphaned_dofs),
     # so it has to be attached to a connection to observe revert() removing it deliberately.
@@ -467,12 +493,15 @@ def test_revert_add_degree_of_freedom():
         # compilation fails with a dangling reference to the removed dof.
         world.remove_connection(connection)
         world.remove_kinematic_structure_entity(b2)
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert not world.is_degree_of_freedom_in_world(dof)
 
 
 def test_revert_remove_degree_of_freedom():
+    """
+    Reverting the removal of a degree of freedom adds it back.
+    """
     world = World()
     with world.modify_world():
         b1 = Body(name=PrefixedName("b1"))
@@ -499,7 +528,7 @@ def test_revert_remove_degree_of_freedom():
     )
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
         # re-attach the dof so the block does not exit with it orphaned again.
         world.add_kinematic_structure_entity(b2)
         world.add_connection(connection)
@@ -508,6 +537,9 @@ def test_revert_remove_degree_of_freedom():
 
 
 def test_revert_add_semantic_annotation():
+    """
+    Reverting the addition of a semantic annotation removes it again.
+    """
     world = World()
     with world.modify_world():
         body = Body(name=PrefixedName("body"))
@@ -516,17 +548,20 @@ def test_revert_add_semantic_annotation():
 
     add_handle = AddSemanticAnnotationModification.from_domain_object(handle)
     with world.modify_world():
-        add_handle.apply(world)
+        add_handle.apply(world=world)
 
     assert handle.id in {a.id for a in world.semantic_annotations}
 
     with world.modify_world():
-        add_handle.revert(world)
+        add_handle.revert(world=world)
 
     assert handle.id not in {a.id for a in world.semantic_annotations}
 
 
 def test_revert_remove_semantic_annotation():
+    """
+    Reverting the removal of a semantic annotation adds it back.
+    """
     world = World()
     with world.modify_world():
         body = Body(name=PrefixedName("body"))
@@ -542,12 +577,15 @@ def test_revert_remove_semantic_annotation():
     assert handle.id not in {a.id for a in world.semantic_annotations}
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert handle.id in {a.id for a in world.semantic_annotations}
 
 
 def test_revert_add_actuator():
+    """
+    Reverting the addition of an actuator removes it again.
+    """
     world = World()
     actuator = Actuator(name=PrefixedName("actuator"))
     with world.modify_world():
@@ -555,12 +593,15 @@ def test_revert_add_actuator():
 
     modification = _last_modification_block(world)[0]
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert actuator not in world.actuators
 
 
 def test_revert_remove_actuator():
+    """
+    Reverting the removal of an actuator adds it back.
+    """
     world = World()
     actuator = Actuator(name=PrefixedName("actuator"))
     with world.modify_world():
@@ -572,12 +613,16 @@ def test_revert_remove_actuator():
     assert isinstance(modification, RemoveActuatorModification)
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert actuator in world.actuators
 
 
 def test_revert_set_dofs_has_hardware_interface_restores_per_dof_previous_value():
+    """
+    Reverting a change of the hardware interface gives each degree of freedom the value
+    it had before.
+    """
     # dof1 and dof2 are each attached to a connection so neither is deleted as an
     # orphan when the modify_world block that adds it closes.
     world = World()
@@ -615,13 +660,16 @@ def test_revert_set_dofs_has_hardware_interface_restores_per_dof_previous_value(
     assert isinstance(modification, SetDofHasHardwareInterface)
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert dof1.has_hardware_interface is True
     assert dof2.has_hardware_interface is False
 
 
 def test_revert_attribute_update_scalar():
+    """
+    Reverting the update of a scalar attribute restores its previous value.
+    """
     world = World()
     body = Body(name=PrefixedName("body"))
     with world.modify_world():
@@ -637,12 +685,15 @@ def test_revert_attribute_update_scalar():
     assert isinstance(modification, AttributeUpdateModification)
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert body.name == original_name
 
 
 def test_revert_attribute_update_list():
+    """
+    Reverting the update of a list attribute restores its previous elements.
+    """
     world = World()
     with world.modify_world():
         oven_body = Body(name=PrefixedName("oven_body"))
@@ -670,12 +721,16 @@ def test_revert_attribute_update_list():
     assert door in oven.doors
 
     with world.modify_world():
-        modification.revert(world)
+        modification.revert(world=world)
 
     assert door not in oven.doors
 
 
 def test_world_model_modification_block_revert_restores_removed_branch():
+    """
+    Reverting a block that removed a branch of the kinematic structure adds the branch
+    back.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -691,7 +746,7 @@ def test_world_model_modification_block_revert_restores_removed_branch():
 
     block = _last_modification_block(world)
     with world.modify_world():
-        block.revert(world)
+        block.revert(world=world)
 
     assert world.is_kinematic_structure_entity_in_world(child)
     assert connection in world.connections

@@ -5,6 +5,9 @@ after the rules krrood ships.
 
 from __future__ import annotations
 
+from cognitive_robot_abstract_machine.orm_interface_imports import (
+    ModuleLevelOrmInterfaceImportChecker,
+)
 from cognitive_robot_abstract_machine.pull_request_labels import ChangeKindLabel
 from cognitive_robot_abstract_machine.repository_files import RepositoryFile
 from krrood.development_tools.agents.rule import Section
@@ -46,9 +49,13 @@ class GeneratedORMInterfacesRules(Section):
         "developer"
     )
 
-    ASK_ABOUT_ORM_IMPORT_CYCLES = (
-        "If an ORM import creates an import cycle, ask the user if a local import "
-        "is fine"
+    IMPORT_INTERFACES_INSIDE_FUNCTIONS = (
+        "Import an ORM interface only inside the functions that need it or under "
+        "`TYPE_CHECKING`, never when the module is loaded. This is an exception to "
+        "importing at the top of the module. A `generate_orm.py` is exempt: its "
+        "module-level imports declare the interfaces it builds on",
+        (),
+        ModuleLevelOrmInterfaceImportChecker(),
     )
 
 
@@ -64,8 +71,9 @@ class KrroodIsolationRules(Section):
         "`krrood`, including its tests under `test/krrood_test`, never imports "
         "another workspace package - in particular not `coraplex`, "
         "`semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or "
-        "`experiments`. The only exceptions are `random_events` and "
-        "`probabilistic_model`, which `krrood`'s source already depends on"
+        "`experiments`. The only exceptions are `random_events`, "
+        "`probabilistic_model` and `krrood_compute_resources`, which `krrood`'s "
+        "source already depends on"
     )
 
     MIMIC_OTHER_PACKAGES_IN_KRROOD_TESTS = (
@@ -76,8 +84,8 @@ class KrroodIsolationRules(Section):
     )
 
     MIMICS_IMPORT_ONLY_KRROOD_DEPENDENCIES = (
-        "Those mimic classes import only `krrood`, `random_events` and "
-        "`probabilistic_model`"
+        "Those mimic classes import only `krrood`, `random_events`, "
+        "`probabilistic_model` and `krrood_compute_resources`"
     )
 
 

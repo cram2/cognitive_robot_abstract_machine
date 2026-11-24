@@ -26,6 +26,7 @@ from probabilistic_model.learning.exceptions import (
     UnsupportedLeafDistributionError,
 )
 from probabilistic_model.learning.learning_method import LearningMethod
+from probabilistic_model.learning.training_schedule import MiniBatchTraining
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     InnerUnit,
     LeafUnit,
@@ -180,7 +181,7 @@ class ExpectationMaximization:
         :param data: One row per sample, columns ordered like the circuit's variables.
         :return: The average log-likelihood and the responsibilities of every unit.
         """
-        average_log_likelihood = float(np.mean(circuit.log_likelihood(data)))
+        average_log_likelihood = float(np.mean(circuit.log_likelihood(events=data)))
         log_responsibilities = np.full(
             (len(data), max(circuit.graph.node_indices()) + 1), -np.inf
         )
@@ -394,6 +395,40 @@ class ExpectationMaximization:
         for key in list(probabilities.keys()):
             probabilities[key] = float(np.sum(weights[value_hashes == key]))
         distribution.normalize()
+
+
+# %% training until convergence
+@dataclass(kw_only=True)
+class ExpectationMaximizationTraining(MiniBatchTraining):
+    """
+    Expectation maximization of the parameters of a circuit, in place, one iteration on
+    every batch; the loss of a batch is its negative average log-likelihood before the
+    iteration.
+    """
+
+    circuit: ProbabilisticCircuit
+    """
+    The circuit whose parameters are learned.
+    """
+
+    learnable_units: LearnableUnits
+    """
+    The units of the circuit to update.
+    """
+
+    expectation_maximization: ExpectationMaximization = field(
+        default_factory=ExpectationMaximization
+    )
+    """
+    The expectation maximization the parameters are learned with.
+    """
+
+    def step_on_batch(self, *, batch: tuple[SampleArray, ...]) -> float:
+        [data] = batch
+        [average_log_likelihood] = self.expectation_maximization.learn(
+            self.circuit, data, self.learnable_units, 1
+        )
+        return -average_log_likelihood
 
 
 # %% learning method

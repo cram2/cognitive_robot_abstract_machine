@@ -1,3 +1,8 @@
+"""
+Tests of motions that keep running while bodies of the world are moved to another
+parent, and of how the robot comes to rest before that happens.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -15,7 +20,7 @@ from cramph.nodes_for_testing import ConstTrueNode
 
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
@@ -31,6 +36,7 @@ from semantic_digital_twin.world_description.connections import (
     FixedConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% helpers
 
@@ -59,6 +65,10 @@ def _add_box_next_to_the_robot(world: World) -> Body:
 def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A motion built while a box stood on its own still brings the box to its goal pose
+    after the box was moved onto the robot.
+    """
     world = cylinder_bot_world
     box = _add_box_next_to_the_robot(world)
     robot = world.get_kinematic_structure_entity_by_name("bot")
@@ -72,15 +82,13 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
             carry := Sequence(
                 nodes=[
                     CartesianPose(
-                        root_link=world.root,
-                        tip_link=robot,
+                        kinematic_chain=KinematicChain(root=world.root, tip=robot),
                         goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
                         name="approach",
                     ),
                     MoveBranch(branch_root=box, new_parent=robot),
                     CartesianPose(
-                        root_link=world.root,
-                        tip_link=box,
+                        kinematic_chain=KinematicChain(root=world.root, tip=box),
                         goal_pose=goal_pose,
                         name="carry",
                     ),
@@ -93,7 +101,7 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
-    assert carry.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert carry.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert np.allclose(
         world.compute_forward_kinematics(world.root, box), goal_pose, atol=0.02
     )
@@ -102,6 +110,10 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
 def test_building_the_nodes_again_registers_no_further_variables(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    Building the nodes again after a body was moved reuses the variables already
+    registered.
+    """
     world = cylinder_bot_world
     box = _add_box_next_to_the_robot(world)
     robot = world.get_kinematic_structure_entity_by_name("bot")
@@ -111,8 +123,7 @@ def test_building_the_nodes_again_registers_no_further_variables(
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
@@ -186,8 +197,7 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=5, reference_frame=world.root),
         )
     )
@@ -204,7 +214,7 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
             break
         executor.tick()
         holding_still = (
-            choosing.life_cycle_state == LifeCycleValues.RUNNING
+            choosing.life_cycle_state == LifeCycleValue.RUNNING
             and not chooser.speeds_when_asked
         )
         if holding_still:
@@ -240,8 +250,7 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )
@@ -254,6 +263,10 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
 def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_at_rest(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    The robot counts as at rest below the speed at rest given to its motion control, and
+    not above it.
+    """
     world = cylinder_bot_world
     robot = world.get_kinematic_structure_entity_by_name("bot")
     motion_control = MotionControl(speed_at_rest=0.5)
@@ -263,8 +276,7 @@ def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_a
     statechart = Statechart(context=executor.context)
     statechart.add_node(
         node=CartesianPose(
-            root_link=world.root,
-            tip_link=robot,
+            kinematic_chain=KinematicChain(root=world.root, tip=robot),
             goal_pose=Pose.from_xyz_rpy(x=0.2, reference_frame=world.root),
         )
     )

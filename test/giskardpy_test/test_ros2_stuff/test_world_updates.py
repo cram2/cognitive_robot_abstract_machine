@@ -1,3 +1,10 @@
+"""
+Tests of which world updates Giskard and its clients apply, when, and how they tell what
+the other side caught up with.
+"""
+
+from __future__ import annotations
+
 import json
 import time
 from dataclasses import dataclass, field
@@ -7,7 +14,6 @@ from typing_extensions import Any
 import pytest
 
 from cramph.executor import NoPacing
-from krrood.patterns.called_positionally import called_positionally
 from semantic_digital_twin.adapters.ros import background_node
 from giskardpy.middleware.ros2.command_publishing import CommandPublisher
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
@@ -29,7 +35,7 @@ from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.adapters.json_serializer import to_json
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Vector3
@@ -91,8 +97,12 @@ class BufferingSynchronizerMimic:
         self.applied_message_batches += 1
         self.buffered_model_modification = False
 
-    @called_positionally
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
+        """
+        Remember the position it was asked about.
+
+        :return: The answer the mimic was configured with.
+        """
         self.asked_about_positions.append(position)
         return self.caught_up
 
@@ -109,8 +119,10 @@ class PublishingSynchronizerMimic:
     Position of the change this world published last.
     """
 
-    origin: MetaData = field(
-        default_factory=lambda: MetaData(node_name="client", process_id=0)
+    origin: MessageOrigin = field(
+        default_factory=lambda: MessageOrigin(
+            sender=Sender(node_name="client", process_id=0)
+        )
     )
     """
     The publisher the positions of this world belong to.
@@ -127,8 +139,11 @@ class PublishingSynchronizerMimic:
             origin=self.origin, sequence_number=self.published_sequence_number
         )
 
-    @called_positionally
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
+        """
+        :return: Whether ``position`` is not after the position this world caught up with,
+            whatever its publisher.
+        """
         return self.applied_sequence_number >= position.sequence_number
 
 
@@ -225,23 +240,33 @@ class TestCatchingUp:
     """
 
     def test_the_position_to_catch_up_with_reaches_the_synchronizer(self):
+        """
+        The world updates ask the synchronizer that received the change.
+        """
         world_synchronizer = BufferingSynchronizerMimic(caught_up=True)
         world_updates = IncomingWorldUpdates(world_synchronizer=world_synchronizer)
         position = StreamPosition(
-            origin=MetaData(node_name="publisher", process_id=1), sequence_number=7
+            origin=MessageOrigin(sender=Sender(node_name="publisher", process_id=1)),
+            sequence_number=7,
         )
 
         assert world_updates.has_applied(position=position)
         assert world_synchronizer.asked_about_positions == [position]
 
     def test_a_position_that_was_not_reached_is_reported_as_such(self):
+        """
+        A change the synchronizer did not apply yet is not reported as applied.
+        """
         world_updates = IncomingWorldUpdates(
             world_synchronizer=BufferingSynchronizerMimic(caught_up=False)
         )
 
         assert not world_updates.has_applied(
             position=StreamPosition(
-                origin=MetaData(node_name="publisher", process_id=1), sequence_number=7
+                origin=MessageOrigin(
+                    sender=Sender(node_name="publisher", process_id=1)
+                ),
+                sequence_number=7,
             )
         )
 
@@ -278,6 +303,10 @@ class TestClientWorldUpdates:
         world_updates.wait_for_the_changes_of_a_goal(result={})
 
     def test_the_changes_of_a_goal_are_waited_for(self):
+        """
+        Waiting for the changes of a goal ends once the position its result reports was
+        applied.
+        """
         synchronizer = PublishingSynchronizerMimic(applied_sequence_number=9)
         world_updates = ClientWorldUpdates(
             world_synchronizer=synchronizer,
@@ -289,7 +318,9 @@ class TestClientWorldUpdates:
             result={
                 "published_position": to_json(
                     StreamPosition(
-                        origin=MetaData(node_name="giskard", process_id=1),
+                        origin=MessageOrigin(
+                            sender=Sender(node_name="giskard", process_id=1)
+                        ),
                         sequence_number=9,
                     )
                 )
@@ -297,6 +328,10 @@ class TestClientWorldUpdates:
         )
 
     def test_changes_that_never_arrive_are_reported(self):
+        """
+        A reported change that is not applied within the timeout is raised, naming the
+        position that was awaited.
+        """
         world_updates = ClientWorldUpdates(
             world_synchronizer=PublishingSynchronizerMimic(applied_sequence_number=8),
             timeout=timedelta(seconds=0.05),
@@ -308,7 +343,9 @@ class TestClientWorldUpdates:
                 result={
                     "published_position": to_json(
                         StreamPosition(
-                            origin=MetaData(node_name="giskard", process_id=1),
+                            origin=MessageOrigin(
+                                sender=Sender(node_name="giskard", process_id=1)
+                            ),
                             sequence_number=9,
                         )
                     )

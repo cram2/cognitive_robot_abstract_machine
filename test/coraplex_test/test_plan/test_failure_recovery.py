@@ -24,7 +24,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
     SetGripperAction,
 )
 from cramph.composites import Sequence
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import StatechartAlreadyCompiledError
 from cramph.failure_handling import HandledOnFailure, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
@@ -32,7 +32,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.world import World
 from ...plan_running import run_plan
 
@@ -60,10 +60,10 @@ class StepFailingItsFirstRuns(
     def on_start(self) -> None:
         self.runs += 1
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         if self.runs <= self.failing_runs:
-            return ObservationStateValues.FALSE
-        return ObservationStateValues.TRUE
+            return ObservationStateValue.FALSE
+        return ObservationStateValue.TRUE
 
 
 @dataclass(kw_only=True)
@@ -124,7 +124,7 @@ class GripperIsOpen(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNo
     def on_start(self) -> None:
         self.runs += 1
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         open_state = self.end_effector.default_configuration(
             GripperState.OPEN
         ).joint_state
@@ -134,7 +134,7 @@ class GripperIsOpen(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNo
                 open_state.connections, open_state.target_values
             )
         )
-        return ObservationStateValues.TRUE if is_open else ObservationStateValues.FALSE
+        return ObservationStateValue.TRUE if is_open else ObservationStateValue.FALSE
 
 
 @dataclass(kw_only=True)
@@ -170,7 +170,7 @@ class OpenGripperBeforeReadingIt(SequentialInsertion[GripperIsOpen]):
 
     def nodes_to_insert(self, plan_node: GripperIsOpen) -> list[StatechartNode]:
         action = SetGripperAction(
-            configuration=plan_node.end_effector.default_configuration(
+            gripper_configuration=plan_node.end_effector.default_configuration(
                 self.gripper_state
             )
         )
@@ -242,7 +242,7 @@ class CloseGripperBeforeAFailingStep(SequentialInsertion[StepFailingItsFirstRuns
     ) -> list[StatechartNode]:
         return [
             SetGripperAction(
-                configuration=self.end_effector.default_configuration(
+                gripper_configuration=self.end_effector.default_configuration(
                     GripperState.CLOSE
                 )
             )
@@ -257,7 +257,7 @@ def _closed_gripper(end_effector: EndEffector) -> SetGripperAction:
     :return: An action closing the gripper of `end_effector`.
     """
     return SetGripperAction(
-        configuration=end_effector.default_configuration(GripperState.CLOSE)
+        gripper_configuration=end_effector.default_configuration(GripperState.CLOSE)
     )
 
 
@@ -269,13 +269,15 @@ def _pick_up_of_the_milk(
         recovering from a failure with `recovery`, its pick-up, and the milk.
     """
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.right_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.right_arm
+    )
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
-                    1.5, 2.4, 0.0, reference_frame=world.root
+                planar_goal_pose=Pose2D.from_xy_yaw(
+                    x=1.5, y=2.4, reference_frame=world.root
                 )
             ),
             HandledOnFailure(handled_node=pick_up, failure_handling_strategy=recovery),
@@ -302,7 +304,7 @@ def test_a_pick_up_whose_grasp_failed_is_run_again_until_it_holds_the_milk(
         [*extensions, PlanRewriting(transformations=[failing_grasp])],
     )
 
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
     [inserted_step] = failing_grasp.inserted_steps
     assert inserted_step.runs == failing_runs + 1
     assert milk.root.parent_connection.parent is robot.right_arm.end_effector.tool_frame
@@ -325,8 +327,8 @@ def test_a_pick_up_is_given_up_on_and_leaves_the_milk_once_the_attempts_ran_out(
             [*extensions, PlanRewriting(transformations=[failing_grasp])],
         )
 
-    assert pick_up.life_cycle_state == LifeCycleValues.FAILED
-    assert plan.life_cycle_state == LifeCycleValues.FAILED
+    assert pick_up.life_cycle_state == LifeCycleValue.FAILED
+    assert plan.life_cycle_state == LifeCycleValue.FAILED
     assert milk.root.parent_connection.parent is parent_of_the_milk
 
 
@@ -351,9 +353,9 @@ def test_an_inserted_action_lets_the_failed_step_succeed(pr2_apartment_context) 
 
     [opening] = transformation.inserted_actions
     assert plan.nodes == [close, opening, handled]
-    assert opening.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert opening.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert check.runs == 2
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_inserting_gives_up_once_the_attempts_ran_out(pr2_apartment_context) -> None:
@@ -373,7 +375,7 @@ def test_inserting_gives_up_once_the_attempts_ran_out(pr2_apartment_context) -> 
         run_plan(plan, extensions)
 
     assert len(transformation.inserted_actions) == maximum_attempts
-    assert handled.life_cycle_state == LifeCycleValues.FAILED
+    assert handled.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_a_transformation_that_does_not_apply_gives_up(pr2_apartment_context) -> None:
@@ -392,7 +394,7 @@ def test_a_transformation_that_does_not_apply_gives_up(pr2_apartment_context) ->
         run_plan(plan, extensions)
 
     assert transformation.inserted_actions == []
-    assert handled.life_cycle_state == LifeCycleValues.FAILED
+    assert handled.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_a_transformation_that_does_not_match_gives_up(pr2_apartment_context) -> None:
@@ -411,7 +413,7 @@ def test_a_transformation_that_does_not_match_gives_up(pr2_apartment_context) ->
         run_plan(plan, extensions)
 
     assert plan.nodes == [close, handled]
-    assert handled.life_cycle_state == LifeCycleValues.FAILED
+    assert handled.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_an_inserted_action_is_offered_to_the_plan_rewriting(

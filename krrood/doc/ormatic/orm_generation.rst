@@ -23,7 +23,7 @@ The script for generating the test ORM interface for KRROOD looks like this:
     import os
     from dataclasses import is_dataclass
 
-    import krrood.entity_query_language.orm.model
+    import krrood.ormatic.data_access_objects.symbol_graph_mappings
     import krrood.entity_query_language.symbol_graph
     from dataset.example_classes import (
         PhysicalObject,
@@ -40,7 +40,7 @@ The script for generating the test ORM interface for KRROOD looks like this:
     from krrood.entity_query_language.symbol_graph import SymbolGraph
     from krrood.ormatic.data_access_objects.alternative_mapping import AlternativeMapping
     from krrood.ormatic.ormatic import ORMatic
-    from krrood.ormatic.utils import classes_of_package
+    from krrood.class_diagrams.utils import classes_of_package
     from krrood.utils import recursive_subclasses
 
     # build the symbol graph

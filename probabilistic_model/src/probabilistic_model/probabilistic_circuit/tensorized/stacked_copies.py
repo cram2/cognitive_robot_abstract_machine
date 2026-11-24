@@ -73,15 +73,15 @@ class StackedLayer:
         return nodes + copy * self.nodes_per_copy
 
     @classmethod
-    def of_leaf_layer_copies(cls, copies: list[LeafLayer]) -> StackedLayer:
+    def from_leaf_layer_copies(cls, *, copies: list[LeafLayer]) -> StackedLayer:
         """
         :param copies: The copies of a leaf layer.
         :return: The copies as one layer, shared if they are all equal.
         """
         first = copies[0]
-        if all(copy.has_equal_parameters(first) for copy in copies[1:]):
+        if all(copy.has_equal_parameters(other=first) for copy in copies[1:]):
             return cls.shared(first)
-        return cls(type(first).concatenate(copies), first.number_of_nodes, False)
+        return cls(type(first).concatenate(layers=copies), first.number_of_nodes, False)
 
     @classmethod
     def of_inner_layer_copies(

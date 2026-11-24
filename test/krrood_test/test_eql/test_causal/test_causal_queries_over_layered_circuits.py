@@ -39,7 +39,6 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
-from ...dataset import ormatic_interface  # noqa: F401, registers the DAOs
 from ...dataset.example_classes import (
     KRROODOrientation,
     KRROODPosition,

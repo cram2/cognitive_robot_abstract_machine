@@ -1,3 +1,9 @@
+"""
+Tests of the actions that use a tool, such as mixing, cutting, wiping and pouring.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -26,7 +32,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPositionTrajectory,
 )
 from cramph.composites import PausedUntilTrue, Sequence
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.node import StatechartNode
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.ormatic.data_access_objects.helper import to_dao
@@ -37,8 +43,11 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Sponge,
     Whisk,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Pose,
+    Pose2D,
+)
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -121,6 +130,10 @@ def _alignments_of(goal):
 
 
 def test_mixing_action_expands_to_aligned_motion(tool_action_world):
+    """
+    Mixing expands to one tool path goal, which moves the whisk's tool frame along its
+    waypoints while keeping it aligned.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     whisk = Whisk(root=tool_body)
 
@@ -131,7 +144,7 @@ def test_mixing_action_expands_to_aligned_motion(tool_action_world):
     trajectory = _trajectory_of(goals[0])
     assert len(trajectory.goal_points) > 0
     assert len(_alignments_of(goals[0])) == 1
-    assert trajectory.tip_link == whisk.get_tool_frame()
+    assert trajectory.kinematic_chain.tip == whisk.get_tool_frame()
 
 
 def test_cutting_action_pointer_stride_reduces_waypoints(tool_action_world):
@@ -345,7 +358,7 @@ def test_a_tool_motion_moves_the_tool_relative_to_the_world(tool_action_world) -
 
     goal = _tool_path_goals(action, extensions)[0]
 
-    assert _trajectory_of(goal).root_link is world.root
+    assert _trajectory_of(goal).kinematic_chain.root is world.root
     assert robot.mobile_base.full_body_controlled == full_body_controlled
 
 
@@ -375,6 +388,10 @@ def test_a_tool_path_is_followed_within_the_position_threshold_of_its_action(
 def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
     tool_action_world,
 ) -> None:
+    """
+    A wipe is done once the tool reaches its final waypoint within the action's
+    threshold.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     sponge = Sponge(root=tool_body)
     action = WipingAction(
@@ -390,9 +407,9 @@ def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
         for node in [action, *action.descendants]
         if isinstance(node, PositionReached)
     ]
-    assert final_waypoint_reached.tip_link is tool_body
+    assert final_waypoint_reached.kinematic_chain.tip is tool_body
     assert final_waypoint_reached.goal_point is action._waypoints[-1]
-    assert final_waypoint_reached.threshold == action.final_waypoint_success_tolerance
+    assert final_waypoint_reached.threshold == action.final_waypoint_threshold
 
 
 def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
@@ -415,7 +432,7 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
+                planar_goal_pose=Pose2D.from_xy_yaw(
                     x=1.85, y=2.2, reference_frame=world.root
                 )
             ),
@@ -426,7 +443,7 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
     run_plan(plan, extensions)
 
     [tool_path] = [node for node in wiping.nodes if _trajectory_of(node) is not None]
-    assert tool_path.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert tool_path.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% accepting a stalled wipe
@@ -489,9 +506,12 @@ def wipe_stuck_away_from_its_final_waypoint(
 def test_a_wipe_stalled_within_its_tolerance_of_the_final_waypoint_is_done(
     tool_action_world,
 ) -> None:
+    """
+    A wipe whose tool stalls within the threshold of its final waypoint succeeds.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     wiping = wipe_stuck_away_from_its_final_waypoint(
-        world, robot, WipingAction.final_waypoint_success_tolerance / 2
+        world, robot, WipingAction.final_waypoint_threshold / 2
     )
 
     run_plan(wiping, extensions)
@@ -499,15 +519,19 @@ def test_a_wipe_stalled_within_its_tolerance_of_the_final_waypoint_is_done(
     [final_waypoint_check] = [
         node for node in wiping.nodes if isinstance(node, PausedUntilTrue)
     ]
-    assert final_waypoint_check.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert final_waypoint_check.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_wipe_stalled_beyond_its_tolerance_of_the_final_waypoint_is_not_done(
     tool_action_world,
 ) -> None:
+    """
+    A wipe whose tool stalls beyond the threshold of its final waypoint fails, having
+    made no progress.
+    """
     world, robot, extensions, container, tool_body = tool_action_world
     wiping = wipe_stuck_away_from_its_final_waypoint(
-        world, robot, 2 * WipingAction.final_waypoint_success_tolerance
+        world, robot, 2 * WipingAction.final_waypoint_threshold
     )
 
     with pytest.raises(MotionMadeNoProgress):
@@ -540,6 +564,9 @@ def _rewritten_mixing(world, robot):
 
 
 def test_justin_keeps_its_torso_upright_while_it_uses_a_tool(justin_world) -> None:
+    """
+    Justin keeps its torso upright with one alignment while it mixes.
+    """
     robot = justin_world.get_semantic_annotations_by_type(Justin)[0]
 
     action = _rewritten_mixing(justin_world, robot)
@@ -548,7 +575,7 @@ def test_justin_keeps_its_torso_upright_while_it_uses_a_tool(justin_world) -> No
     torso_alignments = [
         alignment
         for alignment in _alignments_of(action)
-        if alignment.tip_link is torso_tip
+        if alignment.kinematic_chain.tip is torso_tip
     ]
     assert len(torso_alignments) == 1
 

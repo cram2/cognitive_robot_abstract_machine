@@ -2,12 +2,13 @@
 Tests of the statechart nodes that watch a force-torque sensor.
 """
 
+import dataclasses
 import json
 from pathlib import Path
 
 from geometry_msgs.msg import WrenchStamped
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.composites import Sequence, Parallel
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
@@ -23,6 +24,15 @@ from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.ros_context import RosNodeAccess
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+
+
+def test_a_force_impact_monitor_names_its_threshold_as_a_force():
+    """
+    The value is the force above which the monitor fires, not a goal error.
+    """
+    field_names = {field.name for field in dataclasses.fields(ForceImpactMonitor)}
+    assert "force_threshold" in field_names
+    assert "threshold" not in field_names
 
 
 def test_force_impact_node(rclpy_node):
@@ -42,7 +52,7 @@ def test_force_impact_node(rclpy_node):
         node=(
             parallel := Parallel(
                 nodes=[
-                    ForceImpactMonitor(topic_name=topic_name, threshold=10),
+                    ForceImpactMonitor(topic_name=topic_name, force_threshold=10),
                     Sequence(
                         nodes=[
                             PublishOnStart(topic_name=topic_name, msg=msg_below),
@@ -74,13 +84,13 @@ def test_force_impact_node(rclpy_node):
     statechart_copy.draw(file_name=Path("muh.pdf"))
     assert (
         statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[0]
-        == ObservationStateValues.UNKNOWN
+        == ObservationStateValue.UNKNOWN
     )
     assert (
-        ObservationStateValues.FALSE
+        ObservationStateValue.FALSE
         in statechart_copy.state_history.get_observation_history_of_node(node=ft_node)
     )
     assert (
         statechart_copy.state_history.get_observation_history_of_node(node=ft_node)[-1]
-        == ObservationStateValues.TRUE
+        == ObservationStateValue.TRUE
     )

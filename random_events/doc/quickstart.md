@@ -32,6 +32,7 @@ Next, import the necessary functionality:
 
 from krrood.adapters.json_serializer import to_json, from_json
 from random_events.variable import Symbolic, Continuous, Integer
+from random_events.plotting import EventPlotter
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.interval import SimpleInterval, Interval, closed, closed_open, open_closed, open
 from random_events.set import SetElement, Set
@@ -179,7 +180,7 @@ Events can also be plotted.
 :tags: []
 
 e3 = SimpleEvent.from_data({x: closed(0, 1) | closed(2, 2.5), y: closed(2, 3) | closed(4, 5)}).as_composite_set()
-fig = go.Figure(e3.plot(), e3.plotly_layout())
+fig = go.Figure(EventPlotter(e3).plot(), EventPlotter(e3).plotly_layout())
 fig.show()
 ```
 

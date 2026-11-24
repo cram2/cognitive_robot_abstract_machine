@@ -1,3 +1,9 @@
+"""
+Recreates the Sage10k database holding one loaded scene.
+"""
+
+from __future__ import annotations
+
 import os
 import time
 
@@ -6,7 +12,6 @@ from sqlalchemy.orm import sessionmaker
 from experiments.sage_10k.demos import Sage10kSouthwesternStoreDemo
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
-from semantic_digital_twin.orm.ormatic_interface import *
 
 
 def main():
@@ -16,6 +21,8 @@ def main():
     Loading this scene from the database is ~ 5 times faster than loading it from the
     files.
     """
+    from semantic_digital_twin.orm.ormatic_interface import Base
+
     current_time = time.time()
     print("creating database")
     engine = create_engine(os.getenv("SAGE10k_DATABASE_URI"))

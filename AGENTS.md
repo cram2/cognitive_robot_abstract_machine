@@ -14,7 +14,7 @@
 - A group of primitives that travels together, or a return type that keeps being repeated, becomes a dataclass
 - Never duplicate code. Never put methods in a catch-all module such as `utils.py`; move them onto the class that owns the behaviour
 - Access attributes with `.`, never with `getattr`, and never wrap attribute access in try-except
-- Never use mutable objects as default arguments
+- Never use mutable objects as default arguments or dataclass field defaults (checked by `krrood check`)
 - Every dataclass is declared with `kw_only=True`, so its fields are passed by keyword. A dataclass an `Enum` mixes in is exempt, since the enum passes its member values positionally (checked by `krrood check`)
 - Every parameter of a method after `self` or `cls` is keyword-only: a `*` comes before them, as in `def move_to(self, *, target: Pose)`. Dunder methods, property setters and deleters, and methods that a standard library or third-party base class defines or dispatches to by name, such as the `visit_` methods of `ast.NodeVisitor`, are exempt, since Python or that library passes their arguments positionally. Mark any other method a caller outside our control calls positionally, such as a method applied as a decorator, with `krrood.patterns.called_positionally.called_positionally` (checked by `krrood check`)
 - A descriptor that manages a dataclass field subclasses `krrood.patterns.dataclass_field_descriptor.DataclassFieldDescriptor`, implementing `read` and `write`, and the owning class inherits `DataclassFieldDescriptorOwner` so its subclasses keep the descriptor
@@ -38,6 +38,8 @@
 - Name an enum member for the situation it means, not for the function it dispatches to or the text it renders
 - Never repeat the enclosing type's name in its members, or the same word twice within one name
 - Never take an identifier the language or something in scope already binds: `Enum` reserves `name`, a parameter `field` shadows `dataclasses.field`, a field shadows a method of the same name. These fail at runtime or silently, not at import
+- Never name a variable, parameter, attribute or import after a builtin such as `id` or `type`, nor a top-level module after a module of the standard library (checked by `krrood check`)
+- Never bind a name again before it is used, assign to a loop variable inside its loop, or reuse a parameter or an import as a loop, `with` or `except` target (checked by `krrood check`)
 - A rename is finished only when every reader of the old name, docstrings and comments included, uses the new one and the tests pass. A mechanical rename across a file is exactly where a method and a field converge on one name
 - When no honest specific name exists, suspect the code, not your vocabulary: a thing that can only be described vaguely usually has no single subject (a container for whatever its caller passed, a function doing two jobs). Remove it instead of hunting for a better word
 
@@ -47,8 +49,9 @@
   - Single Responsibility: each class and method does one thing. If a method has cyclomatic complexity in the hundreds, refactor
   - Open/Closed: open for extension, closed for modification
   - Liskov Substitution: subtypes are substitutable for their base types without breaking behaviour
-  - Interface Segregation: many small interfaces over one large one. An interface is an explicit superclass or mixin, never a `Protocol`
+  - Interface Segregation: many small interfaces over one large one. An interface is an explicit superclass or mixin
   - Dependency Inversion: depend on abstractions, not concrete implementations
+- Never declare an interface as a `Protocol` (checked by `krrood check`)
 - Keep code modular and decoupled
 - Eliminate YAGNI smells
 - Make interfaces hard to misuse
@@ -60,15 +63,17 @@
 - Never write a method that only forwards to or renames another call. A one-line method is allowed only when it implements an abstract method or a `classproperty`, caches its result, or removes duplication - and in the last case, first try to abstract the duplicated code itself
 - A method with a single caller must earn its place under these rules; otherwise inline it
 - Reduce nesting and complexity with guard clauses: handle alternative outputs first by inverting conditions and returning early, so the main branch holds the main output and the biggest compute. A single level of abstraction never justifies deep nesting; split the method instead
+- Never put an `else` after a branch that returns or raises, nest an `if` whose condition could join its parent's, or nest blocks more than five deep (checked by `krrood check`)
 
 ## Exception modelling
 <!-- from ExceptionModellingRules in krrood/development_tools/agents/shipped_rules/design_principles.py -->
 - Never use try-except; a program in an illegal state raises an appropriate exception
 - Create meaningful custom exceptions as dataclasses
+- Never raise `Exception` itself, and never word an exception's message where it is raised: its `error_message` words it (checked by `krrood check`)
 - Put each exception in the `exceptions.py` closest to the code that raises it:
   - An exception raised only within one subpackage goes in that subpackage's `exceptions.py`; create the file if the subpackage has none
   - An exception raised across several subpackages goes in the `exceptions.py` of their nearest common package
-- Never use `assert` outside tests: Python drops it when run with `-O`, so the check silently disappears. Raise a custom exception instead
+- Never use `assert` outside tests: Python drops it when run with `-O`, so the check silently disappears. Raise a custom exception instead (checked by `krrood check`)
 - Custom exceptions subclass `krrood.exceptions.DataclassException`, implementing its `error_message` and `suggest_correction`
 
 ## Constants and class level values
@@ -78,6 +83,7 @@
   - A default a caller may want to change is a parameter of the method that uses it if only that method does, otherwise a dataclass field with that default. For example, a `Heater` takes `target_temperature: float = 20.0` as a field instead of declaring `DEFAULT_TARGET_TEMPERATURE: ClassVar[float] = 20.0`
   - A constant that belongs to a class is a `classproperty`
   - `ClassVar` is allowed only for state that explicitly has to be shared and mutable across every instance of a class. This almost never applies
+- Never rebind a module's variable from a function with `global` (checked by `krrood check`)
 - Use the `classproperty` `krrood` provides
 
 ## Structured data
@@ -108,6 +114,7 @@
   - type information - the type hints carry it
 - A docstring holds at most 4 lines of prose, field lists and literal blocks aside, and a comment block at most 3 lines (checked by `krrood check`)
 - Comments are meaningful and DRY; remove comments that restate the code
+- Never leave code commented out; delete it (checked by `krrood check`)
 - Reference code with Sphinx roles (`:func:`, `:class:`, `:attr:`, `:meth:`), never with plain backticks, and use directives such as `.. note::` and `.. warning::` for notes and warnings
 - Never use all-caps words for emphasis in docstrings or comments; use RST emphasis (`*word*`). Genuine identifiers, acronyms and enum/constant names (`UUID`, `WHERE`, `Definiteness.DEFINITE`) are exempt
 - Always format modified Python files with ruff followed by docformatter, through the repository's pre-commit hook
@@ -118,9 +125,11 @@
 
 # Imports
 <!-- from ImportsRules in krrood/development_tools/agents/shipped_rules/imports.py -->
-- Imports are absolute. Exception: a test imports another test module (a shared mimic or fixture from the test datasets) relatively
-- Imports go at the top of the module; fix an import cycle by restructuring the modules, never with a local import
+- Imports are absolute. Exception: a test imports another test module (a shared mimic or fixture from the test datasets) relatively (checked by `krrood check`)
+- Imports go at the top of the module, before any other code (checked by `krrood check`)
+- Fix an import cycle by restructuring the modules, never with a local import
 - Guard type-only imports with `TYPE_CHECKING`
+- Never import under `TYPE_CHECKING` what the module uses when it runs (checked by `krrood check`)
 - A distribution that declares its core in `[tool.krrood.core-boundary]` of its `pyproject.toml` keeps it light: a core module imports a module outside core, or a library outside core's `dependencies` and what they require, only inside the functions that need it or under `TYPE_CHECKING`, never at module level. This is the one exception to importing at the top of the module (checked by `krrood check`)
 - Run `krrood check` over the distribution's source through the repository's pre-commit hook, so every rule a checker enforces holds for the code a commit changes
 
@@ -137,7 +146,8 @@
 
 ## Writing tests
 <!-- from WritingTestsRules in krrood/development_tools/agents/shipped_rules/testing.py -->
-- Write tests with pytest: plain test functions or classes, pytest fixtures, `pytest.raises` and plain `assert`; never `unittest.TestCase` or its assertion methods
+- Write tests with pytest: plain test functions or classes, pytest fixtures, `pytest.raises` and plain `assert`
+- Never write a test on `unittest.TestCase` or with its assertion methods (checked by `krrood check`)
 - Reuse the existing fixtures in `conftest.py`
 - Work test-driven: prove a bug with a meaningful, failing test before fixing it. Every new feature and fix is covered by tests
 - When fixing a failing test, never modify the test itself
@@ -166,9 +176,10 @@
 
 # Type hints
 <!-- from TypeHintsRules in krrood/development_tools/agents/shipped_rules/type_hints.py -->
-- Every parameter and return value has an accurate type hint, `Any` and `-> None` included
-- Use builtin generics and `X | None` (`list[int]`, `Pose | None`), never `typing.List`, `Dict`, `Optional` or `Union`; import every other typing construct from `typing_extensions`, never from `typing`
-- Use `from __future__ import annotations` instead of wrapping types in strings
+- Every parameter and return value has a type hint, `Any` and `-> None` included (checked by `krrood check`)
+- Every type hint is accurate: it names the types the code takes and returns
+- Use builtin generics and `X | None` (`list[int]`, `Pose | None`), never `typing.List`, `Dict`, `Optional` or `Union`; import every other typing construct from `typing_extensions`, never from `typing` (checked by `krrood check`)
+- Use `from __future__ import annotations` instead of wrapping types in strings (checked by `krrood check`)
 - When each class in a family declares the type it handles, carry that type as a bound generic parameter, not a `ClassVar`, so it is part of the signature and cannot disagree with a separate attribute: bind it in each member (`class MemberOfFamily(Family[ConcreteType])`)
 - Generic classes inherit `Generic` and then `krrood.patterns.subclass_safe_generic.SubClassSafeGeneric`, which narrows field types when a subclass binds a parameter. Read a bound type with `get_type_of_generic_parameter`, never via `__orig_bases__`. Such classes cannot be frozen dataclasses
 
@@ -197,13 +208,13 @@
 - Never track one again: git refuses to overwrite a tracked path a checkout has generated its own copy of, which makes every branch switch fail
 - Set `CRAM_ORM_BUILD=never` in the environment of the test runs you start, and regenerate them with `scripts/regenerate_all_orm.py` when a change needs it; the `--orm-build` option is rejected when `--confcutdir` excludes `test/conftest.py`, which registers it
 - When regenerating the ORM interfaces does not fix an ORM problem, ask the developer
-- If an ORM import creates an import cycle, ask the user if a local import is fine
+- Import an ORM interface only inside the functions that need it or under `TYPE_CHECKING`, never when the module is loaded. This is an exception to importing at the top of the module. A `generate_orm.py` is exempt: its module-level imports declare the interfaces it builds on (checked by `krrood check`)
 
 # Krrood isolation
 <!-- from KrroodIsolationRules in agent_rules.py -->
-- `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events` and `probabilistic_model`, which `krrood`'s source already depends on
+- `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events`, `probabilistic_model` and `krrood_compute_resources`, which `krrood`'s source already depends on
 - When a `krrood` test needs behaviour another package triggers, mimic the relevant classes and patterns in `test/krrood_test/dataset` and test against the mimics. Keep the test in `krrood` and do not depend on another package to reproduce the scenario
-- Those mimic classes import only `krrood`, `random_events` and `probabilistic_model`
+- Those mimic classes import only `krrood`, `random_events`, `probabilistic_model` and `krrood_compute_resources`
 
 # Pull request labels
 <!-- from PullRequestLabelsRules in agent_rules.py -->

@@ -1,3 +1,8 @@
+"""
+Conversion of a layered circuit into a rustworkx circuit, one unit per node of every
+layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -70,7 +75,6 @@ class RustworkxCircuitBuilder:
 class SumLayerToSumUnitsConverter(
     TensorizedToRustworkxConverter[SumLayer, List[SumUnit]]
 ):
-
     @classmethod
     def convert(cls, data: SumLayer, builder: RustworkxCircuitBuilder) -> list[SumUnit]:
         units = [
@@ -92,7 +96,6 @@ class SumLayerToSumUnitsConverter(
 class ProductLayerToProductUnitsConverter(
     TensorizedToRustworkxConverter[ProductLayer, List[ProductUnit]]
 ):
-
     @classmethod
     def convert(
         cls, data: ProductLayer, builder: RustworkxCircuitBuilder
@@ -115,8 +118,8 @@ class UnivariateInputLayerToLeavesConverter(
     TensorizedToRustworkxConverter[UnivariateInputLayer, List[Unit]]
 ):
     """
-    Convert any univariate input layer into one leaf per node, through the distributions of its
-    nodes.
+    Convert any univariate input layer into one leaf per node, through the distributions
+    of its nodes.
     """
 
     @classmethod
@@ -127,11 +130,12 @@ class UnivariateInputLayerToLeavesConverter(
     def convert(
         cls, data: UnivariateInputLayer, builder: RustworkxCircuitBuilder
     ) -> list[Unit]:
+        """
+        Convert a layer into one leaf per node, see :meth:`Converter.convert`.
+        """
         return [
             leaf(distribution, builder.circuit)
-            for distribution in data.node_distributions(
-                builder.variables[data.variable]
-            )
+            for distribution in data.node_distributions(variables=builder.variables)
         ]
 
 
@@ -151,16 +155,18 @@ class MultivariateGaussianLayerToLeavesConverter(
     def convert(
         cls, data: AbstractMultivariateGaussianLayer, builder: RustworkxCircuitBuilder
     ) -> list[Unit]:
+        """
+        Convert a layer into one leaf per node, see :meth:`Converter.convert`.
+        """
         return [
             leaf(distribution, builder.circuit)
-            for distribution in data.node_distributions(builder.variables)
+            for distribution in data.node_distributions(variables=builder.variables)
         ]
 
 
 class LayeredCircuitToRustworkxCircuitConverter(
     TensorizedToRustworkxConverter[LayeredProbabilisticCircuit, ProbabilisticCircuit]
 ):
-
     @classmethod
     def convert(cls, data: LayeredProbabilisticCircuit) -> ProbabilisticCircuit:
         builder = RustworkxCircuitBuilder(data.variables)

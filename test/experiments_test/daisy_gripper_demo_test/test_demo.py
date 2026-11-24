@@ -140,10 +140,14 @@ def test_every_gripper_step_announces_its_motion_and_waits_after_it(
 def test_each_gripper_moves_alone_then_both_together_presets_before_flex(
     plan: Sequence,
 ) -> None:
+    """
+    The demo moves each gripper alone and then both together, through the preset states
+    before the flexible ones.
+    """
     commands = [
         (
-            type(action.configuration.end_effector),
-            action.configuration.joint_state.state_type,
+            type(action.gripper_configuration.end_effector),
+            action.gripper_configuration.joint_state.state_type,
             isinstance(motion, Parallel),
         )
         for _, motion, _ in gripper_steps(plan)

@@ -36,7 +36,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from cramph.composites import Sequence
 from cramph.context import ContextExtension, StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.failure_handling import HandledOnFailure, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
 from cramph.statechart import Statechart
@@ -120,7 +120,7 @@ class JointReading(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNod
     How far a joint may stand from its expected position and still count as being there.
     """
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         joints_at_their_positions = all(
             abs(connection.position - target_value) < self.tolerance
             for connection, target_value in zip(
@@ -128,8 +128,8 @@ class JointReading(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNod
             )
         )
         if joints_at_their_positions:
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -149,10 +149,10 @@ class GraspCheck(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNode)
     The gripper whose fingers should be around :attr:`body`.
     """
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         if self.body in bodies_in_gripper(self.gripper):
-            return ObservationStateValues.TRUE
-        return ObservationStateValues.FALSE
+            return ObservationStateValue.TRUE
+        return ObservationStateValue.FALSE
 
 
 # %% disturbances
@@ -200,9 +200,9 @@ class Nudge(SucceedsOnObservingTrue, StatechartNode):
         self._runs += 1
         self._ticks_slid = 0
 
-    def on_tick(self) -> ObservationStateValues:
+    def on_tick(self) -> ObservationStateValue:
         if self._runs > self.nudged_runs or self._ticks_slid >= self.duration_in_ticks:
-            return ObservationStateValues.TRUE
+            return ObservationStateValue.TRUE
         x, y, z = self.displacement.to_np()[:3] / self.duration_in_ticks
         connection = self.body.parent_connection
         connection.origin = (
@@ -212,7 +212,7 @@ class Nudge(SucceedsOnObservingTrue, StatechartNode):
             @ connection.origin
         )
         self._ticks_slid += 1
-        return ObservationStateValues.UNKNOWN
+        return ObservationStateValue.UNKNOWN
 
 
 # %% plan transformations
@@ -246,7 +246,7 @@ class CheckGraspBeforeAttaching(SequentialInsertion[PickUpAction]):
         return [
             GraspCheck(
                 name="grasp check",
-                body=plan_node.grasp.graspable.root,
+                body=plan_node.grasp_candidate.graspable.root,
                 gripper=plan_node.arm.end_effector,
             )
         ]
@@ -281,8 +281,8 @@ class NudgeWhileClosing(ParallelInsertion[GraspingAction]):
         ][-1]
 
     def nodes_to_insert(self, plan_node: GraspingAction) -> list[StatechartNode]:
-        approach = plan_node.grasp.world_T_grasp.to_np()[:3, 0]
-        body = plan_node.grasp.graspable.root
+        approach = plan_node.grasp_candidate.world_T_grasp.to_np()[:3, 0]
+        body = plan_node.grasp_candidate.graspable.root
         return [
             Nudge(
                 name="nudge",
@@ -321,7 +321,7 @@ class OpenGripperBeforeReading(SequentialInsertion[JointReading]):
         return [
             SetGripperAction(
                 name="open gripper",
-                configuration=self.end_effector.default_configuration(
+                gripper_configuration=self.end_effector.default_configuration(
                     GripperState.OPEN
                 ),
             )
@@ -454,15 +454,15 @@ class FailureHandlingDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
                 NavigateAction(
-                    target_location=Pose2D(
+                    planar_goal_pose=Pose2D(
                         position=self.counter_stand.position,
                         yaw=self.counter_stand.yaw,
                         reference_frame=world.root,
-                    ).pose
+                    )
                 ),
                 SetGripperAction(
                     name="close gripper",
-                    configuration=end_effector.default_configuration(
+                    gripper_configuration=end_effector.default_configuration(
                         GripperState.CLOSE
                     ),
                 ),
@@ -485,7 +485,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
                     name="milk is picked up",
                     handled_node=PickUpAction(
                         name="pick up milk",
-                        grasp=milk.grasp_candidates()[0],
+                        grasp_candidate=milk.grasp_candidates()[0],
                         arm=arm,
                     ),
                     failure_handling_strategy=RetryFailedNode(

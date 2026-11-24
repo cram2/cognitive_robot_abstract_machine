@@ -21,10 +21,12 @@ can use the same conventions:
 - `krrood issue-answer --form NAME --field IDENTIFIER` reads the body of an issue opened
   with an issue form from standard input and prints its answer to one field, code
   without its fence; it exits with 1 when the issue leaves the field empty.
-- `krrood check [--all-lines] FILE...` reports the code that breaks a rule a checker
-  enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)". Only the lines
-  the staged change (`git diff --cached`) adds or changes are checked, because existing
-  code has many violations; `--all-lines` checks every line.
+- `krrood check [--all-lines | --since REVISION] FILE...` reports the code that breaks a
+  rule a checker enforces; `AGENTS.md` marks such a rule "(checked by `krrood check`)".
+  Only the lines the staged change (`git diff --cached`) adds or changes are checked,
+  because existing code has many violations; `--all-lines` checks every line.
+  `--since REVISION` checks the lines the working tree changes since `REVISION`, staged
+  or not; without files it checks every tracked Python file changed since then.
 
 `format`, `agents-md`, `skills` and `issue-forms` exit with 1 when they modified a file, and `check` when it
 found a violation, following pre-commit's convention for hooks.
@@ -36,7 +38,10 @@ followed by `Rules`. Its members are its rules: each names one rule, and its val
 the rule's statement, or the statement followed by the details that spell it out.
 Every member is an `AgentRule`, so `ExceptionModellingRules.NEVER_TRY_EXCEPT.statement`
 is one of the rules on modelling exceptions. A rule can carry a checker, a `CodeRuleChecker` that finds the code breaking it; give it
-as the third element of the member's value. When a script can check only part of a
+as the third element of the member's value. A rule that lint rules of ruff enforce takes a
+`RuffRuleChecker` naming them, with the settings they need and whether the rule covers
+tests, the code they test or both; it runs ruff isolated from any configuration file, so
+every repository checks alike. When a script can check only part of a
 rule, split the rule so the checkable part carries the checker. A nested section names the section it is
 part of by overriding the `parent` classproperty. A section's heading is its topic in
 words, in sentence case (`ExternalServicesAndCIRules` becomes "External services and
@@ -91,6 +96,17 @@ Like every checker, it checks only the lines a commit changes, so existing cross
 not block a commit and a new one cannot slip in; `krrood check --all-lines` lists all of
 them.
 
+## Excluding files
+
+A repository keeps files out of `krrood check` in its `pyproject.toml`, wherever the
+check runs:
+
+```toml
+[tool.krrood.check]
+# Regular expressions, searched for in each path relative to the repository root.
+exclude = ['(^|/)generated_module\.py$', '^test/dataset/']
+```
+
 ## Installation
 
 The formatting tools are an optional dependency, pinned so every repository formats
@@ -112,6 +128,9 @@ The hooks run the `krrood` command already installed in your development environ
 (`language: system`), because pre-commit would otherwise install that whole repository
 rather than krrood. `krrood-check` needs that environment anyway: the core boundary check
 reads the installed packages.
+
+The same check runs in CI too: `krrood check --since` with the base of a pull request
+checks the lines it changes.
 
 To use rules that are not released yet, install krrood from a commit of
 cognitive_robot_abstract_machine:
@@ -210,7 +229,7 @@ module they come from. Find the member by the rule's text and change it there.
 - A repository's own rule is in its `agent_rules.py`, or in a module of its
   `agent_rules` package.
 - A shared rule lives in the module for its top-level section in
-  `krrood/development_tools/agents/shipped_rules/` (in `krrood/src` of
+  `krrood/development_tools/agents/shipped_rules/` (in `krrood/krrood-development-tools/src` of
   cognitive_robot_abstract_machine).
 - A section is named for its topic, broadly enough that later rules on that topic fit
   in it (`SerializationRules`, not `JSONSerializationRules`). Each topic is one section, so
