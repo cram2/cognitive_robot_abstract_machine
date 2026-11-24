@@ -51,7 +51,7 @@ from cramph.exceptions import (
     UnknownTransitionKindError,
 )
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
-from cramph.world_access import WorldAccess, degrees_of_freedom_in
+from cramph.world_access import WorldAccess
 from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import (
@@ -1614,7 +1614,11 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :return: What this built node changes and reads in the world: here, the degrees
             of freedom its observation reads.
         """
-        return WorldAccess(read=degrees_of_freedom_in(self.artifacts.observation))
+        return WorldAccess(
+            read=WorldAccess.degrees_of_freedom_of(
+                expression=self.artifacts.observation
+            )
+        )
 
     def on_tick(self) -> ObservationStateValue | None:
         """

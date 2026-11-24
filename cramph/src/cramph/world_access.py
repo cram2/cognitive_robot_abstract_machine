@@ -19,20 +19,6 @@ from semantic_digital_twin.world_description.world_entity import (
 # %% the parts of the world a node touches
 
 
-def degrees_of_freedom_in(expression: Scalar | None) -> frozenset[DegreeOfFreedom]:
-    """
-    :param expression: A symbolic expression, or None.
-    :return: The degrees of freedom whose variables `expression` reads.
-    """
-    if expression is None:
-        return frozenset()
-    return frozenset(
-        variable.dof
-        for variable in expression.free_variables()
-        if isinstance(variable, DegreeOfFreedomVariable)
-    )
-
-
 @dataclass(frozen=True, kw_only=True)
 class WorldAccess:
     """
@@ -71,6 +57,22 @@ class WorldAccess:
         """
         return self.moved | self.held
 
+    @staticmethod
+    def degrees_of_freedom_of(
+        *, expression: Scalar | None
+    ) -> frozenset[DegreeOfFreedom]:
+        """
+        :param expression: A symbolic expression, or None.
+        :return: The degrees of freedom whose variables `expression` depends on.
+        """
+        if expression is None:
+            return frozenset()
+        return frozenset(
+            variable.dof
+            for variable in expression.free_variables()
+            if isinstance(variable, DegreeOfFreedomVariable)
+        )
+
     def merged_with(self, *, other: WorldAccess) -> WorldAccess:
         """
         :param other: More of what the same node does to the world.
@@ -84,7 +86,7 @@ class WorldAccess:
             read_frames=self.read_frames | other.read_frames,
         )
 
-    def holding_what_it_moves(self) -> WorldAccess:
+    def count_moved_as_held(self) -> WorldAccess:
         """
         :return: This access, with what it moves counted as held instead.
         """

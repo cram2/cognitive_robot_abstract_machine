@@ -52,7 +52,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 from cramph.node import NodeArtifacts, StatechartNode, EndStatechart
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
-from cramph.world_access import WorldAccess, degrees_of_freedom_in
+from cramph.world_access import WorldAccess
 
 
 @dataclass(kw_only=True)
@@ -192,11 +192,11 @@ class MotionStatechartNode(StatechartNode):
                             *artifacts.constraints.equality_constraints,
                             *artifacts.constraints.inequality_constraints,
                         ]
-                        for degree_of_freedom in degrees_of_freedom_in(
-                            constraint.expression
+                        for degree_of_freedom in WorldAccess.degrees_of_freedom_of(
+                            expression=constraint.expression
                         )
                     ),
-                    read=degrees_of_freedom_in(artifacts.error),
+                    read=WorldAccess.degrees_of_freedom_of(expression=artifacts.error),
                 )
             )
         )

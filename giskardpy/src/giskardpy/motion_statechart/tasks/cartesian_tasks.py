@@ -786,7 +786,7 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
             returns, with what its constraints move counted as held, since they keep it
             where it was.
         """
-        return super().world_access().holding_what_it_moves()
+        return super().world_access().count_moved_as_held()
 
     def set_up(self) -> None:
         """
