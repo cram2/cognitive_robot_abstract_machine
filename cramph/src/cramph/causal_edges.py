@@ -236,19 +236,36 @@ class WorldEdges(CausalEdgeSource):
 
 
 @dataclass(kw_only=True)
+class WorldChange:
+    """
+    What one ended run changed in the world.
+    """
+
+    run: NodeRun
+    """
+    The run.
+    """
+
+    degrees_of_freedom: list[DegreeOfFreedom]
+    """
+    The degrees of freedom it moved.
+    """
+
+    frames: list[KinematicStructureEntity]
+    """
+    The frames it attached to a new parent.
+    """
+
+
+@dataclass(kw_only=True)
 class ChangesOfTheWorld:
     """
-    The ended runs that moved each degree of freedom and attached each frame.
+    The changes the ended runs of a statechart made to the world.
     """
 
-    movers: dict[UUID, list[NodeRun]]
+    changes: list[WorldChange]
     """
-    The ended runs that moved the degree of freedom with each id.
-    """
-
-    reattachers: dict[KinematicStructureEntity, list[NodeRun]]
-    """
-    The ended runs that attached each frame to a new parent.
+    What each ended run that changed the world changed, in the order of the runs.
     """
 
     @classmethod
@@ -258,15 +275,22 @@ class ChangesOfTheWorld:
         """
         :return: The changes the ended runs of `runs` made.
         """
-        movers, reattachers = {}, {}
-        for run in runs.all_runs:
-            if run.end_tick is None:
-                continue
-            for degree_of_freedom in access[run.node].moved:
-                movers.setdefault(degree_of_freedom.id, []).append(run)
-            for frame in access[run.node].reattached:
-                reattachers.setdefault(frame, []).append(run)
-        return cls(movers=movers, reattachers=reattachers)
+        changes = [
+            WorldChange(
+                run=run,
+                degrees_of_freedom=list(access[run.node].moved),
+                frames=list(access[run.node].reattached),
+            )
+            for run in runs.all_runs
+            if run.end_tick is not None
+        ]
+        return cls(
+            changes=[
+                change
+                for change in changes
+                if change.degrees_of_freedom or change.frames
+            ]
+        )
 
     def last_mover(
         self, *, degree_of_freedom_id: UUID, reader: NodeRun
@@ -276,7 +300,15 @@ class ChangesOfTheWorld:
             with `degree_of_freedom_id` and ended before `reader` started.
         """
         return self.last_before(
-            changers=self.movers.get(degree_of_freedom_id, []), reader=reader
+            changers=[
+                change.run
+                for change in self.changes
+                if any(
+                    moved.id == degree_of_freedom_id
+                    for moved in change.degrees_of_freedom
+                )
+            ],
+            reader=reader,
         )
 
     def last_reattacher(
@@ -286,7 +318,10 @@ class ChangesOfTheWorld:
         :return: The last run unrelated to `reader` that attached `frame` to a new
             parent and ended before `reader` started.
         """
-        return self.last_before(changers=self.reattachers.get(frame, []), reader=reader)
+        return self.last_before(
+            changers=[change.run for change in self.changes if frame in change.frames],
+            reader=reader,
+        )
 
     @staticmethod
     def last_before(*, changers: list[NodeRun], reader: NodeRun) -> NodeRun | None:
