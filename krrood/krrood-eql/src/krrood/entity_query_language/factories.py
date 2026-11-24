@@ -37,7 +37,8 @@ from krrood.entity_query_language.core.mapped_variable import (
     HasSymbolicOperations,
     Attribute,
 )
-from krrood.entity_query_language.evaluation import evaluate_statements_of
+from krrood.entity_query_language.evaluation import ConditionEvaluation
+from krrood.entity_query_language.ground_term import TermReader
 from krrood.entity_query_language.core.variable import (
     DomainType,
     Literal,
@@ -857,35 +858,34 @@ def distinct(
             )
 
 
-def get_false_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
+def get_false_statements(
+    statement: SymbolicExpression, *, state: TermReader | None = None
+) -> list[SymbolicExpression]:
     """
     :param statement: The condition whose statements are checked.
-    :return: The statements of the condition that held for none of the values they were
-        evaluated on, see :func:`evaluate_statements_of`. In a conjunction that is the
-        first conjunct that could not hold together with the conjuncts before it.
+    :param state: What the evaluation reads ground terms with; their live values when
+        omitted.
+    :return: :attr:`~krrood.entity_query_language.evaluation.ConditionEvaluation.false_statements`
+        of *statement*.
     """
-    statement_results = evaluate_statements_of(statement)
-    held_ids = {result.operand._id_ for result in statement_results if result.is_true}
-    never_held = {
-        result.operand._id_: result.operand
-        for result in statement_results
-        if result.operand._id_ not in held_ids
-    }
-    return list(never_held.values())
+    return ConditionEvaluation.from_condition(
+        condition=statement, state=state
+    ).false_statements
 
 
-def get_true_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
+def get_true_statements(
+    statement: SymbolicExpression, *, state: TermReader | None = None
+) -> list[SymbolicExpression]:
     """
     :param statement: The condition whose statements are checked.
-    :return: The statements of the condition that held for at least one of the values
-        they were evaluated on, see :func:`evaluate_statements_of`.
+    :param state: What the evaluation reads ground terms with; their live values when
+        omitted.
+    :return: :attr:`~krrood.entity_query_language.evaluation.ConditionEvaluation.true_statements`
+        of *statement*.
     """
-    held = {
-        result.operand._id_: result.operand
-        for result in evaluate_statements_of(statement)
-        if result.is_true
-    }
-    return list(held.values())
+    return ConditionEvaluation.from_condition(
+        condition=statement, state=state
+    ).true_statements
 
 
 def evaluate_condition(condition: ConditionType) -> bool:
@@ -1196,8 +1196,8 @@ def distribution_of(
 ) -> Distribution:
     """
     Request the distribution a match's conditions describe (see
-    :class:`~krrood.parametrization.probabilistic_queries.Distribution`),
-    e.g. ``distribution_of(a(Pick)(arm=0.3, outcome=...))``. It never resolves to rows:
+    :class:`~krrood.parametrization.probabilistic_queries.Distribution`), e.g.
+    ``distribution_of(a(Pick)(arm=0.3, outcome=...))``. It never resolves to rows:
     :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` answers
     it with the resolved probabilistic model.
 

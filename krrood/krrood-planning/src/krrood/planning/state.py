@@ -12,12 +12,11 @@ from typing_extensions import TYPE_CHECKING, Any, Iterable, Iterator
 
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
-from krrood.entity_query_language.evaluation_context import EvaluationContext
+from krrood.entity_query_language.evaluation import ConditionEvaluation
 from krrood.entity_query_language.factories import (
     ConditionType,
     an,
     entity,
-    get_false_statements,
     literal,
 )
 from krrood.entity_query_language.ground_term import (
@@ -154,12 +153,12 @@ class State(TermReader):
             of *action*.
         """
         symbolic_action = action.to_symbolic()
-        precondition = symbolic_action.precondition()
-        if not self.satisfies(condition=precondition):
-            with EvaluationContext(term_reader=self).as_current():
-                failed_conditions = get_false_statements(precondition)
+        precondition = ConditionEvaluation.from_condition(
+            condition=symbolic_action.precondition(), state=self
+        )
+        if not precondition.is_satisfied:
             raise ActionIsNotApplicable(
-                action=action, failed_conditions=failed_conditions
+                action=action, failed_conditions=precondition.false_statements
             )
         return self.apply_effects(*symbolic_action.effects())
 

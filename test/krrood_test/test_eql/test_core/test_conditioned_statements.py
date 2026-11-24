@@ -2,16 +2,20 @@
 Selecting the statements of a condition by whether they hold.
 """
 
+from krrood.entity_query_language.evaluation import ConditionEvaluation
 from krrood.entity_query_language.factories import (
     and_,
     get_false_statements,
     get_true_statements,
+    literal,
     not_,
     or_,
     variable,
 )
+from krrood.entity_query_language.ground_term import AttributeTerm
 
 from ...dataset.example_classes import KRROODPosition
+from ...dataset.term_readers import AssignedValueReader
 from ...dataset.value_comparisons import IsGreaterThan
 
 # %% which expressions are statements
@@ -213,3 +217,59 @@ def test_statements_skipped_after_a_false_statement_are_neither_true_nor_false()
 
     assert [statement._id_ for statement in false_statements] == [large_x._id_]
     assert true_statements == []
+
+
+# %% one evaluation of a condition
+
+
+def test_a_conjunction_whose_conjunct_fails_is_not_satisfied():
+    position = variable(KRROODPosition, [KRROODPosition(x=2.0, y=0.0, z=0.0)])
+    large_x = IsGreaterThan(value=position.x, bound=1.0)
+    large_y = IsGreaterThan(value=position.y, bound=1.0)
+
+    evaluation = ConditionEvaluation.from_condition(condition=and_(large_x, large_y))
+
+    assert evaluation.is_satisfied is False
+    assert [statement._id_ for statement in evaluation.false_statements] == [
+        large_y._id_
+    ]
+    assert [statement._id_ for statement in evaluation.true_statements] == [
+        large_x._id_
+    ]
+
+
+def test_a_disjunction_with_a_false_disjunct_is_satisfied():
+    """
+    A false disjunct is a false statement, yet the disjunction holds.
+    """
+    position = variable(KRROODPosition, [KRROODPosition(x=2.0, y=0.0, z=0.0)])
+    large_x = IsGreaterThan(value=position.x, bound=1.0)
+    large_y = IsGreaterThan(value=position.y, bound=1.0)
+
+    evaluation = ConditionEvaluation.from_condition(condition=or_(large_y, large_x))
+
+    assert evaluation.is_satisfied is True
+    assert [statement._id_ for statement in evaluation.false_statements] == [
+        large_y._id_
+    ]
+
+
+def test_a_condition_is_evaluated_in_the_given_state():
+    """
+    The state reads the position's ``x`` as large, though the live position's is not.
+    """
+    position = KRROODPosition(x=0.0, y=0.0, z=0.0)
+    condition = IsGreaterThan(value=literal(position).x, bound=1.0)
+    state = AssignedValueReader(
+        assigned_values={AttributeTerm(instance=position, attribute_name="x"): 2.0}
+    )
+
+    assert (
+        ConditionEvaluation.from_condition(condition=condition).is_satisfied,
+        ConditionEvaluation.from_condition(
+            condition=condition, state=state
+        ).is_satisfied,
+    ) == (False, True)
+    assert [
+        statement._id_ for statement in get_true_statements(condition, state=state)
+    ] == [condition._id_]

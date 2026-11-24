@@ -184,6 +184,25 @@ def test_rejected_action_names_the_conditions_that_fail(stacking_world):
     )
 
 
+def test_rejected_action_names_the_conditions_that_fail_in_the_state(stacking_world):
+    """
+    Block ``b`` is clear on the live objects, but the state makes it carry something.
+    """
+    state = State().add_facts(literal(stacking_world.b).clear == False)
+    with pytest.raises(ActionIsNotApplicable) as raised:
+        state.apply_action(
+            action=Stack(block=stacking_world.b, target=stacking_world.c)
+        )
+    (failed,) = raised.value.failed_conditions
+    fact = Fact.from_condition(condition=failed)
+    operand_values = tuple(
+        operand._value_ for operand in fact.expression._ground_term_operands_
+    )
+    assert fact.expression._ground_term_(
+        operand_values=operand_values
+    ) == AttributeTerm(instance=stacking_world.b, attribute_name="clear")
+
+
 # %% applying effects
 
 
