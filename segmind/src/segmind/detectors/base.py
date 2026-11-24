@@ -16,6 +16,7 @@ from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 from krrood.entity_query_language.predicate import Triple
 from segmind.datastructures.events import MotionEvent, DetectionEvent, RotationEvent
+from segmind.framework_name import SegmentationFramework
 from segmind.datastructures.object_tracker import ObjectTrackerFactory
 from segmind.event_logger import EventLogger
 from semantic_digital_twin.robots.robot_parts import EndEffector
@@ -112,6 +113,13 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
     """
     Abstract base class for all detectors.
     """
+
+    @classproperty
+    def ticking_framework(cls) -> str:
+        """
+        :return: segmind, which ticks every detector, see :attr:`~cramph.node.StatechartNode.ticking_framework`.
+        """
+        return SegmentationFramework.SEGMIND
 
     tracked_object: Body | None = None
     """

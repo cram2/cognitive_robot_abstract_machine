@@ -67,10 +67,10 @@ class StatechartContext:
 
     framework_name: str | None = None
     """
-    The name of the framework the statecharts of this context run in, None if it names
-    none.
+    The name of the framework the statecharts of this context run in, None if they run
+    every node in this process.
 
-    It changes the children only of the composite nodes it owns, see
+    A framework it names changes the children only of the composite nodes it owns, see
     :attr:`~cramph.node.CompositeNode.structure_owner`.
     """
 

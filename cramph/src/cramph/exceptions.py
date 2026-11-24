@@ -885,9 +885,9 @@ class ChildrenOwnedByAnotherFrameworkError(StatechartError):
     The framework that owns the children of the node.
     """
 
-    framework_name: str | None
+    framework_name: str
     """
-    The framework that tried to change them, None if it names none.
+    The framework that tried to change them.
     """
 
     def error_message(self) -> str:

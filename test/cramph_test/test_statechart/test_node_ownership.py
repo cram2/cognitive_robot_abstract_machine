@@ -1,13 +1,12 @@
 """
-Tests that every node has a framework that ticks it and every composite node a
-framework that may change its children, and that a statechart lets only that framework
-change them.
+Tests that every node has a framework that ticks it and every composite node a framework
+that may change its children, and that a statechart lets only that framework change
+them.
 """
 
 from __future__ import annotations
 
 import json
-from enum import StrEnum
 
 import pytest
 from typing_extensions import Any
@@ -16,35 +15,17 @@ from cramph.composites import Sequence
 from cramph.context import StatechartContext
 from cramph.data_types import ObservationStateValue
 from cramph.exceptions import ChildrenOwnedByAnotherFrameworkError
-from cramph.node import ReadingFramework, StructureCopyNode
+from cramph.node import ReadingFramework, StructureCopyCompositeNode
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.world import World
 
-# %% mimics
-
-
-class Framework(StrEnum):
-    """
-    The frameworks sharing the statecharts of these tests.
-    """
-
-    PERCEPTION = "perception"
-    """
-    Ticks the nodes that look at the scene.
-    """
-
-    MOTION = "motion"
-    """
-    Ticks the nodes that move the robot.
-    """
-
-    PLANNING = "planning"
-    """
-    Decides which nodes run, and sends the statechart to the others.
-    """
-
+from ..dataset.frameworks import (
+    Framework,
+    SequenceThePerceptionTicks,
+    StepTheMotionTicks,
+)
 
 # %% helpers
 
@@ -67,7 +48,7 @@ def statechart_of(*, framework: Framework | None) -> Statechart:
 
 def step(*, name: str) -> NodeSucceedingOnObservingTrue:
     """
-    :return: A node naming no framework, which succeeds once it observes True.
+    :return: A structure node, which succeeds once it observes True.
     """
     return NodeSucceedingOnObservingTrue(
         name=name, observation=ObservationStateValue.TRUE
@@ -76,14 +57,13 @@ def step(*, name: str) -> NodeSucceedingOnObservingTrue:
 
 def sequence_perception_ticks(
     *, structuring_framework: Framework | None = None
-) -> Sequence:
+) -> SequenceThePerceptionTicks:
     """
-    :return: A sequence of two steps that the perception framework ticks.
+    :return: A sequence of two structure nodes that the perception framework ticks.
     """
-    return Sequence(
+    return SequenceThePerceptionTicks(
         name="look around",
         nodes=[step(name="look left"), step(name="look right")],
-        ticking_framework=Framework.PERCEPTION,
         structuring_framework=structuring_framework,
     )
 
@@ -91,57 +71,43 @@ def sequence_perception_ticks(
 # %% who ticks a node
 
 
-def test_a_child_naming_no_framework_is_ticked_by_the_framework_of_its_parent() -> None:
+def test_a_structure_node_below_a_node_a_framework_ticks_has_no_tick_owner() -> None:
     """
-    A child inherits the framework that ticks its parent.
+    Every framework builds and ticks the structure nodes of cramph, wherever they sit.
     """
     sequence = sequence_perception_ticks()
     statechart_of(framework=Framework.PLANNING).add_node(node=sequence)
 
-    assert [child.tick_owner for child in sequence.children] == [
-        sequence.ticking_framework,
-        sequence.ticking_framework,
-    ]
+    assert [child.tick_owner for child in sequence.children] == [None, None]
 
 
-def test_a_child_naming_its_own_framework_is_ticked_by_it() -> None:
+def test_a_node_below_a_node_another_framework_ticks_keeps_the_framework_of_its_class() -> (
+    None
+):
     """
-    A framework a child names outranks the one of its parent.
+    The framework a node class names outranks the one of the parent.
     """
-    sequence = Sequence(
+    sequence = SequenceThePerceptionTicks(
         name="look and reach",
         nodes=[
             step(name="look"),
-            NodeSucceedingOnObservingTrue(
-                name="reach",
-                observation=ObservationStateValue.TRUE,
-                ticking_framework=Framework.MOTION,
-            ),
+            StepTheMotionTicks(name="reach", observation=ObservationStateValue.TRUE),
         ],
-        ticking_framework=Framework.PERCEPTION,
     )
     statechart_of(framework=Framework.PLANNING).add_node(node=sequence)
 
     assert [child.tick_owner for child in sequence.children] == [
-        Framework.PERCEPTION,
-        Framework.MOTION,
+        None,
+        StepTheMotionTicks.ticking_framework,
     ]
 
 
-def test_a_top_level_node_naming_no_framework_has_no_tick_owner() -> None:
+def test_a_structure_node_below_a_node_another_framework_ticks_is_read_as_itself() -> (
+    None
+):
     """
-    Every framework reading such a node builds and ticks it, as before.
-    """
-    node = step(name="shared")
-    statechart_of(framework=Framework.PLANNING).add_node(node=node)
-
-    assert node.tick_owner is None
-
-
-def test_a_child_of_a_node_another_framework_ticks_is_read_as_a_stand_in() -> None:
-    """
-    The framework a child inherits reaches the document, which is read before the
-    child knows its parent.
+    The reader holds a stand-in for the node it does not tick, and the structure nodes
+    below it.
     """
     statechart = statechart_of(framework=Framework.PLANNING)
     statechart.add_node(node=sequence_perception_ticks())
@@ -152,9 +118,10 @@ def test_a_child_of_a_node_another_framework_ticks_is_read_as_a_stand_in() -> No
         **ReadingFramework(framework_name=Framework.MOTION).create_kwargs(),
     )
 
-    assert [type(child) for child in read.nodes[0].children] == [
-        StructureCopyNode,
-        StructureCopyNode,
+    assert [type(node) for node in read.nodes] == [
+        StructureCopyCompositeNode,
+        NodeSucceedingOnObservingTrue,
+        NodeSucceedingOnObservingTrue,
     ]
 
 
@@ -252,10 +219,25 @@ def test_any_framework_may_change_the_children_of_a_node_no_framework_owns() -> 
     assert sequence.children[-1] is second
 
 
+def test_a_statechart_naming_no_framework_may_change_the_children_of_every_node() -> (
+    None
+):
+    """
+    A statechart that runs every node in its own process changes them as before.
+    """
+    sequence = sequence_perception_ticks()
+    statechart = statechart_of(framework=None)
+    statechart.add_node(node=sequence)
+
+    sequence.add_node(node=(looking_up := step(name="look up")))
+
+    assert sequence.children[-1] is looking_up
+
+
 def test_a_framework_adds_a_node_another_framework_owns_with_its_children() -> None:
     """
-    The framework sending a statechart builds every node in it, including the children
-    a node takes while it joins.
+    The framework sending a statechart builds every node in it, including the children a
+    node takes while it joins.
     """
     sequence = sequence_perception_ticks()
 

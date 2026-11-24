@@ -1,12 +1,11 @@
 """
-Tests that a framework reading a statechart builds only the nodes it ticks itself, and
-a stand-in for every node another framework ticks, without importing that node's class.
+Tests that a framework reading a statechart builds only the nodes it ticks itself, and a
+stand-in for every node another framework ticks, without importing that node's class.
 """
 
 from __future__ import annotations
 
 import json
-from enum import StrEnum
 
 from typing_extensions import Any
 
@@ -19,34 +18,19 @@ from cramph.node import (
     StructureCopyCompositeNode,
     StructureCopyNode,
 )
-from cramph.nodes_for_testing import (
-    CompositeNodeWithChainedChildren,
-    NodeObservingTheOppositeOfAnObservationPredicate,
-    NodeSucceedingOnObservingTrue,
-)
+from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import from_json, to_json
 from semantic_digital_twin.world import World
 
-# %% mimics
-
-
-class Framework(StrEnum):
-    """
-    The frameworks sharing the statecharts of these tests.
-    """
-
-    PERCEPTION = "perception"
-    """
-    Ticks the nodes that look at the scene.
-    """
-
-    MOTION = "motion"
-    """
-    Ticks the nodes that move the robot.
-    """
-
+from ..dataset.frameworks import (
+    ChainThePerceptionTicks,
+    Framework,
+    StepTheMotionTicks,
+    StepThePerceptionTicks,
+    WatcherTheMotionTicks,
+)
 
 # %% helpers
 
@@ -75,26 +59,20 @@ def read_node(*, node: StatechartNode, framework: Framework) -> StatechartNode:
     )
 
 
-def node_looking_at_the_scene() -> NodeSucceedingOnObservingTrue:
+def node_looking_at_the_scene() -> StepThePerceptionTicks:
     """
     :return: A node the perception framework ticks.
     """
-    return NodeSucceedingOnObservingTrue(
-        name="look at the scene",
-        observation=ObservationStateValue.TRUE,
-        ticking_framework=Framework.PERCEPTION,
+    return StepThePerceptionTicks(
+        name="look at the scene", observation=ObservationStateValue.TRUE
     )
 
 
-def node_reaching() -> NodeSucceedingOnObservingTrue:
+def node_reaching() -> StepTheMotionTicks:
     """
     :return: A node the motion framework ticks.
     """
-    return NodeSucceedingOnObservingTrue(
-        name="reach",
-        observation=ObservationStateValue.TRUE,
-        ticking_framework=Framework.MOTION,
-    )
+    return StepTheMotionTicks(name="reach", observation=ObservationStateValue.TRUE)
 
 
 def empty_statechart() -> Statechart:
@@ -123,10 +101,10 @@ def test_a_stand_in_keeps_the_id_name_and_framework_of_its_node() -> None:
     """
     node = node_looking_at_the_scene()
     read = read_node(node=node, framework=Framework.MOTION)
-    assert (read._node_id, read.name, read.ticking_framework) == (
+    assert (read._node_id, read.name, read.tick_owner) == (
         node._node_id,
         node.name,
-        node.ticking_framework,
+        node.tick_owner,
     )
 
 
@@ -145,9 +123,7 @@ def test_a_composite_node_another_framework_ticks_is_read_as_a_composite_stand_i
     """
     A stand-in of a composite node can hold the children the document gives it.
     """
-    node = CompositeNodeWithChainedChildren(
-        name="search the shelf", ticking_framework=Framework.PERCEPTION
-    )
+    node = ChainThePerceptionTicks(name="search the shelf")
     empty_statechart().add_node(node=node)
     read = read_node(node=node, framework=Framework.MOTION)
     assert type(read) is StructureCopyCompositeNode
@@ -172,17 +148,16 @@ def test_a_node_the_reading_framework_ticks_is_read_as_itself() -> None:
     """
     node = node_reaching()
     read = read_node(node=node, framework=Framework.MOTION)
-    assert (type(read), read.observation, read._node_id, read.ticking_framework) == (
+    assert (type(read), read.observation, read._node_id) == (
         type(node),
         node.observation,
         node._node_id,
-        node.ticking_framework,
     )
 
 
 def test_a_node_no_framework_ticks_is_read_as_itself_by_every_framework() -> None:
     """
-    A node without a ticking framework is read as before.
+    A structure node of cramph is built by every framework.
     """
     node = NodeSucceedingOnObservingTrue(
         name="shared", observation=ObservationStateValue.TRUE
@@ -191,14 +166,14 @@ def test_a_node_no_framework_ticks_is_read_as_itself_by_every_framework() -> Non
     assert type(read) is type(node)
 
 
-def test_a_reader_naming_no_framework_reads_a_stand_in() -> None:
+def test_a_reader_naming_no_framework_builds_every_node() -> None:
     """
-    Without a :class:`~cramph.node.ReadingFramework`, no framework-ticked node is built.
+    Without a :class:`~cramph.node.ReadingFramework`, the reader ticks every node
+    itself.
     """
-    read = from_json(
-        through_json_string(document=to_json(node_reaching())),
-    )
-    assert type(read) is StructureCopyNode
+    node = node_reaching()
+    read = from_json(through_json_string(document=to_json(node)))
+    assert type(read) is type(node)
 
 
 # %% a statechart
@@ -245,7 +220,7 @@ def test_a_node_another_framework_ticks_joins_through_a_change_block_as_a_stand_
             **reading_kwargs(framework=Framework.MOTION),
         )
     assert [type(node) for node in receiver.nodes] == [
-        NodeSucceedingOnObservingTrue,
+        StepTheMotionTicks,
         StructureCopyNode,
     ]
 
@@ -258,11 +233,7 @@ def test_a_node_referring_to_a_node_another_framework_ticks_refers_to_its_stand_
     """
     statechart = empty_statechart()
     looking = node_looking_at_the_scene()
-    watching = NodeObservingTheOppositeOfAnObservationPredicate(
-        name="watch the scene",
-        watched_node=looking,
-        ticking_framework=Framework.MOTION,
-    )
+    watching = WatcherTheMotionTicks(name="watch the scene", watched_node=looking)
     statechart.add_nodes(nodes=[watching, looking])
     read = Statechart.from_json(
         data=through_json_string(document=statechart.to_json()),
