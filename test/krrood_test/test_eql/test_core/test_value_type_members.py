@@ -9,12 +9,13 @@ import datetime
 import pytest
 
 from krrood.entity_query_language.core.mapped_variable import (
+    Attribute,
     CallWithExpressionArguments,
     CallWithValueArguments,
 )
 from krrood.entity_query_language.factories import an, entity, variable
 
-from ...dataset.rule_tree_domains import Payment, Period, TaxYear
+from ...dataset.rule_tree_domains import Ledger, Payment, Period, TaxYear
 
 
 # %% calls with variables as arguments
@@ -92,3 +93,20 @@ def test_a_method_of_every_variable_stays_a_method_when_no_field_has_its_name():
     tax_year = TaxYear(number=2017)
 
     assert variable(TaxYear, domain=[tax_year]).first() is tax_year
+
+
+def test_every_public_method_of_a_variable_steps_aside_for_a_field_of_its_name():
+    """
+    Each public method a variable has reads the field of the value type with its name.
+    """
+    ledger = variable(Ledger, domain=[])
+
+    assert [
+        type(member)
+        for member in (
+            ledger.first,
+            ledger.tolist,
+            ledger.evaluate,
+            ledger.conclusions_of_type,
+        )
+    ] == [Attribute] * 4

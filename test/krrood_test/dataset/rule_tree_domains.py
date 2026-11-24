@@ -61,6 +61,18 @@ class ChildLabel(Symbol):
     """
 
 
+@dataclass(kw_only=True, eq=False)
+class HouseholdChildLabel(ChildLabel):
+    """
+    A label a rule tree concludes for a child together with the household it lives in.
+    """
+
+    household: Household
+    """
+    The household the label names next to the child.
+    """
+
+
 # %% votes
 
 
@@ -165,4 +177,31 @@ class Period(Symbol):
     first: datetime.date
     """
     The first day of the period.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class Ledger(Symbol):
+    """
+    A record with a field named like every public method a variable has.
+    """
+
+    first: int
+    """
+    The number of the first entry.
+    """
+
+    tolist: str
+    """
+    The name of the list the ledger is kept in.
+    """
+
+    evaluate: bool
+    """
+    Whether the ledger is still to be audited.
+    """
+
+    conclusions_of_type: str
+    """
+    The kind of conclusions the audit of the ledger reached.
     """

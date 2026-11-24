@@ -13,7 +13,7 @@ from enum import Enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields, is_dataclass
 from functools import cached_property
-from inspect import isclass
+from inspect import getattr_static, isclass, isfunction
 from typing_extensions import (
     TYPE_CHECKING,
     Any,
@@ -362,26 +362,36 @@ class ExpressionMethodOrDomainField:
         if instance is None:
             return self.method
         value_type = instance._type_
-        if is_dataclass(value_type):
-            if self.method.__name__ in {field_.name for field_ in fields(value_type)}:
-                return instance._get_mapped_variable_(
-                    type_=Attribute, _attribute_name_=self.method.__name__
-                )
+        if is_dataclass(value_type) and self.method.__name__ in {
+            field_.name for field_ in fields(value_type)
+        }:
+            return instance._get_mapped_variable_(
+                type_=Attribute, _attribute_name_=self.method.__name__
+            )
         return self.method.__get__(instance, owner)
 
 
-class DomainFieldsOverrideExpressionMethods:
+class DomainFieldsOverrideExpressionMethods(ABC):
     """
-    A variable whose value type may declare dataclass fields named like the public
-    methods every expression has, such as ``first``; those names then read the field.
+    An interface for variables whose value type may declare dataclass fields named like
+    a public method of :class:`SymbolicExpression`, such as ``first``; on such a
+    variable those names read the field.
     """
 
-    first = ExpressionMethodOrDomainField(method=SymbolicExpression.first)
-    tolist = ExpressionMethodOrDomainField(method=SymbolicExpression.tolist)
-    evaluate = ExpressionMethodOrDomainField(method=SymbolicExpression.evaluate)
-    conclusions_of_type = ExpressionMethodOrDomainField(
-        method=SymbolicExpression.conclusions_of_type
-    )
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """
+        Let a field of the value type take the name of every public method of
+        :class:`SymbolicExpression` that the subclass inherits without overriding it.
+        """
+        super().__init_subclass__(**kwargs)
+        for name in dir(SymbolicExpression):
+            method = getattr_static(SymbolicExpression, name)
+            if (
+                not name.startswith("_")
+                and isfunction(method)
+                and getattr_static(cls, name, None) is method
+            ):
+                setattr(cls, name, ExpressionMethodOrDomainField(method=method))
 
 
 # %% variables
@@ -1085,18 +1095,14 @@ class CallWithExpressionArguments(Call[T], GroundTermExpression[CallTerm]):
         Overrides :meth:`MappedVariable._evaluate__`: the bindings the arguments take
         are kept in each result.
         """
-        for child_result in self._child_._evaluate_(sources=sources):
-            for argument_result in cartesian_product_while_passing_the_bindings_around(
-                self._arguments_that_are_expressions_, child_result
-            ):
-                for value in self._values_returned_(
-                    bindings=argument_result.bindings
-                    | {self._child_._id_: child_result.value}
-                ):
-                    yield self._build_operation_result_(
-                        bindings=argument_result.bindings | {self._id_: value},
-                        child_result=argument_result,
-                    )
+        for operands_result in cartesian_product_while_passing_the_bindings_around(
+            self._ground_term_operands_, sources
+        ):
+            for value in self._values_returned_(bindings=operands_result.bindings):
+                yield self._build_operation_result_(
+                    bindings=operands_result.bindings | {self._id_: value},
+                    child_result=operands_result,
+                )
 
     def _apply_mapping_(
         self, *, value: Any, sources: OperationResult | None = None

@@ -4,6 +4,7 @@ are about, and that an alternative concludes only for the values no earlier bran
 for.
 """
 
+from krrood.entity_query_language.rules.conclusion_selector import ValueCombination
 from krrood.entity_query_language.factories import (
     add,
     alternative,
@@ -19,6 +20,7 @@ from ...dataset.rule_tree_domains import (
     Child,
     ChildLabel,
     Household,
+    HouseholdChildLabel,
     Verdict,
     Vote,
     Voter,
@@ -83,6 +85,45 @@ def test_a_default_concludes_only_for_voters_no_vote_approves_for():
     assert sorted(
         (verdict.voter.name, verdict.approves) for verdict in query.tolist()
     ) == [("alice", True), ("bob", False)]
+
+
+def test_an_else_is_an_alternative_only_for_the_variables_every_conclusion_uses():
+    """
+    A variable only the first branch's conclusion uses does not tell apart what the else
+    concludes for: a child the first branch labelled is not labelled by the else.
+    """
+    household = variable(Household, domain=[Household(size=1), Household(size=5)])
+    young, old = Child(name="young", age=5), Child(name="old", age=19)
+    child = variable(Child, domain=[young, old])
+    label = deduced_variable(ChildLabel)
+    query = an(entity(label).where(household.size >= 3, child.age >= 18))
+    with query:
+        add(
+            label,
+            inference(HouseholdChildLabel)(
+                child=child, household=household, text="adult"
+            ),
+        )
+        with alternative():
+            add(label, inference(ChildLabel)(child=child, text="other"))
+
+    assert labels_by_child_name(query.tolist()) == [
+        ("old", "adult"),
+        ("young", "other"),
+    ]
+
+
+# %% combinations of values
+
+
+def test_combinations_of_equal_but_distinct_values_differ():
+    """
+    Two combinations are the same only when they hold the very same objects.
+    """
+    value = [1]
+
+    assert ValueCombination(values=(value,)) == ValueCombination(values=(value,))
+    assert ValueCombination(values=([1],)) != ValueCombination(values=([1],))
 
 
 # %% variables only the conclusions use

@@ -286,12 +286,41 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
         return cls(left=current_condition, right=new_condition)
 
 
+@dataclass(kw_only=True, eq=False)
+class ValueCombination:
+    """
+    One value for each of several variables, equal to another combination only when it
+    holds the very same objects in the same order, since a variable ranges over the
+    objects of its domain and two equal objects are still two values.
+    """
+
+    values: tuple[Any, ...]
+    """
+    The value of each variable, in the order of the variables.
+    """
+
+    def __hash__(self) -> int:
+        """
+        :return: A hash of the identities of the values.
+        """
+        return hash(tuple(id(value) for value in self.values))
+
+    def __eq__(self, other: object) -> bool:
+        """
+        :return: Whether *other* holds the very same objects in the same order.
+        """
+        return (
+            isinstance(other, ValueCombination)
+            and len(self.values) == len(other.values)
+            and all(mine is theirs for mine, theirs in zip(self.values, other.values))
+        )
+
+
 @dataclass(kw_only=True)
 class ConcludedValueCombinations:
     """
     The combinations of values of :attr:`Alternative._variables_shared_by_conclusions_`
-    that one branch of an :class:`Alternative` already concluded for, told apart by
-    identity since a variable ranges over the objects of its domain.
+    that one branch of an :class:`Alternative` already concluded for.
     """
 
     variables: tuple[Variable, ...]
@@ -299,36 +328,33 @@ class ConcludedValueCombinations:
     The variables whose values make up a combination.
     """
 
-    values_by_identity: dict[tuple[int, ...], tuple[Any, ...]] = field(
-        default_factory=dict
-    )
+    combinations: set[ValueCombination] = field(default_factory=set)
     """
-    Each combination's values, keyed by their identities; holding the values keeps those
-    identities from being reused while they are compared.
+    The combinations concluded for so far.
     """
 
-    def _identities_(self, *, bindings: Bindings) -> tuple[int, ...]:
+    def _combination_in_(self, *, bindings: Bindings) -> ValueCombination:
         """
         :param bindings: Bindings holding a value for every one of :attr:`variables`.
-        :return: The identities of those values.
+        :return: The combination of those values.
         """
-        return tuple(id(bindings[variable._id_]) for variable in self.variables)
+        return ValueCombination(
+            values=tuple(bindings[variable._id_] for variable in self.variables)
+        )
 
     def add(self, *, bindings: Bindings) -> None:
         """
         :param bindings: Bindings holding a value for every one of :attr:`variables`,
             whose combination is now concluded for.
         """
-        self.values_by_identity[self._identities_(bindings=bindings)] = tuple(
-            bindings[variable._id_] for variable in self.variables
-        )
+        self.combinations.add(self._combination_in_(bindings=bindings))
 
     def contains(self, *, bindings: Bindings) -> bool:
         """
         :param bindings: Bindings holding a value for every one of :attr:`variables`.
         :return: Whether their combination was already concluded for.
         """
-        return self._identities_(bindings=bindings) in self.values_by_identity
+        return self._combination_in_(bindings=bindings) in self.combinations
 
 
 @dataclass(kw_only=True, eq=False)
@@ -408,7 +434,8 @@ class Alternative(OR, ConclusionSelector):
     def _variables_shared_by_conclusions_(self) -> tuple[Variable, ...]:
         """
         The variables in the concluded value of every conclusion of either branch, for
-        whose values the branches are alternatives to each other.
+        whose values the branches are alternatives to each other, in the order the first
+        conclusion's value names them.
         """
         conclusions = [
             conclusion
@@ -417,17 +444,18 @@ class Alternative(OR, ConclusionSelector):
         ]
         if not conclusions:
             return ()
-        shared_ids = set.intersection(
-            *(
-                {variable._id_ for variable in conclusion.variables_in_concluded_value}
-                for conclusion in conclusions
-            )
-        )
-        # Every shared variable is in the first conclusion, whose order is kept.
+        first_conclusion, *other_conclusions = conclusions
+        variable_ids_of_other_conclusions = [
+            {variable._id_ for variable in conclusion.variables_in_concluded_value}
+            for conclusion in other_conclusions
+        ]
         return tuple(
             variable
-            for variable in conclusions[0].variables_in_concluded_value
-            if variable._id_ in shared_ids
+            for variable in first_conclusion.variables_in_concluded_value
+            if all(
+                variable._id_ in variable_ids
+                for variable_ids in variable_ids_of_other_conclusions
+            )
         )
 
     def _result_with_conclusions_of_(
