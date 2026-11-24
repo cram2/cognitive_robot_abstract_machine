@@ -24,6 +24,7 @@ from experiments.control_loop_experiments.control_loop_profiler import (
 )
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.giskard_tester import GiskardTester
+from giskardpy.middleware.ros2.motion_goal import DebugOutput
 from giskardpy.middleware.ros2.robot_interface_config import (
     StandAloneRobotInterfaceConfig,
 )
@@ -65,9 +66,36 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 # %% how much the measurement records
+
+
+class PlotterMode(StrEnum):
+    """
+    Whether Giskard records the trajectory of the motion while it is measured.
+
+    Recording costs time in every cycle, so the same motion is measured under both modes
+    to show what it costs.
+    """
+
+    PLAIN = "plain"
+    """
+    Nothing is recorded, so only the control loop itself is measured.
+    """
+
+    DEBUG = "debug"
+    """
+    The trajectory is recorded and plotted, as it is when a motion is debugged.
+    """
+
+    @property
+    def debug_output(self) -> DebugOutput:
+        """
+        :return: What the measured goal asks Giskard to produce to debug it.
+        """
+        return DebugOutput(plots_trajectory=self is PlotterMode.DEBUG)
 
 
 # %% the robot under measurement
@@ -331,10 +359,12 @@ class CartesianGoalScenario(BenchmarkScenario):
         motion_statechart.add_node(
             node=(
                 cartesian_goal := CartesianPose(
-                    root_link=robot.get_kinematic_structure_entity(
-                        name="base_footprint"
+                    kinematic_chain=KinematicChain(
+                        root=robot.get_kinematic_structure_entity(
+                            name="base_footprint"
+                        ),
+                        tip=tip,
                     ),
-                    tip_link=tip,
                     goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                         pos_x=-0.2, reference_frame=tip
                     ),
@@ -373,9 +403,11 @@ class CollisionAvoidanceScenario(BenchmarkScenario):
         motion_statechart = Statechart(context=robot.api.context)
         motion_statechart.add_node(
             node=CartesianPose(
-                root_link=robot.default_root,
-                tip_link=robot.get_kinematic_structure_entity(
-                    name="r_gripper_tool_frame"
+                kinematic_chain=KinematicChain(
+                    root=robot.default_root,
+                    tip=robot.get_kinematic_structure_entity(
+                        name="r_gripper_tool_frame"
+                    ),
                 ),
                 goal_pose=Pose.from_xyz_axis_angle(
                     x=0.8,
@@ -434,8 +466,9 @@ class ApartmentDrivingScenario(BenchmarkScenario):
         motion_statechart.add_node(
             node=(
                 cartesian_goal := CartesianPose(
-                    root_link=robot.get_kinematic_structure_entity(name="map"),
-                    tip_link=base,
+                    kinematic_chain=KinematicChain(
+                        root=robot.get_kinematic_structure_entity(name="map"), tip=base
+                    ),
                     goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=0.4, y=-2.0, reference_frame=base
                     ),
@@ -486,23 +519,25 @@ class KitchenPointingScenario(BenchmarkScenario):
                 sequence := Sequence(
                     nodes=[
                         Pointing(
-                            root_link=map_frame,
-                            tip_link=camera,
+                            kinematic_chain=KinematicChain(root=map_frame, tip=camera),
                             goal_point=handle_point,
                             pointing_axis=pointing_axis,
                         ),
                         Parallel(
                             nodes=[
                                 Pointing(
-                                    root_link=map_frame,
-                                    tip_link=camera,
+                                    kinematic_chain=KinematicChain(
+                                        root=map_frame, tip=camera
+                                    ),
                                     goal_point=handle_point,
                                     pointing_axis=pointing_axis,
                                 ),
                                 CartesianPose(
-                                    root_link=map_frame,
-                                    tip_link=robot.get_kinematic_structure_entity(
-                                        name="base_footprint"
+                                    kinematic_chain=KinematicChain(
+                                        root=map_frame,
+                                        tip=robot.get_kinematic_structure_entity(
+                                            name="base_footprint"
+                                        ),
                                     ),
                                     goal_pose=HomogeneousTransformationMatrix.from_xyz_axis_angle(
                                         y=2.0,
@@ -557,8 +592,10 @@ class LongSequenceScenario(BenchmarkScenario):
         ]
         waypoints = [
             CartesianPose(
-                root_link=robot.get_kinematic_structure_entity(name="base_footprint"),
-                tip_link=tips[index % len(tips)],
+                kinematic_chain=KinematicChain(
+                    root=robot.get_kinematic_structure_entity(name="base_footprint"),
+                    tip=tips[index % len(tips)],
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tips[index % len(tips)]
                 ),
@@ -616,8 +653,10 @@ class DeeplyNestedCascadeScenario(BenchmarkScenario):
                 for _ in range(self.instant_steps_per_waypoint)
             ]
             waypoint = CartesianPose(
-                root_link=robot.get_kinematic_structure_entity(name="base_footprint"),
-                tip_link=tip,
+                kinematic_chain=KinematicChain(
+                    root=robot.get_kinematic_structure_entity(name="base_footprint"),
+                    tip=tip,
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                     pos_x=offset, reference_frame=tip
                 ),
@@ -700,6 +739,11 @@ class ScenarioRunner:
     Sets a scenario up, measures its motion and takes the robot down again.
     """
 
+    plotter_mode: PlotterMode = PlotterMode.PLAIN
+    """
+    Whether Giskard records the trajectory of the motion while it is measured.
+    """
+
     target_frequency: float = 100.0
     """
     Frequency the controller is discretized for, in hertz.
@@ -743,13 +787,14 @@ class ScenarioRunner:
         :param robot: The robot the motion is executed on.
         :param motion_statechart: The motion that is executed.
         """
+        debug_output = self.plotter_mode.debug_output
         if self.python_profiler is None:
             robot.api.compile(statechart=motion_statechart)
-            robot.api.execute()
+            robot.api.execute(debug_output=debug_output)
             return
         self.python_profiler.enable()
         try:
             robot.api.compile(statechart=motion_statechart)
-            robot.api.execute()
+            robot.api.execute(debug_output=debug_output)
         finally:
             self.python_profiler.disable()

@@ -26,7 +26,7 @@ if TYPE_CHECKING:
         HasRootBody,
         HasSupportingSurface,
     )
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
     from semantic_digital_twin.grasping.object_relative_grasp import (
         ObjectRelativeGrasp,
     )
@@ -2468,7 +2468,7 @@ class NoGraspGeometry(UsageError):
     shape to derive them from.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The annotation whose grasps were asked for.
     """
@@ -2497,7 +2497,7 @@ class GraspNotOnObjectError(UsageError):
     The grasp that missed.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object it was meant for.
     """

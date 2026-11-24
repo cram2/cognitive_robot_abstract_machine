@@ -1,8 +1,18 @@
+"""
+Tests of converting object chains deeper than Python's recursion limit.
+"""
+
+from __future__ import annotations
+
 import sys
+
+from typing_extensions import TYPE_CHECKING
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from ..dataset.example_classes import Person
-from ..dataset.ormatic_interface import PersonDAO
+
+if TYPE_CHECKING:
+    from ..dataset.ormatic_interface import PersonDAO
 
 
 def test_deep_person_chain_to_dao():
@@ -17,7 +27,7 @@ def test_deep_person_chain_to_dao():
     # P0 knows [P1], P1 knows [P2], ..., P1999 knows []
 
     depth = 2000
-    current_person = Person(name=f"Person {depth-1}")
+    current_person = Person(name=f"Person {depth - 1}")
     for i in range(depth - 2, -1, -1):
         p = Person(name=f"Person {i}", knows=[current_person])
         current_person = p
@@ -44,7 +54,7 @@ def test_deep_person_chain_from_dao():
     sys.setrecursionlimit(limit)
 
     depth = 2000
-    current_person = Person(name=f"Person {depth-1}")
+    current_person = Person(name=f"Person {depth - 1}")
     for i in range(depth - 2, -1, -1):
         p = Person(name=f"Person {i}", knows=[current_person])
         current_person = p

@@ -1,3 +1,8 @@
+"""
+Gantt charts of the life cycle and observation states each node of a statechart went
+through.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -9,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.node import StatechartNode
 from semantic_digital_twin.world_description.geometry import Color
 
@@ -28,7 +33,7 @@ class StateSpan:
     A stretch of ticks over which a node kept one state.
     """
 
-    state: LifeCycleValues | ObservationStateValues
+    state: LifeCycleValue | ObservationStateValue
     """
     The state the node kept.
     """
@@ -143,7 +148,7 @@ class HistoryGanttChartPlotter:
         self,
         *,
         ticks: list[int],
-        states: list[LifeCycleValues] | list[ObservationStateValues],
+        states: list[LifeCycleValue] | list[ObservationStateValue],
     ) -> list[StateSpan]:
         """
         :param ticks: The tick of every snapshot recording a node, in order.
@@ -184,7 +189,7 @@ class HistoryGanttChartPlotter:
             self.total_ticks * self.x_width_per_tick if self.x_width_per_tick else None
         )
 
-    def plot_gantt_chart(self, *, file_name: str) -> None:
+    def plot_gantt_chart(self, *, file_name: Path) -> None:
         """
         Render the Gantt chart and save it.
 
@@ -537,14 +542,14 @@ class HistoryGanttChartPlotter:
         finally:
             plt.close(fig)
 
-    def _save_figure(self, *, file_name: str) -> None:
+    def _save_figure(self, *, file_name: Path) -> None:
         """
         Saves the current figure to the specified file.
 
         :param file_name: The complete path and file name where the figure should be
             saved.
         """
-        Path(file_name).parent.mkdir(parents=True, exist_ok=True)
+        file_name.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(file_name)
         plt.close()
         logger.info(f"Saved gantt chart to {file_name}.")

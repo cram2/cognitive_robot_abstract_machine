@@ -1,0 +1,1248 @@
+"""
+User interface (grammar & vocabulary) for entity query language.
+"""
+
+from __future__ import annotations
+
+import operator
+from dataclasses import dataclass
+from inspect import isclass
+from uuid import UUID
+
+from typing_extensions import (
+    Any,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TYPE_CHECKING,
+    TypeVar,
+    deprecated,
+    overload,
+)
+
+from krrood.entity_query_language.core.base_expressions import (
+    Selectable,
+    SymbolicExpression,
+    TruthValueOperator,
+)
+from krrood.entity_query_language.operators.causal import (
+    cause,
+    confounder,
+)
+from krrood.entity_query_language.core.helpers import _resolve_domain
+from krrood.entity_query_language.core.mapped_variable import (
+    CanBehaveLikeAVariable,
+    HasSymbolicOperations,
+    Attribute,
+)
+from krrood.entity_query_language.evaluation import evaluate_statements_of
+from krrood.entity_query_language.core.variable import (
+    DomainType,
+    Literal,
+    ExternallySetVariable,
+)
+from krrood.entity_query_language.enums import DomainSource, ProbabilisticLibrary
+from krrood.entity_query_language.exceptions import (
+    ProbabilisticLibrariesNotInstalled,
+    UnsupportedExpressionTypeForDistinct,
+)
+from krrood.entity_query_language.operators.aggregators import (
+    Max,
+    Min,
+    Sum,
+    Average,
+    Count,
+    CountAll,
+    CountRange,
+    Mode,
+    MultiMode,
+)
+from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.concatenation import Concatenation
+from krrood.entity_query_language.operators.conditionals import CaseWhen
+from krrood.entity_query_language.operators.core_logical_operators import (
+    chained_logic,
+    AND,
+    OR,
+)
+from krrood.entity_query_language.operators.logical_quantifiers import ForAll, Exists
+from krrood.entity_query_language.predicate import *  # type: ignore
+from krrood.entity_query_language.predicate import (
+    Predicate,
+    RenderedFields,
+    SymbolicFunction,
+    symbolic_callable_to_function,
+    symbolic_function,
+)
+from krrood.entity_query_language.query.match import (
+    Match,
+)
+from krrood.entity_query_language.query.quantifiers import (
+    ResultQuantificationConstraint,
+    An,
+    The,
+    ResultQuantifier,
+)
+from krrood.entity_query_language.query.query import Entity, SetOf, Query
+from krrood.entity_query_language.rules.conclusion import Add
+from krrood.entity_query_language.rules.conclusion_selector import (
+    Refinement,
+    Alternative,
+    Next,
+)
+from krrood.entity_query_language.utils import is_iterable
+from krrood.symbol_graph.symbol_graph import Symbol, SymbolGraph
+
+if TYPE_CHECKING:
+    from krrood.parametrization.probabilistic_queries import (
+        Distribution,
+        Probability,
+    )
+
+ConditionType = Union[SymbolicExpression, bool, Predicate, TruthValueOperator]
+"""
+The possible types for conditions.
+"""
+
+# %% Query Construction
+
+
+def entity(selected_variable: T) -> Entity[T]:
+    """
+    Create an entity descriptor for a selected variable.
+
+    :param selected_variable: The variable to select in the result.
+    :return: Entity descriptor.
+    """
+    return Entity(_selected_variables_=(selected_variable,))
+
+
+def set_of(*selected_variables: Union[Selectable[T], Any]) -> SetOf:
+    """
+    Create a set descriptor for the selected variables.
+
+    :param selected_variables: The variables to select in the result set.
+    :return: Set descriptor.
+    """
+    return SetOf(_selected_variables_=selected_variables)
+
+
+# %% Variable Declaration
+
+
+def variable(
+    type_: type[T],
+    domain: Iterable[T] | None = None,
+) -> Union[T, Selectable[T], Variable[T]]:
+    """
+    Declare a symbolic variable that can be used inside queries.
+
+    Filters the domain to elements that are instances of T.
+
+    .. warning::
+
+        If no domain is provided, and the type_ is a Symbol type, then the domain is
+        every instance of the type in the evaluation: the SymbolGraph's, which may
+        contain unnecessarily many elements, or a state's objects when the query is
+        evaluated with a state.
+
+    :param type_: The type of variable.
+    :param domain: Iterable of potential values for the variable, or None. If None, the
+        domain is every instance of a Symbol type in the evaluation; for other types the
+        variable should not be evaluated by EQL but by another evaluator (e.g., EQL To
+        SQL converter in Ormatic).
+    :return: A Variable that can be queried for.
+    """
+    return Variable(
+        _type_=type_,
+        _domain_=_resolve_domain(type_, domain),
+    )
+
+
+def literal(value: T) -> Union[T, Literal[T]]:
+    """
+    Declare an expression whose only value is *value*.
+
+    :param value: The value the expression stands for.
+    :return: A literal of *value* that can be used inside queries.
+    """
+    return Literal(_value_=value, _type_=type(value))
+
+
+def deduced_variable(
+    type_: type[T] | None = None,
+) -> Union[type[T], ExternallySetVariable[T]]:
+    """
+    Create a variable that is inferred through deductive reasoning.
+
+    :param type_: The type of the variable values.
+    :return: An instance of `ExternallySetVariable[T]`.
+    """
+    return ExternallySetVariable(_type_=type_, _domain_source_=DomainSource.DEDUCTION)
+
+
+def variable_from(
+    domain: DomainType | T,
+) -> T | Variable[T]:
+    """
+    Create a variable that ranges over the values of a domain.
+
+    Each call creates a variable of its own, so two variables from one domain range over
+    it independently and a condition can relate one value to another.
+
+    :param domain: The values, or an expression whose value, for each of its bindings,
+        holds them; a value declared as a collection, or a collection of undeclared
+        kind, holds its elements, ``None`` holds none, and any other value itself.
+    :return: A variable that can be queried for.
+    """
+    return Variable(_domain_=domain)
+
+
+# %% Causal Constructs
+
+# `cause` and `confounder` (see operators/causal.py) are re-exported here so query-
+# building imports can come from this one module, alongside `a`, `an`, `set_of`, and
+# the rest of this file's factories.
+
+# %% Operators on Variables
+
+
+def concatenation(
+    *variables: Union[Iterable[T], Selectable[T]],
+) -> Union[T, Selectable[T]]:
+    """
+    Concatenation of two or more variables.
+    """
+    return Concatenation(_operation_children_=variables)
+
+
+def contains(
+    container: Union[Iterable, CanBehaveLikeAVariable[T]], item: Any
+) -> Comparator:
+    """
+    Check whether a container contains an item.
+
+    :param container: The container expression.
+    :param item: The item to look for.
+    :return: A comparator expression equivalent to ``item in container``.
+    :rtype: SymbolicExpression
+    """
+    return in_(item, container)
+
+
+def in_(item: Any, container: Union[Iterable, CanBehaveLikeAVariable[T]]):
+    """
+    Build a comparator for membership: ``item in container``.
+
+    :param item: The candidate item.
+    :param container: The container expression.
+    :return: Comparator expression for membership.
+    :rtype: Comparator
+    """
+    return Comparator(left=container, right=item, operation=operator.contains)
+
+
+@deprecated("Use variable_from, which ranges over the elements of a collection.")
+def flat_variable(
+    var: Union[CanBehaveLikeAVariable[T], Iterable[T]],
+) -> Union[Variable[T], T]:
+    """
+    Create a variable that ranges over the elements of a collection.
+
+    .. deprecated::
+        Use :func:`variable_from`, which this is now the same as.
+    """
+    return variable_from(var)
+
+
+# %% Logical Operators
+
+
+def and_(*conditions: ConditionType) -> ConditionType:
+    """
+    Logical conjunction of conditions.
+
+    :param conditions: One or more conditions to combine.
+    :type conditions: SymbolicExpression | bool
+    :return: An AND operator joining the conditions.
+    :rtype: SymbolicExpression
+    """
+    return chained_logic(AND, *conditions)
+
+
+def or_(*conditions: ConditionType) -> ConditionType:
+    """
+    Logical disjunction of conditions.
+
+    :param conditions: One or more conditions to combine.
+    :type conditions: SymbolicExpression | bool
+    :return: An OR operator joining the conditions.
+    :rtype: SymbolicExpression
+    """
+    return chained_logic(OR, *conditions)
+
+
+def not_(operand: ConditionType) -> SymbolicExpression:
+    """
+    A symbolic NOT operation that can be used to negate symbolic expressions.
+    """
+    if not isinstance(operand, SymbolicExpression):
+        operand = Literal(_value_=operand)
+    return operand._invert_()
+
+
+def for_all(
+    universal_variable: Union[CanBehaveLikeAVariable[T], T],
+    condition: ConditionType,
+) -> ForAll:
+    """
+    A universal on variable that finds all sets of variable bindings (values) that
+    satisfy the condition for **every** value of the universal_variable.
+
+    :param universal_variable: The universal on variable that the condition must satisfy
+        for all its values.
+    :param condition: A SymbolicExpression or bool representing a condition that must be
+        satisfied.
+    :return: A SymbolicExpression that can be evaluated producing every set that
+        satisfies the condition.
+    """
+    return ForAll(left=universal_variable, right=condition)
+
+
+def exists(
+    universal_variable: Union[CanBehaveLikeAVariable[T], T],
+    condition: ConditionType,
+) -> Exists:
+    """
+    A universal on variable that finds all sets of variable bindings (values) that
+    satisfy the condition for **any** value of the universal_variable.
+
+    :param universal_variable: The universal on variable that the condition must satisfy
+        for any of its values.
+    :param condition: A SymbolicExpression or bool representing a condition that must be
+        satisfied.
+    :return: A SymbolicExpression that can be evaluated producing every set that
+        satisfies the condition.
+    """
+    return Exists(left=universal_variable, right=condition)
+
+
+# %% Result Quantifiers
+
+
+def _quantify_or_build_match(
+    arg: Union[T, Query, type[T], Callable[..., T]],
+    quantifier_type: type[ResultQuantifier],
+    quantification: ResultQuantificationConstraint | None = None,
+    *,
+    target_type: type[T] | None = None,
+) -> Union[T, Query, Match[T]]:
+    """
+    Shared implementation for :py:func:`an` and :py:func:`the`.
+
+    The behaviour is selected by the runtime type of ``arg``:
+
+    * If ``arg`` stands for an expression - a
+      :class:`~krrood.entity_query_language.core.base_expressions.SymbolicExpression` (an
+      entity, a set expression, a variable or an attribute), or a
+      :class:`~krrood.entity_query_language.query.match.Match`, which contributes the
+      query carrying its pattern - it is quantified with ``quantifier_type``. Raw
+      selectables that are not already a
+      :class:`~krrood.entity_query_language.query.query.Query` are first wrapped with
+      :py:func:`entity`.
+    * Otherwise ``arg`` is treated as a type (or a callable factory) and a structural
+      :class:`~krrood.entity_query_language.query.match.Match` is built — selectable by default
+      and generative-ready through a
+      :class:`~krrood.entity_query_language.backends.GenerativeBackend`. Restrict the search to
+      specific instances with :meth:`~krrood.entity_query_language.query.match.Match.from_`.
+      The match reads like an instance of the matched class, both statically (the
+      overloads return ``Union[T, Match[T]]``, so IDEs offer the class's own attributes)
+      and at runtime (attribute access is delegated symbolically, see
+      :meth:`~krrood.entity_query_language.query.match.Match.__getattr__`).
+
+    :param arg: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param quantifier_type: The result quantifier to apply (``An`` or ``The``).
+    :param quantification: Optional quantification constraint (quantify path only).
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: A quantified query, or a ``Match`` builder.
+    """
+    if isinstance(arg, (SymbolicExpression, HasSymbolicOperations)):
+        arg = SymbolicExpression._as_operand_(value=arg)
+        if not isinstance(arg, Query):
+            arg = entity(arg)
+        return arg._quantify_(
+            quantifier_type=quantifier_type, quantification_constraint=quantification
+        )
+
+    match_ = Match(_factory_=arg, _declared_type_=target_type)
+    match_._quantifier_type_ = quantifier_type
+    return match_
+
+
+TSymbolicExpression = TypeVar("TSymbolicExpression", bound=SymbolicExpression)
+"""
+Bound to the concrete symbolic-expression subtype (``Entity[...]``, ``Query[...]``,
+``SetOf``, an ``Attribute`` chain, ...) passed to
+:py:func:`an`/:py:func:`the`/:py:func:`a`, so their quantify-path overload returns that
+same type instead of falling through to the ``Callable[..., T]`` match-building
+overload.
+
+.. note::
+    Not every symbolic expression is affected, but the ones that inherit ``__call__`` from
+    :class:`~krrood.entity_query_language.core.mapped_variable.CanBehaveLikeAVariable` (``Entity``,
+    ``Query``, ``Match``, ``Attribute``, ...) are, so without this overload taking priority they
+    would structurally match ``Callable[..., T]`` first.
+"""
+
+
+@overload
+def an(
+    entity_: type[T],
+    quantification: None = ...,
+    *,
+    target_type: None = ...,
+) -> Union[T, Match[T]]: ...
+
+
+@overload
+def an(
+    entity_: TSymbolicExpression,
+    quantification: ResultQuantificationConstraint | None = ...,
+    *,
+    target_type: None = ...,
+) -> TSymbolicExpression: ...
+
+
+@overload
+def an(
+    entity_: Callable[..., T],
+    quantification: None = ...,
+    *,
+    target_type: type[T] = ...,
+) -> Union[T, Match[T]]: ...
+
+
+@overload
+def an(
+    entity_: T,
+    quantification: ResultQuantificationConstraint | None = ...,
+    *,
+    target_type: None = ...,
+) -> T: ...
+
+
+def an(
+    entity_,
+    quantification=None,
+    *,
+    target_type=None,
+):
+    """
+    Select all values satisfying the given description.
+
+    Depending on ``entity_`` this either quantifies an existing symbolic expression with the
+    ``An`` quantifier (zero or more results), or builds a structural ``Match`` when ``entity_``
+    is a type or a callable factory. See :py:func:`_quantify_or_build_match` for details;
+    restrict a match to specific instances with
+    :meth:`~krrood.entity_query_language.query.match.Match.from_`.
+
+    :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param quantification: Optional quantification constraint (quantify path only).
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: The applied quantifier or the constructed match.
+    """
+    return _quantify_or_build_match(
+        entity_, An, quantification, target_type=target_type
+    )
+
+
+@overload
+def a(
+    entity_: type[T],
+    quantification: None = ...,
+    *,
+    target_type: None = ...,
+) -> Union[T, Match[T]]: ...
+
+
+@overload
+def a(
+    entity_: TSymbolicExpression,
+    quantification: ResultQuantificationConstraint | None = ...,
+    *,
+    target_type: None = ...,
+) -> TSymbolicExpression: ...
+
+
+@overload
+def a(
+    entity_: Callable[..., T],
+    quantification: None = ...,
+    *,
+    target_type: type[T] = ...,
+) -> Union[T, Match[T]]: ...
+
+
+@overload
+def a(
+    entity_: T,
+    quantification: ResultQuantificationConstraint | None = ...,
+    *,
+    target_type: None = ...,
+) -> T: ...
+
+
+def a(
+    entity_,
+    quantification=None,
+    *,
+    target_type=None,
+):
+    """
+    Select all values satisfying the given description.
+
+    This accommodates words not starting with a vowel; it delegates to :func:`an`. It is a real
+    function (not an ``a = an`` alias) so its ``__name__`` is ``"a"``, which lets tools that key a
+    namespace by ``__name__`` (e.g. the doctest harness) expose it under the name ``a``.
+
+    :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param quantification: Optional quantification constraint (quantify path only).
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: The applied quantifier or the constructed match.
+    """
+    return an(entity_, quantification, target_type=target_type)
+
+
+@overload
+def the(
+    entity_: type[T],
+    *,
+    target_type: None = ...,
+) -> Union[T, Match[T]]: ...
+
+
+@overload
+def the(
+    entity_: TSymbolicExpression,
+    *,
+    target_type: None = ...,
+) -> TSymbolicExpression: ...
+
+
+@overload
+def the(
+    entity_: Callable[..., T],
+    *,
+    target_type: type[T] = ...,
+) -> Union[T, Match[T]]: ...
+
+
+@overload
+def the(
+    entity_: T,
+    *,
+    target_type: None = ...,
+) -> T: ...
+
+
+def the(
+    entity_,
+    *,
+    target_type=None,
+):
+    """
+    Select the unique value satisfying the given description.
+
+    Behaves like :py:func:`an` but applies the ``The`` quantifier, which expects exactly one
+    result when the expression is materialized (raising otherwise). Restrict a match to
+    specific instances with :meth:`~krrood.entity_query_language.query.match.Match.from_`.
+
+    :param entity_: An entity/set/variable/attribute to quantify, or a type/callable to match.
+    :param target_type: Optional explicit type for callable factories (match path only).
+    :return: The applied quantifier or the constructed match.
+    """
+    return _quantify_or_build_match(entity_, The, None, target_type=target_type)
+
+
+# %% Rules
+
+
+def add(variable: Any, value: Any) -> None:
+    """
+    Add a value to a variable.
+
+    :param variable: The variable to which the value will be added.
+    :param value: The value to be added to the variable.
+    :return: None
+    """
+    Add(left=variable, right=value)
+
+
+def inference(
+    factory: Callable[..., T],
+) -> Callable[..., InstantiatedVariable[T]]:
+    """
+    This returns a factory function that creates a new variable whose values *factory*
+    builds, and takes keyword arguments for *factory*.
+
+    :param factory: The callable that builds the values, such as a class or a factory
+        method; the variable's type is the type it builds.
+    :return: The factory function for creating a new variable.
+    """
+    return lambda **kwargs: InstantiatedVariable(
+        _factory_=factory,
+        _kwargs_=kwargs,
+    )
+
+
+def refinement(*conditions: ConditionType) -> SymbolicExpression:
+    """
+    Add a refinement branch (ExceptIf node with its right the new conditions and its
+    left the base/parent rule/query) to the current condition tree.
+
+    Each provided condition is chained with AND, and the resulting branch is connected
+    via ExceptIf to the current node, representing a refinement/specialization path.
+
+    :param conditions: The refinement conditions. They are chained with AND.
+    :returns: The newly created branch node for further chaining.
+    """
+    return Refinement.create_and_update_rule_tree(*conditions)
+
+
+def alternative(*conditions: ConditionType) -> SymbolicExpression:
+    """
+    Add an alternative branch (logical ElseIf) to the current condition tree.
+
+    Each provided condition is chained with AND, and the resulting branch is connected
+    via ElseIf to the current node, representing an alternative path.
+
+    :param conditions: Conditions to chain with AND and attach as an alternative.
+    :returns: The newly created branch node for further chaining.
+    """
+    return Alternative.create_and_update_rule_tree(*conditions)
+
+
+def next_rule(*conditions: ConditionType) -> SymbolicExpression:
+    """
+    Add a consequent rule that gets always executed after the current rule.
+
+    Each provided condition is chained with AND, and the resulting branch is connected
+    via Next to the current node, representing the next path.
+
+    :param conditions: Conditions to chain with AND and attach as an alternative.
+    :returns: The newly created branch node for further chaining.
+    """
+    return Next.create_and_update_rule_tree(*conditions)
+
+
+# %% Conditionals
+
+
+def case_when(
+    condition: SymbolicExpression,
+    then_value: SymbolicExpression,
+    else_value: SymbolicExpression | None = None,
+) -> CaseWhen:
+    """
+    Create a CASE WHEN ... THEN ... ELSE ... END expression.
+
+    .. code-block:: python
+
+        action = variable(MoveAction, domain=[])
+        query = an(set_of(
+            min(case_when(action.polymorphic_type == 'PickUpActionDAO', action.database_id))
+        ))
+
+    :param condition: The condition to evaluate
+    :param then_value: The value if condition is true
+    :param else_value: The value if condition is false
+    :return: A CaseWhen expression
+    """
+    return CaseWhen(condition=condition, then_value=then_value, else_value=else_value)
+
+
+# %% Aggregators
+
+
+def max(
+    variable: Selectable[T],
+    key: Callable | None = None,
+    default: T | None = None,
+    distinct: bool = False,
+) -> Union[T, Max[T]]:
+    """
+    Maps the variable values to their maximum value.
+
+    :param variable: The variable for which the maximum value is to be found.
+    :param key: A function that extracts a comparison key from each variable value.
+    :param default: The value returned when the iterable is empty.
+    :param distinct: Whether to only consider distinct values.
+    :return: A Max object that can be evaluated to find the maximum value.
+    """
+    return Max(
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
+    )
+
+
+def mode(
+    variable: Selectable[T],
+    default: T | None = None,
+) -> Union[T, Mode[T]]:
+    """
+    Calculate and return the first mode from the variable values.
+
+    The mode is the most common value in the iterable. It is found by counting the
+    occurrences of each value and returning the one with the highest count. If there are
+    multiple values with the same highest count, the first one encountered is returned.
+    This is an aggregation function, thus the query will be fully evaluated before the
+    result is returned.
+
+    :param variable: The variable for which the mode value is to be found.
+    :param default: The value returned when the iterable is empty.
+    :return: A Max object that can be evaluated to find the mode value.
+    """
+    return Mode(_child_=variable, _default_value_=default)
+
+
+def multimode(
+    variable: Selectable[T],
+    default: T | None = None,
+) -> Union[T, MultiMode[T]]:
+    """
+    Calculate and return all mode values from the variable values.
+
+    Similar to :py:func:`krrood.entity_query_language.factories.mode` but returns all values that have the same mode value (i.e., all values that have the same highest count).
+
+    :param variable: The variable for which the mode value is to be found.
+    :param default: The value returned when the iterable is empty.
+    :return: A Max object that can be evaluated to find the mode value.
+    """
+    return MultiMode(_child_=variable, _default_value_=default)
+
+
+def min(
+    variable: Selectable[T],
+    key: Callable | None = None,
+    default: T | None = None,
+    distinct: bool = False,
+) -> Union[T, Min[T]]:
+    """
+    Maps the variable values to their minimum value.
+
+    :param variable: The variable for which the minimum value is to be found.
+    :param key: A function that extracts a comparison key from each variable value.
+    :param default: The value returned when the iterable is empty.
+    :param distinct: Whether to only consider distinct values.
+    :return: A Min object that can be evaluated to find the minimum value.
+    """
+    return Min(
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
+    )
+
+
+def sum(
+    variable: Union[T, Selectable[T]],
+    key: Callable | None = None,
+    default: T | None = None,
+    distinct: bool = False,
+) -> Union[T, Sum]:
+    """
+    Computes the sum of values produced by the given variable.
+
+    :param variable: The variable for which the sum is calculated.
+    :param key: A function that extracts a comparison key from each variable value.
+    :param default: The value returned when the iterable is empty.
+    :param distinct: Whether to only consider distinct values.
+    :return: A Sum object that can be evaluated to find the sum of values.
+    """
+    return Sum(
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
+    )
+
+
+def average(
+    variable: Union[Selectable[T], Any],
+    key: Callable | None = None,
+    default: T | None = None,
+    distinct: bool = False,
+) -> Union[T, Average]:
+    """
+    Computes the average of values produced by the given variable.
+
+    Evaluated bare (``average(x.A).first(backend=...)``, with no enclosing
+    ``set_of``/``grouped_by``) against a
+    :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend`, this resolves
+    in closed form via ``ProbabilisticModel.moment`` instead of sampling and averaging
+    rows -- the same declarative call reads correctly under either backend.
+
+    :param variable: The variable for which the average is calculated.
+    :param key: A function that extracts a comparison key from each variable value.
+    :param default: The value returned when the iterable is empty.
+    :param distinct: Whether to only consider distinct values.
+    :return: An Average object that can be evaluated to find the average of values.
+    """
+    return Average(
+        _child_=variable,
+        _key_function_=key,
+        _default_value_=default,
+        _distinct_=distinct,
+    )
+
+
+def count(variable: Selectable[T], distinct: bool = False) -> Union[T, Count[T]]:
+    """
+    Count the number of values produced by the given variable.
+
+    :param variable: The variable for which the count is calculated.
+    :param distinct: Whether to only consider distinct values.
+    :return: A Count object that can be evaluated to count the number of values.
+    """
+    return Count(_child_=variable, _distinct_=distinct)
+
+
+def count_all(distinct: bool = False) -> Union[T, Count[T]]:
+    """
+    Count all results (by group).
+
+    :param distinct: Whether to only consider distinct values.
+    :return: A Count object that can be evaluated to count the number of values.
+    """
+    return CountAll(_distinct_=distinct)
+
+
+def count_range(
+    variable: Selectable[T], distinct: bool = False
+) -> Union[T, CountRange[T]]:
+    """
+    Count values produced by the given variable and return a closed interval reflecting
+    uncertainty.
+
+    Concrete (non-``...``) values set the lower bound; ``...`` (Ellipsis) values are
+    added to the upper bound to represent items whose category is unknown.
+
+    :param variable: The variable whose values are counted.
+    :param distinct: Whether to only consider distinct values.
+    :return: A CountRange that evaluates to a SimpleInterval ``[concrete_count,
+        concrete_count + ellipsis_count]``.
+    """
+    return CountRange(_child_=variable, _distinct_=distinct)
+
+
+def distinct(
+    expression: T,
+    *on: Any,
+) -> T:
+    """
+    Indicate that the result of the expression should be distinct.
+    """
+    match expression:
+        case Query():
+            return expression.distinct(*on)
+        case Selectable():
+            return entity(expression).distinct(*on)
+        case _:
+            raise UnsupportedExpressionTypeForDistinct(
+                unsupported_expression_type=type(expression)
+            )
+
+
+def get_false_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
+    """
+    :param statement: The condition whose statements are checked.
+    :return: The statements of the condition that held for none of the values they were
+        evaluated on, see :func:`evaluate_statements_of`. In a conjunction that is the
+        first conjunct that could not hold together with the conjuncts before it.
+    """
+    statement_results = evaluate_statements_of(statement)
+    held_ids = {result.operand._id_ for result in statement_results if result.is_true}
+    never_held = {
+        result.operand._id_: result.operand
+        for result in statement_results
+        if result.operand._id_ not in held_ids
+    }
+    return list(never_held.values())
+
+
+def get_true_statements(statement: SymbolicExpression) -> list[SymbolicExpression]:
+    """
+    :param statement: The condition whose statements are checked.
+    :return: The statements of the condition that held for at least one of the values
+        they were evaluated on, see :func:`evaluate_statements_of`.
+    """
+    held = {
+        result.operand._id_: result.operand
+        for result in evaluate_statements_of(statement)
+        if result.is_true
+    }
+    return list(held.values())
+
+
+def evaluate_condition(condition: ConditionType) -> bool:
+    """
+    Evaluates the condition to True or False.
+
+    :param condition: The condition to evaluate.
+    :return: True if there is a possible solution, False otherwise.
+    """
+    if type(condition) is bool:
+        return condition
+    return any(condition.evaluate())
+
+
+@dataclass(kw_only=True, eq=False)
+class NodeId(SymbolicFunction):
+    """
+    The stable identity of an EQL node, as a value operation.
+    """
+
+    node: SymbolicExpression
+    """
+    The node whose identity is read.
+    """
+
+    def __call__(self) -> UUID:
+        return self.node._id_
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+node_id = symbolic_callable_to_function(NodeId)
+
+
+@dataclass(kw_only=True, eq=False)
+class NodeDescendants(SymbolicFunction):
+    """
+    The descendants of an EQL node, as a value operation.
+    """
+
+    node: SymbolicExpression
+    """
+    The node whose descendants are read.
+    """
+
+    def __call__(self) -> Iterable[SymbolicExpression]:
+        return self.node._descendants_
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+node_descendants = symbolic_callable_to_function(NodeDescendants)
+
+
+@dataclass(kw_only=True, eq=False)
+class NodeType(SymbolicFunction):
+    """
+    The selectable type of an EQL node, as a value operation.
+    """
+
+    node: Selectable
+    """
+    The node whose type is read.
+    """
+
+    def __call__(self) -> type | None:
+        return getattr(self.node, "_type_", None)
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+node_type = symbolic_callable_to_function(NodeType)
+
+
+@dataclass(kw_only=True, eq=False)
+class NodeChildren(SymbolicFunction):
+    """
+    The children of an EQL node, as a value operation.
+    """
+
+    node: CanBehaveLikeAVariable
+    """
+    The node whose children are read.
+    """
+
+    def __call__(self) -> Iterable[SymbolicExpression]:
+        return self.node._children_
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+node_children = symbolic_callable_to_function(NodeChildren)
+
+
+@dataclass(kw_only=True, eq=False)
+class AttributeOwnerClass(SymbolicFunction):
+    """
+    The class that owns an attribute, as a value operation.
+    """
+
+    node: Attribute
+    """
+    The attribute whose owner class is read.
+    """
+
+    def __call__(self) -> type:
+        return self.node._owner_class_
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+attribute_owner_class = symbolic_callable_to_function(AttributeOwnerClass)
+
+
+@dataclass(kw_only=True, eq=False)
+class NodeParents(SymbolicFunction):
+    """
+    The parents of an EQL node, as a value operation.
+    """
+
+    node: SymbolicExpression
+    """
+    The node whose parents are read.
+    """
+
+    def __call__(self) -> Iterable[SymbolicExpression]:
+        return self.node._parents_
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+node_parents = symbolic_callable_to_function(NodeParents)
+
+
+@dataclass(kw_only=True, eq=False)
+class IsSubclass(Predicate):
+    """
+    Whether one class is a subclass of another class (or tuple of classes).
+    """
+
+    subclass: Type
+    """
+    The candidate subclass.
+    """
+
+    parent_or_parents: Type | tuple[Type, ...]
+    """
+    The class or tuple of classes checked against.
+    """
+
+    def __call__(self) -> bool:
+        return issubclass(self.subclass, self.parent_or_parents)
+
+    @classmethod
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
+        """:return: the clause *"<subclass> is a subclass of <parent>"* — a custom fragment because
+        the name-based reading lacks the article and preposition (*"subclass holds for …"*).
+        """
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+        )
+        from krrood.entity_query_language.verbalization.vocabulary.english import (
+            Prepositions,
+        )
+
+        return clause(
+            Noun(content=fields["subclass"]),
+            Copula(),
+            Noun(content="subclass"),
+            Prepositions.OF,
+            Noun(content=fields["parent_or_parents"]),
+        )
+
+
+issubclass_ = symbolic_callable_to_function(IsSubclass)
+
+
+@dataclass(kw_only=True, eq=False)
+class IsClass(Predicate):
+    """
+    Whether an object is a class.
+    """
+
+    object: Any
+    """
+    The object checked.
+    """
+
+    def __call__(self) -> bool:
+        return isclass(self.object)
+
+    @classmethod
+    def _verbalization_fragment_(
+        cls, *, fields: RenderedFields
+    ) -> VerbalizationFragment:
+        """:return: the clause *"<object> is a class"* — a custom fragment because the name-based
+        reading drops the complement's article (*"… is class"*)."""
+        # Imported locally to avoid the core -> verbalization import cycle (as Triple does).
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            clause,
+            Copula,
+            Noun,
+        )
+
+        return clause(Noun(content=fields["object"]), Copula(), Noun(content="class"))
+
+
+is_class = symbolic_callable_to_function(IsClass)
+
+
+@dataclass(kw_only=True, eq=False)
+class RuntimeType(SymbolicFunction):
+    """
+    The runtime class of an object, as a value operation.
+    """
+
+    object: Any
+    """
+    The object whose runtime class is read.
+    """
+
+    def __call__(self) -> type:
+        return self.object.__class__
+
+    @classmethod
+    def _verbalization_fragment_(cls, *, fields):
+        from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+            FunctionVerbalizationTemplates,
+        )
+
+        return FunctionVerbalizationTemplates.possessive(
+            *fields.values(), function_class=cls
+        )
+
+
+type_ = symbolic_callable_to_function(RuntimeType)
+
+
+@symbolic_function
+def type_(obj: Any) -> type:
+    """
+    Determines the type of the given object.
+
+    :param obj: The object whose type is to be determined.
+    :return: The type of the given object.
+    """
+    return type(obj)
+
+
+# %% Probabilistic Queries
+
+
+def distribution_of(
+    match: Match, *, marginalize_for: tuple[Attribute, ...] = ()
+) -> Distribution:
+    """
+    Request the distribution a match's conditions describe (see
+    :class:`~krrood.parametrization.probabilistic_queries.Distribution`),
+    e.g. ``distribution_of(a(Pick)(arm=0.3, outcome=...))``. It never resolves to rows:
+    :class:`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend` answers
+    it with the resolved probabilistic model.
+
+    :param match: The match whose conditions describe the distribution.
+    :param marginalize_for: Optionally, a subset of the match's free variables to narrow
+        the result to (further marginalization), e.g. ``distribution_of(match,
+        marginalize_for=(match.outcome,))``. Without it, every one of the match's free
+        variables is kept.
+    :return: Distribution descriptor.
+    :raises ProbabilisticLibrariesNotInstalled: If a library probabilistic queries need
+        is not installed.
+    """
+    _require_probabilistic_libraries()
+    from krrood.parametrization.probabilistic_queries import Distribution
+
+    return Distribution(match=match, marginalize_for=marginalize_for)
+
+
+def probability_of(
+    condition: ConditionType, evidence: ConditionType | None = None
+) -> Probability:
+    """
+    Request the probability of a condition, optionally given evidence (see
+    :class:`~krrood.parametrization.probabilistic_queries.Probability`), e.g.
+    ``probability_of(x.A > 5, x.B < 2)``. For the expectation of an attribute, use
+    :func:`average` instead.
+
+    :param condition: The condition to compute the probability of.
+    :param evidence: The condition to condition the probability on, or ``None`` for the
+        unconditional probability.
+    :return: Probability descriptor.
+    :raises ProbabilisticLibrariesNotInstalled: If a library probabilistic queries need
+        is not installed.
+    """
+    _require_probabilistic_libraries()
+    from krrood.parametrization.probabilistic_queries import Probability
+
+    return Probability(condition=condition, evidence=evidence)
+
+
+def _require_probabilistic_libraries() -> None:
+    """
+    Raise :class:`ProbabilisticLibrariesNotInstalled` unless every library probabilistic
+    queries need is installed.
+    """
+    missing_libraries = ProbabilisticLibrary.missing()
+    if missing_libraries:
+        raise ProbabilisticLibrariesNotInstalled(missing_libraries=missing_libraries)

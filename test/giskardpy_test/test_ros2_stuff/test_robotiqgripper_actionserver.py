@@ -19,7 +19,7 @@ from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
 
 from cramph.context import StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.executor import RealTimePacer, StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
@@ -35,6 +35,12 @@ from krrood.patterns.called_positionally import called_positionally
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.tracy import Tracy
+
+from .test_action_server_task_goal_cancellation import (
+    GoalCancellationScenario,
+    GoalHoldingServer,
+    UnansweredGoalTreatment,
+)
 
 
 def unique_topic(prefix: str = "robotiq/gripper_cmd") -> str:
@@ -90,7 +96,7 @@ class MockRobotiqActionServer:
 
 def run_statechart_until_observed(
     task: RobotiqGripperActionServerTask,
-    target_observation: ObservationStateValues,
+    target_observation: ObservationStateValue,
     rclpy_node: Node,
 ) -> None:
     """
@@ -99,7 +105,7 @@ def run_statechart_until_observed(
     statechart = Statechart(context=StatechartContext(world=World()))
     statechart.add_node(node=task)
 
-    if target_observation == ObservationStateValues.TRUE:
+    if target_observation == ObservationStateValue.TRUE:
         statechart.add_node(node=EndMotion.when_true(node=task))
     else:
         statechart.add_node(node=EndMotion.when_false(node=task))
@@ -158,16 +164,16 @@ def test_a_gripper_without_a_parallel_gripper_command_server_is_reached_with_a_f
 @pytest.mark.parametrize(
     "reached_goal, stalled, expected_observation",
     [
-        (True, False, ObservationStateValues.TRUE),
-        (False, True, ObservationStateValues.TRUE),
-        (False, False, ObservationStateValues.FALSE),
+        (True, False, ObservationStateValue.TRUE),
+        (False, True, ObservationStateValue.TRUE),
+        (False, False, ObservationStateValue.FALSE),
     ],
     ids=["reached_goal", "stalled_on_contact", "failed_movement"],
 )
 def test_robotiq_task_observes_result(
     reached_goal: bool,
     stalled: bool,
-    expected_observation: ObservationStateValues,
+    expected_observation: ObservationStateValue,
     rclpy_node: Node,
 ) -> None:
     topic = unique_topic()
@@ -201,10 +207,10 @@ def test_robotiq_task_handles_goal_rejection(rclpy_node: Node) -> None:
     )
 
     try:
-        run_statechart_until_observed(task, ObservationStateValues.FALSE, rclpy_node)
+        run_statechart_until_observed(task, ObservationStateValue.FALSE, rclpy_node)
         assert task._done is True
         assert task._goal_accepted is False
-        assert task.on_tick() == ObservationStateValues.FALSE
+        assert task.on_tick() == ObservationStateValue.FALSE
     finally:
         server.destroy()
 
@@ -226,7 +232,7 @@ def test_robotiq_task_builds_and_sends_correct_goal_message(rclpy_node: Node) ->
     )
 
     try:
-        run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+        run_statechart_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
         assert len(mock_server.received_goals) == 1
         received_cmd = mock_server.received_goals[0]
         # Convert array.array to list for comparison
@@ -248,7 +254,7 @@ def test_robotiq_task_uses_default_values(rclpy_node: Node) -> None:
     )
 
     try:
-        run_statechart_until_observed(task, ObservationStateValues.TRUE, rclpy_node)
+        run_statechart_until_observed(task, ObservationStateValue.TRUE, rclpy_node)
         assert len(mock_server.received_goals) == 1
         received_cmd = mock_server.received_goals[0]
         assert list(received_cmd.position) == [0.07]
@@ -256,3 +262,33 @@ def test_robotiq_task_uses_default_values(rclpy_node: Node) -> None:
         assert list(received_cmd.effort) == [50.0]
     finally:
         server.destroy()
+
+
+# %% restarting
+
+
+def test_a_restarted_robotiq_task_waits_for_the_result_of_its_new_goal(
+    rclpy_node: Node,
+) -> None:
+    """
+    A Robotiq task started again does not observe the answer to the goal it sent before
+    while the server has not yet accepted its new goal.
+    """
+    topic = unique_topic()
+    server = GoalHoldingServer(
+        action=ParallelGripperCommand,
+        answered_goal_count=1,
+        unanswered_goal_treatment=UnansweredGoalTreatment.LEFT_UNACCEPTED,
+    )
+    action_server = server.serve(node=rclpy_node, action_topic=topic)
+    task = RobotiqGripperActionServerTask(action_topic=topic, target_position=0.03)
+    scenario = GoalCancellationScenario(task=task, server=server, rclpy_node=rclpy_node)
+    task.reset_condition = scenario.add_one_tick_trigger(
+        start_condition=task.observes_false
+    ).observes_true
+
+    try:
+        scenario.run_until(condition=lambda: server.received_goal_count >= 2)
+        assert task.observation_state == ObservationStateValue.UNKNOWN
+    finally:
+        action_server.destroy()

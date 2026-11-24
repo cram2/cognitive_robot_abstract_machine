@@ -1,3 +1,7 @@
+"""
+Deep copies of dataclasses built through their constructors.
+"""
+
 import copy
 
 import pytest
@@ -8,6 +12,8 @@ from krrood.patterns.mixin import Mixin
 
 from ..dataset.deep_copied_classes import (
     AnnotatedMeasurements,
+    Logbook,
+    LoggedReading,
     Measurements,
     PairOfMeasurements,
     SensorReading,
@@ -77,6 +83,37 @@ def test_a_deep_copy_copies_an_object_reached_twice_once(metre: UnitOfMeasuremen
     copied = copy.deepcopy(PairOfMeasurements(first=shared, second=shared))
     assert copied.first is copied.second
     assert copied.first is not shared
+
+
+# %% fields a deep copy keeps
+
+
+@pytest.fixture
+def logged_reading() -> LoggedReading:
+    """
+    A reading recorded in a logbook that refers back to it.
+    """
+    logbook = Logbook()
+    reading = LoggedReading(value=1.0, notes=["calibrated"], logbook=logbook)
+    logbook.readings.append(reading)
+    return reading
+
+
+def test_a_deep_copy_keeps_a_field_marked_shared(logged_reading: LoggedReading):
+    """
+    A field marked shared refers to the original's object in the copy, even when that
+    object refers back to the original.
+    """
+    assert copy.deepcopy(logged_reading).logbook is logged_reading.logbook
+
+
+def test_a_deep_copy_still_copies_the_fields_not_marked_shared(
+    logged_reading: LoggedReading,
+):
+    """
+    Marking one field shared leaves the other fields copied.
+    """
+    assert copy.deepcopy(logged_reading).notes is not logged_reading.notes
 
 
 # %% equality and hashing

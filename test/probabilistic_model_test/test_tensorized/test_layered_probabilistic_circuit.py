@@ -467,12 +467,15 @@ def test_discrete_leaves_become_discrete_layers(mixed_circuit):
 
 
 def test_round_trip_through_rustworkx_keeps_the_likelihood(continuous_circuit):
+    """
+    A circuit converted into a layered circuit and back has its likelihood.
+    """
     samples = continuous_circuit.sample(200)
     np.testing.assert_allclose(
         LayeredCircuitToRustworkxCircuitConverter.convert(
             RustworkxCircuitToLayeredCircuitConverter.convert(continuous_circuit)
-        ).log_likelihood(samples),
-        continuous_circuit.log_likelihood(samples),
+        ).log_likelihood(events=samples),
+        continuous_circuit.log_likelihood(events=samples),
     )
 
 
@@ -480,22 +483,28 @@ def test_round_trip_through_rustworkx_keeps_the_likelihood(continuous_circuit):
 
 
 def test_log_likelihood(any_circuit):
+    """
+    A layered circuit has the likelihood of the rustworkx circuit it was converted from.
+    """
     samples = any_circuit.sample(500)
     np.testing.assert_allclose(
         RustworkxCircuitToLayeredCircuitConverter.convert(any_circuit).log_likelihood(
-            samples
+            events=samples
         ),
-        any_circuit.log_likelihood(samples),
+        any_circuit.log_likelihood(events=samples),
     )
 
 
 def test_log_likelihood_outside_the_support_is_minus_infinity(deterministic_mixture):
+    """
+    A layered circuit gives every point outside of its support no likelihood.
+    """
     outside = np.array([[10.0, 10.0], [1.5, 1.5]])
     assert np.all(
         np.isneginf(
             RustworkxCircuitToLayeredCircuitConverter.convert(
                 deterministic_mixture
-            ).log_likelihood(outside)
+            ).log_likelihood(events=outside)
         )
     )
 
@@ -648,11 +657,14 @@ def test_decomposability(any_circuit):
 
 
 def test_samples_lie_in_the_support(any_circuit):
+    """
+    Every sample of a layered circuit lies in its support.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(any_circuit)
     samples = layered.sample(500)
     assert samples.shape == (500, len(layered.variables))
     assert not np.any(np.isnan(samples))
-    assert np.all(layered.log_likelihood(samples) > -np.inf)
+    assert np.all(layered.log_likelihood(events=samples) > -np.inf)
 
 
 @pytest.mark.parametrize(
@@ -696,8 +708,8 @@ def assert_same_truncation(
 
     truncation.distribution.validate()
     np.testing.assert_allclose(
-        truncation.distribution.log_likelihood(grid),
-        rx_truncation.distribution.log_likelihood(grid),
+        truncation.distribution.log_likelihood(events=grid),
+        rx_truncation.distribution.log_likelihood(events=grid),
         atol=1e-10,
     )
     return truncation.distribution
@@ -775,6 +787,10 @@ def test_truncation_of_a_gaussian_circuit_produces_truncated_gaussian_layers(
 
 
 def test_truncation_of_a_mixed_circuit(mixed_circuit, x, count, letter):
+    """
+    Truncated, a circuit over continuous, integer and symbolic variables agrees with the
+    truncated rustworkx circuit.
+    """
     event = SimpleEvent.from_data(
         {
             x: closed(0.5, 3.0),
@@ -789,8 +805,8 @@ def test_truncation_of_a_mixed_circuit(mixed_circuit, x, count, letter):
     assert truncation.probability == pytest.approx(rx_truncation.probability)
     samples = truncation.distribution.sample(200)
     np.testing.assert_allclose(
-        truncation.distribution.log_likelihood(samples),
-        rx_truncation.distribution.log_likelihood(samples),
+        truncation.distribution.log_likelihood(events=samples),
+        rx_truncation.distribution.log_likelihood(events=samples),
     )
 
 
@@ -814,8 +830,8 @@ def test_the_batched_pass_agrees_with_truncating_once_per_simple_set(
         separate_truncation.probability
     )
     np.testing.assert_allclose(
-        batched_truncation.distribution.log_likelihood(grid),
-        separate_truncation.distribution.log_likelihood(grid),
+        batched_truncation.distribution.log_likelihood(events=grid),
+        separate_truncation.distribution.log_likelihood(events=grid),
         atol=1e-10,
     )
 
@@ -925,6 +941,10 @@ def test_truncation_does_not_change_the_original(deterministic_mixture, x):
 def test_conditioning_on_a_continuous_variable(
     circuit_fixture, expected_probability, request, x
 ):
+    """
+    Conditioned on a continuous variable, a layered circuit agrees with the conditioned
+    rustworkx circuit.
+    """
     # p(x = 0.75) is the weight of the only branch whose support contains 0.75
     rx_circuit = request.getfixturevalue(circuit_fixture)
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit)
@@ -936,8 +956,8 @@ def test_conditioning_on_a_continuous_variable(
     assert list(conditioning.distribution.variables) == list(layered.variables)
     grid = np.stack([np.full(40, 0.75), np.linspace(-1, 4, 40)], axis=-1)
     np.testing.assert_allclose(
-        conditioning.distribution.log_likelihood(grid),
-        rx_conditional.log_likelihood(grid),
+        conditioning.distribution.log_likelihood(events=grid),
+        rx_conditional.log_likelihood(events=grid),
         atol=1e-10,
     )
 
@@ -980,6 +1000,10 @@ def test_conditioning_on_an_impossible_point(deterministic_mixture, x):
 
 
 def test_conditioning_on_a_symbolic_variable(mixed_circuit, letter):
+    """
+    Conditioned on a symbolic variable, a layered circuit agrees with the conditioned
+    rustworkx circuit.
+    """
     point = {letter: Letter.B}
     rx_conditioning = mixed_circuit.log_conditional(point)
     conditioning = RustworkxCircuitToLayeredCircuitConverter.convert(
@@ -988,8 +1012,8 @@ def test_conditioning_on_a_symbolic_variable(mixed_circuit, letter):
     assert conditioning.log_likelihood == pytest.approx(rx_conditioning.log_likelihood)
     samples = conditioning.distribution.sample(200)
     np.testing.assert_allclose(
-        conditioning.distribution.log_likelihood(samples),
-        rx_conditioning.distribution.log_likelihood(samples),
+        conditioning.distribution.log_likelihood(events=samples),
+        rx_conditioning.distribution.log_likelihood(events=samples),
     )
 
 
@@ -1020,12 +1044,16 @@ def test_conditioning_on_an_integer_variable(mixed_circuit, x, count, letter):
 
 
 def test_conditioning_on_every_variable(deterministic_mixture, x, y):
+    """
+    Conditioned on every variable, the probability of the condition is the likelihood of
+    the point, which the conditioned circuit is certain of.
+    """
     conditioning = RustworkxCircuitToLayeredCircuitConverter.convert(
         deterministic_mixture
     ).conditional({x: 0.5, y: 0.5})
     assert conditioning.likelihood == pytest.approx(0.3)
     np.testing.assert_allclose(
-        conditioning.distribution.log_likelihood(np.array([[0.5, 0.5]])),
+        conditioning.distribution.log_likelihood(events=np.array([[0.5, 0.5]])),
         np.array([0.0]),
     )
 
@@ -1037,6 +1065,10 @@ def test_conditioning_on_every_variable(deterministic_mixture, x, y):
     "circuit_fixture", ["overlapping_mixture", "deterministic_mixture"]
 )
 def test_marginal_of_one_variable(circuit_fixture, request, x):
+    """
+    The marginal of a layered circuit over one variable has the likelihood of the
+    rustworkx marginal.
+    """
     rx_circuit = request.getfixturevalue(circuit_fixture)
     marginal = RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit).marginal(
         [x]
@@ -1044,8 +1076,8 @@ def test_marginal_of_one_variable(circuit_fixture, request, x):
     assert list(marginal.variables) == [x]
     grid = np.linspace(-1, 4, 60).reshape(-1, 1)
     np.testing.assert_allclose(
-        marginal.log_likelihood(grid),
-        rx_circuit.marginal([x]).log_likelihood(grid),
+        marginal.log_likelihood(events=grid),
+        rx_circuit.marginal([x]).log_likelihood(events=grid),
         atol=1e-10,
     )
 
@@ -1069,14 +1101,17 @@ def test_marginal_of_a_circuit_with_shared_leaves(shared_children_circuit, x):
 
 
 def test_marginal_of_a_discrete_variable(mixed_circuit, count):
+    """
+    The marginal over a discrete variable has the likelihood of the rustworkx marginal.
+    """
     marginal = RustworkxCircuitToLayeredCircuitConverter.convert(
         mixed_circuit
     ).marginal([count])
     assert list(marginal.variables) == [count]
     grid = np.array([[0], [1], [2], [3]])
     np.testing.assert_allclose(
-        marginal.log_likelihood(grid),
-        mixed_circuit.marginal([count]).log_likelihood(grid),
+        marginal.log_likelihood(events=grid),
+        mixed_circuit.marginal([count]).log_likelihood(events=grid),
     )
 
 
@@ -1099,17 +1134,23 @@ def test_marginal_does_not_change_the_original(deterministic_mixture, x, y):
 
 
 def test_json_round_trip(any_circuit):
+    """
+    A layered circuit restored from JSON has its variables and its likelihood.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(any_circuit)
     restored = from_json(to_json(layered))
     assert isinstance(restored, LayeredProbabilisticCircuit)
     assert list(restored.variables) == list(layered.variables)
     samples = any_circuit.sample(200)
     np.testing.assert_allclose(
-        restored.log_likelihood(samples), layered.log_likelihood(samples)
+        restored.log_likelihood(events=samples), layered.log_likelihood(events=samples)
     )
 
 
 def test_json_round_trip_of_a_truncated_gaussian_layer(gaussian_circuit, x, y):
+    """
+    A truncated layered circuit restored from JSON has its likelihood.
+    """
     event = SimpleEvent.from_data(
         {x: closed(-2.0, 1.0), y: closed(-1.0, 3.0)}
     ).as_composite_set()
@@ -1121,11 +1162,15 @@ def test_json_round_trip_of_a_truncated_gaussian_layer(gaussian_circuit, x, y):
     restored = from_json(to_json(truncated))
     samples = truncated.sample(200)
     np.testing.assert_allclose(
-        restored.log_likelihood(samples), truncated.log_likelihood(samples)
+        restored.log_likelihood(events=samples),
+        truncated.log_likelihood(events=samples),
     )
 
 
 def test_json_round_trip_of_a_conditioned_circuit(overlapping_mixture, x):
+    """
+    A conditioned layered circuit restored from JSON has its likelihood.
+    """
     # conditioning attaches a Dirac delta layer per conditioned variable under a new
     # product root
     conditioned = (
@@ -1139,7 +1184,8 @@ def test_json_round_trip_of_a_conditioned_circuit(overlapping_mixture, x):
     restored = from_json(to_json(conditioned))
     samples = conditioned.sample(200)
     np.testing.assert_allclose(
-        restored.log_likelihood(samples), conditioned.log_likelihood(samples)
+        restored.log_likelihood(events=samples),
+        conditioned.log_likelihood(events=samples),
     )
 
 
@@ -1149,70 +1195,93 @@ def test_json_round_trip_of_a_conditioned_circuit(overlapping_mixture, x):
 @pytest.mark.parametrize(
     "transform, upper_end_of_grid",
     [
-        (lambda circuit, x, y: circuit.apply_translation({x: 1.5, y: -0.5}), 6),
-        (lambda circuit, x, y: circuit.apply_scaling({x: 2.0, y: 3.0}), 14),
+        (
+            lambda circuit, x, y: circuit.apply_translation(
+                translation={x: 1.5, y: -0.5}
+            ),
+            6,
+        ),
+        (lambda circuit, x, y: circuit.apply_scaling(scaling={x: 2.0, y: 3.0}), 14),
     ],
     ids=["translation", "scaling"],
 )
 def test_transformation_matches_rustworkx(
     deterministic_mixture, x, y, transform, upper_end_of_grid
 ):
+    """
+    Translated or scaled, a layered circuit agrees with the transformed rustworkx
+    circuit.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(deterministic_mixture)
     transform(deterministic_mixture, x, y)
     transform(layered, x, y)
     grid = grid_of(-2, upper_end_of_grid, 20)
     np.testing.assert_allclose(
-        layered.log_likelihood(grid), deterministic_mixture.log_likelihood(grid)
+        layered.log_likelihood(events=grid),
+        deterministic_mixture.log_likelihood(events=grid),
     )
 
 
 def test_renaming_variables_with_a_prefix(deterministic_mixture):
+    """
+    Prefixing the names of the variables keeps the likelihood of every point.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(deterministic_mixture)
     samples = np.array([[0.5, 0.5], [2.5, 3.0]])
-    before = layered.log_likelihood(samples)
+    before = layered.log_likelihood(events=samples)
 
     layered.rename_variables_with_prefix("world")
     assert [variable.name for variable in layered.variables] == ["world.x", "world.y"]
-    np.testing.assert_allclose(layered.log_likelihood(samples), before)
+    np.testing.assert_allclose(layered.log_likelihood(events=samples), before)
 
 
 def test_renaming_keeps_the_column_order(deterministic_mixture, x, y):
+    """
+    Renaming the variables so that they sort differently moves the columns the layers
+    read with them.
+    """
     # renaming may reorder the variables, and the layers have to follow
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(deterministic_mixture)
     samples = np.array([[0.5, 0.7], [2.5, 3.0]])
-    before = layered.log_likelihood(samples)
+    before = layered.log_likelihood(events=samples)
 
     layered.update_variables({x: Continuous("z"), y: Continuous("a")})
     assert [variable.name for variable in layered.variables] == ["a", "z"]
-    np.testing.assert_allclose(layered.log_likelihood(samples[:, ::-1]), before)
+    np.testing.assert_allclose(layered.log_likelihood(events=samples[:, ::-1]), before)
 
 
 # %% simplification
 
 
 def test_normalize_makes_the_weights_sum_to_one(overlapping_mixture):
+    """
+    Normalizing a circuit whose weights do not sum to one makes them sum to one.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(overlapping_mixture)
     root = layered.root
     root.log_weights = root.log_weights + 3.0
     samples = np.array([[0.5, 0.5], [2.0, 1.5]])
-    before = layered.log_likelihood(samples)
+    before = layered.log_likelihood(events=samples)
 
     layered.normalize()
     np.testing.assert_allclose(
         root.log_normalization_constants, np.zeros(root.number_of_nodes), atol=1e-12
     )
-    np.testing.assert_allclose(layered.log_likelihood(samples), before)
+    np.testing.assert_allclose(layered.log_likelihood(events=samples), before)
 
 
 def test_simplify_keeps_the_likelihood(deterministic_mixture):
+    """
+    Simplifying a layered circuit never adds layers and keeps its likelihood.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(deterministic_mixture)
     samples = np.array([[0.5, 0.5], [2.5, 3.0]])
-    before = layered.log_likelihood(samples)
+    before = layered.log_likelihood(events=samples)
     number_of_layers = len(layered.layers)
 
     layered.simplify()
     assert len(layered.layers) <= number_of_layers
-    np.testing.assert_allclose(layered.log_likelihood(samples), before)
+    np.testing.assert_allclose(layered.log_likelihood(events=samples), before)
 
 
 # %% symbolic encoding
@@ -1239,14 +1308,20 @@ def test_a_value_outside_of_the_domain_has_no_position(sparse_letter):
 def test_a_distribution_over_elements_with_large_hashes_keeps_its_probabilities(
     domain,
 ):
+    """
+    A symbolic distribution over elements with large hashes keeps its probabilities in a
+    layered circuit.
+    """
     variable = Symbolic(name="large_hash", domain=Set.from_iterable(domain))
     distribution = symbolic_distribution(
         variable, {domain.FIRST: 0.25, domain.SECOND: 0.75}
     )
-    layer = SymbolicLayer.from_distributions(0, [distribution])
-    assert dict(layer.node_distribution(0, variable).probabilities) == dict(
-        distribution.probabilities
+    layer = SymbolicLayer.from_distributions(
+        variable_index=0, distributions=[distribution]
     )
+    assert dict(
+        layer.node_distribution(index=0, variable=variable).probabilities
+    ) == dict(distribution.probabilities)
 
 
 def test_the_support_of_a_symbolic_circuit_agrees_with_rustworkx():
@@ -1285,6 +1360,10 @@ def test_symbolic_layer_stores_positions_in_the_domain(sparse_symbolic_circuit):
 def test_log_likelihood_of_a_sparse_symbolic_circuit_agrees_with_rustworkx(
     sparse_symbolic_circuit,
 ):
+    """
+    A layered circuit over a symbolic variable with a sparse domain has the likelihood
+    of the rustworkx circuit.
+    """
     events = np.array(
         [
             [1.5, hash(SparseLetter.LOW)],
@@ -1296,19 +1375,22 @@ def test_log_likelihood_of_a_sparse_symbolic_circuit_agrees_with_rustworkx(
     np.testing.assert_allclose(
         RustworkxCircuitToLayeredCircuitConverter.convert(
             sparse_symbolic_circuit
-        ).log_likelihood(events),
-        sparse_symbolic_circuit.log_likelihood(events),
+        ).log_likelihood(events=events),
+        sparse_symbolic_circuit.log_likelihood(events=events),
     )
 
 
 def test_samples_are_hashes_of_domain_elements(sparse_symbolic_circuit, sparse_letter):
+    """
+    The samples of a symbolic variable are the hashes of its domain elements.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(sparse_symbolic_circuit)
     samples = layered.sample(500)
     column = layered.variables.index(sparse_letter)
     assert set(samples[:, column].tolist()) <= {
         float(hash(element)) for element in SparseLetter
     }
-    assert np.isfinite(sparse_symbolic_circuit.log_likelihood(samples)).all()
+    assert np.isfinite(sparse_symbolic_circuit.log_likelihood(events=samples)).all()
 
 
 def test_probability_of_an_event_of_a_sparse_symbolic_circuit_agrees_with_rustworkx(
@@ -1330,6 +1412,10 @@ def test_probability_of_an_event_of_a_sparse_symbolic_circuit_agrees_with_rustwo
 def test_conditioning_a_sparse_symbolic_circuit_agrees_with_rustworkx(
     sparse_symbolic_circuit, sparse_letter
 ):
+    """
+    Conditioning a circuit over a symbolic variable with a sparse domain agrees with the
+    rustworkx circuit.
+    """
     point = {sparse_letter: SparseLetter.HIGH}
     rx_conditioning = sparse_symbolic_circuit.log_conditional(point)
     conditioning = RustworkxCircuitToLayeredCircuitConverter.convert(
@@ -1338,8 +1424,8 @@ def test_conditioning_a_sparse_symbolic_circuit_agrees_with_rustworkx(
     assert conditioning.log_likelihood == pytest.approx(rx_conditioning.log_likelihood)
     samples = conditioning.distribution.sample(200)
     np.testing.assert_allclose(
-        conditioning.distribution.log_likelihood(samples),
-        rx_conditioning.distribution.log_likelihood(samples),
+        conditioning.distribution.log_likelihood(events=samples),
+        rx_conditioning.distribution.log_likelihood(events=samples),
     )
 
 
@@ -1367,13 +1453,17 @@ def test_every_discrete_layer_is_stored_sparsely(discrete_circuit):
 
 
 def test_sparse_and_dense_tables_answer_queries_alike(discrete_circuit, x):
+    """
+    A circuit storing its discrete probabilities in sparse tables answers queries like
+    one storing them in dense tables.
+    """
     dense = RustworkxCircuitToLayeredCircuitConverter.convert(discrete_circuit)
     sparse = RustworkxCircuitToLayeredCircuitConverter.convert(
         discrete_circuit
     ).store_discrete_probabilities_as(SparseProbabilityTable)
     samples = dense.sample(300)
     np.testing.assert_allclose(
-        sparse.log_likelihood(samples), dense.log_likelihood(samples)
+        sparse.log_likelihood(events=samples), dense.log_likelihood(events=samples)
     )
     event = SimpleEvent.from_data({x: closed(0.5, 2.5)})
     event.fill_missing_variables(dense.variables)
@@ -1384,35 +1474,48 @@ def test_sparse_and_dense_tables_answer_queries_alike(discrete_circuit, x):
     sparse_truncation = sparse.truncated(event.as_composite_set())
     assert sparse_truncation.probability == pytest.approx(dense_truncation.probability)
     np.testing.assert_allclose(
-        sparse_truncation.distribution.log_likelihood(samples),
-        dense_truncation.distribution.log_likelihood(samples),
+        sparse_truncation.distribution.log_likelihood(events=samples),
+        dense_truncation.distribution.log_likelihood(events=samples),
     )
 
 
 def test_samples_of_a_sparse_circuit_are_likely_under_the_dense_one(discrete_circuit):
+    """
+    The samples of a circuit with sparse tables are likely under the same circuit with
+    dense tables.
+    """
     dense = RustworkxCircuitToLayeredCircuitConverter.convert(discrete_circuit)
     sparse = RustworkxCircuitToLayeredCircuitConverter.convert(
         discrete_circuit
     ).store_discrete_probabilities_as(SparseProbabilityTable)
-    assert np.isfinite(dense.log_likelihood(sparse.sample(300))).all()
+    assert np.isfinite(dense.log_likelihood(events=sparse.sample(300))).all()
 
 
 # %% layers outside of a circuit
 
 
 def test_uniform_layer_likelihood():
+    """
+    Every node of a uniform layer has the density of its interval inside of it and none
+    outside.
+    """
     layer = uniform_layer_of(0, [(0, 1), (1, 3)])
     assert layer.number_of_nodes == 2
     np.testing.assert_allclose(
-        layer.log_likelihood_of_nodes(np.array([[0.5], [2.0], [5.0]])),
+        layer.log_likelihood_of_nodes(events=np.array([[0.5], [2.0], [5.0]])),
         np.array([[0.0, -np.inf], [-np.inf, -np.log(2)], [-np.inf, -np.inf]]),
     )
 
 
 def test_dirac_delta_layer_likelihood():
-    layer = DiracDeltaLayer(0, np.array([0.0, 1.0]), np.array([1.0, 2.0]))
+    """
+    A Dirac delta layer gives each node its density at its location and zero elsewhere.
+    """
+    layer = DiracDeltaLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.0, 1.0]), np.array([1.0, 2.0])
+    )
     np.testing.assert_allclose(
-        layer.log_likelihood_of_nodes(np.array([[0.0], [1.0], [2.0]])),
+        layer.log_likelihood_of_nodes(events=np.array([[0.0], [1.0], [2.0]])),
         np.array([[0.0, -np.inf], [-np.inf, np.log(2)], [-np.inf, -np.inf]]),
     )
 
@@ -1438,35 +1541,59 @@ def test_layers_visits_parents_first(shared_children_circuit):
 
 
 def test_validate_detects_a_shape_mismatch():
+    """
+    A Dirac delta layer whose locations and densities differ in length is refused.
+    """
     with pytest.raises(ShapeMismatchError):
-        DiracDeltaLayer(0, np.array([0.0, 1.0]), np.array([1.0])).validate()
+        DiracDeltaLayer(
+            np.zeros(2, dtype=np.int64), np.array([0.0, 1.0]), np.array([1.0])
+        ).validate()
 
 
 def test_gaussian_layer_likelihood(x):
-    layer = GaussianLayer(0, np.array([0.0, 2.0]), np.array([1.0, 0.5]))
+    """
+    A Gaussian layer gives each node the density of its Gaussian.
+    """
+    layer = GaussianLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.0, 2.0]), np.log([1.0, 0.5])
+    )
     points = np.array([[0.0], [2.0]])
-    result = layer.log_likelihood_of_nodes(points)
+    result = layer.log_likelihood_of_nodes(events=points)
     for node in range(2):
         np.testing.assert_allclose(
-            result[:, node], layer.node_distribution(node, x).log_likelihood(points)
+            result[:, node],
+            layer.node_distribution(index=node, variable=x).log_likelihood(
+                events=points
+            ),
         )
 
 
 def test_symbolic_layer_likelihood(letter):
+    """
+    Every node of a symbolic layer has the log-likelihood of its distribution at the
+    positions of the domain elements.
+    """
     distributions = [
         symbolic_distribution(letter, dict(zip(Letter, probabilities)))
         for probabilities in ((0.5, 0.25, 0.25), (0.1, 0.6, 0.3))
     ]
-    layer = SymbolicLayer.from_distributions(0, distributions)
+    layer = SymbolicLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
     hashes = np.array([[hash(element)] for element in letter.domain.simple_sets])
     # a layer reads the positions of the domain elements, which the circuit encodes
     positions = SymbolicEncoding(letter).indices_of_hashes(hashes[:, 0]).reshape(-1, 1)
-    result = layer.log_likelihood_of_nodes(positions)
+    result = layer.log_likelihood_of_nodes(events=positions)
     for node, distribution in enumerate(distributions):
-        np.testing.assert_allclose(result[:, node], distribution.log_likelihood(hashes))
+        np.testing.assert_allclose(
+            result[:, node], distribution.log_likelihood(events=hashes)
+        )
 
 
 def test_a_symbolic_layer_has_no_cumulative_distribution(mixed_circuit):
+    """
+    A symbolic layer has no cumulative distribution function.
+    """
     [symbolic_layer] = [
         layer
         for layer in RustworkxCircuitToLayeredCircuitConverter.convert(
@@ -1475,17 +1602,22 @@ def test_a_symbolic_layer_has_no_cumulative_distribution(mixed_circuit):
         if isinstance(layer, SymbolicLayer)
     ]
     with pytest.raises(UndefinedCumulativeDistributionError):
-        symbolic_layer.cumulative_distribution_of_nodes(np.zeros((1, 3)))
+        symbolic_layer.cumulative_distribution_of_nodes(events=np.zeros((1, 3)))
 
 
 def test_integer_layer_cumulative_distribution(count):
+    """
+    An integer layer has the cumulative distribution function of its distribution.
+    """
     distribution = IntegerDistribution(
         variable=count, probabilities=MissingDict(float, {0: 0.2, 1: 0.3, 2: 0.5})
     )
-    layer = IntegerLayer.from_distributions(0, [distribution])
+    layer = IntegerLayer.from_distributions(
+        variable_index=0, distributions=[distribution]
+    )
     points = np.array([[-1], [0], [1], [2], [3]])
     np.testing.assert_allclose(
-        layer.cumulative_distribution_of_nodes(points)[:, 0],
+        layer.cumulative_distribution_of_nodes(events=points)[:, 0],
         distribution.cumulative_distribution_function(points),
     )
 

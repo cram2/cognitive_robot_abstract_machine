@@ -38,7 +38,7 @@ instance are available on the match itself and build symbolic expressions: readi
 attribute, indexing, comparing and arithmetic.
 
 ```python
-robot = an(ExampleRobot)(name="R2D2").from_(world.robots)
+robot = an(ExampleRobot)(name="R2D2").from_(domain=world.robots)
 
 robot.where(robot.battery >= 50)   # an attribute of the matched instance
 robot.where(robot == known_robot)  # the instance itself
@@ -61,17 +61,17 @@ the match has been lowered.
 
 ## Binding to a domain with `.from_()`
 
-Chaining `.from_(domain)` after the call binds the match to a specific set of candidate objects.
+Chaining `.from_(domain=...)` after the call binds the match to a specific set of candidate objects.
 
 ```python
 from krrood.entity_query_language.factories import an, a
 
 # Create a variable for any 'Robot' in the 'world.robots' domain that matches the pattern
-r = an(ExampleRobot)(name="R2D2").from_(world.robots)
+r = an(ExampleRobot)(name="R2D2").from_(domain=world.robots)
 ```
 
 ```{hint}
-Use `an(Type)(...).from_(domain)` as the entry point for your structural queries when you need to
+Use `an(Type)(...).from_(domain=...)` as the entry point for your structural queries when you need to
 specify a domain, and `an(Type)` for nested child attributes. Use `the(...)` instead of `an(...)`
 when exactly one solution is expected.
 ```
@@ -103,11 +103,11 @@ The real power of the match API comes from nesting. You can describe deeply nest
 fixed_connection = a(FixedConnection)(
     parent=an(ExampleContainer)(name="C1"),
     child=an(ExampleHandle)(name="H1")
-).from_(world.connections)
+).from_(domain=world.connections)
 ```
 
 ```{note}
-`.from_(domain)` is syntactic sugar. Under the hood, it sets the match's domain, which is later used
+`.from_(domain=...)` is syntactic sugar. Under the hood, it sets the match's domain, which is later used
 to create a {py:func}`~krrood.entity_query_language.factories.variable`,
  selects it using {py:func}`~krrood.entity_query_language.factories.entity` and automatically adds the corresponding {py:meth}`~krrood.entity_query_language.query.query.Query.where` clauses.
 ```
@@ -146,7 +146,7 @@ world_connections = [ExampleConnection(c1, h1)]
 conn = the(ExampleConnection)(
     parent=an(ExampleContainer)(name="Bin"),
     child=an(ExampleHandle)(name="Grip")
-).from_(world_connections)
+).from_(domain=world_connections)
 
 # 2. Execute the query
 result = conn.first()

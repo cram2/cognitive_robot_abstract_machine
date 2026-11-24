@@ -52,24 +52,22 @@ class MypyCheckResult:
 
 def _run_mypy_on_fixture(cache_dir: Path) -> MypyCheckResult:
     """
-    Type-check the fixture module with ``mypy``, resolving ``krrood`` as a first-party
-    package.
-
-    ``krrood`` ships no ``py.typed`` marker, so mypy resolves it through its editable
-    install and skips analysing it ("missing library stubs or py.typed marker") by
-    default. Pointing MYPYPATH at the source root (derived from the already-imported
-    package's own file, not a hardcoded relative path) makes mypy treat it that way
-    anyway, exactly as it would once py.typed is added.
+    Type-check the fixture module with ``mypy``, which reads ``krrood`` from the source
+    root of every krrood distribution, since krrood ships no ``py.typed`` marker.
 
     :param cache_dir: A scratch directory for mypy's incremental cache, so repeated runs
         never write ``.mypy_cache`` into the repository.
     :return: The check's outcome.
     """
     fixture_path = Path(quantifier_overloads_fixture.__file__)
-    krrood_src = Path(krrood.__file__).resolve().parent.parent
+    krrood_sources = os.pathsep.join(
+        str(Path(portion).parent)
+        for portion in krrood.__path__
+        if Path(portion).parent.name == "src"
+    )
 
     previous_mypypath = os.environ.get("MYPYPATH")
-    os.environ["MYPYPATH"] = str(krrood_src)
+    os.environ["MYPYPATH"] = krrood_sources
     try:
         stdout, stderr, exit_status = mypy_api.run(
             ["--cache-dir", str(cache_dir), str(fixture_path)]

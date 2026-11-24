@@ -1,3 +1,7 @@
+"""
+Tests of the entry point that preprocesses Sage10k scenes into the database.
+"""
+
 from __future__ import annotations
 
 import os
@@ -8,7 +12,6 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from experiments.orm.ormatic_interface import PreprocessedObjectDAO
 from krrood.ormatic.utils import create_engine
 
 from .test_preprocessing import _populated_sqlite_engine, _sage10k_object
@@ -32,6 +35,8 @@ def test_entry_point_writes_objects_across_its_own_worker_processes(
     :func:`~krrood.ormatic.data_access_objects.helper.get_dao_class` resolving those
     back to one DAO regardless.
     """
+    from experiments.orm.ormatic_interface import PreprocessedObjectDAO
+
     objects = [
         _sage10k_object(object_id="book_1", room_id="room_1", source_id="book_1_src")
     ]

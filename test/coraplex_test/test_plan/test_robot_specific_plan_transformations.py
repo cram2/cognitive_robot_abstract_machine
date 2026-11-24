@@ -1,3 +1,8 @@
+"""
+Tests that a plan is adapted to the robot executing it, such as driving a differential
+drive, closing a container or moving the tool center point in a straight line.
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -22,7 +27,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from cramph.composites import Parallel, Sequence, StatementNode
 from cramph.context import ContextExtension
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import StatechartNode
 from giskardpy.motion_statechart.tasks.drive_tasks import (
@@ -59,7 +64,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -72,6 +77,7 @@ from ...plan_running import (
     statechart_of,
     world_of,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% recording a run
 
@@ -98,7 +104,7 @@ class OrientationWhileRunning(TickingExecutorExtension):
     """
 
     def after_tick(self, *, executor: StatechartExecutor) -> None:
-        if self.node.life_cycle_state != LifeCycleValues.RUNNING:
+        if self.node.life_cycle_state != LifeCycleValue.RUNNING:
             return
         self.orientations.append(self.body.global_pose.to_np()[:3, :3])
 
@@ -150,7 +156,7 @@ def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidat
                 ),
             )
         )
-        graspable = HasGraspCandidates(root=box)
+        graspable = IsGraspable(root=box)
         world.add_semantic_annotations([graspable])
     return GraspCandidate(
         graspable, Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box)
@@ -162,7 +168,7 @@ def navigation_to(world: World, **parameters) -> NavigateAction:
     :return: A drive to a pose two meters from the origin of `world`.
     """
     return NavigateAction(
-        target_location=Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root),
+        planar_goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=world.root),
         **parameters,
     )
 
@@ -176,12 +182,12 @@ def assert_drives_differentially_to(
     """
     assert type(goal) is DifferentialDriveBaseGoal
     assert goal.mobile_base is robot.mobile_base
-    assert goal.threshold == action.base_pose_threshold
+    assert goal.threshold == action.threshold
     np.testing.assert_allclose(
         goal.goal_pose.to_np(),
-        robot.mobile_base.pose_facing(action.target_location).to_np(),
+        robot.mobile_base.pose_facing(heading=action.planar_goal_pose).to_np(),
     )
-    assert goal.goal_pose.reference_frame is action.target_location.reference_frame
+    assert goal.goal_pose.reference_frame is action.planar_goal_pose.reference_frame
 
 
 # %% driving a differential drive
@@ -217,42 +223,51 @@ def test_stretch_drives_with_its_differential_drive_whatever_the_plan_adaptation
 def test_the_differential_drive_goal_takes_the_threshold_of_the_action(
     stretch_apartment_context,
 ) -> None:
+    """
+    A Stretch drives to a navigation's goal with its differential drive, at the
+    threshold the navigation was given.
+    """
     world, robot, extensions = stretch_apartment_context
     default_action = navigation_to(world)
 
     action = prepared(
-        navigation_to(
-            world, base_pose_threshold=10 * default_action.base_pose_threshold
-        ),
+        navigation_to(world, threshold=10 * default_action.threshold),
         robot_executor(extensions),
     )
 
-    assert action.base_pose_threshold != default_action.base_pose_threshold
+    assert action.threshold != default_action.threshold
     assert_drives_differentially_to(action.goal, action, robot)
 
 
 def test_the_base_pose_threshold_defaults_to_the_one_of_the_differential_drive_goal(
     stretch_apartment_context,
 ) -> None:
+    """
+    A navigation given no threshold takes the default threshold of the differential
+    drive goal.
+    """
     world, robot, extensions = stretch_apartment_context
 
-    assert navigation_to(world).base_pose_threshold == (
-        DifferentialDriveBaseGoal.threshold
-    )
+    assert navigation_to(world).threshold == (DifferentialDriveBaseGoal.threshold)
 
 
 def test_stretch_drives_every_leg_of_a_path_with_its_differential_drive(
     stretch_apartment_context,
 ) -> None:
+    """
+    A Stretch drives every leg of a planned path with its differential drive, at the
+    navigation's threshold, the last leg ending at the target.
+    """
     world, robot, extensions = stretch_apartment_context
-    target = Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)
+    target = Pose2D.from_xy_yaw(2.0, 2.0, reference_frame=world.root)
     unchanged = prepared(
-        PathPlanningNavigateAction(target=target),
+        PathPlanningNavigateAction(planar_goal_pose=target),
         simulated_executor(extensions, robot_adaptations=[]),
     )
 
     action = prepared(
-        PathPlanningNavigateAction(target=target), simulated_executor(extensions)
+        PathPlanningNavigateAction(planar_goal_pose=target),
+        simulated_executor(extensions),
     )
 
     legs = action.nodes
@@ -260,8 +275,8 @@ def test_stretch_drives_every_leg_of_a_path_with_its_differential_drive(
         unchanged.nodes
     )
     assert all(leg.mobile_base is robot.mobile_base for leg in legs)
-    assert all(leg.threshold == action.base_pose_threshold for leg in legs)
-    np.testing.assert_allclose(legs[-1].goal_pose.to_np(), target.to_np())
+    assert all(leg.threshold == action.threshold for leg in legs)
+    np.testing.assert_allclose(legs[-1].goal_pose.to_np(), target.pose.to_np())
 
 
 @pytest.mark.parametrize("build_executor", [simulated_executor, robot_executor])
@@ -319,6 +334,10 @@ def test_stretch_keeps_its_drive_goal_without_its_robot_adaptations(
 def test_a_simulated_stretch_arrives_driving_with_its_differential_drive(
     stretch_apartment_context,
 ) -> None:
+    """
+    A simulated Stretch arrives at the navigation's goal pose, driving with its
+    differential drive.
+    """
     world, robot, extensions = stretch_apartment_context
     executor = simulated_executor(extensions)
     action = navigation_to(world)
@@ -328,19 +347,23 @@ def test_a_simulated_stretch_arrives_driving_with_its_differential_drive(
 
     np.testing.assert_allclose(
         robot.root.global_pose.to_np(),
-        robot.mobile_base.pose_facing(action.target_location).to_np(),
-        atol=2 * action.base_pose_threshold,
+        robot.mobile_base.pose_facing(heading=action.planar_goal_pose).to_np(),
+        atol=2 * action.threshold,
     )
 
 
 def test_a_simulated_stretch_drives_differentially_to_a_pose_chosen_while_running(
     stretch_apartment_context,
 ) -> None:
+    """
+    A simulated Stretch also drives differentially to a goal pose chosen only while the
+    plan runs.
+    """
     world, robot, extensions = stretch_apartment_context
     executor = simulated_executor(extensions)
     navigation = StatementNode(
         statement=a(NavigateAction)(
-            target_location=variable_from([navigation_to(world).target_location])
+            planar_goal_pose=variable_from([navigation_to(world).planar_goal_pose])
         )
     )
     executor.compile(statechart=statechart_of(executor, navigation))
@@ -362,7 +385,7 @@ def test_a_drive_chosen_while_running_is_watched_for_stalling_as_it_is_driven(
     executor = simulated_executor(extensions)
     navigation = StatementNode(
         statement=a(NavigateAction)(
-            target_location=variable_from([navigation_to(world).target_location])
+            planar_goal_pose=variable_from([navigation_to(world).planar_goal_pose])
         )
     )
     executor.compile(statechart=statechart_of(executor, navigation))
@@ -385,7 +408,9 @@ def close_action(world: World, robot: AbstractRobot) -> CloseAction:
     :return: An action closing a container of the apartment with the arm of `robot`.
     """
     handle = world.get_semantic_annotations_by_type(Handle)[0]
-    return CloseAction(grasp=handle.grasp_candidates()[0], arm=robot.all_arms[0])
+    return CloseAction(
+        grasp_candidate=handle.grasp_candidates()[0], arm=robot.all_arms[0]
+    )
 
 
 def closing_step_of(action: CloseAction) -> StatechartNode:
@@ -400,6 +425,10 @@ def closing_step_of(action: CloseAction) -> StatechartNode:
 def test_a_simulated_stretch_stays_in_front_of_the_container_it_closes(
     stretch_apartment_context,
 ) -> None:
+    """
+    Closing a container, a simulated Stretch keeps the side its arm reaches out of
+    facing the container, and closes it as any robot would.
+    """
     world, robot, extensions = stretch_apartment_context
     unchanged = prepared(close_action(world, robot), robot_executor(extensions))
     default_close = closing_step_of(unchanged)
@@ -412,21 +441,23 @@ def test_a_simulated_stretch_stays_in_front_of_the_container_it_closes(
     assert type(closing_step) is Parallel
     holding, facing, close = closing_step.nodes
     assert type(holding) is CartesianPose
-    assert holding.root_link is action.grasp.graspable.root
-    assert holding.tip_link is tool_frame
+    assert holding.kinematic_chain.root is action.grasp_candidate.graspable.root
+    assert holding.kinematic_chain.tip is tool_frame
     np.testing.assert_allclose(holding.goal_pose.to_np(), Pose().to_np())
     assert holding.goal_pose.reference_frame is tool_frame
     assert type(facing) is AlignPlanes
-    assert facing.root_link is world.root
-    assert facing.tip_link is robot.root
-    np.testing.assert_allclose(facing.goal_normal.to_np()[:3], [1, 0, 0])
-    assert facing.goal_normal.reference_frame is action.grasp.graspable.root
+    assert facing.kinematic_chain.root is world.root
+    assert facing.kinematic_chain.tip is robot.root
+    np.testing.assert_allclose(facing.reference_normal.to_np()[:3], [1, 0, 0])
+    assert (
+        facing.reference_normal.reference_frame is action.grasp_candidate.graspable.root
+    )
     np.testing.assert_allclose(facing.tip_normal.to_np()[:3], [0, -1, 0])
     assert facing.tip_normal.reference_frame is robot.root
     assert type(close) is ArticulateGraspedMechanism
     assert close.tip_link is default_close.tip_link
     assert close.environment_link is default_close.environment_link
-    assert close.goal_joint_state == default_close.goal_joint_state
+    assert close.goal_position == default_close.goal_position
 
 
 def test_a_stretch_closes_a_container_with_its_base_free_to_turn(
@@ -501,14 +532,18 @@ def lifting_goal_of(action: PickUpAction) -> StatechartNode:
 def test_stretch_reaches_in_a_straight_line(
     stretch_apartment_context, build_executor
 ) -> None:
+    """
+    A Stretch reaches in a straight line, to the same goal and with the same thresholds
+    as the default reach.
+    """
     world, robot, extensions = stretch_apartment_context
     unchanged = prepared(
-        ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+        ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
         build_executor(extensions, robot_adaptations=[]),
     )
 
     action = prepared(
-        ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+        ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
         build_executor(extensions),
     )
 
@@ -516,40 +551,72 @@ def test_stretch_reaches_in_a_straight_line(
         reaching_goals_of(action), reaching_goals_of(unchanged), strict=True
     ):
         assert type(goal.nodes[0]) is CartesianPositionStraight
-        assert goal.root_link is default_goal.root_link
-        assert goal.tip_link is default_goal.tip_link
+        assert goal.kinematic_chain.root is default_goal.kinematic_chain.root
+        assert goal.kinematic_chain.tip is default_goal.kinematic_chain.tip
         np.testing.assert_allclose(
             goal.goal_pose.to_np(), default_goal.goal_pose.to_np()
         )
-        assert goal.translation_threshold == default_goal.translation_threshold
+        assert goal.position_threshold == default_goal.position_threshold
         assert goal.orientation_threshold == default_goal.orientation_threshold
-        assert goal.binding_policy == default_goal.binding_policy
+        assert goal.goal_binding_policy == default_goal.goal_binding_policy
+
+
+def test_stretch_reaches_in_a_straight_line_at_the_approach_speeds(
+    stretch_apartment_context,
+) -> None:
+    """
+    The straight line keeps the speeds the reach approaches at.
+    """
+    world, robot, extensions = stretch_apartment_context
+    action = prepared(
+        ReachAction(
+            grasp_candidate=handle_grasp(world),
+            arm=robot.all_arms[0],
+            pre_approach_cruise_linear_velocity=0.05,
+            final_approach_cruise_linear_velocity=0.02,
+        ),
+        simulated_executor(extensions),
+    )
+
+    goals = reaching_goals_of(action)
+
+    assert [goal.nodes[0].cruise_velocity for goal in goals] == [
+        action.pre_approach_cruise_linear_velocity,
+        action.final_approach_cruise_linear_velocity,
+    ]
+    assert [goal.nodes[1].cruise_angular_velocity for goal in goals] == [
+        goal.cruise_angular_velocity for goal in goals
+    ]
 
 
 @pytest.mark.parametrize("build_executor", [simulated_executor, robot_executor])
 def test_stretch_lifts_in_a_straight_line(
     stretch_apartment_context, build_executor
 ) -> None:
+    """
+    A Stretch lifts what it picked up in a straight line, to the same goal and with the
+    same thresholds as the default lift.
+    """
     world, robot, extensions = stretch_apartment_context
     unchanged = lifting_goal_of(
         prepared(
-            PickUpAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+            PickUpAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
             build_executor(extensions, robot_adaptations=[]),
         )
     )
 
     goal = lifting_goal_of(
         prepared(
-            PickUpAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+            PickUpAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
             build_executor(extensions),
         )
     )
 
     assert type(goal.nodes[0]) is CartesianPositionStraight
-    assert goal.root_link is unchanged.root_link
-    assert goal.tip_link is unchanged.tip_link
+    assert goal.kinematic_chain.root is unchanged.kinematic_chain.root
+    assert goal.kinematic_chain.tip is unchanged.kinematic_chain.tip
     np.testing.assert_allclose(goal.goal_pose.to_np(), unchanged.goal_pose.to_np())
-    assert goal.translation_threshold == unchanged.translation_threshold
+    assert goal.position_threshold == unchanged.position_threshold
     assert goal.orientation_threshold == unchanged.orientation_threshold
 
 
@@ -568,17 +635,21 @@ def held_orientations_of(action: StatechartNode) -> list[HoldOrientation]:
 def test_stretch_holds_the_orientation_of_its_base_while_it_reaches(
     stretch_apartment_context, build_executor
 ) -> None:
+    """
+    A Stretch holds the orientation of its base beside a reach, so only its arm and lift
+    move the gripper sideways.
+    """
     world, robot, extensions = stretch_apartment_context
 
     action = prepared(
-        ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+        ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
         build_executor(extensions),
     )
 
     [hold] = held_orientations_of(action)
     assert hold.parent_node is action.parent_node
-    assert hold.root_link is world.root
-    assert hold.tip_link is robot.root
+    assert hold.kinematic_chain.root is world.root
+    assert hold.kinematic_chain.tip is robot.root
 
 
 def test_stretch_holds_the_orientation_of_its_base_once_for_nested_tool_motions(
@@ -591,7 +662,7 @@ def test_stretch_holds_the_orientation_of_its_base_once_for_nested_tool_motions(
     world, robot, extensions = stretch_apartment_context
 
     action = prepared(
-        PickUpAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+        PickUpAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
         simulated_executor(extensions),
     )
 
@@ -607,7 +678,8 @@ def test_stretch_holds_the_orientation_of_its_base_for_each_of_successive_tool_m
     """
     world, robot, extensions = stretch_apartment_context
     reaches = [
-        ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0]) for _ in range(2)
+        ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0])
+        for _ in range(2)
     ]
 
     prepared(Sequence(nodes=list(reaches)), simulated_executor(extensions))
@@ -620,17 +692,28 @@ def test_stretch_holds_the_orientation_of_its_base_for_each_of_successive_tool_m
 def test_stretch_holds_the_orientation_of_its_base_beside_a_hold_of_something_else(
     stretch_apartment_context,
 ) -> None:
+    """
+    A Stretch holds the orientation of its base also when the reach runs beside a hold
+    of another link.
+    """
     world, robot, extensions = stretch_apartment_context
-    reach = ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0])
+    reach = ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0])
     tool_frame = robot.all_arms[0].end_effector.tool_frame
 
     prepared(
-        Parallel(nodes=[HoldPose(root_link=world.root, tip_link=tool_frame), reach]),
+        Parallel(
+            nodes=[
+                HoldPose(
+                    kinematic_chain=KinematicChain(root=world.root, tip=tool_frame)
+                ),
+                reach,
+            ]
+        ),
         simulated_executor(extensions),
     )
 
     [hold] = held_orientations_of(reach)
-    assert hold.tip_link is robot.root
+    assert hold.kinematic_chain.tip is robot.root
 
 
 def test_stretch_holds_the_orientation_of_its_base_only_once_it_drove_there(
@@ -649,7 +732,7 @@ def test_stretch_holds_the_orientation_of_its_base_only_once_it_drove_there(
                 x=0.7, y=-1.3, z=0.9, reference_frame=world.root
             ),
             hip_rotation=0.0,
-            end_effector=robot.all_arms[0].end_effector,
+            arm=robot.all_arms[0],
         ),
         simulated_executor(extensions),
     )
@@ -684,7 +767,7 @@ def stretch_reaching_milk_from(
         extensions=[recording],
     )
     action = ReachAction(
-        grasp=GraspCandidate(milk, Pose(reference_frame=milk.root)),
+        grasp_candidate=GraspCandidate(milk, Pose(reference_frame=milk.root)),
         arm=robot.all_arms[0],
     )
     executor.compile(statechart=statechart_of(executor, action))
@@ -732,7 +815,7 @@ def test_a_simulated_stretch_reaches_without_turning_its_base(
 
     executor.execute()
 
-    assert action.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert action.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert_kept_its_heading(recording)
 
 
@@ -763,10 +846,13 @@ def test_a_simulated_stretch_facing_away_fails_to_reach_rather_than_turning(
 def test_a_robot_of_another_type_reaches_without_its_base_orientation_held(
     pr2_apartment_context,
 ) -> None:
+    """
+    A robot of another type reaches without its base orientation held.
+    """
     world, robot, extensions = pr2_apartment_context
 
     action = prepared(
-        ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+        ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
         simulated_executor(extensions),
     )
 
@@ -774,10 +860,13 @@ def test_a_robot_of_another_type_reaches_without_its_base_orientation_held(
 
 
 def test_a_robot_of_another_type_reaches_unchanged(pr2_apartment_context) -> None:
+    """
+    A robot of another type reaches with the default pose goals.
+    """
     world, robot, extensions = pr2_apartment_context
 
     action = prepared(
-        ReachAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+        ReachAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
         simulated_executor(extensions),
     )
 
@@ -785,11 +874,14 @@ def test_a_robot_of_another_type_reaches_unchanged(pr2_apartment_context) -> Non
 
 
 def test_a_robot_of_another_type_lifts_unchanged(pr2_apartment_context) -> None:
+    """
+    A robot of another type lifts with the default pose goal.
+    """
     world, robot, extensions = pr2_apartment_context
 
     goal = lifting_goal_of(
         prepared(
-            PickUpAction(grasp=handle_grasp(world), arm=robot.all_arms[0]),
+            PickUpAction(grasp_candidate=handle_grasp(world), arm=robot.all_arms[0]),
             simulated_executor(extensions),
         )
     )
@@ -809,13 +901,17 @@ def garmi_extensions(_garmi_world_setup) -> list[ContextExtension]:
 def test_a_simulated_garmi_drives_its_fingers_with_a_giskard_goal(
     garmi_extensions,
 ) -> None:
+    """
+    A simulated Garmi moves its fingers with a motion goal rather than a gripper
+    command.
+    """
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
         GarmiLeftGripper
     )[0]
 
     action = prepared(
         SetGripperAction(
-            configuration=gripper.default_configuration(GripperState.OPEN)
+            gripper_configuration=gripper.default_configuration(GripperState.OPEN)
         ),
         simulated_executor(garmi_extensions),
     )

@@ -5,14 +5,19 @@ array backend that trains.
 
 from __future__ import annotations
 
+import math
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import numpy as np
 from array_api_compat import array_namespace, device
 from typing_extensions import Iterator, Self
 
-from probabilistic_model.learning.device_memory import DeviceMemory, StepMemory
+from krrood_compute_resources.memory import DeviceMemory
+
+from probabilistic_model.learning.step_memory import StepMemory
 from probabilistic_model.learning.exceptions import NotEnoughMemoryError
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
@@ -35,7 +40,17 @@ class ConvergenceHistory:
 
     converged: bool
     """
-    Whether training stopped because the loss converged rather than at the epoch limit.
+    Whether training stopped because the loss converged rather than at a limit.
+    """
+
+    duration: timedelta = timedelta()
+    """
+    The wall-clock time of the epochs.
+    """
+
+    epoch_durations: list[timedelta] = field(default_factory=list)
+    """
+    The wall-clock time of each epoch, in the order they ran.
     """
 
     @property
@@ -45,13 +60,25 @@ class ConvergenceHistory:
         """
         return len(self.epoch_losses)
 
+    @property
+    def average_epoch_duration(self) -> timedelta | None:
+        """
+        :return: The mean duration of the epochs after the first, which also compiles
+            the training step, the first epoch's alone if it is the only one, ``None``
+            without epochs.
+        """
+        if not self.epoch_durations:
+            return None
+        durations = self.epoch_durations[1:] or self.epoch_durations
+        return sum(durations, timedelta()) / len(durations)
+
 
 @dataclass(kw_only=True)
 class Convergence:
     """
     Stops training once the average loss of an epoch improved by less than
     :attr:`tolerance` for :attr:`patience` epochs in a row, or after
-    :attr:`maximum_epochs`.
+    :attr:`maximum_epochs` or :attr:`maximum_duration`.
     """
 
     tolerance: float = 1e-3
@@ -67,6 +94,11 @@ class Convergence:
     maximum_epochs: int = 1000
     """
     The number of epochs after which training stops without having converged.
+    """
+
+    maximum_duration: timedelta | None = None
+    """
+    The wall-clock time after which no further epoch starts, no limit if ``None``.
     """
 
     def has_converged(self, *, epoch_losses: list[float]) -> bool:
@@ -91,11 +123,125 @@ class Convergence:
         :return: The losses of the epochs trained until convergence or the epoch limit.
         """
         epoch_losses: list[float] = []
-        while len(epoch_losses) < self.maximum_epochs:
+        epoch_durations: list[timedelta] = []
+        start = time.perf_counter()
+
+        def elapsed() -> timedelta:
+            """
+            :return: The time since training started.
+            """
+            return timedelta(seconds=time.perf_counter() - start)
+
+        while len(epoch_losses) < self.maximum_epochs and not self.is_out_of_time(
+            elapsed=elapsed()
+        ):
+            epoch_start = time.perf_counter()
             epoch_losses.append(training.train_one_epoch())
-            if self.has_converged(epoch_losses=epoch_losses):
-                return ConvergenceHistory(epoch_losses=epoch_losses, converged=True)
-        return ConvergenceHistory(epoch_losses=epoch_losses, converged=False)
+            training.finish_epoch(average_loss=epoch_losses[-1])
+            epoch_durations.append(timedelta(seconds=time.perf_counter() - epoch_start))
+            if training.has_settled() and self.has_converged(epoch_losses=epoch_losses):
+                return ConvergenceHistory(
+                    epoch_losses=epoch_losses,
+                    converged=True,
+                    duration=elapsed(),
+                    epoch_durations=epoch_durations,
+                )
+        return ConvergenceHistory(
+            epoch_losses=epoch_losses,
+            converged=False,
+            duration=elapsed(),
+            epoch_durations=epoch_durations,
+        )
+
+    def is_out_of_time(self, *, elapsed: timedelta) -> bool:
+        """
+        :param elapsed: The time training has taken so far.
+        :return: Whether :attr:`maximum_duration` has passed.
+        """
+        return self.maximum_duration is not None and elapsed >= self.maximum_duration
+
+
+# %% learning rate schedule
+
+
+@dataclass(kw_only=True)
+class LearningRatePlateau:
+    """
+    Divides the learning rate by :attr:`factor` whenever the average loss of an epoch
+    has not improved relatively by :attr:`relative_tolerance` on the best loss for
+    :attr:`patience` epochs, as :class:`torch.optim.lr_scheduler.ReduceLROnPlateau`
+    does.
+    """
+
+    factor: float = 0.1
+    """
+    The factor the learning rate is multiplied by at every reduction.
+    """
+
+    patience: int = 10
+    """
+    The number of epochs without improvement after which the learning rate is reduced.
+    """
+
+    relative_tolerance: float = 1e-4
+    """
+    The improvement on the best loss, relative to its magnitude, below which an epoch
+    counts as not improving.
+    """
+
+    reductions_until_settled: int = 3
+    """
+    The number of reductions after which training may stop.
+    """
+
+    best_loss: float = field(default=math.inf, init=False)
+    """
+    The lowest average loss of an epoch so far.
+    """
+
+    epochs_without_improvement: int = field(default=0, init=False)
+    """
+    The number of epochs since the best loss, or since the last reduction.
+    """
+
+    reductions: int = field(default=0, init=False)
+    """
+    The number of reductions so far.
+    """
+
+    @property
+    def scale(self) -> float:
+        """
+        :return: The factor the initial learning rate is multiplied by now.
+        """
+        return self.factor**self.reductions
+
+    @property
+    def is_settled(self) -> bool:
+        """
+        :return: Whether the learning rate was reduced often enough for training to
+            stop.
+        """
+        return self.reductions >= self.reductions_until_settled
+
+    def record(self, *, average_loss: float) -> None:
+        """
+        Count an epoch, reducing the learning rate if the loss stopped improving.
+
+        :param average_loss: The average loss of the epoch.
+        """
+        if math.isinf(
+            self.best_loss
+        ) or self.best_loss - average_loss > self.relative_tolerance * abs(
+            self.best_loss
+        ):
+            self.best_loss = average_loss
+            self.epochs_without_improvement = 0
+            return
+        self.epochs_without_improvement += 1
+        if self.epochs_without_improvement > self.patience:
+            self.reductions += 1
+            self.epochs_without_improvement = 0
 
 
 # %% mini-batches
@@ -191,13 +337,27 @@ class MiniBatchTraining(ABC):
     """
 
     @abstractmethod
-    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> float:
+    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> float | BackendArray:
         """
         Update the parameters by one step on a batch.
 
         :param batch: The same rows of every training array.
-        :return: The loss of the batch before the step.
+        :return: The loss of the batch before the step, a float or a scalar array of the
+            backend that may still be computed on its device.
         """
+
+    def finish_epoch(self, *, average_loss: float) -> None:
+        """
+        React to the end of an epoch, nothing by default.
+
+        :param average_loss: The average loss of the epoch.
+        """
+
+    def has_settled(self) -> bool:
+        """
+        :return: Whether the training's own schedule lets it stop, always by default.
+        """
+        return True
 
     def train_one_epoch(self) -> float:
         """
@@ -208,4 +368,34 @@ class MiniBatchTraining(ABC):
         total_loss = 0.0
         for batch in self.mini_batches.batches_of_epoch(arguments=self.arguments):
             total_loss += self.step_on_batch(batch=batch) * batch[0].shape[0]
-        return total_loss / self.arguments[0].shape[0]
+        return float(total_loss) / self.arguments[0].shape[0]
+
+
+@dataclass(kw_only=True)
+class PlateauScheduledTraining(MiniBatchTraining, ABC):
+    """
+    Mini-batch training whose learning rate a :class:`LearningRatePlateau` reduces, and
+    which stops only once the plateau has settled.
+    """
+
+    learning_rate_plateau: LearningRatePlateau | None = None
+    """
+    The schedule of the learning rate, a constant learning rate if ``None``.
+    """
+
+    @abstractmethod
+    def scale_learning_rate(self, *, scale: float) -> None:
+        """
+        :param scale: The factor the initial learning rate is multiplied by from now.
+        """
+
+    def finish_epoch(self, *, average_loss: float) -> None:
+        if self.learning_rate_plateau is None:
+            return
+        self.learning_rate_plateau.record(average_loss=average_loss)
+        self.scale_learning_rate(scale=self.learning_rate_plateau.scale)
+
+    def has_settled(self) -> bool:
+        return (
+            self.learning_rate_plateau is None or self.learning_rate_plateau.is_settled
+        )

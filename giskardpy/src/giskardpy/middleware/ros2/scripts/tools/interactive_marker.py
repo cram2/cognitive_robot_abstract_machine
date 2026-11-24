@@ -1,3 +1,8 @@
+"""
+A ROS 2 tool that lets a user drag markers in RViz to move the tips of kinematic chains
+to Cartesian poses.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -11,16 +16,17 @@ from visualization_msgs.msg import InteractiveMarkerFeedback
 
 from cramph.monitors import CountSeconds
 from cramph.statechart import Statechart
-from giskardpy.data_types.exceptions import UnpairedKinematicChainParametersError
-from semantic_digital_twin.adapters.ros import background_node
+from giskardpy.exceptions import UnpairedKinematicChainParametersError
 from giskardpy.middleware.ros2.giskard_client_executor import GiskardClientExecutor
 from giskardpy.motion_statechart.graph_node import EndMotion
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
+from krrood.patterns.called_positionally import called_positionally
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.adapters.ros import background_node
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
-from krrood.patterns.called_positionally import called_positionally
 
 # %% kinematic chain endpoints
 
@@ -266,8 +272,10 @@ class InteractiveMarkerNode:
         motion_statechart.add_nodes(
             nodes=[
                 goal_transformation := CartesianPose(
-                    root_link=kinematic_chain_marker.root_body,
-                    tip_link=kinematic_chain_marker.tip_body,
+                    kinematic_chain=KinematicChain(
+                        root=kinematic_chain_marker.root_body,
+                        tip=kinematic_chain_marker.tip_body,
+                    ),
                     goal_pose=goal_transformation,
                 ),
                 motion_timeout := CountSeconds(seconds=self.motion_timeout_seconds),

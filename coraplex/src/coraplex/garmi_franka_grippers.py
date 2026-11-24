@@ -110,14 +110,16 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
     """
 
     def is_applicable(self, plan_node: MoveGripper) -> bool:
-        return isinstance(plan_node.gripper, (GarmiLeftGripper, GarmiRightGripper))
+        return isinstance(
+            plan_node.two_finger_gripper, (GarmiLeftGripper, GarmiRightGripper)
+        )
 
     def apply(self, plan_node: MoveGripper) -> None:
         """
         Puts the task in place of the step that drives the fingers: `plan_node`, or the
         action whose goal it is.
         """
-        gripper = plan_node.gripper
+        gripper = plan_node.two_finger_gripper
         if plan_node.width <= gripper.separation_in(GripperState.CLOSE):
             task = self.grasp(gripper)
         else:
@@ -141,11 +143,13 @@ class CloseGarmiFingersToWidthWithTheirFrankaDriver(
     """
 
     def is_applicable(self, plan_node: MoveFingersToWidthAction) -> bool:
-        return isinstance(plan_node.gripper, (GarmiLeftGripper, GarmiRightGripper))
+        return isinstance(
+            plan_node.two_finger_gripper, (GarmiLeftGripper, GarmiRightGripper)
+        )
 
     def apply(self, plan_node: MoveFingersToWidthAction) -> None:
         plan_node.statechart.replace(
-            node=plan_node, replacement=self.grasp(plan_node.gripper)
+            node=plan_node, replacement=self.grasp(plan_node.two_finger_gripper)
         )
 
 

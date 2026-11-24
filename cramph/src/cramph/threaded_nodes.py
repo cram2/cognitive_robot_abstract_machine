@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing_extensions import Any, Callable
 
 from cramph.node import SucceedsOnObservingTrue, FailsOnObservingFalse
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,7 @@ class FunctionCall(SucceedsOnObservingTrue, FailsOnObservingFalse, ThreadedNode)
     def run(self) -> Any:
         return self.function()
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         """
         Wait for the function and observe whether it succeeded.
 
@@ -126,8 +126,8 @@ class FunctionCall(SucceedsOnObservingTrue, FailsOnObservingFalse, ThreadedNode)
         """
         self.wait_until_finished()
         if self._error is None:
-            return ObservationStateValues.TRUE
+            return ObservationStateValue.TRUE
         if isinstance(self._error, self.failure_types):
             logger.info("%s failed: %s", self.unique_name, self._error)
-            return ObservationStateValues.FALSE
+            return ObservationStateValue.FALSE
         raise self._error

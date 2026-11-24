@@ -1,3 +1,9 @@
+"""
+Fixtures shared by the krrood tests, and the generation of their ORM interface.
+"""
+
+from __future__ import annotations
+
 import logging
 import os
 import tempfile
@@ -7,7 +13,7 @@ from dataclasses import is_dataclass
 import pytest
 from sqlalchemy.orm import configure_mappers, sessionmaker
 
-import krrood.entity_query_language.orm.model
+import krrood.ormatic.data_access_objects.symbol_graph_mappings
 import krrood.symbol_graph.symbol_graph
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.entity_query_language.predicate import (
@@ -38,6 +44,13 @@ from .dataset import (
     identity_hashed_values_created_on_access,
     interface_typed_fields,
     single_value_classes,
+)
+from .dataset.throwing_trials import (
+    Court,
+    ReleasePoint,
+    Throw,
+    ThrowMeasurements,
+    ThrowParameters,
 )
 from .dataset.example_classes import (
     KRROODPhysicalObject,
@@ -94,6 +107,7 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(identity_hashed_values_created_on_access))
     all_classes |= set(classes_of_module(interface_typed_fields))
     all_classes |= {Symbol, Role}
+    all_classes |= {Court, ReleasePoint, Throw, ThrowMeasurements, ThrowParameters}
 
     # remove classes that don't need persistence
     all_classes -= {HasType, HasTypes, ContainsType}
@@ -159,16 +173,8 @@ def pytest_configure(config):
     logging.getLogger("numpy").setLevel(logging.WARNING)
 
 
-# Generate ormatic_interface.py at module level, before the star import below.
-# This must happen here (not in a pytest hook) because hooks run after the
-# conftest module is fully imported, which means the import on the next line
-# would fail if the generated file is stale or missing.
+# Generate ormatic_interface.py when this conftest is loaded, before any test imports it.
 generate_sqlalchemy_interface()
-
-try:
-    from .dataset.ormatic_interface import *
-except ImportError:
-    pass
 
 # Generate verbalization_results.py the same way: always fresh, so a wording change
 # shows up as an ordinary diff to review before committing, instead of a failing test.
@@ -214,6 +220,14 @@ def cleanup_after_test():
     SymbolGraph().clear()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load the ORM interface, whose import registers the mappers every test may use.
+    """
+    from .dataset import ormatic_interface  # noqa: F401
+
+
 @pytest.fixture(scope="session")
 def engine():
     configure_mappers()
@@ -232,6 +246,12 @@ def session(engine):
 
 @pytest.fixture
 def database(engine, session):
+    """
+    Create the tables of the test ORM interface for the test, and drop the database
+    after it.
+    """
+    from .dataset.ormatic_interface import Base
+
     Base.metadata.create_all(engine)
     yield
     drop_database(engine)

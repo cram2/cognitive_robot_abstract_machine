@@ -5,7 +5,7 @@ reached a local minimum.
 
 from __future__ import annotations
 
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
@@ -17,7 +17,6 @@ from giskardpy.motion_statechart.graph_node import (
     velocity_convergence_expression,
 )
 from cramph.node import NodeArtifacts
-from giskardpy.utils.decorators import dataclass
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 

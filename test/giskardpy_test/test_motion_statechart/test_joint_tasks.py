@@ -1,7 +1,11 @@
+"""
+Tests of the tasks that move joints to goal positions or limit their velocity.
+"""
+
 import numpy as np
 import pytest
 
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
@@ -71,9 +75,9 @@ def test_set_seed_configuration(pr2_world_state_reset):
     executor.compile(statechart=statechart)
 
     executor.tick_until_end()
-    assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert end.observation_state == ObservationStateValues.TRUE
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert end.observation_state == ObservationStateValue.TRUE
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     assert np.isclose(connection.position, goal)
 
@@ -110,9 +114,9 @@ def test_set_seed_odometry(pr2_world_state_reset):
     executor.compile(statechart=statechart)
 
     executor.tick_until_end()
-    assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert end.observation_state == ObservationStateValues.TRUE
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert end.observation_state == ObservationStateValue.TRUE
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     assert np.allclose(
         expected.to_np(),
@@ -123,6 +127,10 @@ def test_set_seed_odometry(pr2_world_state_reset):
 
 
 def test_joint_goal(tmp_path):
+    """
+    A joint position task moves a revolute joint to its goal, after which the motion
+    ends.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -174,31 +182,31 @@ def test_joint_goal(tmp_path):
 
     executor.compile(statechart=statechart)
 
-    assert task1.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+    assert task1.observation_state == ObservationStateValue.UNKNOWN
+    assert end.observation_state == ObservationStateValue.UNKNOWN
+    assert task1.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     executor.tick_until_end()
-    statechart.draw(file_name=str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     # +1 compared to the tick count without a moving dof: EndMotion now waits for the
     # dof's velocity to settle below its convergence threshold before observing True.
     assert len(statechart.state_history) == 7
     assert (
         statechart.state_history.get_observation_history_of_node(node=task1)[-1]
-        == ObservationStateValues.TRUE
+        == ObservationStateValue.TRUE
     )
     assert (
         statechart.state_history.get_observation_history_of_node(node=end)[-1]
-        == ObservationStateValues.TRUE
+        == ObservationStateValue.TRUE
     )
     assert (
         statechart.state_history.get_life_cycle_history_of_node(node=task1)[-1]
-        == LifeCycleValues.RUNNING
+        == LifeCycleValue.RUNNING
     )
     assert (
         statechart.state_history.get_life_cycle_history_of_node(node=end)[-1]
-        == LifeCycleValues.RUNNING
+        == LifeCycleValue.RUNNING
     )
 
 
@@ -288,7 +296,9 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
             ),
-            JointVelocityLimit(connections=[head_pan_joint], max_velocity=max_velocity),
+            JointVelocityLimit(
+                connections=[head_pan_joint], max_joint_velocity=max_velocity
+            ),
         ]
     )
 
@@ -301,7 +311,7 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
             f"head_pan_joint's velocity {observed_velocity} exceeded the "
             f"{max_velocity} rad/s cap on tick {i}"
         )
-        if statechart.observation_state[joint_goal] == ObservationStateValues.TRUE:
+        if statechart.observation_state[joint_goal] == ObservationStateValue.TRUE:
             break
     else:
         raise TimeoutError(
@@ -373,8 +383,11 @@ def test_daisy_arm_reaches_its_park_state(
 def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_the_joint(
     pr2_world_state_reset,
 ):
+    """
+    A joint velocity limit scales its constraint by the velocity limit of the joint.
+    """
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
-    limit = JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.05)
+    limit = JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.05)
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
         extensions=[MotionControl()],
@@ -392,6 +405,10 @@ def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_th
 def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     pr2_world_state_reset,
 ):
+    """
+    A joint velocity limit of zero keeps the joint where it is, although a joint goal
+    pulls it away.
+    """
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     start_position = head_pan_joint.position
     executor = StatechartExecutor(
@@ -404,7 +421,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5})
             ),
-            JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.0),
+            JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.0),
         ]
     )
     executor.compile(statechart=statechart)

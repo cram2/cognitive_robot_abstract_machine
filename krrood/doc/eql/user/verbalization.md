@@ -49,7 +49,7 @@ from krrood.entity_query_language.factories import variable, entity, an
 from krrood.entity_query_language.verbalization.pipeline import verbalize_expression
 from krrood.entity_query_language.verbalization._example_domain import Robot
 
-robots = [Robot("R2D2", 95, True), Robot("C3PO", 20, False), Robot("BB8", 80, True)]
+robots = [Robot(name="R2D2", battery=95, operational=True), Robot(name="C3PO", battery=20, operational=False), Robot(name="BB8", battery=80, operational=True)]
 r = variable(Robot, domain=robots)
 
 query = an(entity(r).where(r.battery > 50))
@@ -74,7 +74,7 @@ Verbalization handles cross-variable comparisons too — the sentence describes 
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization._example_domain import Mission
 
-missions = [Mission(robots[0], 1), Mission(robots[1], 3)]
+missions = [Mission(assigned_to=robots[0], priority=1), Mission(assigned_to=robots[1], priority=3)]
 m = variable(Mission, domain=missions)
 
 query = an(entity(r).where(m.assigned_to == r, m.priority > 2))
@@ -236,7 +236,7 @@ an obvious identifying field it is appended:
 
 ```{code-cell} ipython3
 m = variable(Mission, domain=None)
-print(verbalize_expression(m.assigned_to == robots[0]))   # robots[0] is Robot("R2D2", …)
+print(verbalize_expression(m.assigned_to == robots[0]))   # robots[0] is Robot(name="R2D2", …)
 ```
 
 The identifying field(s) are the dataclass fields marked with `GrammarMetadata.is_identifying_field`
@@ -568,7 +568,7 @@ from krrood.entity_query_language.verbalization.pipeline import VerbalizationPip
 from krrood.entity_query_language.verbalization.rendering.formatter import ANSIFormatter
 from krrood.entity_query_language.verbalization.rendering.renderer import ParagraphRenderer
 
-print(VerbalizationPipeline(ParagraphRenderer(ANSIFormatter())).verbalize(query))
+print(VerbalizationPipeline(renderer=ParagraphRenderer(formatter=ANSIFormatter())).verbalize(expression=query))
 ```
 
 Color legend:
@@ -592,7 +592,7 @@ from krrood.entity_query_language.verbalization.pipeline import VerbalizationPip
 from krrood.entity_query_language.verbalization.rendering.formatter import HTMLFormatter
 from krrood.entity_query_language.verbalization.rendering.renderer import ParagraphRenderer
 
-HTML(VerbalizationPipeline(ParagraphRenderer(HTMLFormatter())).verbalize(query))
+HTML(VerbalizationPipeline(renderer=ParagraphRenderer(formatter=HTMLFormatter())).verbalize(expression=query))
 ```
 
 ### Hierarchical HTML
@@ -602,7 +602,7 @@ Use `HierarchicalRenderer` to get an indented bullet structure — great for rul
 ```{code-cell} ipython3
 from krrood.entity_query_language.verbalization.rendering.renderer import HierarchicalRenderer
 
-HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(query))
+HTML(VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(expression=query))
 ```
 
 ## Verbalizing Rule Trees
@@ -620,18 +620,18 @@ from krrood.entity_query_language.verbalization._example_domain import (
     StrongLoveBird,
 )
 
-birds = [Bird('tweety'), Bird('snappy'), Bird('sleepy')]
+birds = [Bird(name='tweety'), Bird(name='snappy'), Bird(name='sleepy')]
 bird = birds[0]
 love_birds = [
-    LoveBirds(birds[0], birds[1], True),
-    LoveBirds(birds[1], birds[2], False),
+    LoveBirds(bird_1=birds[0], bird_2=birds[1], strong_love=True),
+    LoveBirds(bird_1=birds[1], bird_2=birds[2], strong_love=False),
 ]
 
 love_birds = variable(LoveBirds, domain=love_birds)
 bird_view = deduced_variable(BirdView)
 rule_query = an(entity(inference(StrongLoveBird)(bird=love_birds.bird_1)).where(love_birds.strong_love))
 
-HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(rule_query))
+HTML(VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(expression=rule_query))
 ```
 
 The hierarchical renderer shows the **If/then** structure with each condition and conclusion
@@ -664,7 +664,7 @@ drawer_rule = an(entity(inference(Drawer)(
     fc.child == h,
 ))
 
-HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(drawer_rule))
+HTML(VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(expression=drawer_rule))
 ```
 
 And a cabinet rule that aggregates over multiple drawers — notice the *"if"* part (the condition) uses
@@ -680,7 +680,7 @@ cabinet_rule = an(entity(inference(Cabinet)(
     drawers=dr,
 )).where(pc.child == dr.container))
 
-HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter())).verbalize(cabinet_rule))
+HTML(VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter())).verbalize(expression=cabinet_rule))
 ```
 
 ## Verbalization as an Explanation Tool
@@ -725,8 +725,8 @@ from krrood.entity_query_language.verbalization.rendering.formatter import HTMLF
 from krrood.entity_query_language.verbalization.rendering.renderer import HierarchicalRenderer
 from krrood.entity_query_language.verbalization.rendering.source_link_resolver import AutoAPIResolver
 
-vd_robots = [Robot("R2D2", 95, True), Robot("C3PO", 20, False)]
-vd_missions = [Mission(vd_robots[0], 3)]
+vd_robots = [Robot(name="R2D2", battery=95, operational=True), Robot(name="C3PO", battery=20, operational=False)]
+vd_missions = [Mission(assigned_to=vd_robots[0], priority=3)]
 r = variable(Robot, domain=vd_robots)
 m = variable(Mission, domain=vd_missions)
 linked_query = an(entity(r).where(m.assigned_to == r, m.priority > 2))
@@ -735,18 +735,18 @@ linked_query = an(entity(r).where(m.assigned_to == r, m.priority > 2))
 # resolve to the sibling AutoAPI tree in any build — a local _build/html, a Pages preview, or the
 # published site — without hard-coding a host.
 resolver = AutoAPIResolver.for_in_site_docs()
-HTML(VerbalizationPipeline(HierarchicalRenderer(HTMLFormatter(), resolver)).verbalize(linked_query))
+HTML(VerbalizationPipeline(renderer=HierarchicalRenderer(formatter=HTMLFormatter(), link_resolver=resolver)).verbalize(expression=linked_query))
 ```
 
 ## API Reference
 
 - {py:func}`~krrood.entity_query_language.verbalization.pipeline.verbalize_expression` — the simplest entry point; returns plain text (``verbalize_expression(expr)``)
 - {py:class}`~krrood.entity_query_language.verbalization.pipeline.VerbalizationPipeline` — colour / layout / hyperlinks via a renderer
-  - ``VerbalizationPipeline.plain().verbalize(expression)`` — plain prose (what ``verbalize_expression`` uses)
-  - ``VerbalizationPipeline.ansi().verbalize(expression)`` — ANSI-coloured prose
-  - ``VerbalizationPipeline.html(hierarchical=True).verbalize(expression)`` — HTML indented bullets
-  - ``VerbalizationPipeline.html(hierarchical=True, link_resolver=resolver).verbalize(expression)`` — with source hyperlinks
-  - ``VerbalizationPipeline(renderer).verbalize(expression)`` — from a renderer you build directly
+  - ``VerbalizationPipeline.plain().verbalize(expression=expression)`` — plain prose (what ``verbalize_expression`` uses)
+  - ``VerbalizationPipeline.ansi().verbalize(expression=expression)`` — ANSI-coloured prose
+  - ``VerbalizationPipeline.html(hierarchical=True).verbalize(expression=expression)`` — HTML indented bullets
+  - ``VerbalizationPipeline.html(hierarchical=True, link_resolver=resolver).verbalize(expression=expression)`` — with source hyperlinks
+  - ``VerbalizationPipeline(renderer=renderer).verbalize(expression=expression)`` — from a renderer you build directly
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.renderer.ParagraphRenderer` — flat prose layout
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.renderer.HierarchicalRenderer` — indented bullet list layout
 - {py:class}`~krrood.entity_query_language.verbalization.rendering.formatter.PlainFormatter` — no colour markup

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "krrood-code-generation"
+dynamic = ["version"]
+description = "Generation of Python modules from Jinja templates."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "LGPL-3.0-only"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+]
+authors = [
+    {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"},
+    {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}
+]
+dependencies = [
+    "krrood-core==26.10.0",
+    "jinja2",
+    "inflection",
+]
+
+[project.urls]
+Homepage = "https://cram2.github.io/cognitive_robot_abstract_machine/krrood/intro.html"
+"Source" = "https://github.com/cram2/cognitive_robot_abstract_machine"
+"Bug Tracker" = "https://github.com/cram2/cognitive_robot_abstract_machine/issues"
+"Changelog" = "https://github.com/cram2/cognitive_robot_abstract_machine/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["krrood*"]
+
+[tool.setuptools.package-data]
+"*" = ["templates/*.jinja", "visualization/templates/*.jinja"]
+
+[tool.setuptools.dynamic]
+version = {attr = "krrood.code_generation._version.__version__"}

@@ -96,5 +96,5 @@ from tempfile import mkdtemp
 
 output_directory = Path(mkdtemp())
 statechart.draw(file_name=str(output_directory / "statechart.pdf"))
-statechart.plot_gantt_chart(path=str(output_directory / "statechart_gantt_chart.pdf"))
+statechart.plot_gantt_chart(path=output_directory / "statechart_gantt_chart.pdf")
 ```

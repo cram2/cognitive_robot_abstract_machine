@@ -1,3 +1,9 @@
+"""
+Tests of the locations that say where a robot can stand to reach or see a target.
+"""
+
+from __future__ import annotations
+
 from copy import deepcopy
 from dataclasses import dataclass, field
 from itertools import islice
@@ -251,7 +257,9 @@ def test_a_reachability_location_offers_no_standing_pose_farther_than_the_arm_is
     arm = robot.right_arm
     location = ReachabilityLocation(target, arm, context=context_of(extensions))
     sampled = islice(
-        location.costmap().sample(location.number_of_samples, location.sampling_seed),
+        location.costmap().sample(
+            number_of_samples=location.number_of_samples, seed=location.sampling_seed
+        ),
         POSES_CHECKED,
     )
     assert any(
@@ -283,7 +291,8 @@ def test_a_reachability_location_offers_the_poses_in_reach_in_the_order_sampled(
         pose.position.to_np()[:2]
         for pose in islice(
             location.costmap().sample(
-                location.number_of_samples, location.sampling_seed
+                number_of_samples=location.number_of_samples,
+                seed=location.sampling_seed,
             ),
             POSES_CHECKED,
         )
@@ -454,7 +463,9 @@ def test_a_costmap_location_samples_with_the_seed_of_its_plan(single_robot_world
 
     expected = [
         pose.position.to_np()
-        for pose in location.costmap().sample(location.number_of_samples, sampling_seed)
+        for pose in location.costmap().sample(
+            number_of_samples=location.number_of_samples, seed=sampling_seed
+        )
     ]
     np.testing.assert_array_equal(sampled, expected)
 

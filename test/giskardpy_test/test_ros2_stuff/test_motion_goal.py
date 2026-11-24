@@ -6,22 +6,26 @@ import json
 
 import pytest
 
-from giskardpy.middleware.ros2.motion_goal import MotionGoal, MotionGoalPayloadKey
+from giskardpy.middleware.ros2.motion_goal import (
+    DebugOutput,
+    MotionGoal,
+    MotionGoalPayloadKey,
+)
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.context import StatechartContext
 from cramph.monitors import CountSimulationTimeSeconds
 from cramph.statechart import Statechart
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.world import World
 
 # %% the payload a client sends
 
 
-def create_client() -> MetaData:
+def create_client() -> Sender:
     """
     The identity a client names itself with.
     """
-    return MetaData(node_name="client", process_id=3)
+    return Sender(node_name="client", process_id=3)
 
 
 def create_motion_statechart() -> Statechart:
@@ -43,8 +47,11 @@ class TestMotionGoalPayload:
     """
 
     def test_the_motion_statechart_survives_the_round_trip(self):
+        """
+        The motion statechart of a goal arrives as the json it was sent as.
+        """
         motion_statechart = create_motion_statechart()
-        goal = MotionGoal.for_motion_statechart(
+        goal = MotionGoal.from_motion_statechart(
             motion_statechart=motion_statechart, client=create_client()
         )
 
@@ -58,7 +65,7 @@ class TestMotionGoalPayload:
         the goal names.
         """
         client = create_client()
-        goal = MotionGoal.for_motion_statechart(
+        goal = MotionGoal.from_motion_statechart(
             motion_statechart=create_motion_statechart(), client=client
         )
 
@@ -67,8 +74,13 @@ class TestMotionGoalPayload:
         assert restored.client == client
 
     def test_a_goal_built_on_a_change_names_it(self):
-        position = StreamPosition(origin=create_client(), sequence_number=11)
-        goal = MotionGoal.for_motion_statechart(
+        """
+        A goal names the change of the client's world it was built on.
+        """
+        position = StreamPosition(
+            origin=MessageOrigin(sender=create_client()), sequence_number=11
+        )
+        goal = MotionGoal.from_motion_statechart(
             motion_statechart=create_motion_statechart(),
             client=create_client(),
             required_position=position,
@@ -79,7 +91,10 @@ class TestMotionGoalPayload:
         assert restored.required_position == position
 
     def test_a_goal_built_on_nothing_requires_nothing(self):
-        goal = MotionGoal.for_motion_statechart(
+        """
+        A goal built without a change of the world requires none.
+        """
+        goal = MotionGoal.from_motion_statechart(
             motion_statechart=create_motion_statechart(), client=create_client()
         )
 
@@ -87,36 +102,53 @@ class TestMotionGoalPayload:
 
         assert restored.required_position is None
 
-    @pytest.mark.parametrize("publishes_debug_expressions", [True, False])
-    def test_a_goal_says_whether_its_debug_expressions_are_published(
-        self, publishes_debug_expressions
+    @pytest.mark.parametrize(
+        "debug_output",
+        [
+            DebugOutput(publishes_expression_markers=True),
+            DebugOutput(plots_trajectory=True),
+            DebugOutput(publishes_expression_markers=True, plots_trajectory=True),
+        ],
+    )
+    def test_a_goal_says_what_giskard_produces_to_debug_it(
+        self, *, debug_output: DebugOutput
     ):
-        goal = MotionGoal.for_motion_statechart(
+        """
+        The debug output of a goal survives its round trip through json.
+        """
+        goal = MotionGoal.from_motion_statechart(
             motion_statechart=create_motion_statechart(),
             client=create_client(),
-            publishes_debug_expressions=publishes_debug_expressions,
+            debug_output=debug_output,
         )
 
         restored = MotionGoal.from_json(data=json.loads(json.dumps(goal.to_json())))
 
-        assert restored.publishes_debug_expressions is publishes_debug_expressions
+        assert restored.debug_output == debug_output
 
-    def test_a_goal_publishes_no_debug_expressions_unless_asked(self):
-        goal = MotionGoal.for_motion_statechart(
+    def test_a_goal_asks_for_no_debug_output_unless_told_to(self):
+        """
+        A goal built without a debug output asks for the default :class:`DebugOutput`.
+        """
+        goal = MotionGoal.from_motion_statechart(
             motion_statechart=create_motion_statechart(), client=create_client()
         )
 
-        assert goal.publishes_debug_expressions is False
+        assert goal.debug_output == DebugOutput()
 
-    def test_a_client_that_does_not_send_the_debug_expression_flag_gets_no_markers(
-        self,
-    ):
-        goal = MotionGoal.for_motion_statechart(
-            motion_statechart=create_motion_statechart(), client=create_client()
+    def test_a_client_that_does_not_send_the_debug_output_gets_the_default(self):
+        """
+        A payload without :attr:`MotionGoalPayloadKey.DEBUG_OUTPUT` asks for the default
+        :class:`DebugOutput`.
+        """
+        goal = MotionGoal.from_motion_statechart(
+            motion_statechart=create_motion_statechart(),
+            client=create_client(),
+            debug_output=DebugOutput(publishes_expression_markers=True),
         )
         payload = json.loads(json.dumps(goal.to_json()))
-        del payload[MotionGoalPayloadKey.PUBLISHES_DEBUG_EXPRESSIONS]
+        del payload[MotionGoalPayloadKey.DEBUG_OUTPUT]
 
         restored = MotionGoal.from_json(data=payload)
 
-        assert restored.publishes_debug_expressions is False
+        assert restored.debug_output == DebugOutput()

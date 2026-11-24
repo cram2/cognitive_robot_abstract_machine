@@ -17,11 +17,9 @@ import tqdm
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
-import coraplex.orm.ormatic_interface  # type: ignore  # noqa: F401
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from cramph.context import ContextExtension, StatechartContext
 from cramph.statechart import Statechart
-from coraplex.orm.ormatic_interface import Base  # type: ignore
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from experiments.experiment_definitions import (
@@ -30,7 +28,7 @@ from experiments.experiment_definitions import (
     MeanAndStandardDeviation,
     TypstRenderer,
 )
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an
 from krrood.ormatic.data_access_objects.dao import selectin_loading
 from krrood.ormatic.data_access_objects.helper import to_dao
@@ -38,8 +36,7 @@ from krrood.ormatic.utils import create_engine, drop_database
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.hsrb import HSRB
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -47,7 +44,6 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from cramph.composites import Sequence, StatementNode
-from cramph.orm.ormatic_interface import SequenceDAO  # type: ignore
 
 _REPO_ROOT = pathlib.Path(__file__).parents[4]
 _APARTMENT_URDF = _REPO_ROOT / "coraplex" / "resources" / "worlds" / "apartment.urdf"
@@ -62,7 +58,9 @@ def _build_hsrb_world() -> World:
         old_root = world.root
         map_body = Body(name=PrefixedName("map"))
         odom = Body(name=PrefixedName("odom_combined"))
-        map_C_odom = Connection6DoF.create_with_dofs(world, map_body, odom)
+        map_C_odom = Connection6DoF.create_with_dofs(
+            world=world, parent=map_body, child=odom
+        )
         world.add_connection(map_C_odom)
         drive = OmniDrive.create_with_dofs(parent=odom, child=old_root, world=world)
         world.add_connection(drive)
@@ -95,14 +93,8 @@ def _random_navigate_action(world: World):
     Return an underspecified :class:`NavigateAction` with randomised pose.
     """
     action = a(NavigateAction)(
-        target_location=a(Pose.from_xyz_rpy)(
-            x=...,
-            y=...,
-            z=0.0,
-            roll=0.0,
-            pitch=0.0,
-            yaw=...,
-            reference_frame=world.root,
+        planar_goal_pose=a(Pose2D.from_xy_yaw)(
+            x=..., y=..., yaw=..., reference_frame=world.root
         ),
     )
     action.limit(n=10)
@@ -221,6 +213,9 @@ def reliability_experiment(
     :param world_building_duration: Pre-measured world building time (s).
     :return: Timing breakdown for this single run.
     """
+    from coraplex.orm.ormatic_interface import Base
+    from cramph.orm.ormatic_interface import SequenceDAO
+
     plan = create_plan(world, plan_size)
 
     t0 = time.perf_counter()

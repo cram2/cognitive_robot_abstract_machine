@@ -25,8 +25,8 @@ from cramph.node import EndedByOwner, SucceedsOnObservingTrue, FailsOnObservingF
 from cramph.context import ContextExtension
 from cramph.data_types import (
     LifeCyclePredicate,
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from cramph.exceptions import (
     NoChildChooserForNodeError,
@@ -44,6 +44,7 @@ from cramph.node import (
     NodeRebuild,
     TerminalNode,
 )
+from cramph.structure_change_recorder import StructureChangeRecorder
 from krrood.exceptions import DataclassException
 from krrood.symbolic_math.symbolic_math import (
     Scalar,
@@ -227,10 +228,24 @@ class ControlStructureNode(CompositeNode, ABC):
         them.
         """
         self._check_accepts_children()
+        self.check_handed_children()
         for node in list(self.nodes):
-            self._check_can_be_a_child(node=node)
-            self._place_child_in_statechart(node=node)
+            self._add_listed_child_to_statechart(node=node)
         self._wire_children()
+
+    def check_handed_children(
+        self, *, taken_over: StatechartNode | None = None
+    ) -> None:
+        """
+        Rejects every handed child :meth:`_check_can_be_a_child` or
+        :meth:`~cramph.node.CompositeNode._add_node_sanity_check` rejects, see
+        :meth:`~cramph.node.CompositeNode.check_handed_children`.
+        """
+        for node in self.nodes:
+            if node is taken_over:
+                continue
+            self._check_can_be_a_child(node=node)
+            self._add_node_sanity_check(node=node)
 
     def check_children(self) -> None:
         """
@@ -297,12 +312,12 @@ class ControlStructureNode(CompositeNode, ABC):
         node = self._as_node(node=node)
         self._check_is_not_a_child(node=node)
         if not self.belongs_to_statechart():
-            self.nodes.insert(position, node)
+            self.insert_child(position=position, node=node)
             return
         self._check_can_be_a_child(node=node)
         self._check_accepts_children()
-        self.nodes.insert(position, node)
-        self._place_child_in_statechart(node=node)
+        self.insert_child(position=position, node=node)
+        self._add_listed_child_to_statechart(node=node)
         self._wire_children()
         if self.statechart.compiler.latest_compile_covers(node=self):
             self.statechart.request_rebuild(node=self)
@@ -441,7 +456,7 @@ class Parallel(EndedByOwner, ControlStructureNode):
             for child in self.nodes
             if rebuild.rebuilt(node=child) is None
             and child.life_cycle_state
-            not in (LifeCycleValues.FAILED, LifeCycleValues.INTERRUPTED)
+            not in (LifeCycleValue.FAILED, LifeCycleValue.INTERRUPTED)
         ]
         rebuilt.minimum_success = max(
             0, self.minimum_success - len(counted_as_succeeded)
@@ -1171,12 +1186,12 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
             handed them, and nothing at all unless `child` failed. Empty as well for a
             child that failed on its own, which no monitor is the reason for.
         """
-        if child.life_cycle_state != LifeCycleValues.FAILED:
+        if child.life_cycle_state != LifeCycleValue.FAILED:
             return []
         return [
             monitor
             for monitor in self.failure_monitors_of(child=child)
-            if monitor.last_observation_state == ObservationStateValues.TRUE
+            if monitor.last_observation_state == ObservationStateValue.TRUE
         ]
 
     @property
@@ -1198,12 +1213,12 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         if self._out_of_children:
             return False
-        if self.life_cycle_state != LifeCycleValues.RUNNING:
+        if self.life_cycle_state != LifeCycleValue.RUNNING:
             return False
         latest_child = self.latest_child
         return latest_child is None or latest_child.life_cycle_state in (
-            LifeCycleValues.FAILED,
-            LifeCycleValues.INTERRUPTED,
+            LifeCycleValue.FAILED,
+            LifeCycleValue.INTERRUPTED,
         )
 
     def choose_child(self) -> None:
@@ -1245,6 +1260,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         self._add_child_to_statechart(node=child)
         self._chosen_children.append(child)
+        self._structure_change_recorder._record_changed_chosen_children(node=self)
         self.success_condition = logic_or(self.success_condition, child.is_succeeded)
         self.statechart.request_rebuild(node=self)
 
@@ -1256,6 +1272,14 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         :param children: Children of this node, in the order they were chosen.
         """
         self._chosen_children = list(children)
+        self._structure_change_recorder._record_changed_chosen_children(node=self)
+
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Also records the chosen children, see :meth:`CompositeNode._record_structure`.
+        """
+        super()._record_structure(recorder=recorder)
+        recorder._record_changed_chosen_children(node=self)
 
     def give_up_on_child_when(
         self, *, child: StatechartNode, failure_monitors: list[StatechartNode]
@@ -1316,7 +1340,7 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         latest_child = self.latest_child
         if latest_child is None:
             return NodeArtifacts(
-                observation=Scalar(float(ObservationStateValues.UNKNOWN))
+                observation=Scalar(float(ObservationStateValue.UNKNOWN))
             )
         return NodeArtifacts(observation=Scalar(latest_child.last_observation))
 

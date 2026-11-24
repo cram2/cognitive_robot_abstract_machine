@@ -1,0 +1,917 @@
+"""
+This module provides mechanisms for mapping symbolic expressions to object domains.
+
+It contains classes for attribute access, indexing, and function calls on symbolic
+expressions.
+"""
+
+from __future__ import annotations
+
+import operator
+import uuid
+from enum import Enum
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from functools import cached_property
+from inspect import isclass
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generic,
+    Iterable,
+    Self,
+    get_args,
+    get_origin,
+)
+
+from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.class_diagrams.call_arguments import CallArguments
+from krrood.class_diagrams.call_signature import CallSignature
+from krrood.class_diagrams.collection_kind import DeclaredValueKind
+from krrood.entity_query_language.core.base_expressions import (
+    UnaryExpression,
+    Bindings,
+    OperationResult,
+    Operand,
+    Selectable,
+    SymbolicExpression,
+    UnificationDict,
+)
+from krrood.entity_query_language.evaluation_context import EvaluationContext
+from krrood.entity_query_language.ground_term import (
+    AttributeTerm,
+    CallTerm,
+    GroundTermExpression,
+    GroundTermType,
+    IndexTerm,
+)
+from krrood.entity_query_language.exceptions import (
+    MultipleValuesAlongAccessPath,
+    NoValueAlongAccessPath,
+    NotNumberLikeFieldError,
+    ReadOnlyMapping,
+    SymbolicDunderAccessError,
+)
+from krrood.entity_query_language.operators.comparator import Comparator
+from krrood.entity_query_language.operators.math_operations import MathOperator
+from krrood.entity_query_language.utils import T
+from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
+from krrood.entity_query_language.class_diagram_lookup import (
+    get_field_type_endpoint,
+    get_method_return_type,
+    get_wrapped_field,
+)
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.operators.arithmetic import (
+        ArithmeticOperation,
+    )
+
+
+def attribute_names_for_completion(type_: Any) -> set[str]:
+    """
+    Collect the non-dunder attribute and annotation names of a type, for interactive
+    completion on expressions that stand for a value of that type.
+
+    :param type_: The value type whose attribute names to collect; anything that is not
+        a class yields no names.
+    :return: The collected names.
+    """
+    names: set[str] = set()
+    if not isinstance(type_, type):
+        return names
+    names.update(
+        name
+        for name in dir(type_)
+        if not (name.startswith("__") and name.endswith("__"))
+    )
+    for klass in type_.__mro__:
+        names.update(getattr(klass, "__annotations__", {}).keys())
+    return names
+
+
+class HasSymbolicOperations(Operand, Generic[T], ABC):
+    """
+    Something that stands for a value of type ``T``, on which every operation builds a
+    symbolic expression instead of computing an answer: reading an attribute, indexing,
+    calling, comparing and arithmetic.
+
+    Implementations differ only in *which* expression the operation is built on, which
+    they report as :attr:`_symbolic_expression_`: an expression that is itself a variable
+    reports itself, while something that merely stands for one - a match, whose lowered
+    query carries its pattern - reports that expression. The operations themselves are
+    written once, here.
+    """
+
+    _type_: type[T] | None
+    """
+    The type of the value this stands for, whose attributes and operations are offered.
+    """
+
+    _id_: uuid.UUID
+    """
+    The identity this is hashed by, since comparing two of these builds a
+    :class:`~krrood.entity_query_language.operators.comparator.Comparator` rather than
+    answering whether they are the same.
+    """
+
+    __iter__ = None
+    """
+    Prevent iteration, which :meth:`__getitem__` would otherwise supply through Python's
+    legacy sequence protocol - endlessly, since every index is a valid expression.
+    """
+
+    @property
+    @abstractmethod
+    def _symbolic_expression_(self) -> CanBehaveLikeAVariable[T]:
+        """
+        :return: The expression every symbolic operation on this is built on.
+        """
+        ...
+
+    def _is_own_name_(self, *, name: str) -> bool:
+        """
+        :param name: A name that this does not define.
+        :return: Whether the name belongs to this object's own machinery rather than to
+            the value type, making a missing one a genuine :class:`AttributeError`. An
+            expression that is itself a variable claims no such names, since the value
+            type may define any of them.
+        """
+        return False
+
+    def __getattr__(self, name: str) -> Attribute[T]:
+        """
+        Read a name that is not this object's own as an attribute of the value type.
+
+        Dunder names are never symbolic: mapping them would let ``copy``, ``pickle`` and
+        anything else probing optional dunder hooks recurse into endless expression
+        creation, and would blur the language's semantics - access a dunder-named member
+        symbolically through a :func:`symbolic_function` instead.
+        :class:`~krrood.entity_query_language.exceptions.SymbolicDunderAccessError` is an
+        :class:`AttributeError` so that such probing still reads it as a missing
+        attribute.
+        """
+        if name.startswith("__") and name.endswith("__"):
+            raise SymbolicDunderAccessError(attribute_name=name)
+        if self._is_own_name_(name=name):
+            raise AttributeError(name)
+        return self._symbolic_expression_._get_mapped_variable_(
+            type_=Attribute, _attribute_name_=name
+        )
+
+    def __dir__(self) -> list[str]:
+        """
+        Surface the value type's attributes for interactive completion.
+
+        :meth:`__getattr__` already makes every public name a valid symbolic attribute,
+        but completion engines list :meth:`__dir__` only - which would otherwise show
+        just this object's own members.
+        """
+        names = set(super().__dir__())
+        names.update(attribute_names_for_completion(self._type_))
+        return sorted(names)
+
+    def __getitem__(self, key: Any) -> Index[T]:
+        indexing = (
+            IndexByExpression if isinstance(key, SymbolicExpression) else IndexByValue
+        )
+        return self._symbolic_expression_._get_mapped_variable_(
+            type_=indexing, _key_=key
+        )
+
+    def __call__(self, *args, **kwargs) -> Call[T]:
+        return self._symbolic_expression_._get_mapped_variable_(
+            type_=Call, _arguments_=CallArguments(positional=args, keyword=kwargs)
+        )
+
+    def __eq__(self, other) -> Comparator:
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.eq
+        )
+
+    def __ne__(self, other) -> Comparator:
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.ne
+        )
+
+    def __lt__(self, other) -> Comparator:
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.lt
+        )
+
+    def __le__(self, other) -> Comparator:
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.le
+        )
+
+    def __gt__(self, other) -> Comparator:
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.gt
+        )
+
+    def __ge__(self, other) -> Comparator:
+        return Comparator(
+            left=self._symbolic_expression_, right=other, operation=operator.ge
+        )
+
+    def _arithmetic_(
+        self, *, other: Any, math_operator: MathOperator
+    ) -> ArithmeticOperation:
+        """
+        Build a binary arithmetic operation with this as the left operand.
+
+        :param other: The right operand.
+        :param math_operator: The operator to apply.
+        :return: The symbolic arithmetic operation.
+        """
+        from krrood.entity_query_language.operators.arithmetic import (
+            ArithmeticOperation,
+        )
+
+        return ArithmeticOperation(
+            left=self._symbolic_expression_, right=other, math_operator=math_operator
+        )
+
+    def _reflected_arithmetic_(
+        self, *, other: Any, math_operator: MathOperator
+    ) -> ArithmeticOperation:
+        """
+        Build a binary arithmetic operation with this as the right operand.
+
+        This is used for the reflected dunders (``other <op> self``) so that the operand
+        order is preserved for non-commutative operators such as subtraction and
+        division.
+
+        :param other: The left operand.
+        :param math_operator: The operator to apply.
+        :return: The symbolic arithmetic operation.
+        """
+        from krrood.entity_query_language.operators.arithmetic import (
+            ArithmeticOperation,
+        )
+
+        return ArithmeticOperation(
+            left=other, right=self._symbolic_expression_, math_operator=math_operator
+        )
+
+    def __add__(self, other) -> ArithmeticOperation:
+        return self._arithmetic_(other=other, math_operator=MathOperator.ADD)
+
+    def __radd__(self, other) -> ArithmeticOperation:
+        return self._reflected_arithmetic_(other=other, math_operator=MathOperator.ADD)
+
+    def __sub__(self, other) -> ArithmeticOperation:
+        return self._arithmetic_(other=other, math_operator=MathOperator.SUBTRACT)
+
+    def __rsub__(self, other) -> ArithmeticOperation:
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.SUBTRACT
+        )
+
+    def __mul__(self, other) -> ArithmeticOperation:
+        return self._arithmetic_(other=other, math_operator=MathOperator.MULTIPLY)
+
+    def __rmul__(self, other) -> ArithmeticOperation:
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.MULTIPLY
+        )
+
+    def __truediv__(self, other) -> ArithmeticOperation:
+        return self._arithmetic_(other=other, math_operator=MathOperator.DIVIDE)
+
+    def __rtruediv__(self, other) -> ArithmeticOperation:
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.DIVIDE
+        )
+
+    def __floordiv__(self, other) -> ArithmeticOperation:
+        return self._arithmetic_(other=other, math_operator=MathOperator.FLOOR_DIVIDE)
+
+    def __rfloordiv__(self, other) -> ArithmeticOperation:
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.FLOOR_DIVIDE
+        )
+
+    def __mod__(self, other) -> ArithmeticOperation:
+        return self._arithmetic_(other=other, math_operator=MathOperator.MODULO)
+
+    def __rmod__(self, other) -> ArithmeticOperation:
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.MODULO
+        )
+
+    def __pow__(self, other) -> ArithmeticOperation:
+        return self._arithmetic_(other=other, math_operator=MathOperator.POWER)
+
+    def __rpow__(self, other) -> ArithmeticOperation:
+        return self._reflected_arithmetic_(
+            other=other, math_operator=MathOperator.POWER
+        )
+
+    def __neg__(self) -> ArithmeticOperation:
+        from krrood.entity_query_language.operators.arithmetic import (
+            UnaryArithmeticOperation,
+        )
+
+        return UnaryArithmeticOperation(
+            _child_=self._symbolic_expression_, math_operator=MathOperator.NEGATE
+        )
+
+    def __hash__(self):
+        return hash(self._id_)
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
+    """
+    An expression the symbolic operations attach to: it is the value they are built on,
+    and it holds the mappings taken from it, so writing the same one twice gives one
+    node rather than two.
+
+    :class:`HasSymbolicOperations` says what can be written; this says what it is written
+    on. Anything that stands for a value but is no expression - a match - implements the
+    former alone and reports one of these as :attr:`_symbolic_expression_`.
+    """
+
+    _known_mapped_variables_: dict[MappedVariableCacheItem, MappedVariable] = field(
+        init=False, default_factory=dict
+    )
+    """
+    A storage of created MappedVariable instances to prevent recreating same mapping
+    multiple times.
+    """
+
+    @property
+    def _symbolic_expression_(self) -> CanBehaveLikeAVariable[T]:
+        """
+        :return: This variable, which is what its own operations are built on.
+        """
+        return self
+
+    @property
+    def _expression_read_from_(self) -> CanBehaveLikeAVariable | None:
+        """
+        The expression whose value this one's values are read from along an access path,
+        which is none for an expression at the root of one.
+        """
+        return None
+
+    @property
+    def _declared_value_kind_(self) -> DeclaredValueKind:
+        """
+        What this expression is declared to evaluate to, which is undeclared unless the
+        expression reads a value whose annotation says it.
+        """
+        return DeclaredValueKind.UNDECLARED
+
+    def _get_mapped_variable_(
+        self, *, type_: type[MappedVariable], **kwargs
+    ) -> MappedVariable:
+        """
+        Retrieves or creates a MappedVariable instance based on the provided arguments.
+
+        :param type_: The type of the MappedVariable to retrieve or create.
+        :param kwargs: Keyword arguments to pass to the MappedVariable constructor.
+        :return: The retrieved or created MappedVariable instance.
+        """
+        cache_item = MappedVariableCacheItem(
+            mapping_type=type_,
+            constructor_arguments=CallSignature.from_callable(callee=type_).bind(
+                arguments=CallArguments(keyword={"_child_": self, **kwargs})
+            ),
+        )
+        if cache_item in self._known_mapped_variables_:
+            return self._known_mapped_variables_[cache_item]
+        instance = type_(_child_=self, **kwargs)
+        self._known_mapped_variables_[cache_item] = instance
+        return instance
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
+    """
+    A symbolic expression the maps the values of symbolic variables.
+    """
+
+    _child_: CanBehaveLikeAVariable[T]
+    """
+    The child expression to apply the mapping to.
+    """
+
+    _rerooted_chains_: dict[uuid.UUID, MappedVariable] = field(
+        init=False, default_factory=dict
+    )
+    """
+    This chain rebuilt on other roots, keyed by the identifier of each new root.
+
+    Roots are identified rather than held, because comparing two symbolic expressions
+    builds a comparison instead of answering whether they are the same.
+    """
+
+    def __post_init__(self):
+        self._var_ = self
+        super().__post_init__()
+        self._update_type_()
+
+    def _node_for_new_position_(self) -> MappedVariable:
+        """:return: This variable itself — mapped variables are shared-identity singletons, not cloned."""
+        return self
+
+    def _update_type_(self) -> None:
+        """
+        Update the `_type_` attribute.
+        """
+        # Default implementation is that the type is the child type.
+        self._type_ = self._child_._type_ if self._type_ is None else self._type_
+
+    def _evaluate__(
+        self,
+        *,
+        sources: OperationResult,
+    ) -> Iterable[OperationResult]:
+        """
+        Apply the mapping to the child's values.
+        """
+        yield from (
+            self._build_operation_result_(
+                bindings=child_result.bindings | {self._id_: mapped_value},
+                child_result=child_result,
+            )
+            for child_result in self._child_._evaluate_(sources=sources)
+            for mapped_value in self._apply_mapping_(
+                value=child_result.value, sources=sources
+            )
+        )
+
+    @abstractmethod
+    def _apply_mapping_(
+        self, *, value: Any, sources: OperationResult | None = None
+    ) -> Iterable[T]:
+        """
+        Apply the mapping to a value from the child variable.
+
+        :param value: The value to map.
+        :param sources: The bindings from the evaluation context.
+        """
+        pass
+
+    @abstractmethod
+    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
+        """
+        :param child: The expression to apply this mapping to.
+        :return: This mapping applied to ``child``.
+        """
+
+    def _reroot_on_(
+        self, *, root: CanBehaveLikeAVariable, replaced: SymbolicExpression
+    ) -> CanBehaveLikeAVariable:
+        """
+        Rebuild this mapping chain on top of another expression.
+
+        Each mapping is rebuilt once per root, so chains that share a mapping still
+        share it afterwards and keep ranging over the same values.
+
+        .. note::
+            The root alone identifies a rebuild: ``replaced`` is either this chain's
+            own base or a step within it, both fixed once the chain exists.
+
+        :param root: The expression to place at the base of the rebuilt chain.
+        :param replaced: The expression ``root`` takes the place of, which is this
+            chain's own base unless a step within the chain names the new root.
+        :return: The mappings applied after ``replaced``, in the same order, on top of
+            ``root``.
+        """
+        if self._id_ == replaced._id_:
+            return root
+        if root._id_ in self._rerooted_chains_:
+            return self._rerooted_chains_[root._id_]
+        if isinstance(self._child_, MappedVariable):
+            rebuilt_child = self._child_._reroot_on_(root=root, replaced=replaced)
+        elif self._child_._id_ == replaced._id_:
+            rebuilt_child = root
+        else:
+            rebuilt_child = self._child_
+        self._rerooted_chains_[root._id_] = self._rebuild_on_(child=rebuilt_child)
+        return self._rerooted_chains_[root._id_]
+
+    @property
+    def _expression_read_from_(self) -> CanBehaveLikeAVariable:
+        """
+        Overrides :attr:`CanBehaveLikeAVariable._expression_read_from_`: the child this
+        mapping is applied to.
+        """
+        return self._child_
+
+    @property
+    def _access_path_(self) -> list[Self]:
+        """
+        :return: The access path of the variable as a list of operations.
+        """
+        current = self
+        result = [current]
+        while current._expression_read_from_ is not None:
+            current = current._expression_read_from_
+            result.append(current)
+        return result[:-1][::-1]
+
+    @property
+    def _chain_root_(self) -> CanBehaveLikeAVariable:
+        """
+        :return: The first non-:class:`MappedVariable` expression at the base of this
+            mapping chain (e.g. the ``robot`` variable behind ``robot.arm.joint``).
+        """
+        current = self
+        while isinstance(current, MappedVariable):
+            current = current._child_
+        return current
+
+    @property
+    def _variable_rooted_(self) -> SymbolicExpression:
+        """
+        :return: This chain re-rooted onto the variable its root selects, when that root
+            is a query, or else this chain as written.
+        :raises AmbiguousQueryAttribute: If it is rooted at a query selecting several
+            variables, which leaves the chain no single subject to be re-rooted onto.
+        """
+        return self._chain_root_._rerooted_on_selection_(chain=self)
+
+    def _set_external_root_instance_value_(self, *, instance: Any, value: Any):
+        """
+        Set the field of the instance at this access path to the given value.
+
+        This modifies instance in-place.
+
+        .. warning::
+            This method is only for use cases where symbolic access is needed outside of EQLs query evaluation.
+
+
+        :param instance: The instance to be updated.
+        :param value: The value to set.
+        :raises MultipleValuesAlongAccessPath: If a step reaches more than one value,
+            leaving the rest of the chain without one value to follow.
+        :raises NoValueAlongAccessPath: If a step reaches no value at all, leaving the
+            rest of the chain with nothing to follow.
+        """
+        current = instance
+        for domain_mapping in self._access_path_[:-1]:
+            current = self._value_reached_by_(step=domain_mapping, instance=current)
+
+        self._set_child_instance_value_(instance=current, value=value)
+
+    def _set_child_instance_value_(self, *, instance: Any, value: Any):
+        """
+        Set the field of the instance using this operation to the given value.
+
+        This modifies instance in-place.
+
+        Two mappings name where their value is kept and so override this: an
+        :class:`Attribute` names a field, and an :class:`IndexByValue` names the key an
+        element is stored under. The other two do not, and a value cannot be written
+        through either: a :class:`Call` computes its value, and an
+        :class:`IndexByExpression` names which elements to reach rather than where one
+        of them lives.
+
+        Naming such a place is a separate question from how many values a mapping
+        reaches. A call reaches exactly one value and still cannot be written through,
+        because it computes that value rather than reading it from somewhere.
+
+        :param instance: The instance to be updated.
+        :param value: The value to set.
+        :raises ReadOnlyMapping: If this mapping does not name where its value is kept.
+        """
+        raise ReadOnlyMapping(mapping=self)
+
+    def apply_mapping_on_external_root(self, *, instance: Any) -> T:
+        """
+        Follow this chain from a value outside query evaluation, applying each mapping
+        along the access path in turn.
+
+        A pattern met along the way, such as a :class:`~krrood.entity_query_language.query.match.Match`,
+        stands for the instance it describes: an attribute of it is the value the pattern
+        states for that attribute.
+
+        .. warning::
+            This is only for use cases where symbolic access is needed outside of EQL's
+            query evaluation.
+
+        :param instance: The value to follow the chain from.
+        :return: The value the chain leads to.
+        :raises MultipleValuesAlongAccessPath: If a step reaches more than one value,
+            leaving the rest of the chain without one value to follow.
+        :raises NoValueAlongAccessPath: If a step reaches no value at all, leaving the
+            rest of the chain with nothing to follow.
+        """
+        current = instance
+        for domain_mapping in self._access_path_:
+            current = self._value_reached_by_(step=domain_mapping, instance=current)
+        return current
+
+    def _value_reached_by_(self, *, step: MappedVariable, instance: Any) -> Any:
+        """
+        :param step: One step of this chain's access path.
+        :param instance: The value that step is applied to.
+        :return: The one value the step reaches from it.
+        :raises MultipleValuesAlongAccessPath: If the step reaches one value per element
+            rather than a single one.
+        :raises NoValueAlongAccessPath: If the step reaches no value -- an attribute the
+            instance does not have, or a key nothing is stored under. Reported as itself,
+            since the exhaustion it is read from would otherwise surface far away as an
+            unrelated failure of whatever generator is following the chain.
+        """
+        if not isinstance(step, SingleValueMapping):
+            raise MultipleValuesAlongAccessPath(chain=self, step=step)
+        for reached in step._apply_mapping_on_external_value_(value=instance):
+            return reached
+        raise NoValueAlongAccessPath(chain=self, step=step, instance=instance)
+
+    def get_clean_name_from_mapped_variable(self) -> str:
+        """
+        Get a clean name from a mapped variable by joining its attribute names.
+
+        :return: The clean name.
+        """
+        names = []
+        for step in self._access_path_:
+            if isinstance(step, Attribute):
+                names.append(step._attribute_name_)
+        return ".".join(names)
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class SingleValueMapping(MappedVariable[T], GroundTermExpression[GroundTermType], ABC):
+    """
+    A mapping that reaches a single value, fully determined by the expression it is
+    applied to and its own arguments.
+
+    Two occurrences of one therefore denote the same value and share the node
+    :meth:`CanBehaveLikeAVariable._get_mapped_variable_` gives them.
+
+    ..note::
+        The guarantee is *at most* one value. An attribute reaches no value when the
+        instance does not have that attribute, and an index by a value reaches no value
+        when nothing is stored under that key.
+    """
+
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return (self._child_,)
+
+    def _apply_mapping_(
+        self, *, value: Any, sources: OperationResult | None = None
+    ) -> Iterable[T]:
+        term_value = EvaluationContext.current_value_of_term(
+            term=self._ground_term_(operand_values=(value,))
+        )
+        if term_value is not None:
+            yield term_value.value
+
+    def _apply_mapping_on_external_value_(self, *, value: Any) -> Iterable[T]:
+        """
+        :param value: A value outside query evaluation.
+        :return: The value this mapping reaches from it, or nothing when it reaches none.
+        """
+        return self._apply_mapping_(value=value)
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class Attribute(SingleValueMapping[T, AttributeTerm]):
+    """
+    A symbolic attribute that can be used to access attributes of symbolic variables.
+
+    For instance, if Body.name is called, then the attribute name is "name" and
+    `_owner_class_` is `Body`
+    """
+
+    _attribute_name_: str
+    """
+    The name of the attribute.
+    """
+
+    @cached_property
+    def _owner_class_(self) -> type | None:
+        """
+        The class that owns this attribute.
+        """
+        return self._child_._type_
+
+    def _update_type_(self) -> None:
+        """
+        Update the `_type_` attribute with the type of the values of this attribute.
+        """
+        self._type_ = get_field_type_endpoint(self._owner_class_, self._attribute_name_)
+
+    @cached_property
+    def _declared_value_kind_(self) -> DeclaredValueKind:
+        """
+        Overrides :attr:`CanBehaveLikeAVariable._declared_value_kind_`: the kind the
+        annotation of the attribute's field declares.
+        """
+        if not isinstance(self._owner_class_, type):
+            return DeclaredValueKind.UNDECLARED
+        wrapped_field = get_wrapped_field(self._owner_class_, self._attribute_name_)
+        if wrapped_field is None:
+            return DeclaredValueKind.UNDECLARED
+        return wrapped_field.declared_value_kind
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> AttributeTerm:
+        (instance,) = operand_values
+        return AttributeTerm(instance=instance, attribute_name=self._attribute_name_)
+
+    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(
+            type_=Attribute, _attribute_name_=self._attribute_name_
+        )
+
+    def _apply_mapping_on_external_value_(self, *, value: Any) -> Iterable[T]:
+        """
+        :param value: A value outside query evaluation.
+        :return: The value of this attribute, which for a pattern is the value it states.
+        """
+        if isinstance(value, HasFactoryAndKwargs):
+            return value._stated_values_(keyword=self._attribute_name_)
+        return self._apply_mapping_(value=value)
+
+    @property
+    def _name_(self):
+        return f"{self._child_._name_}.{self._attribute_name_}"
+
+    def _set_child_instance_value_(self, *, instance: Any, value: Any):
+        setattr(instance, self._attribute_name_, value)
+
+    def number_like_field(self) -> Self:
+        """
+        Assert this attribute resolves to an integer or floating-point type that is
+        neither a boolean nor an enumeration.
+
+        :return: This attribute.
+        :raises AmbiguousQueryAttribute: If this attribute is chain-rooted at a query
+            that selects more than one variable, so it has no single subject to resolve
+            its type from.
+        :raises NotNumberLikeFieldError: If this attribute does not exist or is not
+            number-like.
+        """
+        resolved_type = self._variable_rooted_._type_
+        is_number_like = (
+            isclass(resolved_type)
+            and issubclass(resolved_type, (int, float))
+            and not issubclass(resolved_type, (bool, Enum))
+        )
+        if not is_number_like:
+            raise NotNumberLikeFieldError(attribute=self, resolved_type=resolved_type)
+        return self
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class Index(MappedVariable[T], ABC):
+    """
+    A variable created by indexing its child by a key.
+
+    What the key is decides how many values the indexing reaches, so the two kinds are
+    separate: see :class:`IndexByValue` and :class:`IndexByExpression`.
+    """
+
+    _key_: Any
+    """
+    The key to index with.
+    """
+
+    def _update_type_(self) -> None:
+        """
+        Narrow ``_type_`` to the child's element type: indexing a ``List[X]``-like
+        attribute reaches a single ``X``, not the container type itself.
+
+        Without this, an indexed attribute's ``_type_`` stayed the child's raw container
+        type (e.g. ``List[PlanNode]``), which later broke any ``issubclass()`` check
+        against it -- subscripted generics aren't valid ``issubclass()`` arguments.
+        """
+        if self._type_ is not None:
+            return
+        child_type = self._child_._type_
+        args = get_args(child_type)
+        self._type_ = args[0] if args else child_type
+
+    @property
+    def _name_(self):
+        return f"{self._child_._var_._name_}[{repr(self._key_)}]"
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class IndexByValue(Index[T], SingleValueMapping[T, IndexTerm]):
+    """
+    Indexing by a key that is a plain value, which reaches the one element stored under
+    it.
+    """
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> IndexTerm:
+        (container,) = operand_values
+        return IndexTerm(container=container, key=self._key_)
+
+    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(type_=IndexByValue, _key_=self._key_)
+
+    def _set_child_instance_value_(self, *, instance: Any, value: Any):
+        instance[self._key_] = value
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class IndexByExpression(Index[T], GroundTermExpression[IndexTerm]):
+    """
+    Indexing by a key that is itself an expression, which reaches one element per value
+    that expression takes.
+
+    A row of a query is the exception: it is keyed by the expressions it binds, so
+    indexing it by one of them reaches the single value bound to it.
+    """
+
+    @property
+    def _ground_term_operands_(self) -> tuple[SymbolicExpression, ...]:
+        return self._child_, self._key_
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> IndexTerm:
+        container, key = operand_values
+        return IndexTerm(container=container, key=key)
+
+    def _apply_mapping_(
+        self, *, value: Any, sources: OperationResult | None = None
+    ) -> Iterable[T]:
+        if isinstance(value, UnificationDict) and self._key_ in value:
+            yield value[self._key_]
+            return
+        for key in self._key_._evaluate_(sources=sources):
+            term_value = EvaluationContext.current_value_of_term(
+                term=self._ground_term_(operand_values=(value, key.value))
+            )
+            if term_value is not None:
+                yield term_value.value
+
+    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(type_=IndexByExpression, _key_=self._key_)
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
+class Call(SingleValueMapping[T, CallTerm]):
+    """
+    A variable created through a function call operation on its child variable.
+    """
+
+    _arguments_: CallArguments = field(default_factory=CallArguments)
+    """
+    The arguments the called value is called with.
+    """
+
+    def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> CallTerm:
+        (callee,) = operand_values
+        return CallTerm.from_call(callee=callee, arguments=self._arguments_)
+
+    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
+        return child._get_mapped_variable_(type_=Call, _arguments_=self._arguments_)
+
+    @property
+    def _name_(self):
+        return f"{self._child_._var_._name_}()"
+
+    def _update_type_(self) -> None:
+        """
+        Read the called value's return type.
+
+        The child stands either for a callable itself - a function or method, whose own
+        hints carry the return type - or for an instance of a class that defines
+        ``__call__``, where the return type is that method's. A method is not a field
+        though, so an attribute naming one resolves to no type of its own; the return
+        annotation is then read off the method on its owner class instead. An
+        unannotated callable leaves the type unknown.
+        """
+        called = self._child_._type_
+        if called is not None:
+            type_hints = get_type_hints_of_object(called)
+            if (
+                "return" not in type_hints
+                and isclass(called)
+                and "__call__" in dir(called)
+            ):
+                type_hints = get_type_hints_of_object(called.__call__)
+            self._type_ = type_hints.get("return")
+            return
+        if isinstance(self._child_, Attribute):
+            self._type_ = get_method_return_type(
+                self._child_._owner_class_, self._child_._attribute_name_
+            )
+
+
+@dataclass(kw_only=True, frozen=True)
+class MappedVariableCacheItem:
+    """
+    What identifies a mapped variable among those taken from one variable: two writings
+    of the same mapping give equal cache items.
+    """
+
+    mapping_type: type[MappedVariable]
+    """
+    The mapping to create, e.g. :class:`Attribute` or :class:`Call`.
+    """
+
+    constructor_arguments: CallArguments
+    """
+    The arguments the mapping is constructed with, its child first.
+    """

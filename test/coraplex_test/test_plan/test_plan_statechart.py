@@ -34,14 +34,13 @@ from cramph.composites import (
     Sequence,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.nodes_for_testing import ConstTrueNode, NodeFailingOnObservingFalse
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.graph_node import EndMotion
-from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.factories import a, variable
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -49,11 +48,8 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
-from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Milk,
-    Spoon,
-)
-from krrood_spatial_math.spatial_types import Pose
+from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from ...plan_running import robot_executor, run_plan, simulated_executor, statechart_of
 from ...statechart_json_round_trip import StatechartSentThroughJSON
@@ -61,13 +57,15 @@ from ...statechart_json_round_trip import StatechartSentThroughJSON
 # %% helpers
 
 
-def _pose_in_front_of_the_robot(world, robot) -> Pose:
+def _pose_in_front_of_the_robot(world, robot) -> Pose2D:
     """
-    :return: A pose in the world frame, a few centimetres in front of where the robot
-        stands now.
+    :return: A pose on the floor in the world frame, a few centimetres in front of where
+        the robot stands now.
     """
-    return world.transform(
-        Pose.from_xyz_rpy(x=0.05, reference_frame=robot.root), world.root
+    return Pose2D.from_pose(
+        world.transform(
+            Pose.from_xyz_rpy(x=0.05, reference_frame=robot.root), world.root
+        )
     )
 
 
@@ -93,7 +91,7 @@ class RecordingLocationInFrontOfTheRobot(Location):
     Whether the torso stood high, once per sampling.
     """
 
-    def candidates(self) -> Iterator[Pose]:
+    def candidates(self) -> Iterator[Pose2D]:
         torso_high = self.robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
         self.torso_high_when_sampled.append(torso_high.is_achieved())
         yield _pose_in_front_of_the_robot(self.world, self.robot)
@@ -105,6 +103,10 @@ class RecordingLocationInFrontOfTheRobot(Location):
 def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
     pr2_apartment_context,
 ) -> None:
+    """
+    An action grounded in the middle of a sequence runs in the same statechart as the
+    steps around it, which ends once.
+    """
     world, robot, extensions = pr2_apartment_context
     torso = MoveTorsoAction(torso_state=TorsoState.HIGH)
     plan = Sequence(
@@ -112,8 +114,8 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
             torso,
             StatementNode(
                 statement=a(NavigateAction)(
-                    target_location=variable(
-                        Pose, domain=[_pose_in_front_of_the_robot(world, robot)]
+                    planar_goal_pose=variable(
+                        Pose2D, domain=[_pose_in_front_of_the_robot(world, robot)]
                     )
                 )
             ),
@@ -128,12 +130,16 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
     assert navigate.statechart is statechart
     assert torso.statechart is statechart
     assert len(statechart.get_nodes_by_type(node_type=EndMotion)) == 1
-    assert plan.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before_left(
     pr2_apartment_context,
 ) -> None:
+    """
+    An underspecified action is grounded in the world as the steps before it left it,
+    not as it was when the plan was built.
+    """
     world, robot, extensions = pr2_apartment_context
     torso_high = robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
     assert not torso_high.is_achieved()
@@ -144,7 +150,7 @@ def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             StatementNode(
                 statement=a(NavigateAction)(
-                    target_location=variable(Pose, domain=location)
+                    planar_goal_pose=variable(Pose2D, domain=location)
                 )
             ),
         ]
@@ -187,12 +193,18 @@ def test_actions_with_the_same_parameters_are_different_nodes() -> None:
 def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     pr2_apartment_context,
 ) -> None:
+    """
+    The pick-up to the left of a place in a sequence is the one preceding it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.left_arm,
+        graspable=milk,
+        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
     statechart = Statechart(context=simulated_executor(extensions).context)
 
@@ -207,12 +219,19 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
 def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     pr2_apartment_context,
 ) -> None:
+    """
+    A pause around the place makes the pick-up a sibling of its parent, which still
+    counts as preceding it.
+    """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+    )
     place = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        arm=robot.left_arm,
+        graspable=milk,
+        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
     )
     paused_place = PausedUntilTrue(monitor=ConstTrueNode(), monitored_node=place)
     statechart = Statechart(context=simulated_executor(extensions).context)
@@ -223,72 +242,6 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
         statechart.get_preceding_node_by_type(node=place, node_type=PickUpAction)
         is pick_up
     )
-
-
-def test_a_place_after_several_pick_ups_uses_the_arm_that_picked_its_object(
-    pr2_apartment_context,
-) -> None:
-    world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
-    place_milk = PlaceAction(
-        object_designator=milk,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
-    )
-    statechart = Statechart(context=simulated_executor(extensions).context)
-
-    statechart.add_node(
-        node=Sequence(
-            nodes=[
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
-                PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.right_arm),
-                place_milk,
-            ]
-        )
-    )
-
-    moved_tool_frames = {
-        node.tip_link
-        for node in place_milk.descendants
-        if isinstance(node, CartesianPose)
-    }
-    assert moved_tool_frames == {robot.left_arm.end_effector.tool_frame}
-
-
-def test_a_place_after_an_earlier_place_uses_the_arm_that_picked_its_object(
-    pr2_apartment_context,
-) -> None:
-    world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
-    place_spoon = PlaceAction(
-        object_designator=spoon,
-        target_location=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
-    )
-    statechart = Statechart(context=simulated_executor(extensions).context)
-
-    statechart.add_node(
-        node=Sequence(
-            nodes=[
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
-                PlaceAction(
-                    object_designator=milk,
-                    target_location=Pose.from_xyz_rpy(
-                        0.8, -1.5, 0.7, reference_frame=world.root
-                    ),
-                ),
-                PickUpAction(grasp=spoon.grasp_candidates()[0], arm=robot.right_arm),
-                place_spoon,
-            ]
-        )
-    )
-
-    moved_tool_frames = {
-        node.tip_link
-        for node in place_spoon.descendants
-        if isinstance(node, CartesianPose)
-    }
-    assert moved_tool_frames == {robot.right_arm.end_effector.tool_frame}
 
 
 # %% running on the robot
@@ -351,9 +304,11 @@ def test_a_sent_plan_compiles_without_what_its_actions_read_to_expand(
             nodes=[
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
                 NavigateAction(
-                    target_location=_pose_in_front_of_the_robot(world, robot)
+                    planar_goal_pose=_pose_in_front_of_the_robot(world, robot)
                 ),
-                PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.left_arm),
+                PickUpAction(
+                    grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
+                ),
             ]
         ),
     )
@@ -376,7 +331,7 @@ def test_an_underspecified_node_is_sent_as_a_node_choosing_its_child(
     itself, and not the statement it is grounded from.
     """
     world, robot, extensions = pr2_apartment_context
-    node = StatementNode(statement=a(NavigateAction)(target_location=...))
+    node = StatementNode(statement=a(NavigateAction)(planar_goal_pose=...))
 
     received = from_json(json.loads(json.dumps(to_json(node))))
 
@@ -387,6 +342,10 @@ def test_an_underspecified_node_is_sent_as_a_node_choosing_its_child(
 def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions(
     pr2_apartment_context, monkeypatch
 ) -> None:
+    """
+    A plan run on the robot is sent once, with the executor's chooser grounding its
+    actions.
+    """
     world, robot, extensions = pr2_apartment_context
     giskard = GiskardRecordingTheGoal()
     monkeypatch.setattr(
@@ -397,8 +356,8 @@ def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             StatementNode(
                 statement=a(NavigateAction)(
-                    target_location=variable(
-                        Pose, domain=[_pose_in_front_of_the_robot(world, robot)]
+                    planar_goal_pose=variable(
+                        Pose2D, domain=[_pose_in_front_of_the_robot(world, robot)]
                     )
                 )
             ),
@@ -515,7 +474,7 @@ def test_a_plan_that_fails_on_the_robot_raises_motion_did_not_finish(
         "GiskardClientExecutor",
         lambda node_handle, context: GiskardTickingTheGoalUntilItEnded(),
     )
-    plan = NodeFailingOnObservingFalse(observation=ObservationStateValues.FALSE)
+    plan = NodeFailingOnObservingFalse(observation=ObservationStateValue.FALSE)
     executor = robot_executor(extensions)
     executor.compile(statechart=statechart_of(executor, plan))
 
@@ -523,12 +482,16 @@ def test_a_plan_that_fails_on_the_robot_raises_motion_did_not_finish(
         executor.execute()
 
     assert failure.value.unfinished_motions == [plan]
-    assert plan.life_cycle_state == LifeCycleValues.FAILED
+    assert plan.life_cycle_state == LifeCycleValue.FAILED
 
 
 def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empty(
     pr2_apartment_context, monkeypatch
 ) -> None:
+    """
+    An underspecified action left without candidates on the robot fails, naming itself
+    as empty.
+    """
     world, robot, extensions = pr2_apartment_context
     monkeypatch.setattr(
         executors,
@@ -536,7 +499,7 @@ def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empt
         lambda node_handle, context: GiskardTickingTheGoalUntilItEnded(),
     )
     plan = StatementNode(
-        statement=a(NavigateAction)(target_location=variable(Pose, domain=[]))
+        statement=a(NavigateAction)(planar_goal_pose=variable(Pose2D, domain=[]))
     )
     executor = robot_executor(extensions)
     executor.compile(statechart=statechart_of(executor, plan))
@@ -559,7 +522,7 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     sent.add_node(
         node=(
             action := SetGripperAction(
-                configuration=robot.left_arm.end_effector.default_configuration(
+                gripper_configuration=robot.left_arm.end_effector.default_configuration(
                     GripperState.OPEN
                 )
             )
@@ -589,7 +552,8 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     sent.add_node(
         node=(
             action := FaceAndLookAtAction(
-                face_at=FaceAtAction(target=target), look_at=LookAtAction(target=target)
+                face_at=FaceAtAction(look_target=target),
+                look_at=LookAtAction(look_target=target),
             )
         )
     )
