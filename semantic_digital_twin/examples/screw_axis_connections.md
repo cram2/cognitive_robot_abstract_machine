@@ -30,7 +30,9 @@ per unit of position is a unit vector, so the position of a prismatic connection
 
 The screw axis is given in the *connection frame*. `parent_T_connection_expression` places the
 connection frame relative to the parent, and `connection_T_child_expression` places the child relative
-to the connection frame, so a child set off from the axis swings around it. Joints read from robot and
+to the connection frame. The child's own frame need not lie on the axis: a door whose frame is at its
+centre swings around the hinge at its edge, and the child in the figure below, 15 centimeters from the
+axis, circles it. Joints read from robot and
 scene descriptions put the axis through the connection frame's origin, as the examples below do; the
 axis may also lie elsewhere, as {ref}`Where the axis lies <where-the-axis-lies>` explains.
 
