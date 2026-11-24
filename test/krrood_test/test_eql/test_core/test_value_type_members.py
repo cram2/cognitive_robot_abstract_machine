@@ -14,6 +14,7 @@ from krrood.entity_query_language.core.mapped_variable import (
     Attribute,
     CallWithExpressionArguments,
     CallWithValueArguments,
+    ExpressionMemberOrDomainField,
 )
 from krrood.entity_query_language.factories import an, entity, variable
 
@@ -112,3 +113,27 @@ def test_every_public_method_of_a_variable_steps_aside_for_a_field_of_its_name()
             ledger.conclusions_of_type,
         )
     ] == [Attribute] * 4
+
+
+def test_a_property_steps_aside_for_a_field_of_its_name():
+    """
+    A property of a variable reads the field of the value type with its name.
+    """
+    first = ExpressionMemberOrDomainField(
+        member_name="first", member=property(lambda expression: 2017)
+    )
+    period = variable(Period, domain=[])
+
+    assert type(first.__get__(period, type(period))) is Attribute
+
+
+def test_a_property_stays_a_property_when_no_field_has_its_name():
+    """
+    Without a field of its name, a property of a variable reads the property.
+    """
+    first = ExpressionMemberOrDomainField(
+        member_name="first", member=property(lambda expression: 2017)
+    )
+    tax_year = variable(TaxYear, domain=[])
+
+    assert first.__get__(tax_year, type(tax_year)) == 2017

@@ -299,20 +299,26 @@ class ValueCombination:
     The value of each variable, in the order of the variables.
     """
 
+    @property
+    def identities(self) -> tuple[int, ...]:
+        """
+        The identities of :attr:`values`, which holding the values keeps from being
+        reused.
+        """
+        return tuple(id(value) for value in self.values)
+
     def __hash__(self) -> int:
         """
-        :return: A hash of the identities of the values.
+        :return: A hash of :attr:`identities`.
         """
-        return hash(tuple(id(value) for value in self.values))
+        return hash(self.identities)
 
     def __eq__(self, other: object) -> bool:
         """
         :return: Whether *other* holds the very same objects in the same order.
         """
         return (
-            isinstance(other, ValueCombination)
-            and len(self.values) == len(other.values)
-            and all(mine is theirs for mine, theirs in zip(self.values, other.values))
+            isinstance(other, ValueCombination) and self.identities == other.identities
         )
 
 

@@ -340,58 +340,70 @@ class HasSymbolicOperations(Operand, Generic[T], ABC):
 
 
 @dataclass(kw_only=True)
-class ExpressionMethodOrDomainField:
+class ExpressionMemberOrDomainField:
     """
-    A public method of a variable that steps aside for a dataclass field of the same
-    name on the variable's value type: on such a variable the name reads that field
-    symbolically, like any other attribute of the value type.
-    """
-
-    method: Callable
-    """
-    The method the name refers to when the value type declares no such field.
+    A public method or property of a variable that steps aside for a dataclass field of
+    the same name on the variable's value type: on such a variable the name reads that
+    field symbolically, like any other attribute of the value type.
     """
 
-    def __get__(
-        self, instance: CanBehaveLikeAVariable | None, owner: type
-    ) -> Callable | Attribute:
+    member_name: str
+    """
+    The name the member and the field share.
+    """
+
+    member: Any
+    """
+    The method or property the name refers to when the value type declares no such
+    field.
+    """
+
+    def __get__(self, instance: CanBehaveLikeAVariable | None, owner: type) -> Any:
         """
-        :return: The field of the instance's value type with the method's name where
-            that type declares one, otherwise the method.
+        :return: The field of the instance's value type with the member's name where
+            that type declares one, otherwise the member.
         """
         if instance is None:
-            return self.method
+            return self.member
         value_type = instance._type_
-        if is_dataclass(value_type) and self.method.__name__ in {
+        if is_dataclass(value_type) and self.member_name in {
             field_.name for field_ in fields(value_type)
         }:
             return instance._get_mapped_variable_(
-                type_=Attribute, _attribute_name_=self.method.__name__
+                type_=Attribute, _attribute_name_=self.member_name
             )
-        return self.method.__get__(instance, owner)
+        return self.member.__get__(instance, owner)
 
 
-class DomainFieldsOverrideExpressionMethods(ABC):
+class DomainFieldsOverrideExpressionMembers(ABC):
     """
     An interface for variables whose value type may declare dataclass fields named like
-    a public method of :class:`SymbolicExpression`, such as ``first``; on such a
-    variable those names read the field.
+    a public method or property of :class:`SymbolicExpression`, such as ``first``; on
+    such a variable those names read the field.
+
+    .. note::
+        A public dataclass field of :class:`SymbolicExpression` could not step aside:
+        its value lives on the instance, where it is read before any class attribute.
     """
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """
-        Let a field of the value type take the name of every public method of
-        :class:`SymbolicExpression` that the subclass inherits without overriding it.
+        Let a field of the value type take the name of every public method and property
+        of :class:`SymbolicExpression` that the subclass inherits without overriding it.
         """
         super().__init_subclass__(**kwargs)
         for name in dir(SymbolicExpression):
-            method = getattr_static(SymbolicExpression, name)
+            member = getattr_static(SymbolicExpression, name)
             if (
                 not name.startswith("_")
-                and isfunction(method)
-                and getattr_static(cls, name, None) is method
+                and (isfunction(member) or isinstance(member, property))
+                and getattr_static(cls, name, None) is member
             ):
-                setattr(cls, name, ExpressionMethodOrDomainField(method=method))
+                setattr(
+                    cls,
+                    name,
+                    ExpressionMemberOrDomainField(member_name=name, member=member),
+                )
 
 
 # %% variables
@@ -399,7 +411,7 @@ class DomainFieldsOverrideExpressionMethods(ABC):
 
 @dataclass(kw_only=True, eq=False, repr=False)
 class CanBehaveLikeAVariable(
-    DomainFieldsOverrideExpressionMethods,
+    DomainFieldsOverrideExpressionMembers,
     Selectable[T],
     HasSymbolicOperations[T],
     ABC,

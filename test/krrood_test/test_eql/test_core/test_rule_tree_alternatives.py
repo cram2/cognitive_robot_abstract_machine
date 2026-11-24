@@ -128,6 +128,15 @@ def test_combinations_of_equal_but_distinct_values_differ():
     assert ValueCombination(values=([1],)) != ValueCombination(values=([1],))
 
 
+def test_combinations_of_different_lengths_differ():
+    """
+    A combination is not the same as a longer one that starts with its values.
+    """
+    value = [1]
+
+    assert ValueCombination(values=(value,)) != ValueCombination(values=(value, value))
+
+
 # %% variables only the conclusions use
 
 
