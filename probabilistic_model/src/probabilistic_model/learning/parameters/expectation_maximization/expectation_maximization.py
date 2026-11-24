@@ -143,13 +143,20 @@ class MaximizationRegularization:
 
 # %% expectation maximization
 @dataclass(kw_only=True)
-class ExpectationMaximization(MaximizationRegularization):
+class ExpectationMaximization:
     """
     Expectation maximization for the parameters of some units of an existing circuit.
 
     The expectation step evaluates the whole circuit; the maximization step updates the
     weights of the learned sum units and the distributions of the learned leaves, while
     every other unit keeps its parameters.
+    """
+
+    regularization: MaximizationRegularization = field(
+        default_factory=MaximizationRegularization
+    )
+    """
+    How the maximization step keeps the learned weights and variances away from zero.
     """
 
     def learn(
@@ -308,7 +315,7 @@ class ExpectationMaximization(MaximizationRegularization):
                             )
                         )
                     )
-                    + self.smoothing
+                    + self.regularization.smoothing
                     for log_weight, child in log_weighted_children
                 ]
             )
@@ -335,10 +342,12 @@ class ExpectationMaximization(MaximizationRegularization):
 
         :param counts: Smoothed expected count of every child.
         :return: The log of every count's share, floored at
-            :attr:`minimum_mixture_proportion`.
+            :attr:`MaximizationRegularization.minimum_mixture_proportion`.
         """
         proportions = counts / np.sum(counts)
-        return np.log(np.maximum(proportions, self.minimum_mixture_proportion))
+        return np.log(
+            np.maximum(proportions, self.regularization.minimum_mixture_proportion)
+        )
 
     def _update_leaf_distribution(
         self,
@@ -371,7 +380,7 @@ class ExpectationMaximization(MaximizationRegularization):
     ) -> None:
         """
         Set a Gaussian to the weighted mean and standard deviation of the values, its
-        variance floored at :attr:`minimum_gaussian_variance`.
+        variance floored at :attr:`MaximizationRegularization.minimum_gaussian_variance`.
 
         :param distribution: The Gaussian to update in place.
         :param values: The value of its variable in every row.
@@ -382,7 +391,7 @@ class ExpectationMaximization(MaximizationRegularization):
         variance = np.sum(weights * (values - mean) ** 2) / total_weight
         distribution.location = float(mean)
         distribution.scale = float(
-            np.sqrt(max(variance, self.minimum_gaussian_variance))
+            np.sqrt(max(variance, self.regularization.minimum_gaussian_variance))
         )
 
     @staticmethod

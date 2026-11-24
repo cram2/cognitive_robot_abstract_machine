@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from typing_extensions import Callable
 
 from probabilistic_model.learning.parameters.circuit_parameter_learning import LayerType
@@ -31,6 +30,7 @@ from probabilistic_model.learning.parameters.training_schedule import (
 from probabilistic_model.learning.parameters.expectation_maximization.layer_maximization import (
     SufficientStatistics,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import SampleRows
 
 # %% training state
 
@@ -221,7 +221,7 @@ class JaxExpectationMaximizationTraining(
     ) -> jax.Array:
         return self.take_compiled_step(step=self.compiled_step_and_update, batch=batch)
 
-    def step_on_rows(self, *, rows: np.ndarray) -> jax.Array:
+    def step_on_rows(self, *, rows: SampleRows) -> jax.Array:
         """
         On a single training device, the rows are gathered by the compiled step itself,
         see :meth:`MiniBatchTraining.step_on_rows`.

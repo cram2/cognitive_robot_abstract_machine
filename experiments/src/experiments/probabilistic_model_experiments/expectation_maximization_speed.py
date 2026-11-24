@@ -31,6 +31,7 @@ from experiments.probabilistic_model_experiments.layered_circuit_speed import (
 from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationLearning,
+    MaximizationRegularization,
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     factorized_gaussian_mixture,
@@ -188,7 +189,9 @@ class ExpectationMaximizationSpeedComparison:
             ),
             iterations=self.iterations,
             expectation_maximization=ExpectationMaximization(
-                minimum_gaussian_variance=self.minimum_gaussian_variance
+                regularization=MaximizationRegularization(
+                    minimum_gaussian_variance=self.minimum_gaussian_variance
+                )
             ),
         )
         scikit_learn_mixture = GaussianMixture(

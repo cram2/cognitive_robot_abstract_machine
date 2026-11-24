@@ -21,6 +21,7 @@ from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.learning.exceptions import UnsupportedLeafDistributionError
 from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
+    MaximizationRegularization,
 )
 from probabilistic_model.learning.structure.progressive.exceptions import (
     ColumnStructureMismatchError,
@@ -460,7 +461,9 @@ def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
         template=_make_factorized_template("x")
     )
     column = progressive_circuit.add_column(task_name="task-a")
-    expectation_maximization = ExpectationMaximization(minimum_gaussian_variance=0.25)
+    expectation_maximization = ExpectationMaximization(
+        regularization=MaximizationRegularization(minimum_gaussian_variance=0.25)
+    )
     learner = ProgressiveExpectationMaximization(
         progressive_circuit, expectation_maximization=expectation_maximization
     )
@@ -469,7 +472,7 @@ def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
 
     [gaussian_leaf] = _gaussian_leaves(progressive_circuit, column)
     assert gaussian_leaf.distribution.scale == pytest.approx(
-        np.sqrt(expectation_maximization.minimum_gaussian_variance)
+        np.sqrt(expectation_maximization.regularization.minimum_gaussian_variance)
     )
 
 

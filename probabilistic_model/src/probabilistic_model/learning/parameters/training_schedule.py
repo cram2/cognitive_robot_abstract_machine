@@ -22,6 +22,7 @@ from probabilistic_model.learning.parameters.exceptions import NotEnoughMemoryEr
 
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
+    SampleRows,
 )
 
 # %% convergence
@@ -295,7 +296,7 @@ class MiniBatches:
             )
         return cls(batch_size=batch_size, seed=seed)
 
-    def row_indices_of_epoch(self, *, number_of_rows: int) -> Iterator[np.ndarray]:
+    def row_indices_of_epoch(self, *, number_of_rows: int) -> Iterator[SampleRows]:
         """
         :param number_of_rows: The number of rows of every training array.
         :return: The indices of the rows of every batch of one epoch, together every
@@ -318,7 +319,7 @@ class MiniBatches:
 
     @staticmethod
     def selected_rows(
-        *, arguments: tuple[BackendArray, ...], rows: np.ndarray
+        *, arguments: tuple[BackendArray, ...], rows: SampleRows
     ) -> tuple[BackendArray, ...]:
         """
         :param arguments: The training arrays, one row per training example each.
@@ -364,7 +365,7 @@ class MiniBatchTraining(ABC):
             backend that may still be computed on its device.
         """
 
-    def step_on_rows(self, *, rows: np.ndarray) -> float | BackendArray:
+    def step_on_rows(self, *, rows: SampleRows) -> float | BackendArray:
         """
         Update the parameters by one step on the batch of some rows of every training
         array, see :meth:`step_on_batch`.

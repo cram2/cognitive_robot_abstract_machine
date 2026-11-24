@@ -24,6 +24,7 @@ from probabilistic_model.learning.parameters.circuit_parameter_learning import (
     CircuitParameterTraining,
     LayerType,
 )
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import SampleRows
 
 TrainingStateType = TypeVar("TrainingStateType")
 """
@@ -255,7 +256,7 @@ class JaxCircuitParameterTraining(CircuitParameterTraining[LayerType], ABC):
         return self.state.loss
 
     def take_compiled_step_on_rows(
-        self, *, step: CompiledStep, rows: np.ndarray
+        self, *, step: CompiledStep, rows: SampleRows
     ) -> jax.Array:
         """
         :param step: The compiled step to take.

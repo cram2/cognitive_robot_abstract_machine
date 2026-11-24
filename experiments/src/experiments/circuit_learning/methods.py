@@ -427,14 +427,14 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
                 layer=root,
                 batches_per_update=self.batches_per_update,
                 step_size=self.step_size,
-                regularization=self.expectation_maximization,
+                regularization=self.expectation_maximization.regularization,
                 records_cuda_graphs=True,
             )
         return JaxExpectationMaximization(
             layer=root,
             batches_per_update=self.batches_per_update,
             step_size=self.step_size,
-            regularization=self.expectation_maximization,
+            regularization=self.expectation_maximization.regularization,
         )
 
     def learn(
