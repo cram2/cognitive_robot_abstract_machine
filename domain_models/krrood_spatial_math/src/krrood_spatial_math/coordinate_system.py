@@ -100,15 +100,6 @@ class AffineFrame(CoordinateSystem[GenericSpace, NameT], Interface):
         its coordinate along each axis in the attribute named after it.
         """
 
-    @classproperty
-    def gram_matrix(cls) -> tuple[tuple[float, ...], ...] | None:
-        """
-        The inner products of the axis vectors of this kind of frame with each other, one
-        coordinate unit long each, in the order of the axes; ``None`` where their lengths
-        and the angles between them are not known.
-        """
-        return None
-
 
 GenericAffineFrame = TypeVar("GenericAffineFrame", bound=AffineFrame)
 """
@@ -126,19 +117,7 @@ class CartesianFrame(AffineFrame[GenericEuclideanSpace, NameT], Interface):
     """
     An affine frame whose axes are perpendicular and one unit of its Euclidean space
     long, so it measures lengths and angles.
-
     """
-
-    @classproperty
-    def gram_matrix(cls) -> tuple[tuple[float, ...], ...]:
-        """
-        The identity, unlike :attr:`AffineFrame.gram_matrix`: the axes are one unit
-        long and perpendicular.
-        """
-        return tuple(
-            tuple(float(row == column) for column in range(len(cls.axes)))
-            for row in range(len(cls.axes))
-        )
 
 
 # %% values given in a coordinate system

@@ -22,6 +22,7 @@ from krrood_spatial_math.coordinate_system import (
     GenericCoordinateSystem,
 )
 from krrood_spatial_math.exceptions import (
+    FrameMeasuresNoLengthsError,
     ReferenceFrameMismatchError,
     SpaceMeasuresNoLengthsError,
 )
@@ -46,8 +47,8 @@ from .dataset.spaces import (
     StoredScalablePlaneLineSegment,
     ScalablePlanePoint,
     ScalablePlaneVector,
-    StretchedAxesFrame,
-    StretchedAxesVector,
+    UnmeasuredAxesFrame,
+    UnmeasuredAxesVector,
 )
 
 # %% points and vectors given in an affine frame
@@ -316,8 +317,8 @@ def test_a_vectors_length_is_the_square_root_of_its_inner_product_with_itself():
 
 def test_a_euclidean_space_multiplies_the_coordinates_of_a_cartesian_frame():
     """
-    In a Cartesian frame, whose Gram matrix is the identity, the inner product is the
-    sum of the products of the coordinates.
+    In a Cartesian frame the inner product is the sum of the products of the
+    coordinates.
     """
     product = EuclideanSpace.inner_product(
         first=FloatCoordinateVector3Dimensional(x=1, y=2, z=3, coordinate_system=None),
@@ -326,16 +327,16 @@ def test_a_euclidean_space_multiplies_the_coordinates_of_a_cartesian_frame():
     assert product == 32.0
 
 
-def test_a_euclidean_space_measures_a_frame_with_long_axes_by_its_gram_matrix():
+def test_a_vector_of_a_frame_that_is_not_cartesian_measures_no_length():
     """
-    One unit along each axis of a frame whose axes are two and three units long is the
-    diagonal of a two by three rectangle.
+    The coordinates of an affine frame that is not Cartesian give no length, even in a
+    Euclidean space.
     """
-    vector = StretchedAxesVector(x=1.0, y=1.0, coordinate_system=None)
+    vector = UnmeasuredAxesVector(x=1.0, y=1.0, coordinate_system=None)
 
-    assert vector.norm() == math.sqrt(
-        sum(entry for row in StretchedAxesFrame.gram_matrix for entry in row)
-    )
+    with pytest.raises(FrameMeasuresNoLengthsError) as raised:
+        vector.norm()
+    assert raised.value.frame_kind is UnmeasuredAxesFrame
 
 
 def test_a_symbolic_vectors_inner_product_is_its_euclidean_spaces():

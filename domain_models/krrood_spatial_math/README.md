@@ -42,9 +42,8 @@ coordinate system. Its base depends on `krrood` alone.
   space given by its coordinates in an affine frame, one per axis that frame's kind
   names in its `axes`, held in the field or property of that name, each of the
   coordinate type, such as `float` or `sm.Scalar`. Its `dot` and `norm` are the inner
-  product of its Euclidean space, `EuclideanSpace.inner_product`, which multiplies the
-  coordinates through the `gram_matrix` of its kind of frame: the identity for a
-  `CartesianFrame`, and not known for another affine frame, which raises
+  product of its Euclidean space, `EuclideanSpace.inner_product`, the sum of the products
+  of its coordinates in a `CartesianFrame`; a vector of another affine frame raises
   `FrameMeasuresNoLengthsError`. A vector of a space that is not Euclidean raises
   `SpaceMeasuresNoLengthsError`. Only a three-dimensional vector, `Vector3Dimensional`,
   has a `cross` product. A change of frame maps its axes but never shifts it: its
@@ -266,7 +265,7 @@ What the interfaces refuse, each where it is first possible:
 
 - `keypoint - thumbnail_keypoint`, points of two frames, raises `ReferenceFrameMismatchError`.
 - `box_width.norm()` raises `FrameMeasuresNoLengthsError`: pixels may not be square, so
-  `PixelFrame` gives no `gram_matrix` and pixel coordinates alone give no lengths.
+  `PixelFrame` is not a `CartesianFrame` and pixel coordinates alone give no lengths.
   Measuring needs the pixel size, or a camera model that maps pixels to the Cartesian
   frame of the camera.
 - `box_width` has no `cross`: only a three-dimensional vector has a cross product.

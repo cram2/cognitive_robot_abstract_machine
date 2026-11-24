@@ -106,7 +106,7 @@ class ReferenceFrameMismatchError(SpatialTypesError):
 class FrameMeasuresNoLengthsError(SpatialTypesError):
     """
     Raised when a length, an angle or a distance is asked of values given in a kind of
-    frame whose Gram matrix is not known, such as a pixel frame of unknown pixel size.
+    frame that is not Cartesian, such as a pixel frame of unknown pixel size.
     """
 
     frame_kind: type
@@ -116,15 +116,12 @@ class FrameMeasuresNoLengthsError(SpatialTypesError):
 
     def error_message(self) -> str:
         return (
-            f"{self.frame_kind.__name__} does not know the lengths of its axes or the "
-            f"angles between them, so its coordinates alone give no lengths or angles."
+            f"{self.frame_kind.__name__} is not a Cartesian frame, so its coordinates "
+            f"alone give no lengths or angles."
         )
 
     def suggest_correction(self) -> str:
-        return (
-            "change the values into a Cartesian frame first, or give their kind of "
-            "frame a gram_matrix."
-        )
+        return "change the values into a Cartesian frame first."
 
 
 @dataclass(kw_only=True)

@@ -7,7 +7,6 @@ from __future__ import annotations
 from typing_extensions import TYPE_CHECKING
 
 from krrood.patterns.interface import Interface
-from krrood_spatial_math.exceptions import FrameMeasuresNoLengthsError
 
 if TYPE_CHECKING:
     from krrood_spatial_math.coordinate_system import GenericCoordinate
@@ -37,21 +36,14 @@ class EuclideanSpace(Space, Interface):
     @classmethod
     def inner_product(cls, *, first: Vector, second: Vector) -> GenericCoordinate:
         """
-        :param first: A translation of this kind of space, given in an affine frame.
+        :param first: A translation of this kind of space, given in a Cartesian frame.
         :param second: A translation given in the same frame.
         :return: The product of both lengths and the cosine of the angle between them:
-            ``first`` times the Gram matrix of their frame kind times ``second``.
-        :raises FrameMeasuresNoLengthsError: If their frame kind's Gram matrix is not
-            known.
+            the sum of the products of their coordinates.
         """
-        gram_matrix = first.frame_kind.gram_matrix
-        if gram_matrix is None:
-            raise FrameMeasuresNoLengthsError(frame_kind=first.frame_kind)
         return sum(
-            first_coordinate * row[column] * second_coordinate
-            for first_coordinate, row in zip(
-                first.coordinates, gram_matrix, strict=True
+            first_coordinate * second_coordinate
+            for first_coordinate, second_coordinate in zip(
+                first.coordinates, second.coordinates, strict=True
             )
-            for column, second_coordinate in enumerate(second.coordinates)
-            if row[column] != 0
         )

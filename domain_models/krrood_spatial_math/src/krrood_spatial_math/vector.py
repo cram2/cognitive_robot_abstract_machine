@@ -15,11 +15,15 @@ from krrood.symbolic_math.exceptions import (
 )
 from krrood_spatial_math.coordinate_system import (
     AxisCoordinates,
+    CartesianFrame,
     GenericAffineFrame,
     GenericCoordinate,
     GenericCoordinateSystem,
 )
-from krrood_spatial_math.exceptions import SpaceMeasuresNoLengthsError
+from krrood_spatial_math.exceptions import (
+    FrameMeasuresNoLengthsError,
+    SpaceMeasuresNoLengthsError,
+)
 from krrood_spatial_math.space import EuclideanSpace
 
 # %% vectors given in an affine frame
@@ -90,8 +94,7 @@ class Vector(
             itself.
         :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
             not Euclidean.
-        :raises FrameMeasuresNoLengthsError: If the Gram matrix of its kind of frame is
-            not known.
+        :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
         return self.dot(self) ** 0.5
 
@@ -105,8 +108,7 @@ class Vector(
             frames differ.
         :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
             not Euclidean.
-        :raises FrameMeasuresNoLengthsError: If the Gram matrix of its kind of frame is
-            not known.
+        :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
         if not isinstance(other, type(self)):
             raise UnsupportedOperationError(
@@ -122,10 +124,13 @@ class Vector(
             :meth:`dot` checks the operands of.
         :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
             not Euclidean.
+        :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
         space_kind = self.frame_kind.space_kind
         if not issubclass(space_kind, EuclideanSpace):
             raise SpaceMeasuresNoLengthsError(space_kind=space_kind)
+        if not issubclass(self.frame_kind, CartesianFrame):
+            raise FrameMeasuresNoLengthsError(frame_kind=self.frame_kind)
         return space_kind.inner_product(first=self, second=other)
 
 

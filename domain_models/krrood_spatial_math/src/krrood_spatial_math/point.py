@@ -90,8 +90,7 @@ class Point(AxisCoordinates, Generic[GenericVector]):
             length of their difference.
         :raises SpaceMeasuresNoLengthsError: If its kind of frame charts a space that is
             not Euclidean.
-        :raises FrameMeasuresNoLengthsError: If the Gram matrix of its kind of frame is
-            not known.
+        :raises FrameMeasuresNoLengthsError: If its kind of frame is not Cartesian.
         """
         return (self - other).norm()
 
