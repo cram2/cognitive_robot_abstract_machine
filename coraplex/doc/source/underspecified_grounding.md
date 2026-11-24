@@ -170,12 +170,16 @@ a(Sequence)(
 - **`a(...)` chooses.** Once a statement adopts a candidate, the values that candidate gave the statement's variables are
   bound in the `StatementBindings` context extension. Every later statement grounds under them, so a later `a(...)`
   statement reusing `arm` chooses only among candidates with that arm. A statement that tries its next candidate after
-  a failure rebinds its variables to that candidate's values, and a statement that is reset releases them. Statements
-  grounded together are only combined with candidates that agree on the variables they share.
+  a failure rebinds its variables to that candidate's values, a statement that is reset releases them, and a statement
+  grounds anew once a value it opened its candidates under is released or bound to another value. Statements grounded together are only
+  combined with candidates that agree on the variables they share. The bindings last until the plan ends.
 - **`the(...)` refers.** A `the(...)` statement describes the one action left once the statements before it bound its
-  variables. A `DefiniteStatementNode` runs that action without a trial of its own, and if the action fails, the node
-  fails: there is nothing else to run. A `the(...)` statement that still describes several actions raises
-  `MultipleSolutionFound`, one that describes none raises `NoSolutionFound`.
+  variables, and binds the variables it shares with the statements after it. A `DefiniteStatementNode` runs that action
+  without a trial of its own, and if the action fails, the node fails: there is nothing else to run. A `the(...)`
+  statement that describes no action or several fails the trial it runs in, so the statement being tried goes on with
+  its next candidate; outside a trial, it ends the plan with `DefiniteStatementDescribesNoSingleAction`. The
+  `ProbabilisticBackend` ignores the quantifier and draws several samples, so a `the(...)` statement needs the
+  `EntityQueryLanguageGenerativeBackend`.
 - **`a(Sequence)(nodes=[...])` is the scope.** An `a(...)` statement of a control structure that states its nodes is
   that structure, built from what it states, and only the statements among its nodes may leave something open. It is
   also a remainder root: the trial of a statement in it runs what is left of it, so the `the(...)` statements after the

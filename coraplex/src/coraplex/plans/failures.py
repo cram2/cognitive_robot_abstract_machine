@@ -1,3 +1,8 @@
+"""
+The failures a plan can end with, most of which it can recover from by trying something
+else.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,6 +14,7 @@ from giskardpy.motion_statechart.exceptions import (
     CollisionViolatedError,
     NoProgressError,
 )
+from cramph.composites import DescribedNodes
 from cramph.exceptions import ExecutionFailure
 from giskardpy.qp.exceptions import InfeasibleException
 from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
@@ -177,6 +183,39 @@ class CandidateLimitReached(EmptyUnderspecified):
         return (
             "Allow more candidates, through the step's own limit or the context's "
             "candidates_to_try, or check whether any candidate can succeed at all."
+        )
+
+
+@dataclass(kw_only=True)
+class DefiniteStatementDescribesNoSingleAction(EmptyUnderspecified):
+    """
+    Raised when a definite `the(...)` step describes no action or several under the
+    values the steps before it chose, so it has no action to run.
+    """
+
+    described_actions: DescribedNodes
+    """
+    How many actions the step described.
+    """
+
+    def error_message(self) -> str:
+        """
+        Differs from :meth:`EmptyUnderspecified.error_message` in naming how many
+        actions the step described.
+        """
+        return (
+            f"{self.node} should describe one action under the values the steps before "
+            f"it chose, but describes {self.described_actions.name.lower()}."
+        )
+
+    def suggest_correction(self) -> str:
+        """
+        Differs from :meth:`EmptyUnderspecified.suggest_correction` in pointing at the
+        steps before it.
+        """
+        return (
+            "Let a step before it choose every variable it leaves open, or loosen the "
+            "conditions it adds to those choices."
         )
 
 

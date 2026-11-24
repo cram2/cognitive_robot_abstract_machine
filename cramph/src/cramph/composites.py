@@ -7,6 +7,7 @@ from __future__ import annotations, division
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from functools import partial
 from itertools import combinations, takewhile
 from uuid import UUID
@@ -1450,6 +1451,13 @@ class StatementBindings(ContextExtension):
             if binding.statement_id != statement_id
         }
 
+    def cleanup(self) -> None:
+        """
+        Unbind every variable, since the statements of a statechart that stopped
+        running choose nothing for the next one.
+        """
+        self.bindings = {}
+
 
 # %% running a child grounded from a statement
 
@@ -1491,12 +1499,20 @@ class StatementNode(CompositeNodeChoosingItsChild):
     How many candidates the current run through the statement has yielded.
     """
 
-    _variable_values_of_candidate: dict[int, dict[UUID, Any]] = field(
+    _bound_values_of_candidates: Bindings = field(
         default_factory=dict, init=False, repr=False
     )
     """
-    The values each candidate yielded since the statement was last grounded anew gave
-    the statement's variables, keyed by the identity of the candidate.
+    The values other statements had bound when :attr:`_candidates` were opened, which
+    every one of them keeps.
+    """
+
+    _generated_candidates: dict[int, GeneratedInstance] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    Every candidate yielded since the statement was last grounded anew, with the values
+    it gave the statement's variables, keyed by the identity of the candidate.
     """
 
     @property
@@ -1516,9 +1532,8 @@ class StatementNode(CompositeNodeChoosingItsChild):
         """
         Grounds the statement into its next candidate, against the world as it is now
         and keeping the values other statements bound, see :class:`StatementBindings`.
-
-        The statement is left suspended in between, so the next call resumes where this
-        one stopped.
+        The next call resumes where this one stopped, unless a value it keeps was
+        released or bound to another value since, which grounds it anew.
 
         :param query_backend: The backend answering the statement.
         :param default_candidate_limit: How many candidates a run through a statement
@@ -1526,16 +1541,19 @@ class StatementNode(CompositeNodeChoosingItsChild):
         :return: The next candidate, or None once the statement is exhausted or
             :attr:`candidate_limit` candidates were yielded.
         """
+        bound_values = self.statement_bindings.values_bound_by_others(
+            statement_id=self._node_id
+        )
+        if self._bound_values_changed(bound_values=bound_values):
+            self.stop_grounding()
         if self._candidates is None:
             self._candidates_pulled = 0
             self.candidate_limit = self.statement._limit_ or default_candidate_limit
-            self._variable_values_of_candidate = {}
-            self._candidates = self._recorded(
+            self._generated_candidates = {}
+            self._bound_values_of_candidates = bound_values
+            self._candidates = self._record_variable_values(
                 generated=query_backend.generate(
-                    expression=self.statement,
-                    bound_values=self.statement_bindings.values_bound_by_others(
-                        statement_id=self._node_id
-                    ),
+                    expression=self.statement, bound_values=bound_values
                 )
             )
         if self.reached_candidate_limit:
@@ -1548,26 +1566,41 @@ class StatementNode(CompositeNodeChoosingItsChild):
         self._candidates_pulled += 1
         return candidate
 
-    def _recorded(
+    def _bound_values_changed(self, *, bound_values: Bindings) -> bool:
+        """
+        :param bound_values: The values other statements bound now.
+        :return: Whether a value :attr:`_candidates` keep is missing from
+            `bound_values` or is another value there; a variable bound only since
+            changes nothing.
+        """
+        return any(
+            variable_id not in bound_values or bound_values[variable_id] is not value
+            for variable_id, value in self._bound_values_of_candidates.items()
+        )
+
+    def _record_variable_values(
         self, *, generated: Iterator[GeneratedInstance]
     ) -> Generator[Any, None, None]:
         """
         :param generated: The candidates the backend generates for the statement.
-        :return: The candidates of `generated`, remembering in
-            :attr:`_variable_values_of_candidate` the variable values of each.
+        :return: The candidates of `generated`, remembering each in
+            :attr:`_generated_candidates`.
         """
         for each in generated:
-            self._variable_values_of_candidate[id(each.instance)] = each.variable_values
+            self._generated_candidates[id(each.instance)] = each
             yield each.instance
 
-    def variable_values_of(self, *, candidate: Any) -> Bindings:
+    def find_variable_values(self, *, candidate: Any) -> Bindings:
         """
         :param candidate: A candidate this statement yielded since it was last grounded
             anew.
         :return: The values `candidate` gave the statement's variables, keyed by the
             identifier of each variable; empty for a candidate it did not yield.
         """
-        return self._variable_values_of_candidate.get(id(candidate), {})
+        generated = self._generated_candidates.get(id(candidate))
+        if generated is None:
+            return {}
+        return generated.variable_values
 
     @property
     def statement_bindings(self) -> StatementBindings:
@@ -1583,12 +1616,15 @@ class StatementNode(CompositeNodeChoosingItsChild):
         """
         Differs from :meth:`CompositeNodeChoosingItsChild.adopt_chosen_child` in also
         binding the statement's variables to the values the candidate `child` holds gave
-        them.
+        them, if it holds one.
         """
         super().adopt_chosen_child(child=child)
+        grounded_node = self._find_grounded_node(child=child)
+        if grounded_node is None:
+            return
         self.statement_bindings.bind(
             statement_id=self._node_id,
-            variable_values=self.variable_values_of(candidate=self.grounded_nodes[-1]),
+            variable_values=self.find_variable_values(candidate=grounded_node),
         )
 
     def on_reset(self) -> None:
@@ -1647,16 +1683,28 @@ class StatementNode(CompositeNodeChoosingItsChild):
     def grounded_nodes(self) -> list[StatechartNode]:
         """
         :return: The node of the statement's type each child chosen so far holds, in
-            the order they were chosen, each found below whatever holds it.
+            the order they were chosen, see :meth:`_find_grounded_node`.
         """
         return [
-            next(
+            grounded_node
+            for child in self.chosen_children
+            if (grounded_node := self._find_grounded_node(child=child)) is not None
+        ]
+
+    def _find_grounded_node(self, *, child: StatechartNode) -> StatechartNode | None:
+        """
+        :param child: A child this node chose.
+        :return: The node of the statement's type `child` is or holds below whatever
+            holds it, None for a child holding none.
+        """
+        return next(
+            (
                 node
                 for node in [child, *child.descendants]
                 if isinstance(node, self.statement._type_)
-            )
-            for child in self.chosen_children
-        ]
+            ),
+            None,
+        )
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -1672,32 +1720,120 @@ class StatementNode(CompositeNodeChoosingItsChild):
         return f"{self.statement._type_.__name__}"
 
 
+class DescribedNodes(Enum):
+    """
+    How many nodes a definite statement describes, as far as running it needs to know.
+    """
+
+    NONE = auto()
+    """
+    The statement describes no node.
+    """
+
+    ONE = auto()
+    """
+    The statement describes exactly one node, which it runs.
+    """
+
+    SEVERAL = auto()
+    """
+    The statement describes more than one node.
+    """
+
+
+@dataclass(kw_only=True)
+class DefiniteDescription:
+    """
+    What a definite statement describes while its variables keep some bound values.
+    """
+
+    described_nodes: DescribedNodes
+    """
+    How many nodes the statement describes.
+    """
+
+    sole_node: GeneratedInstance | None = None
+    """
+    The one node the statement describes, with the values it gives the statement's
+    variables; None unless it describes exactly one.
+    """
+
+    @classmethod
+    def from_generated(cls, *, generated: Iterator[GeneratedInstance]) -> Self:
+        """
+        :param generated: Every node the statement describes.
+        :return: The description of them, reading no further than the second node.
+        """
+        first = next(generated, None)
+        if first is None:
+            return cls(described_nodes=DescribedNodes.NONE)
+        if next(generated, None) is not None:
+            return cls(described_nodes=DescribedNodes.SEVERAL)
+        return cls(described_nodes=DescribedNodes.ONE, sole_node=first)
+
+
 @dataclass(eq=False, repr=False, kw_only=True)
 class DefiniteStatementNode(StatementNode):
     """
     Runs the one node a definite `the(...)` statement describes once the statements
     before it bound the variables it shares with them, see :class:`StatementBindings`.
-
-    It has nothing to choose, so its chooser runs that node without trying it out first
-    and does not ground the statement again once the node failed.
+    Its chooser runs that node untried and nothing after it failed; it fails without
+    running anything if the statement describes no node or several.
     """
 
-    def sole_candidate(
+    latest_description: DefiniteDescription | None = field(
+        default=None, init=False, repr=False
+    )
+    """
+    What the statement described when it was last grounded to run, see
+    :meth:`ground_described_node`; None if it was not since the latest reset.
+    """
+
+    def describe(
         self, *, query_backend: GenerativeBackend, bound_values: Bindings
-    ) -> Any:
+    ) -> DefiniteDescription:
         """
         :param query_backend: The backend answering the statement.
         :param bound_values: The values chosen for variables the statement shares,
             keyed by the identifier of each variable.
-        :return: The one node the statement describes while its variables keep
-            `bound_values`.
-        :raises MultipleSolutionFound: If the statement describes more than one node.
-        :raises NoSolutionFound: If it describes none.
+        :return: What the statement describes while its variables keep `bound_values`.
         """
-        (generated,) = query_backend.generate(
-            expression=self.statement, bound_values=bound_values
+        return DefiniteDescription.from_generated(
+            generated=query_backend.generate_without_quantifier(
+                expression=self.statement, bound_values=bound_values
+            )
         )
-        return generated.instance
+
+    def ground_described_node(self, *, query_backend: GenerativeBackend) -> Any | None:
+        """
+        Describe the node to run under the values other statements bound, remembering
+        what the statement described in :attr:`latest_description`.
+
+        :param query_backend: The backend answering the statement.
+        :return: The one node the statement describes; None if it ran a node since the
+            latest reset, or if it describes no node or several.
+        """
+        if self.latest_child is not None:
+            return None
+        self.latest_description = self.describe(
+            query_backend=query_backend,
+            bound_values=self.statement_bindings.values_bound_by_others(
+                statement_id=self._node_id
+            ),
+        )
+        sole_node = self.latest_description.sole_node
+        if sole_node is None:
+            return None
+        self._generated_candidates = {id(sole_node.instance): sole_node}
+        return sole_node.instance
+
+    def on_reset(self) -> None:
+        """
+        Differs from :meth:`StatementNode.on_reset` in also forgetting
+        :attr:`latest_description`.
+        """
+        super().on_reset()
+        self.latest_description = None
 
 
 # %% grounding statements together
@@ -1766,10 +1902,10 @@ class StatementsGroundedTogether:
         """
         values: Bindings = {}
         for statement, candidate in combination.items():
-            for variable_id, value in statement.variable_values_of(
+            for variable_id, value in statement.find_variable_values(
                 candidate=candidate
             ).items():
-                if values.setdefault(variable_id, value) is not value:
+                if values.setdefault(variable_id, value) != value:
                     return False
         return True
 

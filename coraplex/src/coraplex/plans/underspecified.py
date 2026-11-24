@@ -23,6 +23,7 @@ from coraplex.robot_plans.plan_transformations import WriteTheOdometryInsteadOfD
 from coraplex.robot_plans.robot_specific_plan_transformations import (
     KeepStretchInFrontOfTheContainerItCloses,
 )
+from coraplex.plans.failures import DefiniteStatementDescribesNoSingleAction
 from cramph.visualization import RvizVisualization
 from cramph.context import ContextExtension, StatechartContext
 from cramph.composites import (
@@ -43,6 +44,7 @@ from cramph.exceptions import ExecutionFailure
 from cramph.data_types import TransitionKind
 from cramph.node import DerivedConditionVariable, NodeRebuild, StatechartNode
 from cramph.statechart import Statechart
+from krrood.entity_query_language.core.base_expressions import Bindings
 from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
 
 if TYPE_CHECKING:
@@ -63,7 +65,7 @@ class PlanChildChooser(ChildChooser[GenericChoosingNode], ABC):
     """
 
     @staticmethod
-    def child_running(*, candidate: Action) -> Sequence:
+    def wrap_in_sequence(*, candidate: Action) -> Sequence:
         """
         :param candidate: The action a statement runs.
         :return: `candidate` in a sequence of its own, for the nodes a plan
@@ -121,9 +123,9 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
 
     def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
         """
-        :return: :attr:`candidate`, see :meth:`PlanChildChooser.child_running`.
+        :return: :attr:`candidate`, see :meth:`PlanChildChooser.wrap_in_sequence`.
         """
-        return self.child_running(candidate=self.candidate)
+        return self.wrap_in_sequence(candidate=self.candidate)
 
     def prepare_chosen_child(
         self, *, node: StatementNode, child: StatechartNode
@@ -189,8 +191,14 @@ class SubtreeRebuild(NodeRebuild):
     Whether a branch was cut below the node rebuilt last.
     """
 
+    _described_values: Bindings = field(default_factory=dict, init=False, repr=False)
+    """
+    The values the definite statements the current rebuild described so far give their
+    variables, keyed by the identifier of each variable.
+    """
+
     @staticmethod
-    def root_around(node: StatechartNode) -> StatechartNode:
+    def root_around(*, node: StatechartNode) -> StatechartNode:
         """
         :param node: A node of a running plan.
         :return: The node holding everything that runs beside `node`, and the definite
@@ -249,10 +257,13 @@ class SubtreeRebuild(NodeRebuild):
             statement without one runs the action it describes, and every branch ends
             before its first other statement without a candidate, since what follows
             that statement depends on how it is grounded.
+        :raises DefiniteStatementDescribesNoSingleAction: If a definite statement
+            without a candidate describes no action or several.
         """
         self._world = world
         self._rebuilt = {}
         self._cut = False
+        self._described_values = {}
         return self.rebuilt(node=self.root)
 
     def carry_over_conditions(self) -> None:
@@ -287,10 +298,10 @@ class SubtreeRebuild(NodeRebuild):
             branch is cut at it, or if it cannot be rebuilt without what is left out.
         """
         if node not in self._rebuilt:
-            self._rebuilt[node] = self._rebuild_anew(node)
+            self._rebuilt[node] = self._rebuild_anew(node=node)
         return self._rebuilt[node]
 
-    def _rebuild_anew(self, node: StatechartNode) -> StatechartNode | None:
+    def _rebuild_anew(self, *, node: StatechartNode) -> StatechartNode | None:
         """
         :return: `node` rebuilt onto :attr:`_world`, see :meth:`rebuilt`.
         """
@@ -322,8 +333,11 @@ class SubtreeRebuild(NodeRebuild):
     ) -> StatechartNode:
         """
         :return: The candidate of `statement` from :attr:`candidates`, or else the
-            action it describes under the values the statements of the plan bound and
-            those the candidates of :attr:`candidates` give their variables.
+            action it describes under the values the statements of the plan bound, those
+            the candidates of :attr:`candidates` give their variables, and those of the
+            definite statements described before it.
+        :raises DefiniteStatementDescribesNoSingleAction: If it describes no action or
+            several.
         """
         candidate = self.candidates.get(statement)
         if candidate is not None:
@@ -333,14 +347,21 @@ class SubtreeRebuild(NodeRebuild):
         )
         for grounded, grounded_candidate in self.candidates.items():
             bound_values.update(
-                grounded.variable_values_of(candidate=grounded_candidate)
+                grounded.find_variable_values(candidate=grounded_candidate)
             )
+        bound_values.update(self._described_values)
         grounding = statement.context.require_extension(
             extension_type=StatementGrounding
         )
-        return statement.sole_candidate(
+        description = statement.describe(
             query_backend=grounding.query_backend, bound_values=bound_values
-        ).rebound_to(self._world)
+        )
+        if description.sole_node is None:
+            raise DefiniteStatementDescribesNoSingleAction(
+                node=statement, described_actions=description.described_nodes
+            )
+        self._described_values.update(description.sole_node.variable_values)
+        return description.sole_node.instance.rebound_to(self._world)
 
     def _rebuild_running_child(
         self, node: CompositeNodeChoosingItsChild
@@ -393,7 +414,7 @@ class SubtreeRebuild(NodeRebuild):
         return f"{candidates} in {self.root.name}"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionTrial:
     """
     Tries grounded actions against a copy of the world, to check that a candidate can
@@ -430,14 +451,13 @@ class ActionTrial:
             WriteTheOdometryInsteadOfDriving(),
             KeepStretchInFrontOfTheContainerItCloses(),
         ],
-        kw_only=True,
     )
     """
     The plan transformations adapting every candidate to being tried, in place of the
     plan adaptations of :attr:`trial_executor_type`.
     """
 
-    copy_marker_alpha: float = field(default=0.9, kw_only=True)
+    copy_marker_alpha: float = 0.9
     """
     The opacity the copy is drawn with while debugging, so it can be told apart from the
     world it copies where the two overlap.
@@ -659,33 +679,31 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         grounding = node.context.require_extension(extension_type=StatementGrounding)
         if isinstance(node, DefiniteStatementNode):
             return self._described_action(node=node, grounding=grounding)
-        root = SubtreeRebuild.root_around(node)
+        root = SubtreeRebuild.root_around(node=node)
         statements = self.statements_grounded_with(node)
         if len(statements) == 1:
-            return self._candidate_alone(node, root, grounding)
-        return self._candidate_together(node, statements, root, grounding)
+            return self._candidate_alone(node=node, root=root, grounding=grounding)
+        return self._candidate_together(
+            node=node, statements=statements, root=root, grounding=grounding
+        )
 
     def _described_action(
         self, *, node: DefiniteStatementNode, grounding: StatementGrounding
     ) -> StatechartNode | None:
         """
         :return: The sequence holding the action `node` describes under the values the
-            statements before it bound, or None once it ran since the latest reset,
-            since no other action is left.
+            statements before it bound; None once it ran since the latest reset, since
+            no other action is left, or if it describes no action or several, see
+            :meth:`~cramph.composites.DefiniteStatementNode.ground_described_node`.
         """
-        if node.latest_child is not None:
+        action = node.ground_described_node(query_backend=grounding.query_backend)
+        if action is None:
             return None
-        return self.child_running(
-            candidate=node.sole_candidate(
-                query_backend=grounding.query_backend,
-                bound_values=node.statement_bindings.values_bound_by_others(
-                    statement_id=node._node_id
-                ),
-            )
-        )
+        return self.wrap_in_sequence(candidate=action)
 
     def _candidate_alone(
         self,
+        *,
         node: StatementNode,
         root: StatechartNode,
         grounding: StatementGrounding,
@@ -702,7 +720,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             if self.trial.succeeds(
                 SubtreeRebuild.unfinished_nodes(root, {node: candidate})
             ):
-                return self.child_running(candidate=candidate)
+                return self.wrap_in_sequence(candidate=candidate)
             candidate = node.next_candidate(
                 query_backend=grounding.query_backend,
                 default_candidate_limit=grounding.candidates_to_try,
@@ -712,6 +730,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
 
     def _candidate_together(
         self,
+        *,
         node: StatementNode,
         statements: list[StatementNode],
         root: StatechartNode,
@@ -743,7 +762,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
                     statement.choose_child_with(
                         chooser=CandidateHandOver(candidate=combination[statement])
                     )
-            return self.child_running(candidate=combination[node])
+            return self.wrap_in_sequence(candidate=combination[node])
         for statement in statements:
             statement.stop_grounding()
             if statement is not node:
@@ -764,16 +783,16 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
                 ancestor
                 for ancestor in reversed(node.path)
                 if isinstance(ancestor, Parallel)
-                and node in cls.statements_starting_with(ancestor)
+                and node in cls.statements_starting_with(node=ancestor)
             ),
             None,
         )
         if parallel is None:
             return [node]
-        return cls.statements_starting_with(parallel)
+        return cls.statements_starting_with(node=parallel)
 
     @classmethod
-    def statements_starting_with(cls, node: StatechartNode) -> list[StatementNode]:
+    def statements_starting_with(cls, *, node: StatechartNode) -> list[StatementNode]:
         """
         :return: The statements that start when `node` starts and have chosen no child
             since their latest reset: `node` itself, or those of every child of a
@@ -796,7 +815,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         return [
             statement
             for child in children
-            for statement in cls.statements_starting_with(child)
+            for statement in cls.statements_starting_with(node=child)
         ]
 
     def cleanup(self) -> None:

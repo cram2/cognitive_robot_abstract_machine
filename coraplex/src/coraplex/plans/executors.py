@@ -20,6 +20,7 @@ from coraplex.exceptions import (
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from coraplex.plans.failures import (
     CandidateLimitReached,
+    DefiniteStatementDescribesNoSingleAction,
     EmptyUnderspecified,
     MotionExceededSimulationTimeLimit,
     MotionMadeNoProgress,
@@ -408,13 +409,22 @@ class PlanExecutor(Executor, ABC):
     def _candidate_shortage(self) -> EmptyUnderspecified | None:
         """
         :return: A :class:`CandidateLimitReached` if a statement node tried as many
-            actions as it may, an :class:`EmptyUnderspecified` if one ran out of actions
-            to try, ``None`` if none did. A definite statement, which runs one action,
-            fails because that action did.
+            actions as it may, a :class:`DefiniteStatementDescribesNoSingleAction` if a
+            definite statement had no single action to run, an
+            :class:`EmptyUnderspecified` if a statement ran out of actions to try,
+            ``None`` if none did. A definite statement that ran its one action fails
+            because that action did.
         """
         for node in self.statechart.get_nodes_by_type(node_type=StatementNode):
-            if isinstance(node, DefiniteStatementNode) or not node.ran_out_of_children:
+            if not node.ran_out_of_children:
                 continue
+            if isinstance(node, DefiniteStatementNode):
+                description = node.latest_description
+                if description is None or description.sole_node is not None:
+                    continue
+                return DefiniteStatementDescribesNoSingleAction(
+                    node=node, described_actions=description.described_nodes
+                )
             if node.reached_candidate_limit:
                 return CandidateLimitReached(
                     node=node, candidate_limit=node.candidate_limit

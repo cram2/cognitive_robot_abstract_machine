@@ -12,7 +12,9 @@ import pytest
 from cramph.composites import (
     ChildChooser,
     ChildChooserAccess,
+    DefiniteDescription,
     DefiniteStatementNode,
+    DescribedNodes,
     Parallel,
     Sequence,
     StatementBindings,
@@ -36,7 +38,6 @@ from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
 )
-from krrood.entity_query_language.exceptions import MultipleSolutionFound
 from krrood.entity_query_language.factories import a, the, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.symbolic_math.symbolic_math import Scalar
@@ -70,13 +71,22 @@ class ChooserRunningTheDescribedNode(ChildChooser[DefiniteStatementNode]):
     """
 
     def choose_child(self, *, node: DefiniteStatementNode) -> StatechartNode | None:
+        return node.ground_described_node(
+            query_backend=EntityQueryLanguageGenerativeBackend()
+        )
+
+
+@dataclass(kw_only=True)
+class ChooserRunningANodeOfAnotherType(ChildChooser[StatementNode]):
+    """
+    Runs, once, a node of another type than the statement describes.
+    """
+
+    def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
         if node.latest_child is not None:
             return None
-        return node.sole_candidate(
-            query_backend=EntityQueryLanguageGenerativeBackend(),
-            bound_values=node.statement_bindings.values_bound_by_others(
-                statement_id=node._node_id
-            ),
+        return NodeSucceedingOnObservingTrue(
+            name="another node", observation=ObservationStateValue.TRUE
         )
 
 
@@ -178,6 +188,21 @@ def _run(
     statechart.add_node(node=EndStatechart.when_true(node=goal))
     executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=100)
+    return statechart
+
+
+def _start(
+    executor: StatechartExecutor, choosers: list[ChildChooser], goal: StatechartNode
+) -> Statechart:
+    """
+    Start running `goal` with `choosers`, without running it to its end.
+
+    :return: The statechart that started.
+    """
+    executor.context.add_extension(extension=ChildChooserAccess(choosers=choosers))
+    statechart = Statechart(context=executor.context)
+    statechart.add_node(node=goal)
+    executor.compile(statechart=statechart)
     return statechart
 
 
@@ -363,7 +388,7 @@ def test_a_statement_that_is_reset_releases_the_variables_it_bound(
     """
     tool = variable(str, domain=["hammer", "wrench"])
     sequence = Sequence(nodes=[a(StepWithATool)(step="take", tool=tool)])
-    _run(statechart_executor, [ChooserRunningEveryCandidate()], sequence)
+    _start(statechart_executor, [ChooserRunningEveryCandidate()], sequence)
     [taking] = sequence.nodes
     bindings = statechart_executor.context.require_extension(
         extension_type=StatementBindings
@@ -375,6 +400,74 @@ def test_a_statement_that_is_reset_releases_the_variables_it_bound(
     taking.on_reset()
 
     assert bindings.values_bound_by_others(statement_id="another statement") == {}
+
+
+def test_the_values_statements_bound_are_released_once_the_statechart_ran(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The choices of a statechart that ran bind nothing in the next one run in the same
+    context.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    _run(
+        statechart_executor,
+        [ChooserRunningEveryCandidate()],
+        Sequence(nodes=[a(StepWithATool)(step="take", tool=tool)]),
+    )
+
+    bindings = statechart_executor.context.require_extension(
+        extension_type=StatementBindings
+    )
+    assert bindings.bindings == {}
+
+
+def test_a_statement_grounds_anew_once_another_statement_bound_another_value(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    A statement whose candidates were opened under one value of a shared variable does
+    not go on with them once another statement bound the variable to another value.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    putting = StatementNode(statement=a(StepWithATool)(step="put", tool=tool))
+    never_succeeding = NodeSucceedingOnObservingTrue(
+        name="never succeeding", observation=ObservationStateValue.UNKNOWN
+    )
+    _start(
+        statechart_executor,
+        [ChooserRunningEveryCandidate()],
+        Sequence(nodes=[never_succeeding, putting]),
+    )
+    bindings = putting.statement_bindings
+    backend = EntityQueryLanguageGenerativeBackend()
+    bindings.bind(statement_id="take", variable_values={tool._id_: "hammer"})
+    putting.next_candidate(query_backend=backend, default_candidate_limit=10)
+
+    bindings.bind(statement_id="take", variable_values={tool._id_: "wrench"})
+
+    assert (
+        putting.next_candidate(query_backend=backend, default_candidate_limit=10).tool
+        == "wrench"
+    )
+
+
+def test_a_statement_choosing_a_node_of_another_type_binds_nothing(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    A child holding no node of the statement's type gives the statement's variables no
+    value.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    sequence = Sequence(nodes=[a(StepWithATool)(step="take", tool=tool)])
+
+    _start(statechart_executor, [ChooserRunningANodeOfAnotherType()], sequence)
+
+    [taking] = sequence.nodes
+    assert [child.name for child in taking.chosen_children] == ["another node"]
+    assert taking.grounded_nodes == []
+    assert taking.statement_bindings.bindings == {}
 
 
 def test_a_statement_keeps_a_value_another_statement_bound() -> None:
@@ -430,25 +523,93 @@ def test_a_definite_statement_describes_the_one_node_the_bound_values_leave() ->
     tool = variable(str, domain=["hammer", "wrench"])
     node = DefiniteStatementNode(statement=the(StepWithATool)(step="put", tool=tool))
 
-    described = node.sole_candidate(
+    description = node.describe(
         query_backend=EntityQueryLanguageGenerativeBackend(),
         bound_values={tool._id_: "wrench"},
     )
 
+    described = description.sole_node.instance
+    assert description.described_nodes == DescribedNodes.ONE
     assert (described.step, described.tool) == ("put", "wrench")
 
 
-def test_a_definite_statement_leaving_a_choice_raises() -> None:
+def test_a_definite_statement_leaving_a_choice_describes_several_nodes() -> None:
     """
     A definite statement whose variables are not all bound describes several nodes.
     """
     tool = variable(str, domain=["hammer", "wrench"])
     node = DefiniteStatementNode(statement=the(StepWithATool)(step="put", tool=tool))
 
-    with pytest.raises(MultipleSolutionFound):
-        node.sole_candidate(
-            query_backend=EntityQueryLanguageGenerativeBackend(), bound_values={}
-        )
+    description = node.describe(
+        query_backend=EntityQueryLanguageGenerativeBackend(), bound_values={}
+    )
+
+    assert description == DefiniteDescription(described_nodes=DescribedNodes.SEVERAL)
+
+
+def test_a_definite_statement_whose_condition_the_bound_values_break_describes_no_node() -> (
+    None
+):
+    """
+    The statement only describes a step with the second tool, so with the first tool
+    bound it describes none.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    putting = the(StepWithATool)(step="put", tool=tool)
+    node = DefiniteStatementNode(statement=putting.where(putting.tool == "wrench"))
+
+    description = node.describe(
+        query_backend=EntityQueryLanguageGenerativeBackend(),
+        bound_values={tool._id_: "hammer"},
+    )
+
+    assert description == DefiniteDescription(described_nodes=DescribedNodes.NONE)
+
+
+def test_a_definite_statement_describing_several_nodes_fails_without_running_one(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    A definite statement whose tool no statement chose has no single node to run, and
+    remembers that it described several.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    sequence = Sequence(nodes=[the(StepWithATool)(step="put", tool=tool)])
+
+    _start(statechart_executor, [ChooserRunningTheDescribedNode()], sequence)
+
+    [putting] = sequence.nodes
+    assert putting.chosen_children == []
+    assert putting.ran_out_of_children
+    assert putting.latest_description == DefiniteDescription(
+        described_nodes=DescribedNodes.SEVERAL
+    )
+
+
+def test_a_definite_statement_binds_the_variables_it_shares_with_the_statements_after_it(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The definite step describes the second tool only, and the step after it, which would
+    take the first, takes that tool as well.
+    """
+    tool = variable(str, domain=["hammer", "wrench"])
+    taking = the(StepWithATool)(step="take", tool=tool)
+    sequence = Sequence(
+        nodes=[
+            taking.where(taking.tool == "wrench"),
+            a(StepWithATool)(step="put", tool=tool),
+        ]
+    )
+
+    _run(
+        statechart_executor,
+        [ChooserRunningEveryCandidate(), ChooserRunningTheDescribedNode()],
+        sequence,
+    )
+
+    _, putting = sequence.nodes
+    assert [step.tool for step in putting.grounded_nodes] == ["wrench"]
 
 
 def test_a_definite_statement_runs_with_the_value_the_statement_before_it_chose(

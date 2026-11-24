@@ -7,8 +7,12 @@ from itertools import product
 
 import pytest
 
-from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
-from krrood.entity_query_language.factories import a, variable
+from krrood.entity_query_language.backends import (
+    EntityQueryLanguageGenerativeBackend,
+    InstanceConstruction,
+)
+from krrood.entity_query_language.exceptions import MultipleSolutionFound
+from krrood.entity_query_language.factories import a, the, variable
 from ..dataset.choices_made_in_one_step_and_used_in_another import (
     Item,
     TakingAndPutting,
@@ -176,3 +180,69 @@ def test_a_variable_used_twice_in_one_match_takes_one_value(
         (each_tool, each_item, each_tool, each_item)
         for each_tool, each_item in product(tools, items)
     ]
+
+
+# %% generating regardless of the quantifier
+
+
+def test_a_definite_match_describing_several_instances_raises_when_generated(
+    tools: list[Tool], items: list[Item]
+) -> None:
+    """
+    Generated with its quantifier, a definite match describing an instance per tool
+    raises.
+    """
+    tool = variable(Tool, domain=tools)
+
+    with pytest.raises(MultipleSolutionFound):
+        list(
+            EntityQueryLanguageGenerativeBackend().generate(
+                expression=the(Taking)(tool=tool, item=items[0]), bound_values={}
+            )
+        )
+
+
+def test_generating_without_the_quantifier_yields_every_instance_a_definite_match_describes(
+    tools: list[Tool], items: list[Item]
+) -> None:
+    """
+    Without its quantifier, a definite match describing several instances yields each of
+    them instead of raising.
+    """
+    tool = variable(Tool, domain=tools)
+
+    generated = EntityQueryLanguageGenerativeBackend().generate_without_quantifier(
+        expression=the(Taking)(tool=tool, item=items[0]), bound_values={}
+    )
+
+    assert [each.instance.tool for each in generated] == tools
+
+
+# %% what a construction remembers
+
+
+def test_a_construction_forgets_the_instances_rejected_before_the_one_handed_out(
+    tools: list[Tool], items: list[Item]
+) -> None:
+    """
+    Once an instance is handed out, the construction no longer holds it, nor the
+    instances constructed before it that were rejected.
+    """
+    tool = variable(Tool, domain=tools)
+    taking = a(Taking)(tool=tool, item=items[0])
+    pattern_variable_ids = [
+        attribute_match.assigned_variable._id_
+        for attribute_match in taking._matches_with_variables_
+    ]
+    construction = InstanceConstruction(
+        match=taking,
+        rows=[
+            dict(zip(pattern_variable_ids, [each_tool, items[0]]))
+            for each_tool in tools
+        ],
+    )
+    rejected, accepted = construction
+
+    construction.generated(instance=accepted)
+
+    assert construction._not_handed_out == {}

@@ -12,13 +12,13 @@ from typing_extensions import Callable, ClassVar, Dict, Iterator, List
 
 from krrood.entity_query_language.backends import EntityQueryLanguageGenerativeBackend
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
-from krrood.entity_query_language.exceptions import MultipleSolutionFound
 from krrood.entity_query_language.factories import a, the, variable, variable_from
 from cramph.composites import (
     ChildChooserAccess,
     DefiniteStatementNode,
     Parallel,
     Sequence,
+    DescribedNodes,
     StatementBindings,
     StatementNode,
 )
@@ -32,6 +32,7 @@ from coraplex.datastructures.enums import ActionTrialVisualization
 from coraplex.exceptions import MotionDidNotFinish
 from coraplex.plans.failures import (
     CandidateLimitReached,
+    DefiniteStatementDescribesNoSingleAction,
     EmptyUnderspecified,
     MotionViolatedCollisionAvoidance,
     PlanFailure,
@@ -491,7 +492,14 @@ def test_a_trial_keeps_the_choices_statements_made_in_the_world_it_copies(
     world, robot, extensions = apartment_world_pr2_copy_with_context
     plan = _steps_sharing_an_arm(robot)
     executor = run_plan(plan, extensions)
-    chosen_arm = plan.nodes[0].grounded_nodes[-1].arm
+    choosing = plan.nodes[0]
+    chosen_arm = choosing.grounded_nodes[-1].arm
+    choosing.statement_bindings.bind(
+        statement_id=choosing._node_id,
+        variable_values=choosing.find_variable_values(
+            candidate=choosing.grounded_nodes[-1]
+        ),
+    )
     trial = executor.child_chooser.trial
 
     copied = trial._copy()
@@ -597,21 +605,57 @@ def test_a_definite_step_whose_node_failed_fails_without_grounding_again(
     ]
 
 
-def test_a_definite_step_leaving_a_choice_raises(
+def test_a_definite_step_leaving_a_choice_fails_the_plan_naming_it(
     apartment_world_pr2_copy_with_context,
 ):
     """
-    A definite step whose arm no step before it chose describes a step per arm.
+    A definite step whose arm no step before it chose describes a step per arm, so it
+    has no single action to run.
     """
     world, robot, extensions = apartment_world_pr2_copy_with_context
     plan = Sequence(
         nodes=[the(ActionRefusingSomeArms)(arm=variable(Arm, domain=robot.all_arms))]
     )
     executor = simulated_executor(extensions)
+    executor.compile(statechart=statechart_of(executor, plan))
 
-    with pytest.raises(MultipleSolutionFound):
-        executor.compile(statechart=statechart_of(executor, plan))
-        executor.execute()
+    outcome = executor.attempt()
+
+    [describing] = plan.nodes
+    assert outcome.failure == DefiniteStatementDescribesNoSingleAction(
+        node=describing, described_actions=DescribedNodes.SEVERAL
+    )
+    assert describing.chosen_children == []
+
+
+def test_a_step_whose_definite_step_describes_no_action_is_tried_with_its_next_arm(
+    apartment_world_pr2_copy_with_context,
+):
+    """
+    The definite step after the first step only describes a step with the second arm;
+    with the first arm it describes none, which fails the trial of the first step's
+    first candidate instead of the plan.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    arm = variable(Arm, domain=robot.all_arms)
+    describing = the(ActionRefusingSomeArms)(arm=arm)
+    plan = Sequence(
+        nodes=[
+            a(Sequence)(
+                nodes=[
+                    a(ActionRefusingSomeArms)(arm=arm),
+                    describing.where(describing.arm == robot.all_arms[1]),
+                ]
+            )
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    [steps] = plan.nodes
+    choosing, described = steps.nodes
+    assert [step.arm for step in choosing.grounded_nodes] == [robot.all_arms[1]]
+    assert [step.arm for step in described.grounded_nodes] == [robot.all_arms[1]]
 
 
 def test_a_definite_step_starting_with_a_parallel_is_not_grounded_with_its_statements(
@@ -629,7 +673,7 @@ def test_a_definite_step_starting_with_a_parallel_is_not_grounded_with_its_state
         ]
     )
 
-    statements = UnderspecifiedChildChooser.statements_starting_with(parallel)
+    statements = UnderspecifiedChildChooser.statements_starting_with(node=parallel)
 
     assert statements == [parallel.nodes[0]]
 

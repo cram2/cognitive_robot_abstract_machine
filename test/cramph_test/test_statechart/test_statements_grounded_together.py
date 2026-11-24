@@ -4,6 +4,8 @@ Grounding several statements into combinations of their candidates.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from cramph.composites import StatementNode, StatementsGroundedTogether
 from cramph.data_types import ObservationStateValue
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
@@ -12,6 +14,28 @@ from krrood.entity_query_language.backends import (
 )
 from krrood.entity_query_language.factories import a, variable
 from krrood.entity_query_language.query.match import Match
+
+# %% mimics
+
+
+@dataclass(kw_only=True)
+class Label:
+    """
+    A text a node can be named after.
+    """
+
+    text: str
+    """
+    The text of the label.
+    """
+
+    @property
+    def in_capitals(self) -> str:
+        """
+        :return: :attr:`text` in capitals, a new string every time it is read.
+        """
+        return self.text.upper()
+
 
 # %% helpers
 
@@ -152,4 +176,32 @@ def test_statements_sharing_a_variable_are_combined_only_where_they_agree() -> N
 
     assert [_names_of(combination) for combination in combinations] == [
         [each_name, each_name] for each_name in names
+    ]
+
+
+def test_statements_sharing_a_value_derived_from_a_variable_agree_on_equal_values() -> (
+    None
+):
+    """
+    A value derived from a shared variable is a new object in each statement's
+    candidates, so statements agree on it when the values are equal.
+    """
+    labels = [Label(text="first"), Label(text="second")]
+    name = variable(Label, domain=labels).in_capitals
+    statements = [
+        StatementNode(
+            statement=a(NodeSucceedingOnObservingTrue)(
+                name=name, observation=observation
+            )
+        )
+        for observation in (ObservationStateValue.TRUE, ObservationStateValue.UNKNOWN)
+    ]
+    combinations = StatementsGroundedTogether(
+        statements=statements,
+        query_backend=EntityQueryLanguageGenerativeBackend(),
+        default_candidate_limit=10,
+    )
+
+    assert [_names_of(combination) for combination in combinations] == [
+        [label.in_capitals, label.in_capitals] for label in labels
     ]

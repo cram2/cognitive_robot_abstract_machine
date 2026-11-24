@@ -39,6 +39,7 @@ from krrood.entity_query_language.exceptions import (
     NoSolutionFound,
 )
 from krrood.entity_query_language.query.match import Match
+from krrood.entity_query_language.query.quantifiers import ResultQuantifier
 from krrood.entity_query_language.query.query import Entity
 
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
@@ -190,12 +191,17 @@ class ProbabilisticBackend(GenerativeBackend):
         return model.expectation((random_event_variable,))[random_event_variable]
 
     def _generate(
-        self, *, expression: Match[T], bound_values: Bindings
+        self,
+        *,
+        expression: Match[T],
+        bound_values: Bindings,
+        quantifier_type: type[ResultQuantifier],
     ) -> Iterator[GeneratedInstance]:
         """
         Differs from
         :meth:`~krrood.entity_query_language.backends.GenerativeBackend._generate` in
-        raising instead of keeping a bound value of a variable the match is given.
+        raising instead of keeping a bound value of a variable the match is given, and
+        in yielding as many samples as it draws whatever `quantifier_type` allows.
 
         :raises BoundValuesNotSupported: If `bound_values` binds a variable the match is
             given.

@@ -31,6 +31,7 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
+from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.patterns.classproperty import classproperty
 
 logger = logging.getLogger(__name__)
@@ -146,10 +147,31 @@ class GeneratedInstance:
 
 
 @dataclass(kw_only=True)
+class ConstructedInstance:
+    """
+    An instance constructed for a match, with the row of values it was constructed from.
+    """
+
+    instance: Any
+    """
+    The constructed instance.
+    """
+
+    row: Bindings
+    """
+    The values of the pattern's variables :attr:`instance` was constructed from, keyed
+    by the identifier of the variable assigned to each attribute.
+    """
+
+
+@dataclass(kw_only=True)
 class InstanceConstruction:
     """
     Constructs the instances of a match from rows of values of its pattern's variables,
     remembering the row each instance was constructed from.
+
+    The instances are expected to be handed out in the order they were constructed, see
+    :meth:`generated`.
     """
 
     match: Match
@@ -163,12 +185,12 @@ class InstanceConstruction:
     of the variable assigned to each attribute.
     """
 
-    _row_of_instance: dict[int, Bindings] = field(
+    _not_handed_out: dict[int, ConstructedInstance] = field(
         default_factory=dict, init=False, repr=False
     )
     """
-    The row each constructed instance not yet handed out by :meth:`generated` was
-    constructed from, keyed by the identity of the instance.
+    The instances constructed since the one :meth:`generated` handed out last, in the
+    order they were constructed, keyed by the identity of the instance.
     """
 
     def __iter__(self) -> Iterator[Any]:
@@ -177,7 +199,9 @@ class InstanceConstruction:
         """
         for row in self.rows:
             instance = self.match._construct_instance_from_bindings_(bindings=row)
-            self._row_of_instance[id(instance)] = row
+            self._not_handed_out[id(instance)] = ConstructedInstance(
+                instance=instance, row=row
+            )
             yield instance
 
     @cached_property
@@ -195,11 +219,17 @@ class InstanceConstruction:
 
     def generated(self, *, instance: Any) -> GeneratedInstance:
         """
-        :param instance: An instance this construction yielded.
-        :return: `instance` with the values the expressions the match was given took in
+        Forget `instance` and the instances constructed before it, which were rejected
+        or handed out already.
+
+        :param instance: An instance this construction yielded and did not hand out yet.
+        :return:`instance` with the values the expressions the match was given took in
             the row it was constructed from.
         """
-        row = self._row_of_instance.pop(id(instance))
+        constructed_ids = list(self._not_handed_out)
+        for rejected_id in constructed_ids[: constructed_ids.index(id(instance))]:
+            del self._not_handed_out[rejected_id]
+        row = self._not_handed_out.pop(id(instance)).row
         return GeneratedInstance(
             instance=instance,
             variable_values={
@@ -246,18 +276,49 @@ class GenerativeBackend(QueryBackend, ABC):
         :raises GenerativeBackendQueryIsNotUnderspecifiedVariable: If `expression` is
             not a match.
         """
+        self._check_is_match(expression=expression)
+        yield from self._generate(
+            expression=expression,
+            bound_values=bound_values,
+            quantifier_type=expression._quantifier_type_,
+        )
+
+    def generate_without_quantifier(
+        self, *, expression: Evaluable, bound_values: Bindings
+    ) -> Iterator[GeneratedInstance]:
+        """
+        Differs from :meth:`generate` in generating every instance the match describes,
+        whatever its quantifier requires of their number.
+        """
+        self._check_is_match(expression=expression)
+        yield from self._generate(
+            expression=expression, bound_values=bound_values, quantifier_type=An
+        )
+
+    @staticmethod
+    def _check_is_match(*, expression: Evaluable) -> None:
+        """
+        :param expression: The expression to generate instances of.
+        :raises GenerativeBackendQueryIsNotUnderspecifiedVariable: If `expression` is
+            not a match.
+        """
         if not isinstance(expression, Match):
             raise GenerativeBackendQueryIsNotUnderspecifiedVariable(
                 expression=expression
             )
-        yield from self._generate(expression=expression, bound_values=bound_values)
 
     @abstractmethod
     def _generate(
-        self, *, expression: Match[T], bound_values: Bindings
+        self,
+        *,
+        expression: Match[T],
+        bound_values: Bindings,
+        quantifier_type: type[ResultQuantifier],
     ) -> Iterator[GeneratedInstance]:
         """
         :meth:`generate` once `expression` is known to be a match.
+
+        :param quantifier_type: The quantifier the generated instances satisfy.
         """
 
 
@@ -300,7 +361,11 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         return True
 
     def _generate(
-        self, *, expression: Match[T], bound_values: Bindings
+        self,
+        *,
+        expression: Match[T],
+        bound_values: Bindings,
+        quantifier_type: type[ResultQuantifier],
     ) -> Iterator[GeneratedInstance]:
         self._warn_or_raise_on_unresolved_cause_(expression=expression)
         enumerated_variables: dict[uuid.UUID, Selectable] = {}
@@ -322,7 +387,7 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         )
         satisfying = expression._select_satisfying_(instances=construction)
         for instance in satisfying._quantify_(
-            quantifier_type=expression._quantifier_type_
+            quantifier_type=quantifier_type
         )._evaluate_natively_():
             yield construction.generated(instance=instance)
 
