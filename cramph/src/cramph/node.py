@@ -890,8 +890,6 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
     The name is not unique, use :attr:`unique_name`, if you need a unique identifier.
     """
 
-    # to_json writes it as a plain name, since a serialized enum member would make the
-    # reader import the enum the ticking framework names itself with
     ticking_framework: str | None = field(
         default=None, metadata=JSONMetadata(serialize=False).as_dict()
     )
@@ -1226,18 +1224,18 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             that ticks its node reads a stand-in from that document.
         """
         identification = self._identification()
-        document = {
+        serialized_node = {
             **DataclassJSONSerializer.to_json(instance=self, **kwargs),
             **identification,
         }
         if self.tick_owner is None:
-            return document
+            return serialized_node
         stand_in = self.stand_in_type(name=self.name)
         stand_in.plot_specifications = deepcopy(self.plot_specifications)
         return {
             **DataclassJSONSerializer.to_json(instance=stand_in, **kwargs),
             **identification,
-            NodeJSONKey.TICKED_NODE: document,
+            NodeJSONKey.TICKED_NODE: serialized_node,
         }
 
     @classmethod
@@ -1252,11 +1250,11 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         if tracker.has(key=node_id):
             return tracker.get(key=node_id)
         ticking_framework = data.get(NodeJSONKey.TICKING_FRAMEWORK)
-        ticked_node_document = data.get(NodeJSONKey.TICKED_NODE)
-        if ticked_node_document is not None and ReadingFramework.is_ticked_by_reader(
+        serialized_ticked_node = data.get(NodeJSONKey.TICKED_NODE)
+        if serialized_ticked_node is not None and ReadingFramework.is_ticked_by_reader(
             ticking_framework=ticking_framework, from_json_kwargs=kwargs
         ):
-            return from_json(ticked_node_document, **kwargs)
+            return from_json(serialized_ticked_node, **kwargs)
         node = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
         node._take_over_owners(data=data)
         node._take_over_node_id(node_id=node_id)
