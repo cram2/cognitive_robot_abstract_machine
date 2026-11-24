@@ -23,6 +23,18 @@ from probabilistic_model.graph import DirectedAcyclicGraph
 # %% the graph
 
 
+@dataclass(frozen=True, kw_only=True)
+class HiddenCommonCause:
+    """
+    A hidden variable that causes the two ends of a bidirected edge and nothing else.
+    """
+
+    edge: GraphEdge
+    """
+    The bidirected edge it stands for.
+    """
+
+
 @dataclass(eq=False, kw_only=True)
 class AncestralGraph(EdgeMarkedGraph):
     """
@@ -300,57 +312,28 @@ class AncestralGraph(EdgeMarkedGraph):
             *(self.possible_descendants(node=node) for node in on_paths)
         )
 
-    # %% m-separation in a maximal ancestral graph
+    # %% separation in a maximal ancestral graph
 
-    def is_m_separated(
-        self, *, first: GraphNode, second: GraphNode, given: frozenset[GraphNode]
-    ) -> bool:
+    @cached_property
+    def directed_graph_with_hidden_causes(
+        self,
+    ) -> DirectedAcyclicGraph[GraphNode | HiddenCommonCause]:
         """
-        :param first: A node of a graph with only directed and bidirected edges.
-        :param second: Another node.
-        :param given: The nodes conditioned on, neither of the two among them.
-        :return: Whether every path between the two has a collider that is neither
-            given nor an ancestor of a given node, or a non-collider that is given.
+        :return: The graph's directed edges, with a :class:`HiddenCommonCause` of the
+            ends of each bidirected edge in its place. For a graph with only directed
+            and bidirected edges, it d-separates two sets of nodes given a third
+            exactly where the graph m-separates them.
         """
-        opens_colliders = set(given).union(
-            *(self.directed_part.ancestors(node) for node in given)
-        )
-        visited: set[tuple[GraphNode, bool]] = set()
-        to_visit = [
-            (edge.other_end(node=first), self.arrives_by_arrow(edge=edge, at=first))
-            for edge in self.edges_at(node=first)
-        ]
-        while to_visit:
-            node, entered_by_arrow = to_visit.pop()
-            if node == second:
-                return False
-            if (node, entered_by_arrow) in visited:
-                continue
-            visited.add((node, entered_by_arrow))
-            for edge in self.edges_at(node=node):
-                is_collider = (
-                    entered_by_arrow and edge.mark_at(node=node) is EdgeMark.ARROW
-                )
-                if is_collider and node not in opens_colliders:
-                    continue
-                if not is_collider and node in given:
-                    continue
-                to_visit.append(
-                    (
-                        edge.other_end(node=node),
-                        self.arrives_by_arrow(edge=edge, at=node),
-                    )
-                )
-        return True
-
-    @staticmethod
-    def arrives_by_arrow(*, edge: GraphEdge, at: GraphNode) -> bool:
-        """
-        :param edge: An edge.
-        :param at: The end a path leaves the edge from.
-        :return: Whether the path enters the other end through an arrow.
-        """
-        return edge.mark_at(node=edge.other_end(node=at)) is EdgeMark.ARROW
+        directed = DirectedAcyclicGraph()
+        directed.add_nodes_from(self.nodes())
+        for edge in self.edges():
+            if edge.is_directed:
+                directed.add_edge(edge.parent, edge.child)
+            elif edge.is_bidirected:
+                hidden = HiddenCommonCause(edge=edge)
+                directed.add_edge(hidden, edge.first)
+                directed.add_edge(hidden, edge.second)
+        return directed
 
     def without_causal_first_edges(
         self, *, cause: GraphNode, effect: GraphNode

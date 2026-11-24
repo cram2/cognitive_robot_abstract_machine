@@ -27,7 +27,6 @@ from probabilistic_model.causal_structure.exceptions import (
 )
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
-    CausalGraphJSONKey,
     ColliderPatternInCausalGraph,
     EdgeMark,
     GraphEdge,
@@ -346,9 +345,8 @@ def test_a_causal_graphs_json_keeps_its_member_graph_limit():
     assert (
         type(restored),
         restored.maximum_member_graphs,
-        to_json(graph)[CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS],
         restored,
-    ) == (CausalGraph, 7, 7, graph)
+    ) == (CausalGraph, 7, graph)
 
 
 def test_graph_round_trips_through_json():

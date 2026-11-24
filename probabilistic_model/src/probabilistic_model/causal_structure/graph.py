@@ -11,7 +11,12 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import cached_property
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from krrood.adapters.json_serializer import (
+    DataclassJSONSerializer,
+    SubclassJSONSerializer,
+    from_json,
+    to_json,
+)
 from krrood.patterns.classproperty import classproperty
 from random_events.variable import Variable
 from typing_extensions import Any, Iterable, Self, TypeVar
@@ -456,11 +461,6 @@ class CausalGraphJSONKey(StrEnum):
     The edges, in the graph's order.
     """
 
-    MAXIMUM_MEMBER_GRAPHS = "maximum_member_graphs"
-    """
-    The graph's :attr:`CausalGraph.maximum_member_graphs`.
-    """
-
 
 @dataclass(eq=False)
 class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
@@ -480,10 +480,20 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
         :raises UnknownGraphNode: If an edge joins a node that is not among the nodes.
         """
         graph = cls()
-        graph.add_nodes_from(nodes)
-        for edge in edges:
-            graph.add_edge(edge)
+        graph.add_nodes_and_edges(nodes=nodes, edges=edges)
         return graph
+
+    def add_nodes_and_edges(
+        self, *, nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]
+    ) -> None:
+        """
+        :param nodes: Nodes to add.
+        :param edges: Edges to add between the graph's nodes and those.
+        :raises UnknownGraphNode: If an edge joins a node the graph then lacks.
+        """
+        self.add_nodes_from(nodes)
+        for edge in edges:
+            self.add_edge(edge)
 
     @classproperty
     def is_closed_under_union(cls) -> bool:
@@ -543,10 +553,10 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
         """
-        Extends :meth:`SubclassJSONSerializer.to_json` with the nodes and the edges.
+        Extends :meth:`DataclassJSONSerializer.to_json` with the nodes and the edges.
         """
         return {
-            **super().to_json(**kwargs),
+            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
             CausalGraphJSONKey.NODES: to_json(self.nodes(), **kwargs),
             CausalGraphJSONKey.EDGES: to_json(self.edges(), **kwargs),
         }
@@ -554,12 +564,15 @@ class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
-        :return: The graph over the nodes and the edges in *data*.
+        :return: The graph :meth:`DataclassJSONSerializer.from_json` reads, over the
+            nodes and the edges in *data*.
         """
-        return cls.from_edges(
+        graph = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
+        graph.add_nodes_and_edges(
             nodes=from_json(data[CausalGraphJSONKey.NODES], **kwargs),
             edges=from_json(data[CausalGraphJSONKey.EDGES], **kwargs),
         )
+        return graph
 
     def edge_between(self, first: GraphNode, second: GraphNode) -> GraphEdge | None:
         """
@@ -614,24 +627,6 @@ class CausalGraph(EdgeMarkedGraph):
     How many directed acyclic graphs the graph may stand for and still have them
     listed.
     """
-
-    def to_json(self, **kwargs: Any) -> dict[str, Any]:
-        """
-        Extends :meth:`EdgeMarkedGraph.to_json` with :attr:`maximum_member_graphs`.
-        """
-        return {
-            **super().to_json(**kwargs),
-            CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS: self.maximum_member_graphs,
-        }
-
-    @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
-        """
-        Extends :meth:`EdgeMarkedGraph._from_json` with :attr:`maximum_member_graphs`.
-        """
-        graph = super()._from_json(data=data, **kwargs)
-        graph.maximum_member_graphs = data[CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS]
-        return graph
 
     def possible_ancestors(self, *, node: GraphNode) -> set[GraphNode]:
         """

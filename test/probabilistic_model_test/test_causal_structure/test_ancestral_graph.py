@@ -394,10 +394,8 @@ def test_m_separation_blocks_at_given_non_colliders_and_unopened_colliders(
     graph = ancestral_graph_of(*edges)
 
     assert (
-        graph.is_m_separated(
-            first=graph.node("A"),
-            second=graph.node("C"),
-            given=frozenset(graph.node(name) for name in given),
+        graph.directed_graph_with_hidden_causes.is_directionally_separated(
+            {graph.node("A")}, {graph.node("C")}, {graph.node(name) for name in given}
         )
         == separated
     )
@@ -416,10 +414,8 @@ def test_m_separation_ends_on_a_diamond_beside_a_separate_edge():
     )
     started = time.monotonic()
 
-    separated = graph.is_m_separated(
-        first=graph.node("B"),
-        second=graph.node("G"),
-        given=frozenset({graph.node("D")}),
+    separated = graph.directed_graph_with_hidden_causes.is_directionally_separated(
+        {graph.node("B")}, {graph.node("G")}, {graph.node("D")}
     )
 
     assert (separated, time.monotonic() - started < 1.0) == (True, True)

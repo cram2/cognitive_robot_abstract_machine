@@ -573,8 +573,8 @@ class GeneralizedAdjustmentCriterion(AdjustmentCriterion[AncestralGraph]):
             return AdjustmentFailure(
                 reason=InvalidAdjustmentReason.CONTAINS_FORBIDDEN_NODE
             )
-        if not self.back_door_graph.is_m_separated(
-            first=self.cause, second=self.effect, given=adjustment.nodes
+        if not self.back_door_graph.directed_graph_with_hidden_causes.is_directionally_separated(
+            {self.cause}, {self.effect}, set(adjustment.nodes)
         ):
             return AdjustmentFailure(
                 reason=InvalidAdjustmentReason.LEAVES_NON_CAUSAL_PATH_OPEN
