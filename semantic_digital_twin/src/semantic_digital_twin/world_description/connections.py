@@ -239,7 +239,7 @@ class ScrewAxisConnection(ActiveConnection1DOF):
     """
     How the child's pose changes per unit of position, in the connection frame,
     `normalized <https://cram2.github.io/cognitive_robot_abstract_machine/semantic_digital_twin/examples/screw_axis_connections.html#why-the-screw-axis-is-normalized>`__
-    as in `Modern Robotics, Definition 3.24 <https://hades.mech.northwestern.edu/images/7/7f/MR.pdf#page=122>`__.
+    as in :cite:t:`lynch2017modern` (definition 3.24).
 
     .. warning:: Set it only before the connection is added to a world: a later
         assignment is not recorded, published or rolled back. Replace the connection.
@@ -277,10 +277,10 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         :param axis: The unit vector the child rotates about and translates along, in
             the connection frame.
         :param pitch: How far the child advances along ``axis`` per revolution, in
-            meters, as the `pitch of a single-start thread
-            <https://en.wikipedia.org/wiki/Screw_thread#Lead,_pitch,_and_starts>`__;
-            negative for a left-handed thread. Lynch and Park's pitch is per radian:
-            ``pitch / (2 * pi)``.
+            meters, as the pitch of a single-start thread
+            :cite:p:`wikipedia_screw_thread` (section "Lead, pitch, and starts");
+            negative for a left-handed thread. The pitch of :cite:t:`lynch2017modern` is
+            per radian: ``pitch / (2 * pi)``.
         :return: The screw axis of a helical connection, such as a bottle cap's.
         """
         return ScrewAxis(
@@ -449,9 +449,10 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         Radians per unit of position up to which the child counts as not rotating.
 
         A normalized screw axis rotates the child by one radian per unit of position or
-        not at all, so this only absorbs rounding errors.
+        not at all, so this only absorbs rounding errors, up to the same tolerance as
+        the normalization.
         """
-        return 1e-9
+        return ScrewAxis.normalization_tolerance
 
     @classproperty
     def smallest_advance_per_radian(cls) -> float:

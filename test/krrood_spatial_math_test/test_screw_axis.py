@@ -19,6 +19,32 @@ from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
 from .dataset.frames import KnownFrames
 from .reference_implementations import rigid_motion_rate_matrix
 
+TILTED = np.array([0.48, 0.6, 0.64])
+"""
+A unit vector along none of the frame's axes, for checks that must hold for any
+direction.
+"""
+
+POINT_OFF_THE_ORIGIN = np.array([0.3, -0.2, 0.1])
+"""
+A point an axis through it misses the origin by, whatever its direction.
+"""
+
+
+def _tuple(vector: np.ndarray) -> tuple[float, ...]:
+    """
+    :return: The vector as a tuple of floats, as the parametrizations give the parts.
+    """
+    return tuple(float(entry) for entry in vector)
+
+
+def _off_the_origin(rotation: np.ndarray) -> tuple[float, ...]:
+    """
+    :return: The translation of a body turning by ``rotation`` about an axis through
+        :data:`POINT_OFF_THE_ORIGIN`: that of its point at the origin circling it.
+    """
+    return _tuple(-np.cross(rotation, POINT_OFF_THE_ORIGIN))
+
 # %% the parts of a screw axis
 
 
@@ -150,8 +176,19 @@ def test_the_direction_of_a_zero_screw_axis_is_the_zero_vector():
         ((0.0, 0.0, 1.0), (0.0, 0.0, 0.5)),
         ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0)),
         ((0.0, 0.0, 0.0), (0.0, 0.6, 0.8)),
+        (_tuple(TILTED), _tuple(0.5 * TILTED)),
+        (_tuple(TILTED), _off_the_origin(TILTED)),
+        (_tuple(1e-12 * TILTED), _tuple(TILTED)),
     ],
-    ids=["revolute", "helical", "off-origin revolute", "prismatic"],
+    ids=[
+        "revolute",
+        "helical",
+        "off-origin revolute",
+        "prismatic",
+        "tilted helical",
+        "tilted off-origin revolute",
+        "rounding error in the rotation of a slide",
+    ],
 )
 def test_a_screw_axis_with_a_unit_rotation_or_only_a_unit_translation_is_normalized(
     rotation, translation
@@ -175,8 +212,19 @@ def test_a_screw_axis_with_a_unit_rotation_or_only_a_unit_translation_is_normali
         ((0.0, 0.0, 0.5), (0.0, 0.0, 1.0)),
         ((0.0, 0.0, 0.0), (0.0, 0.0, 2.0)),
         ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+        (_tuple(2 * TILTED), (0.0, 0.0, 0.0)),
+        (_tuple(1e-6 * TILTED), _tuple(TILTED)),
+        (_tuple((1 + 1e-6) * TILTED), (0.0, 0.0, 0.0)),
     ],
-    ids=["fast rotation", "slow rotation with unit translation", "long slide", "zero"],
+    ids=[
+        "fast rotation",
+        "slow rotation with unit translation",
+        "long slide",
+        "zero",
+        "tilted fast rotation",
+        "slight rotation beyond the tolerance, with unit translation",
+        "rotation longer than one beyond the tolerance",
+    ],
 )
 def test_a_screw_axis_without_a_unit_rotation_or_only_a_unit_translation_is_not_normalized(
     rotation, translation
@@ -199,8 +247,18 @@ def test_a_screw_axis_without_a_unit_rotation_or_only_a_unit_translation_is_not_
         ((0.0, 0.0, 1.0), (0.0, 0.0, 0.5), True),
         ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), True),
         ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), False),
+        (_tuple(TILTED), _tuple(0.5 * TILTED), True),
+        ((0.0, 0.0, 0.0), _tuple(TILTED), True),
+        (_tuple(TILTED), _off_the_origin(TILTED), False),
     ],
-    ids=["helical through the origin", "prismatic", "revolute off the origin"],
+    ids=[
+        "helical through the origin",
+        "prismatic",
+        "revolute off the origin",
+        "tilted helical through the origin",
+        "tilted prismatic",
+        "tilted revolute off the origin",
+    ],
 )
 def test_a_screw_axis_passes_through_the_origin_if_its_translation_is_parallel_to_its_rotation(
     rotation, translation, passes_through_origin
@@ -256,6 +314,8 @@ def test_checking_whether_a_symbolic_screw_axis_is_normalized_raises():
         ((0.0, 0.0, 1e-12), 0.0, True),
         ((0.0, 0.0, 1e-12), 1e-9, False),
         ((0.0, 0.0, 1.0), 1e-9, True),
+        (_tuple(TILTED), 1e-9, True),
+        (_tuple(1e-12 * TILTED), 1e-9, False),
     ],
     ids=[
         "unit rotation",
@@ -263,6 +323,8 @@ def test_checking_whether_a_symbolic_screw_axis_is_normalized_raises():
         "rounding error, exactly",
         "rounding error, within the tolerance",
         "unit rotation, beyond the tolerance",
+        "tilted unit rotation",
+        "tilted rounding error, within the tolerance",
     ],
 )
 def test_a_screw_axis_and_its_twist_turn_the_body_if_the_rotation_exceeds_the_tolerance(
@@ -302,8 +364,18 @@ def test_checking_whether_a_symbolic_screw_axis_turns_the_body_raises():
         ((0.0, 0.0, 2.0), (0.4, 0.0, 0.5), 0.25),
         ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), 0.0),
         ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), np.inf),
+        (_tuple(2 * TILTED), _tuple(np.add(_off_the_origin(2 * TILTED), 0.5 * TILTED)), 0.25),
+        (_tuple(TILTED), _off_the_origin(TILTED), 0.0),
+        ((0.0, 0.0, 0.0), _tuple(TILTED), np.inf),
     ],
-    ids=["helical off the origin", "revolute off the origin", "prismatic"],
+    ids=[
+        "helical off the origin",
+        "revolute off the origin",
+        "prismatic",
+        "tilted helical off the origin",
+        "tilted revolute off the origin",
+        "tilted prismatic",
+    ],
 )
 def test_the_translation_per_radian_is_the_part_of_the_translation_along_the_rotation(
     rotation, translation, translation_per_radian
@@ -324,14 +396,22 @@ def test_the_translation_per_radian_is_the_part_of_the_translation_along_the_rot
     )
 
 
-def test_the_axis_point_closest_to_the_origin_is_where_the_hinge_sits(table_frame):
+@pytest.mark.parametrize(
+    "rotation, hinge_point",
+    [
+        (np.array([0.0, 0.0, 2.0]), np.array([0.4, 0.0, 0.0])),
+        (2 * TILTED, np.array([0.6, 0.0, -0.45])),
+    ],
+    ids=["vertical hinge", "tilted hinge"],
+)
+def test_the_axis_point_closest_to_the_origin_is_where_the_hinge_sits(
+    table_frame, rotation: np.ndarray, hinge_point: np.ndarray
+):
     """
-    A body turning about a hinge at (0.4, 0, 0) moves its point at the origin by
-    -(rotation × hinge point), and the axis point recovers the hinge, in the screw
-    axis's frame.
+    A body turning about a hinge through a point orthogonal to its rotation moves its
+    point at the origin by -(rotation × hinge point), and the axis point recovers the
+    hinge point, in the screw axis's frame.
     """
-    rotation = np.array([0.0, 0.0, 2.0])
-    hinge_point = np.array([0.4, 0.0, 0.0])
     screw_axis = ScrewAxis(
         rotation_per_unit_position=Vector3(*rotation),
         translation_per_unit_position=Vector3(

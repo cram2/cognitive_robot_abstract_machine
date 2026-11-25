@@ -828,14 +828,21 @@ def test_screw_axis_connection_places_the_child_along_its_screw_axis(
         pytest.param(1.0, 2e-6, (False, False, True), id="finer than any thread"),
     ],
 )
+@pytest.mark.parametrize(
+    "direction",
+    [np.array([0.0, 0.0, 1.0]), np.array([0.48, 0.6, 0.64])],
+    ids=["vertical", "tilted"],
+)
 def test_screw_axis_connection_behaves_like_the_connection_its_screw_axis_describes(
     world_with_two_bodies,
     rotation_per_position,
     translation_per_position,
     expected_behaviour,
+    direction,
 ):
     """
-    Each screw axis makes the connection behave like exactly one connection type.
+    Each screw axis makes the connection behave like exactly one connection type,
+    whichever way it points.
     """
     world, parent, child = world_with_two_bodies
     with world.modify_world():
@@ -844,7 +851,7 @@ def test_screw_axis_connection_behaves_like_the_connection_its_screw_axis_descri
             parent=parent,
             child=child,
             screw_axis=_screw_axis_along(
-                np.array([0.0, 0.0, 1.0]),
+                direction,
                 rotation_per_position,
                 translation_per_position,
             ),
@@ -961,8 +968,16 @@ def test_screw_axis_connection_turns_the_child_about_an_axis_off_the_connection_
         )
 
 
+@pytest.mark.parametrize(
+    "point, direction",
+    [
+        (np.array([0.4, 0.0, 0.0]), np.array([0.0, 0.0, 1.0])),
+        (np.array([0.6, 0.0, -0.45]), np.array([0.48, 0.6, 0.64])),
+    ],
+    ids=["vertical hinge", "tilted hinge"],
+)
 def test_a_hinge_off_the_connection_origin_behaves_like_a_revolute_connection(
-    world_with_two_bodies,
+    world_with_two_bodies, point, direction
 ):
     """
     The point at the frame's origin circles a hinge that misses it, which is no advance
@@ -975,9 +990,7 @@ def test_a_hinge_off_the_connection_origin_behaves_like_a_revolute_connection(
             parent=parent,
             child=child,
             screw_axis=_screw_axis_through(
-                point=np.array([0.4, 0.0, 0.0]),
-                direction=np.array([0.0, 0.0, 1.0]),
-                translation_per_radian=0.0,
+                point=point, direction=direction, translation_per_radian=0.0
             ),
         )
 
