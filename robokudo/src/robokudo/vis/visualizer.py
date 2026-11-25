@@ -12,13 +12,11 @@ for RoboKudo pipeline visualization. It implements:
 
 from __future__ import annotations
 
-import logging
 
 from py_trees.blackboard import Blackboard
 from typing_extensions import Any
 
 from robokudo.annotators.outputs import AnnotatorOutputs
-from robokudo.defs import PACKAGE_NAME
 from robokudo.pipeline import Pipeline
 
 
@@ -144,9 +142,6 @@ class Visualizer(object):
                 self.pipeline.get_annotators()[0]
             )
             self.shared_visualizer_state.active_annotator_i = 0
-
-        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """Logger instance"""
 
     def identifier(self) -> str:
         """Get a unique identifier for this visualizer."""

@@ -20,7 +20,6 @@ from sensor_msgs.msg import CameraInfo
 
 from robokudo.types.cv import ColorToDepthRatio
 from robokudo.cas import CAS
-from robokudo.defs import PACKAGE_NAME
 from robokudo.types.image import ImageRotation
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.descriptors.camera_configs.components import TfComponent
@@ -814,7 +813,6 @@ def test_opencv_reader_stores_camera_observation(
         (camera_info.height, camera_info.width, 3), dtype=np.uint8
     )
     interface._has_new_data = True
-    interface.rk_logger = logging.getLogger("robokudo-opencv-camera-test")
     cas = CAS()
     timestamp_nanoseconds = 123_456_789
     monkeypatch.setattr(
@@ -967,7 +965,6 @@ def robot_camera() -> ROSCameraInterface:
     camera.tf_to = "map"
     camera.camera_config = TfComponent(tf_from=camera.tf_from, tf_to=camera.tf_to)
     camera.tf_wrapper = Mock()
-    camera.rk_logger = logging.getLogger(PACKAGE_NAME)
     return camera
 
 

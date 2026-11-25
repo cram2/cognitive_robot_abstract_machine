@@ -91,6 +91,63 @@ def test_collection_reader_descriptor_uses_configured_camera_interface(
 # %% Acquisition lifecycle
 
 
+def test_collection_reader_waits_after_dropped_frame(
+    reader_pipeline: ReaderPipeline,
+) -> None:
+    """
+    A rejected acquisition cannot advance downstream annotators.
+    """
+    reader_pipeline.camera_interface.has_new_data.return_value = True
+    reader_pipeline.camera_interface.set_data.return_value = False
+    original_cas = reader_pipeline.pipeline.cas
+    assert reader_pipeline.reader.update() == Status.RUNNING
+    assert reader_pipeline.pipeline.cas is original_cas
+
+
+def test_collection_reader_preserves_timers_after_dropped_frame(
+    reader_pipeline: ReaderPipeline,
+) -> None:
+    """
+    A dropped acquisition preserves processing and acquisition wait timers.
+    """
+    reader_pipeline.camera_interface.has_new_data.return_value = True
+    reader_pipeline.camera_interface.set_data.return_value = False
+    original_timer = reader_pipeline.pipeline.processing_start_time
+    reader_pipeline.reader.start_timer = original_timer
+
+    assert reader_pipeline.reader.update() == Status.RUNNING
+
+    assert reader_pipeline.pipeline.processing_start_time == original_timer
+    assert reader_pipeline.reader.start_timer == original_timer
+
+
+@pytest.mark.parametrize("delivery_result", [None, True])
+def test_collection_reader_commits_only_successful_acquisition(
+    reader_pipeline: ReaderPipeline, delivery_result: bool | None
+) -> None:
+    """
+    Retrying a dropped frame publishes only the accepted CAS with the next identifier.
+    """
+    reader_pipeline.camera_interface.has_new_data.return_value = True
+    reader_pipeline.camera_interface.set_data.side_effect = [False, delivery_result]
+    original_cas = reader_pipeline.pipeline.cas
+
+    assert reader_pipeline.reader.update() == Status.RUNNING
+    assert reader_pipeline.reader.update() == Status.SUCCESS
+
+    dropped_cas = reader_pipeline.camera_interface.set_data.call_args_list[0].kwargs[
+        "cas"
+    ]
+    accepted_cas = reader_pipeline.camera_interface.set_data.call_args_list[1].kwargs[
+        "cas"
+    ]
+    assert dropped_cas is not original_cas
+    assert accepted_cas is not dropped_cas
+    assert reader_pipeline.pipeline.cas is accepted_cas
+    assert accepted_cas.cas_id == original_cas.cas_id + 1
+    assert reader_pipeline.reader.start_timer is None
+
+
 def test_collection_reader_waits_without_replacing_cas(
     reader_pipeline: ReaderPipeline,
 ) -> None:

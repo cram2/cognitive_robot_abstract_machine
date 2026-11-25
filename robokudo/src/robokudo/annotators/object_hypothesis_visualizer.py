@@ -6,6 +6,7 @@ This module provides an annotator for visualizing object hypotheses in both
 
 from __future__ import annotations
 
+import logging
 import copy
 from pathlib import Path
 from timeit import default_timer
@@ -41,6 +42,8 @@ from robokudo.utils.type_conversion import (
 if TYPE_CHECKING:
     import numpy as np
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ObjectHypothesisVisualizer(BaseAnnotator):
@@ -80,7 +83,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self._mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = {}
 
     def _iter_mesh_visuals(self, body: Body) -> list[Mesh]:

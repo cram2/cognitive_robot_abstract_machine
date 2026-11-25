@@ -4,6 +4,7 @@ Open-vocabulary object detection with optional Segment Anything masks.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from timeit import default_timer
@@ -29,6 +30,8 @@ from semantic_digital_twin.world_description.geometry import Color
 
 if TYPE_CHECKING:
     import numpy.typing as numpy_typing
+
+logger = logging.getLogger(__name__)
 
 
 # %% Detection and segmentation values
@@ -245,7 +248,7 @@ class OpenVocabularyObjectDetectionAnnotator(
                 for coordinate in box.tolist()
             ]
             confidence = round(score.item(), confidence_decimal_places)
-            self.rk_logger.info(
+            logger.info(
                 f"Detected {self.classes[label]} with confidence {confidence} at location {box}"
             )
             left, top, right, bottom = box
@@ -300,13 +303,13 @@ class OpenVocabularyObjectDetectionAnnotator(
         )
         if not contours:
             return
-        self.rk_logger.info(f"Attempting to fix {object_hypothesis.roi.roi}")
+        logger.info(f"Attempting to fix {object_hypothesis.roi.roi}")
         left, top, width, height = cv2.boundingRect(contours[0])
         object_hypothesis.roi.roi.pos.x = int(left)
         object_hypothesis.roi.roi.pos.y = int(top)
         object_hypothesis.roi.roi.width = int(width)
         object_hypothesis.roi.roi.height = int(height)
-        self.rk_logger.info(f"After fix: {object_hypothesis.roi.roi}")
+        logger.info(f"After fix: {object_hypothesis.roi.roi}")
 
     def visualize_objects(
         self,

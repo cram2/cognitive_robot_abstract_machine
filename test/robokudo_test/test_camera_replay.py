@@ -234,7 +234,6 @@ def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
     frame = {StorageDocumentField.WORLD: json.dumps(_snapshot(scene.world))}
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader.storage = Mock(load_view_document=Mock(return_value=document))
-    reader.rk_logger = Mock()
     reasoning_world = World()
 
     reader._restore_sensor_world(
@@ -435,7 +434,6 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
     scene = _recorded_scene()
     reasoning_world = World()
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
-    reader.rk_logger = Mock()
     reader._recorded_camera_id = None
     reader.camera_config = Mock(
         restore_annotations=False, replay_mode=MongoReplayMode.FULL_WORLD
@@ -544,7 +542,6 @@ def test_sensor_replay_rejects_conflicting_camera_root_without_changing_world(
     )
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader.storage = Mock(load_view_document=Mock(return_value=document))
-    reader.rk_logger = Mock()
     frame = {
         StorageDocumentField.WORLD: json.dumps(_snapshot(scene.world)),
         StorageDocumentField.VIEW_IDS: {CASViews.CAMERA_OBSERVATION: 1},

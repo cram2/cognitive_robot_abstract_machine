@@ -2,8 +2,10 @@
 Decorator utilities for RoboKudo annotators.
 """
 
+import logging
 import timeit
 from collections import defaultdict
+from functools import wraps
 
 from typing_extensions import Callable, Any
 from robokudo.annotators.core import BaseAnnotator
@@ -26,35 +28,21 @@ def timer_decorator(func: Callable[[...], Any]) -> Callable[[...], Any]:
             pass
 
     .. note::
-        Uses rk_logger if available, otherwise prints to stdout
+        Logs at info level to the logger of the module that defines the decorated function.
     """
+    logger = logging.getLogger(func.__module__)
 
+    @wraps(func)
     def wrapper(*args, **kwargs):
-        logger = None
-        class_name = None
-
-        if args and hasattr(args[0], "rk_logger"):
-            logger = args[0].rk_logger
-            class_name = args[0].__class__
-        elif "self" in kwargs and hasattr(kwargs["self"], "rk_logger"):
-            logger = kwargs["self"].rk_logger
-            class_name = kwargs["self"].__class__
-
+        """
+        Call the decorated function and log how long it took.
+        """
         start_time = timeit.default_timer()
         result = func(*args, **kwargs)
-        end_time = timeit.default_timer()
-        processing_time = end_time - start_time
-
-        if class_name:
-            log_msg = f"Function '{class_name}.{func.__name__}' took {processing_time:.3f} seconds to execute."
-        else:
-            log_msg = f"Function '{func.__name__}' took {processing_time:.3f} seconds to execute."
-
-        if logger:
-            logger.info(log_msg)
-        else:
-            print(log_msg)
-
+        processing_time = timeit.default_timer() - start_time
+        logger.info(
+            f"Function '{func.__qualname__}' took {processing_time:.3f} seconds to execute."
+        )
         return result
 
     return wrapper

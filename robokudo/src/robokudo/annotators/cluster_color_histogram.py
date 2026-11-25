@@ -18,6 +18,8 @@ The module uses:
 """
 
 from __future__ import annotations
+
+import logging
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
@@ -38,6 +40,8 @@ from robokudo.types.cv import Rect
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ClusterColorHistogramAnnotator(BaseAnnotator):
@@ -84,7 +88,7 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """Process object hypotheses and calculate color histograms.

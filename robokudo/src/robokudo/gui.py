@@ -13,7 +13,8 @@ from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 
 from robokudo.pipeline import Pipeline
-from robokudo.defs import PACKAGE_NAME
+
+logger = logging.getLogger(__name__)
 
 
 class SetPipelineRedraw(Behaviour):
@@ -38,8 +39,6 @@ class SetPipelineRedraw(Behaviour):
         """
         super().__init__(name)
 
-        self.rk_logger = logging.getLogger(PACKAGE_NAME)
-
     def update(self) -> Status:
         """
         Execute the behavior's update step.
@@ -49,11 +48,11 @@ class SetPipelineRedraw(Behaviour):
 
         :return: Behavior execution status
         """
-        self.rk_logger.debug("%s.update()" % self.__class__.__name__)
+        logger.debug("%s.update()" % self.__class__.__name__)
 
         parent_pipeline = self.parent
         if not isinstance(parent_pipeline, Pipeline):
-            self.rk_logger.warning(
+            logger.warning(
                 "You've put a PipelineGUI behavior in your tree but your parent is not a Pipeline. Exiting..."
             )
             return Status.INVALID

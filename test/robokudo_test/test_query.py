@@ -1,3 +1,9 @@
+"""
+Tests of the query annotators and the query action server of RoboKudo.
+"""
+
+from __future__ import annotations
+
 # %% Imports
 import logging
 
@@ -31,6 +37,7 @@ from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import PointCloudClusterExtractor
 from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
+from robokudo.annotators.exceptions import QueryServerNotStarted
 from robokudo.annotators.query import QueryAnnotator, GenerateQueryResult
 from robokudo.pipeline import Pipeline
 
@@ -135,3 +142,13 @@ class TestQueryInterface:
         assert client_result["timed_out"] is False
         assert client_result["goal_status"] is GoalStatus.STATUS_SUCCEEDED
         assert len(client_result["goal_result"].res) == 1
+
+
+# %% query annotator before initialise
+def test_query_annotator_update_before_initialise_raises_query_server_not_started():
+    """
+    A query annotator ticked before it is initialised has no query action server to
+    read queries from.
+    """
+    with pytest.raises(QueryServerNotStarted):
+        QueryAnnotator().update()
