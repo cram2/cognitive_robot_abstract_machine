@@ -1,5 +1,10 @@
+"""
+Tests of the annotation conversion utilities.
+"""
+
 # %% Imports
 
+from __future__ import annotations
 import sys
 from dataclasses import replace
 
@@ -62,6 +67,10 @@ from . import _assertions
 
 
 class TestUtilsAnnotationConversion(object):
+    """
+    Tests of converting annotations into object designator fields.
+    """
+
     @pytest.fixture
     def cas_with_tf(self):
         cas = CAS()

@@ -1,3 +1,9 @@
+"""
+Camera configuration of the HSR robot, registered as ``hsr``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar

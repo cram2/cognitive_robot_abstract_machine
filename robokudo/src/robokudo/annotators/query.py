@@ -499,11 +499,25 @@ class QueryActionServer(Node):
 
     @called_positionally
     def goal_cb(self, goal_request: Query.Goal) -> GoalResponse:
+        """
+        Accept every goal the action server receives.
+
+        :param goal_request: The received query goal.
+        :return: :attr:`GoalResponse.ACCEPT`.
+        """
         self.logger.info(f"Received new goal: {goal_request}")
         return GoalResponse.ACCEPT
 
     @called_positionally
     def cancel_cb(self, goal_handle: ServerGoalHandle) -> CancelResponse:
+        """
+        Accept a cancel request and ask the running pipeline to preempt the query
+        through the
+        blackboard entry :attr:`BBIdentifier.QUERY_PREEMPT_REQUESTED`.
+
+        :param goal_handle: Handle of the goal to cancel.
+        :return: :attr:`CancelResponse.ACCEPT`.
+        """
         self.logger.info(f"Received cancel request:{goal_handle}")
         Blackboard().set(BBIdentifier.QUERY_PREEMPT_REQUESTED, True)
         return CancelResponse.ACCEPT

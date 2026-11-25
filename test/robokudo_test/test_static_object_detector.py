@@ -66,6 +66,10 @@ def detector_on_half_resolution_depth(
 def test_bounding_box_cloud_covers_box_on_depth_resolution(
     detector_on_half_resolution_depth: StaticObjectDetectorAnnotator,
 ):
+    """
+    With a depth image at half the color resolution, the bounding box cloud has one
+    point per depth pixel the scaled box covers.
+    """
     detector = detector_on_half_resolution_depth
     parameters = detector.descriptor.parameters
     parameters.bounding_box_x = 4

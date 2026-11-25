@@ -47,6 +47,13 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
 
     @staticmethod
     def _body_size(*, body: Body) -> np.ndarray | None:
+        """
+        :return: The extent of the bounding box around the collision shapes of *body*,
+            or
+            around its visual shapes if it has no collision shapes, or ``None`` if it
+            has
+            neither.
+        """
         shape_collection = (
             body.collision
             if body.collision is not None and len(body.collision) > 0

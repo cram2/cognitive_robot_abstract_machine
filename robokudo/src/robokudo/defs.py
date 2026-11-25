@@ -1,19 +1,10 @@
+"""
+Names shared across RoboKudo: the package, its test ROS node and its loggers, and
+:class:`Region3DWithName`.
+"""
+
 from enum import Enum
 from dataclasses import dataclass
-
-"""
-Core definitions and constants for RoboKudo.
-
-This module provides fundamental definitions and constants used throughout
-the RoboKudo codebase. It includes:
-
-* Package and node naming constants
-* Base classes for spatial data structures
-* Common type definitions
-
-The definitions in this module are used to ensure consistency across
-different parts of the system.
-"""
 
 PACKAGE_NAME: str = "robokudo"
 """The name of the RoboKudo package"""

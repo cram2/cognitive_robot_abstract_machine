@@ -1,3 +1,10 @@
+"""
+Camera configuration of an Intel RealSense camera with aligned depth, registered as
+``realsense``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar

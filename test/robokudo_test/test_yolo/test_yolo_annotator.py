@@ -151,6 +151,9 @@ def _depth_descriptor(scene: CupScene) -> YoloAnnotator.Descriptor:
 
 
 def _hypotheses(annotator: YoloAnnotator) -> list[ObjectHypothesis]:
+    """
+    :return: The object hypotheses the annotator put into its CAS.
+    """
     return annotator.get_cas().filter_annotations_by_type(
         type_to_include=ObjectHypothesis
     )

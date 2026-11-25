@@ -1,3 +1,9 @@
+"""
+Tests of the shape estimator adapters.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 
 from robokudo.utils.shape_estimator_adapters import (
@@ -12,6 +18,10 @@ from robokudo.utils.shape_fitting import CuboidFit, CylinderFit, SphereFit
 
 
 class TestUtilsShapeEstimatorAdapters:
+    """
+    Tests of the summaries the shape fit adapters give.
+    """
+
     def test_sphere_summary_returns_dataclass_with_compact_text(self) -> None:
         fit = SphereFit(
             center=np.zeros(3, dtype=np.float64),

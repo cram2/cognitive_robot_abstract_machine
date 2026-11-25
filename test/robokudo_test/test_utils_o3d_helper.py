@@ -1,5 +1,10 @@
+"""
+Tests of the Open3D helper utilities.
+"""
+
 # %% Imports
 
+from __future__ import annotations
 import numpy as np
 import open3d
 import pytest
@@ -28,6 +33,10 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 
 # %% Point cloud geometry
 class TestUtilsO3DHelper(object):
+    """
+    Tests of the Open3D helpers for bounding boxes, masks and point clouds.
+    """
+
     @pytest.fixture
     def cas(self, kinect_intrinsics: open3d.camera.PinholeCameraIntrinsic) -> CAS:
         cas = robokudo.cas.CAS()

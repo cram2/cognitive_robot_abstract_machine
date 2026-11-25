@@ -1,3 +1,9 @@
+"""
+Tests of when the storage writer resets its database.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import robokudo.annotators.storage as storage_module

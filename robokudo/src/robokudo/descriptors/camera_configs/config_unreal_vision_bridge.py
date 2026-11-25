@@ -1,3 +1,10 @@
+"""
+Camera configuration of simulated cameras in Unreal Engine, read through the Unreal
+Vision Bridge, registered as ``unreal_vision_bridge``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar

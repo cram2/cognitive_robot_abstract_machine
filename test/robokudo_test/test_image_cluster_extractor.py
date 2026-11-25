@@ -1,3 +1,7 @@
+"""
+Tests of the hue, saturation and value thresholds of the image cluster extractor.
+"""
+
 from __future__ import annotations
 
 # %% Imports

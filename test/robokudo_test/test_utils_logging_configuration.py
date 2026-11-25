@@ -1,3 +1,9 @@
+"""
+Tests of RoboKudo's log formatting.
+"""
+
+from __future__ import annotations
+
 import logging
 import tempfile
 
@@ -11,6 +17,11 @@ from robokudo.utils.logging_configuration import (
 
 
 class TestUtilsLoggingConfiguration:
+    """
+    Tests of how :class:`DynamicCompactFormatter` sizes and truncates the file and line
+    column.
+    """
+
     def test_dynamic_compact_formatter_line_width_calculation(self):
         formatter = DynamicCompactFormatter("%(name)s %(filename_line)-50s %(message)s")
         assert formatter.max_file_line_width == 50

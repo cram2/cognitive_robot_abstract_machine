@@ -1,3 +1,7 @@
+"""
+Annotator that extracts SIFT features with OpenCV.
+"""
+
 from __future__ import annotations
 
 # %% Imports

@@ -1,3 +1,9 @@
+"""
+Tests of serializing CAS annotations and the values they hold.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 
 from robokudo.io import cas_annotation_codecs
@@ -54,6 +60,9 @@ def test_deserialize_annotations_forwards_kwargs_for_single_item(monkeypatch):
 
 
 def test_numpy_scalar_json_serializer_roundtrip():
+    """
+    A NumPy scalar is serialized with its dtype and restored to its value.
+    """
     scalar = np.int16(42)
     encoded = cas_annotation_codecs.NumpyScalarJSONSerializer.to_json(instance=scalar)
     restored = cas_annotation_codecs.NumpyScalarJSONSerializer.from_json(

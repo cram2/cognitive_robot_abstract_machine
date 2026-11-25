@@ -1,3 +1,9 @@
+"""
+Tests of the OpenCV helper utilities.
+"""
+
+from __future__ import annotations
+
 import copy
 
 import numpy as np
@@ -31,6 +37,10 @@ from robokudo.utils.cv_helper import (
 
 
 class TestUtilsCVHelper(object):
+    """
+    Tests of the OpenCV helper functions.
+    """
+
     @pytest.fixture()
     def annotator_in_pipeline(self) -> BaseAnnotator:
         root = Pipeline("Sequence")

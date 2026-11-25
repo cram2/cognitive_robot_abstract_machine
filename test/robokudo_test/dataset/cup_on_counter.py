@@ -1,3 +1,7 @@
+"""
+Two recorded Kinect frames of a cup on a kitchen counter, in the file reader's layout.
+"""
+
 from __future__ import annotations
 
 # %% Imports

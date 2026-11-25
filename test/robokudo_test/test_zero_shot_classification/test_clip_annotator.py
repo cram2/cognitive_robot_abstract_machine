@@ -286,6 +286,9 @@ def test_word_naming_image_color_ranks_first(color_embedding_clip):
 
 
 def test_each_image_of_a_batch_is_classified_by_its_own_color(color_embedding_clip):
+    """
+    Classifying a batch of a red and a blue image ranks each image's own color first.
+    """
     annotator = CLIPAnnotator(descriptor=_color_descriptor())
     images = [
         Image.fromarray(solid_image(rgb(COLOR_BY_WORD["red"]))),

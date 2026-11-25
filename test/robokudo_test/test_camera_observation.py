@@ -1,3 +1,7 @@
+"""
+Tests of camera observations: their pose, frames and access through the CAS.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -108,6 +112,10 @@ def test_camera_observation_requires_pose_for_spatial_access():
 
 
 def test_camera_observation_returns_copy_with_pose():
+    """
+    Setting the camera pose returns a new observation with that pose, sharing the camera
+    and camera model, and leaves the original without a pose.
+    """
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():

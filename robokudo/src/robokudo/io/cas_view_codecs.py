@@ -511,6 +511,9 @@ class CameraObservationCodec(ViewCodec):
         return "robokudo_camera_observation_v3"
 
     def can_encode(self, *, value: Any) -> bool:
+        """
+        :return: Whether *value* is a :class:`CameraObservation`.
+        """
         return isinstance(value, CameraObservation)
 
     def encode(self, *, value: CameraObservation) -> ViewPayload:
@@ -533,6 +536,10 @@ class CameraObservationCodec(ViewCodec):
         )
 
     def decode(self, *, payload: ViewPayload, **kwargs: Any) -> CameraObservation:
+        """
+        Restore the observation against the entity tracker that the keyword arguments
+        carry; see :meth:`decode_with_tracker`.
+        """
         return self.decode_with_tracker(
             payload=payload,
             tracker=WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs),

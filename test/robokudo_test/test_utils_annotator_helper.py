@@ -1,3 +1,7 @@
+"""
+Tests of the annotator helper utilities.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -70,6 +74,11 @@ def _camera_observation(
 
 
 class TestUtilsAnnotatorHelper(object):
+    """
+    Tests of transforming poses and clouds between camera and world, and of the image
+    helpers.
+    """
+
     @pytest.fixture()
     def annotator_in_pipeline(self) -> BaseAnnotator:
         root = Pipeline("Sequence")

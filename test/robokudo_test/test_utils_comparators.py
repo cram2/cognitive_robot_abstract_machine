@@ -1,3 +1,7 @@
+"""
+Tests of the comparators that match query values against object hypotheses.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -32,6 +36,10 @@ if TYPE_CHECKING:
 
 
 class TestUtilsComparators(object):
+    """
+    Tests of the similarity each comparator computes.
+    """
+
     @pytest.mark.parametrize(
         ["query_value", "obj_value", "expected_similarity"],
         [

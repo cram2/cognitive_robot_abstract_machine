@@ -1,3 +1,9 @@
+"""
+Tests of sharing Open3D geometries between processes through shared memory.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import open3d as o3d
 import pytest
@@ -120,6 +126,10 @@ def assert_mesh_equal(mesh1, mesh2) -> None:
 
 
 class TestVisGeometryMaps(object):
+    """
+    Tests of writing geometries to shared memory and reading them back.
+    """
+
     @pytest.fixture
     def rng(self) -> np.random.Generator:
         """

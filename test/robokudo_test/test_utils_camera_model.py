@@ -1,3 +1,9 @@
+"""
+Tests of the camera model utilities.
+"""
+
+from __future__ import annotations
+
 import pytest
 
 from robokudo.utils.camera_model import (
@@ -6,6 +12,10 @@ from robokudo.utils.camera_model import (
 
 
 class TestUtilsCameraModel:
+    """
+    Tests of deriving pinhole camera parameters from a field of view.
+    """
+
     def test_pinhole_camera_parameters_from_horizontal_field_of_view(self) -> None:
         parameters = pinhole_camera_parameters_from_horizontal_field_of_view(
             width=640, height=480, horizontal_field_of_view_degrees=90.0

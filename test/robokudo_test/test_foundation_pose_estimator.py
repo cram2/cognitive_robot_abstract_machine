@@ -1,3 +1,8 @@
+"""
+Tests of the FoundationPose estimator on a rendered plate; skipped without its GPU
+build.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -100,6 +105,9 @@ def plate(estimator: FoundationPoseEstimator, tmp_path: Path) -> PlateOnPlane:
 def test_plate_is_posed_on_the_plane_at_its_mask(
     estimator: FoundationPoseEstimator, plate: PlateOnPlane
 ):
+    """
+    The plate is estimated on the plane under its mask, raised by half its thickness.
+    """
     pose = estimator.estimate_pose(object_observation=plate.object_observation)
 
     numpy.testing.assert_allclose(
@@ -112,6 +120,9 @@ def test_plate_is_posed_on_the_plane_at_its_mask(
 def test_tracking_an_unmoved_plate_keeps_its_position(
     estimator: FoundationPoseEstimator, plate: PlateOnPlane
 ):
+    """
+    Tracking the plate in the frame it was estimated in keeps its position.
+    """
     pose = estimator.estimate_pose(object_observation=plate.object_observation)
 
     tracked_pose = estimator.track_pose(

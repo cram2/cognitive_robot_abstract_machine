@@ -40,6 +40,11 @@ pytestmark = pytest.mark.skipif(
 
 
 def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
+    """
+    :return: A pipeline that reads the recording in *recording_directory* once, with a
+        static camera pose, and stores every frame in a freshly dropped database
+        *db_name*.
+    """
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         camera="file_reader",
         loop=False,
@@ -76,6 +81,9 @@ def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
 
 
 def _build_reader_pipeline(db_name: str) -> Pipeline:
+    """
+    :return: A pipeline that replays the frames stored in the database *db_name* once.
+    """
     mongo_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         camera="mongo", loop=False, db_name=db_name
     )

@@ -1,3 +1,7 @@
+"""
+Tests of the cluster position annotator.
+"""
+
 # %% imports
 
 from __future__ import annotations

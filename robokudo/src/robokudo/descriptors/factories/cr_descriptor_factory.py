@@ -1,3 +1,8 @@
+"""
+The factory that builds a collection reader descriptor from a camera configuration's
+registry name.
+"""
+
 from __future__ import annotations
 
 from typing_extensions import Any

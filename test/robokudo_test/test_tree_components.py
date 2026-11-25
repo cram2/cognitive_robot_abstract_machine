@@ -1,3 +1,9 @@
+"""
+Tests of RoboKudo's behaviour tree components.
+"""
+
+from __future__ import annotations
+
 from typing_extensions import Any
 
 import py_trees
@@ -29,6 +35,10 @@ class DummyBehaviour(py_trees.behaviour.Behaviour):
 
 
 class TestTreeComponents:
+    """
+    Tests of RoboKudo's task schedulers.
+    """
+
     def test_iterative_task_scheduler(self):
         leaf_behaviour1 = DummyBehaviour("Behaviour1")
         par1 = py_trees.composites.Parallel(

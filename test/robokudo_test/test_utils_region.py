@@ -1,3 +1,9 @@
+"""
+Tests of the region utilities.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
@@ -13,6 +19,10 @@ from semantic_digital_twin.world_description.world_entity import Region
 
 
 class TestUtilsRegion:
+    """
+    Tests of the oriented bounding box and pose of a world descriptor region.
+    """
+
     @pytest.fixture
     def world_and_region(self):
         world_descriptor = BaseWorldDescriptor()

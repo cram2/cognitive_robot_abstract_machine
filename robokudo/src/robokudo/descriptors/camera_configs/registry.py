@@ -1,3 +1,10 @@
+"""
+The registry of camera configuration classes, which creates a configuration from its
+registry name.
+"""
+
+from __future__ import annotations
+
 import importlib
 import pkgutil
 

@@ -328,6 +328,10 @@ class ModuleLoader:
 
     @staticmethod
     def get_module_path(*, module_name: str) -> Path:
+        """
+        :param module_name: Name of an importable package.
+        :return: The directory on disk that holds the package's files.
+        """
         files = importlib.resources.files(module_name)
         with as_file(files) as path:
             return Path(path)

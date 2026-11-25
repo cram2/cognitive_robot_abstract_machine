@@ -1,3 +1,9 @@
+"""
+Camera configuration of the HSR robot on ROS 2, registered as ``hsr_ros2``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar

@@ -207,10 +207,18 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
 
     @staticmethod
     def _body_name(*, body: Body) -> str:
+        """
+        :return: The name of *body* without its prefix.
+        """
         return body.name.name
 
     @staticmethod
     def _select_body_shape_collection(*, body: Body) -> ShapeCollection | None:
+        """
+        :return: The collision shapes of *body*, or its visual shapes if it has no
+            collision
+            shapes, or ``None`` if it has neither.
+        """
         if body.collision is not None and len(body.collision) > 0:
             return body.collision
         if body.visual is not None and len(body.visual) > 0:

@@ -196,6 +196,10 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             """
 
             def __init__(self) -> None:
+                """
+                Default parameters: a pretrained ultralytics pose model inside
+                :attr:`models_directory`.
+                """
                 self.models_directory: Path = (
                     ModuleLoader.get_module_path(module_name=PACKAGE_NAME) / "models"
                 )

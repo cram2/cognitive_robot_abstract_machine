@@ -1,4 +1,10 @@
+"""
+World descriptor ``world_semdt_raytracer_tabletop``: a table with boxes, a cup and a
+milk carton, rendered by the semantic digital twin ray tracer.
+"""
+
 # %% Imports
+from __future__ import annotations
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
     CameraRange,
@@ -33,6 +39,13 @@ class WorldDescriptor(BaseWorldDescriptor):
     """
 
     def __init__(self) -> None:
+        """
+        Place the table, its surface region, a red and a blue box, a cup and a milk
+        carton on it and the camera optical frame in the world.
+
+        :raises ImportError: If the coraplex package, which holds the cup and milk
+            meshes, cannot be located.
+        """
         super().__init__()
         root = self.world.root
 

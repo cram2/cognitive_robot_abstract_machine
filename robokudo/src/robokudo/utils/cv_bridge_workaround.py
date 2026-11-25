@@ -1,18 +1,8 @@
 """
-A lightweight replacement for cv_bridge while NumPy 2 is in use.
+Image conversions between ROS image messages and OpenCV arrays, in place of
+:class:`cv_bridge.CvBridge`, for the encodings RoboKudo's camera pipelines use:
 
-This class exists because the currently available ``cv_bridge`` binary can be
-compiled against NumPy 1.x and fails to import in environments that use NumPy 2.
-When ``cv_bridge`` wheels/packages become available that are compiled against
-NumPy 2, this module should be removed and users should switch back to
-``cv_bridge.CvBridge``.
-
-Only a subset of the original interface is implemented here:
-* ``imgmsg_to_cv2``
-* ``cv2_to_imgmsg``
-
-The implementation intentionally focuses on encodings used by RoboKudo camera
-pipelines and type conversion helpers.
+:meth:`CVBridgeWorkaround.imgmsg_to_cv2` and :meth:`CVBridgeWorkaround.cv2_to_imgmsg`.
 """
 
 from __future__ import annotations
@@ -164,6 +154,12 @@ class CVBridgeWorkaround:
 
     @classmethod
     def _encoding_to_dtype_channels(cls, *, encoding: str) -> tuple[np.dtype, int]:
+        """
+        :param encoding: A ROS image encoding, named such as ``bgr8`` or generic such as
+            ``16UC1``.
+        :return: The NumPy dtype of one channel and the number of channels.
+        :raises CVBridgeUnsupportedEncoding: If the encoding is neither.
+        """
         normalized = encoding.strip().lower()
         if normalized in cls._ENCODING_TO_DTYPE_CHANNELS:
             dtype, channels = cls._ENCODING_TO_DTYPE_CHANNELS[normalized]
@@ -191,6 +187,15 @@ class CVBridgeWorkaround:
 
     @classmethod
     def _decode_image_message(cls, *, msg: Image) -> npt.NDArray:
+        """
+        :param msg: A ROS image message.
+        :return: The image as an array of height × width, with a third axis for more
+            than one
+            channel.
+        :raises CVBridgeROSImageShapeError: If the image has no pixels.
+        :raises CVBridgeROSImageStepError: If a row is shorter than its pixels.
+        :raises CVBridgeROSImagePayloadError: If the data is shorter than the rows.
+        """
         base_dtype, channels = cls._encoding_to_dtype_channels(encoding=msg.encoding)
         if msg.height <= 0 or msg.width <= 0:
             raise CVBridgeROSImageShapeError(height=msg.height, width=msg.width)
@@ -227,6 +232,11 @@ class CVBridgeWorkaround:
 
     @classmethod
     def _infer_ros_encoding_from_cv_image(cls, *, cv_image: npt.NDArray) -> str:
+        """
+        :param cv_image: A two- or three-dimensional OpenCV image.
+        :return: The ROS image encoding matching its channel count and dtype.
+        :raises CVBridgeImageShapeError: If the image has another number of dimensions.
+        """
         if cv_image.ndim == 2:
             channel_count = 1
         elif cv_image.ndim == 3:

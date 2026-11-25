@@ -1,3 +1,10 @@
+"""
+Camera configuration of the Xtion camera on the TIAGo robot without a TF pose lookup,
+registered as ``tiago_wo_tf``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar

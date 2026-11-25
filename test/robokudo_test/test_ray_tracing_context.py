@@ -39,6 +39,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def test_resolver_selects_named_descriptor_camera() -> None:
+    """
+    A camera named by the source is the one taken from the descriptor's world.
+    """
     world = WorldDescriptor().world
     [camera] = world.get_semantic_annotations_by_type(Camera)
     source = WorldDescriptorSource(camera_name=camera.name)
@@ -51,6 +54,9 @@ def test_resolver_selects_named_descriptor_camera() -> None:
 
 
 def test_resolver_rejects_unknown_camera_name() -> None:
+    """
+    A camera name the descriptor's world lacks raises :class:`CameraAnnotationMissing`.
+    """
     world = WorldDescriptor().world
     source = WorldDescriptorSource(camera_name=PrefixedName(name="unknown_camera"))
 
@@ -117,6 +123,9 @@ def test_resolver_retries_runtime_lookup_after_world_becomes_available() -> None
 
 
 def test_resolver_selects_named_robot_default_camera() -> None:
+    """
+    The default camera of the robot named by the source is taken, not another robot's.
+    """
     world = Mock(spec=World)
     selected_robot = Mock(spec=AbstractRobot)
     selected_robot.name = PrefixedName(name="selected_robot")
@@ -138,6 +147,10 @@ def test_resolver_selects_named_robot_default_camera() -> None:
 
 
 def test_resolver_rejects_ambiguous_runtime_robot_selection() -> None:
+    """
+    Without a robot name, a world holding two robots raises
+    :class:`RobotAnnotationAmbiguous`.
+    """
     world = Mock(spec=World)
     first_robot = Mock(spec=AbstractRobot)
     first_robot.name = PrefixedName(name="first_robot")

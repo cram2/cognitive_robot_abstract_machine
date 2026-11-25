@@ -1,3 +1,9 @@
+"""
+Camera configuration of a Kinect on a robot, registered as ``kinect``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 from typing_extensions import ClassVar

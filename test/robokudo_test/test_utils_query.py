@@ -1,3 +1,9 @@
+"""
+Tests of the query handling utilities.
+"""
+
+from __future__ import annotations
+
 import queue
 
 import pytest
@@ -9,6 +15,10 @@ from robokudo_msgs.action import Query
 
 
 class TestUtilsQuery:
+    """
+    Tests of :class:`QueryHandler`.
+    """
+
     def test_init_feedback_queue(self):
         blackboard = Blackboard()
 

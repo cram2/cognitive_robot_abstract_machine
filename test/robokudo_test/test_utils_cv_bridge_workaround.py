@@ -1,3 +1,9 @@
+"""
+Tests of converting between ROS image messages and OpenCV images.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 from sensor_msgs.msg import Image
@@ -35,6 +41,10 @@ def _make_image_msg(
 
 
 class TestCVBridgeWorkaround(object):
+    """
+    Tests of :class:`CVBridgeWorkaround`.
+    """
+
     def test_imgmsg_to_cv2_rgb8_to_bgr8(self) -> None:
         bridge = CVBridgeWorkaround()
         rgb = np.array(

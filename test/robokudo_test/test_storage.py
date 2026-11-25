@@ -37,6 +37,10 @@ from ._perception_world import camera_interface
 
 @dataclass(kw_only=True)
 class CustomDataclassView:
+    """
+    A dataclass stored as an extra CAS view.
+    """
+
     label: str
     confidence: float
 
@@ -58,10 +62,10 @@ def storage_instance():
 
 @pytest.fixture()
 def cas_data():
+    """
+    :return: A CAS holding a random color image and a random depth image.
+    """
     cas = CAS()
-    """
-    Mock CAS data for testing.
-    """
     cas.set(view_name=CASViews.COLOR_IMAGE, value=np.random.rand(100, 100, 3))
     cas.set(view_name=CASViews.DEPTH_IMAGE, value=np.random.rand(100, 100))
 
@@ -69,6 +73,12 @@ def cas_data():
 
 
 def store_cas_in_storage(storage_instance, cas_data):
+    """
+    Store *cas_data* the way the storage writer does: first each view, then the CAS
+    document that points to them.
+
+    :return: The result of storing the CAS document.
+    """
     flat_cas = storage_instance.generate_dict_from_real_cas(cas=cas_data)
     flat_cas["view_ids"] = {}
 

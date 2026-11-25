@@ -24,6 +24,11 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "storage"
 
     def implementation(self) -> Pipeline:
+        """
+        :return: A pipeline that reads and preprocesses Kinect camera data and stores it
+            with
+            :class:`StorageWriter`.
+        """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
             camera="kinect"
         )

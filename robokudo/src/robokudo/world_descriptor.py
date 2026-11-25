@@ -94,6 +94,10 @@ class CameraPlacement:
 
 @dataclass(eq=False, kw_only=True)
 class PredefinedObject(SemanticAnnotation):
+    """
+    Marks a body as one of the objects a world descriptor places in the world.
+    """
+
     body: Body = field(default=None)
 
 

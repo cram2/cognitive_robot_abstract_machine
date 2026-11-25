@@ -57,6 +57,12 @@ class QueryWorkerThread(threading.Thread):
 
 
 def query_simple_pipeline(node, recording_directory: Path):
+    """
+    Run a pipeline that waits for a query and then segments the clusters on the plane of
+    the looping recording in *recording_directory*.
+
+    :return: The pipeline and its status after at most 20 ticks.
+    """
     cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
         camera="file_reader",
         loop=True,
@@ -99,6 +105,10 @@ def tree_run(node, cup_on_counter_directory: Path):
 
 # %% Query interface tests
 class TestQueryInterface:
+    """
+    The query action interface of a running pipeline.
+    """
+
     def test_query_annotator_returns_running(self, *, tree_run):
         seq, tree_result = tree_run
 

@@ -1,3 +1,9 @@
+"""
+Tests of loading RoboKudo modules.
+"""
+
+from __future__ import annotations
+
 import pytest
 import rclpy
 
@@ -5,6 +11,10 @@ from robokudo.utils.module_loader import ModuleLoader
 
 
 class TestUtilsModuleLoader(object):
+    """
+    Tests of loading RoboKudo modules by package and module name.
+    """
+
     @pytest.fixture(autouse=True)
     def module_loader(self):
         return ModuleLoader()

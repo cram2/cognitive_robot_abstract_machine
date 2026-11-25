@@ -1,5 +1,10 @@
+"""
+Tests of converting camera models to and from ROS camera infos and Open3D intrinsics.
+"""
+
 # %% Imports
 
+from __future__ import annotations
 import pytest
 
 import numpy as np
@@ -27,6 +32,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 
 # %% Camera model conversion
 def test_ros_camera_model_adapter_reads_camera_info():
+    """
+    A ROS camera info becomes a camera model with its resolution and intrinsics.
+    """
     camera_info = CameraInfo()
     camera_info.width = 640
     camera_info.height = 480
@@ -44,6 +52,10 @@ def test_ros_camera_model_adapter_reads_camera_info():
 
 
 def test_ros_camera_model_adapter_accepts_empty_model_with_zero_coefficients():
+    """
+    A camera info without a distortion model and with zero coefficients becomes a model
+    without distortion.
+    """
     camera_info = CameraInfo()
     camera_info.width = 640
     camera_info.height = 480
@@ -81,6 +93,9 @@ def test_ros_camera_model_adapter_writes_camera_info():
 
 
 def test_open3d_camera_model_adapter_creates_intrinsic():
+    """
+    A camera model becomes an Open3D intrinsic with the same resolution and matrix.
+    """
     model = PinholeCameraModel(
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=500.0,

@@ -60,7 +60,14 @@ class ReadinessSignal(Protocol):
 
 
 class PrettyResultPrinter:
+    """
+    Formats a query result for the console.
+    """
+
     def pretty_print_result(self, *, result: Query_Result) -> str:
+        """
+        :return: *result* as indented JSON.
+        """
         result_dict = message_to_ordereddict(result)
         return json.dumps(result_dict, indent=2)
 

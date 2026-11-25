@@ -1,3 +1,10 @@
+"""
+Matching of object hypotheses against the object designator of a query, and
+:class:`QueryHandler`, which answers queries through the ROS action interface.
+"""
+
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from queue import Queue

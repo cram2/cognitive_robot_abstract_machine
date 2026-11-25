@@ -80,6 +80,10 @@ class CheckQueryType(BaseAnnotator):
         super().__init__(name)
 
     def update(self) -> Status:
+        """
+        :return: :attr:`Status.SUCCESS` if the query on the CAS asks for ``numbers``,
+            :attr:`Status.FAILURE` otherwise or if there is no query.
+        """
         # Retrieve the query from the CAS
         query = self.get_cas().get(view_name=CASViews.QUERY)
 

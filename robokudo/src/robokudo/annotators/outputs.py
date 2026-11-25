@@ -94,6 +94,9 @@ class AnnotatorOutputs:
         self.outputs[annotator_name] = AnnotatorOutputStruct()
 
     def clear_outputs(self) -> None:
+        """
+        Reset the output of every annotator registered so far, keeping their entries.
+        """
         annotator_names = [key for key in self.outputs]
         for name in annotator_names:
             self.init_annotator(annotator_name=name)

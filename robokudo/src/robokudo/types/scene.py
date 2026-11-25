@@ -172,7 +172,11 @@ class ParthoodHypothesis(AnalyzableAnnotation, Nameable):
 
 
 @dataclass(kw_only=True)
-class ParthoodComponentHypothesis(ParthoodHypothesis): ...
+class ParthoodComponentHypothesis(ParthoodHypothesis):
+    """
+    Hypothesis about a component of an object, such as the control unit of an electrical
+    device.
+    """
 
 
 @dataclass(kw_only=True)

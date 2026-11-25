@@ -142,6 +142,10 @@ def test_world_relative_crop_succeeds_when_the_transform_is_available(
 def test_world_relative_crop_actually_crops_the_cloud(
     crop_annotator_in_pipeline: PointcloudCropAnnotator,
 ):
+    """
+    Cropping relative to the world removes the points outside the box around the world
+    origin.
+    """
     crop_annotator_in_pipeline.update()
 
     cropped_cloud = crop_annotator_in_pipeline.get_cas().get(view_name=CASViews.CLOUD)

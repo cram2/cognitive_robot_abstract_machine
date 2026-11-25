@@ -112,6 +112,10 @@ class YoloAnnotator(ThreadedAnnotator):
             """
 
             def __init__(self) -> None:
+                """
+                Default parameters: no model is configured; set either
+                :attr:`pretrained_model` or the custom weights in a ROS package.
+                """
                 self.models_directory: Path = (
                     ModuleLoader.get_module_path(module_name=PACKAGE_NAME) / "models"
                 )
@@ -227,6 +231,15 @@ class YoloAnnotator(ThreadedAnnotator):
         name: str = "YoloAnnotator",
         descriptor: YoloAnnotator.Descriptor | None = None,
     ) -> None:
+        """
+        Resolve where the detection model is loaded from; :meth:`setup` loads the
+        models.
+
+        :param name: Name of the annotator.
+        :param descriptor: Descriptor configuring the annotator; the default one if
+            omitted.
+        :raises DetectionModelNotConfigured: If the descriptor configures no model.
+        """
         super().__init__(name, descriptor)
 
         self.model_location: str = self.descriptor.parameters.model_location(

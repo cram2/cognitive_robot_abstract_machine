@@ -1,9 +1,19 @@
+"""
+Tests of finding files in ROS packages.
+"""
+
+from __future__ import annotations
+
 import pytest
 
 from robokudo.utils.file_loader import FileLoader
 
 
 class TestUtilsFileLoader:
+    """
+    Tests of finding ROS packages and their files with :class:`FileLoader`.
+    """
+
     def test_file_loader_find_robokudo_ros_package(self):
         assert FileLoader.get_ros_pkg_path(ros_pkg_name="robokudo_ros")
 

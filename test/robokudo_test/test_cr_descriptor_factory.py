@@ -1,3 +1,9 @@
+"""
+Tests of building collection reader descriptors.
+"""
+
+from __future__ import annotations
+
 import os
 
 import pytest
@@ -11,6 +17,10 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 
 
 class TestCrDescriptorFactory(object):
+    """
+    Tests of :class:`CollectionReaderDescriptorFactory`.
+    """
+
     @pytest.mark.skipif(
         os.getenv("CI") == "true",
         reason="module temporarily disabled until storage functionality is migrated to ormatic",

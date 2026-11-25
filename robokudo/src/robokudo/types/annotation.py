@@ -330,6 +330,11 @@ class SIFTAnnotation(Annotation):
         keypoints: Sequence[cv2.KeyPoint],
         descriptors: Sequence[npt.NDArray[np.float32]],
     ) -> SIFTAnnotation:
+        """
+        :param keypoints: Keypoints OpenCV's SIFT detector found.
+        :param descriptors: The SIFT descriptor of each keypoint, in the same order.
+        :return: The annotation holding both.
+        """
         return cls(
             keypoints=[KeyPoint.from_cv(keypoint=k) for k in keypoints],
             descriptors=descriptors,

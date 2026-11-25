@@ -1,3 +1,10 @@
+"""
+Camera configuration of the Orbbec Astra without a TF pose lookup, registered as
+``orbbec_wo_tf``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar

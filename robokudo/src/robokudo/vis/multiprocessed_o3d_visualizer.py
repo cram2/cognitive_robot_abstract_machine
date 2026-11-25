@@ -569,6 +569,10 @@ class Geometry3DMemoryMap(ObjectMemoryMap[G], Generic[G]):
     kw_only=True,
 )
 class PointCloudMemoryMap(Geometry3DMemoryMap[o3d.geometry.PointCloud]):
+    """
+    Shares an Open3D point cloud: its points, normals, colors and covariances.
+    """
+
     points: ArrayMemoryMap
     """Memory map of the point clouds points."""
 
@@ -591,6 +595,10 @@ class PointCloudMemoryMap(Geometry3DMemoryMap[o3d.geometry.PointCloud]):
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class LineSetMemoryMap(Geometry3DMemoryMap[o3d.geometry.LineSet]):
+    """
+    Shares an Open3D line set: its points, lines and colors.
+    """
+
     colors: ArrayMemoryMap
     """Memory map of the line set colors."""
 
@@ -613,6 +621,10 @@ class LineSetMemoryMap(Geometry3DMemoryMap[o3d.geometry.LineSet]):
     kw_only=True,
 )
 class MeshBaseMemoryMap(Geometry3DMemoryMap[o3d.geometry.MeshBase]):
+    """
+    Shares the vertices, vertex normals and vertex colors of an Open3D mesh.
+    """
+
     vertices: ArrayMemoryMap
     """Memory map of the mesh vertices."""
 
@@ -635,6 +647,12 @@ class MeshBaseMemoryMap(Geometry3DMemoryMap[o3d.geometry.MeshBase]):
     kw_only=True,
 )
 class TriangleMeshMemoryMap(Geometry3DMemoryMap[o3d.geometry.TriangleMesh]):
+    """
+    Shares an Open3D triangle mesh: its vertices and triangles with their normals,
+    colors,
+    texture coordinates and material ids.
+    """
+
     vertices: ArrayMemoryMap
     """Memory map of the mesh vertices."""
 
@@ -683,6 +701,10 @@ class TriangleMeshMemoryMap(Geometry3DMemoryMap[o3d.geometry.TriangleMesh]):
 class OrientedBoundingBoxMemoryMap(
     Geometry3DMemoryMap[o3d.geometry.OrientedBoundingBox]
 ):
+    """
+    Shares an Open3D oriented bounding box: its center, extent, rotation and color.
+    """
+
     center: ArrayMemoryMap
     """Memory map of the oriented bounding box center."""
 
@@ -711,6 +733,10 @@ class OrientedBoundingBoxMemoryMap(
 class AxisAlignedBoundingBoxMemoryMap(
     Geometry3DMemoryMap[o3d.geometry.AxisAlignedBoundingBox]
 ):
+    """
+    Shares an Open3D axis-aligned bounding box: its bounds and color.
+    """
+
     color: ArrayMemoryMap
     """Memory map of the axis aligned bounding box color."""
 
@@ -729,6 +755,12 @@ class AxisAlignedBoundingBoxMemoryMap(
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class TetraMeshMemoryMap(Geometry3DMemoryMap[o3d.geometry.TetraMesh]):
+    """
+    Shares an Open3D tetrahedral mesh: its vertices with their normals and colors, and
+    its
+    tetrahedra.
+    """
+
     tetras: ArrayMemoryMap
     """Memory map of the tetra mesh tetras."""
 
@@ -753,6 +785,11 @@ class TetraMeshMemoryMap(Geometry3DMemoryMap[o3d.geometry.TetraMesh]):
 class MaterialRecordMemoryMap(
     ObjectMemoryMap[o3d.visualization.rendering.MaterialRecord]
 ):
+    """
+    Shares the rendering settings of an Open3D material record: colors and images as
+    memory maps, scalar settings as plain values.
+    """
+
     absorption_color: ArrayMemoryMap
     absorption_distance: float
     albedo_img: ArrayMemoryMap | None
@@ -810,6 +847,10 @@ class MaterialRecordMemoryMap(
     @override
     @classmethod
     def from_object(cls, *, obj: o3d.visualization.rendering.MaterialRecord) -> Self:
+        """
+        Create the memory map of a material record; see
+        :meth:`ObjectMemoryMap.from_object`.
+        """
         attribute_dict, size = cls.create_mapped_attributes_memory_maps(obj=obj)
         return cls(
             byte_size=size,
@@ -895,6 +936,10 @@ class MaterialRecordMemoryMap(
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class HalfEdgeMemoryMap(ObjectMemoryMap[o3d.geometry.HalfEdge]):
+    """
+    Shares one half edge of an Open3D half-edge mesh.
+    """
+
     data: ArrayMemoryMap
     """Memory map containing next, triangle_index, twin and vertex_indices."""
 
@@ -978,6 +1023,10 @@ class HalfEdgeMemoryMap(ObjectMemoryMap[o3d.geometry.HalfEdge]):
 class HalfEdgeTriangleMeshMemoryMap(
     Geometry3DMemoryMap[o3d.geometry.HalfEdgeTriangleMesh]
 ):
+    """
+    Shares an Open3D half-edge triangle mesh: its vertices, triangles and half edges.
+    """
+
     half_edges: list[HalfEdgeMemoryMap]
     """Memory map of the half edge mesh half edges."""
 

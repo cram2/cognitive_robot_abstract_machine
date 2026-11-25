@@ -1,3 +1,7 @@
+"""
+Tests of replaying a recording directory with the file reader camera interface.
+"""
+
 from __future__ import annotations
 
 # %% Imports

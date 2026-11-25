@@ -37,6 +37,10 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         return "static_detector_world_descriptor_from_storage"
 
     def implementation(self):
+        """
+        :return: A pipeline that replays camera data from MongoDB, loads the
+            ``world_iai_kitchen20`` world descriptor and detects its cereal and milk.
+        """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
             camera="mongo"
         )

@@ -1,9 +1,19 @@
+"""
+Tests of the CAS's annotations.
+"""
+
+from __future__ import annotations
+
 import robokudo.cas
 import robokudo.types.annotation
 import robokudo.types.scene
 
 
 class TestCASObject(object):
+    """
+    Tests of storing and filtering annotations in a :class:`CAS`.
+    """
+
     cls = robokudo.cas.CAS
 
     def test_annotations(self):

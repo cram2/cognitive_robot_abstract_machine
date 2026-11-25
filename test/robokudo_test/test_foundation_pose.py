@@ -1,3 +1,8 @@
+"""
+Tests of the FoundationPose annotator against a scripted pose estimator: class meshes,
+matching across frames, pose update modes and visualization.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -352,6 +357,10 @@ def test_unscaled_single_mesh_is_estimated_from_its_own_file(
     scene: FlatSurfaceScene,
     box_mesh_file: Path,
 ):
+    """
+    A class mesh that needs no conversion hands the pose estimator the file it was
+    given.
+    """
     class_mesh = scene.class_mesh(mesh_file=box_mesh_file)
 
     assert class_mesh.estimator_mesh_file == box_mesh_file
@@ -361,6 +370,9 @@ def test_scaled_mesh_is_rewritten_in_meters(
     scene: FlatSurfaceScene,
     box_mesh_file: Path,
 ):
+    """
+    A scaled class mesh hands the pose estimator a new file with the scale applied.
+    """
     scale = 0.5
 
     class_mesh = scene.class_mesh(mesh_file=box_mesh_file, scale=scale)
@@ -375,6 +387,9 @@ def test_mesh_file_declaring_its_unit_is_rewritten_in_meters(
     scene: FlatSurfaceScene,
     tmp_path: Path,
 ):
+    """
+    A mesh file that declares millimeters as its unit is converted into meters.
+    """
     box = trimesh.creation.box(extents=(100.0, 100.0, 100.0))
     box.units = "millimeters"
     mesh_file = tmp_path / "millimeters.glb"
@@ -395,6 +410,9 @@ def test_multi_part_mesh_is_rewritten_as_one_mesh(
     scene: FlatSurfaceScene,
     tmp_path: Path,
 ):
+    """
+    A mesh file with several parts is converted into one mesh holding every vertex.
+    """
     parts = [
         trimesh.creation.box(extents=(0.1, 0.1, 0.1)),
         trimesh.creation.box(extents=(0.1, 0.1, 0.1)).apply_translation((0.3, 0, 0)),
@@ -411,6 +429,9 @@ def test_multi_part_mesh_is_rewritten_as_one_mesh(
 def test_single_mesh_scene_is_estimated_from_its_own_file(
     scene: FlatSurfaceScene, tmp_path: Path
 ):
+    """
+    A scene file holding a single mesh is handed to the pose estimator unchanged.
+    """
     mesh_file = tmp_path / "single.glb"
     trimesh.Scene([trimesh.creation.box(extents=(0.1, 0.1, 0.1))]).export(mesh_file)
 
@@ -424,6 +445,9 @@ def test_two_meshes_of_one_class_are_rejected(
     box_mesh_file: Path,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    Two meshes configured for one object class raise :class:`DuplicateObjectClassMesh`.
+    """
     descriptor = FoundationPoseAnnotator.Descriptor()
     descriptor.parameters = descriptor.Parameters()
     descriptor.parameters.class_meshes = [
@@ -463,6 +487,10 @@ def test_frame_rejects_images_of_different_resolutions(
 
 
 def test_match_takes_the_most_overlapping_object_of_the_class(scene: FlatSurfaceScene):
+    """
+    Of the previous frame's objects of the class, the one whose mask overlaps most is
+    matched.
+    """
     overlapping = PosedObject(
         class_name=scene.class_name,
         pose=object_pose_at_depth(0.5),
@@ -486,6 +514,9 @@ def test_match_takes_the_most_overlapping_object_of_the_class(scene: FlatSurface
 
 
 def test_match_ignores_objects_of_other_classes(scene: FlatSurfaceScene):
+    """
+    An object of another class is never matched, however much it overlaps.
+    """
     other_class = PosedObject(
         class_name="other",
         pose=object_pose_at_depth(0.5),
@@ -504,6 +535,9 @@ def test_match_ignores_objects_of_other_classes(scene: FlatSurfaceScene):
 
 
 def test_match_requires_the_minimum_overlap(scene: FlatSurfaceScene):
+    """
+    An object that overlaps less than the minimum overlap is not matched.
+    """
     distant = PosedObject(
         class_name=scene.class_name,
         pose=object_pose_at_depth(0.5),
@@ -539,6 +573,10 @@ def test_mode_leaves_object_without_pose(
     is_posed: bool,
     scene: FlatSurfaceScene,
 ):
+    """
+    Estimating only unposed objects leaves a posed object alone, and tracking only posed
+    objects leaves an unposed one alone.
+    """
     annotator.descriptor.parameters.pose_update_mode = mode
     object_hypothesis = scene.add_object_hypothesis(annotator=annotator)
     if is_posed:
@@ -566,6 +604,9 @@ def test_mode_estimates_object_without_pose(
     mode: PoseUpdateMode,
     scene: FlatSurfaceScene,
 ):
+    """
+    Every mode that estimates objects without a pose annotates the estimated pose.
+    """
     annotator.descriptor.parameters.pose_update_mode = mode
     object_hypothesis = scene.add_object_hypothesis(annotator=annotator)
 
@@ -585,6 +626,9 @@ def test_mode_tracks_object_from_its_pose_annotation(
     mode: PoseUpdateMode,
     scene: FlatSurfaceScene,
 ):
+    """
+    Every mode that tracks starts tracking from the pose the object already carries.
+    """
     annotator.descriptor.parameters.pose_update_mode = mode
     object_hypothesis = scene.add_object_hypothesis(annotator=annotator)
     known_pose = object_pose_at_depth(0.4)
@@ -605,6 +649,9 @@ def test_estimate_all_objects_ignores_existing_pose(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    Estimating all objects estimates anew instead of tracking from an existing pose.
+    """
     annotator.descriptor.parameters.pose_update_mode = EstimateAllObjects()
     object_hypothesis = scene.add_object_hypothesis(annotator=annotator)
     add_pose_annotation(object_hypothesis, object_pose_at_depth(0.4))
@@ -629,6 +676,9 @@ def test_object_of_unknown_class_is_not_posed(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    An object whose class has no configured mesh is neither estimated nor annotated.
+    """
     object_hypothesis = scene.add_object_hypothesis(
         annotator=annotator, class_name="unknown"
     )
@@ -647,6 +697,11 @@ def test_pose_annotation_reaches_the_world_through_the_camera_pose_of_the_cas(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    The pose annotation is in the camera frame, so that the CAS's camera pose turns it
+    into
+    the estimated pose in the world.
+    """
     world_T_camera = get_transform_matrix_from_q(
         [0.0, 0.0, numpy.sin(numpy.pi / 4), numpy.cos(numpy.pi / 4)], [1.0, 2.0, 3.0]
     )
@@ -685,6 +740,9 @@ def test_tracked_pose_overwrites_its_annotation_when_configured(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    Configured to update existing annotations, tracking overwrites the tracked one.
+    """
     annotator.descriptor.parameters.pose_update_mode = EstimateAndTrack(
         update_existing_pose_annotations=True
     )
@@ -704,6 +762,9 @@ def test_object_without_estimated_pose_gets_no_annotation(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    An object the estimator finds no pose for gets no pose annotation.
+    """
     pose_estimator.estimated_pose = None
     object_hypothesis = scene.add_object_hypothesis(annotator=annotator)
 
@@ -720,6 +781,9 @@ def test_object_is_tracked_from_its_latest_pose_annotation(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    An object with several pose annotations is tracked from the last one.
+    """
     object_hypothesis = scene.add_object_hypothesis(annotator=annotator)
     add_pose_annotation(object_hypothesis, object_pose_at_depth(0.4))
     latest_pose = object_pose_at_depth(0.45)
@@ -736,6 +800,9 @@ def test_object_is_tracked_from_the_previous_frame(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    An object matched to one of the previous frame is tracked from that object's pose.
+    """
     scene.add_object_hypothesis(annotator=annotator)
     annotator.compute()
     scene.next_frame(annotator=annotator)
@@ -758,6 +825,9 @@ def test_object_is_not_tracked_across_frames_when_disabled(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    With tracking across frames disabled, the next frame's object is estimated anew.
+    """
     annotator.descriptor.parameters.pose_update_mode = EstimateAndTrack(
         track_across_frames=False
     )
@@ -777,6 +847,9 @@ def test_track_leaving_the_mask_is_estimated_anew(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    A tracked pose that leaves the object's mask is discarded and estimated anew.
+    """
     pose_estimator.tracked_pose = Pose.from_xyz_quaternion(pos_x=0.5, pos_z=0.5)
     object_hypothesis = scene.add_object_hypothesis(annotator=annotator)
     add_pose_annotation(object_hypothesis, object_pose_at_depth(0.4))
@@ -798,6 +871,10 @@ def test_object_mask_is_placed_at_depth_image_resolution(
     annotator: FoundationPoseAnnotator,
     pose_estimator: ScriptedPoseEstimator,
 ):
+    """
+    With a depth image at half the color resolution, the mask handed to the estimator
+    matches the depth image and covers the object region scaled to it.
+    """
     cas = annotator.get_cas()
     color_to_depth_ratio = ColorToDepthRatio(horizontal=0.5, vertical=0.5)
     cas.color_to_depth_ratio = color_to_depth_ratio
@@ -839,6 +916,9 @@ def visualization_of(
 def test_mesh_frame_bounding_box_spans_the_mesh(
     scene: FlatSurfaceScene, annotator: FoundationPoseAnnotator
 ):
+    """
+    In the mesh frame, the drawn bounding box has the extent of the mesh.
+    """
     shape = annotator.class_meshes.meshes_by_class_name[scene.class_name].shape
     visualization = visualization_of(annotator, VisualizationFrame.MESH)
 
@@ -853,6 +933,9 @@ def test_smallest_bounding_box_frame_uses_the_oriented_box(
     scene: FlatSurfaceScene,
     annotator: FoundationPoseAnnotator,
 ):
+    """
+    In the smallest bounding box frame, the drawn box is the mesh's oriented box.
+    """
     shape = annotator.class_meshes.meshes_by_class_name[scene.class_name].shape
     visualization = visualization_of(
         annotator, VisualizationFrame.SMALLEST_BOUNDING_BOX
@@ -870,6 +953,9 @@ def test_smallest_bounding_box_frame_uses_the_oriented_box(
 def test_nothing_is_drawn_for_an_object_behind_the_camera(
     scene: FlatSurfaceScene, annotator: FoundationPoseAnnotator
 ):
+    """
+    An object behind the camera leaves the image untouched.
+    """
     shape = annotator.class_meshes.meshes_by_class_name[scene.class_name].shape
     visualization = visualization_of(annotator, VisualizationFrame.MESH)
 
@@ -883,6 +969,11 @@ def test_nothing_is_drawn_for_an_object_behind_the_camera(
 def test_axes_are_drawn_in_color_image_pixels_from_the_depth_image_calibration(
     annotator: FoundationPoseAnnotator,
 ):
+    """
+    Axes are projected with the color image calibration derived from the depth image's,
+    so
+    they end at the expected color image pixels.
+    """
     color_camera_model = annotator.color_and_depth_frame().camera_model
     color_to_depth_ratio = ColorToDepthRatio(horizontal=0.5, vertical=0.5)
     visualization = PoseVisualization(
@@ -913,6 +1004,9 @@ def test_axes_are_drawn_in_color_image_pixels_from_the_depth_image_calibration(
 def test_axes_reaching_behind_the_camera_are_not_drawn(
     annotator: FoundationPoseAnnotator,
 ):
+    """
+    Axes that point from the object behind the camera leave the image untouched.
+    """
     visualization = visualization_of(annotator, VisualizationFrame.MESH)
     pose_facing_the_camera = Pose.from_xyz_quaternion(
         0.0, 0.0, 0.05, 1.0, 0.0, 0.0, 0.0
@@ -927,6 +1021,9 @@ def test_posed_objects_are_drawn_and_named_in_the_3d_view(
     scene: FlatSurfaceScene,
     annotator: FoundationPoseAnnotator,
 ):
+    """
+    Each posed object's geometries reach the 3D view under distinct names.
+    """
     annotator.descriptor.parameters.visualize_object_mesh = True
     scene.add_object_hypothesis(annotator=annotator)
 

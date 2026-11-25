@@ -1,3 +1,9 @@
+"""
+Tests of clearing the annotator outputs of a pipeline.
+"""
+
+from __future__ import annotations
+
 import py_trees
 import pytest
 
@@ -7,6 +13,10 @@ from robokudo.exceptions import ParentPipelineMissing
 
 
 class TestClearAnnotatorOutputs:
+    """
+    Tests of :class:`ClearAnnotatorOutputs`.
+    """
+
     def test_raises_without_parent_pipeline(
         self, *, annotator_output_buffer: AnnotatorOutputPerPipelineMap
     ):

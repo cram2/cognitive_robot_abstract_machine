@@ -1,3 +1,10 @@
+"""
+Camera configuration of a Kinect on a robot without a TF pose lookup, registered as
+``kinect_wo_tf``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar

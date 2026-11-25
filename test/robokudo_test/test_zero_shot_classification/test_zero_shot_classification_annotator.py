@@ -96,6 +96,9 @@ def _annotator_in_pipeline(
 def _scene_classifications(
     annotator: ZeroShotClassificationAnnotator,
 ) -> list[Classification]:
+    """
+    :return: The classifications the annotator put into its CAS for the whole scene.
+    """
     return annotator.get_cas().filter_annotations_by_type(
         type_to_include=Classification
     )
@@ -109,6 +112,9 @@ def _classnames(classifications: list[Classification]) -> list[str]:
 
 
 def test_scene_scope_adds_the_image_classifications_to_the_cas():
+    """
+    In scene scope, the CAS gets the classifications of the whole color image.
+    """
     color = COLOR_BY_WORD["green"]
     annotator = _annotator_in_pipeline(_color_descriptor(), solid_image(color))
 
@@ -152,6 +158,9 @@ def test_object_hypothesis_scope_classifies_each_hypothesis_by_its_region():
 
 
 def test_object_hypothesis_scope_skips_hypotheses_rejected_by_filter():
+    """
+    In object hypothesis scope, a hypothesis the filter rejects gets no classification.
+    """
     descriptor = _object_hypothesis_descriptor()
     rejected_object = object_hypothesis(x=0, y=0, width=10, height=10)
     descriptor.parameters.filter_fn = lambda hypothesis: (

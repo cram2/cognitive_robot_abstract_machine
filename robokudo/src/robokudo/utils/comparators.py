@@ -1,3 +1,8 @@
+"""
+Comparators that measure how similar a queried value is to an attribute of an object
+hypothesis.
+"""
+
 from __future__ import annotations
 
 import cv2
