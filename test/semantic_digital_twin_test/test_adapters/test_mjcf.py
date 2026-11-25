@@ -6,12 +6,17 @@ import numpy
 import pytest
 
 from semantic_digital_twin.adapters.mjcf import MJCFParser
-from semantic_digital_twin.adapters.multi_sim import MujocoLight, MujocoTendon
+from semantic_digital_twin.adapters.multi_sim import (
+    MujocoBuilder,
+    MujocoLight,
+    MujocoTendon,
+)
 from semantic_digital_twin.world_description.contact import (
     ContactFriction,
     ContactParameters,
 )
 from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.geometry import Mesh
 
 MJCF_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -498,3 +503,101 @@ def test_parsing_a_scene_without_tendons_does_not_compile_it(monkeypatch):
     world = MJCFParser(file_path).create_world()
 
     assert world.root.name.name == root_name
+
+
+# %% mesh reference frames
+
+TURNED_MESH_SCENE = os.path.join(DATASET_DIR, "turned_mesh_scene.xml")
+"""
+A scene whose one body carries a mesh placed by MJCF's ``refpos`` and ``refquat`` and
+scaled unevenly, the way RoboCasa turns its objects' meshes upright.
+"""
+
+
+def compiled_mesh_vertex_bounds(model: mujoco.MjModel) -> numpy.ndarray:
+    """
+    :param model: A compiled model with a single mesh geom.
+    :return: The lower and upper corner of that geom's vertices in its body's frame.
+    """
+    [geom] = [
+        geom
+        for geom in range(model.ngeom)
+        if model.geom_type[geom] == mujoco.mjtGeom.mjGEOM_MESH
+    ]
+    mesh = model.geom_dataid[geom]
+    first_vertex = model.mesh_vertadr[mesh]
+    vertices = model.mesh_vert[first_vertex : first_vertex + model.mesh_vertnum[mesh]]
+    body_rotation_geom = numpy.zeros(9)
+    mujoco.mju_quat2Mat(body_rotation_geom, model.geom_quat[geom])
+    in_body = vertices @ body_rotation_geom.reshape(3, 3).T + model.geom_pos[geom]
+    return numpy.stack([in_body.min(axis=0), in_body.max(axis=0)])
+
+
+def world_mesh_vertex_bounds(shape: Mesh) -> numpy.ndarray:
+    """
+    :param shape: A mesh shape of a body.
+    :return: The lower and upper corner of its vertices in its body's frame.
+    """
+    body_T_shape = shape.origin.to_np()
+    in_body = shape.mesh.vertices @ body_T_shape[:3, :3].T + body_T_shape[:3, 3]
+    return numpy.stack([in_body.min(axis=0), in_body.max(axis=0)])
+
+
+def compile_from_a_clean_mesh_cache(file_path: str) -> mujoco.MjModel:
+    """
+    MuJoCo reuses the vertices of a mesh file it compiled before, whatever reference
+    frame the earlier compile gave it.
+
+    :param file_path: The scene.
+    :return: The scene compiled with no mesh compiled before.
+    """
+    mujoco.mj_clearCache(mujoco.mj_getCache())
+    return mujoco.MjModel.from_xml_path(file_path)
+
+
+def turned_mesh_of(world) -> Mesh:
+    """
+    :return: The one mesh shape of the turned mesh scene's world.
+    """
+    [shape] = [
+        shape
+        for body in world.bodies
+        for shape in body.collision.shapes
+        if isinstance(shape, Mesh)
+    ]
+    return shape
+
+
+def test_a_mesh_lies_where_its_reference_frame_places_it():
+    expected = compiled_mesh_vertex_bounds(
+        compile_from_a_clean_mesh_cache(TURNED_MESH_SCENE)
+    )
+
+    world = MJCFParser(TURNED_MESH_SCENE).create_world()
+
+    assert world_mesh_vertex_bounds(turned_mesh_of(world)) == pytest.approx(
+        expected, abs=1e-6
+    )
+
+
+@pytest.mark.parametrize(
+    "compiled_before",
+    [False, True],
+    ids=["fresh mesh cache", "scene compiled before"],
+)
+def test_the_simulation_places_a_mesh_where_the_world_does(tmp_path, compiled_before):
+    """
+    The world is built for the simulation in the process that compiled the original
+    scene, as RoboCasa does, so MuJoCo may reuse that compile's vertices.
+    """
+    world = MJCFParser(TURNED_MESH_SCENE).create_world()
+    mujoco.mj_clearCache(mujoco.mj_getCache())
+    if compiled_before:
+        mujoco.MjModel.from_xml_path(TURNED_MESH_SCENE)
+    builder = MujocoBuilder()
+
+    builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
+
+    assert compiled_mesh_vertex_bounds(builder.spec.compile()) == pytest.approx(
+        world_mesh_vertex_bounds(turned_mesh_of(world)), abs=1e-6
+    )

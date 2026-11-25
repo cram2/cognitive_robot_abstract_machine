@@ -93,6 +93,7 @@ def _geometry_cache_key(geometry: Shape) -> Any:
                 round(geometry.scale.x, 6),
                 round(geometry.scale.y, 6),
                 round(geometry.scale.z, 6),
+                tuple(np.round(geometry.file_T_mesh.to_np(), 6).flatten()),
             )
         case _:
             raise NotImplementedError()
@@ -278,7 +279,10 @@ def load_convex_mesh_shape(
         obj_pkg_filename = convert_to_decomposed_obj_and_save_in_tmp(
             mesh=mesh, mesh_decomposer=mesh_decomposer
         )
-    elif mesh.local_file.suffix.removeprefix(".").lower() in BulletMeshFileFormat:
+    elif (
+        np.allclose(mesh.file_T_mesh.to_np(), np.eye(4))
+        and mesh.local_file.suffix.removeprefix(".").lower() in BulletMeshFileFormat
+    ):
         obj_pkg_filename = str(mesh.local_file)
     else:
         obj_pkg_filename = convert_to_obj_and_save_in_tmp(mesh=mesh)
@@ -335,8 +339,8 @@ def convert_to_decomposed_obj_and_save_in_tmp(
 
 def convert_to_obj_and_save_in_tmp(mesh: Mesh, cache_dir: Path = CACHE_DIR) -> str:
     """
-    Saves the geometry of a mesh, before its scale is applied, as an .obj file in the
-    cache, for a mesh whose file Bullet cannot read.
+    Saves the geometry of a mesh, in its own frame and before its scale is applied, as
+    an .obj file in the cache, for a mesh whose file Bullet cannot read as it is.
 
     The file is named apart from the mesh's convex decomposition, so neither is read in
     place of the other.

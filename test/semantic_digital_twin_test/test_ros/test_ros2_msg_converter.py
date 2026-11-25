@@ -454,6 +454,33 @@ def test_a_package_uri_mesh_is_found_in_the_local_install(
     assert mesh.filename == str(installed_mesh_file)
 
 
+# %% meshes turned within their file
+
+
+def test_a_mesh_turned_within_its_file_is_drawn_from_its_file_origin(
+    cylinder_bot_world, tmp_path
+):
+    mesh_file = tmp_path / "jeroen_cup.stl"
+    shutil.copy(
+        Path(files("semantic_digital_twin")).parent.parent
+        / "resources"
+        / "stl"
+        / "jeroen_cup.stl",
+        mesh_file,
+    )
+    mesh = Mesh(
+        filename=str(mesh_file),
+        origin=map_origin(cylinder_bot_world),
+        file_T_mesh=HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.01, quat_w=0.5**0.5, quat_x=0.5**0.5
+        ),
+    )
+
+    marker = SemDTToRos2Converter.convert(mesh)
+
+    assert marker.pose == PoseToRos2Converter.convert(mesh.file_origin.pose)
+
+
 # %% nothing converts the given object
 
 

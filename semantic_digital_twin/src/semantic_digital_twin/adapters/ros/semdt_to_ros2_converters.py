@@ -218,6 +218,7 @@ class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
     @classmethod
     def convert(cls, data: Mesh) -> Marker:
         marker = super().convert(data)
+        marker.pose = PoseToRos2Converter.convert(data.file_origin.pose)
         marker.type = visualization_msgs.Marker.MESH_RESOURCE
         marker.mesh_resource = cls.mesh_resource_of(data)
         marker.scale.x = data.scale.x
