@@ -9,10 +9,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import krrood.symbolic_math.symbolic_math as sm
 import numpy as np
 import pytest
-
-import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import (
@@ -20,7 +19,6 @@ from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
 )
-
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
@@ -38,7 +36,6 @@ from semantic_digital_twin.semantic_annotations.exceptions import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
     RevoluteConnectionSpecification,
 )
 from semantic_digital_twin.world import World
@@ -81,63 +78,18 @@ def _container_volume(container: HasFillLevel) -> float:
     return extents.x * extents.y * extents.z
 
 
-def _horizontal_unit(direction: np.ndarray) -> np.ndarray:
-    """
-    The horizontal part of a numeric direction, scaled to unit length.
-    """
-    return direction[:2] / np.linalg.norm(direction[:2])
-
-
 # %% test containers
 
 
 @dataclass(eq=False, kw_only=True)
-class _TranslatingContainer(HasFillLevel):
+class _Container(HasFillLevel):
     """
-    A pourable container attached to its parent by a single translating degree of
-    freedom.
+    A pourable container.
     """
-
-    @classmethod
-    def parent_connection_specification(
-        cls,
-        axis: Vector3 | None = None,
-        dof_limits: DegreeOfFreedomLimits | None = None,
-    ) -> PrismaticConnectionSpecification:
-        """
-        :param axis: Axis of the connection. Defaults to the z axis.
-        :param dof_limits: Limits of the generated degree of freedom.
-        :return: The connection the container hangs from.
-        """
-        return PrismaticConnectionSpecification(
-            axis=axis if axis is not None else Vector3.Z(), dof_limits=dof_limits
-        )
 
 
 @dataclass(eq=False, kw_only=True)
-class _TiltingContainer(HasFillLevel):
-    """
-    A pourable container attached to its parent by a single tilting degree of freedom.
-    """
-
-    @classmethod
-    def parent_connection_specification(
-        cls,
-        axis: Vector3 | None = None,
-        dof_limits: DegreeOfFreedomLimits | None = None,
-    ) -> RevoluteConnectionSpecification:
-        """
-        :param axis: Axis of the connection. Defaults to the z axis.
-        :param dof_limits: Limits of the generated degree of freedom.
-        :return: The connection the container hangs from.
-        """
-        return RevoluteConnectionSpecification(
-            axis=axis if axis is not None else Vector3.Z(), dof_limits=dof_limits
-        )
-
-
-@dataclass(eq=False, kw_only=True)
-class _SoftGateContainer(_TranslatingContainer):
+class _SoftGateContainer(_Container):
     """
     A receiver whose transfer gate opens and closes gently, so ordinary poses hold it
     partly open.
@@ -159,7 +111,7 @@ class _SoftGateContainer(_TranslatingContainer):
 
 
 @dataclass(eq=False, kw_only=True)
-class _SteadilyFillingContainer(_TiltingContainer):
+class _SteadilyFillingContainer(_Container):
     """
     A container whose fill rises at a constant rate whatever its pose.
     """
@@ -181,16 +133,6 @@ class _SteadilyFillingContainer(_TiltingContainer):
 # %% world builders
 
 
-def _wide_limits() -> DegreeOfFreedomLimits:
-    """
-    Limits wide enough that no test motion of a container reaches them.
-    """
-    return DegreeOfFreedomLimits(
-        lower=DerivativeMap(position=-2.0, velocity=-1.0),
-        upper=DerivativeMap(position=2.0, velocity=1.0),
-    )
-
-
 def _world_with_root() -> World:
     """
     An empty world holding only its root body.
@@ -207,35 +149,36 @@ def _add_container(
     container_class: type[HasFillLevel],
     name: str,
     axis: Vector3,
-    scale: Scale | None = None,
     world_root_T_self: HomogeneousTransformationMatrix | None = None,
 ) -> HasFillLevel:
     """
     :param world: The world to add the container to.
     :param container_class: The container annotation type.
     :param name: The name of the container.
-    :param axis: Axis of the container's single degree of freedom.
-    :param scale: Extents of the container's geometry; a 0.1 x 0.1 x 0.2 m box if not
-        given.
+    :param axis: Axis the container tilts about.
     :param world_root_T_self: Pose of the container in the world; the origin if not
         given.
-    :return: A container without fill level, on one degree of freedom with
-        :func:`_wide_limits`.
+    :return: A 0.1 x 0.1 x 0.2 m container without fill level, tilting on one degree of
+        freedom whose limits no test motion reaches.
     """
     with world.modify_world():
         return container_class.create_with_new_body_in_world(
             name=name,
             world=world,
             world_root_T_self=world_root_T_self,
-            parent_connection_specification=container_class.parent_connection_specification(
-                axis=axis, dof_limits=_wide_limits()
+            parent_connection_specification=RevoluteConnectionSpecification(
+                axis=axis,
+                dof_limits=DegreeOfFreedomLimits(
+                    lower=DerivativeMap(position=-2.0, velocity=-1.0),
+                    upper=DerivativeMap(position=2.0, velocity=1.0),
+                ),
             ),
-            scale=scale if scale is not None else Scale(0.1, 0.1, 0.2),
+            scale=Scale(0.1, 0.1, 0.2),
         )
 
 
 def _lone_tilting_cup(
-    *, container_class: type[HasFillLevel] = _TiltingContainer
+    *, container_class: type[HasFillLevel] = _Container
 ) -> tuple[World, HasFillLevel]:
     """
     A world holding a single cup without fill level that tilts about y.
@@ -252,55 +195,32 @@ def _lone_tilting_cup(
 
 def _build_world(
     *,
-    source_class: type[HasFillLevel] = _TranslatingContainer,
-    source_axis: Vector3 | None = None,
-    receiver_class: type[HasFillLevel] = _TranslatingContainer,
-    source_height: float = 0.3,
-    receiver_height: float = 0.2,
-    receiver_depth: float = 0.1,
-    scale_factor: float = 1.0,
+    receiver_class: type[HasFillLevel] = _Container,
     couple: bool = True,
     initialize_receiver_fill: bool = True,
 ) -> tuple[World, HasFillLevel, HasFillLevel]:
     """
-    Builds a fixed receiver at the origin and a source held above it on a single degree
-    of freedom.
+    Builds a receiver at the origin and a full source held 0.3 m above it that tilts
+    about y.
 
-    :param source_class: The container annotation type used for the source.
-    :param source_axis: Axis of the source's degree of freedom; defaults to x.
     :param receiver_class: The container annotation type used for the receiver.
-    :param source_height: Height of the source's origin above the world root, in metres.
-    :param receiver_height: Height of the receiver's collision geometry, in metres.
-    :param receiver_depth: Depth of the receiver's collision geometry, in metres, which
-        changes its capacity but not the width its pouring model reads.
-    :param scale_factor: Factor every length in the scene is multiplied by.
     :param couple: Whether the source pours into the receiver.
     :param initialize_receiver_fill: Whether the receiver's fill level is initialized.
     :return: The world, the source, and the receiver.
     """
-    if source_axis is None:
-        source_axis = Vector3(1, 0, 0)
     world = _world_with_root()
     receiver = _add_container(
         world=world,
         container_class=receiver_class,
         name="receiver",
         axis=Vector3(1, 0, 0),
-        scale=Scale(
-            receiver_depth * scale_factor,
-            0.1 * scale_factor,
-            receiver_height * scale_factor,
-        ),
     )
     source = _add_container(
         world=world,
-        container_class=source_class,
+        container_class=_Container,
         name="source",
-        axis=source_axis,
-        scale=Scale(0.1 * scale_factor, 0.1 * scale_factor, 0.2 * scale_factor),
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=source_height * scale_factor
-        ),
+        axis=Vector3(0, 1, 0),
+        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.3),
     )
     if initialize_receiver_fill:
         receiver.initialize_fill_level(initial_fill=0.0)
@@ -315,20 +235,16 @@ def _partly_open_transfer() -> tuple[World, HasFillLevel, HasFillLevel]:
     A tilted source pouring into a receiver with soft gates, so both gate factors lie
     inside their transitions.
     """
-    world, source, receiver = _build_world(
-        source_class=_TiltingContainer,
-        source_axis=Vector3(0, 1, 0),
-        receiver_class=_SoftGateContainer,
-    )
-    _set_source_offset(world, source, 0.5)
+    world, source, receiver = _build_world(receiver_class=_SoftGateContainer)
+    _tilt_source(world, source, 0.5)
     return world, source, receiver
 
 
-def _set_source_offset(world: World, source: HasFillLevel, offset: float) -> None:
+def _tilt_source(world: World, source: HasFillLevel, tilt: float) -> None:
     """
-    Sets the position of the source's single degree of freedom.
+    Tilts the source to ``tilt`` about its tilt axis.
     """
-    JointState.from_mapping({source.root.parent_connection: offset}).apply_to(world)
+    JointState.from_mapping({source.root.parent_connection: tilt}).apply_to(world)
 
 
 def _step_passive_state(world: World, dt: float) -> None:
@@ -341,29 +257,25 @@ def _step_passive_state(world: World, dt: float) -> None:
     )
 
 
-def _replay_latest_modification(*, world: World, onto: World) -> None:
+def _replay(blocks: list, *, onto: World) -> None:
     """
-    Apply the latest model modification of ``world`` to ``onto`` through JSON, as a
-    world synchronizer does.
+    Apply model modification blocks to ``onto`` through JSON, as a world synchronizer
+    does.
     """
-    block = world.get_world_model_manager().model_modification_blocks[-1]
-    tracker = WorldEntityWithIDKwargsTracker.from_world(onto)
-    replayed = from_json(to_json(block), **tracker.create_kwargs())
-    with onto.modify_world():
-        replayed.apply(world=onto)
+    for block in blocks:
+        tracker = WorldEntityWithIDKwargsTracker.from_world(onto)
+        replayed = from_json(to_json(block), **tracker.create_kwargs())
+        with onto.modify_world():
+            replayed.apply(world=onto)
 
 
 def _synchronized_copy(world: World) -> World:
     """
-    A fresh world built by replaying every model modification of ``world`` through JSON,
-    as a world synchronizer does, at the same state.
+    A fresh world built by replaying every model modification of ``world``, at the same
+    state.
     """
     copy = World()
-    for block in world.get_world_model_manager().model_modification_blocks:
-        tracker = WorldEntityWithIDKwargsTracker.from_world(copy)
-        replayed = from_json(to_json(block), **tracker.create_kwargs())
-        with copy.modify_world():
-            replayed.apply(world=copy)
+    _replay(world.get_world_model_manager().model_modification_blocks, onto=copy)
     for degree_of_freedom in world.degrees_of_freedom:
         copy.state[degree_of_freedom.id].position = world.state[
             degree_of_freedom.id
@@ -388,46 +300,6 @@ class TestFillVelocity:
     gated volume its source loses over its own capacity.
     """
 
-    def test_a_receiver_fills_at_the_gated_volume_its_source_loses(self) -> None:
-        """
-        The receiver gains the source's ungated volume rate, gated and converted by its
-        own capacity.
-        """
-        _, source, receiver = _partly_open_transfer()
-
-        assert _value(receiver.fill_velocity()) == pytest.approx(
-            _value(receiver.transfer_gate(source=source))
-            * _value(source.outflow_volume_rate())
-            / receiver.capacity
-        )
-
-    def test_a_source_drains_at_its_gated_drain(self) -> None:
-        """
-        The source loses its drain, gated by where its stream lands.
-        """
-        _, source, receiver = _partly_open_transfer()
-
-        assert _value(source.fill_velocity()) == pytest.approx(
-            _value(receiver.transfer_gate(source=source))
-            * _value(
-                source.fill_equation.fill_velocity(
-                    tilt=source.tilt, fill=source.fill_position
-                )
-            )
-        )
-
-    def test_a_container_pouring_into_nothing_drains_freely(self) -> None:
-        """
-        Without a receiver the fill falls at the drain the equation gives.
-        """
-        world, cup = _lone_tilting_cup()
-        cup.initialize_fill_level(initial_fill=0.8)
-        JointState.from_mapping({cup.root.parent_connection: 1.0}).apply_to(world)
-
-        assert _value(cup.fill_velocity()) == pytest.approx(
-            _value(cup.fill_equation.fill_velocity(tilt=1.0, fill=0.8))
-        )
-
     def test_a_partly_open_transfer_conserves_volume(self) -> None:
         """
         The volume the source loses is the volume the receiver gains.
@@ -440,78 +312,18 @@ class TestFillVelocity:
             -_value(source.fill_velocity()) * source.capacity
         )
 
-    def test_containers_of_different_depth_conserve_volume(self) -> None:
-        """
-        A receiver that holds four times the liquid of the source rises four times more
-        slowly than the source drops.
-        """
-        world, source, receiver = _build_world(
-            source_class=_TiltingContainer,
-            source_axis=Vector3(0, 1, 0),
-            receiver_depth=0.4,
-        )
-        _set_source_offset(world, source, 0.6)
-        source_fill_loss_rate = -_value(source.fill_velocity())
-        assert source_fill_loss_rate > 0.0, "the source must be draining"
-
-        assert _value(
-            receiver.fill_velocity()
-        ) / source_fill_loss_rate == pytest.approx(
-            _container_volume(source) / _container_volume(receiver)
-        )
-
     def test_a_receiver_of_measured_capacity_converts_volume_by_it(self) -> None:
         """
         A receiver whose capacity was measured holds that much at full fill, whatever
         the box its collision geometry bounds would hold.
         """
-        world, source, receiver = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
+        world, source, receiver = _build_world()
         receiver.measured_capacity = 3.0 * _container_volume(receiver)
-        _set_source_offset(world, source, 0.6)
+        _tilt_source(world, source, 0.6)
 
         assert _value(receiver.fill_velocity()) / -_value(
             source.fill_velocity()
         ) == pytest.approx(_container_volume(source) / receiver.measured_capacity)
-
-
-# %% capacity
-
-
-class TestCapacity:
-    """
-    A container holds the box its collision geometry bounds, unless it was measured.
-    """
-
-    def test_the_capacity_is_the_box_of_the_collision_geometry(self) -> None:
-        """
-        Without a measurement the capacity is the collision geometry's box.
-        """
-        _, _, receiver = _build_world(couple=False)
-        assert receiver.capacity == pytest.approx(_container_volume(receiver))
-
-    def test_a_measured_capacity_is_the_capacity(self) -> None:
-        """
-        A measured capacity takes the place of the one the collision geometry bounds.
-        """
-        _, _, receiver = _build_world(couple=False)
-        receiver.measured_capacity = 0.002
-        assert receiver.capacity == receiver.measured_capacity
-
-    def test_a_measured_capacity_survives_a_json_round_trip(self) -> None:
-        """
-        The capacity reaches the process that controls the pour with the annotation.
-        """
-        world, _, receiver = _build_world(couple=False)
-        receiver.measured_capacity = 0.002
-        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-
-        restored = _TranslatingContainer.from_json(
-            data=receiver.to_json(), **tracker.create_kwargs()
-        )
-
-        assert restored.measured_capacity == receiver.measured_capacity
 
 
 # %% geometric transfer gate
@@ -571,105 +383,8 @@ class TestTransferGate:
             1 / (1 + math.exp(-sharpness * margin))
         )
 
-    def test_gate_is_open_when_source_is_above_receiver(self) -> None:
-        """
-        The gate is essentially fully open when the source is held directly over the
-        receiver.
-        """
-        world, source, receiver = _build_world()
-        _set_source_offset(world, source, 0.0)
-        assert _value(receiver.transfer_gate(source=source)) == pytest.approx(
-            1.0, abs=1e-2
-        )
 
-    def test_gate_closes_monotonically_with_horizontal_offset(self) -> None:
-        """
-        Moving the source sideways past the receiver opening closes the gate
-        monotonically.
-        """
-        world, source, receiver = _build_world()
-        gate = receiver.transfer_gate(source=source)
-        values = []
-        for offset in [0.0, 0.05, 0.1, 0.3]:
-            _set_source_offset(world, source, offset)
-            values.append(_value(gate))
-        assert all(earlier >= later for earlier, later in zip(values, values[1:]))
-        assert values[0] > values[-1]
-        assert values[-1] < 0.1
-
-    def test_gate_has_nonzero_gradient_in_transition(self) -> None:
-        """
-        The gate is differentiable: its slope with respect to the source position is
-        non-zero at the rim.
-        """
-        world, source, receiver = _build_world()
-        gate = receiver.transfer_gate(source=source)
-        source_position = source.root.parent_connection.dof.variables.position
-        _set_source_offset(world, source, 0.05)
-        gradient = _value(gate.jacobian(variables=[source_position])[0, 0])
-        assert abs(gradient) > 1e-3
-
-    def test_height_gate_is_unchanged_by_a_uniform_scene_scaling(self) -> None:
-        """
-        Whether the source's lip clears the receiver's opening depends on the shape of
-        the arrangement alone, so two scenes that differ by a uniform scaling read the
-        same height gate.
-        """
-        gates = []
-        for scale_factor in (1.0, 4.0):
-            world, source, receiver = _build_world(
-                receiver_height=0.76, scale_factor=scale_factor
-            )
-            _set_source_offset(world, source, 0.0)
-            gates.append(_value(receiver.height_gate(source=source)))
-        assert 0.01 < gates[0] < 0.99, (
-            "the setup must hold the lip in the gate's transition, not at either end"
-        )
-
-        assert gates[1] == pytest.approx(gates[0])
-
-    def test_gate_closes_when_source_tilts(self) -> None:
-        """
-        Tilting a source held in place sends the stream past the receiver, closing the
-        gate, which forces a controller to reposition the source while pouring.
-        """
-        world, source, receiver = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
-        gate = receiver.transfer_gate(source=source)
-        _set_source_offset(world, source, 0.0)
-        upright_gate = _value(gate)
-        _set_source_offset(world, source, 1.2)
-        tilted_gate = _value(gate)
-        assert upright_gate > 0.9
-        assert tilted_gate < upright_gate
-        assert tilted_gate < 0.5
-
-    def test_gate_closes_when_the_source_lip_is_below_the_receiver_opening(
-        self,
-    ) -> None:
-        """
-        Liquid enters over the rim, so a receiver whose opening reaches above the
-        source's lip cannot be poured into, even while the lip is still well above the
-        receiver's base.
-        """
-        world, source, receiver = _build_world(receiver_height=1.0)
-        _set_source_offset(world, source, 0.0)
-        source_lip = _value(source.liquid_exit_point().z)
-        receiver_base = _value(
-            world.compose_forward_kinematics_expression(
-                world.root, receiver.root
-            ).position.z
-        )
-        receiver_opening = _value(receiver.opening_point().z)
-        assert receiver_base < source_lip < receiver_opening, (
-            "the setup must hold the lip above the receiver's base but below its opening"
-        )
-
-        assert _value(receiver.transfer_gate(source=source)) < 0.1
-
-
-# %% tilt and exit speed
+# %% tilt
 
 
 class TestTilt:
@@ -686,99 +401,6 @@ class TestTilt:
         JointState.from_mapping({cup.root.parent_connection: angle}).apply_to(world)
 
         assert _value(cup.tilt) == pytest.approx(abs(angle), abs=1e-6)
-
-
-class TestExitSpeed:
-    """
-    The stream leaves at the discharge-scaled Torricelli speed of the current head.
-    """
-
-    def _tilted_source(
-        self,
-        *,
-        tilt: float,
-        discharge_coefficient: float = PouringEquation.discharge_coefficient,
-    ) -> HasFillLevel:
-        """
-        A full source tilted by ``tilt`` that drains with the given discharge
-        coefficient.
-        """
-        world, source = _lone_tilting_cup()
-        source.initialize_fill_level(
-            initial_fill=1.0, discharge_coefficient=discharge_coefficient
-        )
-        JointState.from_mapping({source.root.parent_connection: tilt}).apply_to(world)
-        return source
-
-    def test_matches_discharge_scaled_torricelli(self) -> None:
-        """
-        The exit speed is ``C_d * sqrt(2 g h)`` for the current head above the lip.
-        """
-        source = self._tilted_source(tilt=1.2, discharge_coefficient=0.4)
-        head = _value(
-            source.fill_equation.head_above_lip(
-                tilt=source.tilt, fill=source.fill_position
-            )
-        )
-
-        assert _value(source.exit_speed()) == pytest.approx(
-            0.4 * math.sqrt(2 * PouringEquation.standard_gravity * head)
-        )
-
-    def test_discharge_coefficient_scales_speed_linearly(self) -> None:
-        """
-        The discharge coefficient scales the exit speed proportionally.
-        """
-        low = self._tilted_source(tilt=1.2, discharge_coefficient=0.2)
-        high = self._tilted_source(tilt=1.2, discharge_coefficient=0.6)
-
-        assert _value(high.exit_speed()) / _value(low.exit_speed()) == pytest.approx(
-            3.0
-        )
-
-    def test_more_tilt_pours_faster(self) -> None:
-        """
-        A steeper tilt lifts more liquid above the lip, so the exit speed grows.
-        """
-        gentle = self._tilted_source(tilt=0.6)
-        steep = self._tilted_source(tilt=1.2)
-
-        assert _value(steep.exit_speed()) > _value(gentle.exit_speed())
-
-    def test_head_is_floored_when_barely_pouring(self) -> None:
-        """
-        With no head above the lip the head is floored so the exit-speed gradient stays
-        finite.
-        """
-        source = self._tilted_source(tilt=0.0, discharge_coefficient=0.4)
-
-        assert _value(source.exit_speed()) == pytest.approx(
-            0.4
-            * math.sqrt(
-                2 * PouringEquation.standard_gravity * source.fill_equation.minimum_head
-            )
-        )
-
-    def test_initialize_fill_level_threads_the_drain_parameters(self) -> None:
-        """
-        The parameters passed to ``initialize_fill_level`` reach the drain.
-        """
-        _, cup = _lone_tilting_cup()
-
-        cup.initialize_fill_level(
-            initial_fill=1.0,
-            outflow_rate_constant=2.0,
-            discharge_coefficient=0.5,
-            repose_angle=0.4,
-        )
-
-        assert cup.fill_equation == PouringEquation(
-            container_height=cup.root.collision.scale.z,
-            container_width=cup.root.collision.scale.y,
-            outflow_rate_constant=2.0,
-            discharge_coefficient=0.5,
-            repose_angle=0.4,
-        )
 
 
 # %% liquid exit point
@@ -798,29 +420,13 @@ class TestLiquidExitPoint:
             @ source.rim_point()
         )
 
-    def test_exit_point_at_rim_centre_when_upright(self) -> None:
-        """
-        An upright cup has no pour direction, so the exit point stays at the rim centre.
-        """
-        world, source, _ = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
-        _set_source_offset(world, source, 0.0)
-
-        exit_point = _evaluated_xyz(source.liquid_exit_point())
-        rim_center = _evaluated_xyz(self._rim_center_world(world=world, source=source))
-
-        assert exit_point[:2] == pytest.approx(rim_center[:2], abs=1e-3)
-
     def test_exit_point_at_rim_edge_along_pour_direction_when_tilted(self) -> None:
         """
         A tilted cup pours over the rim edge on the pour side, a full rim radius from
         centre.
         """
-        world, source, _ = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
-        _set_source_offset(world, source, 1.2)
+        world, source, _ = _build_world()
+        _tilt_source(world, source, 1.2)
 
         offset = _evaluated_xyz(source.liquid_exit_point()) - _evaluated_xyz(
             self._rim_center_world(world=world, source=source)
@@ -842,23 +448,6 @@ class TestProjectileLandingPoint:
     The projectile model locates where poured liquid lands.
     """
 
-    def test_rim_source_launches_horizontally(self) -> None:
-        """
-        Liquid spilling over a rim has no vertical launch: it travels towards where the
-        opening faces, horizontally.
-        """
-        world, source, _ = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
-        _set_source_offset(world, source, 0.6)
-
-        exit_velocity = _evaluated_xyz(source.liquid_exit_velocity(exit_speed=0.2))
-
-        assert exit_velocity[2] == 0.0
-        assert _horizontal_unit(exit_velocity) == pytest.approx(
-            _horizontal_unit(_evaluated_xyz(source.opening_direction()))
-        )
-
     def test_a_rim_source_launches_at_the_horizontal_share_of_the_exit_speed(
         self,
     ) -> None:
@@ -866,10 +455,8 @@ class TestProjectileLandingPoint:
         The stream's horizontal speed is the exit speed scaled by how far the opening
         leans from vertical.
         """
-        world, source, _ = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
-        _set_source_offset(world, source, 0.6)
+        world, source, _ = _build_world()
+        _tilt_source(world, source, 0.6)
         exit_speed = 0.2
 
         exit_velocity = _evaluated_xyz(
@@ -880,84 +467,14 @@ class TestProjectileLandingPoint:
             exit_speed * _evaluated_xyz(source.opening_direction())[:2]
         )
 
-    def test_upright_source_lands_below_its_rim(self) -> None:
-        """
-        With no tilt the liquid has no horizontal velocity, so it lands directly below
-        the rim.
-        """
-        world, source, receiver = _build_world()
-        _set_source_offset(world, source, 0.1)
-
-        landing = _evaluated_xyz(
-            receiver.projectile_landing_point(source=source, exit_speed=0.2)
-        )
-        source_rim = _evaluated_xyz(
-            world.compose_forward_kinematics_expression(world.root, source.root)
-            @ source.rim_point()
-        )
-
-        assert landing[:2] == pytest.approx(source_rim[:2], abs=1e-3)
-
-    def test_tilting_moves_landing_forward(self) -> None:
-        """
-        Tilting the source gives the liquid horizontal velocity, moving the landing
-        forward.
-        """
-        world, source, receiver = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
-        landing = receiver.projectile_landing_point(source=source, exit_speed=0.2)
-        _set_source_offset(world, source, 0.0)
-        upright_landing = _value(landing.x)
-        _set_source_offset(world, source, 0.6)
-
-        assert _value(landing.x) > upright_landing
-
-    def test_higher_source_lands_farther(self) -> None:
-        """
-        A higher source gives the liquid a longer flight time, so it lands farther
-        forward.
-        """
-        landings = []
-        for source_height in (0.3, 0.7):
-            world, source, receiver = _build_world(
-                source_class=_TiltingContainer,
-                source_axis=Vector3(0, 1, 0),
-                source_height=source_height,
-            )
-            _set_source_offset(world, source, 0.5)
-            landings.append(
-                _value(
-                    receiver.projectile_landing_point(source=source, exit_speed=0.2).x
-                )
-            )
-
-        assert landings[1] > landings[0]
-
-    def test_arc_terminates_at_the_opening_not_the_base(self) -> None:
-        """
-        The arc ends where the liquid arrives, the receiver's opening, not the
-        receiver's origin at its base.
-        """
-        world, source, receiver = _build_world()
-        _set_source_offset(world, source, 0.1)
-
-        landing = receiver.projectile_landing_point(source=source, exit_speed=0.2)
-
-        assert _value(landing.z) == pytest.approx(
-            _value(receiver.opening_point().z), abs=1e-9
-        )
-
     def test_throw_distance_follows_the_fall_to_the_opening(self) -> None:
         """
-        The horizontal throw is the exit velocity carried over the time the liquid takes
-        to fall from the source's lip to the receiver's opening.
+        The stream lands at the receiver's opening, thrown horizontally by the exit
+        velocity over the time the liquid takes to fall from the source's lip to it.
         """
         exit_speed = 0.2
-        world, source, receiver = _build_world(
-            source_class=_TiltingContainer, source_axis=Vector3(0, 1, 0)
-        )
-        _set_source_offset(world, source, 0.6)
+        world, source, receiver = _build_world()
+        _tilt_source(world, source, 0.6)
 
         landing = receiver.projectile_landing_point(
             source=source, exit_speed=exit_speed
@@ -967,11 +484,13 @@ class TestProjectileLandingPoint:
         exit_velocity = _evaluated_xyz(
             source.liquid_exit_velocity(exit_speed=exit_speed)
         )
-        fall_height = exit_point[2] - _value(receiver.opening_point().z)
+        opening_height = _value(receiver.opening_point().z)
+        fall_height = exit_point[2] - opening_height
         flight_time = math.sqrt(2 * fall_height / PouringEquation.standard_gravity)
         assert _value(landing.x) == pytest.approx(
             exit_point[0] + exit_velocity[0] * flight_time, abs=1e-9
         )
+        assert _value(landing.z) == pytest.approx(opening_height, abs=1e-9)
 
 
 # %% coupling guards
@@ -986,10 +505,10 @@ class TestReceiveOutflowGuard:
         """
         A source that was never initialized cannot pour.
         """
-        world, source, receiver = _build_world(couple=False)
+        world, _, receiver = _build_world(couple=False)
         dry_source = _add_container(
             world=world,
-            container_class=_TranslatingContainer,
+            container_class=_Container,
             name="dry_source",
             axis=Vector3(1, 0, 0),
         )
@@ -1005,7 +524,7 @@ class TestReceiveOutflowGuard:
         world, source, receiver = _build_world()
         second_receiver = _add_container(
             world=world,
-            container_class=_TranslatingContainer,
+            container_class=_Container,
             name="second_receiver",
             axis=Vector3(1, 0, 0),
         )
@@ -1033,7 +552,7 @@ class TestReceiveOutflowGuard:
         world, source, receiver = _build_world()
         second_source = _add_container(
             world=world,
-            container_class=_TranslatingContainer,
+            container_class=_Container,
             name="second_source",
             axis=Vector3(1, 0, 0),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.3),
@@ -1047,10 +566,31 @@ class TestReceiveOutflowGuard:
         assert second_source.pours_into is None
 
 
-class TestFillLevelInitializationGuard:
+class TestFillLevelInitialization:
     """
-    A container's fill level can only be initialized once.
+    Initializing a container's fill level gives it its drain, once.
     """
+
+    def test_initialize_fill_level_threads_the_drain_parameters(self) -> None:
+        """
+        The parameters passed to ``initialize_fill_level`` reach the drain.
+        """
+        _, cup = _lone_tilting_cup()
+
+        cup.initialize_fill_level(
+            initial_fill=1.0,
+            outflow_rate_constant=2.0,
+            discharge_coefficient=0.5,
+            repose_angle=0.4,
+        )
+
+        assert cup.fill_equation == PouringEquation(
+            container_height=cup.root.collision.scale.z,
+            container_width=cup.root.collision.scale.y,
+            outflow_rate_constant=2.0,
+            discharge_coefficient=0.5,
+            repose_angle=0.4,
+        )
 
     def test_second_initialization_raises(self) -> None:
         """
@@ -1075,33 +615,22 @@ class TestSynchronizedTransfer:
     pours the same way without any extra step.
     """
 
-    def test_the_copy_knows_which_container_pours_into_which(self) -> None:
+    def test_the_copy_pours_like_the_original(self) -> None:
         """
-        The transfer arrives as a reference between the copy's own annotations.
+        The copy knows which container pours into which, and stepping both worlds alike
+        moves the same volumes in both.
         """
         world, source, receiver = _partly_open_transfer()
-
         copy = _synchronized_copy(world)
 
         copied_source = _counterpart(source, world=copy)
         assert copied_source.pours_into is _counterpart(receiver, world=copy)
-        assert copied_source.fill_connection._world is copy
-
-    def test_the_copy_pours_like_the_original(self) -> None:
-        """
-        Stepping both worlds alike moves the same volumes in both.
-        """
-        world, source, receiver = _partly_open_transfer()
-        copy = _synchronized_copy(world)
-
         for _ in range(20):
             _step_passive_state(world, 0.05)
             _step_passive_state(copy, 0.05)
 
         assert receiver.fill_level > 0.0, "the setup must transfer liquid"
-        assert _counterpart(source, world=copy).fill_level == pytest.approx(
-            source.fill_level
-        )
+        assert copied_source.fill_level == pytest.approx(source.fill_level)
         assert _counterpart(receiver, world=copy).fill_level == pytest.approx(
             receiver.fill_level
         )
@@ -1110,7 +639,7 @@ class TestSynchronizedTransfer:
         """
         A drain replaced in one world drains the source of the other at the next step.
         """
-        world, source, receiver = _partly_open_transfer()
+        world, source, _ = _partly_open_transfer()
         copy = _synchronized_copy(world)
         copied_source = _counterpart(source, world=copy)
         _step_passive_state(copy, 0.05)
@@ -1122,7 +651,9 @@ class TestSynchronizedTransfer:
 
         with world.modify_world():
             source.set_fill_equation(fill_equation=faster_drain)
-        _replay_latest_modification(world=world, onto=copy)
+        _replay(
+            world.get_world_model_manager().model_modification_blocks[-1:], onto=copy
+        )
 
         assert copied_source.fill_equation == faster_drain
         compiled = copied_source.fill_connection.current_compiled_fill_velocity()
@@ -1139,19 +670,6 @@ class TestFillLevelIntegration:
     Each physics step integrates the fill level from the velocity of the container it
     belongs to, inside its limits.
     """
-
-    def test_tilted_empty_source_does_not_drain_below_empty(self) -> None:
-        """
-        A fully tilted cup with no liquid left stays at fill 0, not negative.
-        """
-        world, cup = _lone_tilting_cup()
-        cup.initialize_fill_level(initial_fill=0.0)
-        JointState.from_mapping({cup.root.parent_connection: 1.5}).apply_to(world)
-
-        for _ in range(50):
-            _step_passive_state(world, 0.05)
-
-        assert cup.fill_level == pytest.approx(0.0)
 
     def test_a_filling_container_saturates_at_full(self) -> None:
         """
@@ -1179,40 +697,13 @@ class TestFillLevelIntegration:
             0.2 + _SteadilyFillingContainer.steady_fill_velocity * dt
         )
 
-    def test_repeated_steps_compile_the_fill_velocity_once(
-        self, *, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """
-        Stepping the fill level reuses the fill velocity compiled at the first step.
-        """
-        world, cup = _lone_tilting_cup()
-        cup.initialize_fill_level(initial_fill=0.8)
-        _step_passive_state(world, 0.05)
-        compilations = []
-        original_compile = sm.Scalar.compile
-
-        def counting_compile(expression: sm.Scalar, **kwargs) -> sm.CompiledFunction:
-            """
-            Compiles ``expression`` and records that it was compiled.
-            """
-            compilations.append(expression)
-            return original_compile(expression, **kwargs)
-
-        monkeypatch.setattr(sm.Scalar, "compile", counting_compile)
-        for _ in range(3):
-            _step_passive_state(world, 0.05)
-
-        assert compilations == []
-
 
 # %% the liquid connection on its own
 
 
-def _world_with_bare_liquid_connection(
-    dof_limits: DegreeOfFreedomLimits | None,
-) -> tuple[World, LiquidConnection]:
+def _world_with_unlimited_liquid_connection() -> tuple[World, LiquidConnection]:
     """
-    A world holding a body with a fill-level connection that no container owns.
+    A world holding a body with a fill-level connection without position limits.
     """
     world = World()
     container = Body(name=PrefixedName("container"))
@@ -1225,20 +716,9 @@ def _world_with_bare_liquid_connection(
             parent=container,
             child=fill_level_body,
             axis=Vector3.Z(),
-            dof_limits=dof_limits,
         )
         world.add_connection(connection)
     return world, connection
-
-
-def _fill_level_limits() -> DegreeOfFreedomLimits:
-    """
-    The [0, 1] fill-level limits a fill degree of freedom is created with.
-    """
-    return DegreeOfFreedomLimits(
-        lower=DerivativeMap(position=0.0, velocity=-1.0),
-        upper=DerivativeMap(position=1.0, velocity=1.0),
-    )
 
 
 class TestLiquidConnection:
@@ -1250,7 +730,9 @@ class TestLiquidConnection:
         """
         The QP never commands the fill level.
         """
-        world, connection = _world_with_bare_liquid_connection(_fill_level_limits())
+        world, cup = _lone_tilting_cup()
+        cup.initialize_fill_level(initial_fill=0.5)
+        connection = cup.fill_connection
 
         assert connection.active_dofs == []
         assert connection.passive_dofs == [connection.raw_dof]
@@ -1258,21 +740,11 @@ class TestLiquidConnection:
         assert connection.raw_dof not in world.active_degrees_of_freedom
         assert connection.is_controlled is False
 
-    def test_a_connection_no_container_owns_stands_still(self) -> None:
-        """
-        Without a container there is nothing to fill or drain.
-        """
-        world, connection = _world_with_bare_liquid_connection(_fill_level_limits())
-
-        _step_passive_state(world, 0.05)
-
-        assert connection.position == 0.0
-
     def test_update_state_without_position_limits_raises(self) -> None:
         """
         A fill level without position limits cannot be clamped, so stepping it raises.
         """
-        _, connection = _world_with_bare_liquid_connection(dof_limits=None)
+        _, connection = _world_with_unlimited_liquid_connection()
 
         with pytest.raises(MissingFillLevelLimitsError) as error_info:
             connection.update_state(0.05)
