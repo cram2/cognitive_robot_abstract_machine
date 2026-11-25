@@ -62,6 +62,7 @@ from krrood.ormatic.data_access_objects.dao import (
 from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.ormatic.data_access_objects.helper import (
     get_data_access_object_class,
+    get_mapping_data_access_object_class,
     get_part_class,
 )
 from krrood.ormatic.exceptions import (
@@ -362,7 +363,9 @@ class AttributeChainResolver:
             node = node._child_
         _, node_type = extractor.extract(node=node)
         return (
-            get_data_access_object_class(node_type) if node_type is not None else None
+            get_mapping_data_access_object_class(node_type)
+            if node_type is not None
+            else None
         )
 
 
@@ -666,7 +669,7 @@ class EQLTranslator:
         :param domain_type: The domain type whose DAO is required.
         :raises NoDAOFoundForTypeError: When the type has no associated DAO.
         """
-        dao_class = get_data_access_object_class(domain_type)
+        dao_class = get_mapping_data_access_object_class(domain_type)
         if dao_class is None:
             raise NoDAOFoundForTypeError(obj=domain_type)
         return dao_class
@@ -864,7 +867,7 @@ class EQLTranslator:
         if isinstance(expression, Attribute):
             return AttributeChainResolver().extract_base_dao(attribute=expression)
         if isinstance(expression, Variable) and not isinstance(expression, Literal):
-            dao = get_data_access_object_class(expression._type_)
+            dao = get_mapping_data_access_object_class(expression._type_)
             if dao is not None:
                 return dao
         for child_attr in (
@@ -1191,7 +1194,7 @@ class EQLTranslator:
 
         if attribute_side is not None:
             attribute_dao = resolver.extract_base_dao(attribute=attribute_side)
-            variable_dao = get_data_access_object_class(variable_side._type_)
+            variable_dao = get_mapping_data_access_object_class(variable_side._type_)
 
             if attribute_dao is None or variable_dao is None:
                 return None
@@ -1335,7 +1338,7 @@ class EQLTranslator:
             return extractor.extract_from_literal(literal_node=operand)
 
         if isinstance(operand, Variable):
-            variable_dao = get_data_access_object_class(operand._type_)
+            variable_dao = get_mapping_data_access_object_class(operand._type_)
             if variable_dao is not None:
                 return variable_dao.database_id
             extractor = DomainValueExtractor(session=self.session)
