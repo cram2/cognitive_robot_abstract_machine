@@ -6,6 +6,8 @@ visualizes the outputs of its annotators and can be nested.
 
 from __future__ import annotations
 
+# %% Imports
+
 import logging
 import timeit
 
@@ -22,6 +24,9 @@ import robokudo.cas as cas
 import robokudo.utils.tree
 
 logger = logging.getLogger(__name__)
+
+
+# %% Pipeline lifecycle
 
 
 class Pipeline(Sequence):
@@ -66,14 +71,14 @@ class Pipeline(Sequence):
         """
         self.create_new_cas()
 
-    def create_new_cas(self) -> None:
+    def create_new_cas(self, *, acquired_cas: cas.CAS | None = None) -> None:
         """
-        Create a new Common Analysis Structure (CAS) for this pipeline.
+        Begin a processing cycle with a fresh or successfully acquired CAS.
 
         Also restarts the measurement of the processing duration.
         """
         self._cas_counter += 1
-        self.cas = cas.CAS()
+        self.cas = acquired_cas if acquired_cas is not None else cas.CAS()
         self.cas.cas_id = self._cas_counter
         self.processing_start_time = timeit.default_timer()
 

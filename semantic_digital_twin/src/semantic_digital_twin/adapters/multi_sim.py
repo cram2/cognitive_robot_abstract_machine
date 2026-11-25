@@ -761,7 +761,7 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
         if dof.name.name != joint_props["name"] and dof.name.name != "dof":
             joint_props["equality_joint"] = {
                 "joint": dof.name.name,
-                "data": [entity.offset, entity.multiplier, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                "polynomial_coefficients": [entity.offset, entity.multiplier, 0, 0, 0],
             }
         return joint_props
 
@@ -2028,7 +2028,10 @@ class MujocoSingleJoint(MujocoConnectionJoints[ConnectionType]):
             equality.objtype = mujoco.mjtObj.mjOBJ_JOINT
             equality.name1 = joint_name
             equality.name2 = self._mimicked_joint_name()
-            equality.data = equality_joint["data"]
+            coefficients = equality_joint["polynomial_coefficients"]
+            data = numpy.array(equality.data)
+            data[: len(coefficients)] = coefficients
+            equality.data = data
         mujoco_joint = self.connection.get_simulator_property_of_type(MujocoJoint)
         if mujoco_joint is not None:
             joint_props["stiffness"] = (
@@ -2904,7 +2907,10 @@ class MujocoBuilder(MultiSimBuilder):
             body_spec = self.spec.bodies[body_id + 1]
             if numpy.isclose(body_spec.mass, 0.0):
                 continue
-            inertial_element = ET.SubElement(body_element, "inertial")
+            inertial_element = body_element.find("inertial")
+            if inertial_element is None:
+                inertial_element = ET.SubElement(body_element, "inertial")
+            inertial_element.attrib.clear()
             inertial_element.set("mass", f"{body_spec.mass}")
             inertial_element.set(
                 "diaginertia", " ".join(map(str, body_spec.inertia.tolist()))
@@ -3067,17 +3073,34 @@ class MujocoBuilder(MultiSimBuilder):
         os.makedirs(os.path.dirname(asset_file_path), exist_ok=True)
         return asset_file_path
 
-    def _mesh_name_for(self, mesh_file_path: str, mesh_scale: list[float]) -> str:
+    def _mesh_name_for(
+        self,
+        *,
+        mesh_file_path: str,
+        mesh_scale: list[float],
+        file_T_mesh: HomogeneousTransformationMatrix,
+    ) -> str:
         """
-        The name of the mesh asset for a mesh file at a scale, adding the asset to the
-        spec if no geom used this file at this scale yet.
+        The name of the mesh asset for a mesh file at a scale and in a frame of its
+        file, adding the asset to the spec if no geom used this file so yet.
 
         :param mesh_file_path: The mesh file MuJoCo loads.
         :param mesh_scale: The scale along x, y and z.
-        :return: The name, unique to this file and scale.
+        :param file_T_mesh: The mesh's own frame in its file, see
+            :attr:`~semantic_digital_twin.world_description.geometry.Mesh.file_T_mesh`.
+        :return: The name, unique to this file, scale and frame.
         """
+        file_T_mesh_matrix = file_T_mesh.to_np()
+        reference_position = file_T_mesh_matrix[:3, 3]
+        reference_orientation = numpy.zeros(4)
+        mujoco.mju_mat2Quat(reference_orientation, file_T_mesh_matrix[:3, :3].flatten())
         for mesh in self.spec.meshes:
-            if mesh.file == mesh_file_path and numpy.allclose(mesh.scale, mesh_scale):
+            if (
+                mesh.file == mesh_file_path
+                and numpy.allclose(mesh.scale, mesh_scale)
+                and numpy.allclose(mesh.refpos, reference_position)
+                and numpy.allclose(mesh.refquat, reference_orientation)
+            ):
                 return mesh.name
         mesh_name = os.path.splitext(os.path.basename(mesh_file_path))[0]
         if not numpy.allclose(mesh_scale, [1.0, 1.0, 1.0]):
@@ -3087,6 +3110,8 @@ class MujocoBuilder(MultiSimBuilder):
         mesh = self.spec.add_mesh(name=mesh_name)
         mesh.file = mesh_file_path
         mesh.scale = mesh_scale
+        mesh.refpos = reference_position
+        mesh.refquat = reference_orientation
         return mesh_name
 
     def _thicken_if_near_planar(self, mesh_file_path: str) -> str:
@@ -3188,7 +3213,11 @@ class MujocoBuilder(MultiSimBuilder):
         mesh_file_path = self._thicken_if_near_planar(mesh_file_path)
 
         mesh_scale = [mesh_entity.scale.x, mesh_entity.scale.y, mesh_entity.scale.z]
-        geom_props["meshname"] = self._mesh_name_for(mesh_file_path, mesh_scale)
+        geom_props["meshname"] = self._mesh_name_for(
+            mesh_file_path=mesh_file_path,
+            mesh_scale=mesh_scale,
+            file_T_mesh=mesh_entity.file_T_mesh,
+        )
         if isinstance(texture_file_path, str):
             geom_props["material"] = self._register_texture_material(
                 texture_file_path=texture_file_path

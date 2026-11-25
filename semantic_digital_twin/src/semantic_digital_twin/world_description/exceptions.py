@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 from numpy.typing import NDArray
 
 from krrood.exceptions import DataclassException
@@ -91,3 +92,34 @@ class AsymmetricInertiaTensorError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Give equal products of inertia above and below the diagonal."
+
+
+# %% Mesh files
+
+
+@dataclass(kw_only=True)
+class MeshFileNotPlaceableByAPose(DataclassException, ValueError):
+    """
+    A mesh turned within its file and scaled unevenly cannot be shown by placing its
+    scaled file at a pose, because the scale stretches the mesh along the turned axes.
+    """
+
+    file_name: str
+    """
+    The mesh's file.
+    """
+
+    scale: NDArray[np.float64]
+    """
+    The scale along the mesh's x, y and z axes.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The mesh in {self.file_name} is turned within its file and scaled "
+            f"unevenly by {self.scale}, so no pose places its scaled file where the "
+            f"mesh lies."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Place the mesh's own vertices, its unscaled mesh, instead of its file."

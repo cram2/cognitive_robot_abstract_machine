@@ -68,7 +68,9 @@ supplies or checks that set. Estimation stays in the circuit; nothing in
   with the Bayesian Dirichlet equivalent uniform score instead; it needs at least three
   columns that vary, and the domain causal knowledge only orients the edges it leaves
   undirected.
-  `learning.RelationalCausalStructureLearner` does the same with either learner on a
+  `learning.FastCausalInferenceStructureLearner` allows hidden confounders, see
+  {ref}`section:hidden-confounders`.
+  `learning.RelationalCausalStructureLearner` does the same with any learner on a
   relational circuit's class table and part tables. A part attribute becomes one node for every
   part of its collection. The learned edges are kept as causal relations of the class
   in `krrood`'s class diagram.
@@ -110,8 +112,9 @@ Learning the structure from observational data has limits:
   edge, so copies have to be declared.
 - **Sample size.** A discrete independence test over many cells has little power, so
   small samples miss real edges and the chosen set can be invalid.
-- **Hidden confounders.** The Peter-Clark algorithm assumes every common cause is
-  recorded.
+- **Hidden confounders.** The Peter-Clark algorithm and greedy equivalence search
+  assume every common cause is recorded. Fast causal inference does not; see
+  {ref}`section:hidden-confounders`.
 - **The relational assumption.** A relational circuit lets an instance's attributes
   affect its parts only through the aggregation statistics, and the relational learner
   follows it unless it is given an `ExampleToPartCheck`, which adds the edges where the
@@ -119,6 +122,86 @@ Learning the structure from observational data has limits:
 - **Interventions on counts.** Setting an aggregation statistic is ambiguous once it
   has parents among the part attributes, since many configurations of the parts give
   the same count (Spirtes and Scheines, 2004).
+
+(section:hidden-confounders)=
+## Hidden confounders
+
+With a hidden common cause of the cause and the effect, a graph learned by the
+Peter-Clark algorithm can still name an adjustment set, and the circuit then computes
+the wrong number exactly, without a warning.
+`learning.FastCausalInferenceStructureLearner` learns an `ancestral_graph.AncestralGraph`
+instead {cite:p}`spirtes2000causation`: a partial ancestral graph (PAG), which stands for
+every maximal ancestral graph (MAG) the data cannot tell apart {cite:p}`zhang2008completeness`.
+An edge end is a tail where that node causes the other end, an arrow where it does not,
+and a circle where the data leaves it open.
+
+`AdjustmentSelector` checks such a graph with the generalized adjustment criterion
+{cite:p}`perkovic2018complete`, through the same `identify` and `check_declared`. A set
+is valid if
+
+1. the graph is *amenable*: every possibly directed path from the cause to the effect
+   starts with a visible edge out of the cause, one for which no hidden variable can
+   cause both ends;
+2. it holds neither the cause nor the effect;
+3. it holds no node of the *forbidden set*: the nodes on those paths and their possible
+   descendants;
+4. it m-separates the cause from the effect in a representative MAG of the graph, once
+   the edges from the cause into its causal paths are removed.
+
+A set found this way is valid in every MAG the graph stands for, whatever hidden
+variables they leave out. The selector refuses instead of guessing:
+
+| reason | when |
+|---|---|
+| `NOT_AMENABLE` | an edge out of the cause may hide a confounder; `EffectNotIdentified` names it |
+| `NO_VALID_SET_AMONG_ELIGIBLE` | the graph is amenable, but no eligible set is valid |
+| `SELECTION_BIAS_EDGE` | an edge says the rows were selected, which is not supported |
+| `NOT_ANCESTRAL` | the graph stands for no MAG |
+
+There are no candidate-set ranges for this kind of graph: once a hidden variable may
+cause the cause and its parents, a parent set is no adjustment set, so
+`interventional_range` refuses an effect the graph does not identify.
+
+**When to choose it.** Choose fast causal inference when a common cause of the cause and
+the effect may be unrecorded. Its tests are the same G² tests on discretized columns, so
+it needs about as many rows as the Peter-Clark algorithm, more for long paths.
+
+**It refuses more often.** That is the price of not assuming every confounder is
+recorded. With a recorded confounder $C$ and a hidden variable causing $C$ and $V$
+($V \to X \to Y$, $C \to X$, $C \to Y$), $\{C\}$ is valid, but the PAG of that truth
+has only circles, so the selector refuses. On 20,000 rows of a hidden confounder of $X$ and
+$Y$ ($W \to X \to Y$, $X \leftarrow L \to Y$), the Peter-Clark algorithm returns the
+undirected triangle over $W$, $X$ and $Y$, and on rows where $L$ alone links them
+($W \to X \leftarrow L \to Y$) it returns $W \to X \leftarrow Y$, claiming $Y$ causes $X$.
+Fast causal inference returns $W \circ\!\!\to X \leftarrow\!\!\circ Y$, which claims no
+cause of $X$ at all.
+
+**A MAG is not a directed acyclic graph with bidirected edges.** In the MAG
+$C \to X$, $C \to Y$, $X \to Y$, the edge $X \to Y$ may still hide a confounder: the same
+MAG stands for the graph with a hidden $L \to X$, $L \to Y$ added. Declared by hand, it is
+refused. Adding $V \to X$ and $V \leftrightarrow C$ makes $X \to Y$ visible through
+$V$, and the effect is identified by adjusting for $C$.
+
+**Knowledge it rejects.** Tiers and forbidden edges raise
+`UnsupportedKnowledgeUnderLatentConfounding`: causal-learn turns each into a fully
+directed edge, which claims a cause a hidden variable may explain instead. Required
+edges are kept.
+
+**Relational circuits.** A union of PAGs learned from overlapping tables is no PAG, and a
+part table's rows are not independent. The relational learner therefore learns one
+graph per *scope* with fast causal inference and never merges them:
+
+- the class scope, from the class table;
+- one scope per collection, from a table of every instance with at least one part
+  there, joined to one of its parts drawn at random (`part_draw_seed`).
+
+Each learned relation records its scope. A query uses the graph of the scope its cause,
+effect and declared confounders fall in: the class scope if none is a part attribute,
+the collection's if they reach one part of it. A query that reaches two collections,
+or two parts of one, raises `QuerySpansSeveralParts`. A collection's answer holds for
+instances with at least one part there, and drawing one part per instance uses fewer
+rows than the part table has. An `ExampleToPartCheck` is rejected, since the collection
+tables learn the edges between an instance and its parts directly.
 
 ## Evaluation
 

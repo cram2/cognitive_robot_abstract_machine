@@ -388,8 +388,8 @@ class FixedEdgesLearner(CausalStructureLearner):
     ) -> CausalGraph:
         by_name = {node.name: node for node in nodes}
         return CausalGraph.from_edges(
-            nodes,
-            [
+            nodes=nodes,
+            edges=[
                 GraphEdge.directed_edge(by_name[parent], by_name[child])
                 for child, parents in self.parent_names.items()
                 if child in by_name
