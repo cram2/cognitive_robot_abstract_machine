@@ -284,7 +284,7 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScrewAxisConnectionSpecification(
     ActiveConnection1DOFSpecification[ScrewAxisConnection]
 ):
@@ -295,7 +295,7 @@ class ScrewAxisConnectionSpecification(
     thread of its bottle, depending on its :attr:`screw_axis`.
     """
 
-    screw_axis: ScrewAxis = field(kw_only=True)
+    screw_axis: ScrewAxis
     """
     How the child's pose changes per unit of position, see
     :attr:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection.screw_axis`.

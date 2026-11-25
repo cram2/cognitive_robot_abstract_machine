@@ -622,7 +622,8 @@ class RobotKinematicChain(
     def approximate_length(self) -> float:
         """
         Approximates the length of the kinematic chain by adding up  the distance
-        between each body pair along the chain. For Prismatic Connections the upper
+        between each body pair along the chain. For a :class:`ScrewAxisConnection` that
+        :attr:`~ScrewAxisConnection.behaves_like_a_prismatic_connection`, the upper
         limit of the connection is used, so the function returns the maximum length.
 
         :return: the approximate length of the kinematic chain
