@@ -525,3 +525,17 @@ def test_the_result_loading_of_a_set_of_query_loads_its_rows_as_selected():
     assert ResultLoading.from_query(query=query) == ResultLoading(
         relationship_loading=RelationshipLoading.ON_ACCESS
     )
+
+
+def test_a_translation_without_a_result_loading_takes_the_one_suited_to_its_query(
+    session, database
+):
+    """
+    Translating a query without a result loading evaluates it with the result loading
+    suited to the query.
+    """
+    query = an(entity(variable(InventoryItem, domain=None)))
+
+    translator = eql_to_sql(query, session)
+
+    assert translator.result_loading == ResultLoading.from_query(query=query)

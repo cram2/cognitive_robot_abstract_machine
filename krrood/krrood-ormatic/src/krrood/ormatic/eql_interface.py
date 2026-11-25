@@ -1717,7 +1717,7 @@ def eql_to_sql(
     :param query: The EQL query, or the object standing for it
     :param session: The SQLAlchemy session
     :param result_loading: How the evaluation loads the selected objects; by default
-        as the mappers declare.
+        the one :meth:`ResultLoading.from_query` picks for *query*.
     :return: The translator holding the translated query
     :raises UnsupportedQueryTypeError: When *query* stands for an expression that is not
         a query.
@@ -1729,7 +1729,7 @@ def eql_to_sql(
     result = EQLTranslator(
         eql_query=expression,
         session=session,
-        result_loading=result_loading or ResultLoading(),
+        result_loading=result_loading or ResultLoading.from_query(query=query),
     )
     result.translate()
     return result
