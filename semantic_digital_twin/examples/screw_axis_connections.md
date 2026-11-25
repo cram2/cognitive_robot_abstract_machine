@@ -47,7 +47,7 @@ Two factories build the screw axes of revolute and prismatic connections:
 
 In the figure below, choose a connection with the buttons and move it with the slider. The dashed black
 line is the screw axis, and the grey line is the path the origin of the child follows over the range of
-the slider. The thin axes show the root frame, the dashed axes the connection frame, and the thick axes
+the slider. A prismatic screw axis has a direction but no position, so it is drawn through the child. The thin axes show the root frame, the dashed axes the connection frame, and the thick axes
 the child frame. The forward kinematics of the semantic digital twin computes every pose in the figure.
 
 ```{code-cell} ipython3
@@ -162,8 +162,15 @@ def connection_figure(kinds: list[str]) -> go.Figure:
     for kind in kinds:
         visible = kind == kinds[0]
         group_start = len(figure.data)
+        # A prismatic connection's axis is only a direction, so it is drawn through the
+        # child it slides.
+        line_origin = (
+            root_T_child(kind, 0)[:3, 3]
+            if connections[kind].behaves_like_a_prismatic_connection
+            else axis_origin
+        )
         axis_line = np.array(
-            [axis_origin - 0.3 * axis_direction, axis_origin + 0.3 * axis_direction]
+            [line_origin - 0.3 * axis_direction, line_origin + 0.3 * axis_direction]
         )
         figure.add_trace(go.Scatter3d(
             x=axis_line[:, 0], y=axis_line[:, 1], z=axis_line[:, 2], mode="lines",
