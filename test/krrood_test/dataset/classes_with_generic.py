@@ -139,3 +139,50 @@ class CombinedThreeGenericSubClassSafeWithThirdType(
 class ComplexCombinedThreeGenericSubClassSafeWithThirdTypes(
     CombinedThreeGenericSubClassSafeWithThirdType[ExampleClass, CombinedClass]
 ): ...
+
+
+# %% a generic base, a subclass binding it and a field typed with that binding
+
+
+@dataclass(kw_only=True, eq=False)
+class Wheel:
+    """
+    The kind of drive a wheeled base is generic over.
+    """
+
+    diameter: float = 0.5
+    """
+    How large the wheel is.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class WheeledBase(Generic[T], SubClassSafeGeneric):
+    """
+    A base generic over its drive, in the shape of a robot's mobile base.
+    """
+
+    label: str
+    """
+    The name of the base.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class RoverBase(WheeledBase[Wheel]):
+    """
+    The base of one robot, binding the drive of the generic base.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class WheeledBaseHolder:
+    """
+    Holds a field typed with one parametrization of the generic base, which gets the
+    parametrization a table of its own.
+    """
+
+    base: WheeledBase[Wheel]
+    """
+    The base held.
+    """
