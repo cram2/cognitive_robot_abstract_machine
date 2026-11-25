@@ -173,3 +173,28 @@ class CameraPoseOutsideWorldError(RoboKudoError, LookupError):
             "let the pipeline perceive into the world of its RoboKudo, which "
             "RoboKudo.start gives every pipeline of the analysis engine."
         )
+
+
+@dataclass(kw_only=True)
+class QueryServerNotStarted(RoboKudoError, RuntimeError):
+    """
+    Raised when a query annotator is updated before its initialisation connected it to
+    the query action server.
+    """
+
+    annotator_name: str
+    """
+    The name of the annotator that was updated too early.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.annotator_name} was updated before it was connected to the query "
+            f"action server."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "set the annotator up or initialise it before ticking it, as a behaviour "
+            "tree does when it runs the annotator."
+        )

@@ -1,3 +1,10 @@
+"""
+Size estimation of object hypotheses from 3D oriented bounding boxes.
+"""
+
+from __future__ import annotations
+
+import logging
 import copy
 from timeit import default_timer
 
@@ -35,6 +42,8 @@ Processing steps:
 * The size of the bounding box is stored in the object's annotations.
 """
 
+logger = logging.getLogger(__name__)
+
 
 class SizeBBAnnotator(BaseAnnotator):
     """
@@ -52,7 +61,7 @@ class SizeBBAnnotator(BaseAnnotator):
         Minimal one-time init!
         """
         super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """
@@ -86,8 +95,8 @@ class SizeBBAnnotator(BaseAnnotator):
                     self.get_cas(), cluster_cloud, transform_inplace=True
                 )
             except Exception as e:
-                self.rk_logger.warning(
-                    f"Couldn't find camera viewpoint in the CAS." f"Fail. Error: {e}"
+                logger.warning(
+                    f"Couldn't find camera viewpoint in the common analysis structure. Error: {e}"
                 )
                 return Status.FAILURE
 
@@ -159,9 +168,6 @@ class SizeBBAnnotator(BaseAnnotator):
             size_annotation.y_length = y
             size_annotation.z_length = z
 
-            # self.rk_logger.info(
-            #     f"x length: {x}, y_length {y}, z_length {z}"
-            #     f" of type object: {oh.classification.classname}")
             oh.annotations.append(size_annotation)
             vis_geometries.extend([cluster_obb, pcd])
 
