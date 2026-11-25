@@ -369,6 +369,85 @@ def test_bowl_and_cup_picked_up_as_statements_are_moved_onto_the_kitchen_island(
     assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
 
 
+# %% places referring to the arms their pick-ups chose
+
+
+@dataclass(kw_only=True)
+class PickUpsAndPlacesSharingArms:
+    """
+    The pick-ups of the bowl and of the cup, each leaving its arm to a variable, and the
+    places of both, each referring to the arm its pick-up chose.
+    """
+
+    pick_ups: list[Match]
+    """
+    The pick-up of the bowl and of the cup, run at once.
+    """
+
+    places: list[Match]
+    """
+    The place of the bowl and of the cup, run at once.
+    """
+
+    @classmethod
+    def from_arm_domains(
+        cls,
+        *,
+        kitchen: KitchenWithFilledDrawer,
+        bowl_arms: list[Arm],
+        cup_arms: list[Arm],
+    ) -> PickUpsAndPlacesSharingArms:
+        """
+        :param kitchen: The kitchen the plan is performed in.
+        :param bowl_arms: The arms the bowl may be picked up with, in the order tried.
+        :param cup_arms: The arms the cup may be picked up with, in the order tried.
+        :return: The pick-ups from above and the places at the goals on the kitchen
+            island, sharing a variable for the arm of each object.
+        """
+        bowl_pick_up, cup_pick_up = pick_ups_from_above(kitchen)
+        bowl_arm = variable(Arm, domain=bowl_arms)
+        cup_arm = variable(Arm, domain=cup_arms)
+        return cls(
+            pick_ups=[
+                a(PickUpAction)(
+                    grasp_candidate=bowl_pick_up.grasp_candidate, arm=bowl_arm
+                ),
+                a(PickUpAction)(
+                    grasp_candidate=cup_pick_up.grasp_candidate, arm=cup_arm
+                ),
+            ],
+            places=[
+                the(PlaceAction)(
+                    arm=bowl_arm,
+                    graspable=kitchen.bowl,
+                    goal_pose=kitchen.world_T_bowl_goal,
+                ),
+                the(PlaceAction)(
+                    arm=cup_arm,
+                    graspable=kitchen.cup,
+                    goal_pose=kitchen.world_T_cup_goal,
+                ),
+            ],
+        )
+
+    def assert_each_place_ran_with_the_arm_its_pick_up_chose(
+        self, *, plan: StatechartNode
+    ) -> None:
+        """
+        Assert that each place of `plan` ran once, with the arm its pick-up ran with.
+        """
+        statement_nodes = [
+            node for node in plan.descendants if isinstance(node, StatementNode)
+        ]
+        for pick_up, place in zip(self.pick_ups, self.places):
+            [picked_up] = next(
+                node for node in statement_nodes if node.statement is pick_up
+            ).grounded_nodes
+            placing = next(node for node in statement_nodes if node.statement is place)
+            assert isinstance(placing, DefiniteStatementNode)
+            assert [placed.arm for placed in placing.grounded_nodes] == [picked_up.arm]
+
+
 def test_bowl_and_cup_placed_by_the_arms_their_pick_ups_chose_are_moved_onto_the_kitchen_island(
     kitchen_with_filled_drawer: KitchenWithFilledDrawer,
 ) -> None:
@@ -380,25 +459,17 @@ def test_bowl_and_cup_placed_by_the_arms_their_pick_ups_chose_are_moved_onto_the
     """
     kitchen = kitchen_with_filled_drawer
     robot = kitchen.robot
-    bowl_pick_up, cup_pick_up = pick_ups_from_above(kitchen)
-    bowl_arm = variable(Arm, domain=[robot.left_arm, robot.right_arm])
-    cup_arm = variable(Arm, domain=[robot.right_arm, robot.left_arm])
-    pick_ups = [
-        a(PickUpAction)(grasp_candidate=bowl_pick_up.grasp_candidate, arm=bowl_arm),
-        a(PickUpAction)(grasp_candidate=cup_pick_up.grasp_candidate, arm=cup_arm),
-    ]
-    places = [
-        the(PlaceAction)(
-            arm=bowl_arm, graspable=kitchen.bowl, goal_pose=kitchen.world_T_bowl_goal
-        ),
-        the(PlaceAction)(
-            arm=cup_arm, graspable=kitchen.cup, goal_pose=kitchen.world_T_cup_goal
-        ),
-    ]
+    steps = PickUpsAndPlacesSharingArms.from_arm_domains(
+        kitchen=kitchen,
+        bowl_arms=[robot.left_arm, robot.right_arm],
+        cup_arms=[robot.right_arm, robot.left_arm],
+    )
     plan = Sequence(
         nodes=[
             a(Sequence)(
-                nodes=transport_steps(kitchen, pick_ups=pick_ups, places=places)
+                nodes=transport_steps(
+                    kitchen, pick_ups=steps.pick_ups, places=steps.places
+                )
             )
         ]
     )
@@ -406,16 +477,33 @@ def test_bowl_and_cup_placed_by_the_arms_their_pick_ups_chose_are_moved_onto_the
     run_plan(plan, kitchen.context_extensions, collision_avoidance=True)
 
     assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
-    statement_nodes = [
-        node for node in plan.descendants if isinstance(node, StatementNode)
-    ]
-    for pick_up, place in zip(pick_ups, places):
-        [picked_up] = next(
-            node for node in statement_nodes if node.statement is pick_up
-        ).grounded_nodes
-        placing = next(node for node in statement_nodes if node.statement is place)
-        assert isinstance(placing, DefiniteStatementNode)
-        assert [placed.arm for placed in placing.grounded_nodes] == [picked_up.arm]
+    steps.assert_each_place_ran_with_the_arm_its_pick_up_chose(plan=plan)
+
+
+def test_bowl_and_cup_placed_by_the_only_arms_their_pick_ups_may_take_are_moved_onto_the_kitchen_island(
+    kitchen_with_filled_drawer: KitchenWithFilledDrawer,
+) -> None:
+    """
+    With one arm in the domain of each object there is no choice to try ahead, so the
+    plan is a plain sequence; the places still describe their actions under the arms the
+    pick-ups bound.
+    """
+    kitchen = kitchen_with_filled_drawer
+    robot = kitchen.robot
+    steps = PickUpsAndPlacesSharingArms.from_arm_domains(
+        kitchen=kitchen, bowl_arms=[robot.left_arm], cup_arms=[robot.right_arm]
+    )
+    plan = Sequence(
+        nodes=transport_steps(kitchen, pick_ups=steps.pick_ups, places=steps.places)
+    )
+
+    run_plan(plan, kitchen.context_extensions, collision_avoidance=True)
+
+    assert_bowl_and_cup_stand_on_the_kitchen_island(kitchen)
+    steps.assert_each_place_ran_with_the_arm_its_pick_up_chose(plan=plan)
+
+
+# %% the drawer while its contents are carried away
 
 
 def test_the_drawer_stays_open_while_its_contents_are_carried_away(
