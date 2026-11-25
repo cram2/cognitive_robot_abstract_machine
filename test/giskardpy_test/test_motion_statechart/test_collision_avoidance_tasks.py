@@ -29,6 +29,7 @@ from giskardpy.motion_statechart.tasks.collision_avoidance import (
     _ExternalCollisionAvoidanceTask,
     _SelfCollisionAvoidanceTask,
     ExternalCollisionAvoidance,
+    LinearBufferZoneScaling,
     SelfCollisionAvoidance,
     UpdateTemporaryCollisionRules,
 )
@@ -1098,6 +1099,225 @@ def test_only_closest_objects_with_collision_data_weigh_anything(
         DefaultWeights.WEIGHT_COLLISION_AVOIDANCE if has_data else 0.0
         for has_data in with_data
     ]
+
+
+# %% buffer zones scaled by the distance to a goal
+
+
+def _linear_scaling_at_goal_distance(
+    world: World, goal_distance: float
+) -> LinearBufferZoneScaling:
+    """
+    :param world: The cylinder bot world.
+    :param goal_distance: How far the goal point lies from the bot, in meters.
+    :return: A linear scaling whose goal point stays `goal_distance` away from the bot.
+    """
+    tip = world.get_kinematic_structure_entity_by_name("bot")
+    return LinearBufferZoneScaling(
+        tip_link=tip,
+        goal_point=Point3(x=goal_distance, reference_frame=tip),
+        full_scale_goal_distance=1.0,
+    )
+
+
+def test_linear_buffer_zone_scaling_is_proportional_to_the_goal_distance(
+    cylinder_bot_world: World,
+) -> None:
+    scaling = _linear_scaling_at_goal_distance(cylinder_bot_world, 0.25)
+
+    factor = scaling.scale_factor(world=cylinder_bot_world).evaluate()[0]
+
+    assert factor == pytest.approx(0.25)
+
+
+def test_linear_buffer_zone_scaling_stops_at_its_minimum_close_to_the_goal(
+    cylinder_bot_world: World,
+) -> None:
+    scaling = _linear_scaling_at_goal_distance(cylinder_bot_world, 0.0)
+
+    factor = scaling.scale_factor(world=cylinder_bot_world).evaluate()[0]
+
+    assert factor == pytest.approx(scaling.minimum_scale_factor)
+
+
+def test_linear_buffer_zone_scaling_stops_at_its_maximum_far_from_the_goal(
+    cylinder_bot_world: World,
+) -> None:
+    scaling = _linear_scaling_at_goal_distance(cylinder_bot_world, 2.0)
+
+    factor = scaling.scale_factor(world=cylinder_bot_world).evaluate()[0]
+
+    assert factor == pytest.approx(scaling.maximum_scale_factor)
+
+
+def _lower_errors_of_contacts_with_data(
+    *, executor: StatechartExecutor, task: _ExternalCollisionAvoidanceTask
+) -> list[float]:
+    """
+    :param executor: The executor that ticked `task`.
+    :param task: A built external collision avoidance task.
+    :return: The lower error of every constraint whose contact has collision data.
+    """
+    manager = executor.context.require_extension(
+        extension_type=MotionControlContext
+    ).external_collision_manager
+    return [
+        float(constraint.lower_bound.evaluate()[0])
+        for contact, constraint in zip(
+            task.avoided_contacts, task.constraint_collection.inequality_constraints
+        )
+        if contact.rank < len(manager.last_closest_contacts[contact.group])
+    ]
+
+
+def _contact_distances_with_data(
+    *, executor: StatechartExecutor, task: _ExternalCollisionAvoidanceTask
+) -> list[float]:
+    """
+    :param executor: The executor that ticked `task`.
+    :param task: A built external collision avoidance task.
+    :return: The distance of every avoided contact that has collision data.
+    """
+    manager = executor.context.require_extension(
+        extension_type=MotionControlContext
+    ).external_collision_manager
+    return [
+        float(manager.get_contact_distance_symbol(contact).evaluate()[0])
+        for contact in task.avoided_contacts
+        if contact.rank < len(manager.last_closest_contacts[contact.group])
+    ]
+
+
+def _avoid_bot_and_environment(
+    world: World, *, buffer_zone_distance: float, violated_distance: float
+) -> UpdateTemporaryCollisionRules:
+    """
+    :param world: The cylinder bot world.
+    :param buffer_zone_distance: The configured buffer zone between bot and environment.
+    :param violated_distance: The configured violated distance between them.
+    :return: A node avoiding collisions between the bot and the first environment body.
+    """
+    return UpdateTemporaryCollisionRules(
+        temporary_rules=[
+            AvoidCollisionBetweenGroups(
+                buffer_zone_distance=buffer_zone_distance,
+                violated_distance=violated_distance,
+                body_group_a=[world.get_kinematic_structure_entity_by_name("bot")],
+                body_group_b=[
+                    world.get_kinematic_structure_entity_by_name("environment")
+                ],
+            )
+        ]
+    )
+
+
+def test_scaled_buffer_zone_shrinks_the_lower_error_of_external_contacts(
+    cylinder_bot_world: World,
+) -> None:
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    scaling = _linear_scaling_at_goal_distance(cylinder_bot_world, 0.5)
+    goal = ExternalCollisionAvoidance(robot=robot, buffer_zone_scaling=scaling)
+    buffer_zone_distance = 1.0
+    executor = _compile_collision_avoidance(
+        cylinder_bot_world,
+        goal,
+        _avoid_bot_and_environment(
+            cylinder_bot_world,
+            buffer_zone_distance=buffer_zone_distance,
+            violated_distance=0.0,
+        ),
+    )
+
+    executor.tick()
+
+    task = goal.nodes[0]
+    distances = _contact_distances_with_data(executor=executor, task=task)
+    assert len(distances) == 1
+    assert _lower_errors_of_contacts_with_data(
+        executor=executor, task=task
+    ) == pytest.approx([0.5 * buffer_zone_distance - distances[0]])
+
+
+def test_scaled_buffer_zone_never_drops_below_the_violated_distance(
+    cylinder_bot_world: World,
+) -> None:
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    scaling = _linear_scaling_at_goal_distance(cylinder_bot_world, 0.0)
+    goal = ExternalCollisionAvoidance(robot=robot, buffer_zone_scaling=scaling)
+    violated_distance = 0.2
+    executor = _compile_collision_avoidance(
+        cylinder_bot_world,
+        goal,
+        _avoid_bot_and_environment(
+            cylinder_bot_world,
+            buffer_zone_distance=1.0,
+            violated_distance=violated_distance,
+        ),
+    )
+
+    executor.tick()
+
+    task = goal.nodes[0]
+    distances = _contact_distances_with_data(executor=executor, task=task)
+    assert len(distances) == 1
+    assert _lower_errors_of_contacts_with_data(
+        executor=executor, task=task
+    ) == pytest.approx([violated_distance - distances[0]])
+
+
+def test_scaled_buffer_zone_lets_the_bot_come_closer_to_an_obstacle_at_its_goal(
+    cylinder_bot_world: World, statechart_origin: StatechartOrigin
+) -> None:
+    """
+    The goal is the center of the obstacle, 0.3 m behind its surface.
+
+    The bot stops where its gap to the obstacle equals the buffer zone scaled by its
+    distance to the goal, ``gap = buffer_zone_distance * (gap + 0.3)``.
+    """
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    goal_point = Point3(x=1, reference_frame=cylinder_bot_world.root)
+    buffer_zone_distance = 0.05
+    executor = StatechartExecutor(
+        context=StatechartContext(world=cylinder_bot_world),
+        pacer=SimulationPacer(real_time_factor=2),
+        extensions=[MotionControl()],
+    )
+    statechart = Statechart(
+        context=statechart_origin.create_building_context(executor=executor)
+    )
+    statechart.add_nodes(
+        nodes=[
+            _avoid_bot_and_environment(
+                cylinder_bot_world,
+                buffer_zone_distance=buffer_zone_distance,
+                violated_distance=0.0,
+            ),
+            CartesianPosition(
+                kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
+                goal_point=goal_point,
+            ),
+            ExternalCollisionAvoidance(
+                robot=robot,
+                buffer_zone_scaling=LinearBufferZoneScaling(
+                    tip_link=tip, goal_point=goal_point, full_scale_goal_distance=1.0
+                ),
+            ),
+            local_min := LocalMinimumReached(),
+        ]
+    )
+    statechart.add_node(node=EndMotion.when_true(node=local_min))
+    executor.compile(
+        statechart=statechart_origin.hand_over(statechart=statechart, executor=executor)
+    )
+
+    executor.tick_until_end(timeout=500)
+
+    collisions = executor.context.world.collision_manager.compute_collisions()
+    assert len(collisions.contacts) == 1
+    assert collisions.contacts[0].distance == pytest.approx(
+        buffer_zone_distance * 0.3 / (1 - buffer_zone_distance), abs=2e-3
+    )
 
 
 # %% collision check counting
