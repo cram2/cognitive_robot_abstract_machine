@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import fields, replace
 
 import pytest
-from robokudo.annotators.blur import BlurDescriptor
+from robokudo.annotators.blur import BlurAnnotator, BlurDescriptor
 from robokudo.annotators.cas_check import (
     CASCheckAnnotationTypeExists,
     CASCheckObjectHypothesisExists,
@@ -19,7 +19,9 @@ from robokudo.annotators.image_cluster_extractor import (
     ImageClusterExtractor,
     ImageClusterExtractorDescriptor,
 )
+from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.plane import PlaneDescriptor
+from robokudo.annotators.pointcloud_check import PointcloudCheckAnnotator
 from robokudo.annotators.pointcloud_cluster_extractor import (
     NaivePointCloudClusterExtractor,
     NaivePointCloudClusterExtractorDescriptor,
@@ -30,8 +32,11 @@ from robokudo.tree_components.query_based_task_scheduler import QueryBasedSchedu
 from typing_extensions import get_type_hints
 
 from .dataset.generic_annotators import (
+    AnnotatorNamingScope,
     DescriptorBindingAnnotator,
+    InheritedAnnotationChecker,
     InheritedDescriptorBindingAnnotator,
+    InheritedObjectHypothesisChecker,
     ThreadedDescriptorBindingAnnotator,
 )
 
@@ -153,7 +158,7 @@ def test_explicit_absence_uses_default_descriptor() -> None:
     )
 
 
-# %% Custom constructors
+# %% Specialized initialization
 def test_query_scheduler_preserves_supplied_descriptor() -> None:
     """
     Scheduler initialization preserves configuration supplied to its annotator base.
@@ -168,14 +173,101 @@ def test_query_scheduler_preserves_supplied_descriptor() -> None:
 @pytest.mark.parametrize(
     "annotator_type", [CASCheckAnnotationTypeExists, CASCheckObjectHypothesisExists]
 )
-def test_custom_checker_constructors_preserve_supplied_descriptor(
+def test_checker_initialization_preserves_supplied_descriptor(
     annotator_type: type[BaseAnnotator],
 ) -> None:
     """
-    Explicit configuration survives both specialized checker constructors and copying.
+    Explicit configuration survives specialized checker initialization and copying.
     """
     descriptor = BaseAnnotatorDescriptor()
     checker = annotator_type(descriptor=descriptor)
 
     assert checker.descriptor is descriptor
     assert replace(checker, name="ReplacementChecker").descriptor is descriptor
+
+
+# %% Concrete annotator names
+@pytest.mark.parametrize(
+    "annotator_type",
+    [
+        BaseAnnotator,
+        ThreadedAnnotator,
+        BlurAnnotator,
+        InheritedDescriptorBindingAnnotator,
+        ThreadedDescriptorBindingAnnotator,
+        ImagePreprocessorAnnotator,
+        PointcloudCheckAnnotator,
+        CASCheckAnnotationTypeExists,
+        CASCheckObjectHypothesisExists,
+        InheritedAnnotationChecker,
+        InheritedObjectHypothesisChecker,
+        QueryBasedScheduler,
+    ],
+)
+def test_default_name_identifies_the_concrete_annotator(
+    annotator_type: type[BaseAnnotator],
+) -> None:
+    """
+    Inherited and custom constructors use the concrete class for tree labels.
+    """
+    annotator = annotator_type()
+
+    assert annotator.name == annotator_type.__qualname__
+    assert (
+        annotator.qualified_name
+        == f"{annotator_type.__qualname__}/{annotator_type.__qualname__}"
+    )
+
+
+@pytest.mark.parametrize(
+    "annotator_type",
+    [
+        BaseAnnotator,
+        ThreadedDescriptorBindingAnnotator,
+        CASCheckAnnotationTypeExists,
+        CASCheckObjectHypothesisExists,
+        InheritedAnnotationChecker,
+        InheritedObjectHypothesisChecker,
+        QueryBasedScheduler,
+    ],
+)
+@pytest.mark.parametrize("configured_name", ["AEConfiguredName", ""])
+def test_explicit_name_is_preserved(
+    annotator_type: type[BaseAnnotator],
+    configured_name: str,
+) -> None:
+    """
+    Explicit labels, including empty strings, remain under the caller's control.
+    """
+    annotator = annotator_type(name=configured_name)
+
+    assert annotator.name == configured_name
+    assert (
+        annotator.qualified_name == f"{annotator_type.__qualname__}/{configured_name}"
+    )
+
+
+def test_default_name_uses_the_qualified_class_name() -> None:
+    """
+    A qualified class label is preserved instead of shortening it to the simple name.
+    """
+    annotator = AnnotatorNamingScope.Annotator()
+
+    assert annotator.name == type(annotator).__qualname__
+
+
+def test_dataclass_copies_preserve_resolved_names_and_accept_overrides() -> None:
+    """
+    Copies retain resolved labels while obtaining independent tree identities.
+    """
+    original = InheritedDescriptorBindingAnnotator()
+    copied = replace(original)
+    renamed = replace(original, name="RenamedForAE")
+
+    assert copied.name == type(original).__qualname__
+    assert copied.qualified_name == original.qualified_name
+    assert copied.id != original.id
+    assert renamed.name == "RenamedForAE"
+    assert renamed.qualified_name == f"{type(original).__qualname__}/{renamed.name}"
+    assert renamed.descriptor is original.descriptor
+    assert get_type_hints(type(original))["name"] is str

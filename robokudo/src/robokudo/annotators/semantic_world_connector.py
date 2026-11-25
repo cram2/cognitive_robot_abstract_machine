@@ -68,9 +68,6 @@ class SemanticDigitalTwinConnector(
     An annotator that synchronizes the current state of the world with the semdt.
     """
 
-    name: str = "SemanticDigitalTwinSynchronization"
-    """Name of this node in the behaviour tree."""
-
     object_comparator: ObjectHypothesisComparator = field(init=False, repr=False)
     """Compares perception hypotheses with semantic-world objects."""
 

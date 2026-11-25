@@ -29,18 +29,13 @@ from py_trees.common import Status
 from robokudo.annotators.core import BaseAnnotator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class Redraw(BaseAnnotator):
     """
     Annotator for triggering visualization updates.
 
     This annotator sets the redraw flag on the pipeline to make visualizers show the
     latest visualization output.
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     def update(self) -> Status:

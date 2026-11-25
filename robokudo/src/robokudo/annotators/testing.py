@@ -43,7 +43,7 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SlowAnnotator(ThreadedAnnotator):
     """A slow annotator that demonstrates long-running processing using ThreadedAnnotator.
 
@@ -55,9 +55,6 @@ class SlowAnnotator(ThreadedAnnotator):
     * Timeout behavior verification
     * Visual feedback testing
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     sleep_duration_seconds: float = 1.0
     """Delay applied while simulating annotator work."""
@@ -104,7 +101,7 @@ class SlowAnnotator(ThreadedAnnotator):
         return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class EmptyAnnotator(BaseAnnotator):
     """
     Basic annotator that generates empty visual output.
@@ -112,9 +109,6 @@ class EmptyAnnotator(BaseAnnotator):
     This annotator creates a black image and sets it as output.
     Used for testing visualization and output handling.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     sleep_duration_seconds: float = 1
     """This setting does not introduce a delay or affect the generated output."""
@@ -133,7 +127,7 @@ class EmptyAnnotator(BaseAnnotator):
         return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FailingAnnotator(ThreadedAnnotator):
     """
     Annotator that simulates failures for testing with a long-running annotator using the ThreadedAnnotator class.
@@ -141,9 +135,6 @@ class FailingAnnotator(ThreadedAnnotator):
     This annotator alternates between success and failure states,
     with configurable delays. Used for testing error handling.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     counter: int = field(default=0, init=False, repr=False)
     """Counter for alternating between success and failure states"""
@@ -182,7 +173,7 @@ class FailingAnnotator(ThreadedAnnotator):
         )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class FakeCollectionReaderAnnotator(BaseAnnotator):
     """
     A simulated collection reader for testing pipeline behavior.
@@ -201,9 +192,6 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
     * Feedback message handling
     * CAS creation testing
     """
-
-    name: str = "FakeCollectionReader"
-    """Name of this node in the behaviour tree."""
 
     collection_readers: list[BaseAnnotatorDescriptor] = field(init=False, repr=False)
     """List of collection reader descriptors"""
@@ -331,9 +319,6 @@ class ScopedAnnotator(BaseAnnotator[ScopedDescriptor]):
     .. note::
         This is primarily a demonstration annotator for educational purposes.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     @catch_and_raise_to_blackboard
     def update(self) -> Status:

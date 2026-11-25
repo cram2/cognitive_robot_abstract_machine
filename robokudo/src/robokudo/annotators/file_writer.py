@@ -79,9 +79,6 @@ class FileWriter(BaseAnnotator[FileWriterDescriptor]):
        Target directory must exist and be writable.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     initialized: bool = field(default=False, init=False, repr=False)
     """Whether the configured output directory is available."""
 

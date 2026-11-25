@@ -75,9 +75,6 @@ class StorageWriter(BaseAnnotator[StorageWriterDescriptor]):
     allowing for data recording and offline processing without using ROS bag files.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     storage: Storage = field(init=False, repr=False)
     """Storage connection used to persist pipeline data."""
 

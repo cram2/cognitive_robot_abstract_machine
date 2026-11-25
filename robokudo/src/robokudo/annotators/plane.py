@@ -113,9 +113,6 @@ class PlaneAnnotator(ThreadedAnnotator[PlaneDescriptor]):
        Uses Open3D's plane segmentation with configurable parameters.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def compute(self) -> Status:
         """
         Detect and annotate dominant plane in point cloud.

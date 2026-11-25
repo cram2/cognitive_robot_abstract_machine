@@ -79,8 +79,8 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
     context.
     """
 
-    name: str = "Annotator"
-    """Name of this node in the behaviour tree."""
+    name: str = field(default=cast(str, None))
+    """Behaviour-tree label, defaulting to the concrete class's qualified name."""
 
     descriptor: DescriptorType = field(
         default=cast(DescriptorType, None), kw_only=True, repr=False
@@ -102,7 +102,8 @@ class BaseAnnotator(Behaviour, Generic[DescriptorType], SubClassSafeGeneric):
 
     def __post_init__(self) -> None:
         """Initialize behaviour-tree identity, effective configuration, and logging."""
-        Behaviour.__init__(self, name=self.name)
+        name = type(self).__qualname__ if self.name is None else self.name
+        Behaviour.__init__(self, name=name)
         if self.descriptor is None:
             self.descriptor = self.descriptor_type()
         self.rk_logger = logging.getLogger(PACKAGE_NAME)
@@ -456,9 +457,6 @@ class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
     main thread. It provides functionality to run computations asynchronously and handle
     their results.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     compute_worker: Worker | None = field(default=None, init=False, repr=False)
     """Computation scheduled for the current processing iteration."""

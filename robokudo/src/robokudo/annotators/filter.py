@@ -69,9 +69,6 @@ class FilterAnnotator(BaseAnnotator[FilterDescriptor]):
     annotations, modifying the annotation list in-place based on the filter results.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def update(self) -> Status:
         """
         Apply the filter function to current annotations.

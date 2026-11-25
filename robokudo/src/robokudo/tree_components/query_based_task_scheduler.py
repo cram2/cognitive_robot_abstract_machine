@@ -42,11 +42,6 @@ class QueryBasedScheduler(
     :type filter_function: Callable[[QueryGoal], str]
     """
 
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
-    """
-
     tasks: dict[str, Composite] | None = None
     """
     Available task trees indexed by the query-selected task identifier.

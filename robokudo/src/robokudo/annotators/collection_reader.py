@@ -48,7 +48,7 @@ class CollectionReaderDescriptor(AnnotatorDescriptor[CollectionReaderParameters]
 
 
 # %% Collection reader annotator
-@dataclass(kw_only=True, init=False, eq=False)
+@dataclass(kw_only=True, eq=False)
 class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     """
     Acquire sensor data and share it with other annotators.
@@ -56,9 +56,9 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     It is typically the first annotator in the pipeline.
     """
 
-    name: str = "CollectionReader"
+    descriptor: CollectionReaderDescriptor = field(repr=False)
     """
-    Name of this node in the behaviour tree.
+    Required camera selection and acquisition configuration.
     """
 
     camera_interface: CameraInterface | None = field(default=None, kw_only=True)
@@ -66,54 +66,33 @@ class CollectionReaderAnnotator(BaseAnnotator[CollectionReaderDescriptor]):
     Acquisition interface owned by this reader.
     """
 
-    start_timer: float | None = field(init=False, repr=False)
+    start_timer: float | None = field(default=None, init=False, repr=False)
     """
     Start of the current wait for camera data.
     """
 
-    iterations_since_last_data: int = field(init=False, repr=False)
+    iterations_since_last_data: int = field(default=0, init=False, repr=False)
     """
     Number of consecutive ticks waiting for camera data.
     """
 
-    iterations_since_last_data_warning_threshold: int = field(init=False, repr=False)
+    iterations_since_last_data_warning_threshold: int = field(
+        default=40, init=False, repr=False
+    )
     """
     Number of waiting ticks between camera availability warnings.
     """
 
-    def __init__(
-        self,
-        descriptor: CollectionReaderDescriptor,
-        name: str = "CollectionReader",
-        *,
-        camera_interface: CameraInterface | None = None,
-    ) -> None:
+    def __post_init__(self) -> None:
         """
-        Initialize the configured camera reader and its acquisition state.
+        Specialize :meth:`BaseAnnotator.__post_init__` with the configured acquisition
+        interface.
         """
-        super().__init__(name=name, descriptor=descriptor)
-        self.camera_interface = (
-            descriptor.parameters.camera_interface_type(
-                descriptor.parameters.camera_configuration
+        super().__post_init__()
+        if self.camera_interface is None:
+            self.camera_interface = self.descriptor.parameters.camera_interface_type(
+                self.descriptor.parameters.camera_configuration
             )
-            if camera_interface is None
-            else camera_interface
-        )
-        """
-        Runtime camera interface owned by this reader.
-        """
-        self.start_timer: float | None = None
-        """
-        Start of the current wait for camera data.
-        """
-        self.iterations_since_last_data: int = 0
-        """
-        Number of consecutive ticks waiting for camera data.
-        """
-        self.iterations_since_last_data_warning_threshold: int = 40
-        """
-        Number of waiting ticks between camera availability warnings.
-        """
 
     def initialise(self) -> None:
         """

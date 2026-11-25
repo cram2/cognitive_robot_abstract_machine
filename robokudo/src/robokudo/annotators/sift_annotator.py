@@ -1,3 +1,7 @@
+"""
+Extract and match SIFT features on object hypotheses across camera observations.
+"""
+
 from __future__ import annotations
 
 import colorsys
@@ -25,15 +29,10 @@ if TYPE_CHECKING:
 
 
 # %% Feature extraction
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SIFTAnnotator(ThreadedAnnotator):
     """
     Annotator for SIFT feature extraction and matching using OpenCV.
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     _feature_extractor: cv2.SIFT = field(init=False, repr=False)

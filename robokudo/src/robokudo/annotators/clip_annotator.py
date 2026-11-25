@@ -72,9 +72,6 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator[CLIPDescriptor]):
     text embedding of each vocabulary entry.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     clip_model: CLIPModel = field(init=False, repr=False)
     """CLIP model used for feature extraction."""
 

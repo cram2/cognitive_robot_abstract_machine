@@ -1,3 +1,7 @@
+"""
+Estimate object dimensions from oriented bounding boxes of their point clouds.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -41,7 +45,7 @@ Processing steps:
 """
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class SizeBoundingBoxAnnotator(BaseAnnotator):
     """
     A class to analyze 3D point clouds and compute oriented bounding box sizes.
@@ -49,11 +53,6 @@ class SizeBoundingBoxAnnotator(BaseAnnotator):
     This annotator processes object hypotheses by computing their oriented 3D bounding
     boxes and storing size information as annotations. It performs coordinate
     transformations and uses minimum area rectangles to determine object dimensions.
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     def update(self) -> Status:

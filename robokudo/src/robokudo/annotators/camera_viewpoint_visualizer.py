@@ -18,7 +18,7 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CameraViewpointVisualizer(BaseAnnotator):
     """
     Annotator for visualizing camera viewpoints and reference frames.
@@ -29,11 +29,6 @@ class CameraViewpointVisualizer(BaseAnnotator):
 
     The annotator will fail if the required viewpoint transform cannot be found in the
     CAS.
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     def update(self) -> Status:

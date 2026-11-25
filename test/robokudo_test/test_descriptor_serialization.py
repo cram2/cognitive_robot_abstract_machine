@@ -12,7 +12,6 @@ import pytest
 import torch
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.utils import get_full_class_name, resolve_class_from_full_name
-from robokudo.datastructures.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.annotation_writer import (
     AnnotationPublisherWriterDescriptor,
     AnnotationStorageWriterDescriptor,
@@ -82,6 +81,7 @@ from robokudo.datastructures.annotator_descriptor import (
     AnnotatorDescriptor,
     BaseAnnotatorDescriptor,
 )
+from robokudo.datastructures.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.pipeline import Pipeline
@@ -89,6 +89,7 @@ from robokudo.types.annotation import Classification
 from typing_extensions import get_type_hints
 
 from .dataset.annotation_filters import ClassificationFilter
+from .dataset.generic_annotators import DeclarativeCollectionReader
 
 
 # %% Descriptor discovery
@@ -253,7 +254,12 @@ def test_collection_reader_descriptor_round_trip() -> None:
     assert restored.parameters.camera_interface_type is CameraInterface
 
 
-def test_restored_collection_reader_constructs_its_runtime_interface() -> None:
+@pytest.mark.parametrize(
+    "reader_type", [CollectionReaderAnnotator, DeclarativeCollectionReader]
+)
+def test_restored_collection_reader_constructs_its_runtime_interface(
+    reader_type: type[CollectionReaderAnnotator],
+) -> None:
     """
     A restored descriptor constructs its declared camera implementation.
     """
@@ -266,7 +272,7 @@ def test_restored_collection_reader_constructs_its_runtime_interface() -> None:
         )
     )
     restored = from_json(json.loads(json.dumps(to_json(descriptor))))
-    reader = CollectionReaderAnnotator(restored)
+    reader = reader_type(descriptor=restored)
     assert type(reader.camera_interface) is restored.parameters.camera_interface_type
     assert (
         reader.camera_interface.camera_configuration

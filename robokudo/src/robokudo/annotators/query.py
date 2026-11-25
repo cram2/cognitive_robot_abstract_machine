@@ -85,7 +85,7 @@ if TYPE_CHECKING:
     from robokudo.utils.annotation_conversion import Annotation2ODConverter
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryAnnotator(BaseAnnotator):
     """
     Handle external queries through ROS action server.
@@ -95,9 +95,6 @@ class QueryAnnotator(BaseAnnotator):
     Annotator and the Actionserver are type-agnostic, which means that you are not bound
     to a specific type of query. You can pass these from your AE to this QueryAnnotator.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     feedback_instance: Query.Feedback = field(init=False, repr=False)
     """Feedback message prepared for the active query."""
@@ -167,14 +164,11 @@ class QueryAnnotator(BaseAnnotator):
         return Status.RUNNING
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryFeedback(BaseAnnotator):
     """
     A test class which simply generates a fixed-string feedback.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     feedback_text: str = ""
     """Feedback text sent to the active query client."""
@@ -186,16 +180,13 @@ class QueryFeedback(BaseAnnotator):
         return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryFeedbackAndCount(BaseAnnotator):
     """
     A test class which simply counts up until a fixed number.
 
     Until this number is reached, a pre-defined status is returned.
     """
-
-    name: str = "QueryFeedback"
-    """Name of this node in the behaviour tree."""
 
     count_until: int = 20
     """Number of updates before the feedback node finishes."""
@@ -217,7 +208,7 @@ class QueryFeedbackAndCount(BaseAnnotator):
             return self.return_code
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class QueryReply(BaseAnnotator):
     """
     A test class which simply generates an empty Query Answer to check if the Action
@@ -225,9 +216,6 @@ class QueryReply(BaseAnnotator):
 
     Create a single, empty Object Designator that will be sent to the caller.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     def initialise(self) -> None:
         """
@@ -303,9 +291,6 @@ class GenerateQueryResult(BaseAnnotator[GenerateQueryResultDescriptor]):
     These will be placed into the Blackboard so that a running Query Action Server can
     pick the information up and send it as a query reply.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     color_converter: SemanticColor2ODConverter = field(init=False, repr=False)
     """Converts semantic colors into query result properties."""

@@ -109,9 +109,6 @@ class TSDFAnnotator(ThreadedAnnotator[TSDFDescriptor]):
         To segment objects out of the image a mask is required too. Higher quality masks yield better results.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     translation_comparator: TranslationComparator = field(init=False, repr=False)
     """Translation comparator for comparing world positions between pipeline iterations."""
 

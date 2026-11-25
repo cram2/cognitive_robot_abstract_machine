@@ -96,9 +96,6 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator[ICPPoseRefinementDescriptor])
        Currently limited to refining against a single pre-loaded model.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     class_name_to_ply_model: dict[str, o3d.geometry.PointCloud] = field(
         init=False, repr=False
     )

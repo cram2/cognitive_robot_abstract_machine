@@ -1,3 +1,7 @@
+"""
+Track detected object hypotheses across successive camera observations.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -21,7 +25,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ByteTrackAnnotator(BaseAnnotator):
     """
     A ByteTrack annotator that tracks detected objects across pipeline ticks.
@@ -31,11 +35,6 @@ class ByteTrackAnnotator(BaseAnnotator):
     * ObjectHypothesis ROI
     * ObjectHypothesis ROI + Mask
     * ObjectHypothesis ROI + Mask + Classification annotation
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     tracker: ByteTrackTracker = field(init=False, repr=False)

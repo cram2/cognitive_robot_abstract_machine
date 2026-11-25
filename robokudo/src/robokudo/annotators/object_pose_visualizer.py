@@ -23,7 +23,7 @@ from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from robokudo.utils.transform import get_transform_matrix_from_q
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ObjectPoseVisualizer(BaseAnnotator):
     """
     Annotator for visualizing object poses in the CAS.
@@ -33,11 +33,6 @@ class ObjectPoseVisualizer(BaseAnnotator):
     * Drawing pose information on the color image
     * Creating 3D coordinate frames at each object's pose
     * Displaying the coordinate frames alongside the point cloud
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     @catch_and_raise_to_blackboard

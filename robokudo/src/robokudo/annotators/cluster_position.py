@@ -83,9 +83,6 @@ class ClusterPositionAnnotator(BaseAnnotator[ClusterPositionDescriptor]):
        Can process either ObjectHypothesis or CloudAnnotation data.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def update(self) -> Status:
         """
         Annotate and visualize centroids of nonempty object point clouds.

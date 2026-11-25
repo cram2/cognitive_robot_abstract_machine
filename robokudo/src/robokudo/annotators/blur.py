@@ -74,9 +74,6 @@ class BlurAnnotator(BaseAnnotator[BlurDescriptor]):
        advancement when the blur threshold is exceeded.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def compute_bluriness(self, img: npt.NDArray) -> float:
         """Compute the blur metric for an image.
 

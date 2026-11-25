@@ -108,9 +108,6 @@ class WorldDescriptorBootstrapAnnotator(
     Augment the current shared world with descriptor-defined entities.
     """
 
-    name: str = "WorldDescriptorBootstrap"
-    """Name of this node in the behaviour tree."""
-
     _last_augmented_world_id: int | None = field(default=None, init=False, repr=False)
     """Identity of the world most recently augmented with descriptor entities."""
 

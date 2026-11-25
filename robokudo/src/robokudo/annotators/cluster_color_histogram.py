@@ -92,9 +92,6 @@ class ClusterColorHistogramAnnotator(BaseAnnotator[ClusterColorHistogramDescript
        Histogram plotting can significantly impact performance (200-500ms).
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def update(self) -> Status:
         """Process object hypotheses and calculate color histograms.
 

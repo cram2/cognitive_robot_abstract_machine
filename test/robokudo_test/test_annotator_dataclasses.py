@@ -27,6 +27,8 @@ from robokudo.annotators.yolo_annotator import YoloAnnotator
 from robokudo.cas import CAS
 from robokudo.types.annotation import Classification
 
+from .dataset.generic_annotators import DeclarativeAnnotationChecker
+
 
 # %% Dataclass construction
 @pytest.mark.parametrize(
@@ -103,7 +105,19 @@ def test_default_descriptors_and_runtime_collections_belong_to_each_annotator() 
     assert "IgnoredByFirst" not in second.descriptor.parameters.ignored_class_names
 
 
-# %% Runtime state and specialized constructors
+# %% Runtime state and declarative initialization
+def test_declarative_checker_initializes_its_annotation_condition() -> None:
+    """
+    A generated subclass constructor prepares its condition before validation.
+    """
+    checker = DeclarativeAnnotationChecker()
+    cas = CAS()
+
+    assert checker.function(cas) is False
+    cas.annotations.append(Classification())
+    assert checker.function(cas) is True
+
+
 def test_replacing_threaded_annotator_does_not_reuse_worker() -> None:
     """
     A new tree node starts without the original node's pending computation.
@@ -121,9 +135,11 @@ def test_replacing_threaded_annotator_does_not_reuse_worker() -> None:
 
 def test_replacing_annotation_checker_retains_condition() -> None:
     """
-    A renamed checker still tests the annotation type supplied positionally.
+    A renamed checker still tests the configured annotation type.
     """
-    original = CASCheckAnnotationTypeExists("ClassificationChecker", Classification)
+    original = CASCheckAnnotationTypeExists(
+        name="ClassificationChecker", annotation_type=Classification
+    )
     replacement = replace(original, name="ReplacementChecker")
     cas = CAS()
 

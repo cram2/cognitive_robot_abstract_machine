@@ -94,9 +94,6 @@ class LocationAnnotator(ThreadedAnnotator[LocationDescriptor]):
     * Handles coordinate frame transformations
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def add_location_in_object_hypotheses(
         self,
         region: Region,

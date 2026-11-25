@@ -79,9 +79,6 @@ class ImagePreprocessorAnnotator(BaseAnnotator[ImagePreprocessorDescriptor]):
        Requires properly configured camera intrinsics and color-to-depth ratio.
     """
 
-    name: str = "ImagePreprocessor"
-    """Name of this node in the behaviour tree."""
-
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """Optional color image currently being worked with"""
 

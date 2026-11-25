@@ -149,11 +149,6 @@ class OpenVocabularyObjectDetectionAnnotator(
     Detect configured text classes and optionally segment their image regions.
     """
 
-    name: str = __qualname__
-    """
-    Name of the behaviour-tree node.
-    """
-
     classes: list[str] = field(init=False)
     """
     Text labels supplied to the detection processor.

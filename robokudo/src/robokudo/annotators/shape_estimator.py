@@ -237,9 +237,6 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator[ShapeEstimatorDescriptor]):
     objects.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def compute(self) -> Status:
         """Estimate shapes and publish annotations and 3D visualizations."""
         object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)

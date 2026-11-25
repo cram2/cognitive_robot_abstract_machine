@@ -90,8 +90,8 @@ class AnalysisEngine(AnalysisEngineInterface):
             [
                 # py_trees.behaviours.Count(name="Annotator A", fail_until=-1, running_until=30, success_until=1000),
                 # py_trees.behaviours.Count(name="Annotator B", fail_until=-1, running_until=15, success_until=1000)
-                SlowAnnotator("Slow1Annotator", sleep_duration_seconds=4),
-                SlowAnnotator("Slow2Annotator", sleep_duration_seconds=2),
+                SlowAnnotator(name="Slow1Annotator", sleep_duration_seconds=4),
+                SlowAnnotator(name="Slow2Annotator", sleep_duration_seconds=2),
             ]
         )
 
@@ -100,9 +100,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             ClearAnnotatorOutputs(),
             CollectionReaderAnnotator(descriptor=kinect_config),
             ImagePreprocessorAnnotator(name="ImagePreprocessor"),
-            SlowAnnotator("FastAnnotator", sleep_duration_seconds=1),
+            SlowAnnotator(name="FastAnnotator", sleep_duration_seconds=1),
             parallel,
-            SlowAnnotator("Slow3Annotator", sleep_duration_seconds=2),
+            SlowAnnotator(name="Slow3Annotator", sleep_duration_seconds=2),
         ]:
             seq.add_child(annotator)
 

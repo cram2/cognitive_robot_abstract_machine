@@ -119,9 +119,6 @@ class OutlierRemovalOnObjectHypothesisAnnotator(
     The processing can be selectively disabled for specific object classes.
     """
 
-    name: str = "OutlierRemovalOnObjectHypothesis"
-    """Name of this node in the behaviour tree."""
-
     node: Node = field(init=False, repr=False)
     """ROS node owning the annotator parameter declarations."""
 

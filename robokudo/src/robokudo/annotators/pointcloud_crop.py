@@ -95,9 +95,6 @@ class PointcloudCropAnnotator(BaseAnnotator[PointcloudCropDescriptor]):
        When using world coordinates, requires valid camera-to-world transform in CAS.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """A copy of the color image currently being worked with."""
 

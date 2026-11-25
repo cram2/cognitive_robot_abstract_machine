@@ -1,3 +1,7 @@
+"""
+Associate current object hypotheses with objects tracked in previous observations.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -17,16 +21,11 @@ from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.hypothesis_comparators import ObjectHypothesisComparator
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ObjectAssociator(BaseAnnotator):
     """
     An annotator that associates the objects of the current iteration with the objects
     of the last iteration.
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     tracked_objects: list[ObjectHypothesis] = field(

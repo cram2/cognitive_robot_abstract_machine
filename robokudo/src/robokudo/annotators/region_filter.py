@@ -71,9 +71,6 @@ class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     that provides semantic_digital_twin Regions via a shared World.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     world_frame_name: str = field(init=False, repr=False)
     """Name of the world coordinate frame read from parameters"""
 

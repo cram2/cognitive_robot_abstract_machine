@@ -200,9 +200,6 @@ class ImageClusterExtractor(BaseAnnotator[ImageClusterExtractorDescriptor]):
     The hue, saturation, and value thresholds can be adjusted dynamically based on color queries.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """Color image retained for the current computation."""
 

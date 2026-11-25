@@ -58,9 +58,6 @@ class StaticCameraTransformAnnotator(BaseAnnotator[StaticCameraTransformDescript
     Write a fixed camera-to-world transform to the current CAS.
     """
 
-    name: str = "StaticCameraTransform"
-    """Name of this node in the behaviour tree."""
-
     def update(self) -> Status:
         """
         Bind the configured world pose directly to the optical camera root.

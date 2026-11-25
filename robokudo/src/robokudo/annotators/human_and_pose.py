@@ -252,9 +252,6 @@ class HumanAndPoseAnnotator(ThreadedAnnotator[HumanAndPoseDescriptor]):
     Detects humans with a YOLO pose model and annotates them with their keypoints.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     model: YOLO | None = field(default=None, init=False, repr=False)
     """The YOLO pose model, loaded during setup."""
 

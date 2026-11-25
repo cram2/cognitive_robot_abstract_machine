@@ -13,14 +13,17 @@ from robokudo.annotators.testing import (
 from robokudo.pipeline import Pipeline
 
 
-def create_test_tree():
+def create_test_tree() -> py_trees.composites.Sequence:
+    """
+    Construct a sequence containing fake acquisition, failure, and delayed success.
+    """
     root = py_trees.composites.Sequence("Sequence", memory=True)
 
     # for annotator in [CollectionReader(), ThreadedAnnotator("ImagePreprocessor"), CaffeAnnotator("CaffeAnnotator")]:
     for annotator in [
         FakeCollectionReaderAnnotator(),
-        FailingAnnotator("FailingAnnotator"),
-        SlowAnnotator("CaffeAnnotator"),
+        FailingAnnotator(name="FailingAnnotator"),
+        SlowAnnotator(name="CaffeAnnotator"),
     ]:
         root.add_child(annotator)
 

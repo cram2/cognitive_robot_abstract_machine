@@ -84,7 +84,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ImagePreprocessorAnnotator(
                     name="ImagePreprocessor", descriptor=image_preprocessor_config
                 ),
-                SlowAnnotator("SlowAnnotator"),
+                SlowAnnotator(name="SlowAnnotator"),
             ]
         )
 

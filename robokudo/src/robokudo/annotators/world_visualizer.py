@@ -64,9 +64,6 @@ class WorldVisualizer(
     Visualize predefined objects and regions from the shared world.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     @staticmethod
     def _body_size(body: Body) -> np.ndarray | None:
         shape_collection = (

@@ -42,7 +42,7 @@ from robokudo.utils.transform import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class ClusterPosePCAAnnotator(BaseAnnotator):
     """
     3D pose estimation using principal component analysis.
@@ -57,11 +57,6 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
 
     .. note::
        Requires minimum 10 points per object hypothesis.
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     def update(self) -> Status:

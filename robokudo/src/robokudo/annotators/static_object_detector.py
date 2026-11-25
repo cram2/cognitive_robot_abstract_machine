@@ -142,9 +142,6 @@ class StaticObjectDetectorAnnotator(BaseAnnotator[StaticObjectDetectorDescriptor
        Parameters can be dynamically reconfigured through ROS dynamic reconfigure.
     """
 
-    name: str = "StaticObjectDetector"
-    """Name of this node in the behaviour tree."""
-
     color: npt.NDArray | None = field(default=None, init=False, repr=False)
     """Color image retained for the current computation."""
 

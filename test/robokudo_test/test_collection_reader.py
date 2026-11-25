@@ -6,7 +6,8 @@ from __future__ import annotations
 
 # %% Imports
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from inspect import Parameter, signature
 from unittest.mock import Mock
 
 import pytest
@@ -20,6 +21,8 @@ from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraCon
 from robokudo.io.camera_interface import CameraInterface
 from robokudo.pipeline import Pipeline
 from robokudo.types.core import Query
+
+from .dataset.generic_annotators import DeclarativeCollectionReader
 
 
 # %% Acquisition fixture
@@ -56,12 +59,43 @@ def reader_pipeline() -> ReaderPipeline:
             camera_interface_type=CameraInterface,
         ),
     )
-    reader = CollectionReaderAnnotator(descriptor, camera_interface=camera_interface)
+    reader = CollectionReaderAnnotator(
+        descriptor=descriptor, camera_interface=camera_interface
+    )
     pipeline = Pipeline(children=[reader])
     return ReaderPipeline(reader, pipeline, camera_interface)
 
 
 # %% Single-reader configuration
+
+
+def test_collection_reader_requires_a_descriptor_argument() -> None:
+    """
+    Camera selection remains mandatory in the generated constructor signature.
+    """
+    assert (
+        signature(CollectionReaderAnnotator).parameters["descriptor"].default
+        is Parameter.empty
+    )
+
+
+def test_declarative_reader_initializes_acquisition_state(
+    reader_pipeline: ReaderPipeline,
+) -> None:
+    """
+    A reader with a generated constructor obtains the shared runtime defaults.
+    """
+    reader = DeclarativeCollectionReader(
+        descriptor=reader_pipeline.reader.descriptor,
+        camera_interface=reader_pipeline.camera_interface,
+    )
+
+    assert reader.start_timer is None
+    assert reader.iterations_since_last_data == 0
+    assert (
+        reader.iterations_since_last_data_warning_threshold
+        == reader_pipeline.reader.iterations_since_last_data_warning_threshold
+    )
 
 
 def test_collection_reader_uses_configured_camera_interface(
@@ -71,6 +105,41 @@ def test_collection_reader_uses_configured_camera_interface(
     The reader retains the explicitly supplied acquisition implementation.
     """
     assert reader_pipeline.reader.camera_interface is reader_pipeline.camera_interface
+
+
+def test_collection_reader_defaults_to_its_qualified_class_name(
+    reader_pipeline: ReaderPipeline,
+) -> None:
+    """
+    The generated constructor uses the shared annotator naming rule.
+    """
+    reader = reader_pipeline.reader
+
+    assert reader.name == type(reader).__qualname__
+    assert reader.qualified_name == f"{type(reader).__qualname__}/{reader.name}"
+
+
+@pytest.mark.parametrize("configured_name", ["CameraForAE", ""])
+def test_collection_reader_preserves_explicit_name(
+    reader_pipeline: ReaderPipeline,
+    configured_name: str,
+) -> None:
+    """
+    Explicit reader labels survive initialization and dataclass copying.
+    """
+    original = reader_pipeline.reader
+    reader = CollectionReaderAnnotator(
+        descriptor=original.descriptor,
+        name=configured_name,
+        camera_interface=original.camera_interface,
+    )
+    copied = replace(reader)
+
+    assert reader.name == configured_name
+    assert reader.qualified_name == f"{type(reader).__qualname__}/{configured_name}"
+    assert copied.name == configured_name
+    assert copied.camera_interface is reader.camera_interface
+    assert copied.id != reader.id
 
 
 # %% Acquisition lifecycle

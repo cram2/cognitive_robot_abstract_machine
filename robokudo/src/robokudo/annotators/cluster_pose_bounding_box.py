@@ -100,9 +100,6 @@ class ClusterPoseBoundingBoxAnnotator(BaseAnnotator[ClusterPoseBoundingBoxDescri
        Default behavior aligns z-axis with world frame up direction.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def adjust_bb_orientation_by_bb_size(
         self, pose_orientation: npt.NDArray, bounding_box_extents: list
     ) -> tuple[npt.NDArray, list]:

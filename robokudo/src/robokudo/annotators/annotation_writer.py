@@ -62,9 +62,6 @@ class AnnotationStorageWriter(BaseAnnotator[AnnotationStorageWriterDescriptor]):
     directory, using JSON serialization.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     counter: int = field(default=-1, init=False, repr=False)
     """Counter for generating sequential filenames"""
 
@@ -138,9 +135,6 @@ class AnnotationPublisherWriter(BaseAnnotator[AnnotationPublisherWriterDescripto
     This annotator publishes the current CAS annotations as JSON-encoded
     strings over a ROS topic.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     publisher: Publisher | None = field(default=None, init=False, repr=False)
     """ROS publisher for annotations"""

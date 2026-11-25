@@ -90,9 +90,6 @@ class ObjectHypothesisVisualizer(BaseAnnotator[ObjectHypothesisVisualizerDescrip
     * Optionally filtering objects based on query type
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     _mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = field(
         default_factory=dict, init=False, repr=False
     )

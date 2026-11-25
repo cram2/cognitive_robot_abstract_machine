@@ -110,7 +110,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             ClearAnnotatorOutputs(),
             CollectionReaderAnnotator(descriptor=kinect_config),
             ImagePreprocessorAnnotator(name="ImagePreprocessor"),
-            SlowAnnotator("SlowAnnotator"),
+            SlowAnnotator(name="SlowAnnotator"),
         ]:
             seq.add_child(annotator)
 

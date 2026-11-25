@@ -195,9 +195,6 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
     Detects objects with a YOLO model and annotates them as classified hypotheses.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     model_location: str = field(init=False, repr=False)
     """Where the YOLO model is loaded from."""
 

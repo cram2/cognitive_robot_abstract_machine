@@ -63,9 +63,6 @@ class ROIAdjusterAnnotator(BaseAnnotator[ROIAdjusterDescriptor]):
     and their associated masks, ensuring proper adjustment of both.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
         """Update ROIs by applying the configured pixel offset.

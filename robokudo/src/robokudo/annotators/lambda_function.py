@@ -71,9 +71,6 @@ class LambdaFunctionAnnotator(BaseAnnotator[LambdaFunctionDescriptor]):
     for dynamic behavior definition without creating new annotator classes.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def update(self) -> Status:
         """
         Execute the configured function.

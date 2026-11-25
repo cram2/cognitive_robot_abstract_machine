@@ -78,9 +78,6 @@ class PointcloudCheckAnnotator(BaseAnnotator[PointcloudCheckDescriptor]):
        Will raise exception if point cloud not found in CAS.
     """
 
-    name: str = "PointcloudcloudCheckAnnotator"
-    """Name of this node in the behaviour tree."""
-
     @catch_and_raise_to_blackboard
     def update(self) -> Status:
         """Check point cloud size against threshold.

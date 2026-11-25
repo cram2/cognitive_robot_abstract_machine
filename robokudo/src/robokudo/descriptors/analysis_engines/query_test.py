@@ -33,11 +33,10 @@ from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class PrintNumbers(BaseAnnotator):
-    name: str = __qualname__
     """
-    Name of this node in the behaviour tree.
+    Accumulate a number sequence and publish its progress as query feedback.
     """
 
     current_number: int = field(default=1, init=False, repr=False)
@@ -92,15 +91,10 @@ class PrintNumbers(BaseAnnotator):
             return Status.SUCCESS
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class CheckQueryType(BaseAnnotator):
     """
     Checks if the query type on the CAS is 'numbers'.
-    """
-
-    name: str = __qualname__
-    """
-    Name of this node in the behaviour tree.
     """
 
     def update(self) -> Status:

@@ -203,9 +203,6 @@ class PointCloudClusterExtractor(
        Requires a Plane annotation in the CAS to function.
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     def points_and_indices_from_plane(
         self,
         plane_model: Plane,
@@ -520,9 +517,6 @@ class NaivePointCloudClusterExtractor(
     .. note::
        Unlike PointCloudClusterExtractor, this does not require a plane model.
     """
-
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
 
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:

@@ -137,9 +137,6 @@ class ClusterColorAnnotator(BaseAnnotator[ClusterColorDescriptor]):
     * Value thresholds for black/white/grey
     """
 
-    name: str = __qualname__
-    """Name of this node in the behaviour tree."""
-
     color_hue_positions: dict[Color, float] = field(init=False, repr=False)
     """Representative hue of each named color."""
 
