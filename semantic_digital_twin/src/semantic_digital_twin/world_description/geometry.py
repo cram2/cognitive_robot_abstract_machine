@@ -42,7 +42,10 @@ from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
 )
-from semantic_digital_twin.world_description.exceptions import InvalidColorChannelCount
+from semantic_digital_twin.world_description.exceptions import (
+    InvalidColorChannelCount,
+    MeshFileNotPlaceableByAPose,
+)
 from semantic_digital_twin.world_description.mesh_file_storage import (
     MeshFileSources,
     MeshFileStorage,
@@ -640,24 +643,20 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
 
     def __eq__(self, other: Shape) -> bool:
         """
-        Custom equality comparison that handles TransformationMatrix equivalence.
+        Two shapes are equal when their fields are, a field holding a transformation
+        when its matrix is equal in value, whatever frames it names.
         """
         if not isinstance(other, self.__class__):
             return False
-
-        # Get all field names from the dataclass
-        field_names = [f.name for f in fields(self)]
-
-        for field_name in field_names:
-            self_value = getattr(self, field_name)
-            other_value = getattr(other, field_name)
-
-            if field_name != "origin":
-                if self_value != other_value:
-                    return False
-        if not np.allclose(self.origin.to_np(), other.origin.to_np()):
-            return False
-
+        for field_ in fields(self):
+            self_value = getattr(self, field_.name)
+            other_value = getattr(other, field_.name)
+            if isinstance(self_value, HomogeneousTransformationMatrix):
+                values_equal = np.allclose(self_value.to_np(), other_value.to_np())
+            else:
+                values_equal = self_value == other_value
+            if not values_equal:
+                return False
         return True
 
     def copy_without_reference_frame(self) -> Self:
@@ -725,6 +724,38 @@ class Mesh(Shape):
     Filename of the mesh.
     """
 
+    file_T_mesh: HomogeneousTransformationMatrix = field(
+        default_factory=HomogeneousTransformationMatrix
+    )
+    """
+    The mesh's own frame in the coordinates its file stores the vertices in; the
+    vertices are taken relative to it before :attr:`scale` stretches them along its
+    axes. MJCF describes it by a mesh's ``refpos`` and ``refquat``.
+    """
+
+    @property
+    def file_origin(self) -> HomogeneousTransformationMatrix:
+        """
+        Where to place the file's vertices, once :attr:`scale` stretched them along the
+        file's axes, for them to lie where this mesh lies, relative to the frame
+        :attr:`origin` is given in.
+
+        :raises MeshFileNotPlaceableByAPose: If the mesh is turned within its file and
+            scaled unevenly.
+        """
+        file_T_mesh = self.file_T_mesh.to_np()
+        mesh_R_file = file_T_mesh[:3, :3].T
+        scale = self.scale.to_np()
+        if not np.allclose(mesh_R_file, np.eye(3)) and not np.allclose(scale, scale[0]):
+            raise MeshFileNotPlaceableByAPose(file_name=self.filename, scale=scale)
+        mesh_T_scaled_file = np.eye(4)
+        mesh_T_scaled_file[:3, :3] = mesh_R_file
+        mesh_T_scaled_file[:3, 3] = -scale * (mesh_R_file @ file_T_mesh[:3, 3])
+        return HomogeneousTransformationMatrix(
+            self.origin.to_np() @ mesh_T_scaled_file,
+            reference_frame=self.origin.reference_frame,
+        )
+
     @property
     def volume(self) -> float:
         """
@@ -779,13 +810,13 @@ class Mesh(Shape):
     @classmethod
     def _serialized_fields(cls) -> list[Field]:
         """
-        A mesh carries its package URI or its geometry rather than the file it was read
-        from, which the process reading the json may not have.
+        A mesh carries its package URI or its geometry, in its own frame, rather than the
+        file it was read from, which the process reading the json may not have.
         """
         return [
             field_
             for field_ in super()._serialized_fields()
-            if field_.name != "filename"
+            if field_.name not in ("filename", "file_T_mesh")
         ]
 
     def to_json(self, **kwargs) -> dict[str, Any]:
@@ -795,7 +826,11 @@ class Mesh(Shape):
         """
         package_uri = self.package_uri
         if package_uri is not None:
-            return {**super().to_json(**kwargs), "package_uri": package_uri}
+            return {
+                **super().to_json(**kwargs),
+                "package_uri": package_uri,
+                "file_T_mesh": to_json(self.file_T_mesh, **kwargs),
+            }
         # Serialize the unscaled geometry and the scale separately. This is the same
         # mesh :attr:`mesh` exposes, so a deserialized mesh reproduces the original
         # rather than a differently tessellated version of the same file.
@@ -824,6 +859,7 @@ class Mesh(Shape):
         if "package_uri" in data:
             mesh = super()._from_json(data=data, **kwargs)
             mesh.filename = data["package_uri"]
+            mesh.file_T_mesh = from_json(data["file_T_mesh"], **kwargs)
             return mesh
         geometry = from_json(data["mesh"], **kwargs)
         # Recreate the trimesh without processing to preserve exact topology
@@ -912,10 +948,12 @@ class Mesh(Shape):
     @property
     def unscaled_mesh(self) -> trimesh.Trimesh:
         """
-        The mesh :attr:`stored_mesh` describes, with its duplicate vertices welded
-        unless it is coloured per vertex, before this shape's scale is applied.
+        The mesh :attr:`stored_mesh` describes, in the mesh's own frame
+        :attr:`file_T_mesh`, with its duplicate vertices welded unless it is coloured
+        per vertex, before this shape's scale is applied.
         """
         mesh = self.stored_mesh
+        mesh.apply_transform(np.linalg.inv(self.file_T_mesh.to_np()))
         if mesh.visual.kind != "vertex":
             # Welding duplicate vertices is what makes a mesh watertight, which volume
             # and boolean operations require; formats like STL give every face its own

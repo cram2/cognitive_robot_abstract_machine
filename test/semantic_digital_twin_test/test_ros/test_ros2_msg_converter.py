@@ -1,5 +1,5 @@
 """
-Tests of the conversion between semantic digital twin objects and ROS 2 messages.
+Tests of converting between the world's types and ROS 2 messages.
 """
 
 from __future__ import annotations
@@ -454,6 +454,33 @@ def test_a_package_mesh_received_as_json_is_published_by_package_uri(
     marker = SemDTToRos2Converter.convert(received)
 
     assert marker.mesh_resource == SemDTToRos2Converter.convert(sent).mesh_resource
+
+
+# %% meshes turned within their file
+
+
+def test_a_mesh_turned_within_its_file_is_drawn_from_its_file_origin(
+    cylinder_bot_world, tmp_path
+):
+    """
+    The marker of a mesh turned within its file is posed at the mesh's file origin.
+    """
+    mesh_file = tmp_path / "jeroen_cup.stl"
+    shutil.copy(
+        PackageUriResolver().resolve("package://iai_objects/objects/jeroen_cup.stl"),
+        mesh_file,
+    )
+    mesh = Mesh(
+        filename=str(mesh_file),
+        origin=map_origin(cylinder_bot_world),
+        file_T_mesh=HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.01, quat_w=0.5**0.5, quat_x=0.5**0.5
+        ),
+    )
+
+    marker = SemDTToRos2Converter.convert(mesh)
+
+    assert marker.pose == PoseToRos2Converter.convert(mesh.file_origin.pose)
 
 
 # %% nothing converts the given object
