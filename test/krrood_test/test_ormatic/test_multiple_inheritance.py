@@ -491,3 +491,37 @@ def test_a_set_of_query_refuses_to_load_its_rows_by_class(session, database):
 
     with pytest.raises(UnsupportedResultLoadingError):
         translator.evaluate()
+
+
+@pytest.mark.parametrize(
+    "selected_class, subclass_loading",
+    [
+        (Hinge, SubclassLoading.AS_MAPPED),
+        (InventoryItem, SubclassLoading.ONE_QUERY_PER_CLASS),
+        (HasHinges, SubclassLoading.ONE_QUERY_PER_CLASS),
+    ],
+)
+def test_the_result_loading_of_a_query_loads_by_class_where_classes_differ(
+    selected_class, subclass_loading
+):
+    """
+    The result loading suited to a query loads relationships on access, and loads by
+    class only where the selected class's objects may be of several classes.
+    """
+    query = an(entity(variable(selected_class, domain=None)))
+
+    assert ResultLoading.from_query(query=query) == ResultLoading(
+        relationship_loading=RelationshipLoading.ON_ACCESS,
+        subclass_loading=subclass_loading,
+    )
+
+
+def test_the_result_loading_of_a_set_of_query_loads_its_rows_as_selected():
+    """
+    The result loading suited to a ``set_of`` query keeps the rows it selects.
+    """
+    query = an(set_of(variable(InventoryItem, domain=None)))
+
+    assert ResultLoading.from_query(query=query) == ResultLoading(
+        relationship_loading=RelationshipLoading.ON_ACCESS
+    )

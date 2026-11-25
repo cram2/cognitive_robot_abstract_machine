@@ -10,11 +10,17 @@ from enum import StrEnum
 from itertools import batched
 
 import sqlalchemy
-from sqlalchemy.orm import Session, lazyload, with_polymorphic
+from sqlalchemy.orm import Session, lazyload
 from sqlalchemy.sql.base import ExecutableOption
 from typing_extensions import Any, Sequence
 
+from krrood.entity_query_language.core.base_expressions import HasExpression
+from krrood.entity_query_language.query.query import Entity
 from krrood.ormatic.data_access_objects.dao import DataAccessObject, StoredObjectRow
+from krrood.ormatic.data_access_objects.helper import (
+    get_data_access_object_class,
+    get_part_class,
+)
 
 # %% choices
 
@@ -49,12 +55,6 @@ class SubclassLoading(StrEnum):
     ONE_QUERY_PER_CLASS = "one_query_per_class"
     """
     One statement per class of the selected objects, loading every column of it.
-    """
-
-    ONE_QUERY_PER_HIERARCHY = "one_query_per_hierarchy"
-    """
-    One statement per hierarchy, joining the tables of the selected objects' classes in
-    it.
     """
 
 
@@ -104,6 +104,37 @@ class ResultLoading:
     PostgreSQL.
     """
 
+    @classmethod
+    def from_query(cls, *, query: HasExpression) -> ResultLoading:
+        """
+        :param query: The EQL query to evaluate, or the object standing for it.
+        :return: A result loading that loads the query's objects with few statements:
+            relationships on access, and one statement per class where the selected
+            class's objects may be of several classes.
+        """
+        expression = query._get_expression_()
+        if not isinstance(expression, Entity) or not cls._selects_several_classes(
+            domain_type=expression._type_
+        ):
+            return cls(relationship_loading=RelationshipLoading.ON_ACCESS)
+        return cls(
+            relationship_loading=RelationshipLoading.ON_ACCESS,
+            subclass_loading=SubclassLoading.ONE_QUERY_PER_CLASS,
+        )
+
+    @staticmethod
+    def _selects_several_classes(*, domain_type: type | None) -> bool:
+        """
+        :param domain_type: The class a query selects the objects of.
+        :return: Whether those objects may be loaded as other classes than its own.
+        """
+        if domain_type is None or get_part_class(domain_type) is not None:
+            return True
+        dao_class = get_data_access_object_class(domain_type)
+        if dao_class is None:
+            return False
+        return len(sqlalchemy.inspect(dao_class).self_and_descendants) > 1
+
     @property
     def loads_selected_rows(self) -> bool:
         """
@@ -140,11 +171,11 @@ class ResultLoading:
             )
             ids_by_class.setdefault(dao_class, []).append(selected_object.database_id)
         daos_by_id = {}
-        for entity, ids in self._loaded_entities(ids_by_class=ids_by_class):
+        for dao_class, ids in ids_by_class.items():
             for batch in batched(ids, self.ids_per_statement):
                 statement = (
-                    sqlalchemy.select(entity)
-                    .where(entity.database_id.in_(batch))
+                    sqlalchemy.select(dao_class)
+                    .where(dao_class.database_id.in_(batch))
                     .options(*self.loader_options)
                 )
                 for dao in session.scalars(statement):
@@ -152,30 +183,4 @@ class ResultLoading:
         return [
             daos_by_id[selected_object.database_id]
             for selected_object in selected_objects
-        ]
-
-    def _loaded_entities(
-        self, *, ids_by_class: dict[type[DataAccessObject], list[int]]
-    ) -> list[tuple[Any, list[int]]]:
-        """
-        :param ids_by_class: The ids of the selected objects, by the class they are
-            loaded as.
-        :return: Every entity one statement loads, with the ids it loads.
-        """
-        if self.subclass_loading != SubclassLoading.ONE_QUERY_PER_HIERARCHY:
-            return list(ids_by_class.items())
-        classes_by_root: dict[type, list[type[DataAccessObject]]] = {}
-        for dao_class in ids_by_class:
-            root = sqlalchemy.inspect(dao_class).base_mapper.class_
-            classes_by_root.setdefault(root, []).append(dao_class)
-        return [
-            (
-                with_polymorphic(root, classes, flat=True),
-                [
-                    database_id
-                    for dao_class in classes
-                    for database_id in ids_by_class[dao_class]
-                ],
-            )
-            for root, classes in classes_by_root.items()
         ]
