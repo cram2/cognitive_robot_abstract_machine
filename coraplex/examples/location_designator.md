@@ -37,7 +37,7 @@ from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
-pr2_view = PR2.from_world(world)
+pr2_view = PR2.from_world(world=world)
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from cramph.context import StatechartContext
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
@@ -90,7 +90,7 @@ from coraplex.locations.locations import ReachabilityLocation
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 
 location = ReachabilityLocation(
-    target_pose=Pose(reference_frame=world.get_body_by_name("milk.stl")),
+    target_pose=Pose(reference_frame=world.get_body_by_name(name="milk.stl")),
     arm=pr2_view.left_arm,
     context=context,
 )
@@ -120,10 +120,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Draw
 
 with world.modify_world():
     world.add_semantic_annotation_recursively(
-        drawer := Drawer(
-            root=world.get_body_by_name("cabinet10_drawer_middle"),
-            handle=Handle(root=world.get_body_by_name("handle_cab10_m")),
-        )
+        semantic_annotation=(drawer := Drawer(
+            root=world.get_body_by_name(name="cabinet10_drawer_middle"),
+            handle=Handle(root=world.get_body_by_name(name="handle_cab10_m")),
+        ))
     )
 
 location = ReachabilityLocation(
@@ -145,7 +145,7 @@ with its default camera. It only needs the target.
 from coraplex.locations.locations import VisibilityLocation
 
 location = VisibilityLocation(
-    target_pose=Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
+    target_pose=Pose(reference_frame=world.get_body_by_name(name="milk.stl")), context=context
 )
 
 run(NavigateAction(planar_goal_pose=location.ground()))
@@ -186,7 +186,7 @@ navigate = a(NavigateAction)(
     planar_goal_pose=variable(
         Pose2D,
         domain=ReachabilityLocation(
-            target_pose=Pose(reference_frame=world.get_body_by_name("milk.stl")),
+            target_pose=Pose(reference_frame=world.get_body_by_name(name="milk.stl")),
             arm=pr2_view.left_arm,
             context=context,
         ),
@@ -206,7 +206,7 @@ how far, in cells, its candidates spread around the stand-off distance.
 
 ```python
 location = ReachabilityLocation(
-    target_pose=Pose(reference_frame=world.get_body_by_name("milk.stl")),
+    target_pose=Pose(reference_frame=world.get_body_by_name(name="milk.stl")),
     arm=pr2_view.left_arm,
     context=context,
     map_resolution=0.04,

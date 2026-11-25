@@ -252,17 +252,17 @@ class CameraInterface(object):
         with world.modify_world():
             if reference_body is None:
                 reference_body = Body(name=PrefixedName(name=reference_frame))
-                world.add_body(reference_body)
+                world.add_body(body=reference_body)
             if camera_body is None:
                 camera_body = Body(name=PrefixedName(name=camera_frame))
-                world.add_body(camera_body)
+                world.add_body(body=camera_body)
             mount = Connection6DoF.create_with_dofs(
                 parent=reference_body,
                 child=camera_body,
                 world=world,
                 name=self._standalone_mount_name(camera_body=camera_body),
             )
-            world.add_connection(mount)
+            world.add_connection(connection=mount)
         return mount
 
     @classmethod
@@ -382,7 +382,9 @@ class CameraInterface(object):
             camera_body = Body(name=PrefixedName(name=camera_frame))
         body_cameras = [
             camera
-            for camera in world.get_semantic_annotations_by_type(Camera)
+            for camera in world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Camera
+            )
             if camera.root is camera_body
         ]
         if len(body_cameras) > 1:
@@ -407,7 +409,7 @@ class CameraInterface(object):
         :param world: The world perception perceives into.
         :param camera: Semantic camera whose observation has passed frame validation.
         """
-        if world.find_world_entity_with_id(camera.id) is camera:
+        if world.find_world_entity_with_id(entity_id=camera.id) is camera:
             return
         if not self.adds_missing_camera(world=world):
             return
@@ -415,19 +417,19 @@ class CameraInterface(object):
         camera_body = camera.root
         with world.modify_world():
             if camera_body._world is None:
-                world.add_body(camera_body)
+                world.add_body(body=camera_body)
                 if existing_root is not None:
                     # An unconstrained mount keeps the world connected without
                     # representing an observed camera pose.
                     world.add_connection(
-                        Connection6DoF.create_with_dofs(
+                        connection=Connection6DoF.create_with_dofs(
                             parent=existing_root,
                             child=camera_body,
                             world=world,
                             name=self._standalone_mount_name(camera_body=camera_body),
                         )
                     )
-            world.add_semantic_annotation(camera)
+            world.add_semantic_annotation(semantic_annotation=camera)
 
     def set_data(self, *, cas: CAS, world: World) -> bool | None:
         """
@@ -535,7 +537,7 @@ class ROSCameraInterface(CameraInterface):
         """
         return not (
             self.lookup_viewpoint
-            and WorldSynchronizer.all_callbacks_of_this_type_from_world(world)
+            and WorldSynchronizer.all_callbacks_of_this_type_from_world(world=world)
         )
 
     def lookup_transform(self, *, timestamp: Time | None = None) -> bool:

@@ -143,7 +143,9 @@ class BrakingProfile:
         previous_step = -np.eye(previous_step_height)
         row_offset = 0
         column_offset = 0
-        for _ in Derivatives.range(Derivatives.velocity, number_of_derivatives - 1):
+        for _ in Derivatives.range(
+            start=Derivatives.velocity, stop=number_of_derivatives - 1
+        ):
             row_offset += 1
             link_model[
                 row_offset : row_offset + previous_step_height,

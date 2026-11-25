@@ -42,9 +42,11 @@ def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
     table = Body(name=PrefixedName(name="table"))
     with world.modify_world():
         world.add_connection(
-            Connection6DoF.create_with_dofs(world=world, parent=root, child=item)
+            connection=Connection6DoF.create_with_dofs(
+                world=world, parent=root, child=item
+            )
         )
-        world.add_connection(FixedConnection(parent=root, child=table))
+        world.add_connection(connection=FixedConnection(parent=root, child=table))
     with world.modify_world():
         arm_joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
@@ -52,7 +54,7 @@ def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
             parent=root,
             child=Body(name=PrefixedName(name="arm")),
         )
-        world.add_connection(arm_joint)
+        world.add_connection(connection=arm_joint)
     with world.modify_world():
         item.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=1.0, y=2.0, z=3.0, yaw=0.5, reference_frame=root
@@ -75,12 +77,12 @@ def test_rollback_of_body_removal_reconnects_it():
             parent=root,
             child=leaf,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     version = world.get_world_model_manager().version
     with world.modify_world():
-        world.remove_kinematic_structure_entity(leaf)
+        world.remove_kinematic_structure_entity(kinematic_structure_entity=leaf)
 
-    world.rollback_to_version(version)
+    world.rollback_to_version(version=version)
 
     assert leaf.parent_kinematic_structure_entity == root
 
@@ -93,9 +95,9 @@ def test_rollback_of_attachment_restores_free_pose(free_item_world):
     pose_before = item.global_transform.to_np()
     version = world.get_world_model_manager().version
     with world.modify_world():
-        world.move_branch_with_fixed_connection(item, table)
+        world.move_branch_with_fixed_connection(branch_root=item, new_parent=table)
 
-    world.rollback_to_version(version)
+    world.rollback_to_version(version=version)
 
     np.testing.assert_allclose(item.global_transform.to_np(), pose_before)
 
@@ -107,8 +109,8 @@ def test_reset_state_context_restores_by_degree_of_freedom(free_item_world):
 
     with world.reset_state_context():
         with world.modify_world():
-            world.move_branch_with_fixed_connection(item, table)
-        world.rollback_to_version(version)
+            world.move_branch_with_fixed_connection(branch_root=item, new_parent=table)
+        world.rollback_to_version(version=version)
 
     assert (arm_joint.position, item.global_transform.to_np().tolist()) == (
         0.7,
@@ -147,7 +149,7 @@ def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
                 parent=table,
                 child=Body(name=PrefixedName(name="drawer")),
             )
-            world.add_connection(drawer_joint)
+            world.add_connection(connection=drawer_joint)
         drawer_joint.position = 0.4
 
     assert drawer_joint.position == 0.4
@@ -159,10 +161,12 @@ def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
 def test_rollback_of_merged_world_adds_nothing_back(mini_world: World):
     other = World()
     with other.modify_world():
-        other.add_kinematic_structure_entity(Body(name=PrefixedName(name="other_root")))
-    mini_world.merge_world(other)
+        other.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="other_root"))
+        )
+    mini_world.merge_world(other=other)
 
-    other.rollback_modification_blocks(len(other.modification_history))
+    other.rollback_modification_blocks(count=len(other.modification_history))
 
     assert other.kinematic_structure_entities == []
 
@@ -171,37 +175,37 @@ def test_rollback_to_before_replace_with_raises(mini_world: World):
     replacement = World()
     with replacement.modify_world():
         replacement.add_kinematic_structure_entity(
-            Body(name=PrefixedName(name="new_root"))
+            kinematic_structure_entity=Body(name=PrefixedName(name="new_root"))
         )
     version = mini_world.get_world_model_manager().version
 
-    mini_world._replace_with(replacement)
+    mini_world._replace_with(other=replacement)
 
     with pytest.raises(RollbackBeforeClearError):
-        mini_world.rollback_to_version(version)
+        mini_world.rollback_to_version(version=version)
 
 
 def test_rollback_after_replace_with_reverts_later_blocks(mini_world: World):
     replacement = World()
     with replacement.modify_world():
         replacement.add_kinematic_structure_entity(
-            Body(name=PrefixedName(name="new_root"))
+            kinematic_structure_entity=Body(name=PrefixedName(name="new_root"))
         )
-    mini_world._replace_with(replacement)
+    mini_world._replace_with(other=replacement)
     version = mini_world.get_world_model_manager().version
     entities = list(mini_world.kinematic_structure_entities)
     with mini_world.modify_world():
         mini_world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=mini_world.root, child=Body(name=PrefixedName(name="later"))
             )
         )
 
-    mini_world.rollback_to_version(version)
+    mini_world.rollback_to_version(version=version)
 
     assert mini_world.kinematic_structure_entities == entities
 
 
 def test_merging_world_with_itself_raises(mini_world: World):
     with pytest.raises(WorldMergedWithItselfError):
-        mini_world.merge_world(mini_world)
+        mini_world.merge_world(other=mini_world)

@@ -177,7 +177,7 @@ class WorldStateTrajectoryPlotter:
     Each degree of freedom will have the same color in each subplot.
     """
 
-    def reset(self, initial_state: WorldState, time: float = 0.0):
+    def reset(self, *, initial_state: WorldState, time: float = 0.0):
         self.world_state_trajectory = WorldStateTrajectory.from_world_state(
             state=initial_state, time=time
         )
@@ -270,7 +270,7 @@ class WorldStateTrajectoryPlotter:
         """
         return np.arange(0.0, duration + 1e-9, step)
 
-    def _sort_degrees_of_freedom(self, traj: WorldStateTrajectory) -> list[UUID]:
+    def _sort_degrees_of_freedom(self, *, traj: WorldStateTrajectory) -> list[UUID]:
         """
         Return DOF ids ordered based on self.sort_degrees_of_freedom.
 
@@ -280,11 +280,11 @@ class WorldStateTrajectoryPlotter:
         dof_ids = list(traj._ids)
         if self.sort_degrees_of_freedom:
             dof_ids.sort(
-                key=lambda d: str(traj.world.get_degree_of_freedom_by_id(d).name)
+                key=lambda d: str(traj.world.get_degree_of_freedom_by_id(id=d).name)
             )
         return dof_ids
 
-    def _should_plot_series(self, series: np.ndarray) -> bool:
+    def _should_plot_series(self, *, series: np.ndarray) -> bool:
         """
         Decide whether to plot a DOF series according to suppression rules.
 
@@ -305,7 +305,7 @@ class WorldStateTrajectoryPlotter:
         """
         column = trajectory._index[degree_of_freedom_id]
         return any(
-            self._should_plot_series(trajectory.data[:, derivative, column])
+            self._should_plot_series(series=trajectory.data[:, derivative, column])
             for derivative in self.derivatives_to_plot
         )
 
@@ -334,7 +334,7 @@ class WorldStateTrajectoryPlotter:
             styles[degree_of_freedom_id] = {"color": color, "linestyle": line_style}
         return styles
 
-    def _create_legend(self, figure: plt.Figure, axes: list[plt.Axes]):
+    def _create_legend(self, *, figure: plt.Figure, axes: list[plt.Axes]):
         # Place a single shared legend at the top-right, outside the plotting area but inside the figure.
         handles, labels = axes[-1].get_legend_handles_labels()
         if not handles:
@@ -394,6 +394,7 @@ class WorldStateTrajectoryPlotter:
 
     def _plot_derivatives(
         self,
+        *,
         axes: list[plt.Axes],
         styles: dict[UUID, dict],
         dof_ids: list[UUID],
@@ -430,10 +431,10 @@ class WorldStateTrajectoryPlotter:
                 y = traj.data[:, derivative, col].astype(float)
                 if derivative == Derivatives.position and self.center_positions:
                     y = y - float(y[0])
-                if not self._should_plot_series(y):
+                if not self._should_plot_series(series=y):
                     continue
                 style = styles.get(dof_id, {})
-                name = str(traj.world.get_degree_of_freedom_by_id(dof_id).name)
+                name = str(traj.world.get_degree_of_freedom_by_id(id=dof_id).name)
                 # Support format strings
                 if "fmt" in style:
                     axis.plot(t, y, style["fmt"], label=name)
@@ -471,7 +472,7 @@ class WorldStateTrajectoryPlotter:
 
         degree_of_freedom_ids = [
             degree_of_freedom_id
-            for degree_of_freedom_id in self._sort_degrees_of_freedom(trajectory)
+            for degree_of_freedom_id in self._sort_degrees_of_freedom(traj=trajectory)
             if self._is_drawn(
                 trajectory=trajectory, degree_of_freedom_id=degree_of_freedom_id
             )
@@ -479,7 +480,13 @@ class WorldStateTrajectoryPlotter:
         styles = self._create_styles_for_degrees_of_freedom(
             degree_of_freedom_ids=degree_of_freedom_ids
         )
-        self._plot_derivatives(axes, styles, degree_of_freedom_ids, trajectory, times)
+        self._plot_derivatives(
+            axes=axes,
+            styles=styles,
+            dof_ids=degree_of_freedom_ids,
+            traj=trajectory,
+            t=times,
+        )
 
         spacing = self._tick_spacing(duration=duration)
         ticks = self._times_up_to(
@@ -501,7 +508,7 @@ class WorldStateTrajectoryPlotter:
             axis.set_xlabel("")
 
         if self.legend:
-            self._create_legend(figure, axes)
+            self._create_legend(figure=figure, axes=axes)
         file_name.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(file_name)
         plt.close()

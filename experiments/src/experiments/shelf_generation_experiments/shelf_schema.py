@@ -123,6 +123,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
 
     def spawn(
         self,
+        *,
         world: World,
         mesh_path: Path | None,
         name: str | None = None,
@@ -193,8 +194,8 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
                 parent=_parent,
                 child=body,
             )
-            world.add_body(body)
-            world.add_connection(root_C_body)
+            world.add_body(body=body)
+            world.add_connection(connection=root_C_body)
 
         # Placing the pose in the connection's degrees of freedom rather than in
         # a fixed parent expression keeps the object movable: the ``.origin``
@@ -206,7 +207,7 @@ class RelationalCircuitExperimentObject2D(SpawnSpecification[Body]):
         )
 
         with world.modify_world():
-            world.add_semantic_annotation(type_annotation)
+            world.add_semantic_annotation(semantic_annotation=type_annotation)
 
         self.annotation = body
         return body
@@ -340,6 +341,7 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
 
     def spawn(
         self,
+        *,
         world: World,
         corpus: KinematicStructureEntity,
         shelf_scale: Scale,
@@ -385,15 +387,15 @@ class RelationalCircuitExperimentShelfLayer(SpawnSpecification[ShelfLayer]):
         _parent = parent if parent is not None else world.root
         slab_scale = Scale(x=shelf_scale.x, y=shelf_scale.y, z=slab_thickness)
         layer_annotation = ShelfLayer.get_annotation_specification(
-            name or self.name or "layer",
-            ShelfLayer.get_default_root_kinematic_structure_entity_specification(
+            name=name or self.name or "layer",
+            root_specification=ShelfLayer.get_default_root_kinematic_structure_entity_specification(
                 scale=slab_scale
             ),
-        ).spawn(world, parent=_parent, parent_T_self=parent_T_self)
+        ).spawn(world=world, parent=_parent, parent_T_self=parent_T_self)
         # Reparent the slab under the corpus so the whole shelf moves as one
         # unit when it is repositioned at the room level; the world pose is
         # preserved by the move.
-        world.move_branch(layer_annotation.root, corpus)
+        world.move_branch(branch_root=layer_annotation.root, new_parent=corpus)
         self.annotation = layer_annotation
         with world.modify_world():
             layer_annotation.calculate_supporting_surface()
@@ -739,12 +741,12 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
             else parent_T_self.dot(corpus_pose_in_content_frame)
         )
         corpus_annotation = Cabinet.get_annotation_specification(
-            name or self.name or "shelf_corpus",
-            Cabinet.get_default_root_kinematic_structure_entity_specification(
+            name=name or self.name or "shelf_corpus",
+            root_specification=Cabinet.get_default_root_kinematic_structure_entity_specification(
                 scale=footprint,
                 wall_thickness=corpus_wall_thickness,
             ),
-        ).spawn(world, parent=_parent, parent_T_self=corpus_pose)
+        ).spawn(world=world, parent=_parent, parent_T_self=corpus_pose)
         corpus_body = corpus_annotation.root
         self.annotation = corpus_annotation
 
@@ -768,7 +770,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
                 else parent_T_self.dot(layer_pose_in_content_frame)
             )
             layer.spawn(
-                world,
+                world=world,
                 name=f"layer_{index}",
                 parent=_parent,
                 parent_T_self=layer_pose,
@@ -868,6 +870,7 @@ class RelationalCircuitExperimentShelf(SpawnSpecification[Cabinet]):
 
     def spawn(
         self,
+        *,
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,

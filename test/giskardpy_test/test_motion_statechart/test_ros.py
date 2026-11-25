@@ -44,7 +44,9 @@ def to_and_from_json(
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(target_executor.context.world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(
+        world=target_executor.context.world
+    )
     kwargs = tracker.create_kwargs()
     return Statechart.from_json(
         data=new_json_data, context=target_executor.context, **kwargs
@@ -56,7 +58,9 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
     A motion avoiding collisions, sent through JSON, runs to its local minimum in a copy
     of the PR2 world fetched from a world server.
     """
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     fetcher = FetchWorldServer(node=rclpy_node, world=pr2_world_state_reset)
 
     pr2_world_copy = fetch_world_from_service(
@@ -65,13 +69,15 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
 
     time.sleep(2)
 
-    fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    fetched_pr2 = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     r_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     base_footprint = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_footprint"
+        name="base_footprint"
     )
 
     client_executor = StatechartExecutor(
@@ -84,7 +90,7 @@ def test_execute_collision_goal_in_fetched_world(rclpy_node, pr2_world_state_res
             nodes=[
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
-                        {
+                        mapping={
                             PR2Joint.RIGHT_ELBOW_FLEX: -1.43286344265,
                             PR2Joint.RIGHT_FOREARM_ROLL: -1.26465060073,
                             PR2Joint.RIGHT_SHOULDER_LIFT: 0.47990329056,

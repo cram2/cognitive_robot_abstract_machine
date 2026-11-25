@@ -18,7 +18,9 @@ def create_giskard(node: Node) -> Giskard:
     """
     return Giskard.standalone(
         world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(HSRB)]
+            robots=[
+                RobotSpecification.specify_real_robot(semantic_annotation_type=HSRB)
+            ]
         ),
         qp_controller_config=QPControllerConfig(target_frequency=20),
     )

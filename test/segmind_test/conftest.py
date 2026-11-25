@@ -50,8 +50,8 @@ def milk_in_the_apartment(_simple_apartment_setup):
     The apartment with its milk and boxes, the milk put back where it stood afterwards.
     """
     world = _simple_apartment_setup
-    milk = world.get_body_by_name("milk.stl")
-    yield world, milk, world.get_body_by_name("box")
+    milk = world.get_body_by_name(name="milk.stl")
+    yield world, milk, world.get_body_by_name(name="box")
     x, y, z = WHERE_THE_MILK_STOOD
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x, y, z, yaw=np.pi, reference_frame=milk.parent_connection.parent
@@ -118,9 +118,9 @@ class BoxAndTrays:
             ),
         )
         with self.world.modify_world():
-            self.world.add_kinematic_structure_entity(root)
+            self.world.add_kinematic_structure_entity(kinematic_structure_entity=root)
             self.world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     world=self.world, parent=root, child=self.box
                 )
             )
@@ -227,7 +227,7 @@ class BoxAndTrays:
             collision=ShapeCollection(shapes=[floor, *walls_across_x, *walls_across_y]),
         )
         self.world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=self.world.root,
                 child=tray,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -252,10 +252,10 @@ def milk_annotated_in_the_apartment(milk_in_the_apartment):
     world, milk, box = milk_in_the_apartment
     annotation = Milk(root=milk)
     with world.modify_world():
-        world.add_semantic_annotation(annotation)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     yield world, annotation, box
     with world.modify_world():
-        world.remove_semantic_annotation(annotation)
+        world.remove_semantic_annotation(semantic_annotation=annotation)
 
 
 # %% the ORM mappers the tests use

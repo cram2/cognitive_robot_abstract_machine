@@ -192,7 +192,7 @@ def test_distortion_model_requires_unique_implementation(
     )
 
     with pytest.raises(InvalidCameraDistortionError):
-        CameraDistortion.get_type_for_model(CameraDistortionModel.NONE)
+        CameraDistortion.get_type_for_model(model=CameraDistortionModel.NONE)
 
 
 @pytest.mark.parametrize(
@@ -238,7 +238,7 @@ def test_distortion_factory_delegates_to_subclass_parser(
         model=PlumbBobCameraDistortion().model, coefficients=coefficients
     )
 
-    parser.assert_called_once_with(coefficients)
+    parser.assert_called_once_with(ordered_coefficients=coefficients)
     assert distortion is expected
 
 

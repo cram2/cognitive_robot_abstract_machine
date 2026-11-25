@@ -30,7 +30,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 
-pr2 = PR2.from_world(world)
+pr2 = PR2.from_world(world=world)
 ```
 
 ## The Executor

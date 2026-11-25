@@ -48,13 +48,15 @@ def create_hsrb_in_world(world: World):
     with world_with_hsrb.modify_world():
         hsrb_root = world_with_hsrb.root
         localization_body = Body(name=PrefixedName(name="odom_combined"))
-        world_with_hsrb.add_kinematic_structure_entity(localization_body)
+        world_with_hsrb.add_kinematic_structure_entity(
+            kinematic_structure_entity=localization_body
+        )
         c_root_bf = OmniDrive.create_with_dofs(
             parent=localization_body, child=hsrb_root, world=world_with_hsrb
         )
-        world_with_hsrb.add_connection(c_root_bf)
+        world_with_hsrb.add_connection(connection=c_root_bf)
 
-    world.merge_world(world_with_hsrb)
+    world.merge_world(other=world_with_hsrb)
 
-    hsrb = HSRB.from_world(world)
+    hsrb = HSRB.from_world(world=world)
     return hsrb

@@ -64,7 +64,7 @@ class NotesThePerceivableObjectsOfTheWorld(BaseAnnotator):
             [
                 annotation.root.id
                 for annotation in self.world.get_semantic_annotations_by_type(
-                    IsPerceivable
+                    semantic_annotation_type=IsPerceivable
                 )
             ]
         )
@@ -102,7 +102,7 @@ class TestUpdatingTheWorldInTheMiddleOfAPass:
         robokudo.tick_tree()
 
         [unknown_object] = robokudo.world.get_semantic_annotations_by_type(
-            UnknownObject
+            semantic_annotation_type=UnknownObject
         )
         assert notes.noted_body_ids == [[unknown_object.root.id]]
         robokudo.close()
@@ -136,6 +136,6 @@ class TestClassOfANewObject:
         assert [
             type(annotation)
             for annotation in robokudo.world.get_semantic_annotations_by_type(
-                IsPerceivable
+                semantic_annotation_type=IsPerceivable
             )
         ] == [UnknownObject]

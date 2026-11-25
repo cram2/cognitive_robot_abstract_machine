@@ -109,7 +109,7 @@ class KinematicStructureEntitySpecification(
         x, y, z = bounds[1] - bounds[0]
         return Scale(x=x, y=y, z=z)
 
-    def to_domain_object(self, name: str | None = None) -> TKinematicStructureEntity:
+    def to_domain_object(self, *, name: str | None = None) -> TKinematicStructureEntity:
         """
         Materialize a new, world-independent kinematic structure entity from this spec.
 
@@ -123,12 +123,13 @@ class KinematicStructureEntitySpecification(
             self, KinematicStructureEntitySpecification
         )
         return domain_object_type.from_shape_collection(
-            self._resolved_name(name),
-            self.shapes.copy_without_reference_frame(),
+            name=self._resolved_name(name=name),
+            shape_collection=self.shapes.copy_without_reference_frame(),
         )
 
     def attach_and_spawn_children(
         self,
+        *,
         world: World,
         entity: KinematicStructureEntity,
         connection_specification: ConnectionSpecification,
@@ -152,18 +153,19 @@ class KinematicStructureEntitySpecification(
         """
         with world.modify_world():
             connection_specification.connect(
-                world,
+                world=world,
                 child=entity,
                 parent=parent,
                 parent_T_connection=connection_specification.parent_T_connection_for_child_at(
-                    parent_T_self or self.parent_T_self
+                    parent_T_child=parent_T_self or self.parent_T_self
                 ),
             )
             for child in self.child_specifications:
-                child.spawn(world, parent=entity)
+                child.spawn(world=world, parent=entity)
 
     def _spawn_attached(
         self,
+        *,
         world: World,
         connection_specification: ConnectionSpecification,
         name: str | None = None,
@@ -183,14 +185,19 @@ class KinematicStructureEntitySpecification(
             None, the stored default is used.
         :return: The materialized kinematic structure entity.
         """
-        entity = self.to_domain_object(name)
+        entity = self.to_domain_object(name=name)
         self.attach_and_spawn_children(
-            world, entity, connection_specification, parent, parent_T_self
+            world=world,
+            entity=entity,
+            connection_specification=connection_specification,
+            parent=parent,
+            parent_T_self=parent_T_self,
         )
         return entity
 
     def spawn(
         self,
+        *,
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
@@ -213,12 +220,17 @@ class KinematicStructureEntitySpecification(
             self.connection_specification or FixedConnectionSpecification()
         )
         return self._spawn_attached(
-            world, connection_specification, name, parent, parent_T_self
+            world=world,
+            connection_specification=connection_specification,
+            name=name,
+            parent=parent,
+            parent_T_self=parent_T_self,
         )
 
     @classmethod
     def box(
         cls,
+        *,
         name: str,
         scale: Scale,
         color: Color | None = None,
@@ -257,6 +269,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def sphere(
         cls,
+        *,
         name: str,
         radius: float,
         color: Color | None = None,
@@ -296,6 +309,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def cylinder(
         cls,
+        *,
         name: str,
         width: float,
         height: float,
@@ -338,6 +352,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def mesh(
         cls,
+        *,
         name: str,
         filename: str,
         scale: Scale | None = None,
@@ -381,6 +396,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def from_event(
         cls,
+        *,
         name: str,
         event: Event,
         parent_T_self: HomogeneousTransformationMatrix | None = None,
@@ -409,7 +425,7 @@ class KinematicStructureEntitySpecification(
         return cls(
             name=name,
             shapes=BoundingBoxCollection.from_event(
-                VolumetricBoundingBox, anchor, event
+                box_type=VolumetricBoundingBox, reference_frame=anchor, event=event
             )
             .as_shapes()
             .copy_without_reference_frame(),
@@ -421,6 +437,7 @@ class KinematicStructureEntitySpecification(
     @classmethod
     def from_3d_points(
         cls,
+        *,
         name: str,
         points_3d: list[Point3],
         minimum_thickness: float = 0.005,
@@ -450,7 +467,7 @@ class KinematicStructureEntitySpecification(
             shapes=ShapeCollection(
                 shapes=[
                     Mesh.from_3d_points(
-                        points_3d,
+                        points_3d=points_3d,
                         minimum_thickness=minimum_thickness,
                         singular_value_ratio_tolerance=singular_value_ratio_tolerance,
                     )
@@ -487,7 +504,7 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
     means no visual geometry.
     """
 
-    def to_domain_object(self, name: str | None = None) -> Body:
+    def to_domain_object(self, *, name: str | None = None) -> Body:
         """
         Create a new, world-independent body from this specification.
 
@@ -496,8 +513,8 @@ class BodySpecification(KinematicStructureEntitySpecification[Body]):
         :return: The created body.
         """
         body = Body.from_shape_collection(
-            self._resolved_name(name),
-            self.shapes.copy_without_reference_frame(),
+            name=self._resolved_name(name=name),
+            shape_collection=self.shapes.copy_without_reference_frame(),
             visuals_shape_collection=(
                 self.visual_shapes.copy_without_reference_frame()
                 if self.visual_shapes is not None

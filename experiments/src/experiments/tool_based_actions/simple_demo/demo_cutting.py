@@ -48,28 +48,30 @@ def main() -> None:
     bread_world = parse_object("bread.stl", color=BREAD_COLOR)
     with world.modify_world():
         world.merge_world_at_pose(
-            bread_world,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            other=bread_world,
+            pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )
     logger.debug("World root: %s", world.root)
-    pr2 = PR2.from_world(world)
+    pr2 = PR2.from_world(world=world)
 
     knife_body = attach_tool(
         world, pr2.right_arm, parse_object("big-knife.stl"), CUT_MOUNT
     )
-    bread_body = world.get_body_by_name("bread.stl")
+    bread_body = world.get_body_by_name(name="bread.stl")
 
     knife = CuttingKnife(root=knife_body)
     with world.modify_world():
-        world.add_semantic_annotations([Bread(root=bread_body), knife])
+        world.add_semantic_annotations(
+            semantic_annotations=[Bread(root=bread_body), knife]
+        )
 
     plan = Sequence(
         nodes=[
             SetGripperAction(
                 gripper_configuration=pr2.right_arm.end_effector.default_configuration(
-                    GripperState.CLOSE
+                    state_type=GripperState.CLOSE
                 )
             ),
             ParkArmsAction(arms=pr2.all_arms),

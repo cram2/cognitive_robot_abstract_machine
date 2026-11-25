@@ -94,7 +94,9 @@ class RealRunner(DemoRunner):
     def run(self) -> None:
         with self.running_robot() as robot:
             self.scene.populate(world=robot.world)
-            [tracy] = robot.world.get_semantic_annotations_by_type(Tracy)
+            [tracy] = robot.world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Tracy
+            )
             executor = RealRobotPlanExecutor(
                 context=StatechartContext.with_extensions(
                     world=robot.world, extensions=[RobotAccess(robot=tracy)]

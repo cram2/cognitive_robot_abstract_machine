@@ -59,16 +59,13 @@ class WorldModelParser(WorldSource, ABC):
 
     @classmethod
     @abstractmethod
-    def from_file(
-        cls, file_path: str, prefix: str | None = None, *args, **kwargs
-    ) -> Self:
+    def from_file(cls, *, file_path: str, prefix: str | None = None, **kwargs) -> Self:
         """
         Create a parser for the world described by a file.
 
         :param file_path: The path or resource URI (such as ``package://``) of the file
             to parse.
         :param prefix: The prefix for every name used in the parsed world.
-        :param args: Further parameters for the aspects the format supports.
         :param kwargs: Further keyword parameters for the aspects the format supports.
         :return: The parser for the described world.
         """

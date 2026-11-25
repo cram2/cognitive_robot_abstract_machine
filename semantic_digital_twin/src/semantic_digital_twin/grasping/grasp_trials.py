@@ -33,7 +33,7 @@ class GraspPerformer(ABC):
     """
 
     @abstractmethod
-    def perform(self, grasp: GraspCandidate) -> GraspResult:
+    def perform(self, *, grasp: GraspCandidate) -> GraspResult:
         """
         :param grasp: The grasp to perform.
         :return: What happened to the object.
@@ -114,7 +114,7 @@ class GraspTrials:
         part = self.grasped_part
         strategy = self.grasp_strategy or part.grasp_strategy
         return draw_grasps(
-            strategy.statement(part, self.result_pattern),
+            strategy.statement(graspable=part, result_pattern=self.result_pattern),
             self.number_of_trials,
             self.model_registry,
         )
@@ -130,5 +130,7 @@ class GraspTrials:
         for grasp in self.drawn_grasps():
             if not grasp.reaches_surface_of(graspable=part):
                 continue
-            grasp.result = self.performer.perform(grasp.grasp_candidate(graspable=part))
+            grasp.result = self.performer.perform(
+                grasp=grasp.grasp_candidate(graspable=part)
+            )
             yield GraspTrialRecord(grasped_part=part, grasp=grasp)

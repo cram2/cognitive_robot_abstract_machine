@@ -119,7 +119,7 @@ def tiago_context(_tiago_world_setup):
     A world holding a Tiago, the robot and the context extensions of its plans.
     """
     world = deepcopy(_tiago_world_setup)
-    robot = world.get_semantic_annotations_by_type(Tiago)[0]
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=Tiago)[0]
     return world, robot, robot_extensions(robot)
 
 
@@ -148,7 +148,7 @@ def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidat
     )
     with world.modify_world():
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=box,
@@ -158,7 +158,7 @@ def top_down_grasp_of_a_box(extensions: list[ContextExtension]) -> GraspCandidat
             )
         )
         graspable = IsGraspable(root=box)
-        world.add_semantic_annotations([graspable])
+        world.add_semantic_annotations(semantic_annotations=[graspable])
     return GraspCandidate(
         graspable=graspable,
         grasp_pose=Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box),
@@ -409,7 +409,7 @@ def close_action(world: World, robot: AbstractRobot) -> CloseAction:
     """
     :return: An action closing a container of the apartment with the arm of `robot`.
     """
-    handle = world.get_semantic_annotations_by_type(Handle)[0]
+    handle = world.get_semantic_annotations_by_type(semantic_annotation_type=Handle)[0]
     return CloseAction(
         grasp_candidate=handle.grasp_candidates()[0], arm=robot.all_arms[0]
     )
@@ -505,7 +505,9 @@ def handle_grasp(world: World) -> GraspCandidate:
     """
     :return: A grasp on a handle of the apartment.
     """
-    return world.get_semantic_annotations_by_type(Handle)[0].grasp_candidates()[0]
+    return world.get_semantic_annotations_by_type(semantic_annotation_type=Handle)[
+        0
+    ].grasp_candidates()[0]
 
 
 def reaching_goals_of(action: ReachAction) -> list[StatechartNode]:
@@ -757,12 +759,14 @@ def stretch_reaching_milk_from(
     :return: The executor, with the reach compiled but not run yet, the reach, and the
         recording.
     """
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     milk.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1, -2, 0.8, reference_frame=world.root
     )
     drive = robot.root.parent_connection
-    drive.origin = world.transform(root_T_base, drive.parent).homogeneous_matrix
+    drive.origin = world.transform(
+        spatial_object=root_T_base, target_frame=drive.parent
+    ).homogeneous_matrix
     recording = OrientationWhileRunning(body=robot.root)
     executor = KinematicallySimulatedPlanExecutor(
         context=StatechartContext.with_extensions(world=world, extensions=extensions),
@@ -900,7 +904,9 @@ def test_a_robot_of_another_type_lifts_unchanged(pr2_apartment_context) -> None:
 @pytest.fixture
 def garmi_extensions(_garmi_world_setup) -> list[ContextExtension]:
     world = deepcopy(_garmi_world_setup)
-    return robot_extensions(world.get_semantic_annotations_by_type(Garmi)[0])
+    return robot_extensions(
+        world.get_semantic_annotations_by_type(semantic_annotation_type=Garmi)[0]
+    )
 
 
 def test_a_simulated_garmi_drives_its_fingers_with_a_giskard_goal(
@@ -911,12 +917,14 @@ def test_a_simulated_garmi_drives_its_fingers_with_a_giskard_goal(
     command.
     """
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
-        GarmiLeftGripper
+        semantic_annotation_type=GarmiLeftGripper
     )[0]
 
     action = prepared(
         SetGripperAction(
-            gripper_configuration=gripper.default_configuration(GripperState.OPEN)
+            gripper_configuration=gripper.default_configuration(
+                state_type=GripperState.OPEN
+            )
         ),
         simulated_executor(garmi_extensions),
     )

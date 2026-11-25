@@ -19,7 +19,7 @@ def familiar_kitchen_objects():
     """
     Forty light cups and forty heavier pots with familiar masses.
     """
-    world = World.create_with_root_body("map")
+    world = World.create_with_root_body(root_body_name="map")
     generator = np.random.default_rng(0)
     cups = []
     pots = []
@@ -40,7 +40,7 @@ def familiar_kitchen_objects():
 
 
 def _light_cup(mass):
-    world = World.create_with_root_body("map")
+    world = World.create_with_root_body(root_body_name="map")
     with world.modify_world():
         cup = Cup.create_with_new_body_in_world(name="probe_cup", world=world)
     cup.root.inertial = Inertial(mass=mass)

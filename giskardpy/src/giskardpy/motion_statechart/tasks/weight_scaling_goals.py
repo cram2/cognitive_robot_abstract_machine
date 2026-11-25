@@ -34,7 +34,7 @@ class MaxManipulability(ConvergingTask, HasKinematicChainParameter):
         """
         artifacts = MotionNodeArtifacts()
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position[:3]
 
         joint_symbols = root_P_tip.free_variables()

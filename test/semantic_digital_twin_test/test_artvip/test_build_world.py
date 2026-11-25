@@ -30,10 +30,12 @@ def test_load_delegates_stage_parsing_to_usd_parser(monkeypatch, main_usd_path):
     # would already be checking.
     loader = ArtVipDatasetLoader()
     monkeypatch.setattr(
-        loader, "_download_object_if_not_exists", lambda category, name: main_usd_path
+        loader,
+        "_download_object_if_not_exists",
+        lambda *, category, name: main_usd_path,
     )
 
-    result = loader.load(ArtVipCategory.SMALL_FURNITURE, "test_object")
+    result = loader.load(category=ArtVipCategory.SMALL_FURNITURE, name="test_object")
 
     assert len(result.world.bodies) == 2  # root + child
     [connection] = result.world.connections
@@ -45,10 +47,12 @@ def test_load_annotates_the_root_body_with_category_and_name(
 ):
     loader = ArtVipDatasetLoader()
     monkeypatch.setattr(
-        loader, "_download_object_if_not_exists", lambda category, name: main_usd_path
+        loader,
+        "_download_object_if_not_exists",
+        lambda *, category, name: main_usd_path,
     )
 
-    result = loader.load(ArtVipCategory.SMALL_FURNITURE, "test_object")
+    result = loader.load(category=ArtVipCategory.SMALL_FURNITURE, name="test_object")
 
     [annotation] = [
         annotation

@@ -14,7 +14,7 @@ def test_post_init_transformation():
 
     with w.modify_world():
         w.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=root,
                 child=b1,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -41,7 +41,7 @@ def test_post_init_transformation():
     )
 
     shape_collection = ShapeCollection(reference_frame=b1)
-    shape_collection.append(shape)
+    shape_collection.append(shape=shape)
     shape_collection.transform_all_shapes_to_own_frame()
     assert shape.origin.reference_frame == b1
     assert shape.origin.position.x == 2.0

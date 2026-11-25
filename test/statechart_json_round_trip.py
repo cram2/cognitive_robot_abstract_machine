@@ -62,7 +62,7 @@ class StatechartSentThroughJSON:
         :return: `sent` with what a receiver reads from the JSON text of it.
         """
         sent_text = json.dumps(sent.to_json())
-        tracker = WorldEntityWithIDKwargsTracker.from_world(context.world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world=context.world)
         received = Statechart.from_json(
             data=json.loads(sent_text),
             context=context,

@@ -103,7 +103,7 @@ class ObjectRelativeGrasp(ABC):
     """
 
     @classmethod
-    def any_pattern(cls, result: Match[GraspResult] | None = None) -> Match[Self]:
+    def any_pattern(cls, *, result: Match[GraspResult] | None = None) -> Match[Self]:
         """
         :param result: The result the grasp is asked to have had; any result when
             ``None``.

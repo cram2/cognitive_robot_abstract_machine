@@ -193,13 +193,13 @@ class PlacementRegionAttacher:
         :return: One entry per region the task resolved.
         """
         environment = loader.build_task_environment(
-            task_name,
+            task_name=task_name,
             layout_id=ALL_LAYOUTS_AND_STYLES,
             style_id=ALL_LAYOUTS_AND_STYLES,
         )
-        task = loader.load_task_from_environment(environment)
+        task = loader.load_task_from_environment(environment=environment)
         region_data = PlacementSamplerRegionReader().read_all(
-            environment, name_prefix=task_name
+            environment=environment, name_prefix=task_name
         )
         records = [self.attach(task.world, data) for data in region_data]
         environment.close()
@@ -212,7 +212,7 @@ class PlacementRegionAttacher:
         :param region_data: The region to attach.
         :return: The attached region's summary statistics.
         """
-        region_data.attach_to(world)
+        region_data.attach_to(world=world)
         world_position = region_data.world_T_sampler.position
         return AttachedPlacementRegion(
             task=region_data.name.prefix,
@@ -301,12 +301,12 @@ class PlacementRegionFidelityMeasurer:
         :return: One entry per placement region the task resolved.
         """
         environment = loader.build_task_environment(
-            task_name,
+            task_name=task_name,
             layout_id=ALL_LAYOUTS_AND_STYLES,
             style_id=ALL_LAYOUTS_AND_STYLES,
         )
         region_data = PlacementSamplerRegionReader().read_all(
-            environment, name_prefix=task_name
+            environment=environment, name_prefix=task_name
         )
         records = [self.measure(data) for data in region_data]
         environment.close()
@@ -452,16 +452,16 @@ class ForbiddenZoneAttacher:
         :return: One entry per zone the task resolved.
         """
         environment = loader.build_task_environment(
-            task_name,
+            task_name=task_name,
             layout_id=ALL_LAYOUTS_AND_STYLES,
             style_id=ALL_LAYOUTS_AND_STYLES,
         )
-        task = loader.load_task_from_environment(environment)
+        task = loader.load_task_from_environment(environment=environment)
         records = [
             self.attach(
                 task.world,
                 GripperExclusionZoneReader.read(
-                    environment,
+                    environment=environment,
                     name_prefix=task_name,
                     object_name=object_name,
                     radius=radius,
@@ -479,7 +479,7 @@ class ForbiddenZoneAttacher:
         :param zone_data: The zone to attach.
         :return: The attached zone's summary statistics.
         """
-        zone_data.attach_to(world)
+        zone_data.attach_to(world=world)
         return AttachedForbiddenZone(
             task=zone_data.name.prefix,
             body_name=zone_data.name.name,
@@ -590,7 +590,7 @@ class ScalarStateExporter:
         :return: One entry per door joint the task's fixture resolved.
         """
         environment = loader.build_task_environment(
-            task_name,
+            task_name=task_name,
             layout_id=ALL_LAYOUTS_AND_STYLES,
             style_id=ALL_LAYOUTS_AND_STYLES,
         )
@@ -718,7 +718,7 @@ class SymbolicStateExporter:
         :return: One entry per state dictionary key the task's fixture resolved.
         """
         environment = loader.build_task_environment(
-            task_name,
+            task_name=task_name,
             layout_id=ALL_LAYOUTS_AND_STYLES,
             style_id=ALL_LAYOUTS_AND_STYLES,
         )

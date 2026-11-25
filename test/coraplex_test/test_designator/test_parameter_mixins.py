@@ -196,7 +196,7 @@ def test_pick_up_action_takes_its_grasp_and_arm(pr2_apartment_context):
     A pick-up records the grasp and the arm it was given as its designator parameters.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     grasp = milk.grasp_candidates()[0]
     arm = robot.left_arm
 

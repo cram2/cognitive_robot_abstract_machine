@@ -27,7 +27,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 logging.disable(logging.CRITICAL)
 apartment = "package://iai_apartment/urdf/apartment.urdf"
-world = URDFParser.from_file(apartment).create_world()
+world = URDFParser.from_file(file_path=apartment).create_world()
 
 ```
 

@@ -102,7 +102,7 @@ class MoveFingers(
         if isinstance(end_effector, HasTwoFingers):
             return MoveGripper(
                 two_finger_gripper=end_effector,
-                width=end_effector.separation_at(configuration.joint_state),
+                width=end_effector.separation_at(joint_state=configuration.joint_state),
                 max_joint_velocity=configuration.finger_velocity,
                 finger_stall_minimum_time=finger_stall_minimum_time,
                 tolerate_finger_stall=tolerate_finger_stall,

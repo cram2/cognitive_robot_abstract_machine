@@ -30,7 +30,7 @@ def ran_pick_up(pr2_apartment_context):
     milk.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=robot.all_arms),

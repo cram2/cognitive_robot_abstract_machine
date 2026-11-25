@@ -77,16 +77,24 @@ def test_semantic_annotations_on_surfaces(kitchen_environment_fixture):
     """
     Tests that giving Table annotations gives a list of the correct annotation on top.
     """
-    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
-    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
-        "vegetable_table"
+    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="fruit_table"
     )
-    table3 = kitchen_environment_fixture.get_semantic_annotation_by_name("empty_table")
-    apple = kitchen_environment_fixture.get_semantic_annotation_by_name("apple")
-    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name("carrot")
-    orange = kitchen_environment_fixture.get_semantic_annotation_by_name("orange")
-    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name("lettuce")
-    banana1 = kitchen_environment_fixture.get_semantic_annotation_by_name("banana1")
+    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="vegetable_table"
+    )
+    table3 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="empty_table"
+    )
+    apple = kitchen_environment_fixture.get_semantic_annotation_by_name(name="apple")
+    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name(name="carrot")
+    orange = kitchen_environment_fixture.get_semantic_annotation_by_name(name="orange")
+    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="lettuce"
+    )
+    banana1 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="banana1"
+    )
 
     assert semantic_annotations_on_surfaces(
         [table1, table2, table3], kitchen_environment_fixture
@@ -104,17 +112,25 @@ def test_get_next_object_using_planar_distance(kitchen_environment_fixture):
 
     :raises AssertionError: If any of the function assertions fail during testing.
     """
-    toya = kitchen_environment_fixture.get_body_by_name("base_link_body")
-    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
-    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
-        "vegetable_table"
+    toya = kitchen_environment_fixture.get_body_by_name(name="base_link_body")
+    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="fruit_table"
     )
-    table3 = kitchen_environment_fixture.get_semantic_annotation_by_name("empty_table")
-    apple = kitchen_environment_fixture.get_semantic_annotation_by_name("apple")
-    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name("carrot")
-    orange = kitchen_environment_fixture.get_semantic_annotation_by_name("orange")
-    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name("lettuce")
-    banana1 = kitchen_environment_fixture.get_semantic_annotation_by_name("banana1")
+    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="vegetable_table"
+    )
+    table3 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="empty_table"
+    )
+    apple = kitchen_environment_fixture.get_semantic_annotation_by_name(name="apple")
+    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name(name="carrot")
+    orange = kitchen_environment_fixture.get_semantic_annotation_by_name(name="orange")
+    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="lettuce"
+    )
+    banana1 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="banana1"
+    )
 
     assert get_next_object_using_planar_distance(
         toya, table1, Vector3.Z()
@@ -146,18 +162,26 @@ def test_goal_surface_of_object(kitchen_environment_fixture):
     The function is evaluated under multiple scenarios to verify its logic in choosing
     the correct table, handling empty tables, and cases with no valid candidates.
     """
-    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
-    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
-        "vegetable_table"
+    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="fruit_table"
     )
-    table3 = kitchen_environment_fixture.get_semantic_annotation_by_name("empty_table")
-    table4 = kitchen_environment_fixture.get_semantic_annotation_by_name("empty_table2")
+    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="vegetable_table"
+    )
+    table3 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="empty_table"
+    )
+    table4 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="empty_table2"
+    )
 
-    banana = kitchen_environment_fixture.get_semantic_annotation_by_name("banana")
-    apple = kitchen_environment_fixture.get_semantic_annotation_by_name("apple")
-    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name("carrot")
-    orange = kitchen_environment_fixture.get_semantic_annotation_by_name("orange")
-    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name("lettuce")
+    banana = kitchen_environment_fixture.get_semantic_annotation_by_name(name="banana")
+    apple = kitchen_environment_fixture.get_semantic_annotation_by_name(name="apple")
+    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name(name="carrot")
+    orange = kitchen_environment_fixture.get_semantic_annotation_by_name(name="orange")
+    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="lettuce"
+    )
 
     # choosing the correct table
     assert goal_surface_of_object(banana, [table1, table2, table3]) == table1
@@ -184,13 +208,15 @@ def test_filter_annotations_by_color(kitchen_environment_fixture):
     parameters returns the expected list of annotations corresponding to that color
     within the given list of objects.
     """
-    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
-    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
-        "vegetable_table"
+    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="fruit_table"
     )
-    apple = kitchen_environment_fixture.get_semantic_annotation_by_name("apple")
-    orange = kitchen_environment_fixture.get_semantic_annotation_by_name("orange")
-    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name("carrot")
+    table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="vegetable_table"
+    )
+    apple = kitchen_environment_fixture.get_semantic_annotation_by_name(name="apple")
+    orange = kitchen_environment_fixture.get_semantic_annotation_by_name(name="orange")
+    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name(name="carrot")
 
     assert filter_annotations_by_color(Color.RED(), [apple, orange]).tolist() == [apple]
     assert filter_annotations_by_color(Color.ORANGE(), [apple, orange]).tolist() == [
@@ -228,14 +254,18 @@ def test_sort_annotations_by_volume(kitchen_environment_fixture):
     Tests the sort_annotations_by_volume function by verifying the order of the returned
     annotations.
     """
-    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name("fruit_table")
+    table1 = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="fruit_table"
+    )
     table2 = kitchen_environment_fixture.get_semantic_annotation_by_name(
-        "vegetable_table"
+        name="vegetable_table"
     )
 
-    apple = kitchen_environment_fixture.get_semantic_annotation_by_name("apple")
-    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name("carrot")
-    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name("lettuce")
+    apple = kitchen_environment_fixture.get_semantic_annotation_by_name(name="apple")
+    carrot = kitchen_environment_fixture.get_semantic_annotation_by_name(name="carrot")
+    lettuce = kitchen_environment_fixture.get_semantic_annotation_by_name(
+        name="lettuce"
+    )
 
     assert sort_annotations_by_volume([]) == []
     assert sort_annotations_by_volume([apple, carrot]) == [apple, carrot]
@@ -270,11 +300,11 @@ def test_world_reasoner_leaves_urdf_doors_and_drawers_on_their_own_joints():
     reasoner.infer_semantic_annotations()
 
     assert set(world.connections) == connections_before_reasoning
-    doors = world.get_semantic_annotations_by_type(Door)
+    doors = world.get_semantic_annotations_by_type(semantic_annotation_type=Door)
     assert doors
     for door in doors:
         assert door.movable_joint.behaves_like_a_revolute_connection
-    drawers = world.get_semantic_annotations_by_type(Drawer)
+    drawers = world.get_semantic_annotations_by_type(semantic_annotation_type=Drawer)
     assert drawers
     for drawer in drawers:
         assert drawer.movable_joint.behaves_like_a_prismatic_connection

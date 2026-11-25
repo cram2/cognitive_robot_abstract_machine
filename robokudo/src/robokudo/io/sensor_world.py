@@ -108,15 +108,15 @@ class RecordedCameraWorld:
         sensor_world = World()
         with sensor_world.modify_world():
             if reference is not None and reference is not root:
-                sensor_world.add_body(reference)
+                sensor_world.add_body(body=reference)
             if pose_child is not root:
-                sensor_world.add_body(pose_child)
-            sensor_world.add_body(root)
+                sensor_world.add_body(body=pose_child)
+            sensor_world.add_body(body=root)
             for parent, child in pairwise((reference, pose_child, root)):
                 if parent is None or parent is child:
                     continue
                 sensor_world.add_connection(
-                    Connection6DoF.create_with_dofs(
+                    connection=Connection6DoF.create_with_dofs(
                         parent=parent,
                         child=child,
                         world=sensor_world,
@@ -125,7 +125,7 @@ class RecordedCameraWorld:
                         ),
                     )
                 )
-            sensor_world.add_semantic_annotation(camera)
+            sensor_world.add_semantic_annotation(semantic_annotation=camera)
         return sensor_world
 
     def install(self, *, reasoning_world: World) -> Camera:
@@ -137,12 +137,12 @@ class RecordedCameraWorld:
         :raises InvalidCameraObservation: If the merged camera or root has an invalid
             type.
         """
-        reasoning_world.merge_world(self.project())
+        reasoning_world.merge_world(other=self.project())
         camera = reasoning_world.get_semantic_annotation_by_id(
-            self.observation.camera.id
+            id=self.observation.camera.id
         )
         root = reasoning_world.get_kinematic_structure_entity_by_id(
-            self.observation.camera.root.id
+            id=self.observation.camera.root.id
         )
         if not isinstance(camera, Camera) or not isinstance(root, Body):
             raise InvalidCameraObservation(

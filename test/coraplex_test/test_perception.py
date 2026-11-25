@@ -125,7 +125,7 @@ def test_detection_moves_the_annotated_body_to_the_perceived_pose(
     the source saw it, not where it was spawned.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     perceived_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
     )
@@ -134,7 +134,9 @@ def test_detection_moves_the_annotated_body_to_the_perceived_pose(
         world=world
     )
 
-    assert annotations == world.get_semantic_annotations_by_type(Milk)
+    assert annotations == world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Milk
+    )
     np.testing.assert_allclose(
         milk_body.global_pose.position.to_np().flatten()[:3],
         PERCEIVED_MILK_POSITION,
@@ -165,7 +167,9 @@ def test_detection_matching_several_bodies_is_rejected(pr2_apartment_context):
     """
     world, view, extensions = pr2_apartment_context
     with world.modify_world():
-        world.add_semantic_annotation(Milk(root=world.get_body_by_name("spoon.stl")))
+        world.add_semantic_annotation(
+            semantic_annotation=Milk(root=world.get_body_by_name(name="spoon.stl"))
+        )
 
     with pytest.raises(AmbiguousDetection):
         Detection(
@@ -179,9 +183,9 @@ def test_several_annotations_on_one_body_are_not_ambiguous(pr2_apartment_context
     to both rather than being rejected.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     with world.modify_world():
-        world.add_semantic_annotation(Milk(root=milk_body))
+        world.add_semantic_annotation(semantic_annotation=Milk(root=milk_body))
     perceived_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
     )
@@ -208,7 +212,7 @@ def test_an_upside_down_detection_is_flipped_without_moving_the_body(
     That correction is a rotation, so the body still ends up at the reported position.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     upside_down_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, roll=np.pi, reference_frame=world.root
     )
@@ -234,7 +238,7 @@ def test_untrusted_orientation_still_moves_the_body_to_the_perceived_position(
     the orientation is left alone.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     perceived_pose = Pose.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, yaw=np.pi / 2, reference_frame=world.root
     )
@@ -258,7 +262,7 @@ def test_untrusted_orientation_keeps_the_bodys_existing_orientation(
     whatever rotation it already had before the detection was applied.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     orientation_before_detection = (
         milk_body.parent_connection.origin.rotation_matrix.to_np()
     )
@@ -299,7 +303,7 @@ def test_world_perception_reports_the_pose_the_world_holds(
     body's current pose rather than any stored or spawned value.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
     )
@@ -325,9 +329,11 @@ def test_a_body_carrying_several_annotations_is_reported_once(
     that object once rather than with a candidate per annotation.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     with world.modify_world():
-        world.add_semantic_annotation(SpecializedMilk(root=milk_body))
+        world.add_semantic_annotation(
+            semantic_annotation=SpecializedMilk(root=milk_body)
+        )
     query = PerceptionQuery(
         semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
     )
@@ -347,14 +353,14 @@ def test_world_perception_follows_the_robots_head(
     a body has to take it out of the answer.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     query = PerceptionQuery(
         semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
     )
 
     assert query.from_world() == [milk_body]
 
-    head_pan = world.get_degree_of_freedom_by_name("head_pan_joint")
+    head_pan = world.get_degree_of_freedom_by_name(name="head_pan_joint")
     world.state[head_pan.id].position = np.pi
     world.notify_state_change()
 
@@ -451,7 +457,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
     Without this, a wrong prior in the world silently aims the reach at empty space.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     milk_body = milk.root
     wrong_prior = (1.0, 1.0, 1.0)
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -479,7 +485,9 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
         """
         distances = []
         for target in targets:
-            root_T_tool = world.transform(target, world.root).to_np()
+            root_T_tool = world.transform(
+                spatial_object=target, target_frame=world.root
+            ).to_np()
             fingers = root_T_tool[:3, :3] @ tool_P_grasp + root_T_tool[:3, 3]
             distances.append(float(np.linalg.norm(fingers - np.array(position))))
         return distances
@@ -649,7 +657,9 @@ def test_robokudo_detection_moves_the_body_in_the_world(
     RoboKudoPerception(ros_node=rclpy_node).detect(query=query).apply_to(world=world)
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
+        world.get_body_by_name(name="milk.stl")
+        .global_pose.position.to_np()
+        .flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -863,7 +873,9 @@ def test_perception_task_moves_the_detected_body(
     run_perception_task(task)
 
     np.testing.assert_allclose(
-        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
+        world.get_body_by_name(name="milk.stl")
+        .global_pose.position.to_np()
+        .flatten()[:3],
         PERCEIVED_MILK_POSITION,
         atol=1e-9,
     )
@@ -877,7 +889,7 @@ def test_a_source_that_sees_nothing_leaves_the_task_observing_false(
     failed observation rather than as a raise that unwinds it.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     spawned_pose = milk_body.global_pose.to_np()
     query = PerceptionQuery(
         semantic_annotation=Milk, region=empty_region, robot=view, world=world
@@ -960,7 +972,7 @@ def receiving_world_kwargs(world: World) -> dict:
     :param world: The world the arriving chart is resolved against.
     :return: The tracker and world keyword arguments.
     """
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     return {"world": world, **tracker.create_kwargs()}
 
 
@@ -989,7 +1001,7 @@ def test_perception_task_survives_a_json_round_trip(
     assert restored.query.semantic_annotation is Milk
     assert restored.query.world is receiving_world
     assert restored.query.robot is receiving_world.get_world_entity_with_id_by_id(
-        view.id
+        id=view.id
     )
     assert restored.query.region.origin.reference_frame is receiving_world.root
 
@@ -1083,7 +1095,7 @@ def test_perception_task_survives_a_chart_round_trip(
     assert restored_tasks[0].query.world is receiving_world
     assert restored_tasks[
         0
-    ].query.robot is receiving_world.get_world_entity_with_id_by_id(view.id)
+    ].query.robot is receiving_world.get_world_entity_with_id_by_id(id=view.id)
 
 
 def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
@@ -1095,7 +1107,7 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     put it rather than to the pose the plan was expanded against.
     """
     world, view, extensions = pr2_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     query = PerceptionQuery(
         semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
     )
@@ -1191,7 +1203,7 @@ def test_a_detection_without_a_box_looks_as_far_to_every_side_of_the_robot(
 
     for x, y in [(distance, 0), (-distance, 0), (0, distance), (0, -distance)]:
         assert task.query.region.contains(
-            Point3(x, y, distance, reference_frame=view.root)
+            point=Point3(x, y, distance, reference_frame=view.root)
         )
 
 

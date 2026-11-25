@@ -59,7 +59,7 @@ def test_custom_color_mode_controls_rendered_colors(
     """
     fixture = camera_intersections
     frame = fixture.ray_tracer.render(
-        fixture.camera, rgb_mode=ForegroundColorRenderingMode()
+        camera=fixture.camera, rgb_mode=ForegroundColorRenderingMode()
     )
     expected = np.zeros(
         (fixture.resolution.width, fixture.resolution.height, 3), dtype=np.uint8

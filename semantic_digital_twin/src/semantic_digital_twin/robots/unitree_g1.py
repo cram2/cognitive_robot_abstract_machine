@@ -125,14 +125,14 @@ class UnitreeG1LeftThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_thumb_0_link"
+                branch_root=robot_root, name="left_hand_thumb_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_thumb_2_link"
+                branch_root=robot_root, name="left_hand_thumb_2_link"
             ),
         )
 
@@ -147,14 +147,14 @@ class UnitreeG1LeftIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_index_0_link"
+                branch_root=robot_root, name="left_hand_index_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_index_1_link"
+                branch_root=robot_root, name="left_hand_index_1_link"
             ),
         )
 
@@ -169,14 +169,14 @@ class UnitreeG1LeftMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_middle_0_link"
+                branch_root=robot_root, name="left_hand_middle_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_middle_1_link"
+                branch_root=robot_root, name="left_hand_middle_1_link"
             ),
         )
 
@@ -191,14 +191,14 @@ class UnitreeG1RightThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_thumb_0_link"
+                branch_root=robot_root, name="right_hand_thumb_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_thumb_2_link"
+                branch_root=robot_root, name="right_hand_thumb_2_link"
             ),
         )
 
@@ -213,14 +213,14 @@ class UnitreeG1RightIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_index_0_link"
+                branch_root=robot_root, name="right_hand_index_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_index_1_link"
+                branch_root=robot_root, name="right_hand_index_1_link"
             ),
         )
 
@@ -235,14 +235,14 @@ class UnitreeG1RightMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_middle_0_link"
+                branch_root=robot_root, name="right_hand_middle_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_middle_1_link"
+                branch_root=robot_root, name="right_hand_middle_1_link"
             ),
         )
 
@@ -286,14 +286,14 @@ class UnitreeG1LeftHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_palm_link"
+                branch_root=robot_root, name="left_hand_palm_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_hand_tool_frame"
+                branch_root=robot_root, name="left_hand_tool_frame"
             ),
         )
 
@@ -337,14 +337,14 @@ class UnitreeG1RightHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_palm_link"
+                branch_root=robot_root, name="right_hand_palm_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_hand_tool_frame"
+                branch_root=robot_root, name="right_hand_tool_frame"
             ),
         )
 
@@ -366,14 +366,14 @@ class UnitreeG1LeftArm(Arm[UnitreeG1LeftHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_shoulder_pitch_link"
+                branch_root=robot_root, name="left_shoulder_pitch_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_wrist_yaw_link"
+                branch_root=robot_root, name="left_wrist_yaw_link"
             ),
         )
 
@@ -395,14 +395,14 @@ class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_shoulder_pitch_link"
+                branch_root=robot_root, name="right_shoulder_pitch_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_wrist_yaw_link"
+                branch_root=robot_root, name="right_wrist_yaw_link"
             ),
         )
 
@@ -411,12 +411,14 @@ class UnitreeG1RightArm(Arm[UnitreeG1RightHand]):
 class D435(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=cls.create_optical_body(
-                robot_root._world.get_body_in_branch_by_name(robot_root, "d435_link"),
-                HomogeneousTransformationMatrix(),
+                mounting_body=robot_root._world.get_body_in_branch_by_name(
+                    branch_root=robot_root, name="d435_link"
+                ),
+                parent_T_optical=HomogeneousTransformationMatrix(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(
@@ -445,11 +447,15 @@ class UnitreeG1Neck(Neck[D435]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "torso_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "d435_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="torso_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="d435_link"
+            ),
         )
 
 
@@ -465,11 +471,15 @@ class UnitreeG1Torso(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "pelvis"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "torso_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="pelvis"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="torso_link"
+            ),
         )
 
 
@@ -481,10 +491,12 @@ class UnitreeG1MobileBase(MobileBase[OmniDrive]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "pelvis"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="pelvis"
+            ),
         )
 
     def setup_hardware_interfaces(self) -> None:
@@ -520,11 +532,13 @@ class UnitreeG1(
             "unitree_g1.srdf",
         )
         self._world.collision_manager.add_ignore_collision_rule(
-            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+            rule=SelfCollisionMatrixRule.from_collision_srdf(
+                file_path=srdf_path, world=self._world
+            )
         )
 
         self._world.collision_manager.extend_default_rules(
-            [
+            rules=[
                 AvoidExternalCollisions(
                     buffer_zone_distance=0.05, violated_distance=0.0, robot=self
                 ),
@@ -537,20 +551,20 @@ class UnitreeG1(
         )
 
         self._world.collision_manager.extend_max_avoided_bodies_rules(
-            [
+            rules=[
                 MaxAvoidedCollisionsOverride(
                     value=4,
                     bodies=set(
                         self._world.get_direct_child_bodies_with_collision(
-                            self._world.get_body_in_branch_by_name(
-                                self.root, "left_wrist_yaw_link"
+                            start_body=self._world.get_body_in_branch_by_name(
+                                branch_root=self.root, name="left_wrist_yaw_link"
                             )
                         )
                     )
                     | set(
                         self._world.get_direct_child_bodies_with_collision(
-                            self._world.get_body_in_branch_by_name(
-                                self.root, "right_wrist_yaw_link"
+                            start_body=self._world.get_body_in_branch_by_name(
+                                branch_root=self.root, name="right_wrist_yaw_link"
                             )
                         )
                     ),

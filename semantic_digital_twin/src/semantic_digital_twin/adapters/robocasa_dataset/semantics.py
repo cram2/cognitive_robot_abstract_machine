@@ -158,7 +158,7 @@ class RoboCasaCategoryResolver:
     subclass.
     """
 
-    def resolve(self, category: str) -> type[HasRootBody] | None:
+    def resolve(self, *, category: str) -> type[HasRootBody] | None:
         """
         Resolve a RoboCasa category to the matching SemanticAnnotation subclass.
 

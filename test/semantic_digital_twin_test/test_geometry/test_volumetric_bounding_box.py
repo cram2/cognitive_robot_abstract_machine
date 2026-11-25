@@ -41,7 +41,7 @@ def test_volumetric_bounding_box_transform_same_frame(pr2_apartment_state_reset)
     assert bb.max_z == 1
     assert bb.origin.position.to_np().tolist() == [0, 0, 0, 1]
 
-    new_origin_bb = bb.transform_to_origin(new_origin)
+    new_origin_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_origin_bb.min_x == -1
     assert new_origin_bb.max_x == 1
@@ -67,7 +67,9 @@ def test_volumetric_bounding_box_transform_different_frame(pr2_apartment_state_r
         0,
         0,
         0,
-        reference_frame=pr2_apartment_state_reset.get_body_by_name("base_footprint"),
+        reference_frame=pr2_apartment_state_reset.get_body_by_name(
+            name="base_footprint"
+        ),
     )
 
     assert bb.min_x == 0
@@ -78,7 +80,7 @@ def test_volumetric_bounding_box_transform_different_frame(pr2_apartment_state_r
     assert bb.max_z == 1
     assert bb.origin.position.to_np().tolist() == [0, 0, 0, 1]
 
-    new_origin_bb = bb.transform_to_origin(new_origin)
+    new_origin_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_origin_bb.min_x == -1.3
     assert new_origin_bb.max_x == pytest.approx(-0.3, abs=0.001)
@@ -103,7 +105,7 @@ def test_volumetric_bounding_box_transform_rotated():
             ),
         )
 
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     bb = VolumetricBoundingBox(
         min_x=-0.5,
@@ -117,7 +119,7 @@ def test_volumetric_bounding_box_transform_rotated():
 
     new_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body1)
 
-    new_bb = bb.transform_to_origin(new_origin)
+    new_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_bb.min_x == 0.0
     assert new_bb.max_x == 2.0
@@ -140,7 +142,9 @@ def test_event_casting(pr2_apartment_state_reset):
     event = Event.from_simple_sets(simple_event)
 
     bbc = BoundingBoxCollection.from_event(
-        VolumetricBoundingBox, pr2_apartment_state_reset.root, event
+        box_type=VolumetricBoundingBox,
+        reference_frame=pr2_apartment_state_reset.root,
+        event=event,
     )
     bb = bbc.bounding_boxes[0]
     assert len(bbc.bounding_boxes) == 1
@@ -197,4 +201,4 @@ def test_contains(pr2_apartment_state_reset):
 
     point = Point3(0, 0, 0, reference_frame=pr2_apartment_state_reset.root)
 
-    assert bb.contains(point)
+    assert bb.contains(point=point)

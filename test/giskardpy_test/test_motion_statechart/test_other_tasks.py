@@ -122,10 +122,10 @@ class TestFeatureFunctions:
         and reference points within specified bounds.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0, 0, 0, reference_frame=tip)
@@ -172,10 +172,10 @@ class TestFeatureFunctions:
         Test HeightGoal with negative height bounds (tip below reference).
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0, 0, 0, reference_frame=tip)
@@ -224,10 +224,10 @@ class TestFeatureFunctions:
         Test that ReachPoint drives a controlled tip point onto a reference point.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0.0, 0.0, 0.1, reference_frame=tip)
@@ -270,10 +270,10 @@ class TestFeatureFunctions:
         plane) between tip and reference points within specified bounds.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0, 0, 0, reference_frame=tip)
@@ -323,10 +323,10 @@ class TestFeatureFunctions:
         position).
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0, 0, 0, reference_frame=tip)
@@ -377,10 +377,10 @@ class TestFeatureFunctions:
         Even with large z difference, if x-y distance is within bounds, goal succeeds.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0, 0, 0, reference_frame=tip)
@@ -431,10 +431,10 @@ class TestFeatureFunctions:
         vertical and horizontal distances simultaneously.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0, 0, 0, reference_frame=tip)
@@ -505,10 +505,10 @@ class TestFeatureFunctions:
         simultaneously.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
 
         tip_point = Point3(0, 0, 0, reference_frame=tip)
@@ -613,9 +613,11 @@ def test_pointing(pr2_world_state_reset: World):
     A pointing task ends once the gripper's pointing axis points at the goal point.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -652,10 +654,10 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
     head is, not just which way it faces, for the torso to help.
     """
     world = pr2_world_state_reset
-    base = world.get_kinematic_structure_entity_by_name("base_link")
-    head = world.get_kinematic_structure_entity_by_name("head_tilt_link")
-    torso = world.get_connection_by_name("torso_lift_joint")
-    head_tilt = world.get_connection_by_name("head_tilt_joint")
+    base = world.get_kinematic_structure_entity_by_name(name="base_link")
+    head = world.get_kinematic_structure_entity_by_name(name="head_tilt_link")
+    torso = world.get_connection_by_name(name="torso_lift_joint")
+    head_tilt = world.get_connection_by_name(name="head_tilt_joint")
     torso.position = torso.dof.limits.upper.position
     world.notify_state_change()
 
@@ -701,11 +703,11 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     pointing runs, and the joint moving the frame still reaches its own goal.
     """
     world = pr2_world_copy
-    base = world.get_kinematic_structure_entity_by_name("base_link")
-    head = world.get_kinematic_structure_entity_by_name("head_tilt_link")
+    base = world.get_kinematic_structure_entity_by_name(name="base_link")
+    head = world.get_kinematic_structure_entity_by_name(name="head_tilt_link")
     with world.modify_world():
         region = Body(name=PrefixedName(name="region"))
-        world.add_kinematic_structure_entity(region)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=region)
         region_joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.Y()
@@ -720,14 +722,16 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
                 lower_position=-1.0, upper_position=1.0, maximum_speed=0.5
             ),
         )
-        world.add_connection(region_joint)
+        world.add_connection(connection=region_joint)
 
     executor = StatechartExecutor(
         context=StatechartContext(world=world),
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    world_T_region = world.compose_forward_kinematics_expression(world.root, region)
+    world_T_region = world.compose_forward_kinematics_expression(
+        root=world.root, tip=region
+    )
     world_T_region.reference_frame = world.root
     pointing = Pointing(
         kinematic_chain=KinematicChain(root=base, tip=head),
@@ -735,7 +739,7 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
         pointing_axis=Vector3.X(reference_frame=head),
     )
     region_goal = JointPositionList(
-        goal_state=JointState.from_mapping({region_joint: 0.8})
+        goal_state=JointState.from_mapping(mapping={region_joint: 0.8})
     )
     statechart.add_node(node=(both := Parallel(nodes=[pointing, region_goal])))
     end = EndMotion()
@@ -760,9 +764,11 @@ def test_pointing_cone(pr2_world_state_reset: World):
     direction from the gripper to the goal.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -821,9 +827,11 @@ def test_align_planes(pr2_world_state_reset: World):
     reference normal.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -882,7 +890,9 @@ def _run_keep_held_body_upright(world: World) -> KeepHeldBodyUpright:
     statechart = Statechart(context=executor.context)
     keep_upright = KeepHeldBodyUpright(
         root_link=world.root,
-        end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+        end_effector=world.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        )[0],
     )
     statechart.add_node(node=keep_upright)
     end = EndMotion()
@@ -907,12 +917,14 @@ def test_keep_held_body_upright_turns_the_body_upright(pr2_world_state_reset: Wo
     A body tilted against the tool frame ends upright, not the tool frame itself.
     """
     world = pr2_world_state_reset
-    tool_frame = world.get_semantic_annotations_by_type(EndEffector)[0].tool_frame
+    tool_frame = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=EndEffector
+    )[0].tool_frame
     held_body = Body(name=PrefixedName(name="held_body"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(held_body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=held_body)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=tool_frame,
                 child=held_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -936,7 +948,9 @@ def test_keep_held_body_upright_holding_nothing_keeps_the_tool_frame_as_it_is(
     With no body below the tool frame, the direction up in it at the start stays up.
     """
     world = pr2_world_state_reset
-    tool_frame = world.get_semantic_annotations_by_type(EndEffector)[0].tool_frame
+    tool_frame = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=EndEffector
+    )[0].tool_frame
     up_in_tool_frame = tool_frame.global_pose.to_np()[:3, :3].T @ np.array(
         [0.0, 0.0, 1.0]
     )
@@ -970,9 +984,11 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     normal, within the task's threshold.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -1029,9 +1045,11 @@ def test_angle_goal(pr2_world_state_reset: World):
     interval [lower_angle, upper_angle].
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -1102,8 +1120,8 @@ class TestArticulateGraspedMechanism:
         motion_statechart.add_node(
             node=(
                 open_goal := ArticulateGraspedMechanism(
-                    environment_link=prismatic_bot2.get_body_by_name("robot"),
-                    tip_link=prismatic_bot2.get_body_by_name("robot2"),
+                    environment_link=prismatic_bot2.get_body_by_name(name="robot"),
+                    tip_link=prismatic_bot2.get_body_by_name(name="robot2"),
                     goal_position=0.0,
                 )
             )
@@ -1157,8 +1175,10 @@ class TestArticulateGraspedMechanism:
 
         root_C_hinge = door.movable_joint
 
-        r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
-        handle = pr2_world_copy.get_semantic_annotations_by_type(Handle)[0].root
+        r_tip = pr2_world_copy.get_body_by_name(name="r_gripper_tool_frame")
+        handle = pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=Handle
+        )[0].root
         open_goal = 1
         close_goal = -1
 
@@ -1251,7 +1271,7 @@ class TestArticulateGraspedMechanism:
                 name="handle", world=world, world_root_T_self=world_T_drawer
             )
             drawer.add(part=handle)
-        tip = world.get_body_by_name("r_gripper_tool_frame")
+        tip = world.get_body_by_name(name="r_gripper_tool_frame")
 
         executor = StatechartExecutor(
             context=StatechartContext(world=world),
@@ -1286,7 +1306,9 @@ class TestArticulateGraspedMechanism:
                 break
             if opening.life_cycle_state != LifeCycleValue.RUNNING:
                 continue
-            handle_P_tip = world.compute_forward_kinematics_np(handle.root, tip)[:3, 3]
+            handle_P_tip = world.compute_forward_kinematics_np(
+                root=handle.root, tip=tip
+            )[:3, 3]
             if handle_P_tip_when_grasped is None:
                 handle_P_tip_when_grasped = handle_P_tip
             largest_drift = max(
@@ -1338,10 +1360,10 @@ class TestArticulateGraspedMechanism:
 
         root_C_screw = bottle_cap.movable_joint
         cap_body = bottle_cap.root
-        r_tip = pr2_world_copy.get_body_by_name("r_gripper_tool_frame")
+        r_tip = pr2_world_copy.get_body_by_name(name="r_gripper_tool_frame")
 
         world_T_cap_before = pr2_world_copy.compute_forward_kinematics_np(
-            pr2_world_copy.root, cap_body
+            root=pr2_world_copy.root, tip=cap_body
         )
 
         executor = StatechartExecutor(
@@ -1382,7 +1404,7 @@ class TestArticulateGraspedMechanism:
         # One full turn must have moved the cap one screw pitch along the screw axis,
         # away from the bottle (towards the robot, -x).
         world_T_cap_unscrewed = pr2_world_copy.compute_forward_kinematics_np(
-            pr2_world_copy.root, cap_body
+            root=pr2_world_copy.root, tip=cap_body
         )
         cap_translation = world_T_cap_unscrewed[:3, 3] - world_T_cap_before[:3, 3]
         np.testing.assert_allclose(cap_translation, [-screw_pitch, 0.0, 0.0], atol=1e-3)
@@ -1418,7 +1440,7 @@ class TestArticulateGraspedMechanism:
 
         # The tightened cap must be back at its initial pose.
         world_T_cap_tightened = pr2_world_copy.compute_forward_kinematics_np(
-            pr2_world_copy.root, cap_body
+            root=pr2_world_copy.root, tip=cap_body
         )
         np.testing.assert_allclose(
             world_T_cap_tightened[:3, 3], world_T_cap_before[:3, 3], atol=1e-3
@@ -1441,7 +1463,7 @@ class TestArticulateGraspedMechanism:
         following the mechanism gives way to collision avoidance, holding the grasped
         part does not.
         """
-        grasped_part = prismatic_bot.get_body_by_name("robot")
+        grasped_part = prismatic_bot.get_body_by_name(name="robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
@@ -1463,7 +1485,7 @@ class TestArticulateGraspedMechanism:
         caller can let the mechanism yield to collision avoidance while the grasp keeps
         outranking it.
         """
-        grasped_part = prismatic_bot.get_body_by_name("robot")
+        grasped_part = prismatic_bot.get_body_by_name(name="robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
@@ -1488,12 +1510,12 @@ class TestArticulateGraspedMechanism:
         Holding on to the grasped part means touching it and what it is mounted on, so
         the end effector holding it is let off collision avoidance while the goal runs.
         """
-        end_effector = pr2_world_copy.get_semantic_annotations_by_type(PR2)[
-            0
-        ].right_arm.end_effector
+        end_effector = pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0].right_arm.end_effector
         goal = ArticulateGraspedMechanism(
             tip_link=end_effector.tool_frame,
-            environment_link=pr2_world_copy.get_body_by_name("torso_lift_link"),
+            environment_link=pr2_world_copy.get_body_by_name(name="torso_lift_link"),
             goal_position=0.0,
             holding_end_effector=end_effector,
         )
@@ -1520,7 +1542,7 @@ class TestArticulateGraspedMechanism:
         """
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
-            environment_link=prismatic_bot.get_body_by_name("robot"),
+            environment_link=prismatic_bot.get_body_by_name(name="robot"),
             goal_position=0.0,
         )
 
@@ -1540,9 +1562,9 @@ class TestArticulateGraspedMechanism:
         """
         A goal position within the joint limits is kept as it was given.
         """
-        grasped_part = prismatic_bot.get_body_by_name("robot")
+        grasped_part = prismatic_bot.get_body_by_name(name="robot")
         connection = grasped_part.get_first_parent_connection_of_type(
-            ActiveConnection1DOF
+            connection_type=ActiveConnection1DOF
         )
         limits = connection.dof.limits
         within_limits = (limits.lower.position + limits.upper.position) / 2
@@ -1561,7 +1583,7 @@ class TestArticulateGraspedMechanism:
         A commanded state the mechanism cannot reach is cut down to its upper limit,
         rather than left as a goal the solver can never observe as reached.
         """
-        grasped_part = prismatic_bot.get_body_by_name("robot")
+        grasped_part = prismatic_bot.get_body_by_name(name="robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,
@@ -1576,7 +1598,7 @@ class TestArticulateGraspedMechanism:
         """
         A goal position below the lower joint limit is clamped to that limit.
         """
-        grasped_part = prismatic_bot.get_body_by_name("robot")
+        grasped_part = prismatic_bot.get_body_by_name(name="robot")
         goal = ArticulateGraspedMechanism(
             tip_link=prismatic_bot.root,
             environment_link=grasped_part,

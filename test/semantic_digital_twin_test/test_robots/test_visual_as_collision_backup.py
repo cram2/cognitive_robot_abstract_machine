@@ -18,4 +18,4 @@ def test_a_robot_that_needs_it_gets_its_visual_geometry_as_collision(
         "front_cover_link",
         "rear_cover_link",
     ):
-        assert _garmi_world_setup.get_body_by_name(cover_name).has_collision()
+        assert _garmi_world_setup.get_body_by_name(name=cover_name).has_collision()

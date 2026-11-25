@@ -39,8 +39,10 @@ class FindParts(Step):
     Finds the parts of each annotation.
     """
 
-    def _apply(self, world: World) -> World:
-        for whole in world.get_semantic_annotations_by_type(self.whole_type):
+    def _apply(self, *, world: World) -> World:
+        for whole in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=self.whole_type
+        ):
             self.finder.find_parts(whole=whole)
         return world
 
@@ -62,7 +64,9 @@ class SplitPartFromShape(Step):
     Splits the part off each annotation's shape.
     """
 
-    def _apply(self, world: World) -> World:
-        for whole in world.get_semantic_annotations_by_type(self.whole_type):
+    def _apply(self, *, world: World) -> World:
+        for whole in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=self.whole_type
+        ):
             self.splitter.ensure_part(whole=whole)
         return world

@@ -21,7 +21,7 @@ def test_stretch_declares_both_wheels_as_controlled(stretch_world_copy) -> None:
     declares them next to the base drive.
     """
     for joint_name in (StretchJoint.RIGHT_WHEEL, StretchJoint.LEFT_WHEEL):
-        assert stretch_world_copy.get_connection_by_name(joint_name).is_controlled
+        assert stretch_world_copy.get_connection_by_name(name=joint_name).is_controlled
 
 
 # %% velocity interface
@@ -35,7 +35,7 @@ def test_velocity_controlled_joints_exist_in_the_world(stretch_world_copy):
     interface = StretchVelocityInterface()
 
     for joint_name in interface.velocity_controlled_joint_names():
-        connection = stretch_world_copy.get_connection_by_name(joint_name)
+        connection = stretch_world_copy.get_connection_by_name(name=joint_name)
         assert isinstance(connection, ActiveConnection1DOF)
 
 
@@ -61,9 +61,9 @@ def test_velocity_interface_sets_up_against_the_robot_description(
     giskard.setup()
 
     world = giskard.executor.context.world
-    assert world.get_connections_by_type(DifferentialDrive)
+    assert world.get_connections_by_type(connection_type=DifferentialDrive)
     for joint_name in StretchVelocityInterface().velocity_controlled_joint_names():
-        assert world.get_connection_by_name(joint_name) is not None
+        assert world.get_connection_by_name(name=joint_name) is not None
 
 
 def test_velocity_interface_reads_the_localization_relative_to_the_odometry_frame_of_its_mobile_base(

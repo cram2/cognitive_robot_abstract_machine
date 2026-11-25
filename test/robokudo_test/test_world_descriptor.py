@@ -39,10 +39,14 @@ def test_get_predefined_object_bodies():
         result_world_C_foobar2 = Connection6DoF.create_with_dofs(
             parent=root, child=foobar2_body, world=test_world
         )
-        test_world.add_connection(result_world_C_foobar1)
-        test_world.add_connection(result_world_C_foobar2)
-        test_world.add_semantic_annotation(PredefinedObject(body=foobar1_body))
-        test_world.add_semantic_annotation(PredefinedObject(body=foobar2_body))
+        test_world.add_connection(connection=result_world_C_foobar1)
+        test_world.add_connection(connection=result_world_C_foobar2)
+        test_world.add_semantic_annotation(
+            semantic_annotation=PredefinedObject(body=foobar1_body)
+        )
+        test_world.add_semantic_annotation(
+            semantic_annotation=PredefinedObject(body=foobar2_body)
+        )
 
     # Set origins in a separate modification block so FK is compiled first
     with test_world.modify_world():

@@ -41,7 +41,7 @@ class RvizRunner(DemoRunner):
 
     def run(self) -> None:
         world = self.scene.build_world()
-        [tracy] = world.get_semantic_annotations_by_type(Tracy)
+        [tracy] = world.get_semantic_annotations_by_type(semantic_annotation_type=Tracy)
 
         rclpy.init()
         node = rclpy.create_node(self.node_name)

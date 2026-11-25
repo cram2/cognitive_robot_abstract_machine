@@ -116,7 +116,7 @@ class LookAtAction(ParallelAction, HasLookTargetParameter, HasCameraParameter):
         """
         target_frame = self.look_target.reference_frame or self.world.root
         world_T_target_frame = self.world.compose_forward_kinematics_expression(
-            self.world.root, target_frame
+            root=self.world.root, tip=target_frame
         )
         world_T_target_frame.reference_frame = self.world.root
         world_T_target_frame.child_frame = target_frame
@@ -158,7 +158,9 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
         :return: :attr:`look_target` moved vertically to the height of the base, which can
             only turn about the vertical and so can only point level.
         """
-        root_P_target = self.world.transform(self.look_target, self.world.root).position
+        root_P_target = self.world.transform(
+            spatial_object=self.look_target, target_frame=self.world.root
+        ).position
         root_P_target.z = self.robot.root.global_pose.z
         return root_P_target
 
@@ -198,7 +200,9 @@ class PathPlanningNavigateAction(
         """
         floors_below = [
             floor
-            for floor in self.world.get_semantic_annotations_by_type(Floor)
+            for floor in self.world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Floor
+            )
             if self._stands_on(floor=floor)
         ]
         if not floors_below:
@@ -211,7 +215,7 @@ class PathPlanningNavigateAction(
         :return: The floor's bounding box in the world's root frame.
         """
         return floor.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=self.world.root)
+            origin=HomogeneousTransformationMatrix(reference_frame=self.world.root)
         ).bounding_box()
 
     def _stands_on(self, *, floor: Floor) -> bool:
@@ -268,7 +272,7 @@ class PathPlanningNavigateAction(
         base_pose = self.robot.root.global_pose
         free_space = self._floor.navigable_space(robot=self.robot, margin=0.0)
         return free_space.path_from_to(
-            Point2.from_pose(base_pose), self.planar_goal_pose.position
+            start=Point2.from_pose(base_pose), goal=self.planar_goal_pose.position
         )
 
 
@@ -331,7 +335,9 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
         """
         current_floor = [
             floor
-            for floor in self.world.get_semantic_annotations_by_type(Level)
+            for floor in self.world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Level
+            )
             if InsideOf(body=self.robot.bodies_with_collision[0], other=floor.root)()
             > 0.9
         ]
@@ -377,7 +383,7 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
         nodes.append(
             JointPositionReached(
                 connection=self.elevator.movable_joint,
-                position=self.elevator.drive_position_for_floor(target_floor),
+                position=self.elevator.drive_position_for_floor(floor=target_floor),
                 threshold=self.arrival_threshold,
                 name="ElevatorAtTargetFloor",
             )

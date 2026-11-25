@@ -86,7 +86,7 @@ def _pick_up_the_milk(
     :return: A pick-up of the milk, standing wherever its trial finds one that works.
     """
     robot = robot_of(extensions)
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     milk_pose = milk.root.global_pose
     return a(MoveAndPickUpAction)(
         navigate=a(NavigateAction)(
@@ -157,7 +157,7 @@ def _transport_of_the_milk(
         pick_up=_pick_up_the_milk(world, extensions),
         place=_place_at(
             Pose(reference_frame=world.root),
-            world.get_semantic_annotations_by_type(Milk)[0],
+            world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0],
             extensions,
         ),
     )
@@ -196,7 +196,7 @@ def test_a_transport_of_a_graspable_stands_around_the_object_then_the_target(
     and close to the target for the place.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     target = Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root)
 
     transport = TransportAction.from_graspable_by_closest_grasps(
@@ -225,7 +225,7 @@ def pick_and_place_of_the_milk(world: World, arm: Arm) -> PickAndPlaceAction:
     :param arm: The arm that picks the milk up and puts it down.
     :return: A pick-and-place of the milk that tries every grasp it offers.
     """
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     return PickAndPlaceAction(
         pick_up=a(PickUpAction)(
             grasp_candidate=variable(GraspCandidate, domain=milk.grasp_candidates()),
@@ -260,7 +260,9 @@ def test_move_and_pick_up_takes_the_grasp_it_was_given(pr2_apartment_context) ->
     rather than whichever grasp the object happens to list first.
     """
     world, robot, extensions = pr2_apartment_context
-    grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[-1]
+    grasp = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+        0
+    ].grasp_candidates()[-1]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
         standing_position=Pose2D(reference_frame=world.root),
         grasp=grasp,
@@ -288,7 +290,9 @@ def test_move_and_pick_up_approaches_with_the_clearances_it_was_given(
     approach_clearance, retreat_distance = 0.07, 0.13
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
         standing_position=Pose2D(reference_frame=world.root),
-        grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
+        grasp=world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+            0
+        ].grasp_candidates()[0],
         arm=robot.left_arm,
         approach_clearance=approach_clearance,
         retreat_distance=retreat_distance,
@@ -337,7 +341,9 @@ def _standing_in_front_of(grasp: GraspCandidate, world: World) -> Pose:
         direction `grasp` is approached along, so that it is approached straight from
         there.
     """
-    world_T_grasp = world.transform(grasp.grasp_pose, world.root).to_np()
+    world_T_grasp = world.transform(
+        spatial_object=grasp.grasp_pose, target_frame=world.root
+    ).to_np()
     world_P_standing = world_T_grasp[:3, 3] - STANDING_DISTANCE * world_T_grasp[:3, 0]
     return Pose.from_xyz_rpy(
         world_P_standing[0], world_P_standing[1], 0.0, reference_frame=world.root
@@ -439,9 +445,9 @@ def _assert_each_standing_pose_tries_its_grasps_closest_first(
     ):
         steps_from_one_pose = list(steps_from_one_pose)
         standing_position = steps_from_one_pose[0].navigate.planar_goal_pose
-        world_P_standing = world.transform(standing_position.pose, world.root).to_np()[
-            :, 3
-        ]
+        world_P_standing = world.transform(
+            spatial_object=standing_position.pose, target_frame=world.root
+        ).to_np()[:, 3]
         closeness = [
             GraspCloseness.from_grasp(
                 grasp=grasp_of(step),
@@ -461,7 +467,9 @@ def _closeness(grasp: GraspCandidate, standing_position: Pose) -> GraspCloseness
     return GraspCloseness.from_grasp(
         grasp=grasp,
         world_T_object=grasp.graspable.root.global_transform.to_np(),
-        world_P_standing=world.transform(standing_position, world.root).to_np()[:, 3],
+        world_P_standing=world.transform(
+            spatial_object=standing_position, target_frame=world.root
+        ).to_np()[:, 3],
     )
 
 
@@ -474,7 +482,7 @@ def test_grasps_ranked_from_the_robot_are_ranked_from_where_it_stands_when_ranke
     ranking follows the robot once it moved.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     ranking = GraspsByCloseness(
         graspable=milk, standing_position=Pose2D(reference_frame=robot.root)
     )
@@ -493,7 +501,7 @@ def test_grasps_ranked_without_a_number_are_all_kept(pr2_apartment_context):
     Ranking grasps without a number of grasps keeps every grasp the object offers.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     ranked = GraspsByCloseness(
         graspable=milk,
@@ -510,7 +518,9 @@ def test_a_grasp_approached_straight_from_the_standing_position_is_the_closest(
     pr2_apartment_context,
 ) -> None:
     world, robot, extensions = pr2_apartment_context
-    grasps = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()
+    grasps = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+        0
+    ].grasp_candidates()
     standing_position = _standing_in_front_of(grasps[0], world)
 
     assert _closeness(grasps[0], standing_position) == min(
@@ -522,7 +532,9 @@ def test_a_grasp_approached_from_the_far_side_is_farther_than_one_approached_hea
     pr2_apartment_context,
 ) -> None:
     world, robot, extensions = pr2_apartment_context
-    grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0]
+    grasp = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+        0
+    ].grasp_candidates()[0]
     standing_position = _standing_in_front_of(grasp, world)
 
     assert _closeness(_turned_around(grasp), standing_position) > _closeness(
@@ -538,7 +550,9 @@ def test_a_nearer_grasp_is_the_closest_however_it_is_approached(
     decides between grasps at the same distance.
     """
     world, robot, extensions = pr2_apartment_context
-    grasps = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()
+    grasps = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+        0
+    ].grasp_candidates()
     standing_position = _standing_in_front_of(grasps[0], world)
 
     assert _closeness(
@@ -553,10 +567,12 @@ def test_a_grasp_at_the_standing_position_itself_is_as_close_as_can_be(
     A grasp right where the robot stands has no direction it is approached from.
     """
     world, robot, extensions = pr2_apartment_context
-    grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0]
+    grasp = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+        0
+    ].grasp_candidates()[0]
 
     assert _closeness(
-        grasp, world.transform(grasp.grasp_pose, world.root)
+        grasp, world.transform(spatial_object=grasp.grasp_pose, target_frame=world.root)
     ) == GraspCloseness(horizontal_distance=0.0, approach_angle=0.0)
 
 
@@ -566,7 +582,9 @@ def test_a_grasp_higher_up_is_as_close_as_one_below_it(pr2_apartment_context) ->
     higher up, the direction they are approached along decides.
     """
     world, robot, extensions = pr2_apartment_context
-    grasp = world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0]
+    grasp = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+        0
+    ].grasp_candidates()[0]
     standing_position = _standing_in_front_of(grasp, world)
 
     assert _closeness(_raised(grasp, RAISED_BY), standing_position) < _closeness(
@@ -582,7 +600,7 @@ def test_a_pick_up_of_a_graspable_tries_each_standing_pose_with_its_closest_gras
     closest grasps.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
         graspable=milk, arm=robot.right_arm, context=context_of(extensions)
     )
@@ -608,7 +626,7 @@ def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     was asked for.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
         graspable=milk,
         arm=robot.right_arm,
@@ -636,7 +654,7 @@ def test_a_pick_up_of_a_graspable_tries_the_grasps_from_each_standing_pose_close
     A pick-up of a graspable tries the grasps from each standing pose closest first.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
         graspable=milk, arm=robot.right_arm, context=context_of(extensions)
     )
@@ -657,7 +675,7 @@ def test_a_transport_of_a_graspable_picks_it_up_by_the_closest_grasps(
     pr2_apartment_context,
 ) -> None:
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
         graspable=milk,
         goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
@@ -683,7 +701,7 @@ def test_a_transport_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     pr2_apartment_context,
 ) -> None:
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
         graspable=milk,
         goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
@@ -721,7 +739,7 @@ def _move_the_milk(world: World) -> Milk:
 
     :return: The milk.
     """
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     milk.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         *MOVED_MILK_POSITION, reference_frame=world.root
     )
@@ -734,7 +752,9 @@ def _assert_every_target_is_at(targets: list[Pose], body: Body, world: World) ->
     """
     for target in targets:
         np.testing.assert_allclose(
-            world.transform(target, world.root).position.to_np(),
+            world.transform(
+                spatial_object=target, target_frame=world.root
+            ).position.to_np(),
             body.global_pose.position.to_np(),
         )
 
@@ -747,7 +767,7 @@ def test_a_transport_of_a_graspable_faces_it_where_it_is_when_it_picks_it_up(
     it was when the plan was built.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
         graspable=milk,
         goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
@@ -775,7 +795,7 @@ def test_a_move_and_pick_up_faces_the_object_where_it_is_when_it_picks_it_up(
     A move-and-pick-up faces and looks at the object where it is when it picks it up.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
         standing_position=Pose2D(reference_frame=world.root),
         grasp=milk.grasp_candidates()[0],
@@ -814,14 +834,16 @@ def test_a_move_and_open_faces_the_handle_where_it_is_when_it_opens_the_containe
     container.
     """
     world, robot, extensions = pr2_apartment_context
-    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    handle = Handle(root=world.get_body_by_name(name=DRAWER_HANDLE))
     move_and_open = MoveAndOpenAction.from_standing_position(
         standing_position=Pose(reference_frame=world.root),
         grasp=handle.grasp_candidates()[0],
         arm=robot.left_arm,
     )
 
-    world.get_connection_by_name(f"{DRAWER}_joint").position = OPENED_DRAWER_POSITION
+    world.get_connection_by_name(
+        name=f"{DRAWER}_joint"
+    ).position = OPENED_DRAWER_POSITION
 
     facing = move_and_open.face_and_look_at
     _assert_every_target_is_at(
@@ -836,10 +858,12 @@ def _hold_the_milk(world: World, arm: Arm) -> None:
     """
     Put the milk in the gripper of `arm`, as a pick-up does.
     """
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     tool_frame = arm.end_effector.tool_frame
     with world.modify_world():
-        world.move_branch_with_fixed_connection(milk.root, tool_frame)
+        world.move_branch_with_fixed_connection(
+            branch_root=milk.root, new_parent=tool_frame
+        )
 
 
 def test_a_move_and_place_from_a_standing_position_places_with_the_given_arm(
@@ -853,7 +877,7 @@ def test_a_move_and_place_from_a_standing_position_places_with_the_given_arm(
     standing_position = Pose2D(reference_frame=world.root)
     target = Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root)
 
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     move_and_place = MoveAndPlaceAction.from_standing_position(
         standing_position=standing_position,
         graspable=milk,
@@ -878,7 +902,7 @@ def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
     and arm.
     """
     world, robot, extensions = pr2_apartment_context
-    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    handle = Handle(root=world.get_body_by_name(name=DRAWER_HANDLE))
     [grasp, *_] = handle.grasp_candidates()
     standing_position = Pose2D(reference_frame=world.root)
 
@@ -902,7 +926,7 @@ def test_an_opening_of_a_handle_is_grounded_by_every_grasp_the_handle_offers(
     given arm.
     """
     world, robot, extensions = pr2_apartment_context
-    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    handle = Handle(root=world.get_body_by_name(name=DRAWER_HANDLE))
 
     openings = list(
         EntityQueryLanguageGenerativeBackend().evaluate(
@@ -926,12 +950,14 @@ def test_an_opening_of_a_handle_first_tries_the_grasp_facing_the_robot(
     stands is tried first, wherever the robot moved before the opening is grounded.
     """
     world, robot, extensions = pr2_apartment_context
-    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    handle = Handle(root=world.get_body_by_name(name=DRAWER_HANDLE))
     opening = OpenAction.from_handle(handle=handle, arm=robot.left_arm)
     horizontally_approached = [
         grasp
         for grasp in handle.grasp_candidates()
-        if world.transform(grasp.grasp_pose, world.root).to_np()[2, 0]
+        if world.transform(
+            spatial_object=grasp.grasp_pose, target_frame=world.root
+        ).to_np()[2, 0]
         == pytest.approx(0, abs=1e-9)
     ]
     facing_grasp = horizontally_approached[facing_grasp_index]
@@ -957,7 +983,7 @@ def test_a_move_and_open_tries_the_grasps_from_each_standing_pose_closest_first(
     standing pose tries the grasp facing it first.
     """
     world, robot, extensions = pr2_apartment_context
-    handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
+    handle = Handle(root=world.get_body_by_name(name=DRAWER_HANDLE))
     step = MoveAndOpenAction.from_handle_by_closest_grasps(
         handle=handle, arm=robot.left_arm, context=context_of(extensions)
     )
@@ -1014,7 +1040,9 @@ def _placing_the_held_milk(
     _hold_the_milk(world, robot.left_arm)
     return MoveAndPlaceAction.from_standing_position(
         standing_position=_standing_pose(world),
-        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+        graspable=world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+            0
+        ],
         goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
         arm=robot.left_arm,
     )
@@ -1023,7 +1051,9 @@ def _placing_the_held_milk(
 MOVE_AND_ACT_STEPS = {
     "pick up": lambda world, extensions: MoveAndPickUpAction.from_standing_position(
         standing_position=_standing_pose(world),
-        grasp=world.get_semantic_annotations_by_type(Milk)[0].grasp_candidates()[0],
+        grasp=world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+            0
+        ].grasp_candidates()[0],
         arm=robot_of(extensions).left_arm,
     ),
     "place": _placing_the_held_milk,
@@ -1054,7 +1084,9 @@ def _assert_base_faces(robot: AbstractRobot, target: Point3):
     Assert that the robot's base front points horizontally at `target`.
     """
     world = robot._world
-    base_P_target = world.transform(target, robot.mobile_base.root).to_np()[:2]
+    base_P_target = world.transform(
+        spatial_object=target, target_frame=robot.mobile_base.root
+    ).to_np()[:2]
     np.testing.assert_allclose(
         base_P_target / np.linalg.norm(base_P_target),
         robot.mobile_base.forward_axis.to_np()[:2],
@@ -1094,7 +1126,7 @@ def test_facing_a_target_given_relative_to_a_body_turns_towards_that_body(
     Facing a target given relative to a body turns the base towards that body.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0].root
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0].root
     plan = Sequence(
         nodes=[
             NavigateAction(planar_goal_pose=_standing_pose(world)),
@@ -1128,7 +1160,9 @@ def test_facing_and_looking_at_a_target_turns_the_base_and_the_camera_towards_it
     run_plan(plan, extensions)
     _assert_base_faces(robot, target.position)
     camera = robot.get_default_camera()
-    camera_P_target = world.transform(target.position, camera.root).to_np()[:3]
+    camera_P_target = world.transform(
+        spatial_object=target.position, target_frame=camera.root
+    ).to_np()[:3]
     camera_V_forward = camera.viewing_direction.to_np()[:3]
     np.testing.assert_allclose(
         camera_P_target / np.linalg.norm(camera_P_target),

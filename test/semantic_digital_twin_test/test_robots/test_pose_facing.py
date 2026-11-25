@@ -85,7 +85,7 @@ def description_is_available(robot_type: type[AbstractRobot]) -> bool:
     stand in for the axis it declares.
     """
     try:
-        CompositePathResolver().resolve(robot_type.get_ros_file_path())
+        CompositePathResolver().resolve(uri=robot_type.get_ros_file_path())
     except (ParsingError, NotImplementedError):
         return False
     return True
@@ -146,8 +146,8 @@ def spawn(robot_type: type[AbstractRobot]) -> MobileBase:
     """
     The mobile base of ``robot_type``, alone in a world of its own.
     """
-    world = World.create_with_root_body("root")
-    robot = RobotSpecification(semantic_annotation_type=robot_type).spawn(world)
+    world = World.create_with_root_body(root_body_name="root")
+    robot = RobotSpecification(semantic_annotation_type=robot_type).spawn(world=world)
     return robot.mobile_base
 
 

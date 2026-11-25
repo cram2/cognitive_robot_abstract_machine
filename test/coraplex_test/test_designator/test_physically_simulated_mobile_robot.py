@@ -33,7 +33,7 @@ def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
     hsrb, simulation = simulated_hsrb
     world = hsrb._world
     goal = Pose.from_xyz_rpy(1.0, 0.5, 0.0, yaw=0.5, reference_frame=world.root)
-    raised = hsrb.mobile_base.torso.get_joint_state_by_type(TorsoState.HIGH)
+    raised = hsrb.mobile_base.torso.get_joint_state_by_type(state_type=TorsoState.HIGH)
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=hsrb.all_arms),
@@ -44,7 +44,7 @@ def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
 
     perform_in_physics(plan, robot_extensions(hsrb), simulation)
 
-    world_T_base = world.compute_forward_kinematics_np(world.root, hsrb.root)
+    world_T_base = world.compute_forward_kinematics_np(root=world.root, tip=hsrb.root)
     simulated_torso_lift = {
         connection.name.name: simulation.simulator.get_joint_value(
             connection.name.name

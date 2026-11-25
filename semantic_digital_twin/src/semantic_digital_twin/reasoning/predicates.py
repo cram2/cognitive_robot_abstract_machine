@@ -90,7 +90,7 @@ class InContactWith(Triple[TBody, TBody]):
         """
         detector = self.body1._world.collision_manager.collision_detector
         result = detector.check_collision_between_bodies(
-            self.body1, self.body2, distance=self.maximum_distance
+            body_a=self.body1, body_b=self.body2, distance=self.maximum_distance
         )
         if result is None:
             return None
@@ -234,7 +234,9 @@ class SupportedBy(Triple[TBody, TBody]):
 
         collision_detector = self.supported._world.collision_manager.collision_detector
         touch = collision_detector.check_collision_between_bodies(
-            self.supported, self.supporting, distance=self.contact_tolerance
+            body_a=self.supported,
+            body_b=self.supporting,
+            distance=self.contact_tolerance,
         )
         if touch is None or touch.distance >= self.contact_tolerance:
             return False
@@ -449,7 +451,7 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     """
     spatial_relation_result: bool = False
 
-    def _signed_distance_along_direction(self, index: int) -> float:
+    def _signed_distance_along_direction(self, *, index: int) -> float:
         """
         Calculate the spatial relation between self.point and self.other with respect to
         a given reference point (self.point_of_semantic_annotation) and a specified axis
@@ -484,7 +486,9 @@ class LeftOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(1) > 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=1) > 0.0
+        )
         return self.spatial_relation_result
 
 
@@ -496,7 +500,9 @@ class RightOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(1) < 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=1) < 0.0
+        )
         return self.spatial_relation_result
 
 
@@ -508,7 +514,9 @@ class Above(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(2) > 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=2) > 0.0
+        )
         return self.spatial_relation_result
 
 
@@ -520,7 +528,9 @@ class Below(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(2) < 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=2) < 0.0
+        )
         return self.spatial_relation_result
 
 
@@ -532,7 +542,9 @@ class Behind(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(0) < 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=0) < 0.0
+        )
         return self.spatial_relation_result
 
 
@@ -544,7 +556,7 @@ class InFrontOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.result = self._signed_distance_along_direction(0) > 0.0
+        self.result = self._signed_distance_along_direction(index=0) > 0.0
         return self.result
 
 
@@ -691,7 +703,9 @@ class PlaceIsOccupied(Predicate):
         region_box_shape = self.box.as_shape()  # returns a Box centered at the region
         region_mesh = region_box_shape.mesh.copy()
         region_mesh.apply_transform(
-            self.world.transform(self.pose, self.world.root).to_np()
+            self.world.transform(
+                spatial_object=self.pose, target_frame=self.world.root
+            ).to_np()
         )
 
         # Prepare collision manager with the region mesh

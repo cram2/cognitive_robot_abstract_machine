@@ -86,7 +86,7 @@ class ForwardKinematicsBinding(HasKinematicChainParameter):
         :param world: The world used for computing where `root` is now.
         """
         new_root_T_root = world.compute_forward_kinematics_np(
-            root, self.kinematic_chain.root
+            root=root, tip=self.kinematic_chain.root
         )
         self.kinematic_chain = replace(self.kinematic_chain, root=root)
         self.root_T_tip.reference_frame = root
@@ -112,7 +112,7 @@ class ForwardKinematicsBinding(HasKinematicChainParameter):
         """
         self._set_root_T_tip(
             root_T_tip=world.compute_forward_kinematics_np(
-                self.kinematic_chain.root, self.kinematic_chain.tip
+                root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
             )
         )
 

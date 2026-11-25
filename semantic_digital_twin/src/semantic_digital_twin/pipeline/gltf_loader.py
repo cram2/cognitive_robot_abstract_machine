@@ -81,7 +81,7 @@ class GLTFLoader(Step):
         return root_children[0]
 
     def _get_relative_transform(
-        self, parent_node: str, child_node: str
+        self, *, parent_node: str, child_node: str
     ) -> HomogeneousTransformationMatrix:
         """
         Determine the transformation from a parent node to its child.
@@ -95,7 +95,7 @@ class GLTFLoader(Step):
 
         return HomogeneousTransformationMatrix(parent_T_child)
 
-    def _trimesh_to_body(self, mesh: trimesh.Trimesh, name: str) -> Body:
+    def _trimesh_to_body(self, *, mesh: trimesh.Trimesh, name: str) -> Body:
         """
         Create a Body representation from a trimesh object.
         """
@@ -118,7 +118,7 @@ class GLTFLoader(Step):
 
         return body
 
-    def _extract_base_name(self, node_name: str) -> str:
+    def _extract_base_name(self, *, node_name: str) -> str:
         """
         Determine the base name of a node by removing suffixes.
         """
@@ -126,7 +126,7 @@ class GLTFLoader(Step):
         return match.group(1) if match else node_name
 
     def _collect_matching_children(
-        self, node: str, base_name: str, object_nodes: set[str]
+        self, *, node: str, base_name: str, object_nodes: set[str]
     ) -> tuple[set[str], set[str]]:
         """
         Find child nodes sharing the same base name.
@@ -136,17 +136,17 @@ class GLTFLoader(Step):
         for child in self.scene.graph.transforms.children.get(node, []):
             if child in object_nodes:
                 continue
-            if self._extract_base_name(child) == base_name:
+            if self._extract_base_name(node_name=child) == base_name:
                 matching.add(child)
             else:
                 non_matching.add(child)
         return matching, non_matching
 
-    def _grouping_similar_meshes(self, base_node: str) -> tuple[set[str], set[str]]:
+    def _grouping_similar_meshes(self, *, base_node: str) -> tuple[set[str], set[str]]:
         """
         Identify related mesh nodes based on their naming patterns.
         """
-        base_name = self._extract_base_name(base_node)
+        base_name = self._extract_base_name(node_name=base_node)
         object_nodes = {base_node}
         new_object_nodes = set()
         to_search = [base_node]
@@ -156,7 +156,7 @@ class GLTFLoader(Step):
                 break
             node = to_search.pop()
             matching, non_matching = self._collect_matching_children(
-                node, base_name, object_nodes
+                node=node, base_name=base_name, object_nodes=object_nodes
             )
             object_nodes.update(matching)
             to_search.extend(matching)
@@ -170,7 +170,7 @@ class GLTFLoader(Step):
 
         return object_nodes, new_object_nodes
 
-    def _fusion_meshes(self, object_nodes: set[str]) -> trimesh.Trimesh:
+    def _fusion_meshes(self, *, object_nodes: set[str]) -> trimesh.Trimesh:
         """
         Combine several geometry nodes into one unified mesh.
         """
@@ -191,6 +191,7 @@ class GLTFLoader(Step):
 
     def _add_child_connection(
         self,
+        *,
         world: World,
         parent_node: str,
         child_node: str,
@@ -203,18 +204,21 @@ class GLTFLoader(Step):
             return
         parent_body = world_elements[parent_node]
         child_body = world_elements[child_node]
-        world.add_kinematic_structure_entity(child_body)
-        relative_transform = self._get_relative_transform(parent_node, child_node)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=child_body)
+        relative_transform = self._get_relative_transform(
+            parent_node=parent_node, child_node=child_node
+        )
         conn = FixedConnection(
             parent=parent_body,
             child=child_body,
             parent_T_connection_expression=relative_transform,
             name=PrefixedName(name=f"{parent_node}_{child_node}"),
         )
-        world.add_connection(conn)
+        world.add_connection(connection=conn)
 
     def _build_world_from_elements(
         self,
+        *,
         world_elements: dict[str, Body],
         connection: dict[str, list[str]],
         world: World,
@@ -229,7 +233,9 @@ class GLTFLoader(Step):
             raise RootNodeNotFoundError(candidates=list(world_elements.keys()))
 
         object_root_body = world_elements[object_root]
-        world.add_kinematic_structure_entity(object_root_body)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=object_root_body
+        )
 
         # Connect root to world root if exists
         if world.root is not None and world.root != object_root_body:
@@ -242,7 +248,7 @@ class GLTFLoader(Step):
                 ),
                 name=PrefixedName(name=f"object_root_{object_root}"),
             )
-            world.add_connection(conn)
+            world.add_connection(connection=conn)
 
         # Add all child connections via BFS
         to_add_nodes = [object_root]
@@ -250,24 +256,29 @@ class GLTFLoader(Step):
             node = to_add_nodes.pop()
             for child in connection.get(node, []):
                 to_add_nodes.append(child)
-                self._add_child_connection(world, node, child, world_elements)
+                self._add_child_connection(
+                    world=world,
+                    parent_node=node,
+                    child_node=child,
+                    world_elements=world_elements,
+                )
 
         return world
 
-    def _create_empty_body(self, name: str) -> Body:
+    def _create_empty_body(self, *, name: str) -> Body:
         """
         Generate a body instance without any geometry.
         """
         return Body(name=PrefixedName(name=name))
 
     def _process_node(
-        self, node: str, body_parent: str, visited_nodes: set[str]
+        self, *, node: str, body_parent: str, visited_nodes: set[str]
     ) -> tuple[NodeProcessingResult | None, set[tuple[str, str]]]:
         """
         Analyze a scene node and convert it to a body if it contains geometry.
         """
-        object_nodes, remaining_children = self._grouping_similar_meshes(node)
-        mesh = self._fusion_meshes(object_nodes)
+        object_nodes, remaining_children = self._grouping_similar_meshes(base_node=node)
+        mesh = self._fusion_meshes(object_nodes=object_nodes)
 
         children_raw = self.scene.graph.transforms.children.get(node, [])
         non_matching = {
@@ -275,8 +286,8 @@ class GLTFLoader(Step):
         }
 
         if len(mesh.vertices) > 0:
-            base_name = self._extract_base_name(node)
-            body = self._trimesh_to_body(mesh, base_name)
+            base_name = self._extract_base_name(node_name=node)
+            body = self._trimesh_to_body(mesh=mesh, name=base_name)
             result = NodeProcessingResult(
                 body=body,
                 visited_nodes=object_nodes,
@@ -294,23 +305,26 @@ class GLTFLoader(Step):
         return None, children_to_visit
 
     def _process_root_node(
-        self, root: str
+        self, *, root: str
     ) -> tuple[Body, set[str], set[tuple[str, str]]]:
         """
         Initial processing of the scene's root node.
         """
-        result, children_to_visit = self._process_node(root, root, set())
+        result, children_to_visit = self._process_node(
+            node=root, body_parent=root, visited_nodes=set()
+        )
 
         if result is not None and len(result.body.visual.shapes) > 0:
             return result.body, result.visited_nodes, children_to_visit
 
         # Root has no geometry - create empty body
-        body = self._create_empty_body(root)
+        body = self._create_empty_body(name=root)
         children_raw = self.scene.graph.transforms.children.get(root, [])
         return body, {root}, {(child, root) for child in children_raw}
 
     def _add_body_to_world_elements(
         self,
+        *,
         world_elements: dict[str, Body],
         base_name_to_node: dict[str, str],
         node: str,
@@ -338,7 +352,7 @@ class GLTFLoader(Step):
             base_name_to_node[base_name] = node
             world_elements[node] = body
 
-    def _create_world_objects(self, world: World) -> World:
+    def _create_world_objects(self, *, world: World) -> World:
         """
         Traverse the scene graph and populate the world with objects.
         """
@@ -349,7 +363,7 @@ class GLTFLoader(Step):
         visited_nodes: set[str] = set()
 
         # Process root
-        root_body, root_visited, to_visit_new_node = self._process_root_node(root)
+        root_body, root_visited, to_visit_new_node = self._process_root_node(root=root)
         world_elements[root] = root_body
         base_name_to_node[str(root_body.name)] = root
         visited_nodes = visited_nodes.union(root_visited)
@@ -361,13 +375,16 @@ class GLTFLoader(Step):
                 continue
 
             result, children_to_visit = self._process_node(
-                node, body_parent, visited_nodes
+                node=node, body_parent=body_parent, visited_nodes=visited_nodes
             )
 
             if result is not None:
                 # Node created a body
                 self._add_body_to_world_elements(
-                    world_elements, base_name_to_node, node, result.body
+                    world_elements=world_elements,
+                    base_name_to_node=base_name_to_node,
+                    node=node,
+                    body=result.body,
                 )
                 visited_nodes.update(result.visited_nodes | {node})
                 connection.setdefault(body_parent, []).append(node)
@@ -378,9 +395,11 @@ class GLTFLoader(Step):
                 visited_nodes.add(node)
                 to_visit_new_node.update(children_to_visit)
 
-        return self._build_world_from_elements(world_elements, connection, world)
+        return self._build_world_from_elements(
+            world_elements=world_elements, connection=connection, world=world
+        )
 
-    def _apply(self, world: World) -> World:
+    def _apply(self, *, world: World) -> World:
         """
         Execute the loading process from file to world.
 
@@ -401,7 +420,9 @@ class GLTFLoader(Step):
 
         if len(self.scene.geometry) == 0:
             root = self._get_root_node()
-            world.add_kinematic_structure_entity(self._create_empty_body(root))
+            world.add_kinematic_structure_entity(
+                kinematic_structure_entity=self._create_empty_body(name=root)
+            )
             return world
 
-        return self._create_world_objects(world)
+        return self._create_world_objects(world=world)

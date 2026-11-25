@@ -62,22 +62,24 @@ def simulated_world() -> World:
     world = World()
     root = Body(name=PrefixedName(name="root"))
     arm = Body(name=PrefixedName(name="arm"))
-    arm.add_simulator_property(GravityCompensation(fraction=0.5))
+    arm.add_simulator_property(simulator_property=GravityCompensation(fraction=0.5))
     with world.modify_world():
-        world.add_simulator_property(MujocoTendon(name="coupling"))
+        world.add_simulator_property(simulator_property=MujocoTendon(name="coupling"))
         hinge = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=root,
             child=arm,
         )
-        hinge.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
-        world.add_connection(hinge)
+        hinge.add_simulator_property(
+            simulator_property=MujocoJoint(stiffness=[1.0, 2.0, 3.0])
+        )
+        world.add_connection(connection=hinge)
         tendon = DegreeOfFreedom(name=PrefixedName(name="tendon"))
-        world.add_degree_of_freedom(tendon)
+        world.add_degree_of_freedom(dof=tendon)
         actuator = Actuator(name=PrefixedName(name="grip"))
-        actuator.add_dof(tendon)
-        world.add_actuator(actuator)
+        actuator.add_dof(dof=tendon)
+        world.add_actuator(actuator=actuator)
     return world
 
 
@@ -96,7 +98,7 @@ def test_copy_keeps_degree_of_freedom_only_an_actuator_drives(
     copied = deepcopy(simulated_world)
 
     [actuator] = copied.actuators
-    assert actuator.dofs == [copied.get_degree_of_freedom_by_name("tendon")]
+    assert actuator.dofs == [copied.get_degree_of_freedom_by_name(name="tendon")]
 
 
 def test_merge_keeps_degree_of_freedom_only_an_actuator_drives(
@@ -104,12 +106,14 @@ def test_merge_keeps_degree_of_freedom_only_an_actuator_drives(
 ):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
-    world.merge_world(simulated_world)
+    world.merge_world(other=simulated_world)
 
     [actuator] = world.actuators
-    assert actuator.dofs == [world.get_degree_of_freedom_by_name("tendon")]
+    assert actuator.dofs == [world.get_degree_of_freedom_by_name(name="tendon")]
 
 
 def test_removing_a_branch_removes_the_actuators_of_its_joints(
@@ -117,12 +121,12 @@ def test_removing_a_branch_removes_the_actuators_of_its_joints(
 ):
     hinge = simulated_world.connections[0]
     joint_actuator = Actuator(name=PrefixedName(name="arm_motor"))
-    joint_actuator.add_dof(hinge.dof)
+    joint_actuator.add_dof(dof=hinge.dof)
     with simulated_world.modify_world():
-        simulated_world.add_actuator(joint_actuator)
+        simulated_world.add_actuator(actuator=joint_actuator)
 
     with simulated_world.modify_world():
-        simulated_world.remove_branch_from_world(hinge.child)
+        simulated_world.remove_branch_from_world(root=hinge.child)
 
     assert (
         [actuator.name.name for actuator in simulated_world.actuators],
@@ -138,11 +142,11 @@ def test_copy_keeps_properties_of_world_body_and_connection(simulated_world: Wor
 
     assert (
         copied.simulator_additional_properties,
-        copied.get_body_by_name("arm").simulator_additional_properties,
+        copied.get_body_by_name(name="arm").simulator_additional_properties,
         copied.connections[0].simulator_additional_properties,
     ) == (
         simulated_world.simulator_additional_properties,
-        simulated_world.get_body_by_name("arm").simulator_additional_properties,
+        simulated_world.get_body_by_name(name="arm").simulator_additional_properties,
         simulated_world.connections[0].simulator_additional_properties,
     )
 
@@ -154,33 +158,43 @@ def test_merge_keeps_properties_of_world_body_and_connection(simulated_world: Wo
     hinge_name = simulated_world.connections[0].name
     expected = (
         list(simulated_world.simulator_additional_properties),
-        list(simulated_world.get_body_by_name("arm").simulator_additional_properties),
+        list(
+            simulated_world.get_body_by_name(name="arm").simulator_additional_properties
+        ),
         list(simulated_world.connections[0].simulator_additional_properties),
     )
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
-    world.merge_world(simulated_world)
+    world.merge_world(other=simulated_world)
 
     assert (
         world.simulator_additional_properties,
-        world.get_body_by_name("arm").simulator_additional_properties,
-        world.get_connection_by_name(hinge_name).simulator_additional_properties,
+        world.get_body_by_name(name="arm").simulator_additional_properties,
+        world.get_connection_by_name(name=hinge_name).simulator_additional_properties,
     ) == expected
 
 
 def test_merge_with_unique_property_in_both_worlds_raises(simulated_world: World):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     with world.modify_world():
-        world.add_simulator_property(GravityCompensation(fraction=1.0))
+        world.add_simulator_property(
+            simulator_property=GravityCompensation(fraction=1.0)
+        )
     with simulated_world.modify_world():
-        simulated_world.add_simulator_property(GravityCompensation(fraction=0.5))
+        simulated_world.add_simulator_property(
+            simulator_property=GravityCompensation(fraction=0.5)
+        )
 
     with pytest.raises(DuplicateSimulatorPropertyError):
-        world.merge_world(simulated_world)
+        world.merge_world(other=simulated_world)
 
 
 def test_failed_merge_leaves_receiving_world_properties_unchanged(
@@ -188,15 +202,21 @@ def test_failed_merge_leaves_receiving_world_properties_unchanged(
 ):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     with world.modify_world():
-        world.add_simulator_property(GravityCompensation(fraction=1.0))
+        world.add_simulator_property(
+            simulator_property=GravityCompensation(fraction=1.0)
+        )
     with simulated_world.modify_world():
-        simulated_world.add_simulator_property(GravityCompensation(fraction=0.5))
+        simulated_world.add_simulator_property(
+            simulator_property=GravityCompensation(fraction=0.5)
+        )
     properties = list(world.simulator_additional_properties)
 
     with pytest.raises(DuplicateSimulatorPropertyError):
-        world.merge_world(simulated_world)
+        world.merge_world(other=simulated_world)
 
     assert world.simulator_additional_properties == properties
 
@@ -204,15 +224,21 @@ def test_failed_merge_leaves_receiving_world_properties_unchanged(
 def test_failed_merge_leaves_merged_world_unchanged(simulated_world: World):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     with world.modify_world():
-        world.add_simulator_property(GravityCompensation(fraction=1.0))
+        world.add_simulator_property(
+            simulator_property=GravityCompensation(fraction=1.0)
+        )
     with simulated_world.modify_world():
-        simulated_world.add_simulator_property(GravityCompensation(fraction=0.5))
+        simulated_world.add_simulator_property(
+            simulator_property=GravityCompensation(fraction=0.5)
+        )
     bodies = list(simulated_world.bodies)
 
     with pytest.raises(DuplicateSimulatorPropertyError):
-        world.merge_world(simulated_world)
+        world.merge_world(other=simulated_world)
 
     assert simulated_world.bodies == bodies
 
@@ -223,9 +249,11 @@ def test_failed_merge_leaves_merged_world_unchanged(simulated_world: World):
 def test_merge_records_moving_the_world_properties(simulated_world: World):
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
-    world.merge_world(simulated_world)
+    world.merge_world(other=simulated_world)
 
     last_block = world.get_world_model_manager().model_modification_blocks[-1]
     assert [
@@ -242,7 +270,9 @@ def test_world_property_addition_survives_json(simulated_world: World):
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     sent = AddWorldSimulatorPropertyModification(
         simulator_property=MujocoTendon(name="coupling")
     )
@@ -257,9 +287,11 @@ def test_world_property_addition_survives_json(simulated_world: World):
 def test_rollback_of_world_property_addition_removes_it(simulated_world: World):
     version = simulated_world.get_world_model_manager().version
     with simulated_world.modify_world():
-        simulated_world.add_simulator_property(MujocoTendon(name="second"))
+        simulated_world.add_simulator_property(
+            simulator_property=MujocoTendon(name="second")
+        )
 
-    simulated_world.rollback_to_version(version)
+    simulated_world.rollback_to_version(version=version)
 
     assert simulated_world.simulator_additional_properties == [
         MujocoTendon(name="coupling")
@@ -272,9 +304,9 @@ def test_rollback_of_world_property_addition_removes_it(simulated_world: World):
 @pytest.mark.parametrize(
     "entity_of",
     [
-        lambda world: world.get_body_by_name("arm"),
+        lambda world: world.get_body_by_name(name="arm"),
         lambda world: world.connections[0],
-        lambda world: world.get_degree_of_freedom_by_name("tendon"),
+        lambda world: world.get_degree_of_freedom_by_name(name="tendon"),
         lambda world: world.actuators[0],
     ],
     ids=["body", "connection", "degree_of_freedom", "actuator"],
@@ -284,7 +316,7 @@ def test_entity_is_found_by_its_id(
 ):
     entity = entity_of(simulated_world)
 
-    assert simulated_world.find_world_entity_with_id(entity.id) is entity
+    assert simulated_world.find_world_entity_with_id(entity_id=entity.id) is entity
 
 
 # %% every field of every copied entity
@@ -350,7 +382,7 @@ def test_copy_keeps_every_field_of_every_entity(
     copied = deepcopy(world)
 
     assert [
-        comparable_fields(copied.get_world_entity_with_id_by_id(entity.id))
+        comparable_fields(copied.get_world_entity_with_id_by_id(id=entity.id))
         for entity in world_entities(world)
     ] == [comparable_fields(entity) for entity in world_entities(world)]
 
@@ -407,8 +439,10 @@ def test_copy_keeps_connection_properties(
             Body(name=PrefixedName(name="parent")),
             Body(name=PrefixedName(name="child")),
         )
-        connection.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
-        world.add_connection(connection)
+        connection.add_simulator_property(
+            simulator_property=MujocoJoint(stiffness=[1.0, 2.0, 3.0])
+        )
+        world.add_connection(connection=connection)
 
     copied = deepcopy(world)
 
@@ -430,18 +464,23 @@ def test_copy_keeps_connection_properties(
     ids=["piecewise constant curvature", "cosserat rod"],
 )
 def test_copy_keeps_soft_connection_properties(
-    build_trunk: Callable[[World, list[SoftTrunkSection]], SoftTrunk],
+    build_trunk: Callable[..., SoftTrunk],
     connection_type: type[Connection],
 ):
     world = World()
-    build_trunk(world, [SoftTrunkSection(length=0.3, radius=0.02, resolution=2)])
-    segment = world.get_connections_by_type(connection_type)[0]
-    segment.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
+    build_trunk(
+        world=world,
+        sections=[SoftTrunkSection(length=0.3, radius=0.02, resolution=2)],
+    )
+    segment = world.get_connections_by_type(connection_type=connection_type)[0]
+    segment.add_simulator_property(
+        simulator_property=MujocoJoint(stiffness=[1.0, 2.0, 3.0])
+    )
 
     copied = deepcopy(world)
 
     assert (
-        copied.get_connection_by_name(segment.name).simulator_additional_properties
+        copied.get_connection_by_name(name=segment.name).simulator_additional_properties
         == segment.simulator_additional_properties
     )
 
@@ -453,7 +492,8 @@ def test_connection_with_new_parent_has_its_own_properties(simulated_world: Worl
     hinge = simulated_world.connections[0]
 
     moved = hinge.copy_with_new_parent(
-        Body(name=PrefixedName(name="new_parent")), HomogeneousTransformationMatrix()
+        new_parent=Body(name=PrefixedName(name="new_parent")),
+        parent_T_connection_expression=HomogeneousTransformationMatrix(),
     )
 
     assert (
@@ -466,7 +506,9 @@ def test_connection_with_new_parent_has_its_own_properties(simulated_world: Worl
 def test_connection_with_new_child_has_its_own_properties(simulated_world: World):
     hinge = simulated_world.connections[0]
 
-    moved = hinge.copy_with_new_child(Body(name=PrefixedName(name="new_child")))
+    moved = hinge.copy_with_new_child(
+        new_child=Body(name=PrefixedName(name="new_child"))
+    )
 
     assert (
         moved.simulator_additional_properties == hinge.simulator_additional_properties

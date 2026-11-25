@@ -40,9 +40,9 @@ class PipelineTestCase(unittest.TestCase):
             parent_T_connection_expression=HomogeneousTransformationMatrix(),
         )
         with cls.dummy_world.modify_world():
-            cls.dummy_world.add_body(b1)
-            cls.dummy_world.add_body(b2)
-            cls.dummy_world.add_connection(c1)
+            cls.dummy_world.add_body(body=b1)
+            cls.dummy_world.add_body(body=b2)
+            cls.dummy_world.add_connection(connection=c1)
 
         cls.fbx_path = os.path.join(
             Path(files("semantic_digital_twin")).parent.parent,
@@ -59,7 +59,7 @@ class PipelineTestCase(unittest.TestCase):
 
             def _apply(self, world: World) -> World:
                 b1 = Body(name=self.body_name)
-                world.add_body(b1)
+                world.add_body(body=b1)
                 return world
 
         pipeline = Pipeline(
@@ -68,7 +68,7 @@ class PipelineTestCase(unittest.TestCase):
 
         dummy_world = World()
 
-        dummy_world = pipeline.apply(dummy_world)
+        dummy_world = pipeline.apply(world=dummy_world)
 
         self.assertEqual(len(dummy_world.bodies), 1)
         self.assertEqual(
@@ -87,7 +87,7 @@ class PipelineTestCase(unittest.TestCase):
             ]
         )
 
-        filtered_world = pipeline.apply(self.dummy_world)
+        filtered_world = pipeline.apply(world=self.dummy_world)
         self.assertEqual(len(filtered_world.bodies), 1)
         self.assertEqual(
             filtered_world.root.name, PrefixedName(name="body1", prefix="krrood_test")
@@ -98,7 +98,7 @@ class PipelineTestCase(unittest.TestCase):
 
         original_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=world.root)
+                origin=HomogeneousTransformationMatrix(reference_frame=world.root)
             ).bounding_boxes[0]
             for body in world.bodies_with_collision
         ]
@@ -111,7 +111,7 @@ class PipelineTestCase(unittest.TestCase):
 
         pipeline = Pipeline(steps=[CenterLocalGeometryAndPreserveWorldPose()])
 
-        centered_world = pipeline.apply(world)
+        centered_world = pipeline.apply(world=world)
 
         centered_global_poses = [
             body.global_transform.to_np()
@@ -122,7 +122,9 @@ class PipelineTestCase(unittest.TestCase):
 
         new_bounding_boxes = [
             body.collision.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=centered_world.root)
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=centered_world.root
+                )
             ).bounding_boxes[0]
             for body in centered_world.bodies_with_collision
         ]
@@ -133,8 +135,8 @@ class PipelineTestCase(unittest.TestCase):
         dresser_pattern = re.compile(r"^.*dresser_(?!drawer\b).*$", re.IGNORECASE)
         world = FBXParser(file_path=self.fbx_path).create_world()
 
-        self.assertIsNotNone(world.get_body_by_name("dresser_205"))
-        self.assertIsNotNone(world.get_body_by_name("dresser_217"))
+        self.assertIsNotNone(world.get_body_by_name(name="dresser_205"))
+        self.assertIsNotNone(world.get_body_by_name(name="dresser_217"))
         self.assertFalse(world.semantic_annotations)
 
         procthor_replace_pipeline = Pipeline(
@@ -152,23 +154,23 @@ class PipelineTestCase(unittest.TestCase):
             ]
         )
 
-        replaced_world = procthor_replace_pipeline.apply(world)
+        replaced_world = procthor_replace_pipeline.apply(world=world)
 
-        self.assertIsNotNone(replaced_world.get_body_by_name("dresser_205"))
-        self.assertIsNotNone(replaced_world.get_body_by_name("dresser_217"))
+        self.assertIsNotNone(replaced_world.get_body_by_name(name="dresser_205"))
+        self.assertIsNotNone(replaced_world.get_body_by_name(name="dresser_217"))
 
         self.assertTrue(replaced_world.semantic_annotations)
         self.assertIsNotNone(
-            replaced_world.get_semantic_annotation_by_name("dresser_205")
+            replaced_world.get_semantic_annotation_by_name(name="dresser_205")
         )
         self.assertIsNotNone(
-            replaced_world.get_semantic_annotation_by_name("dresser_217")
+            replaced_world.get_semantic_annotation_by_name(name="dresser_217")
         )
 
     def test_dresser_from_body(self):
         world = FBXParser(file_path=self.fbx_path).create_world()
 
-        self.assertIsNotNone(dresser := world.get_body_by_name("dresser_205"))
+        self.assertIsNotNone(dresser := world.get_body_by_name(name="dresser_205"))
 
         dresser = dresser_from_body_in_world(dresser, world)
 
@@ -177,7 +179,9 @@ class PipelineTestCase(unittest.TestCase):
     def test_drawer_from_body(self):
         world = FBXParser(file_path=self.fbx_path).create_world()
 
-        self.assertIsNotNone(drawer := world.get_body_by_name("dresser_drawer_205_1"))
+        self.assertIsNotNone(
+            drawer := world.get_body_by_name(name="dresser_drawer_205_1")
+        )
 
         drawer = drawer_from_body_in_world(drawer, world)
 
@@ -186,7 +190,7 @@ class PipelineTestCase(unittest.TestCase):
     def test_door_from_body(self):
         world = FBXParser(file_path=self.fbx_path).create_world()
 
-        self.assertIsNotNone(door := world.get_body_by_name("dresser_door_217_1"))
+        self.assertIsNotNone(door := world.get_body_by_name(name="dresser_door_217_1"))
 
         door = door_from_body_in_world(door, world)
 

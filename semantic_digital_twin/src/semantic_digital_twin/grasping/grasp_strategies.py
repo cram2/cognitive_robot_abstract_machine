@@ -40,6 +40,7 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
 
     def statement(
         self,
+        *,
         graspable: IsGraspable,
         result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> Match[GraspT]:
@@ -51,12 +52,14 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
         :raises NoGraspGeometry: If the object has no shape to measure.
         """
         grasp_type = self.get_type_of_generic_parameter(parameter=GraspT)
-        grasp = grasp_type.any_pattern(result_pattern() if result_pattern else None)
-        return grasp.where(*self.conditions(grasp, graspable))
+        grasp = grasp_type.any_pattern(
+            result=result_pattern() if result_pattern else None
+        )
+        return grasp.where(*self.conditions(grasp=grasp, graspable=graspable))
 
     @abstractmethod
     def conditions(
-        self, grasp: Match[GraspT], graspable: IsGraspable
+        self, *, grasp: Match[GraspT], graspable: IsGraspable
     ) -> list[ConditionType]:
         """
         :param grasp: The grasp of a statement.
@@ -101,10 +104,10 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
     """
 
     def conditions(
-        self, grasp: Match[SurfaceGrasp], graspable: IsGraspable
+        self, *, grasp: Match[SurfaceGrasp], graspable: IsGraspable
     ) -> list[ConditionType]:
         surface = graspable.grasp_surface()
-        heights = self.grasped_heights(surface)
+        heights = self.grasped_heights(surface=surface)
         depth_unit = self.depth_unit(graspable=graspable, surface=surface)
         return [
             grasp.height >= heights.lower,
@@ -120,7 +123,7 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
         ]
 
     @abstractmethod
-    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
+    def grasped_heights(self, *, surface: trimesh.Trimesh) -> Bounds[float]:
         """
         :param surface: The object's grasp surface, in its root body's frame.
         :return: The heights the object may be grasped at, as fractions of the grasp
@@ -151,7 +154,7 @@ class GraspBetweenHeights(SurfaceGraspStrategy, ABC):
     bottom to its top, the upper one excluded.
     """
 
-    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
+    def grasped_heights(self, *, surface: trimesh.Trimesh) -> Bounds[float]:
         return self.height
 
 
@@ -196,7 +199,7 @@ class AxialGraspStrategy(GraspStrategy[AxialGrasp], ABC):
     """
 
     def conditions(
-        self, grasp: Match[AxialGrasp], graspable: IsGraspable
+        self, *, grasp: Match[AxialGrasp], graspable: IsGraspable
     ) -> list[ConditionType]:
         return [
             grasp.position >= self.position.lower,
@@ -268,7 +271,7 @@ class PinchAWall(SurfaceGraspStrategy, ABC):
         directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
         lowest, highest = surface.bounds
         middle = (lowest + highest) / 2
-        heights = self.grasped_heights(surface)
+        heights = self.grasped_heights(surface=surface)
         middle[2] = lowest[2] + (heights.lower + heights.upper) / 2 * (
             highest[2] - lowest[2]
         )
@@ -322,7 +325,7 @@ class PinchTheTopOfAWall(PinchAWall):
     How far below the highest point to pinch, as fractions of :attr:`rim_depth`.
     """
 
-    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
+    def grasped_heights(self, *, surface: trimesh.Trimesh) -> Bounds[float]:
         """
         :return: The heights between the two fractions of the top :attr:`rim_depth`.
         """

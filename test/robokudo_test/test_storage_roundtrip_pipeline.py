@@ -168,7 +168,7 @@ class TestStorageRoundtripPipeline:
             assert (
                 reader_observation.camera
                 is reader_pipeline.world.get_semantic_annotation_by_id(
-                    reader_observation.camera.id
+                    id=reader_observation.camera.id
                 )
             )
             assert reader_observation.camera.id == writer_observation.camera.id

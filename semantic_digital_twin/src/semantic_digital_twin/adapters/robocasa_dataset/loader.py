@@ -268,6 +268,7 @@ class RoboCasaDatasetLoader:
 
     def load_kitchen(
         self,
+        *,
         layout_id: LayoutType,
         style_id: StyleType,
         random_number_generator: numpy.random.Generator | None = None,
@@ -300,12 +301,17 @@ class RoboCasaDatasetLoader:
             mujoco_objects=list(kitchen_appliances.values()),
         )
 
-        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(task.get_xml()))
-        self._apply_kitchen_appliance_semantics(world, kitchen_appliances)
+        world = _parse_robosuite_mjcf(
+            MJCFParser.from_xml_string(xml_string=task.get_xml())
+        )
+        self._apply_kitchen_appliance_semantics(
+            world=world, kitchen_appliances=kitchen_appliances
+        )
         return world
 
     def load_task(
         self,
+        *,
         task_name: str,
         layout_id: LayoutType,
         style_id: StyleType,
@@ -326,11 +332,14 @@ class RoboCasaDatasetLoader:
         :raises RoboCasaTaskNotFoundError: if ``task_name`` is not a registered RoboCasa kitchen
             task.
         """
-        environment = self.build_task_environment(task_name, layout_id, style_id)
-        return self.load_task_from_environment(environment)
+        environment = self.build_task_environment(
+            task_name=task_name, layout_id=layout_id, style_id=style_id
+        )
+        return self.load_task_from_environment(environment=environment)
 
     def build_task_environment(
         self,
+        *,
         task_name: str,
         layout_id: LayoutType,
         style_id: StyleType,
@@ -373,7 +382,7 @@ class RoboCasaDatasetLoader:
         environment.reset()
         return environment
 
-    def load_task_from_environment(self, environment: Any) -> RoboCasaTask:
+    def load_task_from_environment(self, *, environment: Any) -> RoboCasaTask:
         """
         Parse an already built and reset task environment into a
         :class:`RoboCasaTask`.
@@ -383,15 +392,22 @@ class RoboCasaDatasetLoader:
         :return: The task bound to the world it is defined over.
         """
         episode_metadata = environment.get_ep_meta()
-        object_world_poses = self._object_world_poses(environment)
+        object_world_poses = self._object_world_poses(environment=environment)
         stripped_document = self._strip_robot_and_bake_object_poses(
-            environment.sim.model.get_xml(), object_world_poses
+            mjcf_document=environment.sim.model.get_xml(),
+            object_world_poses=object_world_poses,
         )
 
-        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(stripped_document))
-        self._apply_kitchen_appliance_semantics(world, environment.fixtures)
+        world = _parse_robosuite_mjcf(
+            MJCFParser.from_xml_string(xml_string=stripped_document)
+        )
+        self._apply_kitchen_appliance_semantics(
+            world=world, kitchen_appliances=environment.fixtures
+        )
         manipulated_objects = self._apply_task_object_semantics(
-            world, environment.object_cfgs, environment.objects
+            world=world,
+            object_configurations=environment.object_cfgs,
+            objects=environment.objects,
         )
 
         return RoboCasaTask(
@@ -420,7 +436,7 @@ class RoboCasaDatasetLoader:
         )
 
     @staticmethod
-    def _object_world_poses(environment: Any) -> dict[str, tuple[Any, Any]]:
+    def _object_world_poses(*, environment: Any) -> dict[str, tuple[Any, Any]]:
         """
         Read the world pose of each manipulated object's root body from the reset
         simulation.
@@ -445,7 +461,7 @@ class RoboCasaDatasetLoader:
 
     @classmethod
     def _strip_robot_and_bake_object_poses(
-        cls, mjcf_document: str, object_world_poses: dict[str, tuple[Any, Any]]
+        cls, *, mjcf_document: str, object_world_poses: dict[str, tuple[Any, Any]]
     ) -> str:
         """
         Remove the robot from a composed task's MJCF document and write the sampled
@@ -479,13 +495,13 @@ class RoboCasaDatasetLoader:
             if pose is None:
                 continue
             position, orientation = pose
-            body.set("pos", cls._format_vector(position))
-            body.set("quat", cls._format_vector(orientation))
+            body.set("pos", cls._format_vector(vector=position))
+            body.set("quat", cls._format_vector(vector=orientation))
 
         return ET.tostring(root, encoding="unicode")
 
     @staticmethod
-    def _format_vector(vector: Any) -> str:
+    def _format_vector(*, vector: Any) -> str:
         """
         Format a numeric vector as a space-separated MJCF attribute value.
 
@@ -496,6 +512,7 @@ class RoboCasaDatasetLoader:
 
     def _apply_task_object_semantics(
         self,
+        *,
         world: World,
         object_configurations: list[dict[str, Any]],
         objects: dict[str, Any],
@@ -521,17 +538,20 @@ class RoboCasaDatasetLoader:
             robocasa_object = objects.get(object_configuration["name"])
             if robocasa_object is None:
                 continue
-            body = self._find_body(world, robocasa_object.root_body)
+            body = self._find_body(world=world, name=robocasa_object.root_body)
             if body is None:
                 continue
             self._attach_semantic_annotation(
-                world, body, str(object_configuration["info"]["cat"])
+                world=world,
+                body=body,
+                category=str(object_configuration["info"]["cat"]),
             )
             manipulated_objects.append(body)
         return manipulated_objects
 
     def load_kitchen_appliance(
         self,
+        *,
         category: RoboCasaKitchenApplianceCategory,
         style_id: StyleType | None = None,
     ) -> World:
@@ -551,13 +571,20 @@ class RoboCasaDatasetLoader:
         :return: The loaded world, with a SemanticAnnotation attached to the appliance's root body.
         :raises RoboCasaApplianceNotFoundError: if no layout contains a fixture of ``category``.
         """
-        appliance = self._find_configured_appliance(category, style_id)
-        world = _parse_robosuite_mjcf(MJCFParser.from_xml_string(appliance.get_xml()))
-        self._apply_kitchen_appliance_semantics(world, {appliance.name: appliance})
+        appliance = self._find_configured_appliance(
+            category=category, style_id=style_id
+        )
+        world = _parse_robosuite_mjcf(
+            MJCFParser.from_xml_string(xml_string=appliance.get_xml())
+        )
+        self._apply_kitchen_appliance_semantics(
+            world=world, kitchen_appliances={appliance.name: appliance}
+        )
         return world
 
     def _find_configured_appliance(
         self,
+        *,
         category: RoboCasaKitchenApplianceCategory,
         style_id: StyleType | None,
     ) -> Any:
@@ -591,7 +618,9 @@ class RoboCasaDatasetLoader:
             ).values():
                 appliance_category = _category_from_class_name(type(appliance).__name__)
                 if (
-                    self.kitchen_appliance_annotator.resolve(appliance_category)
+                    self.kitchen_appliance_annotator.resolve(
+                        category=appliance_category
+                    )
                     is target_annotation_class
                 ):
                     return appliance
@@ -612,7 +641,7 @@ class RoboCasaDatasetLoader:
         ]
 
     def load_object(
-        self, category: RoboCasaObjectCategory, instance_index: int = 0
+        self, *, category: RoboCasaObjectCategory, instance_index: int = 0
     ) -> World:
         """
         Load a single RoboCasa object as a standalone world.
@@ -650,11 +679,11 @@ class RoboCasaDatasetLoader:
         world = _parse_robosuite_mjcf(
             MJCFParser(file_path=str(model_files[instance_index]))
         )
-        self._apply_object_semantics(world, category)
+        self._apply_object_semantics(world=world, category=category)
         return world
 
     def _apply_kitchen_appliance_semantics(
-        self, world: World, kitchen_appliances: dict[str, Any]
+        self, *, world: World, kitchen_appliances: dict[str, Any]
     ) -> None:
         """
         Attach a SemanticAnnotation to the root body of each kitchen appliance, using
@@ -667,14 +696,14 @@ class RoboCasaDatasetLoader:
             ``Fixture`` instance it was built from.
         """
         for appliance_name, kitchen_appliance in kitchen_appliances.items():
-            body = self._find_body(world, appliance_name)
+            body = self._find_body(world=world, name=appliance_name)
             if body is None:
                 continue
             category = _category_from_class_name(type(kitchen_appliance).__name__)
-            self._attach_semantic_annotation(world, body, category)
+            self._attach_semantic_annotation(world=world, body=body, category=category)
 
     def _apply_object_semantics(
-        self, world: World, category: RoboCasaObjectCategory
+        self, *, world: World, category: RoboCasaObjectCategory
     ) -> None:
         """
         Attach a SemanticAnnotation to the root body of a loaded object.
@@ -689,10 +718,12 @@ class RoboCasaDatasetLoader:
         bodies_with_collision = world.bodies_with_collision
         if not bodies_with_collision:
             raise RoboCasaObjectHasNoCollisionError(category=category)
-        self._attach_semantic_annotation(world, bodies_with_collision[0], category)
+        self._attach_semantic_annotation(
+            world=world, body=bodies_with_collision[0], category=category
+        )
 
     def _attach_semantic_annotation(
-        self, world: World, body: Body, category: str
+        self, *, world: World, body: Body, category: str
     ) -> None:
         """
         Attach the SemanticAnnotation matching ``category`` to ``body``, falling back to
@@ -705,8 +736,8 @@ class RoboCasaDatasetLoader:
         :param category: The RoboCasa appliance or object category of ``body``.
         """
         annotation_class = self.kitchen_appliance_annotator.resolve(
-            category
-        ) or self.object_annotator.resolve(category)
+            category=category
+        ) or self.object_annotator.resolve(category=category)
 
         with world.modify_world():
             if annotation_class is not None:
@@ -715,11 +746,13 @@ class RoboCasaDatasetLoader:
                 annotation = NaturalLanguageWithTypeDescription(
                     root=body, description=category, type_description=category
                 )
-            world.add_semantic_annotation(annotation)
-            self._attach_sub_part_annotations(world, annotation, body)
+            world.add_semantic_annotation(semantic_annotation=annotation)
+            self._attach_sub_part_annotations(
+                world=world, parent_annotation=annotation, parent_body=body
+            )
 
     def _attach_sub_part_annotations(
-        self, world: World, parent_annotation: SemanticAnnotation, parent_body: Body
+        self, *, world: World, parent_annotation: SemanticAnnotation, parent_body: Body
     ) -> None:
         """
         Attach the handle, door and drawer bodies under ``parent_body``, recognised by
@@ -743,21 +776,23 @@ class RoboCasaDatasetLoader:
                 and parent_annotation.handle is None
             ):
                 child_annotation = Handle(root=child_body)
-                world.add_semantic_annotation(child_annotation)
+                world.add_semantic_annotation(semantic_annotation=child_annotation)
                 parent_annotation.add(part=child_annotation)
             elif "door" in child_name and isinstance(parent_annotation, HasDoors):
                 child_annotation = Door(root=child_body)
-                world.add_semantic_annotation(child_annotation)
+                world.add_semantic_annotation(semantic_annotation=child_annotation)
                 parent_annotation.add(part=child_annotation)
             elif "drawer" in child_name and isinstance(parent_annotation, HasDrawers):
                 child_annotation = Drawer(root=child_body)
-                world.add_semantic_annotation(child_annotation)
+                world.add_semantic_annotation(semantic_annotation=child_annotation)
                 parent_annotation.add(part=child_annotation)
 
-            self._attach_sub_part_annotations(world, child_annotation, child_body)
+            self._attach_sub_part_annotations(
+                world=world, parent_annotation=child_annotation, parent_body=child_body
+            )
 
     @staticmethod
-    def _find_body(world: World, name: str) -> Body | None:
+    def _find_body(*, world: World, name: str) -> Body | None:
         """
         Look up a body by name, returning None instead of raising if it is not present.
 
@@ -770,7 +805,7 @@ class RoboCasaDatasetLoader:
         :return: The body, or None if no matching body exists in the world.
         """
         try:
-            return world.get_body_by_name(name)
+            return world.get_body_by_name(name=name)
         except WorldEntityNotFoundError:
             pass
 

@@ -43,7 +43,7 @@ def test_attachment_exclusion(pr2_apartment_context, rclpy_node):
         )
     )
     world.get_body_by_name(
-        "milk.stl"
+        name="milk.stl"
     ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         -1.8, 1, 1, reference_frame=world.root
     )
@@ -51,8 +51,8 @@ def test_attachment_exclusion(pr2_apartment_context, rclpy_node):
     test_world = deepcopy(world)
     with test_world.modify_world():
         test_world.move_branch(
-            test_world.get_body_by_name("milk.stl"),
-            test_world.get_body_by_name("r_gripper_tool_frame"),
+            branch_root=test_world.get_body_by_name(name="milk.stl"),
+            new_parent=test_world.get_body_by_name(name="r_gripper_tool_frame"),
         )
     o = OccupancyCostmap(
         distance_to_obstacle=0.2,

@@ -71,7 +71,7 @@ class MujocoRunner(DemoRunner):
 
     def run(self) -> None:
         world = self.scene.build_world()
-        [tracy] = world.get_semantic_annotations_by_type(Tracy)
+        [tracy] = world.get_semantic_annotations_by_type(semantic_annotation_type=Tracy)
         simulation = MujocoSim(
             world=world,
             headless=self.headless,
@@ -82,7 +82,7 @@ class MujocoRunner(DemoRunner):
         )
         simulation.start_stepped_simulation()
         try:
-            simulation.step_simulation(self.settling_duration)
+            simulation.step_simulation(duration=self.settling_duration)
             executor = PhysicallySimulatedPlanExecutor(
                 context=StatechartContext.with_extensions(
                     world=world, extensions=[RobotAccess(robot=tracy)]

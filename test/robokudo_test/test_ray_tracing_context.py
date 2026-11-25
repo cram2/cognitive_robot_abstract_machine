@@ -43,7 +43,7 @@ def test_resolver_selects_named_descriptor_camera() -> None:
     A camera named by the source is the one taken from the descriptor's world.
     """
     world = WorldDescriptor().world
-    [camera] = world.get_semantic_annotations_by_type(Camera)
+    [camera] = world.get_semantic_annotations_by_type(semantic_annotation_type=Camera)
     source = WorldDescriptorSource(camera_name=camera.name)
 
     selected_camera = RayTracingContextResolver._select_descriptor_camera(
@@ -175,7 +175,7 @@ def test_resolver_preserves_camera_pose_without_override(
     """
     descriptor = WorldDescriptor()
     world = descriptor.world
-    [camera] = world.get_semantic_annotations_by_type(Camera)
+    [camera] = world.get_semantic_annotations_by_type(semantic_annotation_type=Camera)
     descriptor_pose = camera.root.global_transform.to_np().copy()
     module_loader = Mock()
     module_loader.load_world_descriptor.return_value = descriptor
@@ -206,7 +206,7 @@ def test_resolver_applies_camera_pose_override_once() -> None:
     )
     descriptor = WorldDescriptor()
     world = descriptor.world
-    [camera] = world.get_semantic_annotations_by_type(Camera)
+    [camera] = world.get_semantic_annotations_by_type(semantic_annotation_type=Camera)
     config = RayTracingCameraConfiguration(
         source=WorldDescriptorSource(camera_pose=camera_pose)
     )
@@ -251,8 +251,8 @@ def test_resolver_rejects_pose_override_for_world_root_camera() -> None:
         camera_model=FieldOfViewCameraModel(angular_extent=FieldOfView()),
     )
     with world.modify_world():
-        world.add_body(camera_body)
-        world.add_semantic_annotation(camera)
+        world.add_body(body=camera_body)
+        world.add_semantic_annotation(semantic_annotation=camera)
     with pytest.raises(CameraPoseOverrideUnavailable):
         RayTracingContextResolver._apply_camera_pose(
             world=world,

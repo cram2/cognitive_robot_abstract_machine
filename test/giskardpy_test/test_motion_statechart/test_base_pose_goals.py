@@ -45,7 +45,9 @@ def _target(world: World) -> Pose:
 def test_a_holonomic_base_goal_moves_the_root_of_the_robot(
     pr2_world_copy: World,
 ) -> None:
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     target = _target(pr2_world_copy)
 
     goal = HolonomicBaseGoal.moving_base_of(
@@ -60,7 +62,9 @@ def test_a_holonomic_base_goal_moves_the_root_of_the_robot(
 def test_a_differential_drive_goal_drives_the_drive_of_the_robot(
     stretch_world_copy: World,
 ) -> None:
-    robot = stretch_world_copy.get_semantic_annotations_by_type(Stretch)[0]
+    robot = stretch_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=Stretch
+    )[0]
     target = _target(stretch_world_copy)
 
     goal = DifferentialDriveBaseGoal.moving_base_of(
@@ -76,7 +80,9 @@ def test_a_differential_drive_goal_drives_the_drive_of_the_robot(
 def test_a_drive_goal_cannot_move_a_robot_without_a_mobile_base(
     self_collision_bot_world: World, goal_type: type[MobileBasePoseGoal]
 ) -> None:
-    robot = self_collision_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = self_collision_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
 
     with pytest.raises(RobotWithoutMobileBaseError) as raised:
         goal_type.moving_base_of(
@@ -89,7 +95,9 @@ def test_a_drive_goal_cannot_move_a_robot_without_a_mobile_base(
 def test_setting_the_odometry_writes_the_connection_above_the_robot(
     pr2_world_copy: World,
 ) -> None:
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     target = _target(pr2_world_copy)
 
     goal = SetOdometry.moving_base_of(robot=robot, goal_pose=target, threshold=0.05)
@@ -130,7 +138,9 @@ def _equality_constraint_counts(goal: MobileBasePoseGoal) -> list[int]:
 def test_a_holonomic_base_goal_constrains_only_x_y_and_yaw(
     cylinder_bot_world: World,
 ) -> None:
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     goal = HolonomicBaseGoal.moving_base_of(
         robot=robot, goal_pose=_target(cylinder_bot_world), threshold=0.01
     )
@@ -145,7 +155,7 @@ def test_a_differential_drive_goal_constrains_only_x_y_and_yaw(
 ) -> None:
     goal = DifferentialDriveBaseGoal(
         mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-            MobileBase
+            semantic_annotation_type=MobileBase
         )[0],
         goal_pose=_target(cylinder_bot_diff_world),
     )
@@ -162,7 +172,9 @@ def test_a_holonomic_base_goal_reaches_the_pose_on_the_floor_below_its_target(
     A target above the floor or tilted is reached once the base stands below it facing
     its way, which the base can do without lifting or tilting.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     target = Pose.from_xyz_rpy(
         1,
         -0.5,
@@ -202,7 +214,9 @@ def _peak_yaw_per_tick_towards(
         the velocity limit of the drive that the limit does not set the speed.
     :return: The largest angle the base turned within one control cycle.
     """
-    base = world.get_semantic_annotations_by_type(MinimalRobot)[0].root
+    base = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0].root
     turn = BaseOrientation(
         driven_body=base,
         goal_pose=Pose.from_xyz_rpy(yaw=yaw, reference_frame=world.root),
@@ -225,16 +239,18 @@ def test_a_base_turns_as_fast_towards_a_far_away_yaw_as_towards_a_close_one(
     The angular speed towards a yaw goal is set by its cruise velocity, not by how far
     away the goal is.
     """
-    derivatives = Derivatives.range(Derivatives.position, Derivatives.jerk)
+    derivatives = Derivatives.range(start=Derivatives.position, stop=Derivatives.jerk)
     initial_state = {
-        derivative: cylinder_bot_world.state.get_derivative(derivative).copy()
+        derivative: cylinder_bot_world.state.get_derivative(
+            derivative=derivative
+        ).copy()
         for derivative in derivatives
     }
     peak_speeds = []
     for yaw in (np.radians(30), np.radians(150)):
         for derivative in derivatives:
             cylinder_bot_world.state.set_derivative(
-                derivative, initial_state[derivative]
+                derivative=derivative, new_state=initial_state[derivative]
             )
         cylinder_bot_world.notify_state_change()
         peak_speeds.append(_peak_yaw_per_tick_towards(cylinder_bot_world, yaw))

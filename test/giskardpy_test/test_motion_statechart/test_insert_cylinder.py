@@ -41,8 +41,8 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
     hole, its axis pointing straight down.
     """
     world = deepcopy(tracy_world)
-    robot = world.get_semantic_annotations_by_type(Tracy)[0]
-    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=Tracy)[0]
+    tool_frame = world.get_body_by_name(name="r_gripper_tool_frame")
     hole_point = Point3(0.8, -0.3, 0.88, reference_frame=world.root)
     cylinder_height = 0.1
 
@@ -54,7 +54,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
             ),
         )
         world.add_connection(
-            FixedConnection.create_with_dofs(
+            connection=FixedConnection.create_with_dofs(
                 world=world,
                 parent=tool_frame,
                 child=cylinder,
@@ -68,7 +68,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
             visual=ShapeCollection(shapes=[Cylinder(width=0.06, height=0.01)]),
         )
         world.add_connection(
-            FixedConnection.create_with_dofs(
+            connection=FixedConnection.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=hole,
@@ -92,7 +92,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
     )
     close_gripper = JointPositionList(
         goal_state=robot.right_arm.end_effector.get_joint_state_by_type(
-            GripperState.CLOSE
+            state_type=GripperState.CLOSE
         )
     )
     statechart.add_node(node=(sequence := Sequence(nodes=[close_gripper, goal])))
@@ -101,7 +101,7 @@ def test_insert_cylinder_with_tracy(tracy_world: World) -> None:
     executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=3000)
 
-    root_T_cylinder = world.compute_forward_kinematics(world.root, cylinder)
+    root_T_cylinder = world.compute_forward_kinematics(root=world.root, tip=cylinder)
     root_V_axis = root_T_cylinder.rotation_matrix.z_vector()
     root_P_bottom = root_T_cylinder.position + root_V_axis * (cylinder_height / 2)
     assert np.allclose(root_P_bottom, hole_point, atol=0.02)

@@ -28,7 +28,7 @@ class MeshDecomposer(Step, ABC):
     """
 
     @abstractmethod
-    def apply_to_mesh(self, mesh: Mesh) -> list[Shape]:
+    def apply_to_mesh(self, *, mesh: Mesh) -> list[Shape]:
         """
         Apply the mesh decomposition to a given mesh.
 
@@ -37,14 +37,14 @@ class MeshDecomposer(Step, ABC):
         ...
 
     @abstractmethod
-    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+    def apply_to_mesh_and_save(self, *, mesh: Mesh, output_path: str) -> str:
         """
         Apply the mesh decomposition to a given mesh and write the decomposed result
         directly to ``output_path`` (an .obj file).
         """
         ...
 
-    def apply_to_shape(self, shape: Shape) -> list[Mesh]:
+    def apply_to_shape(self, *, shape: Shape) -> list[Mesh]:
         """
         Apply the mesh decomposition to a given shape.
 
@@ -53,13 +53,13 @@ class MeshDecomposer(Step, ABC):
         """
         new_geometry = []
         if isinstance(shape, Mesh):
-            new_geometry = self.apply_to_mesh(shape)
+            new_geometry = self.apply_to_mesh(mesh=shape)
         else:
             new_geometry.append(shape)
 
         return new_geometry
 
-    def apply_to_body(self, body: Body) -> Body:
+    def apply_to_body(self, *, body: Body) -> Body:
         """
         Apply the mesh decomposition to all shapes in a given body.
 
@@ -68,13 +68,13 @@ class MeshDecomposer(Step, ABC):
         """
         new_geometry = []
         for shape in body.visual:
-            decomposed_shapes = self.apply_to_shape(shape)
+            decomposed_shapes = self.apply_to_shape(shape=shape)
             new_geometry.extend(decomposed_shapes)
 
         body.collision = ShapeCollection(shapes=new_geometry)
         return body
 
-    def _apply(self, world: World) -> World:
+    def _apply(self, *, world: World) -> World:
         """
         Apply the mesh decomposition to all bodies in a given world.
 
@@ -82,6 +82,6 @@ class MeshDecomposer(Step, ABC):
         Returns the modified world.
         """
         for body in world.bodies:
-            self.apply_to_body(body)
+            self.apply_to_body(body=body)
 
         return world

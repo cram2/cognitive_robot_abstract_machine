@@ -68,7 +68,9 @@ class SurfaceGrasp(ObjectRelativeGrasp):
 
     def grasp_candidate(self, *, graspable: IsGraspable) -> GraspCandidate:
         root_V_outward = self._outward_direction()
-        root_P_surface = self._surface_point(graspable, root_V_outward)
+        root_P_surface = self._surface_point(
+            graspable=graspable, root_V_outward=root_V_outward
+        )
         if root_P_surface is None:
             raise GraspNotOnObjectError(grasp=self, graspable=graspable)
         root_V_approach = Vector3.NEGATIVE_Z() * math.cos(
@@ -94,7 +96,12 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         """
         :return: Whether the object's grasp surface reaches ``root_P_surface``.
         """
-        return self._surface_point(graspable, self._outward_direction()) is not None
+        return (
+            self._surface_point(
+                graspable=graspable, root_V_outward=self._outward_direction()
+            )
+            is not None
+        )
 
     def _outward_direction(self) -> Vector3:
         """
@@ -103,7 +110,7 @@ class SurfaceGrasp(ObjectRelativeGrasp):
         return Vector3(math.cos(self.yaw), math.sin(self.yaw), 0.0)
 
     def _surface_point(
-        self, graspable: IsGraspable, root_V_outward: Vector3
+        self, *, graspable: IsGraspable, root_V_outward: Vector3
     ) -> Point3 | None:
         """
         :param graspable: The object whose grasp surface the ray is cast against.

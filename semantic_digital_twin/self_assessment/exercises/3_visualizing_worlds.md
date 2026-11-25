@@ -40,7 +40,7 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [exercise]
 table_urdf = "package://iai_objects/urdf/table.urdf"
-world = URDFParser.from_file(table_urdf).create_world()
+world = URDFParser.from_file(file_path=table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 import threading
@@ -53,7 +53,7 @@ viz = ...
 ```{code-cell} ipython3
 :tags: [example-solution]
 table_urdf = "package://iai_objects/urdf/table.urdf"
-world = URDFParser.from_file(table_urdf).create_world()
+world = URDFParser.from_file(file_path=table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher

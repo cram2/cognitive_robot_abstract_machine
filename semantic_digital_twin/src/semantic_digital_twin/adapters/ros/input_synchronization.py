@@ -45,7 +45,7 @@ class TopicInputSynchronizer(
         message = self.take_message()
         if message is None:
             return False
-        self.apply_message(message)
+        self.apply_message(message=message)
         return True
 
     def take_message(self) -> MessageType | None:
@@ -55,7 +55,7 @@ class TopicInputSynchronizer(
         return self.latest_message
 
     @abstractmethod
-    def apply_message(self, message: MessageType) -> None:
+    def apply_message(self, *, message: MessageType) -> None:
         """
         Write the message into the world state.
         """
@@ -74,18 +74,18 @@ class JointStateInputSynchronizer(TopicInputSynchronizer[JointState], ABC):
     message put them.
     """
 
-    def apply_message(self, message: JointState) -> None:
+    def apply_message(self, *, message: JointState) -> None:
         for joint_name, position in zip(message.name, message.position):
             connection: ActiveConnection1DOF = self.world.get_connection_by_name(
-                joint_name
+                name=joint_name
             )
-            if not self.writes(connection):
+            if not self.writes(connection=connection):
                 continue
             self.world.state[connection.raw_dof.id].position = (
                 position - connection.offset
             ) / connection.multiplier
 
-    def writes(self, connection: ActiveConnection1DOF) -> bool:
+    def writes(self, *, connection: ActiveConnection1DOF) -> bool:
         """
         Whether the position this synchronizer received for a connection is its to
         write.
@@ -150,7 +150,7 @@ class SubscribedJointPositionSource(
     The connections of the part this source is attached to.
     """
 
-    def writes(self, connection: ActiveConnection1DOF) -> bool:
+    def writes(self, *, connection: ActiveConnection1DOF) -> bool:
         return connection in self.connections
 
 
@@ -195,7 +195,7 @@ class OdometrySynchronizer(TopicInputSynchronizer[Odometry]):
     The drive connection whose origin follows the odometry.
     """
 
-    def apply_message(self, message: Odometry) -> None:
+    def apply_message(self, *, message: Odometry) -> None:
         pose = message.pose.pose
         self.connection.origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=pose.position.x,
@@ -237,7 +237,7 @@ class TfFrameSynchronizer(InputSynchronizer, HasROS2Node):
         self.tf_wrapper = TFWrapper(node=self.node)
 
     def track(
-        self, connection: Connection6DoF, tf_parent_frame: str, tf_child_frame: str
+        self, *, connection: Connection6DoF, tf_parent_frame: str, tf_child_frame: str
     ) -> None:
         """
         Make the origin of ``connection`` follow the transform between the two frames.
@@ -262,7 +262,7 @@ class TfFrameSynchronizer(InputSynchronizer, HasROS2Node):
             tf_child_frame,
         ) in self.connection_to_frames.items():
             parent_T_child = self.tf_wrapper.lookup_pose(
-                tf_parent_frame, tf_child_frame
+                target_frame=tf_parent_frame, source_frame=tf_child_frame
             ).pose
             connection.origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
                 pos_x=parent_T_child.position.x,

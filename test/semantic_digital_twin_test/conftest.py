@@ -128,7 +128,7 @@ def mesh_package_installer(monkeypatch) -> Callable[[Path], Path]:
         one searched and returns the installed mesh file.
     """
     jeroen_cup = Path(
-        PackageUriResolver().resolve("package://iai_objects/objects/jeroen_cup.stl")
+        PackageUriResolver().resolve(uri="package://iai_objects/objects/jeroen_cup.stl")
     )
 
     def install(prefix: Path) -> Path:

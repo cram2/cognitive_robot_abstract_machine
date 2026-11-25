@@ -35,7 +35,9 @@ def _local_bounding_box(body: Body, use_visual: bool = False) -> VolumetricBound
     :return: The local axis-aligned bounding box of the body in its own frame.
     """
     geometry = body.visual if use_visual else body.collision
-    return geometry.as_bounding_box_collection_in_frame(body).bounding_box()
+    return geometry.as_bounding_box_collection_in_frame(
+        reference_frame=body
+    ).bounding_box()
 
 
 @dataclass(kw_only=True)

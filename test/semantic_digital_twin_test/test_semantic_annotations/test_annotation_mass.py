@@ -63,10 +63,10 @@ def door() -> Door:
     handle = Handle(root=handle_body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_connection(FixedConnection(parent=body, child=handle_body))
-        world.add_semantic_annotation(door)
-        world.add_semantic_annotation(handle)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_connection(connection=FixedConnection(parent=body, child=handle_body))
+        world.add_semantic_annotation(semantic_annotation=door)
+        world.add_semantic_annotation(semantic_annotation=handle)
         door.add(part=handle)
     return door
 

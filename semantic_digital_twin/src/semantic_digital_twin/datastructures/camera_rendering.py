@@ -54,7 +54,7 @@ class ColorRenderingMode(ABC):
     """
 
     @abstractmethod
-    def validate_camera_model(self, camera_model: PinholeCameraModel) -> None:
+    def validate_camera_model(self, *, camera_model: PinholeCameraModel) -> None:
         """
         Reject projection models that this color renderer cannot represent.
 
@@ -66,6 +66,7 @@ class ColorRenderingMode(ABC):
     @abstractmethod
     def render(
         self,
+        *,
         segmentation: npt.NDArray[np.int32],
         camera_model: PinholeCameraModel,
         scene: trimesh.Scene,
@@ -89,11 +90,12 @@ class BodyColorRenderingMode(ColorRenderingMode):
     Color each visible body uniformly with its first collision geometry color.
     """
 
-    def validate_camera_model(self, camera_model: PinholeCameraModel) -> None:
+    def validate_camera_model(self, *, camera_model: PinholeCameraModel) -> None:
         pass
 
     def render(
         self,
+        *,
         segmentation: npt.NDArray[np.int32],
         camera_model: PinholeCameraModel,
         scene: trimesh.Scene,
@@ -103,7 +105,7 @@ class BodyColorRenderingMode(ColorRenderingMode):
         body_colors: dict[Color, BodyColorAssignment] = {}
         for body_index in np.unique(segmentation[segmentation >= 0]):
             body = world.kinematic_structure[int(body_index)]
-            body_rgb = self.get_body_color(body)
+            body_rgb = self.get_body_color(body=body)
             color_rgb[segmentation == body_index] = body_rgb
             color = body.collision[0].color
             body_colors.setdefault(
@@ -115,7 +117,7 @@ class BodyColorRenderingMode(ColorRenderingMode):
         )
 
     @staticmethod
-    def get_body_color(body: Body) -> npt.NDArray[np.uint8]:
+    def get_body_color(*, body: Body) -> npt.NDArray[np.uint8]:
         """
         Return the first collision geometry's unsigned-byte RGB color.
 
@@ -135,7 +137,7 @@ class TexturedColorRenderingMode(ColorRenderingMode):
     Render surface textures and materials with a centered, equal-focal-length camera.
     """
 
-    def validate_camera_model(self, camera_model: PinholeCameraModel) -> None:
+    def validate_camera_model(self, *, camera_model: PinholeCameraModel) -> None:
         resolution = camera_model.resolution
         if not (
             math.isclose(float(camera_model.principal_point.x), resolution.width / 2)
@@ -150,6 +152,7 @@ class TexturedColorRenderingMode(ColorRenderingMode):
 
     def render(
         self,
+        *,
         segmentation: npt.NDArray[np.int32],
         camera_model: PinholeCameraModel,
         scene: trimesh.Scene,
@@ -176,6 +179,7 @@ class DepthMode(ABC):
     @abstractmethod
     def hit_depth(
         self,
+        *,
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
@@ -201,6 +205,7 @@ class OpticalAxisDepthMode(DepthMode):
 
     def hit_depth(
         self,
+        *,
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
@@ -223,6 +228,7 @@ class RayDistanceDepthMode(DepthMode):
 
     def hit_depth(
         self,
+        *,
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],

@@ -245,7 +245,9 @@ class AbstractDetector(EndedByOwner, StatechartNode, ABC):
         """
         return {
             body
-            for end_effector in world.get_semantic_annotations_by_type(EndEffector)
+            for end_effector in world.get_semantic_annotations_by_type(
+                semantic_annotation_type=EndEffector
+            )
             for body in end_effector.bodies
         }
 

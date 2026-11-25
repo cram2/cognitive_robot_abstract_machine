@@ -70,7 +70,7 @@ class RecordedTransformLookup:
     The transform handed back to the caller.
     """
 
-    def lookup_pose(self, target_frame: str, source_frame: str) -> PoseStamped:
+    def lookup_pose(self, *, target_frame: str, source_frame: str) -> PoseStamped:
         return self.parent_T_child
 
 
@@ -146,7 +146,7 @@ def omni_drive_world() -> World:
         root = Body(name=PrefixedName(name="root"))
         base = Body(name=PrefixedName(name="base"))
         world.add_connection(
-            OmniDrive.create_with_dofs(world=world, parent=root, child=base)
+            connection=OmniDrive.create_with_dofs(world=world, parent=root, child=base)
         )
     return world
 
@@ -176,8 +176,8 @@ def world_with_two_connections() -> tuple[
             parent=root,
             child=other_body,
         )
-        world.add_connection(part_connection)
-        world.add_connection(other_connection)
+        world.add_connection(connection=part_connection)
+        world.add_connection(connection=other_connection)
     return world, part_connection, other_connection
 
 
@@ -215,7 +215,7 @@ def tracked_connection(world_with_two_bodies):
         connection = Connection6DoF.create_with_dofs(
             world=world, parent=parent, child=child
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     return world, connection
 
 
@@ -247,8 +247,8 @@ def world_with_mimic_joint() -> tuple[
             offset=0.1,
             raw_dof=driving_connection.raw_dof,
         )
-        world.add_connection(driving_connection)
-        world.add_connection(mimic_connection)
+        world.add_connection(connection=driving_connection)
+        world.add_connection(connection=mimic_connection)
     return world, driving_connection, mimic_connection
 
 
@@ -432,7 +432,7 @@ def test_an_input_that_already_rewrites_hands_out_itself(
         world=omni_drive_world,
         node=rclpy_node,
         topic_name="odom",
-        connection=omni_drive_world.get_connection_by_name("root_T_base"),
+        connection=omni_drive_world.get_connection_by_name(name="root_T_base"),
     )
 
     assert source.rewriting_every_cycle() is source
@@ -468,7 +468,7 @@ def test_closing_the_source_of_a_base_destroys_its_subscription(
         world=omni_drive_world,
         node=rclpy_node,
         topic_name="odom",
-        connection=omni_drive_world.get_connection_by_name("root_T_base"),
+        connection=omni_drive_world.get_connection_by_name(name="root_T_base"),
     )
     subscription = source.subscription
 
@@ -606,7 +606,7 @@ def test_a_reader_of_another_message_type_does_not_join_the_subscription(
             world=omni_drive_world,
             node=rclpy_node,
             topic_name="shared_name",
-            connection=omni_drive_world.get_connection_by_name("root_T_base"),
+            connection=omni_drive_world.get_connection_by_name(name="root_T_base"),
         )
 
     assert joint_state_reader.subscription.callback.receivers == [
@@ -637,7 +637,7 @@ def test_a_reader_leaves_a_subscription_it_did_not_create_alone(
 def test_the_source_of_a_base_writes_the_reported_pose_into_the_drive(
     rclpy_node, omni_drive_world: World
 ):
-    connection = omni_drive_world.get_connection_by_name("root_T_base")
+    connection = omni_drive_world.get_connection_by_name(name="root_T_base")
     expected_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5, yaw=-0.25)
     source = SubscribedBasePoseSource(
         world=omni_drive_world,
@@ -658,7 +658,7 @@ def test_the_source_of_a_base_writes_the_reported_pose_into_the_drive(
 def test_odometry_synchronizer_writes_the_pose_into_the_drive(
     rclpy_node, omni_drive_world: World
 ):
-    connection = omni_drive_world.get_connection_by_name("root_T_base")
+    connection = omni_drive_world.get_connection_by_name(name="root_T_base")
     expected_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.5, y=-2.5, yaw=0.75
     )
@@ -694,7 +694,9 @@ def test_apply_writes_the_looked_up_transform_into_the_connection(
     synchronizer.tf_wrapper = RecordedTransformLookup(
         parent_T_child=make_pose_stamped(1.0, -2.0, 0.5)
     )
-    synchronizer.track(connection, tf_parent_frame="map", tf_child_frame="odom")
+    synchronizer.track(
+        connection=connection, tf_parent_frame="map", tf_child_frame="odom"
+    )
 
     wrote_something = synchronizer.apply()
 
@@ -730,11 +732,13 @@ def test_tracking_a_connection_twice_is_rejected(rclpy_node, tracked_connection)
     """
     world, connection = tracked_connection
     synchronizer = TfFrameSynchronizer(world=world, node=rclpy_node)
-    synchronizer.track(connection, tf_parent_frame="map", tf_child_frame="odom")
+    synchronizer.track(
+        connection=connection, tf_parent_frame="map", tf_child_frame="odom"
+    )
 
     with pytest.raises(AlreadyTrackedByTfFrameError):
         synchronizer.track(
-            connection, tf_parent_frame="map", tf_child_frame="base_link"
+            connection=connection, tf_parent_frame="map", tf_child_frame="base_link"
         )
 
 
@@ -747,8 +751,10 @@ def test_tracking_a_connection_without_six_degrees_of_freedom_is_rejected(
     world, parent, child = world_with_two_bodies
     with world.modify_world():
         connection = FixedConnection(parent=parent, child=child)
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     synchronizer = TfFrameSynchronizer(world=world, node=rclpy_node)
 
     with pytest.raises(ConnectionCannotBeTrackedByTfFrameError):
-        synchronizer.track(connection, tf_parent_frame="map", tf_child_frame="odom")
+        synchronizer.track(
+            connection=connection, tf_parent_frame="map", tf_child_frame="odom"
+        )

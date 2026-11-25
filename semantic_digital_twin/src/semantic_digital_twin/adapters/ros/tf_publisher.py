@@ -66,7 +66,7 @@ class TfFrameNames(UniqueEntityNames):
     body ``copy/milk``, while ``"copy"`` would name it ``copymilk``.
     """
 
-    def preferred_name(self, entity: KinematicStructureEntity) -> str:
+    def preferred_name(self, *, entity: KinematicStructureEntity) -> str:
         return f"{self.prefix}{entity.name}"
 
 
@@ -195,27 +195,30 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
         for connection in self._world.connections:
             ids = (connection.parent.id, connection.child.id)
             if ids in self.connections_to_expression:
-                self.tf_message.transforms.append(self._transform_between(connection))
+                self.tf_message.transforms.append(
+                    self._transform_between(connection=connection)
+                )
             elif ids in self.fixed_connections_to_expression:
-                transform = self._transform_between(connection)
+                transform = self._transform_between(connection=connection)
                 transform.header.stamp = current_time
                 self._write_pose(
-                    transform, self.fixed_connections_to_expression[ids].to_np().ravel()
+                    transform=transform,
+                    pose=self.fixed_connections_to_expression[ids].to_np().ravel(),
                 )
                 self.static_tf_message.transforms.append(transform)
 
-    def _transform_between(self, connection: Connection) -> TransformStamped:
+    def _transform_between(self, *, connection: Connection) -> TransformStamped:
         """
         :param connection: A published connection.
         :return: A transform from the frame of its parent to the frame of its child.
         """
         transform = TransformStamped()
-        transform.header.frame_id = self.frame_names.assign(connection.parent)
-        transform.child_frame_id = self.frame_names.assign(connection.child)
+        transform.header.frame_id = self.frame_names.assign(entity=connection.parent)
+        transform.child_frame_id = self.frame_names.assign(entity=connection.child)
         return transform
 
     @staticmethod
-    def _write_pose(transform: TransformStamped, pose: np.ndarray) -> None:
+    def _write_pose(*, transform: TransformStamped, pose: np.ndarray) -> None:
         """
         :param transform: The transform to write into.
         :param pose: The position followed by the quaternion of the transform.
@@ -235,7 +238,7 @@ class TfPublisherModelCallback(ModelChangeCallback, HasROS2Node):
         current_time = self.node.get_clock().now().to_msg()
         for p_T_c, pose in zip(self.tf_message.transforms, tf_data):
             p_T_c.header.stamp = current_time
-            self._write_pose(p_T_c, pose)
+            self._write_pose(transform=p_T_c, pose=pose)
 
 
 @dataclass(eq=False, kw_only=True)
@@ -317,7 +320,7 @@ class TFPublisher(StateChangeCallback, HasROS2Node):
         root_link = TransformStamped()
         root_link.header.stamp = self.node.get_clock().now().to_msg()
         root_link.header.frame_id = str(self._world.root.name)
-        root_link.child_frame_id = self.frame_names.assign(self._world.root)
+        root_link.child_frame_id = self.frame_names.assign(entity=self._world.root)
         root_link.transform.rotation.w = 1.0
         self.root_link_pub.publish(TFMessage(transforms=[root_link]))
 
@@ -334,7 +337,7 @@ class TFPublisher(StateChangeCallback, HasROS2Node):
         super().stop()
 
     @classmethod
-    def create_with_ignore_robot(cls, robot: AbstractRobot, node: Node) -> Self:
+    def create_with_ignore_robot(cls, *, robot: AbstractRobot, node: Node) -> Self:
         """
         Creates a TF publisher that ignores the robot's kinematic structure.
 
@@ -352,6 +355,7 @@ class TFPublisher(StateChangeCallback, HasROS2Node):
     @classmethod
     def create_with_ignore_existing_tf(
         cls,
+        *,
         world: World,
         node: Node,
         wait_for_existing_tf: int = 5,

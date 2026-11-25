@@ -65,11 +65,11 @@ class ExternalCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             extension_type=MotionControlContext
         ).get_or_create_external_collision_manager(context=self.context)
 
-        manager.register_group_of_body(self.body)
-        group = manager.get_collision_group(self.body)
+        manager.register_group_of_body(body=self.body)
+        group = manager.get_collision_group(body=self.body)
 
         distance_symbol = manager.get_contact_distance_symbol(
-            AvoidedExternalContact(group=group, rank=self.collision_index)
+            contact=AvoidedExternalContact(group=group, rank=self.collision_index)
         )
 
         return MotionNodeArtifacts(
@@ -125,12 +125,16 @@ class SelfCollisionDistanceMonitor(EndedByOwner, MotionStatechartNode):
             extension_type=MotionControlContext
         ).get_or_create_self_collision_manager(context=self.context)
 
-        manager.register_groups_of_body_combination(self.body_a, self.body_b)
-        combination = manager.body_pair_to_group_pair(self.body_a, self.body_b)
+        manager.register_groups_of_body_combination(
+            body_a=self.body_a, body_b=self.body_b
+        )
+        combination = manager.body_pair_to_group_pair(
+            body_a=self.body_a, body_b=self.body_b
+        )
 
         # The contacts of a combination are ranked, so the first is the closest.
         distance_symbol = manager.get_contact_distance_symbol(
-            manager.avoided_contacts_of(combination)[0]
+            contact=manager.avoided_contacts_of(combination=combination)[0]
         )
 
         return MotionNodeArtifacts(

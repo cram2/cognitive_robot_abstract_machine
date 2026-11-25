@@ -49,7 +49,7 @@ class WorldSnapshot:
         Roll back every model modification made since the snapshot was captured, then
         restore the captured degree of freedom states.
         """
-        self.world.rollback_to_version(self.model_version)
+        self.world.rollback_to_version(version=self.model_version)
         for degree_of_freedom_id, values in self.degree_of_freedom_states.items():
             self.world.state[degree_of_freedom_id] = values
         self.world.notify_state_change()

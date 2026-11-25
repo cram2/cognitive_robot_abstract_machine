@@ -68,8 +68,8 @@ class TestWorldFrame:
 
         pose = bound_pose(world, world_T_camera)
 
-        world_body = world.get_body_by_name(FrameName.WORLD)
-        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        world_body = world.get_body_by_name(name=FrameName.WORLD)
+        camera_body = world.get_body_by_name(name=FrameName.CAMERA)
         assert world.root is world_body
         assert pose.reference_frame is world_body
         assert pose.child_frame is camera_body
@@ -81,7 +81,7 @@ class TestWorldFrame:
         """
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName(name="root_of_another_world")))
+            world.add_body(body=Body(name=PrefixedName(name="root_of_another_world")))
         names_before = [body.name for body in world.bodies]
 
         with pytest.raises(UnknownWorldFrameError):
@@ -104,15 +104,15 @@ class TestCameraPerceptionMounts:
         """
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName(name=FrameName.WORLD)))
+            world.add_body(body=Body(name=PrefixedName(name=FrameName.WORLD)))
         bound_pose(world, camera_pose(x=1.0))
         world_T_camera = camera_pose(x=2.0)
 
         bound_pose(world, world_T_camera)
 
-        [camera_body] = world.get_bodies_by_name(FrameName.CAMERA)
+        [camera_body] = world.get_bodies_by_name(name=FrameName.CAMERA)
         assert camera_body.parent_connection.parent is world.get_body_by_name(
-            FrameName.WORLD
+            name=FrameName.WORLD
         )
         assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
 
@@ -126,7 +126,7 @@ class TestCameraPerceptionMounts:
 
         bound_pose(world, world_T_camera)
 
-        [camera_body] = world.get_bodies_by_name(FrameName.CAMERA)
+        [camera_body] = world.get_bodies_by_name(name=FrameName.CAMERA)
         assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
 
 
@@ -145,14 +145,14 @@ class TestCameraOfTheWorld:
         A robot's camera keeps its attachment, and its pose is the measured one.
         """
         world = world_with_a_head_camera()
-        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        camera_body = world.get_body_by_name(name=FrameName.CAMERA)
         camera_pose_before = camera_body.global_transform.to_np()
         world_T_camera = camera_pose(x=4.0)
 
         pose = bound_pose(world, world_T_camera, located_through_tf=True)
 
         assert np.allclose(camera_body.global_transform.to_np(), camera_pose_before)
-        assert pose.reference_frame is world.get_body_by_name(FrameName.WORLD)
+        assert pose.reference_frame is world.get_body_by_name(name=FrameName.WORLD)
         assert pose.child_frame is camera_body
         assert np.allclose(pose.to_np(), world_T_camera.to_np())
 
@@ -197,7 +197,10 @@ class TestCameraOfASharedWorld:
         )
 
         assert [body.id for body in world.bodies] == body_ids_before
-        assert world.get_semantic_annotations_by_type(Camera) == []
+        assert (
+            world.get_semantic_annotations_by_type(semantic_annotation_type=Camera)
+            == []
+        )
 
     def test_camera_located_through_tf_is_located_by_its_measured_pose(
         self, *, shared_world: SharedWorld
@@ -217,7 +220,7 @@ class TestCameraOfASharedWorld:
 
         pose = cas.camera_observation.world_T_camera
         assert pose.reference_frame is shared_world.world.get_body_by_name(
-            FrameName.WORLD
+            name=FrameName.WORLD
         )
         assert pose.child_frame is cas.camera_observation.camera.root
         assert np.allclose(pose.to_np(), world_T_camera.to_np())
@@ -236,13 +239,13 @@ class TestCameraOfASharedWorld:
             cas, world, world_T_camera, camera_interface(located_through_tf=False)
         )
 
-        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        camera_body = world.get_body_by_name(name=FrameName.CAMERA)
         assert camera_body.parent_connection.parent is world.get_body_by_name(
-            FrameName.WORLD
+            name=FrameName.WORLD
         )
-        assert world.get_semantic_annotations_by_type(Camera) == [
-            cas.camera_observation.camera
-        ]
+        assert world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        ) == [cas.camera_observation.camera]
         assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
 
     def test_shared_world_gets_a_ros_camera_without_tf_lookup(
@@ -260,13 +263,13 @@ class TestCameraOfASharedWorld:
             cas, world, world_T_camera, ros_camera_interface(lookup_viewpoint=False)
         )
 
-        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        camera_body = world.get_body_by_name(name=FrameName.CAMERA)
         assert camera_body.parent_connection.parent is world.get_body_by_name(
-            FrameName.WORLD
+            name=FrameName.WORLD
         )
-        assert world.get_semantic_annotations_by_type(Camera) == [
-            cas.camera_observation.camera
-        ]
+        assert world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        ) == [cas.camera_observation.camera]
         assert np.allclose(camera_body.global_transform.to_np(), world_T_camera.to_np())
 
     def test_camera_of_a_robot_in_a_shared_world_is_at_the_measured_pose(
@@ -277,7 +280,7 @@ class TestCameraOfASharedWorld:
         measured one.
         """
         world = shared_world_with_a_robot.world
-        camera_body = world.get_body_by_name(FrameName.CAMERA)
+        camera_body = world.get_body_by_name(name=FrameName.CAMERA)
         camera_pose_before = camera_body.global_transform.to_np()
         world_T_camera = camera_pose(x=4.0)
 
@@ -313,12 +316,12 @@ def annotate_robot_camera(world: World) -> Camera:
     camera_name = PrefixedName(name=FrameName.CAMERA, prefix=RobotName.ROBOT)
     camera = Camera(
         name=camera_name,
-        root=world.get_body_by_name(camera_name),
+        root=world.get_body_by_name(name=camera_name),
         camera_model=camera_model(),
         modalities=(CameraModality.COLOR, CameraModality.DEPTH),
     )
     with world.modify_world():
-        world.add_semantic_annotation(camera)
+        world.add_semantic_annotation(semantic_annotation=camera)
     return camera
 
 
@@ -349,7 +352,7 @@ class TestCameraOfARobotWhosePartsCarryItsName:
 
         assert [body.id for body in world.bodies] == body_ids_before
         assert cas.camera_observation.camera.root is world.get_body_by_name(
-            PrefixedName(name=FrameName.CAMERA, prefix=RobotName.ROBOT)
+            name=PrefixedName(name=FrameName.CAMERA, prefix=RobotName.ROBOT)
         )
 
     @pytest.mark.parametrize("camera_frame", robot_camera_frames())
@@ -372,7 +375,9 @@ class TestCameraOfARobotWhosePartsCarryItsName:
         )
 
         assert cas.camera_observation.camera is robot_camera
-        assert world.get_semantic_annotations_by_type(Camera) == [robot_camera]
+        assert world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        ) == [robot_camera]
         assert np.allclose(
             cas.camera_observation.world_T_camera.to_np(), world_T_camera.to_np()
         )
@@ -399,9 +404,9 @@ class TestCameraOfARobotWhosePartsCarryItsName:
             )
             observations.append(cas.camera_observation)
 
-        assert world.get_semantic_annotations_by_type(Camera) == [
-            observations[0].camera
-        ]
+        assert world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        ) == [observations[0].camera]
         assert observations[1].camera is observations[0].camera
 
     def test_robot_camera_annotated_twice_is_ambiguous(self) -> None:

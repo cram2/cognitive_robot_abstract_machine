@@ -414,6 +414,7 @@ class PoseMapping(AlternativeMapping[Pose]):
     @classmethod
     def from_point_mapping_quaternion_mapping(
         cls,
+        *,
         position: Point3Mapping,
         orientation: QuaternionMapping,
         reference_frame: KinematicStructureEntity,

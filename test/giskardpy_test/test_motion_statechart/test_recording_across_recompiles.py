@@ -87,7 +87,7 @@ def _robot(world: World) -> Body:
     """
     :return: The body of the robot of `world`.
     """
-    return world.get_kinematic_structure_entity_by_name("bot")
+    return world.get_kinematic_structure_entity_by_name(name="bot")
 
 
 def _tick(executor: StatechartExecutor, ticks: int) -> None:
@@ -114,7 +114,7 @@ def _add_box_next_to_the_robot(world: World) -> Body:
     box = Body(name=PrefixedName(name="box"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=box,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -157,7 +157,7 @@ def test_the_world_state_recorded_before_a_branch_moved_is_kept(
     state_at_compile = world.state._data.copy()
     _tick(executor, ticks.before)
 
-    world.move_branch(box, _robot(world))
+    world.move_branch(branch_root=box, new_parent=_robot(world))
     _tick(executor, ticks.after)
 
     trajectory = _world_state_trajectory(executor)

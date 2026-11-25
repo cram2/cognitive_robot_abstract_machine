@@ -65,7 +65,7 @@ class OpeningDetector(AbstractDetector):
         events: list[DetectionEvent] = []
         tracked = set(tracked_objects)
         for moving_part in self.context.world.get_semantic_annotations_by_type(
-            HasMovableJoint
+            semantic_annotation_type=HasMovableJoint
         ):
             body = moving_part.root
             if body not in tracked or moving_part.movable_joint is None:

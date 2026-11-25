@@ -66,7 +66,7 @@ def test_invalid_channel_count_raises_color_exception() -> None:
     A color requires RGB channels and optional opacity.
     """
     with pytest.raises(InvalidColorChannelCount):
-        Color.from_list([])
+        Color.from_list(color=[])
 
 
 # %% Color identity

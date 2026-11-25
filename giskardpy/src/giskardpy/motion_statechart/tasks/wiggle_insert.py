@@ -191,7 +191,7 @@ class WiggleInsert(
         )
 
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position
         root_P_hole = self.context.world.transform(
             target_frame=self.kinematic_chain.root, spatial_object=self.hole_point
@@ -213,7 +213,7 @@ class WiggleInsert(
             AxisAngle(angle=self._random_angle, axis=tip_V_hole_normal)
         )
         root_R_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).rotation_matrix
         root_R_goal = root_R_current.dot(tip_R_hole_normal)
 

@@ -151,14 +151,14 @@ class ICub3LeftThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_thumb_0"
+                branch_root=robot_root, name="l_hand_thumb_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_thumb_tip"
+                branch_root=robot_root, name="l_hand_thumb_tip"
             ),
         )
 
@@ -173,14 +173,14 @@ class ICub3LeftIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_index_0"
+                branch_root=robot_root, name="l_hand_index_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_index_tip"
+                branch_root=robot_root, name="l_hand_index_tip"
             ),
         )
 
@@ -195,14 +195,14 @@ class ICub3LeftMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_middle_0"
+                branch_root=robot_root, name="l_hand_middle_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_middle_tip"
+                branch_root=robot_root, name="l_hand_middle_tip"
             ),
         )
 
@@ -217,14 +217,14 @@ class ICub3LeftRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_ring_0"
+                branch_root=robot_root, name="l_hand_ring_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_ring_tip"
+                branch_root=robot_root, name="l_hand_ring_tip"
             ),
         )
 
@@ -239,14 +239,14 @@ class ICub3LeftLittleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_little_0"
+                branch_root=robot_root, name="l_hand_little_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_little_tip"
+                branch_root=robot_root, name="l_hand_little_tip"
             ),
         )
 
@@ -261,14 +261,14 @@ class ICub3RightThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_thumb_0"
+                branch_root=robot_root, name="r_hand_thumb_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_thumb_tip"
+                branch_root=robot_root, name="r_hand_thumb_tip"
             ),
         )
 
@@ -283,14 +283,14 @@ class ICub3RightIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_index_0"
+                branch_root=robot_root, name="r_hand_index_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_index_tip"
+                branch_root=robot_root, name="r_hand_index_tip"
             ),
         )
 
@@ -305,14 +305,14 @@ class ICub3RightMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_middle_0"
+                branch_root=robot_root, name="r_hand_middle_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_middle_tip"
+                branch_root=robot_root, name="r_hand_middle_tip"
             ),
         )
 
@@ -327,14 +327,14 @@ class ICub3RightRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_ring_0"
+                branch_root=robot_root, name="r_hand_ring_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_ring_tip"
+                branch_root=robot_root, name="r_hand_ring_tip"
             ),
         )
 
@@ -349,14 +349,14 @@ class ICub3RightLittleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_little_0"
+                branch_root=robot_root, name="r_hand_little_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_little_tip"
+                branch_root=robot_root, name="r_hand_little_tip"
             ),
         )
 
@@ -425,12 +425,14 @@ class ICub3LeftHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "l_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="l_hand"
+            ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_tool_frame"
+                branch_root=robot_root, name="l_gripper_tool_frame"
             ),
         )
 
@@ -499,12 +501,14 @@ class ICub3RightHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "r_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="r_hand"
+            ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_tool_frame"
+                branch_root=robot_root, name="r_gripper_tool_frame"
             ),
         )
 
@@ -526,11 +530,15 @@ class ICub3LeftArm(Arm[ICub3LeftHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "root_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "l_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="root_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="l_hand"
+            ),
         )
 
 
@@ -551,11 +559,15 @@ class ICub3RightArm(Arm[ICub3RightHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "root_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "r_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="root_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="r_hand"
+            ),
         )
 
 
@@ -563,12 +575,14 @@ class ICub3RightArm(Arm[ICub3RightHand]):
 class ICub3Camera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=cls.create_optical_body(
-                robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-                HomogeneousTransformationMatrix(),
+                mounting_body=robot_root._world.get_body_in_branch_by_name(
+                    branch_root=robot_root, name="head"
+                ),
+                parent_T_optical=HomogeneousTransformationMatrix(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(
@@ -597,11 +611,15 @@ class ICub3Neck(Neck[ICub3Camera]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "chest"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="chest"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="head"
+            ),
         )
 
 
@@ -617,11 +635,15 @@ class ICub3Torso(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "root_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "chest"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="root_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="chest"
+            ),
         )
 
 
@@ -633,10 +655,12 @@ class ICub3MobileBase(MobileBase[OmniDrive]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "l_hip_1"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="l_hip_1"
+            ),
         )
 
     def setup_hardware_interfaces(self) -> None:

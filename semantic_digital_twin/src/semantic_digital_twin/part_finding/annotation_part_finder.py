@@ -75,16 +75,20 @@ class AnnotationPartFinder:
         shapes = whole.root.visual or whole.root.collision
         if not missing or not shapes:
             return []
-        query = PartQuery.from_mesh(shapes.combined_mesh, type(whole), missing)
+        query = PartQuery.from_mesh(
+            mesh=shapes.combined_mesh,
+            whole_type=type(whole),
+            relationship_names=missing,
+        )
         parts = []
-        for located in self.locator.locate(query):
-            part = self._add(whole, query, located)
+        for located in self.locator.locate(query=query):
+            part = self._add(whole=whole, query=query, located=located)
             if part is not None:
                 parts.append(part)
         return parts
 
     def _add(
-        self, whole: HasParts, query: PartQuery, located: LocatedPart
+        self, *, whole: HasParts, query: PartQuery, located: LocatedPart
     ) -> HasRootBody | None:
         """
         :param whole: The annotation the part was located in.

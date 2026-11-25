@@ -350,7 +350,7 @@ class NamedContainerKind(SymbolicFunction):
 
     def __call__(self) -> ContainerKind | None:
         for part in self.body._world.get_kinematic_structure_entities_of_branch(
-            self.body
+            root=self.body
         ):
             kind = asserted_kind(_name_words(part), ContainerKind)
             if kind is not None:
@@ -393,7 +393,7 @@ class IsPartOfARobot(Predicate):
         robot_roots = {
             robot.root
             for robot in self.body._world.get_semantic_annotations_by_type(
-                AbstractRobot
+                semantic_annotation_type=AbstractRobot
             )
         }
         ancestor = self.body

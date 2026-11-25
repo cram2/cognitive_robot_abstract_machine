@@ -186,7 +186,7 @@ class FlatSurfaceScene:
         world = World()
         root = Body(name=PrefixedName(name="world"))
         with world.modify_world():
-            world.add_body(root)
+            world.add_body(body=root)
         camera_model = PinholeCameraModel.from_field_of_view(
             resolution=self.image_resolution,
             field_of_view=FieldOfView(

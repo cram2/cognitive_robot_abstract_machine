@@ -197,15 +197,17 @@ def test_a_joint_goal_moves_the_mock_robot(robot: ControllerManagerRobotTester) 
     only arrives if the commands reached the hardware and its state came back.
     """
     shoulder_pan_goal = 0.5
-    shoulder_pan = robot.world.get_connection_by_name(UniversalRobotJoint.SHOULDER_PAN)
+    shoulder_pan = robot.world.get_connection_by_name(
+        name=UniversalRobotJoint.SHOULDER_PAN
+    )
 
     motion_statechart = Statechart(context=robot.api.context)
     motion_statechart.add_node(
         node=(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {UniversalRobotJoint.SHOULDER_PAN: shoulder_pan_goal},
-                    robot.api.world,
+                    mapping={UniversalRobotJoint.SHOULDER_PAN: shoulder_pan_goal},
+                    world=robot.api.world,
                 )
             )
         )

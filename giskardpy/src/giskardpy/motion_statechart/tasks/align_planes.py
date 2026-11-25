@@ -66,7 +66,7 @@ class AlignPlanes(
         root_V_root_normal.scale(1)
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).rotation_matrix
         root_V_tip_normal = root_R_tip @ tip_V_tip_normal
         root_V_tip_normal.scale(1)

@@ -177,7 +177,7 @@ def gripper_goal(end_effector: EndEffector, state: GripperState) -> MoveFingers:
     :return: A new goal moving the gripper of `end_effector` to `state`.
     """
     return MoveFingers.create_gripper_goal(
-        configuration=end_effector.default_configuration(state)
+        configuration=end_effector.default_configuration(state_type=state)
     )
 
 
@@ -621,7 +621,7 @@ def test_the_detection_asks_for_the_object_being_reached_for(pr2_apartment_conte
     something else does not query for the wrong thing.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [DetectBeforeGrasp()]
 
     plan = rewritten(reach_action(milk, view), extensions, plan_transformations)
@@ -636,7 +636,7 @@ def test_the_perception_precedes_the_final_approach(pr2_apartment_context):
     the detection go in front of the reach's last step.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [DetectBeforeGrasp()]
 
     plan = rewritten(reach_action(milk, view), extensions, plan_transformations)
@@ -657,7 +657,7 @@ def test_the_perception_precedes_the_final_approach_a_step_was_put_behind(
     transformation put behind it does not take its place.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [MoveGripperLastInTheReachBody(), DetectBeforeGrasp()]
 
     plan = rewritten(reach_action(milk, view), extensions, plan_transformations)
@@ -679,7 +679,7 @@ def test_the_perception_precedes_the_final_approach_of_a_straight_reach(
     found, also where the Stretch runs the reach's steps beside the hold of its base.
     """
     world, view, extensions = stretch_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [DetectBeforeGrasp()]
 
     plan = rewritten(
@@ -705,7 +705,7 @@ def test_the_perception_precedes_the_final_approach_of_a_straight_reach(
 
 def test_a_reach_not_yet_expanded_has_no_final_approach(pr2_apartment_context):
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     with pytest.raises(ReachHasNoFinalApproach):
         DetectBeforeGrasp().final_approach(plan_node=reach_action(milk, view))
@@ -719,7 +719,7 @@ def test_a_reach_does_not_perceive_without_the_transformation(
     the caller did not ask for.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     plan = rewritten(reach_action(milk, view), extensions)
 
@@ -732,7 +732,7 @@ def test_a_transformation_on_reaches_also_fires_inside_a_pick_up(pr2_apartment_c
     reaches reaches it without the pick-up having to pass anything down.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [DetectBeforeGrasp()]
 
     plan = rewritten(
@@ -761,7 +761,9 @@ def drawer_holding(annotation: HasRootBody, world: World) -> Drawer:
     """
     [drawer] = [
         candidate
-        for candidate in world.get_semantic_annotations_by_type(Drawer)
+        for candidate in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Drawer
+        )
         if candidate.root is annotation.root.parent_connection.parent
     ]
     return drawer
@@ -810,8 +812,8 @@ def test_the_drawer_is_only_opened_for_an_object_that_lies_in_one(
     the spoon needs the transformation and the pick-up of the milk does not.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     transformation = OpenDrawerBeforePickUp()
 
     in_a_drawer = pick_up_action(spoon, view.right_arm)
@@ -828,7 +830,7 @@ def test_a_drawer_reports_how_far_it_stands_open(pr2_apartment_context):
     way open at the lower limit of its joint and all of the way at the upper one.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     drawer = drawer_holding(spoon, world)
     connection = drawer.root.parent_connection
 
@@ -847,7 +849,7 @@ def test_a_drawer_that_already_stands_open_needs_no_opening(pr2_apartment_contex
     stands open leaves the pick-up as it is.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     drawer = drawer_holding(spoon, world)
     transformation = OpenDrawerBeforePickUp()
 
@@ -870,7 +872,9 @@ def test_opening_a_drawer_tries_its_standing_pose_with_the_opening(
     pose is tried together with the opening rather than chosen before it.
     """
     world, view, extensions = pr2_apartment_context
-    drawer = drawer_holding(world.get_semantic_annotations_by_type(Spoon)[0], world)
+    drawer = drawer_holding(
+        world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0], world
+    )
 
     [opening] = OpenDrawerBeforeMoveAndPickUp().opening_nodes(
         drawer=drawer,
@@ -888,7 +892,9 @@ def test_opening_a_drawer_stands_where_it_is_opened_from(pr2_apartment_context):
     rather than as close as it would to grasp something that stays put.
     """
     world, view, extensions = pr2_apartment_context
-    drawer = drawer_holding(world.get_semantic_annotations_by_type(Spoon)[0], world)
+    drawer = drawer_holding(
+        world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0], world
+    )
 
     [opening] = OpenDrawerBeforeMoveAndPickUp().opening_nodes(
         drawer=drawer,
@@ -911,7 +917,9 @@ def test_opening_a_drawer_faces_the_handle_where_it_is_when_it_opens_it(
     handle where that left it rather than where it was when the opening was built.
     """
     world, view, extensions = pr2_apartment_context
-    drawer = drawer_holding(world.get_semantic_annotations_by_type(Spoon)[0], world)
+    drawer = drawer_holding(
+        world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0], world
+    )
     [opening] = OpenDrawerBeforeMoveAndPickUp().opening_nodes(
         drawer=drawer,
         arm=view.right_arm,
@@ -927,7 +935,9 @@ def test_opening_a_drawer_faces_the_handle_where_it_is_when_it_opens_it(
         facing["look_at"]._kwargs_["look_target"],
     ]:
         np.testing.assert_allclose(
-            world.transform(target, world.root).position.to_np(),
+            world.transform(
+                spatial_object=target, target_frame=world.root
+            ).position.to_np(),
             drawer.handle.root.global_pose.position.to_np(),
         )
 
@@ -940,7 +950,7 @@ def test_the_drawer_is_opened_before_a_move_and_pick_up_rather_than_inside_it(
     precedes the whole step, whose own drive then positions the robot at the object.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     drawer = drawer_holding(spoon, world)
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
@@ -967,7 +977,7 @@ def test_the_drawer_the_object_lies_in_is_opened_before_the_pick_up(
     pick-up, followed by the drive back to where the object can be reached from.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     drawer = drawer_holding(spoon, world)
     plan_transformations = [OpenDrawerBeforePickUp()]
 
@@ -991,7 +1001,7 @@ def test_the_actions_beside_the_pick_up_are_expanded(pr2_apartment_context):
     the actions in it are expanded all the same.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     plan_transformations = [OpenDrawerBeforePickUp()]
 
     plan = rewritten(
@@ -1010,7 +1020,7 @@ def test_the_drawer_is_opened_with_the_arm_that_picks_up(pr2_apartment_context):
     past, so the opening takes the arm the pick-up was given.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     plan_transformations = [OpenDrawerBeforePickUp()]
 
     pick_up = pick_up_action(spoon, view.left_arm)
@@ -1028,7 +1038,7 @@ def test_an_object_that_lies_in_no_drawer_is_picked_up_unchanged(pr2_apartment_c
     the plan it describes itself.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [OpenDrawerBeforePickUp()]
     pick_up = pick_up_action(milk, view.right_arm)
 
@@ -1065,7 +1075,7 @@ def test_the_opening_joins_the_sequence_a_grounded_pick_up_is_a_child_of(
     candidate.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     drawer = drawer_holding(spoon, world)
     plan_transformations = [ParkArmsBeforeFirstAction()]
     plan_transformations.append(OpenDrawerBeforePickUp())
@@ -1122,7 +1132,7 @@ def test_parking_ends_before_a_first_action_running_in_parallel_starts(
         MoveTorsoAction(torso_state=TorsoState.HIGH),
         SetGripperAction(
             gripper_configuration=view.right_arm.end_effector.default_configuration(
-                GripperState.OPEN
+                state_type=GripperState.OPEN
             )
         ),
     ]
@@ -1149,7 +1159,7 @@ def test_parking_ends_before_a_plan_that_starts_in_parallel(pr2_apartment_contex
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             SetGripperAction(
                 gripper_configuration=view.right_arm.end_effector.default_configuration(
-                    GripperState.OPEN
+                    state_type=GripperState.OPEN
                 )
             ),
         ]
@@ -1194,7 +1204,7 @@ def test_the_drawer_is_opened_once_in_front_of_a_move_and_pick_up_still_to_be_gr
     candidate is tried with the drawer open and the arms out of the way.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     drawer = drawer_holding(spoon, world)
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
@@ -1223,7 +1233,7 @@ def test_the_drawer_is_opened_in_front_of_a_transports_pick_up_before_it_is_grou
     opened once in front of it instead of with each of its candidates.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
     drawer = drawer_holding(spoon, world)
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
@@ -1251,8 +1261,8 @@ def test_a_move_and_pick_up_whose_grasps_are_on_several_objects_is_opened_per_ca
     nothing is opened before grounding; each candidate is rewritten on its own.
     """
     world, view, extensions = pr2_apartment_context
-    spoon = world.get_semantic_annotations_by_type(Spoon)[0]
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    spoon = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
     standing_pose = Pose(reference_frame=world.root)
@@ -1288,7 +1298,7 @@ def test_a_move_and_pick_up_of_an_object_in_no_drawer_is_left_alone(
     one first.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
         standing_position=Pose2D(reference_frame=world.root),
@@ -1305,7 +1315,7 @@ def test_a_move_and_pick_up_of_an_object_in_no_drawer_is_left_alone(
 
 def test_a_transport_of_an_object_in_no_drawer_is_left_alone(pr2_apartment_context):
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     transport = TransportAction.from_graspable_by_closest_grasps(
         graspable=milk,
@@ -1627,7 +1637,8 @@ def shutting_goals_of(plan: StatechartNode) -> list[MoveGripper]:
         node
         for node in plan.descendants
         if isinstance(node, MoveGripper)
-        and node.width == node.two_finger_gripper.separation_in(GripperState.CLOSE)
+        and node.width
+        == node.two_finger_gripper.separation_in(state_type=GripperState.CLOSE)
     ]
 
 
@@ -1650,7 +1661,7 @@ def test_a_grasp_closes_to_the_objects_width_where_objects_push_back(
     shutting them.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     plan = rewritten(
         GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
@@ -1672,7 +1683,7 @@ def test_a_grasp_still_shuts_the_gripper_where_nothing_pushes_back(
     exactly as it was built.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     plan = rewritten(
         GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
@@ -1691,7 +1702,7 @@ def test_a_gripper_whose_fingers_are_not_modelled_like_the_real_ones_still_shuts
     to an object's width, so its grasp is left shutting the gripper.
     """
     world, view, extensions = stretch_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     plan = rewritten(
         GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
@@ -1708,7 +1719,7 @@ def test_the_squeeze_is_handed_on_to_the_fingers(pr2_apartment_context):
     The squeeze the adaptation was given is handed on to the fingers.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     squeeze = 0.002
 
     plan = rewritten(
@@ -1728,7 +1739,7 @@ def test_the_hsr_hand_is_sent_shut_in_a_physical_simulation(hsr_apartment_contex
     In a physical simulation the HSR's hand is closed with the squeeze of its gripper.
     """
     world, view, extensions = hsr_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     plan = rewritten(
         GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
@@ -1746,7 +1757,7 @@ def test_the_real_hsr_hand_is_squeezed_as_its_executor_says(hsr_apartment_contex
     The real HSR's hand is closed with the squeeze its executor's adaptation gives.
     """
     world, view, extensions = hsr_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     executors = []
 
     def kept_robot_executor(extensions):
@@ -1779,9 +1790,9 @@ def test_an_object_without_collision_is_still_held_by_shutting_the_gripper(
     world, view, extensions = pr2_apartment_context
     with world.modify_world():
         body = Body(name=PrefixedName(name="shapeless_milk"))
-        world.add_connection(FixedConnection(parent=world.root, child=body))
+        world.add_connection(connection=FixedConnection(parent=world.root, child=body))
         shapeless = Milk(root=body)
-        world.add_semantic_annotation(shapeless)
+        world.add_semantic_annotation(semantic_annotation=shapeless)
 
     plan = rewritten(
         GraspingAction(grasp_candidate=grasp_of(shapeless), arm=left_or_only_arm(view)),

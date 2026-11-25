@@ -68,15 +68,15 @@ class RemotePartLocator(PartLocator):
                 variable=EnvironmentVariable.PART_FINDING_SERVER_URL
             )
 
-    def locate(self, query: PartQuery) -> list[LocatedPart]:
-        return self.answer(query).parts
+    def locate(self, *, query: PartQuery) -> list[LocatedPart]:
+        return self.answer(query=query).parts
 
-    def answer(self, query: PartQuery) -> PartFindingAnswer:
+    def answer(self, *, query: PartQuery) -> PartFindingAnswer:
         """
         :param query: The shape and the parts wanted.
         :return: The server's whole answer, with the parts and how it found them.
         """
-        url = self._url(PartFindingRoute.PARTS)
+        url = self._url(route=PartFindingRoute.PARTS)
         response = self.session.post(
             url,
             data=gzip.compress(json.dumps(to_json(query)).encode()),
@@ -94,13 +94,13 @@ class RemotePartLocator(PartLocator):
         """
         :return: Which locator the server runs and how busy it is.
         """
-        url = self._url(PartFindingRoute.STATUS)
+        url = self._url(route=PartFindingRoute.STATUS)
         response = self.session.get(url, timeout=self.timeout.total_seconds())
         if response.status_code != HTTPStatus.OK:
             raise PartFindingServerError(url=url, status_code=response.status_code)
         return from_json(response.json())
 
-    def _url(self, route: PartFindingRoute) -> str:
+    def _url(self, *, route: PartFindingRoute) -> str:
         """
         :param route: A path the server answers.
         :return: Its address.

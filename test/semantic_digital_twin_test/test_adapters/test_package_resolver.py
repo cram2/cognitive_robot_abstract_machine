@@ -28,7 +28,7 @@ class TestPrefixPathPackageLocator:
     """
 
     def test_resolves_package_directory_from_ament_prefix_path(
-        self, tmp_path, monkeypatch
+        self, *, tmp_path, monkeypatch
     ):
         expected = _make_package(tmp_path, "some_package", "share", "some_package")
         monkeypatch.setenv("AMENT_PREFIX_PATH", str(tmp_path))
@@ -37,10 +37,10 @@ class TestPrefixPathPackageLocator:
 
         locator = PrefixPathPackageLocator()
 
-        assert locator.resolve("some_package") == expected
+        assert locator.resolve(package_name="some_package") == expected
 
     def test_resolves_package_directory_from_cmake_prefix_path(
-        self, tmp_path, monkeypatch
+        self, *, tmp_path, monkeypatch
     ):
         expected = _make_package(tmp_path, "some_package", "share", "some_package")
         monkeypatch.delenv("AMENT_PREFIX_PATH", raising=False)
@@ -49,9 +49,9 @@ class TestPrefixPathPackageLocator:
 
         locator = PrefixPathPackageLocator()
 
-        assert locator.resolve("some_package") == expected
+        assert locator.resolve(package_name="some_package") == expected
 
-    def test_resolves_merged_install_share_layout(self, tmp_path, monkeypatch):
+    def test_resolves_merged_install_share_layout(self, *, tmp_path, monkeypatch):
         expected = _make_package(tmp_path, "share", "some_package")
         monkeypatch.setenv("AMENT_PREFIX_PATH", str(tmp_path))
         monkeypatch.delenv("CMAKE_PREFIX_PATH", raising=False)
@@ -59,9 +59,9 @@ class TestPrefixPathPackageLocator:
 
         locator = PrefixPathPackageLocator()
 
-        assert locator.resolve("some_package") == expected
+        assert locator.resolve(package_name="some_package") == expected
 
-    def test_resolves_bare_package_directory(self, tmp_path, monkeypatch):
+    def test_resolves_bare_package_directory(self, *, tmp_path, monkeypatch):
         expected = _make_package(tmp_path, "some_package")
         monkeypatch.setenv("AMENT_PREFIX_PATH", str(tmp_path))
         monkeypatch.delenv("CMAKE_PREFIX_PATH", raising=False)
@@ -69,10 +69,10 @@ class TestPrefixPathPackageLocator:
 
         locator = PrefixPathPackageLocator()
 
-        assert locator.resolve("some_package") == expected
+        assert locator.resolve(package_name="some_package") == expected
 
     def test_resolves_against_workspace_glob_under_home_directory(
-        self, tmp_path, monkeypatch
+        self, *, tmp_path, monkeypatch
     ):
         expected = _make_package(
             tmp_path, "robot_ws", "install", "some_package", "share", "some_package"
@@ -83,10 +83,10 @@ class TestPrefixPathPackageLocator:
 
         locator = PrefixPathPackageLocator()
 
-        assert locator.resolve("some_package") == expected
+        assert locator.resolve(package_name="some_package") == expected
 
     def test_additional_prefixes_take_precedence_over_environment(
-        self, tmp_path, monkeypatch
+        self, *, tmp_path, monkeypatch
     ):
         environment_prefix = tmp_path / "from_environment"
         additional_prefix = tmp_path / "from_additional_prefixes"
@@ -102,11 +102,11 @@ class TestPrefixPathPackageLocator:
 
         locator = PrefixPathPackageLocator(additional_prefixes=[str(additional_prefix)])
 
-        assert locator.resolve("some_package") == additional_match
+        assert locator.resolve(package_name="some_package") == additional_match
         assert additional_match != environment_match
 
     def test_raises_package_resolution_error_when_not_found_anywhere(
-        self, tmp_path, monkeypatch
+        self, *, tmp_path, monkeypatch
     ):
         monkeypatch.delenv("AMENT_PREFIX_PATH", raising=False)
         monkeypatch.delenv("CMAKE_PREFIX_PATH", raising=False)
@@ -115,7 +115,7 @@ class TestPrefixPathPackageLocator:
         locator = PrefixPathPackageLocator()
 
         with pytest.raises(PackageResolutionError) as error:
-            locator.resolve("missing_package")
+            locator.resolve(package_name="missing_package")
         assert error.value.package_name == "missing_package"
 
 
@@ -129,7 +129,7 @@ class TestROSPackageLocatorDefaultChain:
     """
 
     def test_default_chain_resolves_via_prefix_path_locator(
-        self, tmp_path, monkeypatch
+        self, *, tmp_path, monkeypatch
     ):
         expected = _make_package(tmp_path, "some_package", "share", "some_package")
         monkeypatch.setenv("AMENT_PREFIX_PATH", str(tmp_path))
@@ -137,12 +137,12 @@ class TestROSPackageLocatorDefaultChain:
         monkeypatch.delenv("ROS_PACKAGE_PATH", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path / "empty_home"))
 
-        resolved = ROSPackageLocator().resolve("some_package")
+        resolved = ROSPackageLocator().resolve(package_name="some_package")
 
         assert resolved == expected
 
     def test_package_uri_resolver_resolves_a_file_via_prefix_path(
-        self, tmp_path, monkeypatch
+        self, *, tmp_path, monkeypatch
     ):
         package_directory = _make_package(
             tmp_path, "some_package", "share", "some_package"
@@ -155,6 +155,6 @@ class TestROSPackageLocatorDefaultChain:
         monkeypatch.delenv("ROS_PACKAGE_PATH", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path / "empty_home"))
 
-        resolved = PackageUriResolver().resolve("package://some_package/model.urdf")
+        resolved = PackageUriResolver().resolve(uri="package://some_package/model.urdf")
 
         assert resolved == expected_file

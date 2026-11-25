@@ -79,12 +79,12 @@ if controls_real_robot:
     # and starting up when the client's default 10s budget would otherwise expire.
     world = join_shared_world(node=node, timeout_seconds=300)
 else:
-    world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
-    Tracy.from_world(world)
+    world = URDFParser.from_file(file_path=Tracy.get_ros_file_path()).create_world()
+    Tracy.from_world(world=world)
     VizMarkerPublisher(_world=world, node=node)
 
 print("Setup World")
-tracy = world.get_semantic_annotations_by_type(Tracy)[0]
+tracy = world.get_semantic_annotations_by_type(semantic_annotation_type=Tracy)[0]
 # Narrower than the 85 mm Tracy's grippers open, so the fingers can close on a box.
 box_edge = 0.06
 box_scale = Scale(x=box_edge, y=box_edge, z=box_edge)
@@ -115,18 +115,20 @@ with world.modify_world():
         ),
     )
 
-    world.add_kinematic_structure_entity(box1)
-    world.add_kinematic_structure_entity(box2)
-    world.add_kinematic_structure_entity(box3)
+    world.add_kinematic_structure_entity(kinematic_structure_entity=box1)
+    world.add_kinematic_structure_entity(kinematic_structure_entity=box2)
+    world.add_kinematic_structure_entity(kinematic_structure_entity=box3)
 
     # The boxes are annotated as gelatin boxes only so that the plan has an annotation
     # offering grasps to name them by; any graspable kind of object would do.
     box2_annotation = GelatinBox(root=box2)
     box3_annotation = GelatinBox(root=box3)
-    world.add_semantic_annotations([box2_annotation, box3_annotation])
+    world.add_semantic_annotations(
+        semantic_annotations=[box2_annotation, box3_annotation]
+    )
 
     world.add_connection(
-        FixedConnection.create_with_dofs(
+        connection=FixedConnection.create_with_dofs(
             parent=world.root,
             child=box1,
             world=world,
@@ -137,7 +139,7 @@ with world.modify_world():
     )
 
     world.add_connection(
-        FixedConnection.create_with_dofs(
+        connection=FixedConnection.create_with_dofs(
             parent=world.root,
             child=box2,
             world=world,
@@ -148,7 +150,7 @@ with world.modify_world():
     )
 
     world.add_connection(
-        FixedConnection.create_with_dofs(
+        connection=FixedConnection.create_with_dofs(
             parent=world.root,
             child=box3,
             world=world,

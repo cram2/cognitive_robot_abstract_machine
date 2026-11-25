@@ -22,7 +22,7 @@ def tip_only_chain(mini_world: World) -> KinematicChain:
     """
     The chain from the tip of :func:`mini_world` to itself.
     """
-    tip = mini_world.get_body_by_name("tip")
+    tip = mini_world.get_body_by_name(name="tip")
     return KinematicChain(root=tip, tip=tip)
 
 

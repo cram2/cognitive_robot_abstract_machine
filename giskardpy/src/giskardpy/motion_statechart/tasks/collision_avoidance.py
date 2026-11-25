@@ -119,8 +119,8 @@ class _CollisionAvoidanceTask(Task, HasCruiseVelocityParameter, ABC):
         manager = self.collision_variable_manager
         return sm.logic_all(
             [
-                manager.get_contact_distance_symbol(contact)
-                >= manager.get_violated_distance_symbol(contact)
+                manager.get_contact_distance_symbol(contact=contact)
+                >= manager.get_violated_distance_symbol(contact=contact)
                 for contact in self.avoided_contacts
             ]
         )
@@ -167,7 +167,7 @@ class _CancelBecauseCollisionViolated(CancelStatechart):
                 for task in self.tasks
                 if task.observation_state == ObservationStateValue.FALSE
                 for violation in task.collision_variable_manager.violated_collisions(
-                    task.avoided_contacts
+                    contacts=task.avoided_contacts
                 )
             ]
         )
@@ -179,7 +179,9 @@ def _single_robot_of_world(node: CompositeNode) -> AbstractRobot:
     :return: The only robot in the world of `node`.
     :raises UnexpectedWorldEntityCountError: If that world holds no robot or several.
     """
-    robots = node.world.get_semantic_annotations_by_type(AbstractRobot)
+    robots = node.world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )
     if len(robots) != 1:
         raise UnexpectedWorldEntityCountError(
             node=node,
@@ -298,7 +300,7 @@ class BufferZoneScaling(HasGoalPointParameter, ABC):
         """
         root_P_goal = (
             world.compose_forward_kinematics_expression(
-                world.root, self.goal_point.reference_frame
+                root=world.root, tip=self.goal_point.reference_frame
             )
             @ self.goal_point
         )
@@ -367,9 +369,9 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         ).get_or_create_external_collision_manager(context=self.context)
         self.avoided_contacts = []
         for group in self._groups_avoiding_external_collisions():
-            self.collision_variable_manager.register_group_of_body(group.root)
+            self.collision_variable_manager.register_group_of_body(body=group.root)
             self.avoided_contacts.extend(
-                self.collision_variable_manager.avoided_contacts_of(group)
+                self.collision_variable_manager.avoided_contacts_of(group=group)
             )
         return super().build()
 
@@ -381,9 +383,11 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         robot_bodies = self.robot.bodies
         groups = []
         for body in self.robot.bodies_with_collision:
-            if not self.context.world.collision_manager.get_max_avoided_bodies(body):
+            if not self.context.world.collision_manager.get_max_avoided_bodies(
+                body=body
+            ):
                 continue
-            group = self.collision_variable_manager.get_collision_group(body)
+            group = self.collision_variable_manager.get_collision_group(body=body)
             if group not in groups and group.root in robot_bodies:
                 groups.append(group)
         return groups
@@ -398,12 +402,14 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         manager = self.collision_variable_manager
         for contact in self.avoided_contacts:
             root_T_group = self.context.world.compose_forward_kinematics_expression(
-                self.context.world.root, contact.group.root
+                root=self.context.world.root, tip=contact.group.root
             )
             root_P_point_on_group = (
-                root_T_group @ manager.get_group_a_P_point_on_a_symbol(contact)
+                root_T_group @ manager.get_group_a_P_point_on_a_symbol(contact=contact)
             )
-            root_V_contact_normal = manager.get_root_V_contact_normal_symbol(contact)
+            root_V_contact_normal = manager.get_root_V_contact_normal_symbol(
+                contact=contact
+            )
             artifacts.constraints.add_inequality_constraint(
                 name=f"{contact.group.root.name}/{contact.rank}",
                 cruise_velocity=self.cruise_velocity,
@@ -411,7 +417,7 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 lower_error=self._buffer_distance(
                     contact=contact, root_P_point_on_group=root_P_point_on_group
                 )
-                - manager.get_contact_distance_symbol(contact),
+                - manager.get_contact_distance_symbol(contact=contact),
                 upper_error=float("inf"),
                 quadratic_weight=self._weight_while_close(
                     contact_normal=root_V_contact_normal
@@ -433,7 +439,7 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             :attr:`buffer_zone_scaling`.
         """
         manager = self.collision_variable_manager
-        buffer_distance = manager.get_buffer_distance_symbol(contact)
+        buffer_distance = manager.get_buffer_distance_symbol(contact=contact)
         if self.buffer_zone_scaling is None:
             return buffer_distance
         return sm.max(
@@ -441,7 +447,7 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             * self.buffer_zone_scaling.scale_factor(
                 world=self.context.world, root_P_contact_point=root_P_point_on_group
             ),
-            manager.get_violated_distance_symbol(contact),
+            manager.get_violated_distance_symbol(contact=contact),
         )
 
 
@@ -526,12 +532,12 @@ class UpdateTemporaryCollisionRules(EndedByOwner, MotionStatechartNode):
             first.
         """
         self.context.world.collision_manager.put_temporary_rules_in_force(
-            self.temporary_rules
+            rules=self.temporary_rules
         )
 
     def on_end(self) -> None:
         self.context.world.collision_manager.take_temporary_rules_out_of_force(
-            self.temporary_rules
+            rules=self.temporary_rules
         )
 
 
@@ -555,7 +561,9 @@ class SetInitialTemporaryCollisionRules(SucceedsOnObservingTrue, MotionStatechar
 
         # compute collision matrix with new rules
         self.context.world.collision_manager.clear_temporary_rules()
-        self.context.world.collision_manager.extend_temporary_rule(self.temporary_rules)
+        self.context.world.collision_manager.extend_temporary_rule(
+            rules=self.temporary_rules
+        )
         self.context.world.collision_manager.update_collision_matrix()
         self.collision_matrix = self.context.world.collision_manager.collision_matrix
 
@@ -563,7 +571,7 @@ class SetInitialTemporaryCollisionRules(SucceedsOnObservingTrue, MotionStatechar
         if not self.set_on_build:
             self.context.world.collision_manager.clear_temporary_rules()
             self.context.world.collision_manager.extend_temporary_rule(
-                old_temporary_rules
+                rules=old_temporary_rules
             )
             self.context.world.collision_manager.update_collision_matrix()
 
@@ -571,7 +579,9 @@ class SetInitialTemporaryCollisionRules(SucceedsOnObservingTrue, MotionStatechar
         return artifacts
 
     def on_start(self) -> None:
-        self.context.world.collision_manager.set_collision_matrix(self.collision_matrix)
+        self.context.world.collision_manager.set_collision_matrix(
+            collision_matrix=self.collision_matrix
+        )
 
 
 # %% self collision avoidance
@@ -615,12 +625,16 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
         """
         collision_matrix = CollisionMatrix()
         avoid_self_collisions = AvoidSelfCollisions(robot=self.robot)
-        avoid_self_collisions.update(self.context.world)
-        avoid_self_collisions.apply_to_collision_matrix(collision_matrix)
+        avoid_self_collisions.update(world=self.context.world)
+        avoid_self_collisions.apply_to_collision_matrix(
+            collision_matrix=collision_matrix
+        )
         for (
             ignore_collision_rule
         ) in self.context.world.collision_manager.ignore_collision_rules:
-            ignore_collision_rule.apply_to_collision_matrix(collision_matrix)
+            ignore_collision_rule.apply_to_collision_matrix(
+                collision_matrix=collision_matrix
+            )
         return collision_matrix
 
     def build(self) -> NodeArtifacts:
@@ -645,23 +659,23 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 # this is no self collision
                 continue
             if not collision_matrix.is_collision_groups_combination_checked(
-                group_a, group_b
+                group_a=group_a, group_b=group_b
             ):
                 # skip because this self collision is never checked
                 continue
             self.collision_variable_manager.register_groups_of_body_combination(
-                group_a.root, group_b.root
+                body_a=group_a.root, body_b=group_b.root
             )
             self.checked_combinations.append(
                 self.collision_variable_manager.body_pair_to_group_pair(
-                    group_a.root, group_b.root
+                    body_a=group_a.root, body_b=group_b.root
                 )
             )
         self.avoided_contacts = [
             contact
             for combination in self.checked_combinations
             for contact in self.collision_variable_manager.avoided_contacts_of(
-                combination
+                combination=combination
             )
         ]
         return super().build()
@@ -674,24 +688,26 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
             group_b = contact.combination.group_b
             group_b_T_group_a = (
                 self.context.world.compose_forward_kinematics_expression(
-                    group_b.root, group_a.root
+                    root=group_b.root, tip=group_a.root
                 )
             )
             group_b_P_point_on_a = (
-                group_b_T_group_a @ manager.get_group_a_P_point_on_a_symbol(contact)
+                group_b_T_group_a
+                @ manager.get_group_a_P_point_on_a_symbol(contact=contact)
             )
             group_b_V_point_on_b_to_point_on_a = (
-                group_b_P_point_on_a - manager.get_group_b_P_point_on_b_symbol(contact)
+                group_b_P_point_on_a
+                - manager.get_group_b_P_point_on_b_symbol(contact=contact)
             )
             group_b_V_contact_normal = manager.get_group_b_V_contact_normal_symbol(
-                contact
+                contact=contact
             )
             artifacts.constraints.add_inequality_constraint(
                 name=f"{group_a.root.name}/{group_b.root.name}/{contact.rank}",
                 cruise_velocity=self.cruise_velocity,
                 velocity_scale=VelocityScale.TRANSLATION,
-                lower_error=manager.get_buffer_distance_symbol(contact)
-                - manager.get_contact_distance_symbol(contact),
+                lower_error=manager.get_buffer_distance_symbol(contact=contact)
+                - manager.get_contact_distance_symbol(contact=contact),
                 upper_error=float("inf"),
                 quadratic_weight=self._weight_while_close(
                     contact_normal=group_b_V_contact_normal

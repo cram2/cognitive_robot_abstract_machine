@@ -53,7 +53,7 @@ class HasParallelGripperCommandServer(HasGripperActionServers, ABC):
         units, a goal of the parallel gripper command action gives.
         """
 
-    def action_topic_serving(self, state_type: JointStateType | None) -> str:
+    def action_topic_serving(self, *, state_type: JointStateType | None) -> str:
         return self.parallel_gripper_command_topic
 
 

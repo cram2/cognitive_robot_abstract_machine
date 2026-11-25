@@ -105,7 +105,7 @@ class RobotSpecification:
 
     @classmethod
     def specify_real_robot(
-        cls, semantic_annotation_type: type[AbstractRobot], urdf: str | None = None
+        cls, *, semantic_annotation_type: type[AbstractRobot], urdf: str | None = None
     ) -> Self:
         """
         :param semantic_annotation_type: The robot to create.
@@ -123,7 +123,7 @@ class RobotSpecification:
         uses_backup = semantic_annotation_type.uses_visual_as_collision_backup
         parser = (
             URDFParser.from_file(
-                description_file_path,
+                file_path=description_file_path,
                 prefix="",
                 use_visual_as_collision_backup=uses_backup,
             )
@@ -142,7 +142,7 @@ class RobotSpecification:
             ),
         )
 
-    def spawn(self, world: World) -> AbstractRobot:
+    def spawn(self, *, world: World) -> AbstractRobot:
         """
         Read the robot and merge it into ``world``.
 
@@ -158,10 +158,14 @@ class RobotSpecification:
         described_robot = self._create_described_robot()
         robot_id = described_robot.id
         if isinstance(described_robot, HasMobileBase):
-            self._merge_behind_its_odometry(world, described_robot)
+            self._merge_behind_its_odometry(
+                world=world, described_robot=described_robot
+            )
         else:
-            self._merge_at_its_localization(world, described_robot)
-        return cast("AbstractRobot", world.get_semantic_annotation_by_id(robot_id))
+            self._merge_at_its_localization(
+                world=world, described_robot=described_robot
+            )
+        return cast("AbstractRobot", world.get_semantic_annotation_by_id(id=robot_id))
 
     def _create_described_robot(self) -> AbstractRobot:
         """
@@ -171,11 +175,11 @@ class RobotSpecification:
         if self.description_parser is None:
             return self.semantic_annotation_type.from_description()
         return self.semantic_annotation_type.from_world(
-            self.description_parser.create_world()
+            world=self.description_parser.create_world()
         )
 
     def _merge_at_its_localization(
-        self, world: World, described_robot: AbstractRobot
+        self, *, world: World, described_robot: AbstractRobot
     ) -> None:
         """
         Merge a robot without a mobile base as ``world.root -> localization -> robot``.
@@ -186,13 +190,13 @@ class RobotSpecification:
         robot_world = described_robot._world
         with world.modify_world():
             localization = self._create_localization(
-                world, cast(Body, robot_world.root)
+                world=world, localized_body=cast(Body, robot_world.root)
             )
-            world.merge_world(robot_world, root_connection=localization)
-        self._move_localization_to_its_pose(world, localization)
+            world.merge_world(other=robot_world, root_connection=localization)
+        self._move_localization_to_its_pose(world=world, localization=localization)
 
     def _merge_behind_its_odometry(
-        self, world: World, described_robot: HasMobileBase
+        self, *, world: World, described_robot: HasMobileBase
     ) -> None:
         """
         Merge a robot with a mobile base as ``world.root -> localization -> odometry ->
@@ -204,26 +208,29 @@ class RobotSpecification:
         """
         robot_world = described_robot._world
         with world.modify_world():
-            odometry_body = Body(name=self._odometry_body_name(described_robot))
-            localization = self._create_localization(world, odometry_body)
-            world.add_connection(localization)
+            odometry_body = Body(name=self._odometry_body_name(robot=described_robot))
+            localization = self._create_localization(
+                world=world, localized_body=odometry_body
+            )
+            world.add_connection(connection=localization)
             drive = described_robot.mobile_base.create_drive(
                 world=world, parent=odometry_body, child=cast(Body, robot_world.root)
             )
-            world.merge_world(robot_world, root_connection=drive)
-            world.set_dofs_has_hardware_interface(drive.active_dofs, True)
+            world.merge_world(other=robot_world, root_connection=drive)
+            world.set_dofs_has_hardware_interface(dofs=drive.active_dofs, value=True)
             merged_robot = cast(
-                HasMobileBase, world.get_semantic_annotation_by_id(described_robot.id)
+                HasMobileBase,
+                world.get_semantic_annotation_by_id(id=described_robot.id),
             )
-            merged_robot.mobile_base.declare_drive_servos(drive)
+            merged_robot.mobile_base.declare_drive_servos(drive=drive)
 
         # The drive's pose is degree of freedom state, set after the modification block.
-        self._move_localization_to_its_pose(world, localization)
+        self._move_localization_to_its_pose(world=world, localization=localization)
         if self.odometry_T_robot_start is not None:
             drive.origin = self.odometry_T_robot_start
 
     @staticmethod
-    def _odometry_body_name(robot: HasMobileBase) -> PrefixedName:
+    def _odometry_body_name(*, robot: HasMobileBase) -> PrefixedName:
         """
         :param robot: The robot whose odometry body is named.
         :return: The name its mobile base declares, with the prefix of the robot's own
@@ -234,7 +241,7 @@ class RobotSpecification:
         )
 
     def _create_localization(
-        self, world: World, localized_body: Body
+        self, *, world: World, localized_body: Body
     ) -> FixedConnection | Connection6DoF:
         """
         :param world: The world the connection is created in.
@@ -248,14 +255,16 @@ class RobotSpecification:
             parent=cast(Body, world.root),
             child=localized_body,
             parent_T_connection_expression=(
-                self._reframe_localization_pose(world, localized_body)
+                self._reframe_localization_pose(
+                    world=world, localized_body=localized_body
+                )
                 if is_fixed
                 else None
             ),
         )
 
     def _move_localization_to_its_pose(
-        self, world: World, localization: FixedConnection | Connection6DoF
+        self, *, world: World, localization: FixedConnection | Connection6DoF
     ) -> None:
         """
         Set the localization pose on a movable localization, whose pose is degree of
@@ -270,10 +279,12 @@ class RobotSpecification:
             or self.localization_pose is None
         ):
             return
-        localization.origin = self._reframe_localization_pose(world, localization.child)
+        localization.origin = self._reframe_localization_pose(
+            world=world, localized_body=localization.child
+        )
 
     def _reframe_localization_pose(
-        self, world: World, localized_body: Body
+        self, *, world: World, localized_body: Body
     ) -> HomogeneousTransformationMatrix | None:
         """
         :param world: The world whose root is the reference frame.

@@ -72,7 +72,9 @@ class GiskardTester(ABC):
         """
         :return: Whether the robot drives with an omnidirectional drive.
         """
-        robot = self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        robot = self.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )[0]
         return isinstance(robot.drive, OmniDrive)
 
     def wait_for_cycles(self, *, number_of_cycles: int = 5) -> None:
@@ -131,15 +133,15 @@ class GiskardTester(ABC):
         with self.api.world.modify_world():
             box = Body(name=PrefixedName(name=name))
             box_shape = Box(scale=Scale(x=size[0], y=size[1], z=size[2]))
-            box.collision.append(box_shape)
-            box.visual.append(box_shape)
+            box.collision.append(shape=box_shape)
+            box.visual.append(shape=box_shape)
 
             connection = FixedConnection(
                 parent=parent_link,
                 child=box,
                 parent_T_connection_expression=parent_T_pose,
             )
-            self.api.world.add_connection(connection)
+            self.api.world.add_connection(connection=connection)
         self.wait_for_cycles()
 
     def add_urdf_to_world(
@@ -164,9 +166,9 @@ class GiskardTester(ABC):
             parent_link = self.api.world.root
         else:
             parent_link = self.api.world.get_kinematic_structure_entity_by_name(
-                parent_link
+                name=parent_link
             )
-        urdf_parser = URDFParser.from_file(file_path, prefix=name)
+        urdf_parser = URDFParser.from_file(file_path=file_path, prefix=name)
         world_from_urdf = urdf_parser.create_world()
         with self.api.world.modify_world():
             parent_C_urdf_root = FixedConnection(
@@ -175,7 +177,7 @@ class GiskardTester(ABC):
                 parent_T_connection_expression=pose,
             )
             self.api.world.merge_world(
-                world_from_urdf, root_connection=parent_C_urdf_root
+                other=world_from_urdf, root_connection=parent_C_urdf_root
             )
 
         self.wait_for_cycles()

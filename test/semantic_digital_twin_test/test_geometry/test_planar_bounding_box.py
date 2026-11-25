@@ -20,7 +20,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 def test_planar_bounding_box_transform_same_frame():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     bb = PlanarBoundingBox(
         min_x=-1,
@@ -34,7 +36,7 @@ def test_planar_bounding_box_transform_same_frame():
         0, 1, 0, reference_frame=world.root
     )
 
-    new_origin_bb = bb.transform_to_origin(new_origin)
+    new_origin_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_origin_bb.min_x == -1
     assert new_origin_bb.max_x == 1
@@ -56,7 +58,7 @@ def test_planar_bounding_box_transform_rotated():
             ),
         )
 
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     bb = PlanarBoundingBox(
         min_x=-0.5, min_y=-1, max_x=0.5, max_y=1, origin=body2.global_pose
@@ -64,7 +66,7 @@ def test_planar_bounding_box_transform_rotated():
 
     new_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body1)
 
-    new_bb = bb.transform_to_origin(new_origin)
+    new_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_bb.min_x == 0.0
     assert new_bb.max_x == 2.0
@@ -76,7 +78,9 @@ def test_planar_bounding_box_transform_rotated():
 def test_planar_bounding_box_event_round_trip():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     simple_event = SimpleEvent.from_data(
         {
@@ -86,7 +90,9 @@ def test_planar_bounding_box_event_round_trip():
     )
     event = Event.from_simple_sets(simple_event)
 
-    bbc = BoundingBoxCollection.from_event(PlanarBoundingBox, world.root, event)
+    bbc = BoundingBoxCollection.from_event(
+        box_type=PlanarBoundingBox, reference_frame=world.root, event=event
+    )
     bb = bbc.bounding_boxes[0]
     assert len(bbc.bounding_boxes) == 1
     assert bb.x_interval.lower == 0
@@ -122,7 +128,9 @@ def test_planar_bounding_box_area_of_a_flat_bounding_box_vanishes():
 def test_planar_bounding_box_contains():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     bb = PlanarBoundingBox(
         min_x=-0.5,
@@ -134,13 +142,15 @@ def test_planar_bounding_box_contains():
 
     point = Point2(0, 0, reference_frame=world.root)
 
-    assert bb.contains(point)
+    assert bb.contains(point=point)
 
 
 def test_planar_bounding_box_does_not_contain_a_point_outside():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     bb = PlanarBoundingBox(
         min_x=-0.5,
@@ -152,7 +162,7 @@ def test_planar_bounding_box_does_not_contain_a_point_outside():
 
     point = Point2(10, 10, reference_frame=world.root)
 
-    assert not bb.contains(point)
+    assert not bb.contains(point=point)
 
 
 def test_planar_bounding_box_center():
@@ -172,7 +182,7 @@ def test_planar_bounding_box_bloat():
         min_x=0, min_y=0, max_x=1, max_y=1, origin=HomogeneousTransformationMatrix()
     )
 
-    bloated = bb.bloat(0.5, 0.25)
+    bloated = bb.bloat(x_amount=0.5, y_amount=0.25)
 
     assert bloated.min_x == -0.5
     assert bloated.max_x == 1.5
@@ -183,12 +193,14 @@ def test_planar_bounding_box_bloat():
 def test_planar_bounding_box_intersection_with():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     a = PlanarBoundingBox(min_x=0, min_y=0, max_x=2, max_y=2, origin=origin)
     b = PlanarBoundingBox(min_x=1, min_y=1, max_x=3, max_y=3, origin=origin)
 
-    intersection = a.intersection_with(b)
+    intersection = a.intersection_with(other=b)
 
     assert intersection.min_x == 1
     assert intersection.min_y == 1
@@ -199,12 +211,14 @@ def test_planar_bounding_box_intersection_with():
 def test_planar_bounding_box_intersection_with_disjoint_box_is_none():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     a = PlanarBoundingBox(min_x=0, min_y=0, max_x=1, max_y=1, origin=origin)
     b = PlanarBoundingBox(min_x=5, min_y=5, max_x=6, max_y=6, origin=origin)
 
-    assert a.intersection_with(b) is None
+    assert a.intersection_with(other=b) is None
 
 
 # %% BoundingBoxCollection[PlanarBoundingBox, Point2]
@@ -213,7 +227,9 @@ def test_planar_bounding_box_intersection_with_disjoint_box_is_none():
 def test_planar_bounding_box_collection_merge():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     first = BoundingBoxCollection(
@@ -225,7 +241,7 @@ def test_planar_bounding_box_collection_merge():
         reference_frame=world.root,
     )
 
-    merged = first.merge(second)
+    merged = first.merge(other=second)
 
     assert len(merged.bounding_boxes) == 2
 
@@ -233,7 +249,9 @@ def test_planar_bounding_box_collection_merge():
 def test_planar_bounding_box_collection_bounding_box():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     collection = BoundingBoxCollection(

@@ -106,18 +106,19 @@ class SelfCollisionMatrixInterface:
     def __post_init__(self):
         self.world = World()
         with self.world.modify_world():
-            self.world.add_body(Body(name=PrefixedName(name="map")))
+            self.world.add_body(body=Body(name=PrefixedName(name="map")))
 
     def load_urdf(self, *, urdf_path: str):
-        robot_world = URDFParser.from_file(urdf_path).create_world()
+        robot_world = URDFParser.from_file(file_path=urdf_path).create_world()
         self.self_collision_matrix_rule = SelfCollisionMatrixRule()
         with self.world.modify_world():
             self.world.clear()
-            self.world.add_body(map := Body(name=PrefixedName(name="map")))
+            self.world.add_body(body=(map := Body(name=PrefixedName(name="map"))))
             self.world.merge_world(
-                robot_world, FixedConnection(parent=map, child=robot_world.root)
+                other=robot_world,
+                root_connection=FixedConnection(parent=map, child=robot_world.root),
             )
-        self.robot = MinimalRobot.from_world(self.world)
+        self.robot = MinimalRobot.from_world(world=self.world)
         VizMarkerPublisher(
             _world=self.world,
             node=background_node.get_node(),
@@ -152,7 +153,9 @@ class SelfCollisionMatrixInterface:
     def sort_bodies(self, *, body_a: Body, body_b: Body) -> tuple[Body, Body]:
         if body_a == body_b:
             return body_a, body_b
-        collision_check = CollisionCheck.create_and_validate(body_a, body_b)
+        collision_check = CollisionCheck.create_and_validate(
+            body_a=body_a, body_b=body_b
+        )
         return collision_check.body_a, collision_check.body_b
 
     def get_reason_for_pair(
@@ -183,7 +186,7 @@ class SelfCollisionMatrixInterface:
 
     def load_srdf(self, *, srdf_path: str):
         self.self_collision_matrix_rule = SelfCollisionMatrixRule.from_collision_srdf(
-            srdf_path, self.world
+            file_path=srdf_path, world=self.world
         )
         for collision_check in self.self_collision_matrix_rule.allowed_collision_pairs:
             self.set_reason_for_pair(
@@ -195,7 +198,7 @@ class SelfCollisionMatrixInterface:
     def safe_srdf(self, *, file_path: str):
         self._sync_reasons_to_collision_pairs()
         self.self_collision_matrix_rule.save_self_collision_matrix(
-            self.robot.name.name, file_path
+            robot_name=self.robot.name.name, file_name=file_path
         )
 
     def _sync_reasons_to_collision_pairs(self):
@@ -206,7 +209,9 @@ class SelfCollisionMatrixInterface:
         self.self_collision_matrix_rule.allowed_collision_pairs.clear()
         for (body_a, body_b), reason in self._reasons.items():
             if reason is not None:
-                collision_check = CollisionCheck.create_and_validate(body_a, body_b)
+                collision_check = CollisionCheck.create_and_validate(
+                    body_a=body_a, body_b=body_b
+                )
                 self.self_collision_matrix_rule.allowed_collision_pairs.add(
                     collision_check
                 )
@@ -218,12 +223,16 @@ class SelfCollisionMatrixInterface:
         self.self_collision_matrix_rule.allowed_collision_bodies.add(body)
 
     def add_pair(self, *, body_a: Body, body_b: Body, reason: DisableCollisionReason):
-        collision_check = CollisionCheck.create_and_validate(body_a, body_b)
+        collision_check = CollisionCheck.create_and_validate(
+            body_a=body_a, body_b=body_b
+        )
         self.self_collision_matrix_rule.allowed_collision_pairs.add(collision_check)
         self.set_reason_for_pair(body_a=body_a, body_b=body_b, reason=reason)
 
     def remove_pair(self, *, body_a: Body, body_b: Body):
-        collision_check = CollisionCheck.create_and_validate(body_a, body_b)
+        collision_check = CollisionCheck.create_and_validate(
+            body_a=body_a, body_b=body_b
+        )
         self.self_collision_matrix_rule.allowed_collision_pairs.discard(collision_check)
         self.set_reason_for_pair(body_a=body_a, body_b=body_b, reason=None)
 
@@ -344,8 +353,8 @@ class CollisionMatrixTable(QTableWidget):
 
         with self.self_collision_matrix_interface.world.modify_world():
             self.self_collision_matrix_interface.dye_all_bodies_white_transparent()
-            body_a.collision.dye_shapes(color_msg)
-            body_b.collision.dye_shapes(color_msg)
+            body_a.collision.dye_shapes(color=color_msg)
+            body_b.collision.dye_shapes(color=color_msg)
 
     def add_table_item(self, *, row, column):
         checkbox = ReasonCheckBox(

@@ -75,7 +75,7 @@ class PoseReached(
         """
         root_T_goal = self.root_T_goal_reference_frame @ self.goal_pose
         root_T_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         distance_to_goal = root_T_goal.position.euclidean_distance(
             root_T_current.position
@@ -112,7 +112,7 @@ class PositionReached(
         """
         root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position
         distance_to_goal = root_P_goal.euclidean_distance(root_P_current)
         return NodeArtifacts(observation=distance_to_goal < self.threshold)
@@ -138,7 +138,7 @@ class OrientationReached(
         """
         root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
         root_R_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).rotation_matrix
         rotation_error = root_R_current.rotational_distance(root_R_goal)
         return NodeArtifacts(observation=sm.abs(rotation_error) < self.threshold)
@@ -175,7 +175,7 @@ class PointingAt(
         )
         tip_V_pointing_axis.scale(1)
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         root_P_tip = root_T_tip.position
         root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
@@ -216,7 +216,7 @@ class VectorsAligned(
         root_V_root_normal.scale(1)
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).rotation_matrix
         root_V_tip_normal = root_R_tip.dot(tip_V_tip_normal)
         error = root_V_tip_normal.angle_between(root_V_root_normal)
@@ -256,7 +256,7 @@ class DistanceToLine(
             line segment of :attr:`line_length` centred on :attr:`center_point`.
         """
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position
         root_V_line_axis = self.context.world.transform(
             target_frame=self.kinematic_chain.root, spatial_object=self.line_axis

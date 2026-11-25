@@ -84,7 +84,7 @@ class CostmapLocation(Location, ABC):
             body follows that body.
         """
         world = self.context.world
-        return world.transform(pose, world.root)
+        return world.transform(spatial_object=pose, target_frame=world.root)
 
 
 @dataclass(kw_only=True)

@@ -450,11 +450,11 @@ def test_node_referenced_by_another_node_is_one_instance_after_json_round_trip()
 
 
 def _root_body(world: World) -> WorldEntityWithID:
-    return world.get_kinematic_structure_entity_by_name("root")
+    return world.get_kinematic_structure_entity_by_name(name="root")
 
 
 def _connection(world: World) -> WorldEntityWithID:
-    return world.get_connection_by_name("root_T_tip")
+    return world.get_connection_by_name(name="root_T_tip")
 
 
 @pytest.mark.parametrize(
@@ -477,7 +477,7 @@ def test_a_statechart_refers_to_world_entities_by_reference(
         "world_entity"
     ] == WorldEntityReferenceWriter().write_reference(obj=world_entity)
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=mini_world)
     msc_copy = Statechart.from_json(
         data=json_data,
         context=StatechartContext(world=mini_world),

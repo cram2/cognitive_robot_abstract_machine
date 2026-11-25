@@ -25,7 +25,9 @@ def create_giskard(node: Node) -> Giskard:
     """
     return Giskard.standalone(
         world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(Tiago)]
+            robots=[
+                RobotSpecification.specify_real_robot(semantic_annotation_type=Tiago)
+            ]
         ),
         qp_controller_config=QPControllerConfig.create_with_simulation_defaults(),
     )

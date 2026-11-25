@@ -668,7 +668,7 @@ def test_an_action_is_sent_with_its_collision_allowances(simple_pr2_context) -> 
     received = Statechart.from_json(
         data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
-        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
     )
 
     [rule] = received.get_node_by_index(index=action.index).temporary_collision_rules
@@ -686,7 +686,7 @@ def test_a_pick_up_and_its_grasp_and_reach_let_the_gripper_touch(
     The allowance is the action's own rather than a node beside each of its goals.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
     )
@@ -708,7 +708,7 @@ def test_a_place_lets_the_gripper_holding_its_object_touch(
     The allowance covers the gripper of the arm the place is given, and the place declares it rather than running a node of its own for it.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
     )
@@ -804,7 +804,7 @@ def test_a_pick_up_grasps_reattaches_and_lifts_as_its_own_steps(
     its own.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
     )
@@ -825,7 +825,7 @@ def test_a_place_reattaches_and_retracts_as_its_own_steps(
     Putting the object back under the world and retracting are the last two steps directly below the place, not a sequence nested inside it.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
     )

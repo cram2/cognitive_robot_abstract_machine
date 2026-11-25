@@ -67,7 +67,7 @@ class StayOnLineTask(
             controlled point and the line segment.
         """
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         root_P_tool = root_T_tip @ self.context.world.transform(
             target_frame=self.kinematic_chain.tip, spatial_object=self.tip_P_tool

@@ -62,7 +62,7 @@ def _empty_world() -> tuple[World, Body]:
     world = World()
     root = Body(name=PrefixedName(name="map"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     return world, root
 
 
@@ -1111,7 +1111,7 @@ def test_extracted_contents_spawn_within_the_layer_footprint(tmp_path: Path) -> 
         theme_dominant_type=ObjectType.BOOK,
     )
     world, root = _empty_world()
-    spawned.spawn(world, parent=root)
+    spawned.spawn(world=world, parent=root)
 
     body = spawned.layers[0].objects[0].annotation
     corpus_x, corpus_y = body.parent_connection.origin.position.to_np()[:2]

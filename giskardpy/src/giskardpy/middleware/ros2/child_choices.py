@@ -173,7 +173,7 @@ class ChildChoiceMessage(SubclassJSONSerializer):
                 first_sent_node_index=self.first_node_index,
             )
         world = statechart.context.world
-        kwargs = WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs()
+        kwargs = WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs()
         statechart.add_nodes_from_json(data=self.nodes, world=world, **kwargs)
         return statechart.get_node_by_index(index=self.first_node_index)
 

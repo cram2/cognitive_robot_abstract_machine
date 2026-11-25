@@ -41,12 +41,12 @@ def pr2_holding_milk(simple_pr2_context):
     extensions it acts in.
     """
     world, robot, extensions = simple_pr2_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     milk = Milk(root=milk_body)
     tool_frame = robot.left_arm.end_effector.tool_frame
     with world.modify_world():
-        world.move_branch(milk_body, tool_frame)
-        world.add_semantic_annotation(milk)
+        world.move_branch(branch_root=milk_body, new_parent=tool_frame)
+        world.add_semantic_annotation(semantic_annotation=milk)
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         *HELD_AT, yaw=HELD_YAW, reference_frame=tool_frame
     )
@@ -94,7 +94,9 @@ def test_a_place_puts_the_held_object_on_the_target_however_it_is_held(
     )
 
     end_effector = robot.left_arm.end_effector
-    tool_T_milk = world.transform(milk.root.global_transform, end_effector.tool_frame)
+    tool_T_milk = world.transform(
+        spatial_object=milk.root.global_transform, target_frame=end_effector.tool_frame
+    )
     descent = _tool_goals_of(place)[1]
     placed_milk = descent.goal_pose.evaluate() @ tool_T_milk.to_np()
 
@@ -117,7 +119,7 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
     end_effector = robot.left_arm.end_effector
     grasp = GraspCandidate(graspable=milk, grasp_pose=end_effector.held_body_T_grasp)
     poses = place.grasp_pose_sequence(
-        reference_T_grasp=grasp.moved_to(target),
+        reference_T_grasp=grasp.moved_to(reference_T_object=target),
         end_effector=end_effector,
         grasp_candidate=grasp,
     )
@@ -169,7 +171,7 @@ def test_a_place_after_an_underspecified_pick_up_joins_the_statechart(
     built nothing holds the object and no pick-up says how it will be held.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
 
     pick_up = a(PickUpAction)(
@@ -198,7 +200,7 @@ def test_place_moves_only_the_arm_it_is_given(pr2_apartment_context):
     alone.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
     place = PlaceAction(arm=robot.right_arm, graspable=milk, goal_pose=target)
     expand(Sequence(nodes=[place]), extensions)

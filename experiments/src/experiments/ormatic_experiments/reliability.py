@@ -50,7 +50,7 @@ _APARTMENT_URDF = "package://iai_apartment/urdf/apartment.urdf"
 def _build_hsrb_world() -> World:
     urdf_parser = URDFParser.from_file(file_path=HSRB.get_ros_file_path())
     world = urdf_parser.create_world()
-    HSRB.from_world(world)
+    HSRB.from_world(world=world)
 
     with world.modify_world():
         old_root = world.root
@@ -59,10 +59,10 @@ def _build_hsrb_world() -> World:
         map_C_odom = Connection6DoF.create_with_dofs(
             world=world, parent=map_body, child=odom
         )
-        world.add_connection(map_C_odom)
+        world.add_connection(connection=map_C_odom)
         drive = OmniDrive.create_with_dofs(parent=odom, child=old_root, world=world)
-        world.add_connection(drive)
-        world.set_dofs_has_hardware_interface(drive.active_dofs, True)
+        world.add_connection(connection=drive)
+        world.set_dofs_has_hardware_interface(dofs=drive.active_dofs, value=True)
 
     return world
 
@@ -73,12 +73,12 @@ def build_cram_world():
     extensions being what its plans read from their context.
     """
     hsrb_world = _build_hsrb_world()
-    apartment = URDFParser.from_file(_APARTMENT_URDF).create_world()
-    hsrb_world.merge_world(apartment)
+    apartment = URDFParser.from_file(file_path=_APARTMENT_URDF).create_world()
+    hsrb_world.merge_world(other=apartment)
     hsrb_world.get_body_by_name(
-        "base_footprint"
+        name="base_footprint"
     ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
-    hsrb = hsrb_world.get_semantic_annotations_by_type(HSRB)[0]
+    hsrb = hsrb_world.get_semantic_annotations_by_type(semantic_annotation_type=HSRB)[0]
     extensions = [
         RobotAccess(robot=hsrb),
         StatementGrounding(query_backend=ProbabilisticBackend()),

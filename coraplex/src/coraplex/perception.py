@@ -106,14 +106,14 @@ class PerceptionQuery(SubclassJSONSerializer):
         bodies = dict.fromkeys(
             body
             for semantic_annotation in self.world.get_semantic_annotations_by_type(
-                self.semantic_annotation
+                semantic_annotation_type=self.semantic_annotation
             )
             for body in semantic_annotation.bodies
         )
         region_bodies = [
             body
             for body in bodies
-            if self.region.contains(body.global_transform.position)
+            if self.region.contains(point=body.global_transform.position)
         ]
 
         robot_camera = self.robot.get_default_camera()
@@ -181,10 +181,14 @@ class Detection:
         matching_annotations = self.resolve_annotations(world=world)
         matching_annotation = matching_annotations[0]
         body = matching_annotation.root
-        robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        robot = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )[0]
 
         # Foundation Pose may return a upside down pose. this detects and fixes it by rotation around x by 180 degree
-        detected_global_pose = world.transform(self.pose, world.root).homogeneous_matrix
+        detected_global_pose = world.transform(
+            spatial_object=self.pose, target_frame=world.root
+        ).homogeneous_matrix
         detected_global_pose = self._frame_with_z_up_and_x_towards(
             root_T_frame=detected_global_pose,
             root_P_target=robot.root.global_transform.position,
@@ -194,7 +198,8 @@ class Detection:
             body.parent_connection.origin = detected_global_pose
         else:
             parent_T_object = world.transform(
-                detected_global_pose, body.parent_connection.parent
+                spatial_object=detected_global_pose,
+                target_frame=body.parent_connection.parent,
             )
             parent_origin = body.parent_connection.origin
             body.parent_connection.origin = (
@@ -244,7 +249,9 @@ class Detection:
             annotation.
         :raises AmbiguousDetection: If the matching annotations sit on different bodies.
         """
-        candidates = world.get_semantic_annotations_by_type(self.semantic_annotation)
+        candidates = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=self.semantic_annotation
+        )
         if not candidates:
             raise PerceivedObjectNotInWorld(
                 semantic_annotation=self.semantic_annotation
@@ -328,7 +335,7 @@ class WorldPerception(PerceptionInterface):
     def look_for(self, *, query: PerceptionQuery) -> list[Detection]:
         annotation_by_body = {}
         for annotation in query.world.get_semantic_annotations_by_type(
-            query.semantic_annotation
+            semantic_annotation_type=query.semantic_annotation
         ):
             annotation_by_body.setdefault(annotation.root, type(annotation))
 
@@ -433,7 +440,7 @@ class RoboKudoPerception(PerceptionInterface):
                 pose_stamped.pose.orientation.z,
                 pose_stamped.pose.orientation.w,
                 reference_frame=world.get_kinematic_structure_entity_by_name(
-                    pose_stamped.header.frame_id
+                    name=pose_stamped.header.frame_id
                 ),
             ),
         )

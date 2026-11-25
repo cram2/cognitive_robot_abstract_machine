@@ -56,7 +56,7 @@ class HasUpdateState(ABC):
     """
 
     @abstractmethod
-    def update_state(self, dt: float) -> None:
+    def update_state(self, *, dt: float) -> None:
         """
         Allows the connection to update the state of its dofs.
 
@@ -329,7 +329,7 @@ class ScrewAxisConnection(ActiveConnection1DOF):
         dof = DegreeOfFreedom(
             name=PrefixedName(name="dof", prefix=str(name)), limits=dof_limits
         )
-        world.add_degree_of_freedom(dof)
+        world.add_degree_of_freedom(dof=dof)
         return cls(
             name=name,
             parent=parent,
@@ -441,8 +441,8 @@ class ScrewAxisConnection(ActiveConnection1DOF):
             ),
         )
         with world.modify_world():
-            world.remove_connection(self)
-            world.add_connection(moved)
+            world.remove_connection(connection=self)
+            world.add_connection(connection=moved)
         return moved
 
     @classproperty
@@ -614,19 +614,19 @@ class Connection6DoF(Connection):
 
         stringified_name = str(name)
         x = DegreeOfFreedom(name=PrefixedName(name="x", prefix=stringified_name))
-        world.add_degree_of_freedom(x)
+        world.add_degree_of_freedom(dof=x)
         y = DegreeOfFreedom(name=PrefixedName(name="y", prefix=stringified_name))
-        world.add_degree_of_freedom(y)
+        world.add_degree_of_freedom(dof=y)
         z = DegreeOfFreedom(name=PrefixedName(name="z", prefix=stringified_name))
-        world.add_degree_of_freedom(z)
+        world.add_degree_of_freedom(dof=z)
         qx = DegreeOfFreedom(name=PrefixedName(name="qx", prefix=stringified_name))
-        world.add_degree_of_freedom(qx)
+        world.add_degree_of_freedom(dof=qx)
         qy = DegreeOfFreedom(name=PrefixedName(name="qy", prefix=stringified_name))
-        world.add_degree_of_freedom(qy)
+        world.add_degree_of_freedom(dof=qy)
         qz = DegreeOfFreedom(name=PrefixedName(name="qz", prefix=stringified_name))
-        world.add_degree_of_freedom(qz)
+        world.add_degree_of_freedom(dof=qz)
         qw = DegreeOfFreedom(name=PrefixedName(name="qw", prefix=stringified_name))
-        world.add_degree_of_freedom(qw)
+        world.add_degree_of_freedom(dof=qw)
         world.state[qw.id].position = 1.0
 
         return cls(
@@ -679,7 +679,9 @@ class Connection6DoF(Connection):
             ``homogeneous_matrix`` before being assigned here.
         """
         local_kinematics = self._calculate_local_kinematics(
-            self._world.transform(transformation, self.parent)
+            transformation=self._world.transform(
+                spatial_object=transformation, target_frame=self.parent
+            )
         )
         position = local_kinematics.position
         orientation = local_kinematics.rotation_matrix.quaternion
@@ -754,7 +756,9 @@ class WheeledDrive(ActiveConnection, HasUpdateState, ABC):
 
         :param transformation: The desired parent-to-child origin.
         """
-        local_kinematics = self._calculate_local_kinematics(transformation)
+        local_kinematics = self._calculate_local_kinematics(
+            transformation=transformation
+        )
         position = local_kinematics.position
         roll, pitch, yaw = local_kinematics.rotation_matrix.rpy
         with self._world._world_lock:
@@ -865,22 +869,22 @@ class OmniDrive(WheeledDrive):
         stringified_name = str(name)
 
         x = DegreeOfFreedom(name=PrefixedName(name="x", prefix=stringified_name))
-        world.add_degree_of_freedom(x)
+        world.add_degree_of_freedom(dof=x)
         y = DegreeOfFreedom(name=PrefixedName(name="y", prefix=stringified_name))
-        world.add_degree_of_freedom(y)
+        world.add_degree_of_freedom(dof=y)
         roll = DegreeOfFreedom(name=PrefixedName(name="roll", prefix=stringified_name))
-        world.add_degree_of_freedom(roll)
+        world.add_degree_of_freedom(dof=roll)
         pitch = DegreeOfFreedom(
             name=PrefixedName(name="pitch", prefix=stringified_name)
         )
-        world.add_degree_of_freedom(pitch)
+        world.add_degree_of_freedom(dof=pitch)
         yaw = DegreeOfFreedom(
             name=PrefixedName(name="yaw", prefix=stringified_name),
             limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 maximum_speed=rotation_velocity_limits
             ),
         )
-        world.add_degree_of_freedom(yaw)
+        world.add_degree_of_freedom(dof=yaw)
 
         x_vel = DegreeOfFreedom(
             name=PrefixedName(name="x_vel", prefix=stringified_name),
@@ -888,14 +892,14 @@ class OmniDrive(WheeledDrive):
                 maximum_speed=translation_velocity_limits
             ),
         )
-        world.add_degree_of_freedom(x_vel)
+        world.add_degree_of_freedom(dof=x_vel)
         y_vel = DegreeOfFreedom(
             name=PrefixedName(name="y_vel", prefix=stringified_name),
             limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 maximum_speed=translation_velocity_limits
             ),
         )
-        world.add_degree_of_freedom(y_vel)
+        world.add_degree_of_freedom(dof=y_vel)
 
         return cls(
             parent=parent,
@@ -920,7 +924,7 @@ class OmniDrive(WheeledDrive):
     def passive_dofs(self) -> list[DegreeOfFreedom]:
         return [self.x, self.y, self.roll, self.pitch]
 
-    def update_state(self, dt: float) -> None:
+    def update_state(self, *, dt: float) -> None:
         state = self._world.state
         state[self.x_velocity.id].position = 0
         state[self.y_velocity.id].position = 0
@@ -1017,22 +1021,22 @@ class DifferentialDrive(WheeledDrive):
         stringified_name = str(name)
 
         x = DegreeOfFreedom(name=PrefixedName(name="x", prefix=stringified_name))
-        world.add_degree_of_freedom(x)
+        world.add_degree_of_freedom(dof=x)
         y = DegreeOfFreedom(name=PrefixedName(name="y", prefix=stringified_name))
-        world.add_degree_of_freedom(y)
+        world.add_degree_of_freedom(dof=y)
         roll = DegreeOfFreedom(name=PrefixedName(name="roll", prefix=stringified_name))
-        world.add_degree_of_freedom(roll)
+        world.add_degree_of_freedom(dof=roll)
         pitch = DegreeOfFreedom(
             name=PrefixedName(name="pitch", prefix=stringified_name)
         )
-        world.add_degree_of_freedom(pitch)
+        world.add_degree_of_freedom(dof=pitch)
         yaw = DegreeOfFreedom(
             name=PrefixedName(name="yaw", prefix=stringified_name),
             limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 maximum_speed=rotation_velocity_limits
             ),
         )
-        world.add_degree_of_freedom(yaw)
+        world.add_degree_of_freedom(dof=yaw)
 
         x_vel = DegreeOfFreedom(
             name=PrefixedName(name="x_vel", prefix=stringified_name),
@@ -1040,7 +1044,7 @@ class DifferentialDrive(WheeledDrive):
                 maximum_speed=translation_velocity_limits
             ),
         )
-        world.add_degree_of_freedom(x_vel)
+        world.add_degree_of_freedom(dof=x_vel)
 
         return cls(
             parent=parent,
@@ -1064,7 +1068,7 @@ class DifferentialDrive(WheeledDrive):
     def passive_dofs(self) -> list[DegreeOfFreedom]:
         return [self.x, self.y, self.roll, self.pitch]
 
-    def update_state(self, dt: float) -> None:
+    def update_state(self, *, dt: float) -> None:
         state = self._world.state
         state[self.x_velocity.id].position = 0
 

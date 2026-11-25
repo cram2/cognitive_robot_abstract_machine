@@ -50,11 +50,13 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odome
     tick_limit = 1000
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
     pr2 = RobotSpecification(
         semantic_annotation_type=PR2, localization_pose=world_T_odometry
-    ).spawn(world)
-    world_T_start = world.compute_forward_kinematics_np(world.root, pr2.root)
+    ).spawn(world=world)
+    world_T_start = world.compute_forward_kinematics_np(root=world.root, tip=pr2.root)
     goal = Pose.from_xyz_rpy(
         x=world_T_start[0, 3] + 0.5,
         y=world_T_start[1, 3] + 0.3,
@@ -94,7 +96,9 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odome
         w, i, j, k = simulation.simulator.get_body_quaternion(
             body_name=pr2.root.name.name
         ).result
-        world_T_believed = world.compute_forward_kinematics_np(world.root, pr2.root)
+        world_T_believed = world.compute_forward_kinematics_np(
+            root=world.root, tip=pr2.root
+        )
     finally:
         simulation.stop_simulation()
 

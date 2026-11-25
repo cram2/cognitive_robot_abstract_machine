@@ -121,7 +121,7 @@ def test_perform_execute_single(pr2_apartment_context):
         robot_view.root.global_transform.to_np()[:3, 3], [0.3, -1.3, 0], decimal=1
     )
     assert world.state[
-        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
+        world.get_degree_of_freedom_by_name(name=PR2Joint.TORSO_LIFT).id
     ].position == pytest.approx(0.3, abs=0.1)
 
 
@@ -132,7 +132,7 @@ def test_perform_single_designator(pr2_apartment_context):
     run_plan(plan, extensions)
 
     assert world.state[
-        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
+        world.get_degree_of_freedom_by_name(name=PR2Joint.TORSO_LIFT).id
     ].position == pytest.approx(0.3, abs=0.1)
 
 
@@ -180,7 +180,7 @@ def test_perform_repeat_runs_a_succeeding_motion_once(pr2_apartment_context):
     run_plan(plan, extensions)
 
     assert world.state[
-        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+        world.get_degree_of_freedom_by_name(name="torso_lift_joint").id
     ].position == pytest.approx(0.3, abs=0.05)
     assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
 
@@ -272,7 +272,9 @@ def test_try_in_order_recovers_from_a_failing_code_step(pr2_apartment_context) -
     run_plan(plan, extensions)
 
     [torso_up] = (
-        robot_view.get_torso().get_joint_state_by_type(TorsoState.HIGH).target_values
+        robot_view.get_torso()
+        .get_joint_state_by_type(state_type=TorsoState.HIGH)
+        .target_values
     )
     assert _torso_position(world) == pytest.approx(torso_up, abs=0.05)
     assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
@@ -321,7 +323,7 @@ def test_cancel_monitor_construction(pr2_apartment_context):
 
 def _torso_position(world):
     return world.state[
-        world.get_degree_of_freedom_by_name("torso_lift_joint").id
+        world.get_degree_of_freedom_by_name(name="torso_lift_joint").id
     ].position
 
 

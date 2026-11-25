@@ -213,7 +213,7 @@ class Footprint:
     """
 
     @classmethod
-    def of(cls, bounding_box: AxisAlignedBox) -> Self:
+    def of(cls, *, bounding_box: AxisAlignedBox) -> Self:
         """
         :param bounding_box: The bounding box to project.
         :return: The projection of that box onto the x-y plane.
@@ -241,7 +241,7 @@ class Footprint:
         return self.max_y - self.min_y
 
     def as_rectangle(
-        self, facecolor: str, edgecolor: str, linewidth: float, zorder: float
+        self, *, facecolor: str, edgecolor: str, linewidth: float, zorder: float
     ) -> Rectangle:
         """
         :param facecolor: The color filling the rectangle.
@@ -450,7 +450,7 @@ class NavigationScene:
             )
             box_type = type(self.search_space.bounding_boxes[0])
             self.obstacles = BoundingBoxCollection.from_event(
-                box_type,
+                box_type=box_type,
                 reference_frame=self.search_space.reference_frame,
                 event=occupied_space,
             )
@@ -468,7 +468,7 @@ class NavigationScene:
         """
         :return: The x-y extent every panel is framed to.
         """
-        return Footprint.of(self.search_space.bounding_box())
+        return Footprint.of(bounding_box=self.search_space.bounding_box())
 
     @property
     def convex_sets(self) -> list[AxisAlignedBox]:
@@ -522,7 +522,7 @@ class SceneLayer(ABC):
 
     @abstractmethod
     def draw(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         """
         Draw this layer's marks.
@@ -543,10 +543,10 @@ class SearchSpaceLayer(SceneLayer):
     """
 
     def draw(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         outlines = [
-            Footprint.of(part).as_rectangle(
+            Footprint.of(bounding_box=part).as_rectangle(
                 facecolor="none",
                 edgecolor=palette.text_secondary,
                 linewidth=0.8,
@@ -568,10 +568,10 @@ class ObstacleLayer(SceneLayer):
     """
 
     def draw(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         rectangles = [
-            Footprint.of(obstacle).as_rectangle(
+            Footprint.of(bounding_box=obstacle).as_rectangle(
                 facecolor=palette.obstacle,
                 edgecolor=palette.obstacle_edge,
                 linewidth=0.4,
@@ -594,7 +594,7 @@ class ConvexSetEmphasis(enum.Enum):
     SUBJECT = enum.auto()
     CONTEXT = enum.auto()
 
-    def fill(self, palette: FigurePalette) -> str:
+    def fill(self, *, palette: FigurePalette) -> str:
         """
         :param palette: The colors of the figure.
         :return: The fill the sets take at this emphasis.
@@ -605,7 +605,7 @@ class ConvexSetEmphasis(enum.Enum):
             else palette.receded_convex_set
         )
 
-    def edge(self, palette: FigurePalette) -> str:
+    def edge(self, *, palette: FigurePalette) -> str:
         """
         :param palette: The colors of the figure.
         :return: The color separating neighbouring sets at this emphasis.
@@ -631,12 +631,12 @@ class ConvexSetsLayer(SceneLayer):
     """
 
     def draw(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         rectangles = [
-            Footprint.of(convex_set).as_rectangle(
-                facecolor=self.emphasis.fill(palette),
-                edgecolor=self.emphasis.edge(palette),
+            Footprint.of(bounding_box=convex_set).as_rectangle(
+                facecolor=self.emphasis.fill(palette=palette),
+                edgecolor=self.emphasis.edge(palette=palette),
                 linewidth=0.4,
                 zorder=3,
             )
@@ -661,7 +661,7 @@ class AdjacencyLayer(SceneLayer):
     """
 
     def draw(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         for adjacency in scene.adjacencies:
             coordinates = adjacency.coordinates
@@ -709,7 +709,7 @@ class PathLayer(SceneLayer):
     """
 
     def draw(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         coordinates = scene.path.coordinates
         line = axes.plot(
@@ -748,20 +748,31 @@ class EndpointsLayer(SceneLayer):
     """
 
     def draw(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[LegendEntry]:
         waypoints = scene.path.waypoints
         return [
             self._draw_endpoint(
-                axes, waypoints[0], "start", "o", palette.start, palette
+                axes=axes,
+                endpoint=waypoints[0],
+                label="start",
+                marker="o",
+                color=palette.start,
+                palette=palette,
             ),
             self._draw_endpoint(
-                axes, waypoints[-1], "goal", "s", palette.goal, palette
+                axes=axes,
+                endpoint=waypoints[-1],
+                label="goal",
+                marker="s",
+                color=palette.goal,
+                palette=palette,
             ),
         ]
 
     def _draw_endpoint(
         self,
+        *,
         axes: Axes,
         endpoint: Point,
         label: str,
@@ -821,7 +832,7 @@ class ScenePanel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         """
         :param scene: The scene the panel draws.
         :return: The line under the title, quantifying what the panel shows.
@@ -837,6 +848,7 @@ class ScenePanel(ABC):
 
     def draw(
         self,
+        *,
         axes: Axes,
         scene: NavigationScene,
         palette: FigurePalette,
@@ -851,11 +863,11 @@ class ScenePanel(ABC):
         :param panel_label: The enumerating label the title is prefixed with.
         :return: The legend entries the panel's layers contribute.
         """
-        self._frame(axes, scene, palette)
+        self._frame(axes=axes, scene=scene, palette=palette)
         entries = [
             entry
             for layer in self.layers()
-            for entry in layer.draw(axes, scene, palette)
+            for entry in layer.draw(axes=axes, scene=scene, palette=palette)
         ]
         axes.set_title(
             f"{panel_label} {self.name}",
@@ -868,7 +880,7 @@ class ScenePanel(ABC):
         axes.text(
             0.0,
             1.01,
-            self.subtitle(scene),
+            self.subtitle(scene=scene),
             transform=axes.transAxes,
             fontsize=8.5,
             color=palette.text_secondary,
@@ -876,7 +888,7 @@ class ScenePanel(ABC):
         return entries
 
     def _frame(
-        self, axes: Axes, scene: NavigationScene, palette: FigurePalette
+        self, *, axes: Axes, scene: NavigationScene, palette: FigurePalette
     ) -> None:
         """
         Give the panel the metric frame every panel shares, so the three read against
@@ -912,7 +924,7 @@ class EnvironmentPanel(ScenePanel):
     def name(self) -> str:
         return "Environment"
 
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         extent = scene.extent
         return (
             f"{len(scene.obstacles)} obstacle footprints in "
@@ -934,7 +946,7 @@ class ConvexSetsPanel(ScenePanel):
     def name(self) -> str:
         return "Graph of convex sets"
 
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         return (
             f"{len(scene.convex_sets)} convex sets, "
             f"{len(scene.adjacencies)} adjacencies"
@@ -955,7 +967,7 @@ class OptimalPathPanel(ScenePanel):
     def name(self) -> str:
         return "Optimal path"
 
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         return f"{scene.path.length:.2f} m over {len(scene.path.waypoints)} waypoints"
 
     def layers(self) -> Sequence[SceneLayer]:
@@ -1018,7 +1030,7 @@ class PanelArrangement:
     """
 
     @classmethod
-    def for_extent(cls, extent: Footprint, panel_count: int) -> Self:
+    def for_extent(cls, *, extent: Footprint, panel_count: int) -> Self:
         """
         :param extent: The x-y extent one panel spans.
         :param panel_count: Number of panels to tile.
@@ -1028,7 +1040,7 @@ class PanelArrangement:
             return cls(rows=panel_count, columns=1)
         return cls(rows=1, columns=panel_count)
 
-    def figure_size(self, extent: Footprint) -> tuple[float, float]:
+    def figure_size(self, *, extent: Footprint) -> tuple[float, float]:
         """
         :param extent: The x-y extent one panel spans.
         :return: The figure's width and height in inches, scaled so that a meter is the
@@ -1045,7 +1057,7 @@ class PanelArrangement:
         )
         return width, height
 
-    def legend_columns(self, extent: Footprint, entry_count: int) -> int:
+    def legend_columns(self, *, extent: Footprint, entry_count: int) -> int:
         """
         Wrap the legend so that a narrow figure does not run it off the page, and spread
         the entries evenly over however many rows that takes rather than leaving a last
@@ -1055,7 +1067,7 @@ class PanelArrangement:
         :param entry_count: Number of legend entries to lay out.
         :return: How many entries to put on one legend row.
         """
-        width, _ = self.figure_size(extent)
+        width, _ = self.figure_size(extent=extent)
         entries_that_fit = max(1, int(width / self.legend_entry_inches))
         rows = math.ceil(entry_count / entries_that_fit)
         return math.ceil(entry_count / rows)
@@ -1101,15 +1113,19 @@ class GraphOfConvexSetsFigure:
         :return: The rendered figure, which the caller owns and has to close.
         """
         palette = self.theme.value
-        arrangement = PanelArrangement.for_extent(self.scene.extent, len(self.panels))
-        with plt.rc_context(self._rc_parameters(palette)):
+        arrangement = PanelArrangement.for_extent(
+            extent=self.scene.extent, panel_count=len(self.panels)
+        )
+        with plt.rc_context(self._rc_parameters(palette=palette)):
             figure, axes_grid = plt.subplots(
                 arrangement.rows,
                 arrangement.columns,
-                figsize=arrangement.figure_size(self.scene.extent),
+                figsize=arrangement.figure_size(extent=self.scene.extent),
                 layout="constrained",
             )
-            entries = self._draw_panels(np.atleast_1d(axes_grid).ravel(), palette)
+            entries = self._draw_panels(
+                all_axes=np.atleast_1d(axes_grid).ravel(), palette=palette
+            )
             figure.suptitle(
                 f"Graph of convex sets navigation in {self.scene.environment_name}",
                 fontsize=13.0,
@@ -1122,14 +1138,16 @@ class GraphOfConvexSetsFigure:
                 handles=[entry.handle for entry in entries],
                 labels=[entry.label for entry in entries],
                 loc="outside lower left",
-                ncols=arrangement.legend_columns(self.scene.extent, len(entries)),
+                ncols=arrangement.legend_columns(
+                    extent=self.scene.extent, entry_count=len(entries)
+                ),
                 frameon=False,
                 fontsize=9.0,
                 labelcolor=palette.text_secondary,
             )
         return figure
 
-    def save(self, output_directory: Path) -> list[Path]:
+    def save(self, *, output_directory: Path) -> list[Path]:
         """
         Render the figure and write it as both a vector and a raster file.
 
@@ -1151,7 +1169,7 @@ class GraphOfConvexSetsFigure:
         return written
 
     def _draw_panels(
-        self, all_axes: Iterable[Axes], palette: FigurePalette
+        self, *, all_axes: Iterable[Axes], palette: FigurePalette
     ) -> list[LegendEntry]:
         """
         Draw every panel and collect one legend entry per distinct label.
@@ -1163,7 +1181,9 @@ class GraphOfConvexSetsFigure:
         entries: list[LegendEntry] = []
         seen_labels = set()
         for panel, axes, label in zip(self.panels, all_axes, self._panel_labels()):
-            for entry in panel.draw(axes, self.scene, palette, label):
+            for entry in panel.draw(
+                axes=axes, scene=self.scene, palette=palette, panel_label=label
+            ):
                 if entry.label in seen_labels:
                     continue
                 seen_labels.add(entry.label)
@@ -1182,7 +1202,7 @@ class GraphOfConvexSetsFigure:
             )
         ]
 
-    def _rc_parameters(self, palette: FigurePalette) -> dict[str, object]:
+    def _rc_parameters(self, *, palette: FigurePalette) -> dict[str, object]:
         """
         :param palette: The colors to draw with.
         :return: The matplotlib settings the figure is rendered under, applied in a

@@ -75,8 +75,8 @@ def in_world(annotation_type, shape: trimesh.Trimesh, name: str):
     annotation = annotation_type(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -116,7 +116,7 @@ def test_drawn_grasps_lie_where_the_annotation_states(carton):
     trials = GraspTrials(
         graspable=carton, performer=RecordingPerformer(), number_of_trials=30
     )
-    allowed = allowed_intervals(carton.grasp_strategy.statement(carton))
+    allowed = allowed_intervals(carton.grasp_strategy.statement(graspable=carton))
 
     grasps = trials.drawn_grasps()
 
@@ -140,7 +140,7 @@ def test_trials_draw_grasps_where_the_strategy_they_are_given_states(carton):
         number_of_trials=30,
         grasp_strategy=strategy,
     )
-    allowed_depth = allowed_intervals(strategy.statement(carton))["depth"]
+    allowed_depth = allowed_intervals(strategy.statement(graspable=carton))["depth"]
 
     grasps = trials.drawn_grasps()
 

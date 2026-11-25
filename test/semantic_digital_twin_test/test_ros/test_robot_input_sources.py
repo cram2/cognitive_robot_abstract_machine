@@ -29,13 +29,15 @@ def annotated_pr2(pr2_world_copy: World) -> PR2:
     """
     The PR2 annotated in a world of its own, which the tests below switch around.
     """
-    return pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    return pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
 
 def test_switching_a_robot_reads_every_part_declaring_a_topic_from_the_robot(
     annotated_pr2, rclpy_node
 ):
-    annotated_pr2.use_real_sources(rclpy_node)
+    annotated_pr2.use_real_sources(node=rclpy_node)
 
     assert isinstance(annotated_pr2.left_arm.source, PendingJointPositionSource)
     assert isinstance(annotated_pr2.mobile_base.source, SubscribedBasePoseSource)
@@ -44,7 +46,7 @@ def test_switching_a_robot_reads_every_part_declaring_a_topic_from_the_robot(
 def test_a_lidar_declaring_no_topic_keeps_reading_the_world_it_stands_in(
     annotated_pr2, rclpy_node
 ):
-    annotated_pr2.use_real_sources(rclpy_node)
+    annotated_pr2.use_real_sources(node=rclpy_node)
 
     assert isinstance(annotated_pr2.mobile_base.lidar.source, SimulatedLidarSource)
 
@@ -55,7 +57,7 @@ def test_a_switched_lidar_is_not_an_input_a_loop_applies(annotated_pr2, rclpy_no
     the world state, so no loop has to apply it.
     """
     annotated_pr2.mobile_base.lidar.use_source(
-        SubscribedLidarSource(node=rclpy_node, topic_name=SCANNER_TOPIC)
+        source=SubscribedLidarSource(node=rclpy_node, topic_name=SCANNER_TOPIC)
     )
 
     assert annotated_pr2.mobile_base.lidar.source not in (
@@ -64,14 +66,14 @@ def test_a_switched_lidar_is_not_an_input_a_loop_applies(annotated_pr2, rclpy_no
 
 
 def test_a_switched_robot_reads_the_topics_its_parts_declare(annotated_pr2, rclpy_node):
-    annotated_pr2.use_real_sources(rclpy_node)
+    annotated_pr2.use_real_sources(node=rclpy_node)
 
     assert annotated_pr2.left_arm.source.topic_name == f"/{RobotTopic.JOINT_STATES}"
     assert annotated_pr2.mobile_base.source.topic_name == f"/{PR2Topic.ODOMETRY}"
 
 
 def test_a_switched_chain_writes_only_its_own_joints(annotated_pr2, rclpy_node):
-    annotated_pr2.use_real_sources(rclpy_node)
+    annotated_pr2.use_real_sources(node=rclpy_node)
 
     assert (
         annotated_pr2.left_arm.source.connections
@@ -86,11 +88,13 @@ def test_a_robot_read_by_both_loops_subscribes_to_its_joint_states_once(
     Every message wakes every subscription on the topic, so a subscription per part and
     loop starves whatever else the node receives.
     """
-    annotated_pr2.use_real_sources(rclpy_node)
+    annotated_pr2.use_real_sources(node=rclpy_node)
     world = annotated_pr2._world
 
-    WorldStateInputs(world=world).add_robot_inputs(annotated_pr2)
-    WorldStateInputs(world=world, reapplies_inputs=True).add_robot_inputs(annotated_pr2)
+    WorldStateInputs(world=world).add_robot_inputs(robot=annotated_pr2)
+    WorldStateInputs(world=world, reapplies_inputs=True).add_robot_inputs(
+        robot=annotated_pr2
+    )
 
     joint_state_subscriptions = [
         subscription
@@ -110,7 +114,7 @@ def test_every_part_read_from_the_robot_is_an_input_to_apply(annotated_pr2, rclp
         for part in annotated_pr2._robot_parts
         if isinstance(part, (RobotKinematicChain, MobileBase))
     ]
-    annotated_pr2.use_real_sources(rclpy_node)
+    annotated_pr2.use_real_sources(node=rclpy_node)
 
     synchronizers = annotated_pr2.get_input_synchronizers()
 

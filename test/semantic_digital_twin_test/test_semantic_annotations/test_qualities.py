@@ -51,7 +51,7 @@ def world() -> World:
     """
     An empty world with a root body to spawn fruits into.
     """
-    return World.create_with_root_body("root")
+    return World.create_with_root_body(root_body_name="root")
 
 
 # %% Ripeness stages

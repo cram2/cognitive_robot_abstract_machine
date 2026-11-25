@@ -414,7 +414,9 @@ class OccupancyCostmap(Costmap):
         free_space_mask = np.ones(len(rays))
 
         ray_tracer = RayTracer(world=self.world)
-        ray_intersections = ray_tracer.ray_test(rays[:, 0], rays[:, 1])
+        ray_intersections = ray_tracer.ray_test(
+            origin_points=rays[:, 0], target_points=rays[:, 1]
+        )
         hit_ray_indices = ray_intersections.ray_indices
         hit_bodies = ray_intersections.bodies
 
@@ -422,7 +424,7 @@ class OccupancyCostmap(Costmap):
         if self.robot_view:
             unoccupied_entities.update(
                 self.world.get_kinematic_structure_entities_of_branch(
-                    self.robot_view.root
+                    root=self.robot_view.root
                 )
             )
         free_space_mask[hit_ray_indices] = [
@@ -442,7 +444,10 @@ class OccupancyCostmap(Costmap):
         :return: The bodies of the world's floors.
         """
         return {
-            floor.root for floor in self.world.get_semantic_annotations_by_type(Floor)
+            floor.root
+            for floor in self.world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Floor
+            )
         }
 
     def inflate_obstacles(self, *, free_space: np.ndarray) -> np.ndarray:
@@ -559,7 +564,7 @@ class VisibilityCostmap(Costmap):
             )
             images.append(
                 ray_tracer.create_depth_map(
-                    origin_copy,
+                    camera_pose=origin_copy,
                     resolution=CameraResolution(
                         width=self.width,
                         height=self.width,

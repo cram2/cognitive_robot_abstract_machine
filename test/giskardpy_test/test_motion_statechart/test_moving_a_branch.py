@@ -48,7 +48,7 @@ def _add_box_next_to_the_robot(world: World) -> Body:
     box = Body(name=PrefixedName(name="box"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=box,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -71,7 +71,7 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
     """
     world = cylinder_bot_world
     box = _add_box_next_to_the_robot(world)
-    robot = world.get_kinematic_structure_entity_by_name("bot")
+    robot = world.get_kinematic_structure_entity_by_name(name="bot")
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
@@ -103,7 +103,7 @@ def test_a_motion_built_before_a_body_was_moved_moves_it_with_its_new_parent(
 
     assert carry.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert np.allclose(
-        world.compute_forward_kinematics(world.root, box), goal_pose, atol=0.02
+        world.compute_forward_kinematics(root=world.root, tip=box), goal_pose, atol=0.02
     )
 
 
@@ -116,7 +116,7 @@ def test_building_the_nodes_again_registers_no_further_variables(
     """
     world = cylinder_bot_world
     box = _add_box_next_to_the_robot(world)
-    robot = world.get_kinematic_structure_entity_by_name("bot")
+    robot = world.get_kinematic_structure_entity_by_name(name="bot")
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
@@ -130,7 +130,7 @@ def test_building_the_nodes_again_registers_no_further_variables(
     executor.compile(statechart=statechart)
     variable_count = len(executor.context.float_variable_data.data)
 
-    world.move_branch(box, robot)
+    world.move_branch(branch_root=box, new_parent=robot)
     executor.tick()
 
     assert len(executor.context.float_variable_data.data) == variable_count
@@ -187,7 +187,7 @@ def test_a_moving_robot_decelerates_to_rest_before_a_child_is_chosen(
     slowing it down rather than by its velocities being cut to zero.
     """
     world = cylinder_bot_world
-    robot = world.get_kinematic_structure_entity_by_name("bot")
+    robot = world.get_kinematic_structure_entity_by_name(name="bot")
     motion_control = MotionControl()
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[motion_control]
@@ -235,12 +235,14 @@ def test_a_degree_of_freedom_the_controller_does_not_command_leaves_the_robot_at
     not the robot moving.
     """
     world = cylinder_bot_world
-    robot = world.get_kinematic_structure_entity_by_name("bot")
+    robot = world.get_kinematic_structure_entity_by_name(name="bot")
     free_box = Body(name=PrefixedName(name="free_box"))
     with world.modify_world():
         world.add_connection(
-            free_connection := Connection6DoF.create_with_dofs(
-                world=world, parent=world.root, child=free_box
+            connection=(
+                free_connection := Connection6DoF.create_with_dofs(
+                    world=world, parent=world.root, child=free_box
+                )
             )
         )
     motion_control = MotionControl()
@@ -268,7 +270,7 @@ def test_the_speed_at_rest_given_to_a_motion_control_decides_when_the_robot_is_a
     not above it.
     """
     world = cylinder_bot_world
-    robot = world.get_kinematic_structure_entity_by_name("bot")
+    robot = world.get_kinematic_structure_entity_by_name(name="bot")
     motion_control = MotionControl(speed_at_rest=0.5)
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[motion_control]

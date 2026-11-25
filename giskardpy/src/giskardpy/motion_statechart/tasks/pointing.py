@@ -50,7 +50,7 @@ class Pointing(
         tip_V_pointing_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point
@@ -112,7 +112,7 @@ class PointingCone(
         tip_V_pointing_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
 
         root_P_goal_point = self.root_T_goal_reference_frame @ self.goal_point

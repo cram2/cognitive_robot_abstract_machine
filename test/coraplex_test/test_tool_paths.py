@@ -41,7 +41,7 @@ def box_body():
         visual=shape_collection,
     )
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
     return body
 
 

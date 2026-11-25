@@ -49,15 +49,15 @@ def _servoed_rover(start_yaw: float = 0.0) -> DifferentialDrive:
         collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.5, y=0.5, z=0.3))]),
     )
     with world.modify_world():
-        world.add_kinematic_structure_entity(odom)
-        world.add_kinematic_structure_entity(base)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=odom)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=base)
         drive = DifferentialDrive.create_with_dofs(
             world=world,
             parent=odom,
             child=base,
             name=PrefixedName(name="drive", prefix="rover"),
         )
-        world.add_connection(drive)
+        world.add_connection(connection=drive)
         for degree_of_freedom in drive.active_dofs:
             servo = VelocityServo(
                 name=PrefixedName(
@@ -69,8 +69,8 @@ def _servoed_rover(start_yaw: float = 0.0) -> DifferentialDrive:
                     else VelocityServoGains(damping=2000.0, torque_limit=1000.0)
                 ),
             )
-            servo.add_dof(degree_of_freedom)
-            world.add_actuator(servo)
+            servo.add_dof(dof=degree_of_freedom)
+            world.add_actuator(actuator=servo)
     world.state[drive.yaw.id].position = start_yaw
     world.notify_state_change()
     return drive
@@ -112,11 +112,11 @@ def _drive_at(
             world.state[drive.x_velocity.id].velocity = forward_velocity
             world.state[drive.yaw.id].velocity = angular_velocity
             world.notify_state_change()
-            simulation.step_simulation(tick)
+            simulation.step_simulation(duration=tick)
         world.state[drive.x_velocity.id].velocity = 0.0
         world.state[drive.yaw.id].velocity = 0.0
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=0.5))
+        simulation.step_simulation(duration=timedelta(seconds=0.5))
         simulator = simulation.simulator
         x, y, _ = simulator.get_body_position(body_name=drive.child.name.name).result
         w, i, j, k = simulator.get_body_quaternion(
@@ -132,7 +132,9 @@ def _drive_at(
 
 
 def test_a_differential_drive_is_built_by_its_own_realisation(rover):
-    realisation = MujocoConnectionJoints.of(rover, rover._world, SimulatorModelNames())
+    realisation = MujocoConnectionJoints.of(
+        connection=rover, world=rover._world, element_names=SimulatorModelNames()
+    )
 
     assert type(realisation) is MujocoDifferentialDriveJoints
 
@@ -167,7 +169,7 @@ def test_a_drive_without_servos_keeps_the_base_where_it_is_built(rover, tmp_path
     world = rover._world
     with world.modify_world():
         for actuator in list(world.actuators):
-            world.remove_actuator(actuator)
+            world.remove_actuator(actuator=actuator)
     builder = MujocoBuilder()
     builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
 

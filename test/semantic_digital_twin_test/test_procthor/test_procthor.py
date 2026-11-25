@@ -53,7 +53,9 @@ class ProcTHORTestCase(unittest.TestCase):
         cls.world = World(name="TestWorld")
         world_root = Body(name=PrefixedName(name="TestWorldRoot"))
         with cls.world.modify_world():
-            cls.world.add_kinematic_structure_entity(world_root)
+            cls.world.add_kinematic_structure_entity(
+                kinematic_structure_entity=world_root
+            )
 
     def test_unity_to_semantic_digital_twin_transform_identity_matrix(self):
         m = np.eye(4)
@@ -136,12 +138,12 @@ class ProcTHORTestCase(unittest.TestCase):
         )
 
         with self.world.modify_world():
-            supporting_surface = self.world.get_semantic_annotations_by_type(Floor)[
-                0
-            ].calculate_supporting_surface()
+            supporting_surface = self.world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Floor
+            )[0].calculate_supporting_surface()
 
         queried_supporting_surface = self.world.get_kinematic_structure_entity_by_name(
-            "Kitchen_4_floor_supporting_surface_region"
+            name="Kitchen_4_floor_supporting_surface_region"
         )
         self.assertEqual(supporting_surface, queried_supporting_surface)
         self.assertIsInstance(queried_supporting_surface, Region)
@@ -213,25 +215,29 @@ class ProcTHORTestCase(unittest.TestCase):
         )
 
         double_door = procthor_door.add_to_world(world=self.world)
-        doors = self.world.get_semantic_annotations_by_type(Door)
+        doors = self.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Door
+        )
 
         self.assertEqual(double_door.name.name, "Doorway_Double_7_room1_room4")
         self.assertEqual(len(doors), 2)
 
     def test_wall_creation(self):
-        parser = ProcTHORParser.from_file(self.file_path, None)
+        parser = ProcTHORParser.from_file(file_path=self.file_path, session=None)
         doors = self.house_json["doors"]
         walls = self.house_json["walls"]
 
         procthor_wall = ProcthorWall(wall_dicts=walls, door_dicts=doors)
 
         procthor_walls_from_door, used_wall_ids = parser._build_procthor_wall_from_door(
-            walls, doors
+            walls=walls, doors=doors
         )
 
         self.assertEqual(procthor_walls_from_door, [procthor_wall])
 
-        procthor_walls_from_polygon = parser._build_procthor_wall_from_polygon(walls)[0]
+        procthor_walls_from_polygon = parser._build_procthor_wall_from_polygon(
+            walls=walls
+        )[0]
 
         self.assertFalse(procthor_walls_from_polygon.door_dicts)
 
@@ -359,13 +365,13 @@ class ProcTHORTestCase(unittest.TestCase):
             name="test_house", house=self.house_json, session=session
         ).create_world()
 
-        world.merge_world(obj_world)
+        world.merge_world(other=obj_world)
 
         ...
 
     def test_parse_full_world(self):
         world = ProcTHORParser.from_file(
-            os.path.join(
+            file_path=os.path.join(
                 Path(files("semantic_digital_twin")).parent.parent,
                 "resources",
                 "procthor_json",
@@ -383,13 +389,13 @@ class ProcTHORTestCase(unittest.TestCase):
         resolver = ProcthorResolver()
         resolver.classes = [Bread]
 
-        resolved_string = resolver.resolve("whitebread_a_slice_8_mesh")
+        resolved_string = resolver.resolve(name="whitebread_a_slice_8_mesh")
         self.assertEqual(Bread, resolved_string)
 
 
 def test_odd_number_of_walls_without_door_is_rejected():
     with pytest.raises(UnpairedProcthorWalls) as error:
-        ProcTHORParser._build_procthor_wall_from_polygon([{"id": "wall|0"}])
+        ProcTHORParser._build_procthor_wall_from_polygon(walls=[{"id": "wall|0"}])
     assert error.value.wall_count == 1
 
 

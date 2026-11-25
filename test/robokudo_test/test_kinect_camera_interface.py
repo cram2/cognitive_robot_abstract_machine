@@ -85,7 +85,7 @@ def world_without_the_world_frame() -> World:
     """
     world = World()
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName(name="root_of_another_world")))
+        world.add_body(body=Body(name=PrefixedName(name="root_of_another_world")))
     return world
 
 

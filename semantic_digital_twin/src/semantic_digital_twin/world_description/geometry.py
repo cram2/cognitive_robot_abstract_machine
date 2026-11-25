@@ -96,7 +96,7 @@ class Color:
     Opacity from zero to one inclusive.
     """
 
-    def set_rgb(self, red: float, green: float, blue: float) -> None:
+    def set_rgb(self, *, red: float, green: float, blue: float) -> None:
         """
         Replace the color's RGB channels while preserving opacity.
         """
@@ -156,7 +156,7 @@ class Color:
 
     @classmethod
     def from_opencv_hue_saturation_value_full(
-        cls, hue: int, saturation: int, value: int
+        cls, *, hue: int, saturation: int, value: int
     ) -> Self:
         """Create a color from OpenCV's 8-bit HSV_FULL channels."""
         return cls(
@@ -173,7 +173,7 @@ class Color:
             round(self.value * self.opencv_maximum_channel_value),
         )
 
-    def to_hex(self, prefix: str = "#") -> str:
+    def to_hex(self, *, prefix: str = "#") -> str:
         """
         Return two hexadecimal digits per RGB channel, excluding opacity.
         """
@@ -182,17 +182,21 @@ class Color:
         )
 
     @classmethod
-    def from_list(cls, color: Sequence[float]) -> Self:
+    def from_list(cls, *, color: Sequence[float]) -> Self:
         """
         Create a color from three RGB or four RGBA channels.
         """
         if len(color) not in (3, 4):
             raise InvalidColorChannelCount(channel_count=len(color))
-        return cls.from_rgba(*color)
+        red, green, blue = color[:3]
+        if len(color) == 3:
+            return cls.from_rgba(red=red, green=green, blue=blue)
+        return cls.from_rgba(red=red, green=green, blue=blue, opacity=color[3])
 
     @classmethod
     def from_rgba(
         cls,
+        *,
         red: float = 1.0,
         green: float = 1.0,
         blue: float = 1.0,
@@ -202,12 +206,13 @@ class Color:
         Create a color from normalized RGB channels and independent opacity.
         """
         color = cls(opacity=float(opacity))
-        color.set_rgb(red, green, blue)
+        color.set_rgb(red=red, green=green, blue=blue)
         return color
 
     @classmethod
     def from_hex(
         cls,
+        *,
         hex_color: str,
         prefix: str = "#",
         pattern: str = "(?:[0-9a-fA-F]{2}){3,4}",
@@ -221,7 +226,7 @@ class Color:
         if re.fullmatch(pattern, digits) is None:
             raise MalformedHexColor(hex_color=hex_color)
         return cls.from_list(
-            [
+            color=[
                 int(digits[index : index + 2], 16) / 255
                 for index in range(0, len(digits), 2)
             ]
@@ -478,6 +483,7 @@ class Scale:
 
     def to_simple_event(
         self,
+        *,
         extend_result_in_direction: Vector3 | None = None,
         amount: float = 0.0,
     ) -> SimpleEvent:
@@ -491,13 +497,15 @@ class Scale:
 
         if extend_result_in_direction is not None:
             self._extend_simple_event_in_direction(
-                simple_event, extend_result_in_direction, amount
+                simple_event=simple_event,
+                direction=extend_result_in_direction,
+                amount=amount,
             )
 
         return simple_event
 
     def _extend_simple_event_in_direction(
-        self, simple_event: SimpleEvent, direction: Vector3, amount: float
+        self, *, simple_event: SimpleEvent, direction: Vector3, amount: float
     ) -> SimpleEvent:
         """
         Extend the inner event in the specified direction to create the container
@@ -536,7 +544,9 @@ class Scale:
     def to_bounding_box(self) -> VolumetricBoundingBox:
         min_point = Point3(-self.x / 2, -self.y / 2, -self.z / 2)
         max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
-        return VolumetricBoundingBox.from_min_max(min_point, max_point, None)
+        return VolumetricBoundingBox.from_min_max(
+            min_point=min_point, max_point=max_point, origin=None
+        )
 
     def to_np(self) -> np.ndarray:
         return np.array([self.x, self.y, self.z])
@@ -603,7 +613,9 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         This should be implemented by subclasses.
         """
 
-    def mesh_in_frame(self, target_frame: KinematicStructureEntity) -> trimesh.Trimesh:
+    def mesh_in_frame(
+        self, *, target_frame: KinematicStructureEntity
+    ) -> trimesh.Trimesh:
         """
         :param target_frame: The kinematic structure entity to express the mesh
             relative to.
@@ -612,7 +624,11 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         """
         world = self.origin.reference_frame._world
         world_mesh = self.mesh.copy()
-        world_mesh.apply_transform(world.transform(self.origin, target_frame).to_np())
+        world_mesh.apply_transform(
+            world.transform(
+                spatial_object=self.origin, target_frame=target_frame
+            ).to_np()
+        )
         return world_mesh
 
     @classmethod
@@ -771,10 +787,10 @@ class Mesh(Shape):
 
         The bounding box is axis-aligned and centered at the origin.
         """
-        return VolumetricBoundingBox.from_mesh(self.mesh, self.origin)
+        return VolumetricBoundingBox.from_mesh(mesh=self.mesh, origin=self.origin)
 
     @staticmethod
-    def _load_in_meters(filename: str, process: bool = True) -> trimesh.Trimesh:
+    def _load_in_meters(*, filename: str, process: bool = True) -> trimesh.Trimesh:
         """
         Load a mesh file, converting its coordinates to meters when the file declares
         the unit they are written in.
@@ -877,7 +893,7 @@ class Mesh(Shape):
         )
 
     @classmethod
-    def add_uv(cls, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
+    def add_uv(cls, *, mesh: trimesh.Trimesh, uv: np.ndarray) -> trimesh.Trimesh:
         faces = mesh.faces
         vertices = mesh.vertices
         # 1. Expand vertices so each face corner gets its own vertex
@@ -894,14 +910,14 @@ class Mesh(Shape):
 
     @classmethod
     def add_texture(
-        cls, mesh: trimesh.Trimesh, texture_file_path: str
+        cls, *, mesh: trimesh.Trimesh, texture_file_path: str
     ) -> trimesh.Trimesh:
         image = Image.open(texture_file_path)
         material_name = os.path.splitext(os.path.basename(texture_file_path))[0]
         mesh.visual.material = SimpleMaterial(name=material_name, image=image)
         return mesh
 
-    def scale_mesh(self, scale: Scale) -> trimesh.Trimesh:
+    def scale_mesh(self, *, scale: Scale) -> trimesh.Trimesh:
         """
         Scales the mesh according to the given scale.
 
@@ -921,7 +937,7 @@ class Mesh(Shape):
         whichever registered source claims it, which copies it here first. The material
         and texture files the mesh refers to by name sit beside the answer.
         """
-        return MeshFileSources().resolve(self.filename)
+        return MeshFileSources().resolve(uri=self.filename)
 
     @property
     def package_uri(self) -> str | None:
@@ -943,7 +959,7 @@ class Mesh(Shape):
         The mesh with exactly the vertices and faces its file stores, before this
         shape's scale is applied.
         """
-        return self._load_in_meters(str(self.local_file), process=False)
+        return self._load_in_meters(filename=str(self.local_file), process=False)
 
     @property
     def unscaled_mesh(self) -> trimesh.Trimesh:
@@ -996,7 +1012,7 @@ class Mesh(Shape):
 
     @classmethod
     def from_file(
-        cls, file_path: str, texture_file_path: str | None = None, **kwargs
+        cls, *, file_path: str, texture_file_path: str | None = None, **kwargs
     ) -> Mesh:
         """
         Create a Mesh from a file path.
@@ -1015,6 +1031,7 @@ class Mesh(Shape):
     @classmethod
     def from_ply_file(
         cls,
+        *,
         ply_file_path: str,
         texture_file_path: str | None = None,
         origin: HomogeneousTransformationMatrix | None = None,
@@ -1068,6 +1085,7 @@ class Mesh(Shape):
     @classmethod
     def from_trimesh(
         cls,
+        *,
         mesh: trimesh.Trimesh,
         origin: HomogeneousTransformationMatrix | None = None,
         scale: Scale | None = None,
@@ -1110,7 +1128,7 @@ class Mesh(Shape):
         mesh_directory = (
             MeshFileStorage().allocate_directory()
             if directory is None
-            else MeshFileStorage.create_mesh_directory(Path(directory))
+            else MeshFileStorage.create_mesh_directory(parent=Path(directory))
         )
         mesh_file_path = mesh_directory / f"{mesh_directory.name}.{file_type}"
 
@@ -1130,6 +1148,7 @@ class Mesh(Shape):
     @classmethod
     def box(
         cls,
+        *,
         extents: tuple[float, float, float] = (1.0, 1.0, 1.0),
         origin: HomogeneousTransformationMatrix | None = None,
         scale: Scale | None = None,
@@ -1151,6 +1170,7 @@ class Mesh(Shape):
     @classmethod
     def triangular_prism(
         cls,
+        *,
         side: float,
         height: float,
         origin: HomogeneousTransformationMatrix | None = None,
@@ -1180,6 +1200,7 @@ class Mesh(Shape):
     @classmethod
     def from_vertices_and_faces(
         cls,
+        *,
         vertices: np.ndarray,
         faces: np.ndarray,
         origin: np.ndarray,
@@ -1209,6 +1230,7 @@ class Mesh(Shape):
     @classmethod
     def from_3d_points(
         cls,
+        *,
         points_3d: list[Point3],
         reference_frame: KinematicStructureEntity | None = None,
         minimum_thickness: float = 0.005,
@@ -1287,6 +1309,7 @@ class Mesh(Shape):
     @classmethod
     def project_texture_coordinates(
         cls,
+        *,
         mesh: trimesh.Trimesh,
         projection_axis: np.ndarray,
         scale: np.ndarray,
@@ -1464,7 +1487,7 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
     """
 
     def clip_segment(
-        self, start: npt.NDArray[np.float64], direction: npt.NDArray[np.float64]
+        self, *, start: npt.NDArray[np.float64], direction: npt.NDArray[np.float64]
     ) -> SimpleInterval | None:
         """
         Clip the parametrized segment ``start + t * direction`` (``t`` in ``[0, 1]``)
@@ -1526,7 +1549,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
 
     @staticmethod
     def _interval(
-        minimum: float, maximum: float, origin_component: Any
+        *, minimum: float, maximum: float, origin_component: Any
     ) -> SimpleInterval:
         """
         :param minimum: The lower bound, relative to ``origin_component``.
@@ -1566,7 +1589,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         return len(cls.axes())
 
     @abstractmethod
-    def contains(self, point: PointT) -> bool:
+    def contains(self, *, point: PointT) -> bool:
         """
         Check whether this box contains a point.
 
@@ -1585,7 +1608,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
     @classmethod
     @abstractmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls, *, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.
@@ -1610,13 +1633,17 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
 
     @property
     def lower(self) -> PointT:
-        return self._corner_at([interval.lower for interval in self._ordered_intervals])
+        return self._corner_at(
+            coordinates=[interval.lower for interval in self._ordered_intervals]
+        )
 
     @property
     def upper(self) -> PointT:
-        return self._corner_at([interval.upper for interval in self._ordered_intervals])
+        return self._corner_at(
+            coordinates=[interval.upper for interval in self._ordered_intervals]
+        )
 
-    def _corner_at(self, coordinates: list[float]) -> PointT:
+    def _corner_at(self, *, coordinates: list[float]) -> PointT:
         """
         :param coordinates: The corner's coordinate along each of :meth:`axes`.
         :return: The corner, in the reference frame of the box's origin.
@@ -1643,6 +1670,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
     @classmethod
     def from_array_bounds(
         cls,
+        *,
         lower: npt.NDArray[np.float64],
         upper: npt.NDArray[np.float64],
         origin: HomogeneousTransformationMatrix,
@@ -1668,7 +1696,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         )
 
     def transform_to_origin(
-        self, reference_T_new_origin: HomogeneousTransformationMatrix
+        self, *, reference_T_new_origin: HomogeneousTransformationMatrix
     ) -> Self:
         """
         Transform the bounding box to a different reference frame.
@@ -1682,7 +1710,8 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         )
 
         new_origin_reference_T_self = self.origin.reference_frame._world.transform(
-            self.origin, reference_T_new_origin.reference_frame
+            spatial_object=self.origin,
+            target_frame=reference_T_new_origin.reference_frame,
         )
 
         self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
@@ -1709,10 +1738,10 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         max_corner = np.max(list_reference_P_corner, axis=0).flatten()
 
         return self.__class__.from_array_bounds(
-            min_corner, max_corner, reference_T_new_origin
+            lower=min_corner, upper=max_corner, origin=reference_T_new_origin
         )
 
-    def intersection_with(self, other: Self) -> Self | None:
+    def intersection_with(self, *, other: Self) -> Self | None:
         """
         Compute the intersection of two bounding boxes.
 
@@ -1720,13 +1749,17 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :return: The intersection of the two bounding boxes or None if they do not
             intersect.
         """
-        other_in_same_frame = other.transform_to_origin(self.origin)
+        other_in_same_frame = other.transform_to_origin(
+            reference_T_new_origin=self.origin
+        )
         result = self.simple_event.intersection_with(
             other=other_in_same_frame.simple_event
         )
         if result.is_empty():
             return None
-        return self.__class__.from_simple_event(result, self.origin)[0]
+        return self.__class__.from_simple_event(
+            simple_event=result, origin=self.origin
+        )[0]
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1789,21 +1822,27 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         """
         :return: The x interval of the bounding box.
         """
-        return self._interval(self.min_x, self.max_x, self.origin.x)
+        return self._interval(
+            minimum=self.min_x, maximum=self.max_x, origin_component=self.origin.x
+        )
 
     @property
     def y_interval(self) -> SimpleInterval:
         """
         :return: The y interval of the bounding box.
         """
-        return self._interval(self.min_y, self.max_y, self.origin.y)
+        return self._interval(
+            minimum=self.min_y, maximum=self.max_y, origin_component=self.origin.y
+        )
 
     @property
     def z_interval(self) -> SimpleInterval:
         """
         :return: The z interval of the bounding box.
         """
-        return self._interval(self.min_z, self.max_z, self.origin.z)
+        return self._interval(
+            minimum=self.min_z, maximum=self.max_z, origin_component=self.origin.z
+        )
 
     @property
     def scale(self) -> Scale:
@@ -1851,7 +1890,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         )
 
     def bloat(
-        self, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
+        self, *, x_amount: float = 0.0, y_amount: float = 0, z_amount: float = 0
     ) -> VolumetricBoundingBox:
         """
         Enlarges the bounding box by a given amount in all dimensions.
@@ -1871,19 +1910,19 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
             origin=self.origin,
         )
 
-    def contains(self, point: Point3) -> bool:
+    def contains(self, *, point: Point3) -> bool:
         """
         Check if the bounding box contains a point.
         """
         point_in_bb = point.reference_frame._world.transform(
-            point, self.origin.reference_frame
+            spatial_object=point, target_frame=self.origin.reference_frame
         )
         x, y, z = (float(point_in_bb.x), float(point_in_bb.y), float(point_in_bb.z))
         return self.simple_event.contains(item=(x, y, z))
 
     @classmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls, *, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.
@@ -1913,6 +1952,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
 
     def enlarge(
         self,
+        *,
         min_x: float = 0.0,
         min_y: float = 0,
         min_z: float = 0,
@@ -1937,18 +1977,26 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         self.max_y += max_y
         self.max_z += max_z
 
-    def enlarge_all(self, amount: float):
+    def enlarge_all(self, *, amount: float):
         """
         Enlarge the axis-aligned bounding box in all dimensions by a given amount in-
         place.
 
         :param amount: The amount to enlarge the bounding box
         """
-        self.enlarge(amount, amount, amount, amount, amount, amount)
+        self.enlarge(
+            min_x=amount,
+            min_y=amount,
+            min_z=amount,
+            max_x=amount,
+            max_y=amount,
+            max_z=amount,
+        )
 
     @classmethod
     def from_mesh(
         cls,
+        *,
         mesh: trimesh.Trimesh,
         origin: HomogeneousTransformationMatrix,
     ) -> Self:
@@ -1986,6 +2034,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
     @classmethod
     def from_min_max(
         cls,
+        *,
         min_point: Point3,
         max_point: Point3,
         origin: HomogeneousTransformationMatrix,
@@ -2088,14 +2137,18 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
         """
         :return: The x interval of the bounding box.
         """
-        return self._interval(self.min_x, self.max_x, self.origin.x)
+        return self._interval(
+            minimum=self.min_x, maximum=self.max_x, origin_component=self.origin.x
+        )
 
     @property
     def y_interval(self) -> SimpleInterval:
         """
         :return: The y interval of the bounding box.
         """
-        return self._interval(self.min_y, self.max_y, self.origin.y)
+        return self._interval(
+            minimum=self.min_y, maximum=self.max_y, origin_component=self.origin.y
+        )
 
     @property
     def depth(self) -> float:
@@ -2130,7 +2183,9 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             reference_frame=self.origin.reference_frame,
         )
 
-    def bloat(self, x_amount: float = 0.0, y_amount: float = 0.0) -> PlanarBoundingBox:
+    def bloat(
+        self, *, x_amount: float = 0.0, y_amount: float = 0.0
+    ) -> PlanarBoundingBox:
         """
         Enlarges the bounding box by a given amount in both dimensions.
 
@@ -2146,17 +2201,17 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             origin=self.origin,
         )
 
-    def contains(self, point: Point2) -> bool:
+    def contains(self, *, point: Point2) -> bool:
         """
         Check if the bounding box contains a point.
         """
         point_in_box_frame = point.reference_frame._world.transform(
-            point, self.origin.reference_frame
+            spatial_object=point, target_frame=self.origin.reference_frame
         )
         x, y = float(point_in_box_frame.x), float(point_in_box_frame.y)
         return self.simple_event.contains(item=(x, y))
 
-    def extrude(self, half_height: float) -> VolumetricBoundingBox:
+    def extrude(self, *, half_height: float) -> VolumetricBoundingBox:
         """
         Extrude this floor-plan box into a 3D slab, centered on the plane it was built
         on.
@@ -2176,7 +2231,7 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
 
     @classmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls, *, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.

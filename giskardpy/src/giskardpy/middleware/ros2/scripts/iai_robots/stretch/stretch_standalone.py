@@ -20,7 +20,9 @@ def create_giskard(node: Node) -> Giskard:
     """
     return Giskard.standalone(
         world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(Stretch)]
+            robots=[
+                RobotSpecification.specify_real_robot(semantic_annotation_type=Stretch)
+            ]
         ),
         qp_controller_config=QPControllerConfig(
             # reproduces the braking of the former prediction_horizon=30

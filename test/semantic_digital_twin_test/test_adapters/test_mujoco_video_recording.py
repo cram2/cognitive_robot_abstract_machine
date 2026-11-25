@@ -48,7 +48,7 @@ requires_mujoco_ci = pytest.mark.skipif(
 def test_overview_camera_pose_applies_distance_floor_for_a_degenerate_box():
     point_bounds = np.array([[1.0, 1.0, 1.0], [1.0, 1.0, 1.0]])
 
-    position = MujocoCamera.overview_pose(point_bounds).position.to_np()[:3]
+    position = MujocoCamera.overview_pose(bounds=point_bounds).position.to_np()[:3]
 
     assert np.linalg.norm(position - np.array([1.0, 1.0, 1.0])) == pytest.approx(1.5)
 
@@ -57,8 +57,12 @@ def test_overview_camera_pose_scales_with_the_bounding_diagonal():
     small_bounds = np.array([[-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]])
     large_bounds = np.array([[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]])
 
-    small_position = MujocoCamera.overview_pose(small_bounds).position.to_np()[:3]
-    large_position = MujocoCamera.overview_pose(large_bounds).position.to_np()[:3]
+    small_position = MujocoCamera.overview_pose(bounds=small_bounds).position.to_np()[
+        :3
+    ]
+    large_position = MujocoCamera.overview_pose(bounds=large_bounds).position.to_np()[
+        :3
+    ]
 
     small_distance = np.linalg.norm(small_position)
     large_distance = np.linalg.norm(large_position)
@@ -68,7 +72,7 @@ def test_overview_camera_pose_scales_with_the_bounding_diagonal():
 def test_overview_camera_pose_looks_at_the_bounding_box_center():
     bounds = np.array([[-1.0, -1.0, -1.0], [1.0, 1.0, 1.0]])
 
-    pose = MujocoCamera.overview_pose(bounds)
+    pose = MujocoCamera.overview_pose(bounds=bounds)
     position = pose.position.to_np()[:3]
 
     from scipy.spatial.transform import Rotation
@@ -87,7 +91,7 @@ def test_recorded_video_write_round_trips_frame_count_and_shape(tmp_path):
     recorded_video = RecordedVideo(frames=frames, frames_per_second=30)
     output_path = tmp_path / "video.mp4"
 
-    result_path = recorded_video.write(output_path)
+    result_path = recorded_video.write(output_path=output_path)
 
     assert result_path == output_path
     assert output_path.exists()
@@ -98,7 +102,7 @@ def test_recorded_video_write_raises_on_empty_recording(tmp_path):
     recorded_video = RecordedVideo(frames=[], frames_per_second=30)
 
     with pytest.raises(EmptyVideoRecordingError):
-        recorded_video.write(tmp_path / "video.mp4")
+        recorded_video.write(output_path=tmp_path / "video.mp4")
 
 
 def test_recorded_video_frame_timestamps_are_derived_from_frames_per_second():
@@ -331,9 +335,9 @@ def test_a_body_added_while_recording_is_rendered_with_a_new_renderer(
     recorder.start()
     try:
         with world.modify_world():
-            world.add_kinematic_structure_entity(added_body)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=added_body)
             world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     parent=world.root, child=added_body, world=world
                 )
             )

@@ -70,7 +70,7 @@ class NPVector3(SubclassJSONSerializer):
             raise ArrayShapeError(expected_shape=(3,), shape=self.data.shape)
 
     @classmethod
-    def from_values(cls, x: float, y: float, z: float) -> Self:
+    def from_values(cls, *, x: float, y: float, z: float) -> Self:
         """
         Construct from scalar components (x, y, z).
         """
@@ -110,7 +110,7 @@ class PrincipalMoments(NPVector3):
         assert np.all(self.data >= 0), "Moments must be non-negative"
 
     @classmethod
-    def from_values(cls, i1: float, i2: float, i3: float) -> Self:
+    def from_values(cls, *, i1: float, i2: float, i3: float) -> Self:
         """
         Construct from scalar components (I1, I2, I3).
         """
@@ -140,7 +140,7 @@ class PrincipalAxes(NPMatrix3x3):
         return PrincipalAxes(data=self.data.T)
 
     @classmethod
-    def from_rotation_matrix(cls, rotation_matrix: RotationMatrix):
+    def from_rotation_matrix(cls, *, rotation_matrix: RotationMatrix):
         """
         Construct PrincipalAxes from a RotationMatrix.
         """
@@ -180,7 +180,7 @@ class InertiaTensor(NPMatrix3x3):
 
     @classmethod
     def from_values(
-        cls, ixx: float, iyy: float, izz: float, ixy: float, ixz: float, iyz: float
+        cls, *, ixx: float, iyy: float, izz: float, ixy: float, ixz: float, iyz: float
     ) -> Self:
         """
         Construct inertia tensor from individual components.
@@ -219,6 +219,7 @@ class InertiaTensor(NPMatrix3x3):
     @classmethod
     def from_principal_moments_and_axes(
         cls,
+        *,
         moments: PrincipalMoments,
         axes: PrincipalAxes = PrincipalAxes(data=np.eye(3)),
     ) -> Self:
@@ -230,7 +231,7 @@ class InertiaTensor(NPMatrix3x3):
         return InertiaTensor(data=data.data)
 
     def to_principal_moments_and_axes(
-        self, sorted_array: NDArray | None = None
+        self, *, sorted_array: NDArray | None = None
     ) -> tuple[PrincipalMoments, PrincipalAxes]:
         """
         Decompose inertia tensor into principal moments and axes.
@@ -247,7 +248,8 @@ class InertiaTensor(NPMatrix3x3):
             eigenvectors = eigenvectors @ np.eye(3)[sorted_indices].T
         if np.linalg.det(eigenvectors) < 0:
             eigenvectors[:, 2] *= -1.0
-        moments = PrincipalMoments.from_values(*eigenvalues)
+        i1, i2, i3 = eigenvalues
+        moments = PrincipalMoments.from_values(i1=i1, i2=i2, i3=i3)
         axes = PrincipalAxes(data=eigenvectors)
         return moments, axes
 
@@ -273,7 +275,9 @@ class Inertial:
     """
 
     inertia: InertiaTensor = field(
-        default_factory=lambda: InertiaTensor.from_values(1.0, 1.0, 1.0, 0.0, 0.0, 0.0)
+        default_factory=lambda: InertiaTensor.from_values(
+            ixx=1.0, iyy=1.0, izz=1.0, ixy=0.0, ixz=0.0, iyz=0.0
+        )
     )
     """
     The inertia tensor of the body about its center of mass, expressed in the body's
@@ -289,5 +293,7 @@ class Inertial:
         """
         return cls(
             mass=1e-6,
-            inertia=InertiaTensor.from_values(1e-12, 1e-12, 1e-12, 0.0, 0.0, 0.0),
+            inertia=InertiaTensor.from_values(
+                ixx=1e-12, iyy=1e-12, izz=1e-12, ixy=0.0, ixz=0.0, iyz=0.0
+            ),
         )

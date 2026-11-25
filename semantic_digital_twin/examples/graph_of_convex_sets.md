@@ -49,7 +49,7 @@ with box_world.modify_world():
                                                         color=Color.from_rgba(red=1., green=1., blue=1., opacity=1.),
                                                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(0,0,0,0,0,0),)],
                                                         ))
-    box_world.add_kinematic_structure_entity(box)
+    box_world.add_kinematic_structure_entity(kinematic_structure_entity=box)
     
 ```
 
@@ -94,7 +94,7 @@ from krrood_spatial_math.spatial_types import Point3
 
 start = Point3(-0.75, 0, 0.15, reference_frame=box_world.root)
 goal = Point3(0.75, 0, 0.15, reference_frame=box_world.root)
-path = graph_of_bounding_boxes.path_from_to(start, goal)
+path = graph_of_bounding_boxes.path_from_to(start=start, goal=goal)
 print("A potential path is", [(point.x, point.y) for point in path])
 ```
 
@@ -106,7 +106,7 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 apartment = "package://iai_kitchen/urdf_obj/kitchen_with_walls.urdf"
 
-apartment_parser = URDFParser.from_file(apartment)
+apartment_parser = URDFParser.from_file(file_path=apartment)
 world = apartment_parser.create_world()
 
 search_space = BoundingBoxCollection(shapes=[VolumetricBoundingBox(min_x=-2, max_x=2,
@@ -143,7 +143,7 @@ Finally, let's find a way from here to there:
 ```{code-cell} ipython3
 start = Point3(-0.75, 0, 1.15, reference_frame=world.root)
 goal = Point3(0.75, 0, 1.15, reference_frame=world.root)
-path = graph_of_bounding_boxes.path_from_to(start, goal)
+path = graph_of_bounding_boxes.path_from_to(start=start, goal=goal)
 print("A potential path is", [(point.x, point.y, point.z) for point in path])
 ```
 

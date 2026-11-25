@@ -45,7 +45,7 @@ world = World()
 root = Body(name=PrefixedName(name="root"))
 
 with world.modify_world():
-    world.add_body(root)
+    world.add_body(body=root)
 with world.modify_world():
     drawer= Drawer.create_with_new_body_in_world(
         name="drawer",
@@ -114,9 +114,9 @@ with world.modify_world():
     box = Box(origin=box_origin, scale=Scale(x=0.1, y=0.1, z=0.1), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1.))
     new_root.collision = [box]
     
-    world.add_body(new_root)
+    world.add_body(body=new_root)
     root_T_dresser = Connection6DoF.create_with_dofs(parent=new_root, child=old_root, world=world)
-    world.add_connection(root_T_dresser)
+    world.add_connection(connection=root_T_dresser)
 rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")

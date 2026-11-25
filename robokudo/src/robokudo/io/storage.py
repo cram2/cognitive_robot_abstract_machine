@@ -226,7 +226,7 @@ class Storage:
         """
         return Storage.cas_view_codecs.decode_view(
             document=view_document,
-            **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+            **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
         )
 
     def store_views_in_mongo(self, *, cas_dict: dict[str, Any]) -> None:
@@ -332,7 +332,9 @@ class Storage:
         if cas_document["annotations"]:
             cas.annotations = deserialize_annotations(
                 cas_document["annotations"],
-                **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+                **WorldEntityWithIDKwargsTracker.from_world(
+                    world=world
+                ).create_kwargs(),
             )
 
     @staticmethod

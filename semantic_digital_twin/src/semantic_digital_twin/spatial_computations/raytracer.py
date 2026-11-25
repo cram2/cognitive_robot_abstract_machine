@@ -112,10 +112,12 @@ class RayTracer:
         # Each collision geometry uses the body name with a geometry-index suffix.
         for body in bodies_to_add:
             world_T_body = self.world.compute_forward_kinematics_np(
-                self.world.root, body
+                root=self.world.root, tip=body
             )
             for geometry_index, collision in enumerate(body.collision):
-                node_name = self.collision_node_name(body, geometry_index)
+                node_name = self.collision_node_name(
+                    body=body, geometry_index=geometry_index
+                )
                 self.scene.add_geometry(
                     collision.mesh,
                     node_name=node_name,
@@ -131,16 +133,16 @@ class RayTracer:
         """
         for body in self.world.bodies:
             world_T_body = self.world.compute_forward_kinematics_np(
-                self.world.root, body
+                root=self.world.root, tip=body
             )
             for geometry_index, collision in enumerate(body.collision):
                 world_T_collision = world_T_body @ collision.origin.to_np()
-                self.scene.graph[self.collision_node_name(body, geometry_index)] = (
-                    world_T_collision
-                )
+                self.scene.graph[
+                    self.collision_node_name(body=body, geometry_index=geometry_index)
+                ] = world_T_collision
 
     @staticmethod
-    def collision_node_name(body: Body, geometry_index: int) -> str:
+    def collision_node_name(*, body: Body, geometry_index: int) -> str:
         """
         Return the scene node identifying a body's collision geometry.
 
@@ -153,6 +155,7 @@ class RayTracer:
     # %% Camera depth and segmentation
     def create_segmentation_mask(
         self,
+        *,
         camera_pose: GenericSpatialType,
         resolution: CameraResolution | None = None,
         min_distance: float = 0,
@@ -173,7 +176,7 @@ class RayTracer:
         :return: Width-first body indices, with negative values for missed rays.
         """
         return self.create_segmentation_and_depth(
-            camera_pose,
+            camera_pose=camera_pose,
             resolution=resolution,
             min_distance=min_distance,
             max_distance=max_distance,
@@ -182,6 +185,7 @@ class RayTracer:
 
     def create_depth_map(
         self,
+        *,
         camera_pose: GenericSpatialType,
         resolution: CameraResolution | None = None,
         min_distance: float = 0,
@@ -205,7 +209,7 @@ class RayTracer:
         :return: Width-first meter depths, with negative values for missed rays.
         """
         return self.create_segmentation_and_depth(
-            camera_pose,
+            camera_pose=camera_pose,
             resolution=resolution,
             min_distance=min_distance,
             max_distance=max_distance,
@@ -215,6 +219,7 @@ class RayTracer:
 
     def create_segmentation_and_depth(
         self,
+        *,
         camera_pose: GenericSpatialType,
         resolution: CameraResolution | None = None,
         min_distance: float = 0,
@@ -250,7 +255,7 @@ class RayTracer:
         )
         depth = np.full(segmentation.shape, -1.0, dtype=np.float32)
         camera_rays = self.create_camera_rays(
-            camera_pose,
+            camera_pose=camera_pose,
             resolution=resolution,
             field_of_view=field_of_view,
             camera_model=camera_model,
@@ -259,8 +264,8 @@ class RayTracer:
         ray_directions = camera_rays.direction_vectors
         pixels = camera_rays.pixel_coordinates
         ray_intersections = self.ray_test(
-            ray_origins,
-            ray_origins + ray_directions,
+            origin_points=ray_origins,
+            target_points=ray_origins + ray_directions,
             multiple_hits=True,
             min_distance=min_distance,
             max_distance=max_distance,
@@ -294,6 +299,7 @@ class RayTracer:
 
     def create_camera_rays(
         self,
+        *,
         camera_pose: GenericSpatialType,
         resolution: CameraResolution | None = None,
         field_of_view: FieldOfView | None = None,
@@ -363,6 +369,7 @@ class RayTracer:
 
     def ray_test(
         self,
+        *,
         origin_points: np.ndarray,
         target_points: np.ndarray,
         multiple_hits: bool = False,
@@ -421,6 +428,7 @@ class RayTracer:
     # %% Aligned RGB-D rendering
     def render(
         self,
+        *,
         camera: Camera,
         rgb_mode: ColorRenderingMode = BodyColorRenderingMode(),
         depth_mode: DepthMode = OpticalAxisDepthMode(),
@@ -450,14 +458,14 @@ class RayTracer:
                 reason="distorted rendering is not supported"
             )
         resolution = camera_model.resolution
-        rgb_mode.validate_camera_model(camera_model)
+        rgb_mode.validate_camera_model(camera_model=camera_model)
         world_T_optical = camera.root.global_transform
         world_T_forward_view = HomogeneousTransformationMatrix(
             data=world_T_optical.to_np() @ camera.optical_R_forward_view.to_np(),
             reference_frame=world_T_optical.reference_frame,
         )
         frame = self.create_segmentation_and_depth(
-            world_T_forward_view,
+            camera_pose=world_T_forward_view,
             resolution=resolution,
             camera_model=camera_model,
             min_distance=camera.camera_range.minimum_distance,
@@ -472,14 +480,16 @@ class RayTracer:
         )
         return RenderedRGBDFrame(
             color_bgr=color_frame.color_image,
-            depth_in_millimeters=self.convert_depth_to_millimeters(frame.depth),
+            depth_in_millimeters=self.convert_depth_to_millimeters(
+                depth_in_meters=frame.depth
+            ),
             segmentation=frame.segmentation,
             body_colors=color_frame.body_colors,
             camera_model=camera_model,
         )
 
     @staticmethod
-    def convert_depth_to_millimeters(depth_in_meters: np.ndarray) -> np.ndarray:
+    def convert_depth_to_millimeters(*, depth_in_meters: np.ndarray) -> np.ndarray:
         """
         Round and saturate meter depths to unsigned millimeters, encoding misses as
         zero.

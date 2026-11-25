@@ -18,14 +18,14 @@ class HSRVelocityInterface(ClosedLoopRobotInterfaceConfig):
 
     def setup(self):
         self.sync_6dof_joint_with_tf_frame(
-            joint=self.world.get_connections_by_type(Connection6DoF)[0],
+            joint=self.world.get_connections_by_type(connection_type=Connection6DoF)[0],
             tf_parent_frame="map",
             tf_child_frame=self.robot.mobile_base.odometry_body_name,
         )
 
         self.sync_robot_parts()
 
-        omni_drive = self.world.get_connections_by_type(OmniDrive)[0]
+        omni_drive = self.world.get_connections_by_type(connection_type=OmniDrive)[0]
         self.add_drive_velocity_command_topic(
             command_topic="/omni_base_controller/cmd_vel", drive=omni_drive
         )

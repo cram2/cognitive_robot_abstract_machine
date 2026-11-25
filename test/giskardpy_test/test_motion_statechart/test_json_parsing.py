@@ -75,13 +75,13 @@ def _create_executor(world: World) -> StatechartExecutor:
 def test_to_json_joint_position_list(mini_world):
     connection = mini_world.connections[0]
     node = JointPositionList(
-        goal_state=JointState.from_mapping({connection: 0.5}),
+        goal_state=JointState.from_mapping(mapping={connection: 0.5}),
         threshold=0.5,
     )
     json_data = to_json(node)
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=mini_world)
     node_copy = from_json(new_json_data, **tracker.create_kwargs())
     assert node_copy.name == node.name
     assert node_copy.threshold == node.threshold
@@ -98,7 +98,7 @@ def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
         goal_point=Point3(1, 0, 0, reference_frame=root),
     )
     new_json_data = json.loads(json.dumps(to_json(node)))
-    tracker = WorldEntityWithIDKwargsTracker.from_world(mini_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=mini_world)
     node_copy = from_json(new_json_data, **tracker.create_kwargs())
     assert node_copy.weight == node.weight
 
@@ -118,31 +118,33 @@ def test_executing_json_parsed_statechart(tmp_path):
             name=PrefixedName(name="dof", prefix="a"),
             limits=limits,
         )
-        world.add_degree_of_freedom(dof)
+        world.add_degree_of_freedom(dof=dof)
         root_C_tip = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             parent=root,
             child=tip,
             raw_dof=dof,
         )
-        world.add_connection(root_C_tip)
+        world.add_connection(connection=root_C_tip)
 
         dof = DegreeOfFreedom(
             name=PrefixedName(name="dof", prefix="b"),
             limits=limits,
         )
-        world.add_degree_of_freedom(dof)
+        world.add_degree_of_freedom(dof=dof)
         root_C_tip2 = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             parent=root,
             child=tip2,
             raw_dof=dof,
         )
-        world.add_connection(root_C_tip2)
+        world.add_connection(connection=root_C_tip2)
 
     statechart = Statechart(context=_create_executor(world).context)
 
-    task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 0.5}))
+    task1 = JointPositionList(
+        goal_state=JointState.from_mapping(mapping={root_C_tip: 0.5})
+    )
     always_true = ConstTrueNode()
     statechart.add_node(node=always_true)
     statechart.add_node(node=task1)
@@ -155,7 +157,7 @@ def test_executing_json_parsed_statechart(tmp_path):
     json_data = statechart.to_json()
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     executor = _create_executor(world)
     statechart_copy = Statechart.from_json(
         data=new_json_data, context=executor.context, **tracker.create_kwargs()
@@ -182,8 +184,12 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     """
     A pose goal read back from JSON still brings the PR2's base to the goal pose.
     """
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="base_footprint"
+    )
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.2, reference_frame=tip
     )
@@ -202,7 +208,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     json_str = json.dumps(json_data)
     new_json_data = json.loads(json_str)
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(pr2_world_state_reset)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=pr2_world_state_reset)
     kwargs = tracker.create_kwargs()
     executor = _create_executor(pr2_world_state_reset)
     statechart_copy = Statechart.from_json(
@@ -212,7 +218,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     executor.compile(statechart=statechart_copy)
     executor.tick_until_end()
 
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+    fk = pr2_world_state_reset.compute_forward_kinematics_np(root=root, tip=tip)
     assert np.allclose(fk, tip_goal, atol=cart_goal.position_threshold)
 
 
@@ -224,7 +230,7 @@ def test_structure_copy_of_a_plain_statechart_keeps_the_motion_node_kinds(
     statechart.add_nodes(
         nodes=[
             task := JointPositionList(
-                goal_state=JointState.from_mapping({connection: 0.5})
+                goal_state=JointState.from_mapping(mapping={connection: 0.5})
             ),
             monitor := LocalMinimumReached(),
             end := EndMotion.when_true(node=task),
@@ -281,7 +287,7 @@ def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round
         node=(
             goal := DifferentialDriveBaseGoal(
                 mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                    MobileBase
+                    semantic_annotation_type=MobileBase
                 )[0],
                 goal_pose=goal_pose,
                 threshold=0.05,
@@ -293,7 +299,7 @@ def test_an_expanded_differential_drive_goal_reaches_its_pose_after_a_json_round
     statechart.context.cleanup()
 
     executor = _create_executor(cylinder_bot_diff_world)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=cylinder_bot_diff_world)
     statechart_copy = Statechart.from_json(
         data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
@@ -315,13 +321,13 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
     receiver binds the goal frame when the leg starts, after the first leg moved the
     base.
     """
-    bot = cylinder_bot_diff_world.get_body_by_name("bot")
+    bot = cylinder_bot_diff_world.get_body_by_name(name="bot")
     statechart = Statechart(context=_create_executor(cylinder_bot_diff_world).context)
     statechart.add_node(
         node=(
             first_leg := DifferentialDriveBaseGoal(
                 mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                    MobileBase
+                    semantic_annotation_type=MobileBase
                 )[0],
                 goal_pose=Pose.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_diff_world.root
@@ -334,7 +340,7 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
         node=(
             second_leg := DifferentialDriveBaseGoal(
                 mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                    MobileBase
+                    semantic_annotation_type=MobileBase
                 )[0],
                 goal_pose=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
                 threshold=0.05,
@@ -347,7 +353,7 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
     statechart.context.cleanup()
 
     executor = _create_executor(cylinder_bot_diff_world)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_diff_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=cylinder_bot_diff_world)
     statechart_copy = Statechart.from_json(
         data=new_json_data, context=executor.context, **tracker.create_kwargs()
     )
@@ -358,7 +364,7 @@ def test_an_expanded_differential_drive_goal_binds_its_goal_frame_after_a_json_r
     assert second_leg_copy.life_cycle_state == LifeCycleValue.SUCCEEDED
     np.testing.assert_allclose(
         cylinder_bot_diff_world.compute_forward_kinematics_np(
-            cylinder_bot_diff_world.root, bot
+            root=cylinder_bot_diff_world.root, tip=bot
         )[:3, 3],
         [1.5, 0, 0],
         atol=2 * second_leg.threshold,

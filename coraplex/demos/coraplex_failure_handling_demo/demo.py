@@ -318,7 +318,7 @@ class OpenGripperBeforeReading(SequentialInsertion[JointReading]):
             SetGripperAction(
                 name="open gripper",
                 gripper_configuration=self.end_effector.default_configuration(
-                    GripperState.OPEN
+                    state_type=GripperState.OPEN
                 ),
             )
         ]
@@ -393,7 +393,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         """
         :return: The apartment.
         """
-        return WorldSpecification.from_urdf(SceneFile.APARTMENT)
+        return WorldSpecification.from_urdf(file_path=SceneFile.APARTMENT)
 
     def robot_specification(self) -> RobotSpecification:
         """
@@ -404,7 +404,9 @@ class FailureHandlingDemonstration(RobotDemonstration):
         )
 
     def is_scene_populated(self, *, world: World) -> bool:
-        return world.is_kinematic_structure_entity_in_world_by_name(ApartmentBody.ROOT)
+        return world.is_kinematic_structure_entity_in_world_by_name(
+            name=ApartmentBody.ROOT
+        )
 
     def populate_scene(self, *, world: World) -> None:
         """
@@ -415,16 +417,18 @@ class FailureHandlingDemonstration(RobotDemonstration):
             name=name,
             semantic_annotation_type=Milk,
             root_specification=BodySpecification.mesh(
-                name,
-                SceneFile.MILK,
+                name=name,
+                filename=SceneFile.MILK,
                 connection_specification=Connection6DoFSpecification(),
             ),
-        ).spawn(world, parent=None, parent_T_self=self.milk_start)
+        ).spawn(world=world, parent=None, parent_T_self=self.milk_start)
 
     def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
-                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+                robot=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=self.used_robot
+                )[0]
             ),
             StatementGrounding(),
             PlanRewriting(
@@ -444,7 +448,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         robot = context.require_extension(extension_type=RobotAccess).robot
         arm = robot.right_arm
         end_effector = arm.end_effector
-        milk = world.get_semantic_annotations_by_type(Milk)[0]
+        milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
         self.plan = Sequence(
             nodes=[
                 ParkArmsAction(arms=robot.all_arms),
@@ -459,7 +463,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
                 SetGripperAction(
                     name="close gripper",
                     gripper_configuration=end_effector.default_configuration(
-                        GripperState.CLOSE
+                        state_type=GripperState.CLOSE
                     ),
                 ),
                 HandledOnFailure(
@@ -467,7 +471,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
                     handled_node=JointReading(
                         name="gripper reading",
                         joint_state=end_effector.default_configuration(
-                            GripperState.OPEN
+                            state_type=GripperState.OPEN
                         ).joint_state,
                     ),
                     failure_handling_strategy=RecoveryByInsertion(
@@ -523,7 +527,7 @@ def main() -> None:
     demonstration = FailureHandlingDemonstration(used_robot=PR2)
     world = demonstration.run()
     demonstration.print_what_happened()
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     print(f"The milk now hangs below {milk.root.parent_connection.parent.name}.")
 
 

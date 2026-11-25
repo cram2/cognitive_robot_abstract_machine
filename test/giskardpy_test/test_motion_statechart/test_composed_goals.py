@@ -44,7 +44,7 @@ def test_cartesian_pose_is_a_parallel_of_its_position_and_orientation(
     """
     A pose goal is a parallel of a position and an orientation task, in that order.
     """
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
@@ -74,7 +74,7 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
     Whatever accompanies a pose, such as a task holding the orientation or a collision
     allowance, runs in the pose itself rather than in another parallel around it.
     """
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     pose = CartesianPose(
@@ -105,7 +105,7 @@ def test_cartesian_pose_observes_its_goal_reached(
     """
     A pose goal observes true once both its tasks do.
     """
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
@@ -135,7 +135,7 @@ def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
     A straight-line pose goal is a parallel of a straight-line position task and an
     orientation task, in that order.
     """
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
     executor = _create_executor(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     statechart.add_node(
@@ -170,7 +170,7 @@ def test_differential_drive_goal_runs_its_steps_in_one_sequence(
         node=(
             goal := DifferentialDriveBaseGoal(
                 mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                    MobileBase
+                    semantic_annotation_type=MobileBase
                 )[0],
                 goal_pose=Pose.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_diff_world.root
@@ -198,7 +198,7 @@ def test_differential_drive_goal_is_a_step_without_an_attempt(
                 nodes=[
                     goal := DifferentialDriveBaseGoal(
                         mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                            MobileBase
+                            semantic_annotation_type=MobileBase
                         )[0],
                         goal_pose=Pose.from_xyz_rpy(
                             x=1, reference_frame=cylinder_bot_diff_world.root

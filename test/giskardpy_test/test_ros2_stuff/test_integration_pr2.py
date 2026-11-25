@@ -82,17 +82,19 @@ class PR2Tester(GiskardTester):
     def __post_init__(self):
         super().__post_init__()
         self.right_tip = self.api.world.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         self.base_footprint = self.api.world.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
-        self.map = self.api.world.get_kinematic_structure_entity_by_name("map")
+        self.map = self.api.world.get_kinematic_structure_entity_by_name(name="map")
 
     def setup_giskard(self) -> Giskard:
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(PR2)]
+                robots=[
+                    RobotSpecification.specify_real_robot(semantic_annotation_type=PR2)
+                ]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(),
@@ -154,7 +156,9 @@ class TestJointGoals:
         statechart.add_node(
             node=(
                 joint_goal := JointPositionList(
-                    goal_state=JointState.from_str_dict(js, giskard.api.world),
+                    goal_state=JointState.from_str_dict(
+                        mapping=js, world=giskard.api.world
+                    ),
                 )
             )
         )
@@ -163,7 +167,7 @@ class TestJointGoals:
         giskard.api.execute()
         sleep(0.1)
         for joint, goal in js.items():
-            connection = giskard.api.world.get_connection_by_name(joint)
+            connection = giskard.api.world.get_connection_by_name(name=joint)
             actual = giskard.api.world.state[connection.dof.id].position
             if (
                 isinstance(connection, ScrewAxisConnection)
@@ -250,11 +254,13 @@ def test_bodies_added_relative_to_the_gripper_are_placed_there_on_the_server(
 
     server_world = pocky_pose_setup.world
     server_r_tip = server_world.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     for name, pose in poses_relative_to_r_tip.items():
-        body = server_world.get_kinematic_structure_entity_by_name(name)
-        r_tip_T_body = server_world.compute_forward_kinematics(server_r_tip, body)
+        body = server_world.get_kinematic_structure_entity_by_name(name=name)
+        r_tip_T_body = server_world.compute_forward_kinematics(
+            root=server_r_tip, tip=body
+        )
         assert np.allclose(r_tip_T_body.position, pose.position, atol=1e-4)
 
 
@@ -267,9 +273,9 @@ def _closest_contact_with(*, world: World, body: Body) -> ClosestPoints:
     :param body: The body whose contact with the robot is measured.
     :return: The closest contact between any body of the robot and `body`.
     """
-    robot = world.get_semantic_annotations_by_type(PR2)[0]
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)[0]
     world.collision_manager.put_temporary_rules_in_force(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=1.0,
                 violated_distance=0.0,
@@ -302,8 +308,8 @@ def test_buffer_zone_scaling_sent_to_the_server_shrinks_the_buffer_zone_near_the
         ),
     )
     world = giskard.api.world
-    wall = world.get_kinematic_structure_entity_by_name("wall")
-    robot = world.get_semantic_annotations_by_type(PR2)[0]
+    wall = world.get_kinematic_structure_entity_by_name(name="wall")
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)[0]
     scaling = LinearBufferZoneScaling(
         goal_point=Point3(reference_frame=wall), full_scale_goal_distance=0.5
     )
@@ -375,7 +381,7 @@ class TestActionServerEvents:
             node=(
                 joint_goal := JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        giskard.better_pose_left, world=giskard.api.world
+                        mapping=giskard.better_pose_left, world=giskard.api.world
                     ),
                 )
             )
@@ -541,7 +547,7 @@ class TestActionServerEvents:
         await asyncio.sleep(1)
 
         # the modification is applied once the motion is over
-        assert giskard.api.world.get_kinematic_structure_entity_by_name("box")
+        assert giskard.api.world.get_kinematic_structure_entity_by_name(name="box")
         assert giskard.giskard.executor.context.world.get_kinematic_structure_entity_by_name(
-            "box"
+            name="box"
         )

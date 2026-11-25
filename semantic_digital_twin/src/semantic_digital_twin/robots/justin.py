@@ -115,14 +115,14 @@ class JustinLeftThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_1thumb_base"
+                branch_root=robot_root, name="left_1thumb_base"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_1thumb4"
+                branch_root=robot_root, name="left_1thumb4"
             ),
         )
 
@@ -137,13 +137,15 @@ class JustinLeftIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_2tip_base"
+                branch_root=robot_root, name="left_2tip_base"
             ),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "left_2tip4"),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="left_2tip4"
+            ),
         )
 
 
@@ -157,14 +159,14 @@ class JustinLeftMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_3middle_base"
+                branch_root=robot_root, name="left_3middle_base"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_3middle4"
+                branch_root=robot_root, name="left_3middle4"
             ),
         )
 
@@ -179,13 +181,15 @@ class JustinLeftRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_4ring_base"
+                branch_root=robot_root, name="left_4ring_base"
             ),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "left_4ring4"),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="left_4ring4"
+            ),
         )
 
 
@@ -199,14 +203,14 @@ class JustinRightThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_1thumb_base"
+                branch_root=robot_root, name="right_1thumb_base"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_1thumb4"
+                branch_root=robot_root, name="right_1thumb4"
             ),
         )
 
@@ -221,13 +225,15 @@ class JustinRightIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_2tip_base"
+                branch_root=robot_root, name="right_2tip_base"
             ),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "right_2tip4"),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="right_2tip4"
+            ),
         )
 
 
@@ -241,14 +247,14 @@ class JustinRightMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_3middle_base"
+                branch_root=robot_root, name="right_3middle_base"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_3middle4"
+                branch_root=robot_root, name="right_3middle4"
             ),
         )
 
@@ -263,14 +269,14 @@ class JustinRightRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_4ring_base"
+                branch_root=robot_root, name="right_4ring_base"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_4ring4"
+                branch_root=robot_root, name="right_4ring4"
             ),
         )
 
@@ -315,12 +321,14 @@ class JustinLeftHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "left_arm7"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="left_arm7"
+            ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_tool_frame"
+                branch_root=robot_root, name="l_gripper_tool_frame"
             ),
         )
 
@@ -365,12 +373,14 @@ class JustinRightHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "right_arm7"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="right_arm7"
+            ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_tool_frame"
+                branch_root=robot_root, name="r_gripper_tool_frame"
             ),
         )
 
@@ -392,11 +402,15 @@ class JustinLeftArm(Arm[JustinLeftHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "left_arm7"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="left_arm7"
+            ),
         )
 
 
@@ -417,11 +431,15 @@ class JustinRightArm(Arm[JustinRightHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "right_arm7"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="right_arm7"
+            ),
         )
 
 
@@ -429,12 +447,14 @@ class JustinRightArm(Arm[JustinRightHand]):
 class JustinCamera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=cls.create_optical_body(
-                robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
-                HomogeneousTransformationMatrix(),
+                mounting_body=robot_root._world.get_body_in_branch_by_name(
+                    branch_root=robot_root, name="head2"
+                ),
+                parent_T_optical=HomogeneousTransformationMatrix(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(
@@ -463,11 +483,15 @@ class JustinNeck(Neck[JustinCamera]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "torso4"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "head2"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="torso4"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="head2"
+            ),
         )
 
 
@@ -483,11 +507,15 @@ class JustinTorso(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "torso4"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="torso4"
+            ),
         )
 
 
@@ -499,10 +527,12 @@ class JustinMobileBase(MobileBase[OmniDrive], HasTorso[JustinTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
         )
 
     def setup_hardware_interfaces(self) -> None:

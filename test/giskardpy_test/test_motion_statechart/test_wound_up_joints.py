@@ -102,8 +102,8 @@ class WatchedWristTurn:
         :param arm_pose: The pose of the rest of the right arm.
         """
         start = arm_pose | {TracyJoint.RIGHT_WRIST_3: winding.value}
-        JointState.from_str_dict(start, world=world).apply_to(world)
-        tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+        JointState.from_str_dict(mapping=start, world=world).apply_to(world=world)
+        tip = world.get_kinematic_structure_entity_by_name(name="r_gripper_tool_frame")
         goal = CartesianPose(
             kinematic_chain=KinematicChain(root=world.root, tip=tip),
             goal_pose=Pose.from_xyz_axis_angle(
@@ -151,7 +151,7 @@ def test_wrist_turn_from_a_wound_up_wrist_names_the_blocked_limit(
     wrist_turn = WatchedWristTurn.from_winding(
         world=tracy_world_copy, winding=WristWinding.WOUND_UP, arm_pose=tracy_arm_pose
     )
-    wrist = tracy_world_copy.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
+    wrist = tracy_world_copy.get_connection_by_name(name=TracyJoint.RIGHT_WRIST_3.value)
     (orientation_task,) = [
         node for node in wrist_turn.goal.nodes if isinstance(node, CartesianOrientation)
     ]
@@ -197,9 +197,11 @@ def test_a_limit_of_a_joint_without_hardware_interface_is_not_blamed(
     environment, is never named as blocking, even when a stalled task drives it into a
     position limit it lies at.
     """
-    wrist = tracy_world_copy.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
+    wrist = tracy_world_copy.get_connection_by_name(name=TracyJoint.RIGHT_WRIST_3.value)
     with tracy_world_copy.modify_world():
-        tracy_world_copy.set_dofs_has_hardware_interface([wrist.raw_dof], False)
+        tracy_world_copy.set_dofs_has_hardware_interface(
+            dofs=[wrist.raw_dof], value=False
+        )
     wrist_turn = WatchedWristTurn.from_winding(
         world=tracy_world_copy, winding=WristWinding.WOUND_UP, arm_pose=tracy_arm_pose
     )

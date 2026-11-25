@@ -69,7 +69,7 @@ def test_link_without_collision_geometry_has_none_by_default():
     """
     A link that describes no collision keeps none, so a description is read as written.
     """
-    world = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).create_world()
+    world = URDFParser.from_file(file_path=VISUAL_ONLY_LINK_URDF).create_world()
 
     cover = _body_named(world, "cover_link")
     assert len(cover.visual.shapes) == 1
@@ -83,7 +83,7 @@ def test_visual_geometry_stands_in_when_a_link_has_no_collision_geometry():
     collision geometry.
     """
     world = URDFParser.from_file(
-        VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
+        file_path=VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
     ).create_world()
 
     cover = _body_named(world, "cover_link")
@@ -98,9 +98,9 @@ def test_visual_geometry_is_left_out_where_the_link_already_collides():
     The visual is a stand-in, not an addition: a link that describes its own collision
     keeps exactly that geometry.
     """
-    as_written = URDFParser.from_file(VISUAL_ONLY_LINK_URDF).create_world()
+    as_written = URDFParser.from_file(file_path=VISUAL_ONLY_LINK_URDF).create_world()
     with_backup = URDFParser.from_file(
-        VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
+        file_path=VISUAL_ONLY_LINK_URDF, use_visual_as_collision_backup=True
     ).create_world()
 
     base_as_written = _body_named(as_written, "base_link")
@@ -139,7 +139,7 @@ def material_colored_world():
         "resources",
     )
     return URDFParser.from_file(
-        MATERIAL_COLORED_LINKS_URDF,
+        file_path=MATERIAL_COLORED_LINKS_URDF,
         path_resolver=CompositePathResolver(
             resolvers=[
                 SearchPathFileResolver(root_directories=[resources]),
@@ -234,7 +234,7 @@ def test_table_parsing(table_parser):
     assert len(world.kinematic_structure_entities) == 6
 
     origin_left_front_leg_joint = world.get_connection(
-        world.root, world.kinematic_structure_entities[1]
+        parent=world.root, child=world.kinematic_structure_entities[1]
     )
     assert isinstance(origin_left_front_leg_joint, FixedConnection)
 
@@ -264,23 +264,25 @@ def test_pr2_parsing(pr2_parser):
 def test_mimic_joints(pr2_parser):
     world = pr2_parser.create_world()
     joint_to_be_mimicked = world.get_connection_by_name(
-        PR2Joint.LEFT_GRIPPER_LEFT_FINGER
+        name=PR2Joint.LEFT_GRIPPER_LEFT_FINGER
     )
-    mimic_joint = world.get_connection_by_name(PR2Joint.LEFT_GRIPPER_RIGHT_FINGER)
+    mimic_joint = world.get_connection_by_name(name=PR2Joint.LEFT_GRIPPER_RIGHT_FINGER)
 
     assert joint_to_be_mimicked.dofs == mimic_joint.dofs
 
 
 def test_declared_joint_dynamics_are_imported(tiago_parser):
     world = tiago_parser.create_world()
-    dynamics = world.get_connection_by_name(TiagoJoint.LEFT_ARM_1).dynamics
+    dynamics = world.get_connection_by_name(name=TiagoJoint.LEFT_ARM_1).dynamics
     assert dynamics.damping == 40.0
     assert dynamics.dry_friction == 1.0
 
 
 def test_undeclared_joint_dynamics_default_to_zero(pr2_parser):
     world = pr2_parser.create_world()
-    dynamics = world.get_connection_by_name("r_gripper_motor_slider_joint").dynamics
+    dynamics = world.get_connection_by_name(
+        name="r_gripper_motor_slider_joint"
+    ).dynamics
     assert dynamics.damping == 0.0
     assert dynamics.dry_friction == 0.0
     assert dynamics.armature == 0.0
@@ -288,7 +290,7 @@ def test_undeclared_joint_dynamics_default_to_zero(pr2_parser):
 
 def test_declared_link_inertial_is_imported(pr2_parser):
     world = pr2_parser.create_world()
-    inertial = world.get_body_by_name("l_elbow_flex_link").inertial
+    inertial = world.get_body_by_name(name="l_elbow_flex_link").inertial
     assert inertial.mass == 1.90327
     assert inertial.center_of_mass.to_np()[:3].tolist() == [0.01014, 0.00032, -0.01211]
     assert inertial.inertia.to_values() == (
@@ -314,7 +316,7 @@ def test_inertia_tensor_is_expressed_in_the_link_frame(table_parser):
     )
     body = Body(name=PrefixedName(name="rotated_inertial_link"))
 
-    inertial = table_parser.parse_inertial(link, body)
+    inertial = table_parser.parse_inertial(link=link, body=body)
     inertia_rotated_by_ninety_degrees_around_z = np.diag([0.003, 0.002, 0.004])
     assert np.allclose(
         inertial.inertia.data, inertia_rotated_by_ninety_degrees_around_z, atol=1e-12
@@ -327,7 +329,7 @@ def test_a_link_that_declares_no_inertial_gets_none(table_parser):
 
 def test_xacro():
     path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    parser = URDFParser.from_xacro(path)
+    parser = URDFParser.from_xacro(xacro_path=path)
     world = parser.create_world()
     world.validate()
     assert len(world.kinematic_structure_entities) > 0
@@ -349,18 +351,22 @@ def _child_pose_after_moving(world, joint_name, position):
     :return: The pose of the joint's child relative to its parent once the joint is moved
         to ``position``.
     """
-    connection = world.get_connection_by_name(joint_name)
+    connection = world.get_connection_by_name(name=joint_name)
     world.state[connection.active_dofs[0].id].position = position
     world.notify_state_change()
-    return world.compute_forward_kinematics_np(connection.parent, connection.child)
+    return world.compute_forward_kinematics_np(
+        root=connection.parent, tip=connection.child
+    )
 
 
 def test_floating_joint_becomes_a_6dof_connection():
-    world = URDFParser.from_file(JOINT_AXES_URDF).create_world()
+    world = URDFParser.from_file(file_path=JOINT_AXES_URDF).create_world()
 
-    connection = world.get_connection_by_name("base_to_free")
+    connection = world.get_connection_by_name(name="base_to_free")
     assert isinstance(connection, Connection6DoF)
-    pose = world.compute_forward_kinematics_np(connection.parent, connection.child)
+    pose = world.compute_forward_kinematics_np(
+        root=connection.parent, tip=connection.child
+    )
     assert np.allclose(pose[:3, 3], [0.2, -0.1, 0.9])
 
 
@@ -368,7 +374,7 @@ def test_joint_rotates_about_its_declared_axis():
     """
     An axis is read as the direction it declares, not rounded to a coordinate axis.
     """
-    world = URDFParser.from_file(JOINT_AXES_URDF).create_world()
+    world = URDFParser.from_file(file_path=JOINT_AXES_URDF).create_world()
 
     pose = _child_pose_after_moving(world, "base_to_knob", pi / 3)
 

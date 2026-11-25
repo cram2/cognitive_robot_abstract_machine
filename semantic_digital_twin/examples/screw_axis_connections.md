@@ -99,7 +99,7 @@ with world.modify_world():
                 x=0.15
             ),
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
         connections[kind] = connection
 
 root_T_connection = connections["Revolute"].parent_T_connection_expression.to_np()
@@ -291,7 +291,7 @@ with cabinet_world.modify_world():
         child=door,
         screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
     )
-    cabinet_world.add_connection(door_connection)
+    cabinet_world.add_connection(connection=door_connection)
 
 door_connection.position = np.pi / 2
 print(door_connection.behaves_like_a_revolute_connection)
@@ -348,7 +348,7 @@ with bottle_world.modify_world():
             axis=Vector3.Z(), pitch=0.004
         ),
     )
-    bottle_world.add_connection(cap_connection)
+    bottle_world.add_connection(connection=cap_connection)
 
 cap_connection.position = cap_connection.position_for_translation(distance=0.002)
 print(cap_connection.position)
@@ -394,7 +394,7 @@ with world.modify_world():
                 x=0.15
             ),
         )
-        world.add_connection(pitch_connection)
+        world.add_connection(connection=pitch_connection)
         pitch_connections.append(pitch_connection)
 
 
@@ -640,8 +640,8 @@ wall = Body(name=PrefixedName(name="wall"))
 hinged_door = Body(name=PrefixedName(name="hinged_door"))
 hinge_point = np.array([-0.8, 0.0, 0.0])
 with hinge_world.modify_world():
-    hinge_world.add_body(wall)
-    hinge_world.add_body(hinged_door)
+    hinge_world.add_body(body=wall)
+    hinge_world.add_body(body=hinged_door)
     hinge = ScrewAxisConnection.create_with_dofs(
         world=hinge_world,
         parent=wall,
@@ -653,7 +653,7 @@ with hinge_world.modify_world():
             ),
         ),
     )
-    hinge_world.add_connection(hinge)
+    hinge_world.add_connection(connection=hinge)
 
 hinge.position = np.pi / 2
 before = hinge_world.compute_forward_kinematics_np(root=wall, tip=hinged_door)

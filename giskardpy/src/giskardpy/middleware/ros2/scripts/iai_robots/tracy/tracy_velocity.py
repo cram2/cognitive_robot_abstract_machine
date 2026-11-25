@@ -24,7 +24,8 @@ def create_giskard(node: Node) -> Giskard:
         world_source=WorldSpecification(
             robots=[
                 RobotSpecification.specify_real_robot(
-                    Tracy, urdf=RosGraph(node=node).robot_description()
+                    semantic_annotation_type=Tracy,
+                    urdf=RosGraph(node=node).robot_description(),
                 )
             ]
         ),

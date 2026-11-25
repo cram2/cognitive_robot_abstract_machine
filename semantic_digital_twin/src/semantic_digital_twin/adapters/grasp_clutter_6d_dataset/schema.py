@@ -82,7 +82,7 @@ class GraspClutter6DCameraInfo:
     """
 
     @classmethod
-    def from_json(cls, data: dict) -> Self:
+    def from_json(cls, *, data: dict) -> Self:
         rotation = data.get("cam_R_w2c")
         translation = data.get("cam_t_w2c")
         camera_T_world = None
@@ -128,7 +128,7 @@ class GraspClutter6DObjectPose:
     """
 
     @classmethod
-    def from_json(cls, data: dict) -> Self:
+    def from_json(cls, *, data: dict) -> Self:
         return cls(
             object_id=int(data["obj_id"]),
             camera_T_object=HomogeneousTransformationMatrix.from_point_rotation_matrix(
@@ -184,7 +184,7 @@ class GraspClutter6DScene:
     frames: list[GraspClutter6DFrame] = field(default_factory=list)
     """Every frame of this scene. Each frame carries its own `image_id` - see :meth:`frame`."""
 
-    def frame(self, image_id: str) -> GraspClutter6DFrame:
+    def frame(self, *, image_id: str) -> GraspClutter6DFrame:
         """
         :param image_id: The frame id to look up, e.g. ``"1"``.
         :raises GraspClutter6DImageNotFoundError: if no frame in `self.frames` has this id.
@@ -198,7 +198,7 @@ class GraspClutter6DScene:
         )
 
     @classmethod
-    def from_directory(cls, scene_id: str, directory: Path) -> Self:
+    def from_directory(cls, *, scene_id: str, directory: Path) -> Self:
         """
         Parse a scene from its extracted directory.
 
@@ -221,9 +221,9 @@ class GraspClutter6DScene:
         frames = [
             GraspClutter6DFrame(
                 image_id=image_id,
-                camera=GraspClutter6DCameraInfo.from_json(camera_data),
+                camera=GraspClutter6DCameraInfo.from_json(data=camera_data),
                 object_poses=[
-                    GraspClutter6DObjectPose.from_json(pose)
+                    GraspClutter6DObjectPose.from_json(data=pose)
                     for pose in gt_json.get(image_id, [])
                 ],
             )
@@ -233,9 +233,9 @@ class GraspClutter6DScene:
 
     def create_world(
         self,
+        *,
         image_id: str,
         models_directory: Path,
-        *,
         with_world_frame: bool = False,
         mesh_unit_scale: float = float(_millimeters_to_meters(1.0)),
         object_names: dict[int, str] | None = None,
@@ -274,7 +274,7 @@ class GraspClutter6DScene:
             found in `models_directory`.
         :return: The built world.
         """
-        frame = self.frame(image_id)
+        frame = self.frame(image_id=image_id)
 
         world = World.create_with_root_body(
             root_body_name="camera", prefix=f"{self.scene_id}_{image_id}"
@@ -287,7 +287,9 @@ class GraspClutter6DScene:
                 scene_id=self.scene_id, image_id=image_id
             )
         if with_world_frame:
-            root_body = self._add_world_frame(world, frame.camera, camera_body)
+            root_body = self._add_world_frame(
+                world=world, camera_info=frame.camera, camera_body=camera_body
+            )
 
         for index, pose in enumerate(frame.object_poses):
             self._create_object_in_world(
@@ -305,7 +307,7 @@ class GraspClutter6DScene:
         return world
 
     def _add_world_frame(
-        self, world: World, camera_info: GraspClutter6DCameraInfo, camera_body: Body
+        self, *, world: World, camera_info: GraspClutter6DCameraInfo, camera_body: Body
     ) -> Body:
         """
         Add a `map` root body and place `camera_body` under it via the inverse of the
@@ -334,13 +336,14 @@ class GraspClutter6DScene:
                 child=camera_body,
                 parent_T_connection_expression=map_T_camera,
             )
-            world.add_body(map_body)
-            world.add_connection(connection)
+            world.add_body(body=map_body)
+            world.add_connection(connection=connection)
 
         return map_body
 
     def _create_object_in_world(
         self,
+        *,
         world: World,
         pose: GraspClutter6DObjectPose,
         index: int,
@@ -387,7 +390,9 @@ class GraspClutter6DScene:
         camera_T_object = HomogeneousTransformationMatrix(
             data=pose.camera_T_object, reference_frame=camera_body, child_frame=body
         )
-        root_T_object = world.transform(camera_T_object, root_body)
+        root_T_object = world.transform(
+            spatial_object=camera_T_object, target_frame=root_body
+        )
 
         loaded_mesh = trimesh.load(str(mesh_path), process=False, force="mesh")
         loaded_mesh.apply_scale(mesh_unit_scale)
@@ -405,12 +410,14 @@ class GraspClutter6DScene:
                 child=body,
                 parent_T_connection_expression=root_T_object,
             )
-            world.add_body(body)
-            world.add_connection(connection)
+            world.add_body(body=body)
+            world.add_connection(connection=connection)
 
         with world.modify_world():
             world.add_semantic_annotation(
-                NaturalLanguageDescription(root=body, description=name)
+                semantic_annotation=NaturalLanguageDescription(
+                    root=body, description=name
+                )
             )
 
         return body

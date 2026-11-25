@@ -63,7 +63,7 @@ class RayTracingCameraInterface(CameraInterface):
         """
         context = self.context_resolver.resolve(perception_world=world)
         frame = context.world.ray_tracer.render(
-            context.camera, rgb_mode=self.camera_config.rgb_mode
+            camera=context.camera, rgb_mode=self.camera_config.rgb_mode
         )
         camera_model = frame.camera_model
 

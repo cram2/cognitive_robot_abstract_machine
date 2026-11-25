@@ -62,9 +62,11 @@ def test_position_reached(pr2_world_state_reset: World):
     A position monitor observes true once the gripper is driven to its goal point.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     goal_point = Point3(0.6, -0.3, 1.0, reference_frame=root)
 
     executor = _create_executor(pr2_world_state_reset)
@@ -98,8 +100,12 @@ def test_position_reached_binding_policies(
     The monitor captures the same goal with the same policy and serves as the success
     condition, so the motion only ends once the monitor detects the goal was reached.
     """
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="base_footprint"
+    )
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     goal_point = Point3(0.2, 0, 0, reference_frame=tip)
 
     executor = _create_executor(pr2_world_state_reset)
@@ -128,9 +134,11 @@ def test_orientation_reached(pr2_world_state_reset: World):
     orientation.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     goal_orientation = RotationMatrix.from_axis_angle(
         AxisAngle(Vector3.Z(reference_frame=root), 0.3)
     )
@@ -161,9 +169,11 @@ def test_pose_reached(pr2_world_state_reset: World):
     orientation of its goal.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     goal_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=0.6, y=-0.3, z=1.0, reference_frame=root
     )
@@ -192,9 +202,11 @@ def test_pointing_at(pr2_world_state_reset: World):
     point.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     goal_point = Point3(2, 0, 0, reference_frame=root)
     pointing_axis = Vector3.X(reference_frame=tip)
 
@@ -224,9 +236,11 @@ def test_vectors_aligned(pr2_world_state_reset: World):
     reference normal.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     reference_normal = Vector3.X(reference_frame=root)
     tip_normal = Vector3.X(reference_frame=tip)
 
@@ -255,9 +269,11 @@ def test_distance_to_line(pr2_world_state_reset: World):
     A line monitor observes true once the gripper is on the segment it watches.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     center_point = Point3(0.6, -0.3, 1.0, reference_frame=root)
     line_axis = Vector3.Y(reference_frame=root)
 

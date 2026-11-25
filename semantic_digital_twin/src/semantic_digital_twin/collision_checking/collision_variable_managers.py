@@ -20,6 +20,7 @@ from semantic_digital_twin.collision_checking.collision_groups import (
 )
 from krrood_spatial_math.spatial_types import Vector3, Point3
 from semantic_digital_twin.world_description.world_entity import Body
+from krrood.patterns.called_positionally import called_positionally
 
 # %% avoided contacts
 
@@ -124,7 +125,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         self._single_reset_block = np.zeros(self.block_size)
         self._single_reset_block[self.get_contact_distance_offset()] = 100
 
-    def _update_reset_indices(self, start_idx: int):
+    def _update_reset_indices(self, *, start_idx: int):
         """
         Updates the reset indices and values when a new block is registered.
         """
@@ -152,7 +153,7 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         """
 
     def _get_cached_symbol(
-        self, method_name: str, identifier: tuple, creator_func: Callable
+        self, *, method_name: str, identifier: tuple, creator_func: Callable
     ):
         """
         Get a symbolic variable from the cache or create it if it doesn't exist.
@@ -174,26 +175,26 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         pass
 
     @abstractmethod
-    def get_contact_distance_symbol(self, contact: AvoidedContact) -> FloatVariable:
+    def get_contact_distance_symbol(self, *, contact: AvoidedContact) -> FloatVariable:
         """
         :return: The distance between the bodies of `contact`.
         """
 
     @abstractmethod
-    def get_violated_distance_symbol(self, contact: AvoidedContact) -> FloatVariable:
+    def get_violated_distance_symbol(self, *, contact: AvoidedContact) -> FloatVariable:
         """
         :return: The distance below which `contact` counts as violated.
         """
 
     @abstractmethod
-    def closest_points_of(self, contact: AvoidedContact) -> ClosestPoints:
+    def closest_points_of(self, *, contact: AvoidedContact) -> ClosestPoints:
         """
         :return: The closest points of the bodies of `contact` as of the latest
             collision check.
         """
 
     def violated_collisions(
-        self, contacts: list[AvoidedContact]
+        self, *, contacts: list[AvoidedContact]
     ) -> list[ViolatedCollision]:
         """
         :param contacts: Registered contacts.
@@ -202,14 +203,16 @@ class BaseCollisionVariableManager(CollisionGroupConsumer, ABC):
         """
         violated = []
         for contact in contacts:
-            violated_distance = self.get_violated_distance_symbol(contact).evaluate()[0]
+            violated_distance = self.get_violated_distance_symbol(
+                contact=contact
+            ).evaluate()[0]
             if (
-                self.get_contact_distance_symbol(contact).evaluate()[0]
+                self.get_contact_distance_symbol(contact=contact).evaluate()[0]
                 < violated_distance
             ):
                 violated.append(
                     ViolatedCollision(
-                        closest_points=self.closest_points_of(contact),
+                        closest_points=self.closest_points_of(contact=contact),
                         violated_distance=violated_distance,
                     )
                 )
@@ -263,6 +266,7 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
     def get_contact_distance_offset(self) -> int:
         return self._contact_distance_offset
 
+    @called_positionally
     def on_compute_collisions(self, collision: CollisionCheckingResult):
         """
         Takes collisions, checks if they are external, and inserts them into the buffer
@@ -271,8 +275,8 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
         self.reset_collision_data()
         self.last_closest_contacts = defaultdict(list)
         for collision in collision.contacts:
-            group_a = self.get_collision_group(collision.body_a)
-            group_b = self.get_collision_group(collision.body_b)
+            group_a = self.get_collision_group(body=collision.body_a)
+            group_b = self.get_collision_group(body=collision.body_b)
             if (group_a in self.registered_groups) == (
                 group_b in self.registered_groups
             ):
@@ -288,12 +292,14 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
             for i in range(
                 min(
                     len(collisions),
-                    group_a.get_max_avoided_bodies(self.collision_manager),
+                    group_a.get_max_avoided_bodies(
+                        collision_manager=self.collision_manager
+                    ),
                 )
             ):
                 collision = collisions[i]
                 group_a_T_root = group_a.root._world.compute_forward_kinematics_np(
-                    group_a.root, group_a.root._world.root
+                    root=group_a.root, tip=group_a.root._world.root
                 )
                 group_a_P_pa = group_a_T_root @ collision.root_P_point_on_body_a
                 self.insert_data_block(
@@ -302,15 +308,16 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
                     root_V_contact_normal=collision.root_V_contact_normal_from_b_to_a,
                     contact_distance=collision.distance,
                     buffer_distance=self.collision_manager.get_buffer_zone_distance(
-                        collision.body_a, collision.body_b
+                        body_a=collision.body_a, body_b=collision.body_b
                     ),
                     violated_distance=self.collision_manager.get_violated_distance(
-                        collision.body_a, collision.body_b
+                        body_a=collision.body_a, body_b=collision.body_b
                     ),
                 )
 
     def insert_data_block(
         self,
+        *,
         contact: AvoidedExternalContact,
         group_a_P_point_on_a: np.ndarray,
         root_V_contact_normal: np.ndarray,
@@ -348,33 +355,33 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
             violated_distance
         )
 
-    def register_group_of_body(self, body: Body):
+    def register_group_of_body(self, *, body: Body):
         """
         Register the collision group associated with a body.
         """
-        group = self.get_collision_group(body)
+        group = self.get_collision_group(body=body)
         if group in self.registered_groups:
             return
         start_idx = len(self.float_variable_data.data)
         self.registered_groups[group] = start_idx
-        for contact in self.avoided_contacts_of(group):
+        for contact in self.avoided_contacts_of(group=group):
             block_start_idx = len(self.float_variable_data.data)
             self._block_start_indices.append(block_start_idx)
-            self._update_reset_indices(block_start_idx)
-            self.get_group_a_P_point_on_a_symbol(contact)
-            self.get_root_V_contact_normal_symbol(contact)
-            self.get_contact_distance_symbol(contact)
-            self.get_buffer_distance_symbol(contact)
-            self.get_violated_distance_symbol(contact)
+            self._update_reset_indices(start_idx=block_start_idx)
+            self.get_group_a_P_point_on_a_symbol(contact=contact)
+            self.get_root_V_contact_normal_symbol(contact=contact)
+            self.get_contact_distance_symbol(contact=contact)
+            self.get_buffer_distance_symbol(contact=contact)
+            self.get_violated_distance_symbol(contact=contact)
 
-    def closest_points_of(self, contact: AvoidedExternalContact) -> ClosestPoints:
+    def closest_points_of(self, *, contact: AvoidedExternalContact) -> ClosestPoints:
         return sorted(
             self.last_closest_contacts[contact.group],
             key=lambda closest_points: closest_points.distance,
         )[contact.rank]
 
     def avoided_contacts_of(
-        self, group: CollisionGroup
+        self, *, group: CollisionGroup
     ) -> list[AvoidedExternalContact]:
         """
         :param group: A collision group.
@@ -383,70 +390,72 @@ class ExternalCollisionVariableManager(BaseCollisionVariableManager):
         """
         return [
             AvoidedExternalContact(group=group, rank=rank)
-            for rank in range(group.get_max_avoided_bodies(self.collision_manager))
+            for rank in range(
+                group.get_max_avoided_bodies(collision_manager=self.collision_manager)
+            )
         ]
 
     def get_group_a_P_point_on_a_symbol(
-        self, contact: AvoidedExternalContact
+        self, *, contact: AvoidedExternalContact
     ) -> Point3:
         """
         :return: The point of `contact` on its group, relative to the root of the group.
         """
         return self._get_cached_symbol(
-            "get_group_a_P_point_on_a_symbol",
-            (contact.group.root.name, contact.rank),
-            lambda: Point3.create_with_variables(
+            method_name="get_group_a_P_point_on_a_symbol",
+            identifier=(contact.group.root.name, contact.rank),
+            creator_func=lambda: Point3.create_with_variables(
                 name=f"group_a_P_point_on_a({contact.group.root.name}, {contact.rank})",
             ),
         )
 
     def get_root_V_contact_normal_symbol(
-        self, contact: AvoidedExternalContact
+        self, *, contact: AvoidedExternalContact
     ) -> Vector3:
         """
         :return: The contact normal of `contact`, pointing from the environment to its
             group, relative to the root of the world.
         """
         return self._get_cached_symbol(
-            "get_root_V_contact_normal_symbol",
-            (contact.group.root.name, contact.rank),
-            lambda: Vector3.create_with_variables(
+            method_name="get_root_V_contact_normal_symbol",
+            identifier=(contact.group.root.name, contact.rank),
+            creator_func=lambda: Vector3.create_with_variables(
                 f"root_V_contact_normal({contact.group.root.name}, {contact.rank})",
             ),
         )
 
     def get_contact_distance_symbol(
-        self, contact: AvoidedExternalContact
+        self, *, contact: AvoidedExternalContact
     ) -> FloatVariable:
         return self._get_cached_symbol(
-            "get_contact_distance_symbol",
-            (contact.group.root.name, contact.rank),
-            lambda: FloatVariable(
+            method_name="get_contact_distance_symbol",
+            identifier=(contact.group.root.name, contact.rank),
+            creator_func=lambda: FloatVariable(
                 f"contact_distance({contact.group.root.name}, {contact.rank})"
             ),
         )
 
     def get_buffer_distance_symbol(
-        self, contact: AvoidedExternalContact
+        self, *, contact: AvoidedExternalContact
     ) -> FloatVariable:
         """
         :return: The distance below which `contact` is pushed apart.
         """
         return self._get_cached_symbol(
-            "get_buffer_distance_symbol",
-            (contact.group.root.name, contact.rank),
-            lambda: FloatVariable(
+            method_name="get_buffer_distance_symbol",
+            identifier=(contact.group.root.name, contact.rank),
+            creator_func=lambda: FloatVariable(
                 f"buffer_distance({contact.group.root.name}, {contact.rank})"
             ),
         )
 
     def get_violated_distance_symbol(
-        self, contact: AvoidedExternalContact
+        self, *, contact: AvoidedExternalContact
     ) -> FloatVariable:
         return self._get_cached_symbol(
-            "get_violated_distance_symbol",
-            (contact.group.root.name, contact.rank),
-            lambda: FloatVariable(
+            method_name="get_violated_distance_symbol",
+            identifier=(contact.group.root.name, contact.rank),
+            creator_func=lambda: FloatVariable(
                 f"violated_distance({contact.group.root.name}, {contact.rank})"
             ),
         )
@@ -508,6 +517,7 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
     def get_contact_distance_offset(self) -> int:
         return self._contact_distance_offset
 
+    @called_positionally
     def on_compute_collisions(self, collision_result: CollisionCheckingResult):
         """
         Takes collisions, checks if they are external, and inserts them into the buffer
@@ -517,8 +527,8 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         self.last_closest_contacts = defaultdict(list)
         for collision in collision_result.contacts:
             key = CollisionGroupCombination(
-                group_a=self.get_collision_group(collision.body_b),
-                group_b=self.get_collision_group(collision.body_a),
+                group_a=self.get_collision_group(body=collision.body_b),
+                group_b=self.get_collision_group(body=collision.body_a),
             )
             # 1. check if collision is external
             if key in self.registered_group_combinations:
@@ -539,13 +549,13 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         for combination, collisions in self.last_closest_contacts.items():
             group_a, group_b = combination.group_a, combination.group_b
             group_a_T_root = group_a.root._world.compute_forward_kinematics_np(
-                group_a.root, group_a.root._world.root
+                root=group_a.root, tip=group_a.root._world.root
             )
             group_b_T_root = group_b.root._world.compute_forward_kinematics_np(
-                group_b.root, group_b.root._world.root
+                root=group_b.root, tip=group_b.root._world.root
             )
             for avoided_contact, contact in zip(
-                self.avoided_contacts_of(combination), collisions
+                self.avoided_contacts_of(combination=combination), collisions
             ):
                 self.insert_data_block(
                     contact=avoided_contact,
@@ -557,18 +567,18 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
                     @ contact.root_V_contact_normal_from_b_to_a,
                     contact_distance=contact.distance,
                     buffer_distance=self.collision_manager.get_buffer_zone_distance(
-                        contact.body_a, contact.body_b
+                        body_a=contact.body_a, body_b=contact.body_b
                     ),
                     violated_distance=self.collision_manager.get_violated_distance(
-                        contact.body_a, contact.body_b
+                        body_a=contact.body_a, body_b=contact.body_b
                     ),
                 )
 
-    def closest_points_of(self, contact: AvoidedSelfContact) -> ClosestPoints:
+    def closest_points_of(self, *, contact: AvoidedSelfContact) -> ClosestPoints:
         return self.last_closest_contacts[contact.combination][contact.rank]
 
     def avoided_contacts_of(
-        self, combination: CollisionGroupCombination
+        self, *, combination: CollisionGroupCombination
     ) -> list[AvoidedSelfContact]:
         """
         The contacts between two groups that are avoided at once, as many as the maximum
@@ -582,8 +592,12 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         :return: The avoided contacts, closest first.
         """
         count = max(
-            combination.group_a.get_max_avoided_bodies(self.collision_manager),
-            combination.group_b.get_max_avoided_bodies(self.collision_manager),
+            combination.group_a.get_max_avoided_bodies(
+                collision_manager=self.collision_manager
+            ),
+            combination.group_b.get_max_avoided_bodies(
+                collision_manager=self.collision_manager
+            ),
         )
         return [
             AvoidedSelfContact(combination=combination, rank=rank)
@@ -592,6 +606,7 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
 
     def insert_data_block(
         self,
+        *,
         contact: AvoidedSelfContact,
         group_a_P_point_on_a: np.ndarray,
         group_b_P_point_on_b: np.ndarray,
@@ -639,39 +654,39 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         ] = violated_distance
 
     def body_pair_to_group_pair(
-        self, body_a: Body, body_b: Body
+        self, *, body_a: Body, body_b: Body
     ) -> CollisionGroupCombination:
         """
         :return: The combination of the groups of `body_a` and `body_b`, ordered by the
             ids of their roots so that both orders of the bodies give the same one.
         """
-        group_a = self.get_collision_group(body_a)
-        group_b = self.get_collision_group(body_b)
+        group_a = self.get_collision_group(body=body_a)
+        group_b = self.get_collision_group(body=body_b)
         if group_a.root.id < group_b.root.id:
             return CollisionGroupCombination(group_a=group_a, group_b=group_b)
         return CollisionGroupCombination(group_a=group_b, group_b=group_a)
 
-    def register_groups_of_body_combination(self, body_a: Body, body_b: Body):
+    def register_groups_of_body_combination(self, *, body_a: Body, body_b: Body):
         """
         Register a combination of bodies for self collision avoidance.
         """
-        key = self.body_pair_to_group_pair(body_a, body_b)
+        key = self.body_pair_to_group_pair(body_a=body_a, body_b=body_b)
         if key in self.registered_group_combinations:
             return
 
         self.registered_group_combinations[key] = len(self.float_variable_data.data)
-        for contact in self.avoided_contacts_of(key):
+        for contact in self.avoided_contacts_of(combination=key):
             block_start_idx = len(self.float_variable_data.data)
             self._block_start_indices.append(block_start_idx)
-            self._update_reset_indices(block_start_idx)
-            self.get_group_a_P_point_on_a_symbol(contact)
-            self.get_group_b_P_point_on_b_symbol(contact)
-            self.get_group_b_V_contact_normal_symbol(contact)
-            self.get_contact_distance_symbol(contact)
-            self.get_buffer_distance_symbol(contact)
-            self.get_violated_distance_symbol(contact)
+            self._update_reset_indices(start_idx=block_start_idx)
+            self.get_group_a_P_point_on_a_symbol(contact=contact)
+            self.get_group_b_P_point_on_b_symbol(contact=contact)
+            self.get_group_b_V_contact_normal_symbol(contact=contact)
+            self.get_contact_distance_symbol(contact=contact)
+            self.get_buffer_distance_symbol(contact=contact)
+            self.get_violated_distance_symbol(contact=contact)
 
-    def get_group_a_P_point_on_a_symbol(self, contact: AvoidedSelfContact) -> Point3:
+    def get_group_a_P_point_on_a_symbol(self, *, contact: AvoidedSelfContact) -> Point3:
         """
         :return: The point of `contact` on its first group, relative to the root of
             that group.
@@ -679,14 +694,14 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         group_a = contact.combination.group_a
         group_b = contact.combination.group_b
         return self._get_cached_symbol(
-            "get_group_a_P_point_on_a_symbol",
-            (group_a.root.name, group_b.root.name, contact.rank),
-            lambda: Point3.create_with_variables(
+            method_name="get_group_a_P_point_on_a_symbol",
+            identifier=(group_a.root.name, group_b.root.name, contact.rank),
+            creator_func=lambda: Point3.create_with_variables(
                 name=f"group_a_P_point_on_a({group_a.root.name}, {group_b.root.name}, {contact.rank})",
             ),
         )
 
-    def get_group_b_P_point_on_b_symbol(self, contact: AvoidedSelfContact) -> Point3:
+    def get_group_b_P_point_on_b_symbol(self, *, contact: AvoidedSelfContact) -> Point3:
         """
         :return: The point of `contact` on its second group, relative to the root of
             that group.
@@ -694,15 +709,15 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         group_a = contact.combination.group_a
         group_b = contact.combination.group_b
         return self._get_cached_symbol(
-            "get_group_b_P_point_on_b_symbol",
-            (group_a.root.name, group_b.root.name, contact.rank),
-            lambda: Point3.create_with_variables(
+            method_name="get_group_b_P_point_on_b_symbol",
+            identifier=(group_a.root.name, group_b.root.name, contact.rank),
+            creator_func=lambda: Point3.create_with_variables(
                 name=f"group_b_P_point_on_b({group_a.root.name}, {group_b.root.name}, {contact.rank})",
             ),
         )
 
     def get_group_b_V_contact_normal_symbol(
-        self, contact: AvoidedSelfContact
+        self, *, contact: AvoidedSelfContact
     ) -> Vector3:
         """
         :return: The contact normal of `contact`, pointing from its second group to its
@@ -711,47 +726,51 @@ class SelfCollisionVariableManager(BaseCollisionVariableManager):
         group_a = contact.combination.group_a
         group_b = contact.combination.group_b
         return self._get_cached_symbol(
-            "get_group_b_V_contact_normal_symbol",
-            (group_a.root.name, group_b.root.name, contact.rank),
-            lambda: Vector3.create_with_variables(
+            method_name="get_group_b_V_contact_normal_symbol",
+            identifier=(group_a.root.name, group_b.root.name, contact.rank),
+            creator_func=lambda: Vector3.create_with_variables(
                 f"group_b_V_contact_normal({group_a.root.name}, {group_b.root.name}, {contact.rank})",
             ),
         )
 
-    def get_contact_distance_symbol(self, contact: AvoidedSelfContact) -> FloatVariable:
+    def get_contact_distance_symbol(
+        self, *, contact: AvoidedSelfContact
+    ) -> FloatVariable:
         group_a = contact.combination.group_a
         group_b = contact.combination.group_b
         return self._get_cached_symbol(
-            "get_contact_distance_symbol",
-            (group_a.root.name, group_b.root.name, contact.rank),
-            lambda: FloatVariable(
+            method_name="get_contact_distance_symbol",
+            identifier=(group_a.root.name, group_b.root.name, contact.rank),
+            creator_func=lambda: FloatVariable(
                 f"contact_distance({group_a.root.name}, {group_b.root.name}, {contact.rank})"
             ),
         )
 
-    def get_buffer_distance_symbol(self, contact: AvoidedSelfContact) -> FloatVariable:
+    def get_buffer_distance_symbol(
+        self, *, contact: AvoidedSelfContact
+    ) -> FloatVariable:
         """
         :return: The distance below which `contact` is pushed apart.
         """
         group_a = contact.combination.group_a
         group_b = contact.combination.group_b
         return self._get_cached_symbol(
-            "get_buffer_distance_symbol",
-            (group_a.root.name, group_b.root.name, contact.rank),
-            lambda: FloatVariable(
+            method_name="get_buffer_distance_symbol",
+            identifier=(group_a.root.name, group_b.root.name, contact.rank),
+            creator_func=lambda: FloatVariable(
                 f"buffer_distance({group_a.root.name}, {group_b.root.name}, {contact.rank})"
             ),
         )
 
     def get_violated_distance_symbol(
-        self, contact: AvoidedSelfContact
+        self, *, contact: AvoidedSelfContact
     ) -> FloatVariable:
         group_a = contact.combination.group_a
         group_b = contact.combination.group_b
         return self._get_cached_symbol(
-            "get_violated_distance_symbol",
-            (group_a.root.name, group_b.root.name, contact.rank),
-            lambda: FloatVariable(
+            method_name="get_violated_distance_symbol",
+            identifier=(group_a.root.name, group_b.root.name, contact.rank),
+            creator_func=lambda: FloatVariable(
                 f"violated_distance({group_a.root.name}, {group_b.root.name}, {contact.rank})"
             ),
         )

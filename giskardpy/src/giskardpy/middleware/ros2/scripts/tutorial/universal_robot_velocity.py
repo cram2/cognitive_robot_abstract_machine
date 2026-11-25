@@ -36,7 +36,8 @@ def create_giskard(node: Node) -> Giskard:
         world_source=WorldSpecification(
             robots=[
                 RobotSpecification.specify_real_robot(
-                    MinimalRobot, urdf=RosGraph(node=node).robot_description()
+                    semantic_annotation_type=MinimalRobot,
+                    urdf=RosGraph(node=node).robot_description(),
                 )
             ]
         ),

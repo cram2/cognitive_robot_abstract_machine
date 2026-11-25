@@ -68,7 +68,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -86,7 +86,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_cylinder),
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.X()
                 ),
@@ -107,7 +107,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_cylinder),
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.X()
                 ),
@@ -128,7 +128,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -146,7 +146,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.X()
                 ),
@@ -164,7 +164,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Y()
                 ),
@@ -201,7 +201,7 @@ def execute(link_length: float, vel_limit: float):
     )
     statechart = Statechart(context=executor.context)
     goal = 1
-    eef = fucking_huge_robot.get_kinematic_structure_entity_by_name("eef")
+    eef = fucking_huge_robot.get_kinematic_structure_entity_by_name(name="eef")
 
     statechart.add_node(
         node=(
@@ -209,7 +209,7 @@ def execute(link_length: float, vel_limit: float):
                 nodes=[
                     SetSeedConfiguration(
                         seed_configuration=JointState.from_str_dict(
-                            {
+                            mapping={
                                 "map_T_link1": goal,
                                 "link1_T_link2": goal,
                                 "link2_T_link3": goal,

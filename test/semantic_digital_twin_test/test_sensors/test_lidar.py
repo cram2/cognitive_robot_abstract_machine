@@ -128,11 +128,11 @@ def world_with_walls(*wall_center_distances: float) -> tuple[World, Body]:
 
     :return: The world and the body the lidar is mounted on.
     """
-    world = World.create_with_root_body("map")
+    world = World.create_with_root_body(root_body_name="map")
     mount = Body(name=PrefixedName(name="lidar_mount"))
     with world.modify_world():
-        world.add_body(mount)
-        world.add_connection(FixedConnection(parent=world.root, child=mount))
+        world.add_body(body=mount)
+        world.add_connection(connection=FixedConnection(parent=world.root, child=mount))
         for index, distance in enumerate(wall_center_distances):
             wall = Body(
                 name=PrefixedName(name=f"wall_{index}"),
@@ -140,9 +140,9 @@ def world_with_walls(*wall_center_distances: float) -> tuple[World, Body]:
                     shapes=[Box(scale=Scale(x=WALL_THICKNESS, y=2.0, z=2.0))]
                 ),
             )
-            world.add_body(wall)
+            world.add_body(body=wall)
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=world.root,
                     child=wall,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -337,7 +337,7 @@ def test_a_lidar_keeps_the_scan_pattern_it_was_built_with():
 def test_a_lidar_is_built_where_its_own_class_mounts_it():
     _, mount = world_with_walls()
 
-    lidar = BodyMountedLidar.with_simulated_source(mount)
+    lidar = BodyMountedLidar.with_simulated_source(robot_root=mount)
 
     assert lidar.root is mount
     assert lidar.scan_pattern == forward_beam_pattern()
@@ -346,7 +346,7 @@ def test_a_lidar_is_built_where_its_own_class_mounts_it():
 def test_a_lidar_built_with_a_simulated_source_measures_the_world():
     _, mount = world_with_walls()
 
-    lidar = BodyMountedLidar.with_simulated_source(mount)
+    lidar = BodyMountedLidar.with_simulated_source(robot_root=mount)
 
     assert isinstance(lidar.source, SimulatedLidarSource)
 
@@ -355,7 +355,7 @@ def test_a_lidar_annotated_from_a_robot_description_measures_the_world():
     _, mount = world_with_walls()
 
     lidar = BodyMountedLidar.setup_default_configuration_in_world_below_robot_root(
-        mount
+        robot_root=mount
     )
 
     assert isinstance(lidar.source, SimulatedLidarSource)
@@ -363,10 +363,10 @@ def test_a_lidar_annotated_from_a_robot_description_measures_the_world():
 
 def test_a_lidar_is_not_read_from_a_source_of_another_kind():
     _, mount = world_with_walls()
-    lidar = BodyMountedLidar.with_simulated_source(mount)
+    lidar = BodyMountedLidar.with_simulated_source(robot_root=mount)
 
     with pytest.raises(UnexpectedInputSourceError) as raised:
-        lidar.use_source(SimulatedJointPositionSource())
+        lidar.use_source(source=SimulatedJointPositionSource())
 
     assert raised.value.expected_source_family is LidarSource
 

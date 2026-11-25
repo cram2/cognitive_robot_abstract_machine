@@ -29,7 +29,7 @@ def test_world_builds_collision_object_for_flat_mesh(
     world = World()
 
     with world.modify_world():
-        world.add_body(body)
+        world.add_body(body=body)
 
     collision_detector = world.collision_manager.collision_detector
     assert list(collision_detector.body_to_bullet_object) == [body]

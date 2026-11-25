@@ -123,8 +123,10 @@ class WorldDescriptor(BaseWorldDescriptor):
             cup_connection = Connection6DoF.create_with_dofs(
                 parent=root, child=cup_body, world=self.world
             )
-            self.world.add_connection(cup_connection)
-            self.world.add_semantic_annotation(PredefinedObject(body=cup_body))
+            self.world.add_connection(connection=cup_connection)
+            self.world.add_semantic_annotation(
+                semantic_annotation=PredefinedObject(body=cup_body)
+            )
 
             milk_visual_mesh = Mesh(
                 origin=HomogeneousTransformationMatrix(),
@@ -144,8 +146,10 @@ class WorldDescriptor(BaseWorldDescriptor):
             milk_connection = Connection6DoF.create_with_dofs(
                 parent=root, child=milk_body, world=self.world
             )
-            self.world.add_connection(milk_connection)
-            self.world.add_semantic_annotation(PredefinedObject(body=milk_body))
+            self.world.add_connection(connection=milk_connection)
+            self.world.add_semantic_annotation(
+                semantic_annotation=PredefinedObject(body=milk_body)
+            )
 
         with self.world.modify_world():
             cup_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(

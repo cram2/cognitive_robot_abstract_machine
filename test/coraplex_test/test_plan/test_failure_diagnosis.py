@@ -84,7 +84,9 @@ def gripper_open_check(end_effector: EndEffector) -> GripperOpenCheck:
     """
     :return: A check that the gripper of `end_effector` is open, on its driven joint.
     """
-    open_state = end_effector.default_configuration(GripperState.OPEN).joint_state
+    open_state = end_effector.default_configuration(
+        state_type=GripperState.OPEN
+    ).joint_state
     return GripperOpenCheck(
         connection=open_state.connections[0], position=open_state.target_values[0]
     )
@@ -95,7 +97,7 @@ def set_gripper(end_effector: EndEffector, state: GripperState) -> SetGripperAct
     :return: An action moving the gripper of `end_effector` to `state`.
     """
     return SetGripperAction(
-        gripper_configuration=end_effector.default_configuration(state)
+        gripper_configuration=end_effector.default_configuration(state_type=state)
     )
 
 
@@ -225,7 +227,7 @@ def test_a_stalled_reach_is_blamed_on_the_navigation_that_placed_the_base(
     confirms it.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     navigate = NavigateAction(
         planar_goal_pose=Pose2D.from_xy_yaw(
             x=1.5, y=2.4, yaw=math.pi, reference_frame=world.root
@@ -303,12 +305,12 @@ def test_a_task_stalled_by_another_driving_its_joint_is_blamed_on_it(
     as stalled is blamed on the other.
     """
     world, robot, extensions = pr2_apartment_context
-    torso = world.get_connection_by_name("torso_lift_joint")
+    torso = world.get_connection_by_name(name="torso_lift_joint")
     lower = JointPositionList(
-        name="lower torso", goal_state=JointState.from_mapping({torso: 0.05})
+        name="lower torso", goal_state=JointState.from_mapping(mapping={torso: 0.05})
     )
     raise_ = JointPositionList(
-        name="raise torso", goal_state=JointState.from_mapping({torso: 0.3})
+        name="raise torso", goal_state=JointState.from_mapping(mapping={torso: 0.3})
     )
     plan = Sequence(nodes=[Parallel(nodes=[lower, raise_])])
 
@@ -334,14 +336,18 @@ def test_tasks_on_different_joints_at_once_are_not_in_conflict(
     Tasks that run at the same time on different joints are not in conflict.
     """
     world, robot, extensions = pr2_apartment_context
-    torso = world.get_connection_by_name("torso_lift_joint")
-    head = world.get_connection_by_name("head_pan_joint")
+    torso = world.get_connection_by_name(name="torso_lift_joint")
+    head = world.get_connection_by_name(name="head_pan_joint")
     plan = Sequence(
         nodes=[
             Parallel(
                 nodes=[
-                    JointPositionList(goal_state=JointState.from_mapping({torso: 0.2})),
-                    JointPositionList(goal_state=JointState.from_mapping({head: 0.3})),
+                    JointPositionList(
+                        goal_state=JointState.from_mapping(mapping={torso: 0.2})
+                    ),
+                    JointPositionList(
+                        goal_state=JointState.from_mapping(mapping={head: 0.3})
+                    ),
                 ]
             )
         ]
@@ -368,7 +374,7 @@ def test_a_task_failed_by_a_condition_is_blamed_on_what_its_condition_read(
     """
     world, robot, extensions = pr2_apartment_context
     right = robot.right_arm.end_effector
-    torso = world.get_connection_by_name("torso_lift_joint")
+    torso = world.get_connection_by_name(name="torso_lift_joint")
     closing = set_gripper(right, GripperState.CLOSE)
     check = JointPositionReached(
         name="gripper open",
@@ -376,7 +382,7 @@ def test_a_task_failed_by_a_condition_is_blamed_on_what_its_condition_read(
         position=gripper_open_check(right).position,
     )
     lift = JointPositionList(
-        name="lift torso", goal_state=JointState.from_mapping({torso: 0.3})
+        name="lift torso", goal_state=JointState.from_mapping(mapping={torso: 0.3})
     )
     lift.fail_condition = check.observes_false
     plan = Sequence(nodes=[closing, Parallel(nodes=[check, lift])])
@@ -406,7 +412,7 @@ def test_a_step_failing_on_its_own_inside_a_handled_pick_up_is_its_own_origin(
     failure started, and no other node is blamed.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     failing_grasp = GraspFailingItsFirstRuns(failing_runs=2)
     plan = Sequence(
         nodes=[
@@ -543,7 +549,7 @@ def test_a_pick_up_out_of_candidates_is_blamed_on_the_navigation_they_share(
     navigation that all candidates started from.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     navigate = NavigateAction(
         planar_goal_pose=Pose2D.from_xy_yaw(
             x=1.5, y=2.4, yaw=math.pi, reference_frame=world.root
@@ -579,7 +585,7 @@ def test_a_place_depends_on_the_pick_up_that_attached_its_object(
     gripper to the place that releases it, through where the milk is attached.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.right_arm
     )
@@ -659,12 +665,12 @@ def test_in_physics_two_tasks_driving_one_joint_are_blamed_on_each_other(
     each blamed on the other.
     """
     hsrb, simulation = simulated_hsrb
-    lift = hsrb._world.get_connection_by_name("arm_lift_joint")
+    lift = hsrb._world.get_connection_by_name(name="arm_lift_joint")
     lower = JointPositionList(
-        name="lower lift", goal_state=JointState.from_mapping({lift: 0.05})
+        name="lower lift", goal_state=JointState.from_mapping(mapping={lift: 0.05})
     )
     raise_ = JointPositionList(
-        name="raise lift", goal_state=JointState.from_mapping({lift: 0.4})
+        name="raise lift", goal_state=JointState.from_mapping(mapping={lift: 0.4})
     )
     plan = Sequence(nodes=[Parallel(nodes=[lower, raise_])])
 

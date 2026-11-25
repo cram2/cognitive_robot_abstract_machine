@@ -93,7 +93,14 @@ def actions_of(motion: StatechartNode) -> list[SetGripperAction]:
 
 
 def test_the_simulated_world_holds_daisy(demonstration_world: World) -> None:
-    assert len(demonstration_world.get_semantic_annotations_by_type(DAiSy)) == 1
+    assert (
+        len(
+            demonstration_world.get_semantic_annotations_by_type(
+                semantic_annotation_type=DAiSy
+            )
+        )
+        == 1
+    )
 
 
 def test_the_scene_needs_no_population(

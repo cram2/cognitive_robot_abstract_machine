@@ -36,7 +36,9 @@ def test_create_segmentation_mask(ray_test_world):
         ]
     )
 
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        parent=world.root, child=body2
+    ).origin = HomogeneousTransformationMatrix(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -44,12 +46,16 @@ def test_create_segmentation_mask(ray_test_world):
 
     resolution = CameraResolution(width=256, height=256)
     seg = rt.create_segmentation_mask(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        camera_pose=HomogeneousTransformationMatrix(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
     assert seg.shape == (resolution.width, resolution.height)
 
-    ray_intersections = rt.ray_test(np.array([1, 0, 1]), np.array([-1, 0, 1]))
+    ray_intersections = rt.ray_test(
+        origin_points=np.array([1, 0, 1]), target_points=np.array([-1, 0, 1])
+    )
     hit = ray_intersections.hit_points
     index = ray_intersections.ray_indices
     body = ray_intersections.bodies
@@ -76,7 +82,9 @@ def test_create_depth_map(ray_test_world):
 
     resolution = CameraResolution(width=512, height=512)
     depth_map = rt.create_depth_map(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        camera_pose=HomogeneousTransformationMatrix(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
     assert depth_map is not None
@@ -95,7 +103,9 @@ def test_create_camera_rays_with_rectangular_resolution(ray_test_world):
 
     resolution = CameraResolution(width=128, height=64)
     camera_rays = ray_tracer.create_camera_rays(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        camera_pose=HomogeneousTransformationMatrix(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
     ray_origins = camera_rays.origin_points
@@ -124,7 +134,9 @@ def test_create_segmentation_mask_with_rectangular_resolution(ray_test_world):
 
     resolution = CameraResolution(width=128, height=64)
     segmentation_mask = ray_tracer.create_segmentation_mask(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        camera_pose=HomogeneousTransformationMatrix(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
 
@@ -146,7 +158,9 @@ def test_create_depth_map_with_rectangular_resolution(ray_test_world):
 
     resolution = CameraResolution(width=128, height=64)
     depth_map = ray_tracer.create_depth_map(
-        HomogeneousTransformationMatrix(camera_pose, reference_frame=world.root),
+        camera_pose=HomogeneousTransformationMatrix(
+            camera_pose, reference_frame=world.root
+        ),
         resolution=resolution,
     )
 
@@ -173,7 +187,9 @@ def test_ray_test(ray_test_world):
     rt = RayTracer(world=world)
     rt.update_scene()
 
-    ray_intersections = rt.ray_test(np.array([1, 0, 0.1]), np.array([-1, 0, 0.1]))
+    ray_intersections = rt.ray_test(
+        origin_points=np.array([1, 0, 0.1]), target_points=np.array([-1, 0, 0.1])
+    )
     hit = ray_intersections.hit_points
     index = ray_intersections.ray_indices
     body = ray_intersections.bodies
@@ -183,7 +199,9 @@ def test_ray_test(ray_test_world):
     assert body1 in body
 
     # Test with a ray that does not hit any object
-    ray_intersections = rt.ray_test(np.array([10, 10, 10]), np.array([20, 20, 20]))
+    ray_intersections = rt.ray_test(
+        origin_points=np.array([10, 10, 10]), target_points=np.array([20, 20, 20])
+    )
     hit = ray_intersections.hit_points
     index = ray_intersections.ray_indices
     body = ray_intersections.bodies
@@ -194,12 +212,16 @@ def test_ray_test(ray_test_world):
 
 def test_ray_test_batch(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    world.get_connection(world.root, body1).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        parent=world.root, child=body1
+    ).origin = HomogeneousTransformationMatrix(
         np.array([[1, 0, 0, 1], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body1,
     )
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        parent=world.root, child=body2
+    ).origin = HomogeneousTransformationMatrix(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -211,7 +233,7 @@ def test_ray_test_batch(ray_test_world):
     rays = np.array([[1, 1, 0.1], [-1, 1, 0.1]])
     targets = np.array([[1, -1, 0.1], [-1, -1, 0.1]])
 
-    ray_intersections = rt.ray_test(rays, targets)
+    ray_intersections = rt.ray_test(origin_points=rays, target_points=targets)
     hits = ray_intersections.hit_points
     indices = ray_intersections.ray_indices
     bodies = ray_intersections.bodies
@@ -228,12 +250,16 @@ def test_ray_test_batch(ray_test_world):
 
 def test_min_distance(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    world.get_connection(world.root, body1).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        parent=world.root, child=body1
+    ).origin = HomogeneousTransformationMatrix(
         np.array([[1, 0, 0, 0.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body1,
     )
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        parent=world.root, child=body2
+    ).origin = HomogeneousTransformationMatrix(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 10], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -245,7 +271,9 @@ def test_min_distance(ray_test_world):
     rays = np.array([[0, 0, 0.1], [-1, 0, 0.1]])
     targets = np.array([[1, 0, 0.1], [1, 0, 0.1]])
 
-    ray_intersections = rt.ray_test(rays, targets, min_distance=1)
+    ray_intersections = rt.ray_test(
+        origin_points=rays, target_points=targets, min_distance=1
+    )
     hits = ray_intersections.hit_points
     indices = ray_intersections.ray_indices
     bodies = ray_intersections.bodies
@@ -256,12 +284,16 @@ def test_min_distance(ray_test_world):
 
 def test_max_distance(ray_test_world):
     world, body1, body2, body3, body4 = ray_test_world
-    world.get_connection(world.root, body1).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        parent=world.root, child=body1
+    ).origin = HomogeneousTransformationMatrix(
         np.array([[1, 0, 0, 1.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body1,
     )
-    world.get_connection(world.root, body2).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        parent=world.root, child=body2
+    ).origin = HomogeneousTransformationMatrix(
         np.array([[1, 0, 0, -1], [0, 1, 0, 0], [0, 0, 1, 10], [0, 0, 0, 1]]),
         reference_frame=world.root,
         child_frame=body2,
@@ -273,14 +305,16 @@ def test_max_distance(ray_test_world):
     rays = np.array([[0, 0, 0.1], [-1, 0, 0.1]])
     targets = np.array([[2, 0, 0.1], [2, 0, 0.1]])
 
-    ray_intersections = rt.ray_test(rays, targets)
+    ray_intersections = rt.ray_test(origin_points=rays, target_points=targets)
     hits = ray_intersections.hit_points
     indices = ray_intersections.ray_indices
     bodies = ray_intersections.bodies
 
     assert len(hits) == 2
 
-    ray_intersections = rt.ray_test(rays, targets, max_distance=1)
+    ray_intersections = rt.ray_test(
+        origin_points=rays, target_points=targets, max_distance=1
+    )
     hits = ray_intersections.hit_points
     indices = ray_intersections.ray_indices
     bodies = ray_intersections.bodies
@@ -336,11 +370,11 @@ def textured_world() -> World:
     world = World()
     root = Body(name=PrefixedName(name="root"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
         for index in range(2):
             box = _textured_box_body(f"box_{index}", seed=index)
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=root,
                     child=box,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -355,10 +389,11 @@ def test_a_ray_hits_the_textured_box_it_points_at(textured_world):
     ray_tracer = RayTracer(world=textured_world)
 
     ray_intersections = ray_tracer.ray_test(
-        np.array([2.0, 0.0, 2.0]), np.array([2.0, 0.0, -2.0])
+        origin_points=np.array([2.0, 0.0, 2.0]),
+        target_points=np.array([2.0, 0.0, -2.0]),
     )
 
-    assert ray_intersections.bodies == [textured_world.get_body_by_name("box_1")]
+    assert ray_intersections.bodies == [textured_world.get_body_by_name(name="box_1")]
 
 
 def test_casting_rays_does_not_decode_the_textures_of_the_world(textured_world):
@@ -370,7 +405,7 @@ def test_casting_rays_does_not_decode_the_textures_of_the_world(textured_world):
     targets = origins - np.array([0.0, 0.0, 4.0])
 
     tracemalloc.start()
-    ray_tracer.ray_test(origins, targets)
+    ray_tracer.ray_test(origin_points=origins, target_points=targets)
     _, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 

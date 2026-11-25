@@ -99,7 +99,7 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [example-solution]
 specification = Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.2, y=0.4, z=0.2))
-free_standing = specification.to_domain_object("free_drawer_body")
+free_standing = specification.to_domain_object(name="free_drawer_body")
 ```
 
 ```{code-cell} ipython3

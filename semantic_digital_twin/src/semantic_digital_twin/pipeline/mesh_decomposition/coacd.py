@@ -143,7 +143,7 @@ class COACDMeshDecomposer(MeshDecomposer):
     Random seed used for sampling.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> list[Mesh]:
+    def apply_to_mesh(self, *, mesh: Mesh) -> list[Mesh]:
         """
         Apply the COACD mesh decomposition to a given mesh.
         Returns a list of TriangleMesh objects representing the decomposed convex parts.
@@ -187,7 +187,7 @@ class COACDMeshDecomposer(MeshDecomposer):
 
         return new_geometry
 
-    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
-        parts = self.apply_to_mesh(mesh)
+    def apply_to_mesh_and_save(self, *, mesh: Mesh, output_path: str) -> str:
+        parts = self.apply_to_mesh(mesh=mesh)
         trimesh.Scene([p.mesh for p in parts]).export(output_path, file_type="obj")
         return output_path

@@ -47,10 +47,14 @@ pytestmark = [
 def parked_tracy() -> Tracy:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
-    robot = RobotSpecification(semantic_annotation_type=Tracy).spawn(world)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
+    robot = RobotSpecification(semantic_annotation_type=Tracy).spawn(world=world)
     for arm in robot.all_arms:
-        arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+        arm.get_joint_state_by_type(state_type=StaticJointState.PARK).apply_to(
+            world=world
+        )
     world.notify_state_change()
     return robot
 
@@ -66,7 +70,7 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
     tracking_tolerance = 0.02
     world = parked_tracy._world
     tool_frame = parked_tracy.left_arm.end_effector.tool_frame
-    start = world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
+    start = world.compute_forward_kinematics_np(root=world.root, tip=tool_frame)[:3, 3]
     goal_point = Point3(start[0], start[1], start[2] + 0.15, reference_frame=world.root)
     reach = CartesianPosition(
         name="reach",
@@ -87,7 +91,7 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
         motion_statechart.add_nodes(nodes=[reach, EndMotion.when_true(node=reach)])
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end(timeout=tick_limit)
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         simulated = numpy.array(
             simulation.simulator.get_body_position(
                 body_name=tool_frame.name.name

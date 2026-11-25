@@ -74,11 +74,11 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [example-solution]
 world = World.create_with_root_body()
-table_top = BodySpecification.box("table_top", Scale(x=1.2, y=0.8, z=0.05)).spawn(world)
-leg_specification = BodySpecification.box("leg", Scale(x=0.05, y=0.05, z=0.7))
+table_top = BodySpecification.box(name="table_top", scale=Scale(x=1.2, y=0.8, z=0.05)).spawn(world=world)
+leg_specification = BodySpecification.box(name="leg", scale=Scale(x=0.05, y=0.05, z=0.7))
 for index, (x, y) in enumerate([(0.55, 0.35), (0.55, -0.35), (-0.55, 0.35), (-0.55, -0.35)]):
     leg_specification.spawn(
-        world,
+        world=world,
         name=f"leg_{index}",
         parent=table_top,
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=x, y=y, z=-0.35),
@@ -89,7 +89,7 @@ for index, (x, y) in enumerate([(0.55, 0.35), (0.55, -0.35), (-0.55, 0.35), (-0.
 :tags: [verify-solution, remove-input]
 if len(world.bodies) != 6: raise ExerciseVerificationFailed(requirement="Expected the root, the table top, and four legs.")
 for index in range(4):
-    leg = world.get_body_by_name(f"leg_{index}")
+    leg = world.get_body_by_name(name=f"leg_{index}")
     if leg.parent_connection.parent is not table_top: raise ExerciseVerificationFailed(requirement="Each leg should attach to the table top.")
 ```
 
@@ -115,7 +115,7 @@ sliding_drawer = BodySpecification.box(
     name="sliding_drawer",
     scale=Scale(x=0.4, y=0.5, z=0.2),
     connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X())),
-).spawn(world)
+).spawn(world=world)
 ```
 
 ```{code-cell} ipython3
@@ -144,15 +144,15 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [example-solution]
 drawer_with_handle = Drawer.get_annotation_specification(
-    "spec_drawer",
-    Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.4, y=0.5, z=0.6)),
+    name="spec_drawer",
+    root_specification=Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.4, y=0.5, z=0.6)),
     part_specifications={
         "handle": Handle.get_annotation_specification(
-            "spec_handle",
-            Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=0.05, z=0.05)),
+            name="spec_handle",
+            root_specification=Handle.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.1, y=0.05, z=0.05)),
         ),
     },
-).spawn(world)
+).spawn(world=world)
 ```
 
 ```{code-cell} ipython3
@@ -183,14 +183,14 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [example-solution]
 scene_specification = WorldSpecification.from_urdf(
-    table_urdf,
+    file_path=table_urdf,
     objects=[
         SemanticAnnotationWithRootSpecification(
             name="milk",
             semantic_annotation_type=Milk,
-            root_specification=BodySpecification.box("milk", Scale(x=0.1, y=0.1, z=0.2)),
+            root_specification=BodySpecification.box(name="milk", scale=Scale(x=0.1, y=0.1, z=0.2)),
         ),
-        BodySpecification.box("cup", Scale(x=0.07, y=0.07, z=0.1)),
+        BodySpecification.box(name="cup", scale=Scale(x=0.07, y=0.07, z=0.1)),
     ],
 )
 first_world = scene_specification.create_world()
@@ -200,9 +200,9 @@ second_world = scene_specification.create_world()
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 if first_world is second_world: raise ExerciseVerificationFailed(requirement="Each materialization should yield an independent world.")
-if len(first_world.get_semantic_annotations_by_type(Milk)) != 1: raise ExerciseVerificationFailed(requirement="The first world should contain exactly one Milk.")
-if len(second_world.get_semantic_annotations_by_type(Milk)) != 1: raise ExerciseVerificationFailed(requirement="The second world should contain exactly one Milk.")
-if first_world.get_body_by_name("cup") is None: raise ExerciseVerificationFailed(requirement="The first world should contain a body named 'cup'.")
+if len(first_world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)) != 1: raise ExerciseVerificationFailed(requirement="The first world should contain exactly one Milk.")
+if len(second_world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)) != 1: raise ExerciseVerificationFailed(requirement="The second world should contain exactly one Milk.")
+if first_world.get_body_by_name(name="cup") is None: raise ExerciseVerificationFailed(requirement="The first world should contain a body named 'cup'.")
 ```
 
 ## 5. Place a robot into the scene
@@ -227,7 +227,7 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [example-solution]
 robot_specification = WorldSpecification.from_urdf(
-    table_urdf,
+    file_path=table_urdf,
     robots=[
         RobotSpecification(
             semantic_annotation_type=PR2,
@@ -240,10 +240,10 @@ robot_world = robot_specification.create_world()
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if len(robot_world.get_semantic_annotations_by_type(PR2)) != 1: raise ExerciseVerificationFailed(requirement="The robot should be annotated.")
-pr2 = robot_world.get_semantic_annotations_by_type(PR2)[0]
-odometry_body = robot_world.get_body_by_name(pr2.mobile_base.odometry_body_name)
+if len(robot_world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)) != 1: raise ExerciseVerificationFailed(requirement="The robot should be annotated.")
+pr2 = robot_world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)[0]
+odometry_body = robot_world.get_body_by_name(name=pr2.mobile_base.odometry_body_name)
 if odometry_body.parent_connection.parent is not robot_world.root: raise ExerciseVerificationFailed(requirement="The odometry body hangs off the world root.")
-root_T_odometry = robot_world.compute_forward_kinematics(robot_world.root, odometry_body)
+root_T_odometry = robot_world.compute_forward_kinematics(root=robot_world.root, tip=odometry_body)
 if not abs(root_T_odometry.position.to_np()[0] - 1.0) < 1e-6: raise ExerciseVerificationFailed(requirement="The localization pose should apply.")
 ```

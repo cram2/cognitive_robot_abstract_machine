@@ -25,6 +25,7 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher imp
 from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
+from krrood.patterns.called_positionally import called_positionally
 
 
 @dataclass(kw_only=True)
@@ -35,6 +36,7 @@ class FakeMarkerPublisher:
 
     published: list[MarkerArray] = field(default_factory=list)
 
+    @called_positionally
     def publish(self, marker_array: MarkerArray) -> None:
         self.published.append(marker_array)
 

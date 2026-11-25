@@ -56,10 +56,12 @@ from semantic_digital_twin.world_description.world_entity import (
 def _spawn_pr2(odometry_T_robot_start: HomogeneousTransformationMatrix | None) -> PR2:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
     return RobotSpecification(
         semantic_annotation_type=PR2, odometry_T_robot_start=odometry_T_robot_start
-    ).spawn(world)
+    ).spawn(world=world)
 
 
 @pytest.fixture
@@ -99,7 +101,7 @@ def test_every_commanded_joint_the_fingers_and_the_drive_are_driven_by_one_servo
     drive = pr2.drive
     commanded = {
         connection.raw_dof
-        for connection in world.get_connections_of_branch(pr2.root)
+        for connection in world.get_connections_of_branch(root=pr2.root)
         if isinstance(connection, ActiveConnection1DOF)
         and connection.has_hardware_interface
     }
@@ -156,8 +158,10 @@ def test_a_servo_that_states_no_dynamics_keeps_those_of_the_joint(pr2):
     connection.dynamics = described
 
     pr2.torso._declare_servo(
-        connection,
-        JointServo(gains=ServoGains(stiffness=1.0, damping=1.0, torque_limit=1.0)),
+        connection=connection,
+        servo=JointServo(
+            gains=ServoGains(stiffness=1.0, damping=1.0, torque_limit=1.0)
+        ),
     )
 
     assert connection.dynamics is described
@@ -165,9 +169,9 @@ def test_a_servo_that_states_no_dynamics_keeps_those_of_the_joint(pr2):
 
 def test_every_body_standing_on_the_base_carries_its_own_weight(pr2):
     for body in pr2.mobile_base.bodies:
-        assert body.get_simulator_property_of_type(GravityCompensation) == (
-            GravityCompensation(fraction=1.0)
-        )
+        assert body.get_simulator_property_of_type(
+            property_type=GravityCompensation
+        ) == (GravityCompensation(fraction=1.0))
 
 
 # %% the compiled model
@@ -220,15 +224,27 @@ def test_each_connection_is_built_by_the_realisation_for_its_type(pr2):
     element_names = SimulatorModelNames()
 
     assert (
-        type(MujocoConnectionJoints.of(pr2.drive, world, element_names))
+        type(
+            MujocoConnectionJoints.of(
+                connection=pr2.drive, world=world, element_names=element_names
+            )
+        )
         is MujocoOmniDriveJoints
     )
     assert (
-        type(MujocoConnectionJoints.of(revolute, world, element_names))
+        type(
+            MujocoConnectionJoints.of(
+                connection=revolute, world=world, element_names=element_names
+            )
+        )
         is MujocoConnectionJoint
     )
     assert (
-        type(MujocoConnectionJoints.of(fixed, world, element_names))
+        type(
+            MujocoConnectionJoints.of(
+                connection=fixed, world=world, element_names=element_names
+            )
+        )
         is MujocoFixedConnectionJoints
     )
 
@@ -243,7 +259,7 @@ def test_a_drive_without_servos_keeps_the_base_where_it_is_built(pr2, tmp_path):
     with world.modify_world():
         for actuator in list(world.actuators):
             if set(actuator.dofs) & set(drive.active_dofs):
-                world.remove_actuator(actuator)
+                world.remove_actuator(actuator=actuator)
     builder = MujocoBuilder()
     builder.build_world(world=world, file_path=str(tmp_path / "scene.xml"))
 
@@ -263,19 +279,21 @@ def test_the_servos_hold_the_parked_arms_and_the_raised_torso_up(pr2):
     """
     world = pr2._world
     for arm in pr2.all_arms:
-        arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
-    pr2.torso.get_joint_state_by_type(TorsoState.HIGH).apply_to(world)
+        arm.get_joint_state_by_type(state_type=StaticJointState.PARK).apply_to(
+            world=world
+        )
+    pr2.torso.get_joint_state_by_type(state_type=TorsoState.HIGH).apply_to(world=world)
     world.notify_state_change()
     tool_frames = [arm.end_effector.tool_frame for arm in pr2.all_arms]
     parked = [
-        world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
+        world.compute_forward_kinematics_np(root=world.root, tip=tool_frame)[:3, 3]
         for tool_frame in tool_frames
     ]
 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         simulated = [
             simulation.simulator.get_body_position(
                 body_name=tool_frame.name.name
@@ -313,10 +331,10 @@ def test_the_servos_drive_the_joints_to_a_commanded_configuration(pr2):
     simulation.start_stepped_simulation()
     try:
         for joint_name, position in commanded.items():
-            connection = world.get_connection_by_name(joint_name)
+            connection = world.get_connection_by_name(name=joint_name)
             world.state[connection.raw_dof.id].position = position
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=3))
+        simulation.step_simulation(duration=timedelta(seconds=3))
         reached = {
             joint_name: simulation.simulator.get_joint_value(joint_name).result
             for joint_name in commanded
@@ -333,17 +351,17 @@ def test_the_servos_drive_the_joints_to_a_commanded_configuration(pr2):
 def test_the_finger_servo_closes_the_gripper(pr2):
     world = pr2._world
     gripper = pr2.right_arm.end_effector
-    gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+    gripper.get_joint_state_by_type(state_type=GripperState.OPEN).apply_to(world=world)
     world.notify_state_change()
     finger_joint = gripper.thumb.root.parent_connection
-    closed = gripper.get_joint_state_by_type(GripperState.CLOSE)
+    closed = gripper.get_joint_state_by_type(state_type=GripperState.CLOSE)
 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        closed.apply_to(world)
+        closed.apply_to(world=world)
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         reached = simulation.simulator.get_joint_value(finger_joint.name.name).result
     finally:
         simulation.stop_simulation()
@@ -372,11 +390,11 @@ def _drive_at(
     ):
         world.state[degree_of_freedom.id].velocity = velocity
     world.notify_state_change()
-    simulation.step_simulation(duration)
+    simulation.step_simulation(duration=duration)
     for degree_of_freedom in (drive.x_velocity, drive.y_velocity, drive.yaw):
         world.state[degree_of_freedom.id].velocity = 0.0
     world.notify_state_change()
-    simulation.step_simulation(timedelta(seconds=0.5))
+    simulation.step_simulation(duration=timedelta(seconds=0.5))
 
 
 @pytest.mark.skipif(
@@ -497,12 +515,14 @@ def _spawn_localized_pr2(
 ) -> PR2:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
     return RobotSpecification(
         semantic_annotation_type=PR2,
         localization_pose=world_T_odometry,
         odometry_T_robot_start=odometry_T_robot_start,
-    ).spawn(world)
+    ).spawn(world=world)
 
 
 @pytest.mark.skipif(
@@ -520,7 +540,7 @@ def test_a_localized_base_starts_where_the_world_has_it():
     simulation = MujocoSim(world=pr2._world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         reached = _simulated_base_pose(simulation, pr2)
     finally:
         simulation.stop_simulation()
@@ -553,7 +573,9 @@ def test_a_localized_base_drives_along_its_odom_and_reports_odometry_in_it():
             world.state[degree_of_freedom.id].position
             for degree_of_freedom in (drive.x, drive.y, drive.yaw)
         )
-        world_T_base = world.compute_forward_kinematics_np(world.root, pr2.root)
+        world_T_base = world.compute_forward_kinematics_np(
+            root=world.root, tip=pr2.root
+        )
     finally:
         simulation.stop_simulation()
 
@@ -572,7 +594,7 @@ def test_the_base_starts_where_the_world_has_it():
     simulation = MujocoSim(world=pr2._world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         reached = _simulated_base_pose(simulation, pr2)
     finally:
         simulation.stop_simulation()

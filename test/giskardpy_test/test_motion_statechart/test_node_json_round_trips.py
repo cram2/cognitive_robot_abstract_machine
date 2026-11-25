@@ -157,18 +157,20 @@ def _tip(world: World) -> Body:
     """
     :return: The tool frame of the right arm of the PR2.
     """
-    return world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    return world.get_kinematic_structure_entity_by_name(name="r_gripper_tool_frame")
 
 
 def _connection(world: World) -> ActiveConnection1DOF:
     """
     :return: The torso joint of the PR2.
     """
-    return world.get_connection_by_name("torso_lift_joint")
+    return world.get_connection_by_name(name="torso_lift_joint")
 
 
 def _robot(world: World) -> AbstractRobot:
-    return world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    return world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
 
 
 def _point(world: World) -> Point3:
@@ -203,7 +205,7 @@ def _orientation(world: World) -> RotationMatrix:
 
 def _joint_goal(world: World) -> JointPositionList:
     return JointPositionList(
-        goal_state=JointState.from_mapping({_connection(world): 0.5})
+        goal_state=JointState.from_mapping(mapping={_connection(world): 0.5})
     )
 
 
@@ -213,7 +215,9 @@ def _driven_base_node(node_type: type[DrivenBaseTask], world: World) -> DrivenBa
         to a pose given in the drive's parent.
     """
     return node_type(
-        driven_body=world.get_connections_by_type(DifferentialDrive)[0].child,
+        driven_body=world.get_connections_by_type(connection_type=DifferentialDrive)[
+            0
+        ].child,
         goal_pose=_pose(world),
         parent_T_goal_reference_frame=HomogeneousTransformationMatrix(
             reference_frame=_root(world)
@@ -226,7 +230,7 @@ def _collision_rule(world: World) -> AvoidCollisionBetweenGroups:
         buffer_zone_distance=0.05,
         violated_distance=0.0,
         body_group_a=[_robot(world).root],
-        body_group_b=[world.get_kinematic_structure_entity_by_name("environment")],
+        body_group_b=[world.get_kinematic_structure_entity_by_name(name="environment")],
     )
 
 
@@ -274,7 +278,9 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             HolonomicBaseGoal,
             lambda world: [
                 HolonomicBaseGoal(
-                    mobile_base=world.get_semantic_annotations_by_type(MobileBase)[0],
+                    mobile_base=world.get_semantic_annotations_by_type(
+                        semantic_annotation_type=MobileBase
+                    )[0],
                     goal_pose=_pose(world),
                 )
             ],
@@ -361,7 +367,9 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             DifferentialDriveBaseGoal,
             lambda world: [
                 DifferentialDriveBaseGoal(
-                    mobile_base=world.get_semantic_annotations_by_type(MobileBase)[0],
+                    mobile_base=world.get_semantic_annotations_by_type(
+                        semantic_annotation_type=MobileBase
+                    )[0],
                     goal_pose=_pose(world),
                 )
             ],
@@ -398,7 +406,9 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 KeepHeldBodyUpright(
                     root_link=_root(world),
-                    end_effector=world.get_semantic_annotations_by_type(EndEffector)[0],
+                    end_effector=world.get_semantic_annotations_by_type(
+                        semantic_annotation_type=EndEffector
+                    )[0],
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -487,13 +497,13 @@ def _cartesian_cases() -> list[NodeRoundTripCase]:
             ArticulateGraspedMechanism,
             lambda world: [
                 ArticulateGraspedMechanism(
-                    environment_link=world.get_body_by_name("torso_lift_link"),
-                    tip_link=world.get_semantic_annotations_by_type(EndEffector)[
-                        0
-                    ].tool_frame,
+                    environment_link=world.get_body_by_name(name="torso_lift_link"),
+                    tip_link=world.get_semantic_annotations_by_type(
+                        semantic_annotation_type=EndEffector
+                    )[0].tool_frame,
                     goal_position=0.0,
                     holding_end_effector=world.get_semantic_annotations_by_type(
-                        EndEffector
+                        semantic_annotation_type=EndEffector
                     )[0],
                 )
             ],
@@ -704,7 +714,7 @@ def _monitor_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_mapping(
-                        {_connection(world): 0.5}
+                        mapping={_connection(world): 0.5}
                     )
                 )
             ],
@@ -778,7 +788,7 @@ def _joint_and_base_cases() -> list[NodeRoundTripCase]:
             lambda world: [
                 MoveGripper(
                     two_finger_gripper=world.get_semantic_annotations_by_type(
-                        EndEffector
+                        semantic_annotation_type=EndEffector
                     )[0],
                     width=0.04,
                 )
@@ -789,9 +799,9 @@ def _joint_and_base_cases() -> list[NodeRoundTripCase]:
             MoveFingersToJointState,
             lambda world: [
                 MoveFingersToJointState(
-                    goal_state=world.get_semantic_annotations_by_type(EndEffector)[
-                        0
-                    ].get_joint_state_by_type(GripperState.CLOSE),
+                    goal_state=world.get_semantic_annotations_by_type(
+                        semantic_annotation_type=EndEffector
+                    )[0].get_joint_state_by_type(state_type=GripperState.CLOSE),
                 )
             ],
             WorldFixture.PR2_WORLD,
@@ -833,8 +843,8 @@ def _collision_cases() -> list[NodeRoundTripCase]:
             SelfCollisionDistanceMonitor,
             lambda world: [
                 SelfCollisionDistanceMonitor(
-                    body_a=world.get_kinematic_structure_entity_by_name("l_thumb"),
-                    body_b=world.get_kinematic_structure_entity_by_name("r_thumb"),
+                    body_a=world.get_kinematic_structure_entity_by_name(name="l_thumb"),
+                    body_b=world.get_kinematic_structure_entity_by_name(name="r_thumb"),
                     distance_threshold=0.05,
                 )
             ],

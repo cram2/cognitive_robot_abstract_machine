@@ -21,10 +21,10 @@ def main() -> None:
     Prints the name of the converter found for a ROS2 message and for a semDT object,
     one per line.
     """
-    print(Ros2ToSemDTConverter.get_to_converter(LaserScan()).__name__)
+    print(Ros2ToSemDTConverter.get_to_converter(input_obj=LaserScan()).__name__)
     print(
         SemDTToRos2Converter.get_to_converter(
-            Box(scale=Scale(x=1.0, y=1.0, z=1.0))
+            input_obj=Box(scale=Scale(x=1.0, y=1.0, z=1.0))
         ).__name__
     )
 

@@ -182,7 +182,7 @@ class IrisSeedingSettings:
     Options forwarded to every :func:`pydrake.geometry.optimization.Iris` call.
     """
 
-    def coverage_grid_seeds(self, lower: Point3, upper: Point3) -> list[Point3]:
+    def coverage_grid_seeds(self, *, lower: Point3, upper: Point3) -> list[Point3]:
         """
         Build a regular grid of candidate seed points strictly inside the axis-aligned
         box spanned by ``lower`` and ``upper``.
@@ -270,15 +270,17 @@ def _shape_to_convex_set(
     :return: A ``VPolytope`` built from the shape's own mesh if it is convex, or an
         ``HPolyhedron`` bounding box otherwise.
     """
-    world_mesh = shape.mesh_in_frame(target_frame)
+    world_mesh = shape.mesh_in_frame(target_frame=target_frame)
 
     if world_mesh.is_convex:
         vertices = _bloat_convex_hull_points(world_mesh.vertices, bloat_x, bloat_y)
         return VPolytope(vertices.T)
 
     bounding_box = shape.local_frame_bounding_box.transform_to_origin(
-        HomogeneousTransformationMatrix(reference_frame=target_frame)
-    ).bloat(bloat_x, bloat_y, 0.01)
+        reference_T_new_origin=HomogeneousTransformationMatrix(
+            reference_frame=target_frame
+        )
+    ).bloat(x_amount=bloat_x, y_amount=bloat_y, z_amount=0.01)
     bounds = bounding_box.to_array_bounds()
     return HPolyhedron.MakeBox(bounds.lower, bounds.upper)
 
@@ -348,6 +350,7 @@ class GraphOfConvexPolygons(
     @classmethod
     def from_world(
         cls,
+        *,
         world: World,
         search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         bloat_obstacles: float = 0.0,
@@ -388,14 +391,16 @@ class GraphOfConvexPolygons(
 
         search_box = result.search_space.bounding_boxes[0]
         seeds = list(extra_seed_points) + settings.coverage_grid_seeds(
-            search_box.lower, search_box.upper
+            lower=search_box.lower, upper=search_box.upper
         )
 
         regions: list[HPolyhedron] = []
         for seed_point in seeds:
             if len(regions) >= settings.max_regions:
                 break
-            seed = world.transform(seed_point, world.root).to_np()[:3]
+            seed = world.transform(
+                spatial_object=seed_point, target_frame=world.root
+            ).to_np()[:3]
             if any(obstacle.PointInSet(seed) for obstacle in result.obstacles):
                 continue
             if any(region.PointInSet(seed) for region in regions):
@@ -409,7 +414,7 @@ class GraphOfConvexPolygons(
         result._trajectory_optimization.AddPathLengthCost()
         return result
 
-    def path_from_to(self, start: Point3, goal: Point3) -> list[Point3] | None:
+    def path_from_to(self, *, start: Point3, goal: Point3) -> list[Point3] | None:
         """
         Calculate a connected path from a start pose to a goal pose.
 
@@ -419,8 +424,12 @@ class GraphOfConvexPolygons(
             covers a path between them.
         :raises PointOccupiedError: If ``start`` or ``goal`` lies inside an obstacle.
         """
-        start_array = self.world.transform(start, self.world.root).to_np()[:3]
-        goal_array = self.world.transform(goal, self.world.root).to_np()[:3]
+        start_array = self.world.transform(
+            spatial_object=start, target_frame=self.world.root
+        ).to_np()[:3]
+        goal_array = self.world.transform(
+            spatial_object=goal, target_frame=self.world.root
+        ).to_np()[:3]
 
         if any(obstacle.PointInSet(start_array) for obstacle in self.obstacles):
             raise PointOccupiedError(point=start)

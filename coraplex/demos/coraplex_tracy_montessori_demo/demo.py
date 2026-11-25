@@ -125,7 +125,7 @@ class ShapeSortingPieceSet:
                 color=Color.YELLOW(),
             ),
             HoleShape.TRIANGLE: Mesh.triangular_prism(
-                self.triangular_prism_side, self.piece_height
+                side=self.triangular_prism_side, height=self.piece_height
             ),
         }
 
@@ -317,13 +317,15 @@ class MontessoriScene:
 
         :return: The world.
         """
-        world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
-        tracy = Tracy.from_world(world)
+        world = URDFParser.from_file(file_path=Tracy.get_ros_file_path()).create_world()
+        tracy = Tracy.from_world(world=world)
         self.solid_contact.contact_parameters(friction=ContactFriction()).apply_to(
-            world.bodies_with_collision
+            bodies=world.bodies_with_collision
         )
         for arm in tracy.all_arms:
-            arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+            arm.get_joint_state_by_type(state_type=StaticJointState.PARK).apply_to(
+                world=world
+            )
         self.populate(world=world)
         return world
 
@@ -336,7 +338,7 @@ class MontessoriScene:
 
         :param world: The world holding Tracy.
         """
-        [tracy] = world.get_semantic_annotations_by_type(Tracy)
+        [tracy] = world.get_semantic_annotations_by_type(semantic_annotation_type=Tracy)
         grasp_height = self.grip.grasp_height(
             gripper=self.sorting_arm(tracy=tracy).end_effector
         )
@@ -362,11 +364,11 @@ class MontessoriScene:
             name=PrefixedName(name="shape_sorting_board")
         )
         self.solid_contact.contact_parameters(friction=ContactFriction()).apply_to(
-            [self.board]
+            bodies=[self.board]
         )
-        world.add_kinematic_structure_entity(self.board)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=self.board)
         world.add_connection(
-            FixedConnection.create_with_dofs(
+            connection=FixedConnection.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=self.board,
@@ -404,9 +406,9 @@ class MontessoriScene:
         body.visual = ShapeCollection(
             shapes=[copy.deepcopy(shape)], reference_frame=body
         )
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=body,
@@ -422,9 +424,9 @@ class MontessoriScene:
         )
         self.solid_contact.contact_parameters(
             friction=ContactParameters.create_for_grasped_object().friction
-        ).apply_to([body])
+        ).apply_to(bodies=[body])
         piece = ShapeSortingPiece(root=body, grasp_height=grasp_height)
-        world.add_semantic_annotations([piece])
+        world.add_semantic_annotations(semantic_annotations=[piece])
         return piece
 
 
@@ -494,7 +496,7 @@ class ShapeSortingPlan:
             + self.scene.pieces.piece_height / 2,
             reference_frame=self.scene.board,
         )
-        return world.transform(board_T_release, world.root)
+        return world.transform(spatial_object=board_T_release, target_frame=world.root)
 
 
 # %% running it

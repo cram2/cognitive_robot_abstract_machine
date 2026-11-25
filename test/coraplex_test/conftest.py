@@ -98,7 +98,10 @@ def grasp_point_of(arm: Arm) -> np.ndarray:
     end_effector = arm.end_effector
     world = end_effector._world
     return (
-        world.transform(end_effector.tool_P_grasp_when_closed, world.root)
+        world.transform(
+            spatial_object=end_effector.tool_P_grasp_when_closed,
+            target_frame=world.root,
+        )
         .to_np()
         .flatten()[:3]
     )
@@ -123,7 +126,9 @@ def pr2_apartment_context(pr2_apartment_world):
     returned to its initial model and state after the test.
     """
     snapshot = WorldSnapshot.capture(world=pr2_apartment_world)
-    pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_apartment_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     yield pr2_apartment_world, pr2, robot_extensions(pr2)
     snapshot.restore()
 
@@ -147,7 +152,9 @@ def stretch_apartment_context(stretch_apartment_world):
     plans, returned to its initial model and state after the test.
     """
     snapshot = WorldSnapshot.capture(world=stretch_apartment_world)
-    robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
+    robot = stretch_apartment_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Stretch
+    )[0]
     yield stretch_apartment_world, robot, robot_extensions(robot)
     snapshot.restore()
 
@@ -160,7 +167,7 @@ def hsr_apartment_context(hsr_apartment_world):
     """
     world, _, _ = hsr_apartment_world
     snapshot = WorldSnapshot.capture(world=world)
-    robot = world.get_semantic_annotations_by_type(HSRB)[0]
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=HSRB)[0]
     yield world, robot, robot_extensions(robot)
     snapshot.restore()
 
@@ -305,7 +312,7 @@ class SimulationThatCountsItsSteps:
     The world it simulates, without a servo, so nothing is waited for to settle.
     """
 
-    def step_simulation(self, duration: timedelta) -> None:
+    def step_simulation(self, *, duration: timedelta) -> None:
         """
         :param duration: Simulated time to advance.
         """
@@ -365,8 +372,10 @@ def simulated_hsrb() -> Iterator[tuple[HSRB, MujocoSim]]:
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
-    hsrb = RobotSpecification(semantic_annotation_type=HSRB).spawn(world)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
+    hsrb = RobotSpecification(semantic_annotation_type=HSRB).spawn(world=world)
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     yield hsrb, simulation

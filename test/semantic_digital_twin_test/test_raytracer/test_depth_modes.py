@@ -74,7 +74,10 @@ def test_depth_mode_with_translated_and_rotated_camera(
     )
 
     depths = depth_mode.hit_depth(
-        hit_points, ray_origins, ray_directions, world_T_camera
+        hit_points=hit_points,
+        ray_origins=ray_origins,
+        ray_directions=ray_directions,
+        world_T_camera=world_T_camera,
     )
 
     np.testing.assert_allclose(depths, expected_depths)
@@ -129,7 +132,7 @@ def test_depth_mode_receives_spatial_camera_pose(
         OpticalAxisDepthMode, "hit_depth", return_value=np.array([2.0, 3.0])
     ) as hit_depth:
         fixture.ray_tracer.create_segmentation_and_depth(
-            HomogeneousTransformationMatrix(),
+            camera_pose=HomogeneousTransformationMatrix(),
             resolution=fixture.resolution,
             depth_mode=OpticalAxisDepthMode(),
         )
@@ -149,7 +152,7 @@ def test_custom_depth_mode_controls_hit_depths(
     """
     fixture = camera_intersections
     frame = fixture.ray_tracer.create_segmentation_and_depth(
-        HomogeneousTransformationMatrix(),
+        camera_pose=HomogeneousTransformationMatrix(),
         resolution=fixture.resolution,
         depth_mode=WorldPlaneDepthMode(),
     )

@@ -94,7 +94,7 @@ class SceneFile(StrEnum):
                 SearchPathFileResolver(root_directories=[resources]),
                 PackageUriResolver(),
             ]
-        ).resolve(self.value)
+        ).resolve(uri=self.value)
 
 
 class ApartmentBody(StrEnum):
@@ -174,13 +174,15 @@ class PlaceSettingObject:
         SemanticAnnotationWithRootSpecification(
             name=name,
             semantic_annotation_type=self.semantic_annotation_type,
-            root_specification=BodySpecification.mesh(name, self.mesh.path),
+            root_specification=BodySpecification.mesh(
+                name=name, filename=self.mesh.path
+            ),
         ).spawn(
-            world,
+            world=world,
             parent=(
                 None
                 if self.starts_on is None
-                else world.get_body_by_name(self.starts_on)
+                else world.get_body_by_name(name=self.starts_on)
             ),
             parent_T_self=self.start,
         )
@@ -290,7 +292,7 @@ class BulletWorldDemonstration(RobotDemonstration):
         """
         :return: The apartment.
         """
-        return WorldSpecification.from_urdf(SceneFile.APARTMENT.path)
+        return WorldSpecification.from_urdf(file_path=SceneFile.APARTMENT.path)
 
     def robot_specification(self) -> RobotSpecification:
         """
@@ -301,7 +303,9 @@ class BulletWorldDemonstration(RobotDemonstration):
         )
 
     def is_scene_populated(self, *, world: World) -> bool:
-        return world.is_kinematic_structure_entity_in_world_by_name(ApartmentBody.ROOT)
+        return world.is_kinematic_structure_entity_in_world_by_name(
+            name=ApartmentBody.ROOT
+        )
 
     def populate_scene(self, *, world: World) -> None:
         """
@@ -317,7 +321,9 @@ class BulletWorldDemonstration(RobotDemonstration):
     def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
-                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+                robot=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=self.used_robot
+                )[0]
             ),
             StatementGrounding(),
             PlanRewriting(transformations=[OpenDrawerBeforeMoveAndPickUp()]),

@@ -35,7 +35,7 @@ inside your ROS2 workspace.
 ```{code-cell} ipython3
 from semantic_digital_twin.adapters.urdf import URDFParser  
   
-parser = URDFParser.from_file(apartment)  
+parser = URDFParser.from_file(file_path=apartment)  
 world = parser.create_world()  
 ```
 

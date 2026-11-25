@@ -98,7 +98,7 @@ class RegionFilter(ThreadedAnnotator):
         if self.get_cas().contains(view_name=CASViews.QUERY):
             query = self.get_cas().get(view_name=CASViews.QUERY)
 
-        regions = self.world.get_kinematic_structure_entity_by_type(Region)
+        regions = self.world.get_kinematic_structure_entity_by_type(entity_type=Region)
         all_regions = {str(region.name): region for region in regions}
         active_regions = all_regions
 

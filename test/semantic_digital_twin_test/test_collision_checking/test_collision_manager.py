@@ -35,13 +35,19 @@ from semantic_digital_twin.world import World
 
 
 class TestExternalCollisionExpressionManager:
-    def test_simple(self, cylinder_bot_world):
+    def test_simple(self, *, cylinder_bot_world):
         float_variable_data = FloatVariableData()
         float_variable_data.register_expression(expression=FloatVariable("muh"))
 
-        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
-        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+            name="environment"
+        )
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+            name="environment2"
+        )
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
         collision_manager = cylinder_bot_world.collision_manager
         collision_manager.temporary_rules.extend(
             [
@@ -63,55 +69,71 @@ class TestExternalCollisionExpressionManager:
             MaxAvoidedCollisionsOverride(value=2, bodies={robot.root})
         )
         collision_manager.add_collision_consumer(
-            external_collisions := ExternalCollisionVariableManager(
-                float_variable_data=float_variable_data
+            consumer=(
+                external_collisions := ExternalCollisionVariableManager(
+                    float_variable_data=float_variable_data
+                )
             )
         )
-        external_collisions.register_group_of_body(robot.root)
+        external_collisions.register_group_of_body(body=robot.root)
         collision_manager.update_collision_matrix()
         collisions = collision_manager.compute_collisions()
 
-        group = external_collisions.get_collision_group(robot.root)
-        first, second = external_collisions.avoided_contacts_of(group)
+        group = external_collisions.get_collision_group(body=robot.root)
+        first, second = external_collisions.avoided_contacts_of(group=group)
 
         # test point on a
-        point1 = external_collisions.get_group_a_P_point_on_a_symbol(first)
+        point1 = external_collisions.get_group_a_P_point_on_a_symbol(contact=first)
         assert np.allclose(
             point1.evaluate(), np.array([0.0, 0.05, 0.249, 1.0]), atol=1e-3
         )
-        point2 = external_collisions.get_group_a_P_point_on_a_symbol(second)
+        point2 = external_collisions.get_group_a_P_point_on_a_symbol(contact=second)
         assert np.allclose(
             point2.evaluate(), np.array([0.05, 0.0, 0.249, 1.0]), atol=1e-3
         )
-        point2 = external_collisions.get_group_a_P_point_on_a_symbol(second)
+        point2 = external_collisions.get_group_a_P_point_on_a_symbol(contact=second)
         assert np.allclose(
             point2.evaluate(), np.array([0.05, 0.0, 0.249, 1.0]), atol=1e-3
         )
 
         # test contact normal
-        contact_normal1 = external_collisions.get_root_V_contact_normal_symbol(first)
+        contact_normal1 = external_collisions.get_root_V_contact_normal_symbol(
+            contact=first
+        )
         assert np.allclose(contact_normal1.evaluate(), np.array([0.0, -1.0, 0.0, 0.0]))
-        contact_normal2 = external_collisions.get_root_V_contact_normal_symbol(second)
+        contact_normal2 = external_collisions.get_root_V_contact_normal_symbol(
+            contact=second
+        )
         assert np.allclose(
             contact_normal2.evaluate(), np.array([-1, 0.0, 0.0, 0.0]), atol=1e-4
         )
 
         # test buffer distance
-        buffer_distance1 = external_collisions.get_buffer_distance_symbol(first)
+        buffer_distance1 = external_collisions.get_buffer_distance_symbol(contact=first)
         assert np.allclose(buffer_distance1.evaluate()[0], 15)
-        buffer_distance2 = external_collisions.get_buffer_distance_symbol(second)
+        buffer_distance2 = external_collisions.get_buffer_distance_symbol(
+            contact=second
+        )
         assert np.allclose(buffer_distance2.evaluate()[0], 10)
 
         # test contact distance
-        contact_distance1 = external_collisions.get_contact_distance_symbol(first)
+        contact_distance1 = external_collisions.get_contact_distance_symbol(
+            contact=first
+        )
         assert np.allclose(contact_distance1.evaluate()[0], 0.2, atol=1e-3)
-        contact_distance2 = external_collisions.get_contact_distance_symbol(second)
+        contact_distance2 = external_collisions.get_contact_distance_symbol(
+            contact=second
+        )
         assert np.allclose(contact_distance2.evaluate()[0], 0.7, atol=1e-3)
 
         # test violated distance
-        violated_distance1 = external_collisions.get_violated_distance_symbol(first)
+        violated_distance1 = external_collisions.get_violated_distance_symbol(
+            contact=first
+        )
         assert np.allclose(violated_distance1.evaluate()[0], 0.23)
-        violated_distance2 = external_collisions.get_violated_distance_symbol(second)
+        violated_distance2 = external_collisions.get_violated_distance_symbol(
+            contact=second
+        )
         assert np.allclose(violated_distance2.evaluate()[0], 0.0)
 
         # test full expr
@@ -126,10 +148,10 @@ class TestExternalCollisionExpressionManager:
 
         # test specific expression
         group_a_P_point_on_a = external_collisions.get_group_a_P_point_on_a_symbol(
-            first
+            contact=first
         )
         root_b_V_contact_normal = external_collisions.get_root_V_contact_normal_symbol(
-            first
+            contact=first
         )
         expr = root_b_V_contact_normal @ group_a_P_point_on_a.vector3
         compiled_expression = expr.compile(
@@ -137,23 +159,31 @@ class TestExternalCollisionExpressionManager:
         )
         result = compiled_expression(external_collisions.float_variable_data.data)
         expected = (
-            external_collisions.get_root_V_contact_normal_symbol(first).evaluate()
-            @ external_collisions.get_group_a_P_point_on_a_symbol(first).evaluate()
+            external_collisions.get_root_V_contact_normal_symbol(
+                contact=first
+            ).evaluate()
+            @ external_collisions.get_group_a_P_point_on_a_symbol(
+                contact=first
+            ).evaluate()
         )
         assert np.allclose(result, expected)
 
 
 class TestSelfCollisionExpressionManager:
-    def test_simple(self, self_collision_bot_world):
+    def test_simple(self, *, self_collision_bot_world):
         float_variable_data = FloatVariableData()
         float_variable_data.register_expression(expression=FloatVariable("muh"))
 
-        r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_tip")
-        l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_tip")
+        r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+            name="r_tip"
+        )
+        l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+            name="l_tip"
+        )
 
-        robot = self_collision_bot_world.get_semantic_annotations_by_type(MinimalRobot)[
-            0
-        ]
+        robot = self_collision_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
         collision_manager = self_collision_bot_world.collision_manager
         collision_manager.temporary_rules.extend(
             [
@@ -168,14 +198,16 @@ class TestSelfCollisionExpressionManager:
             MaxAvoidedCollisionsOverride(value=2, bodies={robot.root})
         )
         collision_manager.add_collision_consumer(
-            self_collisions := SelfCollisionVariableManager(
-                float_variable_data=float_variable_data
+            consumer=(
+                self_collisions := SelfCollisionVariableManager(
+                    float_variable_data=float_variable_data
+                )
             )
         )
-        self_collisions.register_groups_of_body_combination(l_tip, r_tip)
+        self_collisions.register_groups_of_body_combination(body_a=l_tip, body_b=r_tip)
         assert len(self_collisions.registered_group_combinations) == 1
         (combination,) = self_collisions.registered_group_combinations
-        first = self_collisions.avoided_contacts_of(combination)[0]
+        first = self_collisions.avoided_contacts_of(combination=combination)[0]
 
         collision_manager.update_collision_matrix()
         collisions = collision_manager.compute_collisions()
@@ -193,25 +225,31 @@ class TestSelfCollisionExpressionManager:
             expected_body_b_point = expected_r_tip_point
 
         # test point on a
-        point1 = self_collisions.get_group_a_P_point_on_a_symbol(first).evaluate()
+        point1 = self_collisions.get_group_a_P_point_on_a_symbol(
+            contact=first
+        ).evaluate()
         assert np.allclose(point1, expected_body_a_point)
-        point2 = self_collisions.get_group_b_P_point_on_b_symbol(first).evaluate()
+        point2 = self_collisions.get_group_b_P_point_on_b_symbol(
+            contact=first
+        ).evaluate()
         assert np.allclose(point2, expected_body_b_point)
 
         # test contact normal
-        contact_normal1 = self_collisions.get_group_b_V_contact_normal_symbol(first)
+        contact_normal1 = self_collisions.get_group_b_V_contact_normal_symbol(
+            contact=first
+        )
         assert np.allclose(contact_normal1.evaluate(), expected_normal)
 
         # test buffer distance
-        buffer_distance1 = self_collisions.get_buffer_distance_symbol(first)
+        buffer_distance1 = self_collisions.get_buffer_distance_symbol(contact=first)
         assert np.allclose(buffer_distance1.evaluate()[0], 10)
 
         # test contact distance
-        contact_distance1 = self_collisions.get_contact_distance_symbol(first)
+        contact_distance1 = self_collisions.get_contact_distance_symbol(contact=first)
         assert np.allclose(contact_distance1.evaluate()[0], 0.1)
 
         # test violated distance
-        violated_distance1 = self_collisions.get_violated_distance_symbol(first)
+        violated_distance1 = self_collisions.get_violated_distance_symbol(contact=first)
         assert np.allclose(violated_distance1.evaluate()[0], 0.23)
 
         # test full expr
@@ -225,9 +263,11 @@ class TestSelfCollisionExpressionManager:
         assert np.allclose(result, self_collisions.float_variable_data.data)
 
         # test specific expression
-        group_b_P_point_on_b = self_collisions.get_group_b_P_point_on_b_symbol(first)
+        group_b_P_point_on_b = self_collisions.get_group_b_P_point_on_b_symbol(
+            contact=first
+        )
         group_b_V_contact_normal = self_collisions.get_group_b_V_contact_normal_symbol(
-            first
+            contact=first
         )
         expr = group_b_V_contact_normal @ group_b_P_point_on_b.vector3
         compiled_expression = expr.compile(
@@ -237,15 +277,19 @@ class TestSelfCollisionExpressionManager:
         expected = expr.evaluate()
         assert np.allclose(result, expected)
 
-    def test_reset(self, self_collision_bot_world):
+    def test_reset(self, *, self_collision_bot_world):
         float_variable_data = FloatVariableData()
         float_variable_data.register_expression(expression=FloatVariable("muh"))
 
-        r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_tip")
-        l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_tip")
-        robot = self_collision_bot_world.get_semantic_annotations_by_type(MinimalRobot)[
-            0
-        ]
+        r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+            name="r_tip"
+        )
+        l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+            name="l_tip"
+        )
+        robot = self_collision_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
         root = robot.root
         collision_manager = self_collision_bot_world.collision_manager
         collision_manager.temporary_rules.extend(
@@ -261,25 +305,27 @@ class TestSelfCollisionExpressionManager:
             MaxAvoidedCollisionsOverride(value=2, bodies={robot.root})
         )
         collision_manager.add_collision_consumer(
-            self_collisions := SelfCollisionVariableManager(
-                float_variable_data=float_variable_data
+            consumer=(
+                self_collisions := SelfCollisionVariableManager(
+                    float_variable_data=float_variable_data
+                )
             )
         )
-        self_collisions.register_groups_of_body_combination(root, r_tip)
+        self_collisions.register_groups_of_body_combination(body_a=root, body_b=r_tip)
         # insert a variable between the collision entries to possibly mess with the internal indexing
         v = FloatVariable("muh2")
         float_variable_data.register_expression(expression=v)
         float_variable_data.set_value(expression=v, value=23)
-        self_collisions.register_groups_of_body_combination(l_tip, r_tip)
+        self_collisions.register_groups_of_body_combination(body_a=l_tip, body_b=r_tip)
 
         self_collisions.reset_collision_data()
         # other data should not get overwritten
         assert v.evaluate() == 23
 
         combination = list(self_collisions.registered_group_combinations)[1]
-        first = self_collisions.avoided_contacts_of(combination)[0]
+        first = self_collisions.avoided_contacts_of(combination=combination)[0]
 
-        contact_distance1 = self_collisions.get_contact_distance_symbol(first)
+        contact_distance1 = self_collisions.get_contact_distance_symbol(contact=first)
         assert np.allclose(contact_distance1.evaluate()[0], 100)
 
 
@@ -287,7 +333,7 @@ def test_collision_rules_survive_merge(pr2_world_copy):
     expected = len(pr2_world_copy.collision_manager.rules)
     world = World()
     with world.modify_world():
-        world.merge_world(pr2_world_copy)
+        world.merge_world(other=pr2_world_copy)
     assert len(world.collision_manager.rules) == expected
 
 
@@ -320,9 +366,13 @@ def test_an_avoid_rule_leaves_out_subset_bodies_that_cannot_collide(pr2_world_co
     A body with no geometry can never be the reason two things are kept apart, so naming
     one in a rule only misstates what that rule covers.
     """
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
-    without_geometry = pr2_world_copy.get_body_by_name("l_force_torque_adapter_link")
-    with_geometry = pr2_world_copy.get_body_by_name("l_force_torque_link")
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
+    without_geometry = pr2_world_copy.get_body_by_name(
+        name="l_force_torque_adapter_link"
+    )
+    with_geometry = pr2_world_copy.get_body_by_name(name="l_force_torque_link")
     assert not without_geometry.has_collision()
     assert with_geometry.has_collision()
 
@@ -340,13 +390,15 @@ def test_robot_is_in_collision_reports_a_contact_of_its_own(cylinder_bot_world):
     """
     The robot answers for its own bodies, under whichever rules the caller set.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
-        "environment"
+        name="environment"
     )
     collision_manager = cylinder_bot_world.collision_manager
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=10,
                 violated_distance=10,
@@ -368,13 +420,15 @@ def test_robot_is_not_in_collision_while_it_keeps_its_distance(cylinder_bot_worl
     The robot counts as in collision once it comes within the distance the rule says
     must not be violated, and not before.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
-        "environment"
+        name="environment"
     )
     collision_manager = cylinder_bot_world.collision_manager
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=10,
                 violated_distance=0.1,
@@ -401,13 +455,15 @@ def test_robot_is_not_in_collision_exactly_at_the_violated_distance(
     A contact exactly at the violated distance does not violate it, as collision
     avoidance treats it.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
-        "environment"
+        name="environment"
     )
     collision_manager = cylinder_bot_world.collision_manager
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=10,
                 violated_distance=0.0,
@@ -424,7 +480,7 @@ def test_robot_is_not_in_collision_exactly_at_the_violated_distance(
     ]
     collision_manager.clear_temporary_rules()
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=10,
                 violated_distance=contact.distance,
@@ -442,9 +498,11 @@ def test_robot_is_not_in_collision_when_nothing_is_checked(cylinder_bot_world):
     """
     With every collision of the robot allowed, no contact is reported for it.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     collision_manager = cylinder_bot_world.collision_manager
-    collision_manager.extend_temporary_rule([AllowAllCollisions()])
+    collision_manager.extend_temporary_rule(rules=[AllowAllCollisions()])
     collision_manager.update_collision_matrix()
 
     assert not robot.is_in_collision
@@ -458,13 +516,15 @@ def test_robot_within_a_buffer_zone_is_not_yet_in_collision(cylinder_bot_world):
     Collision avoidance keeps a robot out of its buffer zones softly and out of the
     violated distance firmly, so a robot can be inside the first and not the second.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
-        "environment"
+        name="environment"
     )
     collision_manager = cylinder_bot_world.collision_manager
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=10,
                 violated_distance=0.1,
@@ -485,13 +545,15 @@ def test_robot_is_not_within_a_buffer_zone_exactly_at_its_distance(
     """
     A contact exactly at the buffer-zone distance keeps the robot out of the zone.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
-        "environment"
+        name="environment"
     )
     collision_manager = cylinder_bot_world.collision_manager
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=10,
                 violated_distance=0.0,
@@ -508,7 +570,7 @@ def test_robot_is_not_within_a_buffer_zone_exactly_at_its_distance(
     ]
     collision_manager.clear_temporary_rules()
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=contact.distance,
                 violated_distance=0.0,
@@ -529,10 +591,12 @@ def test_robot_close_to_itself_is_not_within_an_external_buffer_zone(
     Only a body outside the robot puts it within an external buffer zone, however close
     its own bodies come to each other.
     """
-    robot = self_collision_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = self_collision_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     collision_manager = self_collision_bot_world.collision_manager
     collision_manager.extend_temporary_rule(
-        [
+        rules=[
             AllowAllCollisions(),
             AvoidSelfCollisions(
                 buffer_zone_distance=10, violated_distance=0.0, robot=robot
@@ -579,6 +643,8 @@ def test_a_consumer_does_not_have_to_be_serializable(pr2_world_copy):
     would otherwise make the change raise.
     """
     collision_manager = pr2_world_copy.collision_manager
-    collision_manager.add_collision_consumer(ConsumerHoldingSomethingUnserializable())
+    collision_manager.add_collision_consumer(
+        consumer=ConsumerHoldingSomethingUnserializable()
+    )
 
     assert "collision_consumers" not in collision_manager.to_json()

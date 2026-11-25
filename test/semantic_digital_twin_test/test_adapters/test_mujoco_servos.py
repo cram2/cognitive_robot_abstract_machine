@@ -56,9 +56,9 @@ def test_the_servo_actuator_is_a_pd_law_clamped_to_the_joints_range():
         ),
     )
     servo = PositionServo(name=PrefixedName(name="hinge_servo"), gains=gains)
-    servo.add_dof(degree_of_freedom)
+    servo.add_dof(dof=degree_of_freedom)
 
-    actuator = MujocoActuator.create_servo(servo)
+    actuator = MujocoActuator.create_servo(servo=servo)
 
     assert actuator.gain_type == mujoco.mjtGain.mjGAIN_FIXED
     assert actuator.gain_parameters[0] == gains.stiffness
@@ -71,9 +71,9 @@ def test_the_servo_actuator_is_a_pd_law_clamped_to_the_joints_range():
 def test_the_velocity_servo_actuator_pushes_against_the_velocity_error():
     gains = VelocityServoGains(damping=10.0, torque_limit=5.0)
     servo = VelocityServo(name=PrefixedName(name="wheel_servo"), gains=gains)
-    servo.add_dof(DegreeOfFreedom(name=PrefixedName(name="wheel")))
+    servo.add_dof(dof=DegreeOfFreedom(name=PrefixedName(name="wheel")))
 
-    actuator = MujocoActuator.create_velocity_servo(servo)
+    actuator = MujocoActuator.create_velocity_servo(servo=servo)
 
     assert actuator.gain_type == mujoco.mjtGain.mjGAIN_FIXED
     assert actuator.gain_parameters[0] == gains.damping
@@ -113,9 +113,9 @@ def _pendulum_world() -> PendulumWorld:
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName(name="root"))
-        world.add_body(root)
+        world.add_body(body=root)
         base = Body(name=PrefixedName(name="base"))
-        world.add_connection(FixedConnection(parent=root, child=base))
+        world.add_connection(connection=FixedConnection(parent=root, child=base))
         arm = Body(name=PrefixedName(name="arm"))
         mirrored_arm = Body(name=PrefixedName(name="mirrored_arm"))
         # the two arms hang at different heights so they never touch each other
@@ -137,7 +137,7 @@ def _pendulum_world() -> PendulumWorld:
                 lower_position=-1.0, upper_position=1.0
             ),
         )
-        world.add_degree_of_freedom(degree_of_freedom)
+        world.add_degree_of_freedom(dof=degree_of_freedom)
         hinge = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=arm)
@@ -147,7 +147,7 @@ def _pendulum_world() -> PendulumWorld:
             child=arm,
             raw_dof=degree_of_freedom,
         )
-        world.add_connection(hinge)
+        world.add_connection(connection=hinge)
         mirrored_hinge = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=mirrored_arm)
@@ -158,7 +158,7 @@ def _pendulum_world() -> PendulumWorld:
             raw_dof=degree_of_freedom,
             multiplier=-1.0,
         )
-        world.add_connection(mirrored_hinge)
+        world.add_connection(connection=mirrored_hinge)
     return PendulumWorld(world=world, hinge=hinge, mirrored_hinge=mirrored_hinge)
 
 
@@ -168,9 +168,9 @@ def _servoed_pendulum_world() -> PendulumWorld:
         name=PrefixedName(name="hinge_servo"),
         gains=ServoGains(stiffness=50.0, damping=5.0, torque_limit=2.0),
     )
-    servo.add_dof(pendulum.hinge.raw_dof)
+    servo.add_dof(dof=pendulum.hinge.raw_dof)
     with pendulum.world.modify_world():
-        pendulum.world.add_actuator(servo)
+        pendulum.world.add_actuator(actuator=servo)
     return pendulum
 
 
@@ -196,9 +196,9 @@ def test_the_servo_of_a_joint_without_position_limits_leaves_its_control_unclamp
         name=PrefixedName(name="continuous_hinge_servo"),
         gains=ServoGains(stiffness=100.0, damping=10.0, torque_limit=5.0),
     )
-    servo.add_dof(degree_of_freedom)
+    servo.add_dof(dof=degree_of_freedom)
 
-    actuator = MujocoActuator.create_servo(servo)
+    actuator = MujocoActuator.create_servo(servo=servo)
 
     assert actuator.control_limited == mujoco.mjtLimited.mjLIMITED_FALSE
 
@@ -232,9 +232,9 @@ def test_a_servoed_joint_is_driven_towards_the_world_state_not_teleported():
         simulator = simulation.simulator
         world.state[pendulum.hinge.raw_dof.id].position = set_point
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=simulator.step_size))
+        simulation.step_simulation(duration=timedelta(seconds=simulator.step_size))
         after_one_step = simulator.get_joint_value("hinge").result
-        simulation.step_simulation(timedelta(seconds=2))
+        simulation.step_simulation(duration=timedelta(seconds=2))
         settled = simulator.get_joint_value("hinge").result
     finally:
         simulation.stop_simulation()
@@ -261,7 +261,7 @@ def test_starting_the_simulation_holds_a_servoed_joint_where_the_world_has_it():
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         held = simulation.simulator.get_joint_value("hinge").result
     finally:
         simulation.stop_simulation()
@@ -299,10 +299,10 @@ def test_a_servoed_joint_stops_where_its_commands_stop():
                 velocity * control_period.total_seconds()
             )
             world.notify_state_change()
-            simulation.step_simulation(control_period)
+            simulation.step_simulation(duration=control_period)
         world.state[degree_of_freedom.id].velocity = 0.0
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
     finally:
         simulation.stop_simulation()
 
@@ -326,7 +326,7 @@ def _blocked_servoed_pendulum_world() -> PendulumWorld:
             shapes=[Box(scale=Scale(x=0.02, y=0.02, z=0.04))], reference_frame=post
         )
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=base,
                 child=post,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -354,7 +354,7 @@ def test_a_blocked_servoed_joint_shows_where_the_physics_stopped_it():
     try:
         world.state[pendulum.hinge.raw_dof.id].position = set_point
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=2))
+        simulation.step_simulation(duration=timedelta(seconds=2))
         stuck = simulation.simulator.get_joint_value("hinge").result
     finally:
         simulation.stop_simulation()
@@ -382,10 +382,10 @@ def test_a_blocked_servoed_joint_keeps_being_pushed_towards_its_set_point():
     try:
         world.state[degree_of_freedom.id].position = set_point
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         world.state[degree_of_freedom.id].position += further
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         control = simulation.simulator.get_actuator("hinge_servo").result.ctrl[0]
     finally:
         simulation.stop_simulation()

@@ -45,7 +45,7 @@ class RootBodyBase(MobileBase[TGenericDrive], ABC):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(root=robot_root)
 

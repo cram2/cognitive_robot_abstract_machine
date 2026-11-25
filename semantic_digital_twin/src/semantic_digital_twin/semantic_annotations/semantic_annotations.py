@@ -134,7 +134,7 @@ class Handle(IsGraspable):
 
     @classmethod
     def _create_handle_geometry(
-        cls, scale: Scale, thickness: float = 0.0
+        cls, *, scale: Scale, thickness: float = 0.0
     ) -> SimpleEvent:
         """
         Create a box event representing the handle.
@@ -160,10 +160,10 @@ class Handle(IsGraspable):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
-        *,
         thickness: float = 0.005,
     ) -> BodySpecification:
         """
@@ -189,7 +189,9 @@ class Handle(IsGraspable):
         handle_event -= inner_box
 
         return BodySpecification.from_event(
-            name, handle_event, connection_specification=connection_specification
+            name=name,
+            event=handle_event,
+            connection_specification=connection_specification,
         )
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
@@ -262,6 +264,7 @@ class Aperture(HasRootRegion):
     @classmethod
     def create_with_new_region_in_world_from_body(
         cls,
+        *,
         name: str,
         world: World,
         body: Body,
@@ -269,16 +272,17 @@ class Aperture(HasRootRegion):
     ) -> Self:
         world.update_forward_kinematics()
         body_scale = (
-            body.collision.as_bounding_box_collection_in_frame(body)
+            body.collision.as_bounding_box_collection_in_frame(reference_frame=body)
             .bounding_box()
             .scale
         )
         return cls.create_with_new_region_in_world(
-            name, world, parent_T_self, scale=body_scale
+            name=name, world=world, world_root_T_self=parent_T_self, scale=body_scale
         )
 
     def _mount_strategy(
         self,
+        *,
         main_has_root_body_annotation: HasRootBody,
         relationship: IsPartWholeRelationship,
     ) -> None:
@@ -290,10 +294,15 @@ class Aperture(HasRootRegion):
         rather than a hole, so the whole keeps its material.
         """
         if relationship.removes_part_geometry_from_whole:
-            self._remove_aperture_geometry_from_parent(main_has_root_body_annotation)
-        super()._mount_strategy(main_has_root_body_annotation, relationship)
+            self._remove_aperture_geometry_from_parent(
+                parent=main_has_root_body_annotation
+            )
+        super()._mount_strategy(
+            main_has_root_body_annotation=main_has_root_body_annotation,
+            relationship=relationship,
+        )
 
-    def _remove_aperture_geometry_from_parent(self, parent: HasRootBody):
+    def _remove_aperture_geometry_from_parent(self, *, parent: HasRootBody):
         """
         Remove the geometry of the aperture from the parent body's collision and visual
         geometry.
@@ -303,14 +312,16 @@ class Aperture(HasRootRegion):
         world = parent._world
         world.update_forward_kinematics()
         hole_event = self.root.area.as_bounding_box_collection_in_frame(
-            parent.root
+            reference_frame=parent.root
         ).event
         wall_event = parent.root.collision.as_bounding_box_collection_in_frame(
-            parent.root
+            reference_frame=parent.root
         ).event
         new_wall_event = wall_event - hole_event
         new_bounding_box_collection = BoundingBoxCollection.from_event(
-            VolumetricBoundingBox, parent.root, new_wall_event
+            box_type=VolumetricBoundingBox,
+            reference_frame=parent.root,
+            event=new_wall_event,
         ).as_shapes()
 
         parent.root.collision = new_bounding_box_collection
@@ -319,6 +330,7 @@ class Aperture(HasRootRegion):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -336,8 +348,8 @@ class Aperture(HasRootRegion):
         """
         scale = scale or Scale()
         return RegionSpecification.from_event(
-            name,
-            scale.to_simple_event().as_composite_set(),
+            name=name,
+            event=scale.to_simple_event().as_composite_set(),
             connection_specification=connection_specification,
         )
 
@@ -354,10 +366,10 @@ class EntryWay(Aperture):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
-        *,
         color: Color | None = None,
     ) -> RegionSpecification:
         """
@@ -372,8 +384,8 @@ class EntryWay(Aperture):
         :return: A region specification with the passage geometry.
         """
         return RegionSpecification.box(
-            name,
-            scale or Scale(),
+            name=name,
+            scale=scale or Scale(),
             color=color or Color.from_rgba(red=1.0, green=1.0, blue=1.0, opacity=0.2),
             connection_specification=connection_specification,
         )
@@ -407,9 +419,9 @@ class Door(HasHandle, HasMovableJoint):
     @classmethod
     def get_annotation_specification(
         cls,
+        *,
         name: str,
         root_specification: KinematicStructureEntitySpecification,
-        *,
         parent_connection_specification: ConnectionSpecification | None = None,
         annotation_kwargs: dict | None = None,
         part_specifications: dict | None = None,
@@ -433,14 +445,14 @@ class Door(HasHandle, HasMovableJoint):
         :return: The annotation specification.
         """
         entry_way_specification = EntryWay.get_annotation_specification(
-            f"{name}_entry_way",
-            EntryWay.get_default_root_kinematic_structure_entity_specification(
+            name=f"{name}_entry_way",
+            root_specification=EntryWay.get_default_root_kinematic_structure_entity_specification(
                 scale=root_specification.scale
             ),
         )
         return super().get_annotation_specification(
-            name,
-            root_specification,
+            name=name,
+            root_specification=root_specification,
             parent_connection_specification=parent_connection_specification,
             annotation_kwargs=annotation_kwargs,
             part_specifications={
@@ -452,6 +464,7 @@ class Door(HasHandle, HasMovableJoint):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -473,11 +486,11 @@ class Door(HasHandle, HasMovableJoint):
         if not (scale.x < scale.y and scale.x < scale.z):
             raise InvalidPlaneDimensions(scale=scale, clazz=Door)
         return super().get_default_root_kinematic_structure_entity_specification(
-            name, scale, connection_specification
+            name=name, scale=scale, connection_specification=connection_specification
         )
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         Calculate where the door's hinge sits: on the edge opposite its handle.
@@ -541,7 +554,7 @@ class DoubleDoor(SemanticAnnotation):
     door_1: Door = field(kw_only=True)
 
     def calculate_left_right_door_from_view_point(
-        self, world_T_view_point: HomogeneousTransformationMatrix
+        self, *, world_T_view_point: HomogeneousTransformationMatrix
     ) -> tuple[Door, Door]:
         """
         Calculate which door is the left and which is the right door based on a given
@@ -568,7 +581,7 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
         return Vector3.Z()
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         A drawer slides, which moves it the same wherever its rails sit, so they sit at
@@ -592,7 +605,7 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
         return Vector3.NEGATIVE_X()
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         An elevator's drive slides it, which moves it the same wherever the drive sits,
@@ -621,7 +634,7 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
                 raise MissingMovableJointError(semantic_annotation=door)
             door.movable_joint.position = door.movable_joint.dof.limits.lower.position
 
-    def drive_position_for_floor(self, floor: Level) -> float:
+    def drive_position_for_floor(self, *, floor: Level) -> float:
         """
         The drive position at which the elevator serves the given floor.
 
@@ -633,13 +646,13 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
         """
         return float(floor.floor_plane[0].z)
 
-    def drive_to_floor(self, floor: Level):
+    def drive_to_floor(self, *, floor: Level):
         """
         Drives the elevator to the floor given
         """
         if self.movable_joint is None:
             raise MissingMovableJointError(semantic_annotation=self)
-        self.movable_joint.position = self.drive_position_for_floor(floor)
+        self.movable_joint.position = self.drive_position_for_floor(floor=floor)
 
 
 ############################### subclasses to Furniture
@@ -740,7 +753,9 @@ class Floor(HasSupportingSurface):
         if not isinstance(robot, HasMobileBase):
             raise MissingMobileBaseError(robot_part=robot)
         return self.planar_free_space(
-            max_height=robot.as_bounding_box_collection_in_frame(robot.root)
+            max_height=robot.as_bounding_box_collection_in_frame(
+                reference_frame=robot.root
+            )
             .bounding_box()
             .scale.z,
             bloat_obstacles=robot.mobile_base.base_radius + margin,
@@ -749,6 +764,7 @@ class Floor(HasSupportingSurface):
     @classmethod
     def create_with_new_body_from_polytope_in_world(
         cls,
+        *,
         name: str,
         world: World,
         floor_polytope: list[Point3],
@@ -762,13 +778,16 @@ class Floor(HasSupportingSurface):
         :param floor_polytope: A list of 3D points defining the floor poly
         """
         return cls.get_annotation_specification(
-            name,
-            BodySpecification.from_3d_points(name, floor_polytope),
-        ).spawn(world, parent_T_self=world_root_T_self)
+            name=name,
+            root_specification=BodySpecification.from_3d_points(
+                name=name, points_3d=floor_polytope
+            ),
+        ).spawn(world=world, parent_T_self=world_root_T_self)
 
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -786,8 +805,8 @@ class Floor(HasSupportingSurface):
         """
         scale = scale or Scale()
         return BodySpecification.from_3d_points(
-            name,
-            scale.to_bounding_box().get_points(),
+            name=name,
+            points_3d=scale.to_bounding_box().get_points(),
             connection_specification=connection_specification,
         )
 
@@ -834,10 +853,10 @@ class Level(HasRootRegion):
         :return: The floor plane of the level
         """
         min_point_global = self._world.transform(
-            self.root.area.min_point, self._world.root
+            spatial_object=self.root.area.min_point, target_frame=self._world.root
         )
         max_point_global = self._world.transform(
-            self.root.area.max_point, self._world.root
+            spatial_object=self.root.area.max_point, target_frame=self._world.root
         )
         min_z = min_point_global.z
         return min_point_global, Point3(
@@ -874,7 +893,9 @@ class Wall(HasApertures):
     def doors(self) -> Iterable[Door]:
         return [
             door
-            for door in self._world.get_semantic_annotations_by_type(Door)
+            for door in self._world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Door
+            )
             if door.entry_way
             and InsideOf(
                 body=door.entry_way.root, other=self.root, minimum_containment_ratio=0.1
@@ -882,7 +903,7 @@ class Wall(HasApertures):
         ]
 
     @classmethod
-    def _create_wall_event(cls, scale: Scale) -> SimpleEvent:
+    def _create_wall_event(cls, *, scale: Scale) -> SimpleEvent:
         """
         Return the collision shapes for the wall.
 
@@ -905,6 +926,7 @@ class Wall(HasApertures):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -924,13 +946,14 @@ class Wall(HasApertures):
         if not (scale.x < scale.y and scale.x < scale.z):
             raise InvalidPlaneDimensions(scale=scale, clazz=Wall)
         return BodySpecification.from_event(
-            name,
-            cls._create_wall_event(scale).as_composite_set(),
+            name=name,
+            event=cls._create_wall_event(scale=scale).as_composite_set(),
             connection_specification=connection_specification,
         )
 
     def bloated_bounding_box_collection(
         self,
+        *,
         origin: HomogeneousTransformationMatrix,
         bloat_amount: float,
         obstacle_height_clearance: float = 0.01,
@@ -948,11 +971,21 @@ class Wall(HasApertures):
         return BoundingBoxCollection(
             shapes=[
                 (
-                    bounding_box.bloat(bloat_amount, 0, obstacle_height_clearance)
+                    bounding_box.bloat(
+                        x_amount=bloat_amount,
+                        y_amount=0,
+                        z_amount=obstacle_height_clearance,
+                    )
                     if bounding_box.width > bounding_box.depth
-                    else bounding_box.bloat(0, bloat_amount, obstacle_height_clearance)
+                    else bounding_box.bloat(
+                        x_amount=0,
+                        y_amount=bloat_amount,
+                        z_amount=obstacle_height_clearance,
+                    )
                 )
-                for bounding_box in self.as_bounding_box_collection_at_origin(origin)
+                for bounding_box in self.as_bounding_box_collection_at_origin(
+                    origin=origin
+                )
             ],
             reference_frame=origin.reference_frame,
         )
@@ -1607,7 +1640,7 @@ class Cutlery(HasHandle, Tableware):
         if not self.root.has_collision():
             raise NoGraspGeometry(graspable=self)
         bounding_box = self.root.collision.as_bounding_box_collection_in_frame(
-            self.root
+            reference_frame=self.root
         ).bounding_box()
         along_x = bounding_box.x_interval.upper - bounding_box.x_interval.lower
         along_y = bounding_box.y_interval.upper - bounding_box.y_interval.lower
@@ -1687,7 +1720,9 @@ class ShapeSortingPiece(IsGraspable):
         if not self.root.has_collision():
             raise NoGraspGeometry(graspable=self)
         bottom_face = (
-            self.root.collision.as_bounding_box_collection_in_frame(self.root)
+            self.root.collision.as_bounding_box_collection_in_frame(
+                reference_frame=self.root
+            )
             .bounding_box()
             .min_z
         )
@@ -1724,7 +1759,7 @@ class BottleCap(HasMovableJoint):
     """
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         A cap screws about its own centre line, so its thread sits at its origin.
@@ -1831,17 +1866,19 @@ class SemanticEnvironmentAnnotation(HasRootBody):
         )
 
         collections = (
-            entity.collision.as_bounding_box_collection_at_origin(origin)
+            entity.collision.as_bounding_box_collection_at_origin(origin=origin)
             for entity in entities_to_consider
         )
         obstacle_bounding_boxes = BoundingBoxCollection.merge_all(
-            collections, world_root
+            collections=collections, reference_frame=world_root
         )
 
         bloated_obstacles = BoundingBoxCollection(
             shapes=[
                 bounding_box.bloat(
-                    bloat_obstacles, bloat_obstacles, obstacle_height_clearance
+                    x_amount=bloat_obstacles,
+                    y_amount=bloat_obstacles,
+                    z_amount=obstacle_height_clearance,
                 )
                 for bounding_box in obstacle_bounding_boxes
             ],
@@ -1850,8 +1887,10 @@ class SemanticEnvironmentAnnotation(HasRootBody):
 
         if semantic_wall_annotation is not None:
             bloated_obstacles = bloated_obstacles.merge(
-                semantic_wall_annotation.bloated_bounding_box_collection(
-                    origin, bloat_walls, obstacle_height_clearance
+                other=semantic_wall_annotation.bloated_bounding_box_collection(
+                    origin=origin,
+                    bloat_amount=bloat_walls,
+                    obstacle_height_clearance=obstacle_height_clearance,
                 )
             )
 
@@ -1943,7 +1982,7 @@ class Tool(IsGraspable, ABC):
         return end_effector
 
     @abstractmethod
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         """
         :param target: The body or pose the tool acts on.
         :return: The normal pairs that must stay aligned while the tool acts on the
@@ -1972,9 +2011,9 @@ class ToolWithHandle(Tool, HasHandle, ABC):
         world = self.root._world
         tip_body = Body(name=self._end_effector_name())
         with world.modify_world():
-            world.add_kinematic_structure_entity(tip_body)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=tip_body)
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=self.root,
                     child=tip_body,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -1993,7 +2032,7 @@ class Whisk(ToolWithHandle):
     A whisk for mixing the contents of containers.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(-1, 0, 0, reference_frame=self.root),
@@ -2008,7 +2047,7 @@ class CuttingKnife(ToolWithHandle):
     A knife for cutting food objects.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(1, 0, 0, reference_frame=self.root),
@@ -2027,7 +2066,7 @@ class PouringCup(Tool, Container):
     A cup for pouring liquids into containers.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
@@ -2045,7 +2084,7 @@ class Sponge(Tool):
         which is why its alignments use negative Z normals unlike the other tools.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         if isinstance(target, Body):
             return [
                 AlignmentPair(
@@ -2056,11 +2095,11 @@ class Sponge(Tool):
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, -1, reference_frame=self.root),
-                reference_normal=self._pose_surface_normal(target),
+                reference_normal=self._pose_surface_normal(pose=target),
             )
         ]
 
-    def _pose_surface_normal(self, pose: Pose) -> Vector3:
+    def _pose_surface_normal(self, *, pose: Pose) -> Vector3:
         """
         :param pose: The pose whose surface normal is computed.
         :return: The pose's local Z axis expressed in the pose's reference frame.

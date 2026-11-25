@@ -90,12 +90,15 @@ def world_setup() -> tuple[
     r2 = Body(name=PrefixedName(name="r2"))
 
     with world.modify_world():
-        [world.add_kinematic_structure_entity(b) for b in [root, l1, l2, bf, r1, r2]]
+        [
+            world.add_kinematic_structure_entity(kinematic_structure_entity=b)
+            for b in [root, l1, l2, bf, r1, r2]
+        ]
         dof = DegreeOfFreedom(
             name=PrefixedName(name="dof"),
             limits=DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1),
         )
-        world.add_degree_of_freedom(dof)
+        world.add_degree_of_freedom(dof=dof)
 
         c_l1_l2 = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -115,12 +118,12 @@ def world_setup() -> tuple[
         )
         bf_root_l1 = FixedConnection(parent=bf, child=l1)
         bf_root_r1 = FixedConnection(parent=bf, child=r1)
-        world.add_connection(c_l1_l2)
-        world.add_connection(c_r1_r2)
-        world.add_connection(bf_root_l1)
-        world.add_connection(bf_root_r1)
+        world.add_connection(connection=c_l1_l2)
+        world.add_connection(connection=c_r1_r2)
+        world.add_connection(connection=bf_root_l1)
+        world.add_connection(connection=bf_root_r1)
         c_root_bf = Connection6DoF.create_with_dofs(parent=root, child=bf, world=world)
-        world.add_connection(c_root_bf)
+        world.add_connection(connection=c_root_bf)
 
     return world, l1, l2, bf, r1, r2
 
@@ -196,11 +199,11 @@ def world_setup_simple():
     )
 
     with world.modify_world():
-        world.add_kinematic_structure_entity(body1)
-        world.add_kinematic_structure_entity(body2)
-        world.add_kinematic_structure_entity(body3)
-        world.add_kinematic_structure_entity(body4)
-        world.add_kinematic_structure_entity(body5)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body1)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body2)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body3)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body4)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body5)
 
         c_root_body1 = Connection6DoF.create_with_dofs(
             parent=root, child=body1, world=world
@@ -218,11 +221,11 @@ def world_setup_simple():
             parent=root, child=body5, world=world
         )
 
-        world.add_connection(c_root_body1)
-        world.add_connection(c_root_body2)
-        world.add_connection(c_root_body3)
-        world.add_connection(c_root_body4)
-        world.add_connection(c_root_body5)
+        world.add_connection(connection=c_root_body1)
+        world.add_connection(connection=c_root_body2)
+        world.add_connection(connection=c_root_body3)
+        world.add_connection(connection=c_root_body4)
+        world.add_connection(connection=c_root_body5)
     return world, body1, body2, body3, body4, body5
 
 
@@ -275,10 +278,10 @@ def ray_test_world():
     )
 
     with world.modify_world():
-        world.add_kinematic_structure_entity(body1)
-        world.add_kinematic_structure_entity(body2)
-        world.add_kinematic_structure_entity(body3)
-        world.add_kinematic_structure_entity(body4)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body1)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body2)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body3)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body4)
 
         c_root_body1 = Connection6DoF.create_with_dofs(
             parent=root, child=body1, world=world
@@ -293,10 +296,10 @@ def ray_test_world():
             parent=root, child=body4, world=world
         )
 
-        world.add_connection(c_root_body1)
-        world.add_connection(c_root_body2)
-        world.add_connection(c_root_body3)
-        world.add_connection(c_root_body4)
+        world.add_connection(connection=c_root_body1)
+        world.add_connection(connection=c_root_body2)
+        world.add_connection(connection=c_root_body3)
+        world.add_connection(connection=c_root_body4)
     return world, body1, body2, body3, body4
 
 
@@ -309,7 +312,9 @@ def two_arm_robot_world():
     world = World()
     with world.modify_world():
         localization_body = Body(name=PrefixedName(name="odom_combined"))
-        world.add_kinematic_structure_entity(localization_body)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=localization_body
+        )
 
         robot_parser = URDFParser.from_file(file_path=robot)
         world_with_robot = robot_parser.create_world()
@@ -318,7 +323,7 @@ def two_arm_robot_world():
         c_root_bf = OmniDrive.create_with_dofs(
             parent=localization_body, child=root, world=world
         )
-        world.merge_world(world_with_robot, root_connection=c_root_bf)
+        world.merge_world(other=world_with_robot, root_connection=c_root_bf)
     return world
 
 
@@ -333,10 +338,12 @@ def pr2_world():
     with world_with_pr2.modify_world():
         pr2_root = world_with_pr2.root
         localization_body = Body(name=PrefixedName(name="odom_combined"))
-        world_with_pr2.add_kinematic_structure_entity(localization_body)
+        world_with_pr2.add_kinematic_structure_entity(
+            kinematic_structure_entity=localization_body
+        )
         c_root_bf = OmniDrive.create_with_dofs(
             parent=localization_body, child=pr2_root, world=world_with_pr2
         )
-        world_with_pr2.add_connection(c_root_bf)
+        world_with_pr2.add_connection(connection=c_root_bf)
 
     return world_with_pr2

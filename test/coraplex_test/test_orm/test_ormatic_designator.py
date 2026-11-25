@@ -112,7 +112,7 @@ def complex_plan(pr2_apartment_context):
     the transport described by queries grounds its steps to.
     """
     world, robot_view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     plan = TransportAction(
         pick_up=MoveAndPickUpAction.from_standing_position(
@@ -162,7 +162,9 @@ def test_a_plan_whose_transport_still_holds_queries_cannot_be_stored(
     """
     world, robot_view, extensions = pr2_apartment_context
     transport = TransportAction.from_graspable_by_closest_grasps(
-        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+        graspable=world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+            0
+        ],
         goal_pose=Pose.from_xyz_quaternion(
             2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
         ),

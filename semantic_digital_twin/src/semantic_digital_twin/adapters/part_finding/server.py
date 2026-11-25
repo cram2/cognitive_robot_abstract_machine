@@ -65,7 +65,7 @@ class PartFindingCache:
     Where the answers are kept.
     """
 
-    def key(self, query: PartQuery, locator: str) -> str:
+    def key(self, *, query: PartQuery, locator: str) -> str:
         """
         :param query: A query.
         :param locator: The settings of the locator that answers it.
@@ -74,7 +74,7 @@ class PartFindingCache:
         content = json.dumps(to_json(query), sort_keys=True) + locator
         return hashlib.sha256(content.encode()).hexdigest()
 
-    def read(self, key: str) -> list[LocatedPart] | None:
+    def read(self, *, key: str) -> list[LocatedPart] | None:
         """
         :param key: The query's key.
         :return: The parts found for it before; ``None`` if it was not answered yet.
@@ -84,7 +84,7 @@ class PartFindingCache:
             return None
         return [from_json(part) for part in json.loads(path.read_text())]
 
-    def write(self, key: str, parts: list[LocatedPart]) -> None:
+    def write(self, *, key: str, parts: list[LocatedPart]) -> None:
         """
         Keep the parts found for a query.
 
@@ -213,15 +213,15 @@ class PartFindingServer:
         self.http_server.shutdown()
         self.http_server.server_close()
 
-    def answer(self, query: PartQuery) -> PartFindingAnswer:
+    def answer(self, *, query: PartQuery) -> PartFindingAnswer:
         """
         :param query: A query.
         :return: The parts found for it, from the cache if it was asked before.
         """
         start = time.perf_counter()
         settings = self.locator_settings
-        key = self.cache.key(query, settings)
-        cached = self.cache.read(key)
+        key = self.cache.key(query=query, locator=settings)
+        cached = self.cache.read(key=key)
         if cached is not None:
             return PartFindingAnswer(
                 parts=cached,
@@ -234,11 +234,11 @@ class PartFindingServer:
         try:
             with self._locator_lock:
                 # A query for the same shape may have been answered while this one waited.
-                parts = self.cache.read(key)
+                parts = self.cache.read(key=key)
                 from_cache = parts is not None
                 if not from_cache:
-                    parts = self.locator.locate(query)
-                    self.cache.write(key, parts)
+                    parts = self.locator.locate(query=query)
+                    self.cache.write(key=key, parts=parts)
         finally:
             with self._counter_lock:
                 self.waiting_queries -= 1
@@ -265,7 +265,7 @@ class PartFindingServer:
             locator=self.locator_settings, waiting_queries=self.waiting_queries
         )
 
-    def is_answerable(self, query: Any) -> bool:
+    def is_answerable(self, *, query: Any) -> bool:
         """
         :param query: What a client sent.
         :return: Whether it is a query about parts of a part-whole relationship type
@@ -327,9 +327,9 @@ class PartFindingRequestHandler(BaseHTTPRequestHandler):
         Answer a status request.
         """
         if self.path != PartFindingRoute.STATUS:
-            self._send_empty(HTTPStatus.NOT_FOUND)
+            self._send_empty(status=HTTPStatus.NOT_FOUND)
             return
-        self._send_json(to_json(self.part_finding_server.status()))
+        self._send_json(content=to_json(self.part_finding_server.status()))
 
     def do_POST(self) -> None:
         """
@@ -337,28 +337,28 @@ class PartFindingRequestHandler(BaseHTTPRequestHandler):
         """
         server = self.part_finding_server
         if self.path != PartFindingRoute.PARTS:
-            self._send_empty(HTTPStatus.NOT_FOUND)
+            self._send_empty(status=HTTPStatus.NOT_FOUND)
             return
         length = int(self.headers.get(HeaderName.CONTENT_LENGTH, 0))
         if length > server.maximum_request_bytes:
-            self._send_empty(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+            self._send_empty(status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
             return
         body = self.rfile.read(length)
         if self.headers.get(HeaderName.CONTENT_ENCODING) == ContentEncoding.GZIP:
             body = gzip.decompress(body)
         query = from_json(json.loads(body))
-        if not server.is_answerable(query):
-            self._send_empty(HTTPStatus.BAD_REQUEST)
+        if not server.is_answerable(query=query):
+            self._send_empty(status=HTTPStatus.BAD_REQUEST)
             return
         if len(query.faces) > server.maximum_faces:
-            self._send_empty(HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+            self._send_empty(status=HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
             return
-        self._send_json(to_json(server.answer(query)))
+        self._send_json(content=to_json(server.answer(query=query)))
 
     def log_message(self, message_format: str, *arguments: Any) -> None:
         logger.debug(message_format, *arguments)
 
-    def _send_json(self, content: Any) -> None:
+    def _send_json(self, *, content: Any) -> None:
         """
         :param content: The json to answer with, with status 200.
         """
@@ -369,7 +369,7 @@ class PartFindingRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_empty(self, status: HTTPStatus) -> None:
+    def _send_empty(self, *, status: HTTPStatus) -> None:
         """
         :param status: The status to answer with, without a body.
         """

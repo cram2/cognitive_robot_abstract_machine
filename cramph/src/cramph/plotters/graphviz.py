@@ -124,7 +124,7 @@ class StatechartGraphviz:
     """
 
     disabled_condition_color: Color = field(
-        default_factory=lambda: Color.from_hex("#9CA3AF")
+        default_factory=lambda: Color.from_hex(hex_color="#9CA3AF")
     )
     """
     The color a condition that cannot become true any more is written in.

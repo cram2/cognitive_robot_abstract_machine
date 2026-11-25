@@ -43,8 +43,10 @@ pytestmark = pytest.mark.skipif(
 def mounted_tracy() -> Tracy:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
-    return RobotSpecification(semantic_annotation_type=Tracy).spawn(world)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
+    return RobotSpecification(semantic_annotation_type=Tracy).spawn(world=world)
 
 
 def test_a_stationary_robot_stands_at_its_localization_pose():
@@ -55,17 +57,21 @@ def test_a_stationary_robot_stands_at_its_localization_pose():
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="floor")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
     localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
 
     tracy = RobotSpecification(
         semantic_annotation_type=Tracy, localization_pose=localization_pose
-    ).spawn(world)
+    ).spawn(world=world)
 
     localization = tracy.root.parent_connection.parent.parent_connection
     assert isinstance(localization, FixedConnection)
     assert localization.parent is world.root
-    root_position = world.compute_forward_kinematics_np(world.root, tracy.root)[:3, 3]
+    root_position = world.compute_forward_kinematics_np(
+        root=world.root, tip=tracy.root
+    )[:3, 3]
     assert root_position[:2] == pytest.approx([1.0, 2.0])
 
 
@@ -81,7 +87,7 @@ def test_the_mounting_table_is_a_table_at_the_robots_root(mounted_tracy):
     assert table in mounted_tracy._robot_parts
     widest_slab = max(
         table.root.collision.as_bounding_box_collection_in_frame(
-            mounted_tracy._world.root
+            reference_frame=mounted_tracy._world.root
         ),
         key=lambda box: (box.max_x - box.min_x) * (box.max_y - box.min_y),
     )
@@ -97,7 +103,7 @@ def test_every_arm_and_gripper_degree_of_freedom_is_driven_by_one_servo(
     those degrees of freedom with exactly one servo actuator.
     """
     world = mounted_tracy._world
-    shoulder = world.get_connection_by_name(TracyJoint.LEFT_SHOULDER_PAN)
+    shoulder = world.get_connection_by_name(name=TracyJoint.LEFT_SHOULDER_PAN)
     shoulder_drive = mounted_tracy.left_arm.drive_of_each_joint[
         TracyJoint.LEFT_SHOULDER_PAN
     ]
@@ -134,11 +140,13 @@ def test_the_grippers_keep_the_descriptions_own_velocity_limit(mounted_tracy):
     Slowing the arms down for safety must not slow the fingers down with them.
     """
     world = mounted_tracy._world
-    knuckle = world.get_connection_by_name(TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE)
-    wrist = world.get_connection_by_name(TracyJoint.LEFT_WRIST_3)
-    description = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
+    knuckle = world.get_connection_by_name(name=TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE)
+    wrist = world.get_connection_by_name(name=TracyJoint.LEFT_WRIST_3)
+    description = URDFParser.from_file(
+        file_path=Tracy.get_ros_file_path()
+    ).create_world()
     described_knuckle_velocity = description.get_connection_by_name(
-        TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE
+        name=TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE
     ).raw_dof.limits.upper.velocity
 
     assert knuckle.raw_dof.limits.upper.velocity == described_knuckle_velocity
@@ -158,9 +166,9 @@ def test_the_servoed_parts_carry_their_weight_and_the_links_pass_through_each_ot
     """
     for arm in mounted_tracy.all_arms:
         for body in arm.bodies + arm.end_effector.bodies:
-            assert body.get_simulator_property_of_type(GravityCompensation) == (
-                GravityCompensation(fraction=1.0)
-            )
+            assert body.get_simulator_property_of_type(
+                property_type=GravityCompensation
+            ) == (GravityCompensation(fraction=1.0))
     builder = MujocoBuilder()
     builder.build_world(
         world=mounted_tracy._world, file_path=str(tmp_path / "scene.xml")
@@ -171,7 +179,7 @@ def test_the_servoed_parts_carry_their_weight_and_the_links_pass_through_each_ot
     }
     fingertip = mounted_tracy.left_arm.end_effector.thumb.tip.name.name
     wrist = mounted_tracy._world.get_connection_by_name(
-        TracyJoint.LEFT_WRIST_3
+        name=TracyJoint.LEFT_WRIST_3
     ).child.name.name
     table = mounted_tracy.root.name.name
     assert frozenset((fingertip, wrist)) in excluded_pairs
@@ -188,15 +196,17 @@ def test_the_servos_hold_the_parked_arms_up(mounted_tracy):
     """
     world = mounted_tracy._world
     for arm in mounted_tracy.all_arms:
-        arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+        arm.get_joint_state_by_type(state_type=StaticJointState.PARK).apply_to(
+            world=world
+        )
     world.notify_state_change()
     tool_frame = mounted_tracy.left_arm.end_effector.tool_frame
-    parked = world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
+    parked = world.compute_forward_kinematics_np(root=world.root, tip=tool_frame)[:3, 3]
 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         simulated = simulation.simulator.get_body_position(
             body_name=tool_frame.name.name
         ).result
@@ -255,7 +265,7 @@ class ArmSwungIntoAWall:
     """
 
     @classmethod
-    def next_to(cls, tracy: Tracy) -> ArmSwungIntoAWall:
+    def next_to(cls, *, tracy: Tracy) -> ArmSwungIntoAWall:
         """
         :param tracy: A robot mounted into a world, whose arms are parked by this.
         :return: The robot with a wall standing on its table, 5 cm from the side of its
@@ -263,7 +273,9 @@ class ArmSwungIntoAWall:
         """
         world = tracy._world
         for arm in tracy.all_arms:
-            arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+            arm.get_joint_state_by_type(state_type=StaticJointState.PARK).apply_to(
+                world=world
+            )
         wall_scale = Scale(x=0.4, y=0.04, z=0.8)
         wall = Body(
             name=PrefixedName(name="wall"),
@@ -272,7 +284,7 @@ class ArmSwungIntoAWall:
         )
         with world.modify_world():
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=world.root,
                     child=wall,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -291,9 +303,11 @@ class ArmSwungIntoAWall:
         """
         The joint that swings the left gripper into the wall as its position grows.
         """
-        return self.tracy._world.get_connection_by_name(TracyJoint.LEFT_SHOULDER_LIFT)
+        return self.tracy._world.get_connection_by_name(
+            name=TracyJoint.LEFT_SHOULDER_LIFT
+        )
 
-    def command_one_control_period(self, simulation: MujocoSim) -> None:
+    def command_one_control_period(self, *, simulation: MujocoSim) -> None:
         """
         Move the shoulder lift on by one control period at :attr:`swing_speed` from
         where the world shows it, the way a controller commands it, and let the physics
@@ -307,12 +321,12 @@ class ArmSwungIntoAWall:
             self.swing_speed * self.control_period.total_seconds()
         )
         world.notify_state_change()
-        simulation.step_simulation(self.control_period)
+        simulation.step_simulation(duration=self.control_period)
 
 
 @pytest.fixture
 def arm_swung_into_a_wall(mounted_tracy) -> ArmSwungIntoAWall:
-    return ArmSwungIntoAWall.next_to(mounted_tracy)
+    return ArmSwungIntoAWall.next_to(tracy=mounted_tracy)
 
 
 @pytest.mark.skipif(
@@ -334,15 +348,17 @@ def test_an_arm_swung_into_a_wall_is_shown_where_the_wall_stops_it(
     simulation.start_stepped_simulation()
     try:
         for _ in range(50):
-            scene.command_one_control_period(simulation)
+            scene.command_one_control_period(simulation=simulation)
         simulated = simulation.simulator.get_body_position(
             body_name=tool_frame.name.name
         ).result
     finally:
         simulation.stop_simulation()
 
-    shown = world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
-    [wall_box] = scene.wall.collision.as_bounding_box_collection_in_frame(world.root)
+    shown = world.compute_forward_kinematics_np(root=world.root, tip=tool_frame)[:3, 3]
+    [wall_box] = scene.wall.collision.as_bounding_box_collection_in_frame(
+        reference_frame=world.root
+    )
     assert shown[1] > wall_box.max_y
     # MuJoCo reports body poses from before its last step, the world its joints after
     assert list(shown) == pytest.approx(list(simulated), abs=1e-3)

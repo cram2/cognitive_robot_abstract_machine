@@ -73,7 +73,7 @@ class MoveToolCenterPointAction(GoalAction):
 
 
 world = setup_world()
-pr2 = PR2.from_world(world)
+pr2 = PR2.from_world(world=world)
 executor = KinematicallySimulatedPlanExecutor(
     context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )

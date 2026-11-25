@@ -32,14 +32,16 @@ def test_a_carry_runs_against_a_controller_in_another_process(
     session = stretch_controller_process.session
     world = session.fetch_world()
     WorldSynchronizer(_world=world, node=session.node)
-    stretch = world.get_semantic_annotations_by_type(Stretch)[0]
+    stretch = world.get_semantic_annotations_by_type(semantic_annotation_type=Stretch)[
+        0
+    ]
     arm = stretch.all_arms[0]
     tool_frame = arm.end_effector.tool_frame
     held_body = Body(name=PrefixedName(name="held_body"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(held_body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=held_body)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=tool_frame,
                 child=held_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(

@@ -79,14 +79,16 @@ def robot_in_collision(
     with world.modify_world():
         world.collision_manager.clear_temporary_rules()
         world.collision_manager.add_temporary_rule(
-            AvoidExternalCollisions(
+            rule=AvoidExternalCollisions(
                 buffer_zone_distance=threshold,
                 robot=robot,
             )
         )
-        world.collision_manager.add_temporary_rule(AllowSelfCollisions(robot=robot))
         world.collision_manager.add_temporary_rule(
-            AllowCollisionBetweenGroups(
+            rule=AllowSelfCollisions(robot=robot)
+        )
+        world.collision_manager.add_temporary_rule(
+            rule=AllowCollisionBetweenGroups(
                 body_group_a=robot.bodies, body_group_b=ignore_collision_with
             )
         )
@@ -141,7 +143,9 @@ def bodies_in_gripper(gripper: HasTwoFingers, sample_size: int = 100) -> list[Bo
     finger_points = trimesh.sample.sample_surface(finger_mesh, sample_size)[0]
     thumb_points = trimesh.sample.sample_surface(thumb_mesh, sample_size)[0]
 
-    ray_intersections = gripper._world.ray_tracer.ray_test(finger_points, thumb_points)
+    ray_intersections = gripper._world.ray_tracer.ray_test(
+        origin_points=finger_points, target_points=thumb_points
+    )
     return list(
         set(ray_intersections.bodies)
         - set(gripper.finger.bodies)
@@ -205,7 +209,9 @@ def is_pose_free_for_robot(robot: AbstractRobot, pose: Pose) -> bool:
         allowed_bodies=robot.bodies_with_collision
         + [
             kse
-            for annotation in robot._world.get_semantic_annotations_by_type(Floor)
+            for annotation in robot._world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Floor
+            )
             for kse in annotation.kinematic_structure_entities
         ],
     )()
@@ -224,7 +230,7 @@ def get_visible_bodies(camera: Camera) -> list[KinematicStructureEntity]:
     rt.update_scene()
 
     seg = rt.create_segmentation_mask(
-        camera.world_T_forward_view,
+        camera_pose=camera.world_T_forward_view,
         resolution=camera.resolution,
         min_distance=0.2,
         field_of_view=camera.field_of_view,
@@ -309,15 +315,15 @@ def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
     )
     with world_without_occlusion.modify_world():
         world_without_occlusion.clear()
-        world_without_occlusion.add_body(root)
-        world_without_occlusion.add_connection(root_to_copied_body)
+        world_without_occlusion.add_body(body=root)
+        world_without_occlusion.add_connection(connection=root_to_copied_body)
 
     # get segmentation mask without occlusion
     ray_tracer_without_occlusion = RayTracer(world=world_without_occlusion)
     ray_tracer_without_occlusion.update_scene()
     segmentation_mask_without_occlusion = (
         ray_tracer_without_occlusion.create_segmentation_mask(
-            camera_pose,
+            camera_pose=camera_pose,
             resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,
@@ -329,7 +335,7 @@ def occluding_bodies(camera: Camera, body: Body) -> list[Body]:
     ray_tracer_with_occlusion.update_scene()
     segmentation_mask_with_occlusion = (
         ray_tracer_with_occlusion.create_segmentation_mask(
-            camera_pose,
+            camera_pose=camera_pose,
             resolution=camera.resolution,
             min_distance=0.1,
             field_of_view=camera.field_of_view,

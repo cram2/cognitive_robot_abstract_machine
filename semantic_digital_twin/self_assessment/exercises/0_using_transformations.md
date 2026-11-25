@@ -48,9 +48,9 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
 urdf_path = "package://iai_objects/urdf/table.urdf"
-table_world = URDFParser.from_file(urdf_path).create_world()
+table_world = URDFParser.from_file(file_path=urdf_path).create_world()
 
-root_C_left_leg = table_world.get_body_by_name("left_front_leg").parent_connection
+root_C_left_leg = table_world.get_body_by_name(name="left_front_leg").parent_connection
 moved_root_T_left_leg = HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5, y=-0.5)
 moved_root_C_left_leg = FixedConnection(name=root_C_left_leg.name,
                                         parent=root_C_left_leg.parent,
@@ -58,8 +58,8 @@ moved_root_C_left_leg = FixedConnection(name=root_C_left_leg.name,
                                         parent_T_connection_expression=moved_root_T_left_leg)
 
 with table_world.modify_world():
-    table_world.remove_connection(root_C_left_leg)
-    table_world.add_connection(moved_root_C_left_leg)
+    table_world.remove_connection(connection=root_C_left_leg)
+    table_world.add_connection(connection=moved_root_C_left_leg)
 
 cube = Box(scale=Scale(x=0.2, y=0.2, z=0.2), color=Color.from_rgba(red=1, green=0, blue=0, opacity=1))
 box_body = Body(
@@ -69,7 +69,7 @@ box_body = Body(
 )
 with table_world.modify_world():
     table_world_C_box = Connection6DoF.create_with_dofs(parent=table_world.root, child=box_body, world=table_world)
-    table_world.add_connection(table_world_C_box)
+    table_world.add_connection(connection=table_world_C_box)
 
 rt = RayTracer(world=table_world); rt.update_scene(); rt.scene.show("jupyter")
 ```

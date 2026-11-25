@@ -92,7 +92,7 @@ class KitchenWithFilledDrawer:
         """
         :return: The surface of the kitchen island the objects are set down on.
         """
-        return self.world.get_body_by_name("kitchen_island_surface")
+        return self.world.get_body_by_name(name="kitchen_island_surface")
 
     @property
     def world_T_bowl_goal(self) -> Pose:
@@ -100,8 +100,10 @@ class KitchenWithFilledDrawer:
         :return: Where the bowl is set down on the kitchen island.
         """
         return self.world.transform(
-            Pose.from_xyz_rpy(x=0.2, z=0.05, reference_frame=self.kitchen_island),
-            self.world.root,
+            spatial_object=Pose.from_xyz_rpy(
+                x=0.2, z=0.05, reference_frame=self.kitchen_island
+            ),
+            target_frame=self.world.root,
         )
 
     @property
@@ -110,10 +112,10 @@ class KitchenWithFilledDrawer:
         :return: Where the cup is set down on the kitchen island.
         """
         return self.world.transform(
-            Pose.from_xyz_rpy(
+            spatial_object=Pose.from_xyz_rpy(
                 x=0.15, y=0.25, z=0.07, reference_frame=self.kitchen_island
             ),
-            self.world.root,
+            target_frame=self.world.root,
         )
 
 
@@ -136,9 +138,9 @@ def add_cylinder(
     shapes = ShapeCollection(shapes=[Cylinder(width=2 * radius, height=height)])
     cylinder = Body(name=PrefixedName(name=name), collision=shapes, visual=shapes)
     with world.modify_world():
-        world.add_kinematic_structure_entity(cylinder)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=cylinder)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=parent_T_cylinder.reference_frame,
                 child=cylinder,
                 parent_T_connection_expression=parent_T_cylinder,
@@ -152,11 +154,11 @@ def kitchen_with_filled_drawer(
     pr2_world_copy: World, kitchen_world: World
 ) -> KitchenWithFilledDrawer:
     world = pr2_world_copy
-    world.merge_world(deepcopy(kitchen_world))
-    robot = world.get_semantic_annotations_by_type(PR2)[0]
+    world.merge_world(other=deepcopy(kitchen_world))
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)[0]
     # Collision avoidance moves the base, so the goals have to hold still in the world.
     robot.mobile_base.full_body_controlled = True
-    drawer = world.get_body_by_name("sink_area_left_middle_drawer_main")
+    drawer = world.get_body_by_name(name="sink_area_left_middle_drawer_main")
     cup = Cup(
         root=add_cylinder(
             world,
@@ -180,10 +182,10 @@ def kitchen_with_filled_drawer(
         )
     )
     drawer_handle = Handle(
-        root=world.get_body_by_name("sink_area_left_middle_drawer_handle")
+        root=world.get_body_by_name(name="sink_area_left_middle_drawer_handle")
     )
     with world.modify_world():
-        world.add_semantic_annotations([cup, bowl, drawer_handle])
+        world.add_semantic_annotations(semantic_annotations=[cup, bowl, drawer_handle])
     return KitchenWithFilledDrawer(
         world=world,
         robot=robot,
@@ -348,7 +350,7 @@ def test_the_drawer_stays_open_while_its_contents_are_carried_away(
 ) -> None:
     kitchen = kitchen_with_filled_drawer
     drawer_joint = kitchen.world.get_body_by_name(
-        "sink_area_left_middle_drawer_main"
+        name="sink_area_left_middle_drawer_main"
     ).parent_connection
 
     run_plan(

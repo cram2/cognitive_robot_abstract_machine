@@ -415,7 +415,11 @@ class ShapeSortingBoard:
         return Body(
             name=name,
             visual=ShapeCollection(
-                shapes=[Mesh.from_file(str(BoardResource.MESH.value), color=self.color)]
+                shapes=[
+                    Mesh.from_file(
+                        file_path=str(BoardResource.MESH.value), color=self.color
+                    )
+                ]
                 + drawer_fronts
                 + self.handles()
             ),

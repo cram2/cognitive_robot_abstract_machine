@@ -42,7 +42,9 @@ class TestUtilsRegion:
             ),
         )
         world_descriptor.build_regions(root=root, specs=[spec])
-        regions = world_descriptor.world.get_kinematic_structure_entity_by_type(Region)
+        regions = world_descriptor.world.get_kinematic_structure_entity_by_type(
+            entity_type=Region
+        )
         assert len(regions) == 1
         return world_descriptor.world, regions[0]
 

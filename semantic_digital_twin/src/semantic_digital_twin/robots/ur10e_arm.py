@@ -67,7 +67,7 @@ class UR10eArm(
         }
 
     @staticmethod
-    def _menagerie_drive(torque_limit: float, joint_damping: float) -> JointDrive:
+    def _menagerie_drive(*, torque_limit: float, joint_damping: float) -> JointDrive:
         """
         Stiffness, servo damping and armature are the same for every joint of the arm in
         MuJoCo Menagerie; only the torque limit and the joint's own passive damping

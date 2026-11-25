@@ -61,7 +61,9 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
         )
         if shape_collection is None or len(shape_collection) == 0:
             return None
-        bb = shape_collection.as_bounding_box_collection_in_frame(body).bounding_box()
+        bb = shape_collection.as_bounding_box_collection_in_frame(
+            reference_frame=body
+        ).bounding_box()
         return np.array([bb.scale.x, bb.scale.y, bb.scale.z], dtype=float)
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
@@ -91,7 +93,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
 
         if self.descriptor.parameters.visualize_objects:
             predefined_objects = self.world.get_semantic_annotations_by_type(
-                PredefinedObject
+                semantic_annotation_type=PredefinedObject
             )
             for predefined_object in predefined_objects:
                 body = predefined_object.body
@@ -108,7 +110,9 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 visualized_geometries.append({"name": str(body.name), "geometry": obb})
 
         if self.descriptor.parameters.visualize_regions:
-            regions = self.world.get_kinematic_structure_entity_by_type(Region)
+            regions = self.world.get_kinematic_structure_entity_by_type(
+                entity_type=Region
+            )
             for region in regions:
                 obb = region_obb_in_camera_coordinates(
                     self.world, region, world_to_camera_transform

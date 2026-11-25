@@ -63,7 +63,7 @@ class GraphOfConvexSets(Generic[PointT, SearchSpaceT], SubClassSafeGeneric, ABC)
             self.search_space = self._default_search_space()
 
     @abstractmethod
-    def path_from_to(self, start: PointT, goal: PointT) -> list[PointT] | None:
+    def path_from_to(self, *, start: PointT, goal: PointT) -> list[PointT] | None:
         """
         Calculate a connected path from a start pose to a goal pose.
 
@@ -151,7 +151,9 @@ def create_reference_frame_with_only_yaw_from_body(body: Body) -> Body:
         name=PrefixedName(prefix=str(body.name), name="base_with_yaw")
     )
 
-    world_T_body = world.transform(body.global_pose, world.root)
+    world_T_body = world.transform(
+        spatial_object=body.global_pose, target_frame=world.root
+    )
     reference_frame_T_world = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=world_T_body.x,
         y=world_T_body.y,
@@ -163,12 +165,12 @@ def create_reference_frame_with_only_yaw_from_body(body: Body) -> Body:
     )
 
     with world.modify_world():
-        world.add_body(reference_frame)
+        world.add_body(body=reference_frame)
         reference_frame_C_world = FixedConnection(
             parent=world.root,
             child=reference_frame,
             parent_T_connection_expression=reference_frame_T_world,
         )
-        world.add_connection(reference_frame_C_world)
+        world.add_connection(connection=reference_frame_C_world)
 
     return reference_frame

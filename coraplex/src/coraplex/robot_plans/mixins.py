@@ -434,7 +434,7 @@ class HasGraspApproach(
             outside of; ``None`` keeps only :attr:`approach_clearance`.
         :return: The tool frame goals around the grasp.
         """
-        tool_goal = end_effector.tool_frame_goal_for_grasp(reference_T_grasp)
+        tool_goal = end_effector.tool_frame_goal_for_grasp(grasp_pose=reference_T_grasp)
         return GraspPoseSequence(
             pre_grasp=self.pre_grasp_pose(
                 reference_T_grasp=reference_T_grasp,
@@ -462,7 +462,7 @@ class HasGraspApproach(
         """
         grasp_T_pre_grasp = HomogeneousTransformationMatrix.from_xyz_rpy(x=-distance)
         return end_effector.tool_frame_goal_for_grasp(
-            (reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
+            grasp_pose=(reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
         )
 
     def _approach_distance(self, *, grasp_candidate: GraspCandidate | None) -> float:
@@ -498,10 +498,12 @@ class HasGraspApproach(
             box.
         """
         bounding_box = body.collision.as_bounding_box_collection_in_frame(
-            body
+            reference_frame=body
         ).bounding_box()
 
-        body_T_grasp = body._world.transform(reference_T_grasp, body).to_np()
+        body_T_grasp = body._world.transform(
+            spatial_object=reference_T_grasp, target_frame=body
+        ).to_np()
         grasp_position = body_T_grasp[:3, 3]
         # The grasp frame's x-axis is where the gripper comes from, so it retraces -x.
         retrace_direction = -body_T_grasp[:3, 0]
@@ -536,13 +538,16 @@ class HasGraspApproach(
         target = reference_T_grasp.reference_frame
         world = target._world
         world_T_grasp = world.transform(
-            reference_T_grasp.homogeneous_matrix, world.root
+            spatial_object=reference_T_grasp.homogeneous_matrix, target_frame=world.root
         )
         world_T_lift = HomogeneousTransformationMatrix.from_xyz_rpy(
             z=self.retreat_distance, reference_frame=world.root
         )
         return Pose(
-            world.transform((world_T_lift @ world_T_grasp).position, target),
+            world.transform(
+                spatial_object=(world_T_lift @ world_T_grasp).position,
+                target_frame=target,
+            ),
             tool_goal.quaternion,
             reference_frame=target,
         )
@@ -700,7 +705,9 @@ class HasVariablePoses(Action, ABC):
         :param variable_pose: One of :attr:`variable_poses`.
         :param value: The pose `variable_pose` takes, in any frame.
         """
-        reference_T_pose = self.world.transform(value, variable_pose.reference_frame)
+        reference_T_pose = self.world.transform(
+            spatial_object=value, target_frame=variable_pose.reference_frame
+        )
         self.context.float_variable_data.set_value(
             expression=variable_pose,
             value=reference_T_pose.to_np()[:3, :4].T.flatten(),

@@ -209,16 +209,20 @@ def _handle_annotation(world, body_name: str):
     :return: The handle annotation of the named body, registering one when the world
         carries none for it.
     """
-    body = world.get_body_by_name(body_name)
+    body = world.get_body_by_name(name=body_name)
     existing = [
         handle
-        for handle in world.get_semantic_annotations_by_type(Handle)
+        for handle in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Handle
+        )
         if handle.root is body
     ]
     if existing:
         return existing[0]
     with world.modify_world():
-        world.add_semantic_annotation_recursively(handle := Handle(root=body))
+        world.add_semantic_annotation_recursively(
+            semantic_annotation=(handle := Handle(root=body))
+        )
     return handle
 
 
@@ -256,16 +260,18 @@ def setup_multi_robot_apartment(
 ):
     apartment_copy = deepcopy(_apartment_world_setup)
     apartment_copy.merge_world_at_pose(
-        deepcopy(multi_story_building),
-        HomogeneousTransformationMatrix.from_xyz_rpy(0, -5, 0),
+        other=deepcopy(multi_story_building),
+        pose=HomogeneousTransformationMatrix.from_xyz_rpy(0, -5, 0),
     )
 
     if request.param == "hsrb":
         hsr_copy = deepcopy(_hsr_world_setup)
-        apartment_copy.merge_world(hsr_copy)
-        view = apartment_copy.get_semantic_annotations_by_type(HSRB)
+        apartment_copy.merge_world(other=hsr_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=HSRB
+        )
         if not view:
-            view = HSRB.from_world(apartment_copy)
+            view = HSRB.from_world(world=apartment_copy)
         else:
             view = view[0]
         view.root.parent_connection.origin = (
@@ -275,11 +281,13 @@ def setup_multi_robot_apartment(
     elif request.param == "stretch":
         stretch_copy = deepcopy(_stretch_world_setup)
         apartment_copy.merge_world(
-            stretch_copy,
+            other=stretch_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(Stretch)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=Stretch
+        )
         if not view:
-            view = Stretch.from_world(stretch_copy)
+            view = Stretch.from_world(world=stretch_copy)
         else:
             view = view[0]
         view.root.parent_connection.origin = (
@@ -290,11 +298,13 @@ def setup_multi_robot_apartment(
     elif request.param == "tiago":
         tiago_copy = deepcopy(_tiago_world_setup)
         apartment_copy.merge_world(
-            tiago_copy,
+            other=tiago_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(Tiago)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=Tiago
+        )
         if not view:
-            view = Tiago.from_world(tiago_copy)
+            view = Tiago.from_world(world=tiago_copy)
         else:
             view = view[0]
         view.root.parent_connection.origin = (
@@ -305,11 +315,13 @@ def setup_multi_robot_apartment(
     elif request.param == "pr2":
         pr2_copy = deepcopy(_pr2_world_setup)
         apartment_copy.merge_world(
-            pr2_copy,
+            other=pr2_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(PR2)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )
         if not view:
-            view = PR2.from_world(pr2_copy)
+            view = PR2.from_world(world=pr2_copy)
         else:
             view = view[0]
         view.root.parent_connection.origin = (
@@ -320,15 +332,17 @@ def setup_multi_robot_apartment(
     elif request.param == "garmi":
         garmi_copy = deepcopy(request.getfixturevalue("_garmi_world_setup"))
         apartment_copy.merge_world(
-            garmi_copy,
+            other=garmi_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(Garmi)[0]
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=Garmi
+        )[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
         for arm in view.all_arms:
-            joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
-            joint_state.apply_to(apartment_copy)
+            joint_state = arm.get_joint_state_by_type(state_type=StaticJointState.PARK)
+            joint_state.apply_to(world=apartment_copy)
 
         return apartment_copy, view
 
@@ -358,7 +372,7 @@ def test_move_torso_multi(multiple_robot_apartment_context):
     world, view, extensions = multiple_robot_apartment_context
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     run_plan(plan, extensions)
-    joint_state = view.get_torso().get_joint_state_by_type(TorsoState.HIGH)
+    joint_state = view.get_torso().get_joint_state_by_type(state_type=TorsoState.HIGH)
 
     for connection, target in joint_state.items():
         assert connection.position == pytest.approx(target, abs=0.01)
@@ -400,17 +414,21 @@ def test_move_gripper_multi(multiple_robot_apartment_context):
     for state in (GripperState.OPEN, GripperState.CLOSE):
         run_plan(
             SetGripperAction(
-                gripper_configuration=end_effector.default_configuration(state)
+                gripper_configuration=end_effector.default_configuration(
+                    state_type=state
+                )
             ),
             extensions,
         )
 
         if isinstance(end_effector, HasTwoFingers):
             assert end_effector.fingertips.separation == pytest.approx(
-                end_effector.separation_in(state), abs=MoveGripper.threshold
+                end_effector.separation_in(state_type=state), abs=MoveGripper.threshold
             )
             continue
-        for connection, target in end_effector.get_joint_state_by_type(state).items():
+        for connection, target in end_effector.get_joint_state_by_type(
+            state_type=state
+        ).items():
             assert connection.position == pytest.approx(target, abs=0.02)
 
 
@@ -426,7 +444,7 @@ def test_park_arms_multi(multiple_robot_apartment_context):
     joints = []
     states = []
     for arm in robot.all_arms:
-        joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
+        joint_state = arm.get_joint_state_by_type(state_type=StaticJointState.PARK)
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
     for connection, value in zip(joints, states):
@@ -448,7 +466,7 @@ def test_reach_action_multi(multiple_robot_apartment_context):
 
     left_arm = left_or_only_arm(view)
 
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     grasp_pose = Pose(reference_frame=milk.root)
     milk_body = milk.root
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -473,7 +491,9 @@ def test_reach_action_multi(multiple_robot_apartment_context):
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
     end_effector_orientation = end_effector_pose.quaternion.to_np()
 
-    target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
+    target_orientation = left_arm.end_effector.tool_frame_goal(
+        grasp_pose=grasp_pose
+    ).quaternion
 
     assert grasp_point_of(left_arm) == pytest.approx([1, -2, 0.8], abs=0.01)
     assert_same_orientation(
@@ -507,7 +527,7 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
     left_arm = left_or_only_arm(robot)
     approach_axis = left_arm.end_effector.approach_axis.to_np()
 
-    pose_T = world.get_body_by_name("milk.stl").global_transform
+    pose_T = world.get_body_by_name(name="milk.stl").global_transform
     pose = pose_T.pose
     if np.allclose(approach_axis, Vector3.Z().to_np()):
         offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
@@ -542,7 +562,7 @@ def test_grasping(multiple_robot_apartment_context):
     world, robot, extensions = multiple_robot_apartment_context
     left_arm = left_or_only_arm(robot)
 
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     grasping_action = GraspingAction(
         grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
         arm=left_or_only_arm(robot),
@@ -579,7 +599,7 @@ def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
     world, view, extensions = multiple_robot_apartment_context
 
     left_arm = left_or_only_arm(view)
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1, -2, 0.6, reference_frame=world.root
     )
@@ -592,9 +612,9 @@ def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
         nodes=[
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(
-                grasp_candidate=world.get_semantic_annotations_by_type(Milk)[
-                    0
-                ].grasp_candidates()[0],
+                grasp_candidate=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=Milk
+                )[0].grasp_candidates()[0],
                 arm=left_or_only_arm(view),
             ),
         ]
@@ -603,14 +623,16 @@ def test_pick_up_multi(multiple_robot_apartment_context, rclpy_node):
     run_plan(root, extensions)
     assert (
         world.get_connection(
-            left_arm.end_effector.tool_frame,
-            world.get_body_by_name("milk.stl"),
+            parent=left_arm.end_effector.tool_frame,
+            child=world.get_body_by_name(name="milk.stl"),
         )
         is not None
     )
 
     assert np.allclose(
-        world.get_body_by_name("milk.stl").global_pose.position.to_np().flatten()[:3],
+        world.get_body_by_name(name="milk.stl")
+        .global_pose.position.to_np()
+        .flatten()[:3],
         grasp_point_of(left_arm),
         atol=0.01,
     )
@@ -623,7 +645,7 @@ def test_place_multi(multiple_robot_apartment_context):
     world, view, extensions = multiple_robot_apartment_context
 
     left_arm = left_or_only_arm(view)
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         1, -2, 0.6, reference_frame=world.root
     )
@@ -636,14 +658,16 @@ def test_place_multi(multiple_robot_apartment_context):
         nodes=[
             ParkArmsAction(arms=view.all_arms),
             PickUpAction(
-                grasp_candidate=world.get_semantic_annotations_by_type(Milk)[
-                    0
-                ].grasp_candidates()[0],
+                grasp_candidate=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=Milk
+                )[0].grasp_candidates()[0],
                 arm=left_or_only_arm(view),
             ),
             PlaceAction(
                 arm=left_or_only_arm(view),
-                graspable=world.get_semantic_annotations_by_type(Milk)[0],
+                graspable=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=Milk
+                )[0],
                 goal_pose=Pose(
                     Point3.from_iterable([1, -2.2, 0.6]), reference_frame=world.root
                 ),
@@ -654,8 +678,8 @@ def test_place_multi(multiple_robot_apartment_context):
     run_plan(root, extensions)
     with pytest.raises(NoEdgeBetweenNodes):
         world.get_connection(
-            left_arm.end_effector.tool_frame,
-            world.get_body_by_name("milk.stl"),
+            parent=left_arm.end_effector.tool_frame,
+            child=world.get_body_by_name(name="milk.stl"),
         )
 
     milk_position = milk_body.global_transform.position.to_np()
@@ -683,7 +707,7 @@ def test_look_at(multiple_robot_apartment_context):
 
 def test_detect(multiple_robot_apartment_context):
     world, robot, extensions = multiple_robot_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
 
     # East of the multi-storey building the fixture merges in, so that the robot looks
     # at the milk rather than at one of the building's room walls.
@@ -702,7 +726,9 @@ def test_detect(multiple_robot_apartment_context):
     run_plan(plan, extensions)
     # Detection returns no value; it writes what it saw into the world by moving the
     # perceived annotation's body to the detected pose.
-    milk_annotations = world.get_semantic_annotations_by_type(Milk)
+    milk_annotations = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Milk
+    )
     assert milk_annotations
     perceived = milk_annotations[0]
     assert milk_body in perceived.bodies
@@ -742,7 +768,7 @@ def test_open(multiple_robot_apartment_context):
     )
     run_plan(plan, extensions)
     assert world.get_connection_by_name(
-        "cabinet10_drawer_middle_joint"
+        name="cabinet10_drawer_middle_joint"
     ).position == pytest.approx(0.45, abs=0.1)
 
 
@@ -752,7 +778,7 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
     """
     world, robot, extensions = multiple_robot_apartment_context
 
-    world.get_connection_by_name("cabinet10_drawer_middle_joint").position = 0.3
+    world.get_connection_by_name(name="cabinet10_drawer_middle_joint").position = 0.3
     world.notify_state_change()
 
     handle = _handle_annotation(world, "handle_cab10_m")
@@ -778,7 +804,7 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
     )
     run_plan(plan, extensions)
     assert world.get_connection_by_name(
-        "cabinet10_drawer_middle_joint"
+        name="cabinet10_drawer_middle_joint"
     ).position == pytest.approx(0, abs=0.1)
 
 
@@ -788,12 +814,12 @@ def test_facing(multiple_robot_apartment_context):
     """
     world, robot, extensions = multiple_robot_apartment_context
 
-    milk_pose = world.get_body_by_name("milk.stl").global_pose
+    milk_pose = world.get_body_by_name(name="milk.stl").global_pose
     plan = FaceAtAction(look_target=milk_pose)
     run_plan(plan, extensions)
     milk_in_base_frame = world.transform(
-        world.get_body_by_name("milk.stl").global_transform,
-        robot.mobile_base.root,
+        spatial_object=world.get_body_by_name(name="milk.stl").global_transform,
+        target_frame=robot.mobile_base.root,
     )
     # Facing the milk means it lies along the base's forward axis, which is the
     # x-axis only for a base modelled that way. The base turns about the vertical,
@@ -810,7 +836,9 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
     world, robot, extensions = multiple_robot_apartment_context
 
     description = TransportAction.from_graspable_by_closest_grasps(
-        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+        graspable=world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[
+            0
+        ],
         goal_pose=Pose(
             Point3.from_iterable([3.1, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
@@ -821,7 +849,9 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
     )
     plan = Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH), description])
     run_plan(plan, extensions)
-    milk_position = world.get_body_by_name("milk.stl").global_transform.to_np()[:3, 3]
+    milk_position = world.get_body_by_name(name="milk.stl").global_transform.to_np()[
+        :3, 3
+    ]
     dist = np.linalg.norm(milk_position - np.array([3.1, 2.2, 0.95]))
     assert dist <= 0.02
 
@@ -844,7 +874,7 @@ def test_move_to_reach(multiple_robot_apartment_context, rclpy_node):
             x=0.7, y=-1.3, z=0.9, reference_frame=world.root
         ),
         hip_rotation=0.0,
-        arm=world.get_semantic_annotations_by_type(Arm)[0],
+        arm=world.get_semantic_annotations_by_type(semantic_annotation_type=Arm)[0],
     )
 
     plan = move_to_reach
@@ -861,7 +891,9 @@ def test_transport_open_container(multiple_robot_apartment_context, rclpy_node):
     )
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     description = TransportAction.from_graspable_by_closest_grasps(
-        graspable=world.get_semantic_annotations_by_type(Spoon)[0],
+        graspable=world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Spoon
+        )[0],
         goal_pose=target_pose,
         arm=right_or_only_arm(robot),
         context=context_of(extensions),
@@ -874,7 +906,7 @@ def test_transport_open_container(multiple_robot_apartment_context, rclpy_node):
         ]
     )
     run_plan(plan, [*extensions, PlanRewriting(transformations=plan_transformations)])
-    spoon_position = world.get_body_by_name("spoon.stl").global_pose
+    spoon_position = world.get_body_by_name(name="spoon.stl").global_pose
     np.testing.assert_allclose(spoon_position, target_pose, atol=0.02)
 
 
@@ -946,11 +978,13 @@ def test_gcs_navigation_plans_on_the_floor_the_robot_stands_on(
     attach_to_statechart(action, extensions)
 
     floor = action._floor
-    assert floor in world.get_semantic_annotations_by_type(Floor)
+    assert floor in world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Floor
+    )
 
     base_pose = robot.root.global_pose
     floor_box = floor.as_bounding_box_collection_at_origin(
-        HomogeneousTransformationMatrix(reference_frame=world.root)
+        origin=HomogeneousTransformationMatrix(reference_frame=world.root)
     ).bounding_box()
     assert floor_box.min_x <= float(base_pose.x) <= floor_box.max_x
     assert floor_box.min_y <= float(base_pose.y) <= floor_box.max_y
@@ -980,7 +1014,8 @@ def test_gcs_navigation_takes_a_waypoints_height_from_that_waypoints_frame(
     # The last pose is the requested target, which carries the caller's own height.
     for pose in action._path()[:-1]:
         base_in_pose_frame = world.transform(
-            robot.root.global_transform, pose.reference_frame
+            spatial_object=robot.root.global_transform,
+            target_frame=pose.reference_frame,
         )
         assert float(pose.reference_frame.global_pose.z) == pytest.approx(
             float(base_in_pose_frame.reference_frame.global_pose.z)
@@ -1050,7 +1085,7 @@ class ElevatorOperator(ModelChangeCallback):
             return
         self.robot_boarded = True
         self.elevator.close()
-        self.elevator.drive_to_floor(self.floor)
+        self.elevator.drive_to_floor(floor=self.floor)
         self.elevator.open()
 
 
@@ -1058,7 +1093,7 @@ def test_elevator_navigation_needs_doors_that_can_open():
     """
     Navigating with an elevator whose door has no movable joint is refused.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
             name="elevator", world=world, scale=Scale(x=2, y=2, z=2)
@@ -1080,7 +1115,7 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
     """
     Navigating with an elevator whose cabin has no movable joint is refused.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
             name="elevator", world=world, scale=Scale(x=2, y=2, z=2)
@@ -1108,14 +1143,18 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
 def test_elevator_navigation(multiple_robot_apartment_context, rclpy_node):
     world, robot, extensions = multiple_robot_apartment_context
 
-    elevator = world.get_semantic_annotations_by_type(Elevator)[0]
+    elevator = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Elevator
+    )[0]
     elevator.open()
 
-    first_floor = world.get_semantic_annotations_by_type(FirstFloor)[0]
+    first_floor = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=FirstFloor
+    )[0]
     starting_height = float(robot.root.global_pose.position.z)
-    elevator_travel = float(elevator.drive_position_for_floor(first_floor)) - float(
-        elevator.movable_joint.position
-    )
+    elevator_travel = float(
+        elevator.drive_position_for_floor(floor=first_floor)
+    ) - float(elevator.movable_joint.position)
 
     operator = ElevatorOperator(
         _world=world, elevator=elevator, floor=first_floor, robot=robot
@@ -1161,7 +1200,7 @@ def test_search_action(multiple_robot_apartment_context) -> None:
     object, having detected it on the first look.
     """
     world, robot, extensions = multiple_robot_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     # East of the multi-storey building the fixture merges in, where every robot has the
     # clearance to stand somewhere the milk is visible from.
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -1249,7 +1288,7 @@ def test_a_search_detects_within_its_cross_and_the_detection_margin(
 
 def test_a_search_leaves_the_world_as_it_found_it(multiple_robot_apartment_context):
     world, robot, extensions = multiple_robot_apartment_context
-    milk_body = world.get_body_by_name("milk.stl")
+    milk_body = world.get_body_by_name(name="milk.stl")
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         6, -2, 1.2, reference_frame=world.root
     )
@@ -1310,7 +1349,7 @@ def test_move_torso_runs_the_joint_goal_of_the_requested_state(
 
     [joint_goal] = nodes_of_type(action, JointPositionList)
     assert joint_goal.goal_state == robot.get_torso().get_joint_state_by_type(
-        TorsoState.HIGH
+        state_type=TorsoState.HIGH
     )
 
 
@@ -1321,7 +1360,9 @@ def test_set_gripper_drives_the_gripper_it_names(multiple_robot_apartment_contex
     _, robot, extensions = multiple_robot_apartment_context
     end_effector = left_or_only_arm(robot).end_effector
     action = SetGripperAction(
-        gripper_configuration=end_effector.default_configuration(GripperState.OPEN)
+        gripper_configuration=end_effector.default_configuration(
+            state_type=GripperState.OPEN
+        )
     )
 
     expand(action, extensions)
@@ -1386,7 +1427,9 @@ def test_opening_drives_the_mechanism_to_its_upper_limit(
     expand(action, extensions)
 
     [opening] = nodes_of_type(action, ArticulateGraspedMechanism)
-    mechanism = handle.root.get_first_parent_connection_of_type(ActiveConnection1DOF)
+    mechanism = handle.root.get_first_parent_connection_of_type(
+        connection_type=ActiveConnection1DOF
+    )
     assert opening.goal_position == mechanism.dof.limits.upper.position
 
 
@@ -1581,7 +1624,7 @@ def test_a_reach_approaches_at_its_tuned_speeds(
     its final approach speed.
     """
     world, robot, extensions = multiple_robot_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     action = ReachAction(
         grasp_candidate=GraspCandidate(
             graspable=milk, grasp_pose=Pose(reference_frame=milk.root)
@@ -1863,7 +1906,7 @@ def test_a_kinematically_simulated_pick_is_held_by_the_world(
     the gripper for it to be held at all.
     """
     world, robot, extensions = multiple_robot_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     arm = right_or_only_arm(robot)
     pick_up = PickUpAction(grasp_candidate=milk.grasp_candidates()[0], arm=arm)
 
@@ -1881,7 +1924,7 @@ def test_a_physically_simulated_pick_is_held_by_its_own_grip(
     hold it whether or not the grasp did.
     """
     world, robot, extensions = multiple_robot_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=right_or_only_arm(robot)
     )
@@ -1897,7 +1940,7 @@ def test_a_physically_simulated_place_is_released_by_its_own_grip(
     lets the object go, so the model is left alone here too.
     """
     world, robot, extensions = multiple_robot_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan = Sequence(
         nodes=[
             PickUpAction(
@@ -1930,15 +1973,15 @@ def add_cup(
     body = Body(name=PrefixedName(name=name), collision=shapes, visual=shapes)
     cup = Cup(root=body)
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=body,
                 parent_T_connection_expression=world_T_cup,
             )
         )
-        world.add_semantic_annotation(cup)
+        world.add_semantic_annotation(semantic_annotation=cup)
     return cup
 
 
@@ -2017,9 +2060,9 @@ def cup_held_tilted(robot: AbstractRobot) -> Cup:
     body = Body(name=PrefixedName(name="held_cup"), collision=shapes, visual=shapes)
     cup = Cup(root=body)
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=tool_frame,
                 child=body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -2027,7 +2070,7 @@ def cup_held_tilted(robot: AbstractRobot) -> Cup:
                 ),
             )
         )
-        world.add_semantic_annotation(cup)
+        world.add_semantic_annotation(semantic_annotation=cup)
     return cup
 
 
@@ -2247,7 +2290,7 @@ def test_a_carry_runs_where_the_statechart_was_received(
         data=json.loads(json.dumps(sent.to_json())),
         context=receiver.context,
         world=world,
-        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
     )
     receiver.compile(statechart=received)
     receiver.tick_until_end(timeout=10_000)
@@ -2329,11 +2372,11 @@ class CupForEachArm:
                 arm=pick_up.arm,
                 graspable=pick_up.grasp_candidate.graspable,
                 goal_pose=self.world.transform(
-                    Pose.from_xyz_rpy(
+                    spatial_object=Pose.from_xyz_rpy(
                         y=sideways_distance,
                         reference_frame=pick_up.grasp_candidate.graspable.root,
                     ),
-                    self.world.root,
+                    target_frame=self.world.root,
                 ),
             )
             for pick_up, sideways_distance in zip(self.pick_ups, [0.3, -0.02])
@@ -2398,7 +2441,10 @@ def test_a_gripper_closes_at_its_grasp_although_the_other_arm_is_moving(
         # A goal puts the point the fingers meet at on the grasp, not the tool frame.
         np.testing.assert_allclose(
             grasp_point_of(pick_up.arm),
-            world.transform(pick_up.grasp_candidate.grasp_pose, world.root)
+            world.transform(
+                spatial_object=pick_up.grasp_candidate.grasp_pose,
+                target_frame=world.root,
+            )
             .position.to_np()
             .flatten()[:3],
             atol=pick_up.position_threshold,

@@ -146,7 +146,7 @@ class Segmind:
         bodies = []
         for semantic_annotation_type in semantic_annotation_types:
             annotations = world.get_semantic_annotations_by_type(
-                semantic_annotation_type
+                semantic_annotation_type=semantic_annotation_type
             )
             if not annotations:
                 raise NoSemanticAnnotationToWatch(semantic_annotation_type)

@@ -111,7 +111,7 @@ def _recorded_scene(
         if pose_frame_alias:
             bodies.append(pose_child)
         for body in bodies:
-            source_world.add_body(body)
+            source_world.add_body(body=body)
         connections = [
             (source_root, reference),
             (reference, camera_root),
@@ -121,11 +121,11 @@ def _recorded_scene(
             connections.append((reference, pose_child))
         for parent, child in connections:
             source_world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     parent=parent, child=child, world=source_world
                 )
             )
-        source_world.add_semantic_annotation(camera)
+        source_world.add_semantic_annotation(semantic_annotation=camera)
 
     pose = (
         HomogeneousTransformationMatrix(
@@ -169,15 +169,17 @@ def test_sensor_world_projection_excludes_inferred_entities() -> None:
 
     sensor_world = RecordedCameraWorld(observation=scene.observation).project()
 
-    camera = sensor_world.get_semantic_annotations_by_type(Camera)[0]
+    camera = sensor_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Camera
+    )[0]
     assert camera.id == scene.observation.camera.id
     assert camera.root.id == scene.observation.camera.root.id
     assert (
         camera.root.parent_connection.parent.id
         == scene.observation.world_T_camera.reference_frame.id
     )
-    assert sensor_world.get_bodies_by_name(scene.source_root.name) == []
-    assert sensor_world.get_bodies_by_name(scene.inferred_body.name) == []
+    assert sensor_world.get_bodies_by_name(name=scene.source_root.name) == []
+    assert sensor_world.get_bodies_by_name(name=scene.inferred_body.name) == []
 
 
 def test_full_snapshot_replays_only_camera_context() -> None:
@@ -189,9 +191,11 @@ def test_full_snapshot_replays_only_camera_context() -> None:
         view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
     )
     recorded_world = World()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(recorded_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=recorded_world)
     WorldModelSnapshot.apply_to_json_snapshot_to_world(
-        recorded_world, _snapshot(scene.world), **tracker.create_kwargs()
+        world=recorded_world,
+        json_data=_snapshot(scene.world),
+        **tracker.create_kwargs(),
     )
     restored_observation = CameraObservationCodec().decode_with_tracker(
         payload=ViewPayload.from_document(document=document), tracker=tracker
@@ -221,8 +225,8 @@ def test_full_snapshot_replays_only_camera_context() -> None:
         replayed.world_T_camera.reference_frame.id
         == scene.observation.world_T_camera.reference_frame.id
     )
-    assert reasoning_world.get_bodies_by_name(scene.inferred_body.name) == []
-    assert reasoning_world.get_bodies_by_name(scene.source_root.name) == []
+    assert reasoning_world.get_bodies_by_name(name=scene.inferred_body.name) == []
+    assert reasoning_world.get_bodies_by_name(name=scene.source_root.name) == []
 
 
 def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
@@ -263,7 +267,7 @@ def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
         replayed.camera.root.global_transform.to_np(),
         replayed.world_T_camera.to_np(),
     )
-    assert reasoning_world.get_bodies_by_name(scene.inferred_body.name) == []
+    assert reasoning_world.get_bodies_by_name(name=scene.inferred_body.name) == []
 
 
 @pytest.mark.parametrize("pose_frame_alias", [False, True])
@@ -321,7 +325,7 @@ def test_missing_pose_merges_camera_into_existing_world() -> None:
     reasoning_world = World()
     unrelated = Body(name=PrefixedName(name="runtime_entity"))
     with reasoning_world.modify_world():
-        reasoning_world.add_body(unrelated)
+        reasoning_world.add_body(body=unrelated)
     RecordedCameraWorld(observation=scene.observation).install(
         reasoning_world=reasoning_world
     )
@@ -335,7 +339,7 @@ def test_missing_pose_merges_camera_into_existing_world() -> None:
 
     assert replayed.world_T_camera is None
     assert replayed.camera.root.parent_connection.parent is unrelated
-    assert reasoning_world.get_bodies_by_name(scene.inferred_body.name) == []
+    assert reasoning_world.get_bodies_by_name(name=scene.inferred_body.name) == []
 
 
 def test_camera_pose_child_must_match_camera_root() -> None:
@@ -478,10 +482,13 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
 
     reader.set_data(cas=cas, world=reasoning_world)
 
-    assert reasoning_world.find_world_entity_with_id(scene.inferred_body.id) is not None
+    assert (
+        reasoning_world.find_world_entity_with_id(entity_id=scene.inferred_body.id)
+        is not None
+    )
     assert (
         cas.require_camera_observation().camera
-        is reasoning_world.get_semantic_annotation_by_id(scene.observation.camera.id)
+        is reasoning_world.get_semantic_annotation_by_id(id=scene.observation.camera.id)
     )
     assert cas.contains(view_name=CASViews.QUERY)
 
@@ -499,7 +506,7 @@ def test_sensor_projection_copies_camera_data_and_sampled_pose(
     scene = _recorded_scene(pose_frame_alias=pose_frame_alias)
     projected_world = RecordedCameraWorld(observation=scene.observation).project()
     projected_camera = projected_world.get_semantic_annotation_by_id(
-        scene.observation.camera.id
+        id=scene.observation.camera.id
     )
     assert projected_camera is not scene.observation.camera
     assert projected_camera.root is not scene.observation.camera.root
@@ -544,7 +551,7 @@ def test_sensor_replay_rejects_conflicting_camera_root_without_changing_world(
     )
     reasoning_world = World()
     with reasoning_world.modify_world():
-        reasoning_world.add_body(conflict)
+        reasoning_world.add_body(body=conflict)
     document = Storage.encode_view_document(
         view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
     )
@@ -557,7 +564,12 @@ def test_sensor_replay_rejects_conflicting_camera_root_without_changing_world(
     with pytest.raises(InvalidCameraObservation):
         reader._restore_sensor_world(cas_frame=frame, world=reasoning_world)
     assert reasoning_world.bodies == [conflict]
-    assert reasoning_world.get_semantic_annotations_by_type(Camera) == []
+    assert (
+        reasoning_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        )
+        == []
+    )
 
 
 # %% Missing stored views

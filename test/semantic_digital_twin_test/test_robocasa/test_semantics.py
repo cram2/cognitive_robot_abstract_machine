@@ -35,39 +35,41 @@ ROBOCASA_RESOURCES_DIR = (
 
 def test_kitchen_appliance_resolver_resolves_known_category():
     resolver = RoboCasaKitchenApplianceResolver()
-    assert resolver.resolve("cabinet") is Cabinet
-    assert resolver.resolve("MICROWAVE") is Microwave
+    assert resolver.resolve(category="cabinet") is Cabinet
+    assert resolver.resolve(category="MICROWAVE") is Microwave
 
 
 def test_kitchen_appliance_resolver_returns_none_for_unknown_category():
     resolver = RoboCasaKitchenApplianceResolver()
-    assert resolver.resolve("paper_towel_holder") is None
+    assert resolver.resolve(category="paper_towel_holder") is None
 
 
 def test_kitchen_appliance_resolver_resolves_compound_class_name():
     resolver = RoboCasaKitchenApplianceResolver()
-    assert resolver.resolve("HingeCabinet") is Cabinet
-    assert resolver.resolve("hinge_cabinet") is Cabinet
+    assert resolver.resolve(category="HingeCabinet") is Cabinet
+    assert resolver.resolve(category="hinge_cabinet") is Cabinet
 
 
 def test_kitchen_appliance_resolver_resolves_enum_category():
     resolver = RoboCasaKitchenApplianceResolver()
-    assert resolver.resolve(RoboCasaKitchenApplianceCategory.CABINET) is Cabinet
+    assert (
+        resolver.resolve(category=RoboCasaKitchenApplianceCategory.CABINET) is Cabinet
+    )
 
 
 def test_object_resolver_resolves_known_category():
     resolver = RoboCasaObjectResolver()
-    assert resolver.resolve("apple") is Apple
+    assert resolver.resolve(category="apple") is Apple
 
 
 def test_object_resolver_returns_none_for_unknown_category():
     resolver = RoboCasaObjectResolver()
-    assert resolver.resolve("blender") is None
+    assert resolver.resolve(category="blender") is None
 
 
 def test_object_resolver_resolves_enum_category():
     resolver = RoboCasaObjectResolver()
-    assert resolver.resolve(RoboCasaObjectCategory.APPLE) is Apple
+    assert resolver.resolve(category=RoboCasaObjectCategory.APPLE) is Apple
 
 
 def test_category_from_class_name_converts_upper_camel_case():
@@ -109,10 +111,10 @@ def test_mjcf_document_from_element_copy_is_parseable_by_mjcf_parser():
     )
 
     world = MJCFParser.from_xml_string(
-        _mjcf_document_from_element_copy(fixture_body)
+        xml_string=_mjcf_document_from_element_copy(fixture_body)
     ).create_world()
 
-    assert world.get_body_by_name("hinge_cabinet_main") is not None
+    assert world.get_body_by_name(name="hinge_cabinet_main") is not None
 
 
 ROBOSUITE_STYLE_GEOM_GROUPS_MJCF = """
@@ -136,9 +138,9 @@ def test_parse_robosuite_mjcf_excludes_default_group_geoms_from_visuals():
     unmodified, convention-agnostic ``MJCFParser`` alone.
     """
     world = _parse_robosuite_mjcf(
-        MJCFParser.from_xml_string(ROBOSUITE_STYLE_GEOM_GROUPS_MJCF)
+        MJCFParser.from_xml_string(xml_string=ROBOSUITE_STYLE_GEOM_GROUPS_MJCF)
     )
-    base = world.get_kinematic_structure_entity_by_name("base")
+    base = world.get_kinematic_structure_entity_by_name(name="base")
 
     visual_colors = {tuple(shape.color.to_rgba()) for shape in base.visual.shapes}
     assert (1.0, 0.0, 0.0, 1.0) not in visual_colors
@@ -152,9 +154,9 @@ def test_parse_robosuite_mjcf_keeps_default_group_geoms_collidable():
     geoms is to still be collided with.
     """
     world = _parse_robosuite_mjcf(
-        MJCFParser.from_xml_string(ROBOSUITE_STYLE_GEOM_GROUPS_MJCF)
+        MJCFParser.from_xml_string(xml_string=ROBOSUITE_STYLE_GEOM_GROUPS_MJCF)
     )
-    base = world.get_kinematic_structure_entity_by_name("base")
+    base = world.get_kinematic_structure_entity_by_name(name="base")
 
     assert len(base.collision.shapes) == 2
 
@@ -163,12 +165,14 @@ def test_attach_semantic_annotation_uses_kitchen_appliance_resolver():
     world = MJCFParser(
         file_path=str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
     ).create_world()
-    body = world.get_body_by_name("hinge_cabinet_main")
+    body = world.get_body_by_name(name="hinge_cabinet_main")
 
     loader = RoboCasaDatasetLoader()
-    loader._attach_semantic_annotation(world, body, "cabinet")
+    loader._attach_semantic_annotation(world=world, body=body, category="cabinet")
 
-    annotations = world.get_semantic_annotations_by_type(Cabinet)
+    annotations = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Cabinet
+    )
     assert len(annotations) == 1
     assert annotations[0].root == body
 
@@ -177,13 +181,15 @@ def test_attach_semantic_annotation_falls_back_to_natural_language():
     world = MJCFParser(
         file_path=str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
     ).create_world()
-    body = world.get_body_by_name("hinge_cabinet_main")
+    body = world.get_body_by_name(name="hinge_cabinet_main")
 
     loader = RoboCasaDatasetLoader()
-    loader._attach_semantic_annotation(world, body, "paper_towel_holder")
+    loader._attach_semantic_annotation(
+        world=world, body=body, category="paper_towel_holder"
+    )
 
     annotations = world.get_semantic_annotations_by_type(
-        NaturalLanguageWithTypeDescription
+        semantic_annotation_type=NaturalLanguageWithTypeDescription
     )
     assert len(annotations) == 1
     assert annotations[0].type_description == "paper_towel_holder"
@@ -193,15 +199,15 @@ def test_attach_semantic_annotation_attaches_door_and_handle_sub_parts():
     world = MJCFParser(
         file_path=str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
     ).create_world()
-    body = world.get_body_by_name("hinge_cabinet_main")
-    door_body = world.get_body_by_name("hinge_cabinet_door")
+    body = world.get_body_by_name(name="hinge_cabinet_main")
+    door_body = world.get_body_by_name(name="hinge_cabinet_door")
 
     loader = RoboCasaDatasetLoader()
-    loader._attach_semantic_annotation(world, body, "cabinet")
+    loader._attach_semantic_annotation(world=world, body=body, category="cabinet")
 
-    [cabinet] = world.get_semantic_annotations_by_type(Cabinet)
-    [door] = world.get_semantic_annotations_by_type(Door)
-    [handle] = world.get_semantic_annotations_by_type(Handle)
+    [cabinet] = world.get_semantic_annotations_by_type(semantic_annotation_type=Cabinet)
+    [door] = world.get_semantic_annotations_by_type(semantic_annotation_type=Door)
+    [handle] = world.get_semantic_annotations_by_type(semantic_annotation_type=Handle)
 
     assert door in cabinet.doors
     assert door.root.name.name == "hinge_cabinet_door"
@@ -219,7 +225,7 @@ def test_find_body_returns_none_for_missing_body():
     world = MJCFParser(
         file_path=str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
     ).create_world()
-    assert RoboCasaDatasetLoader._find_body(world, "does_not_exist") is None
+    assert RoboCasaDatasetLoader._find_body(world=world, name="does_not_exist") is None
 
 
 def test_find_body_falls_back_to_prefix_match():
@@ -227,7 +233,7 @@ def test_find_body_falls_back_to_prefix_match():
         file_path=str(ROBOCASA_RESOURCES_DIR / "cabinet_fixture.xml")
     ).create_world()
 
-    body = RoboCasaDatasetLoader._find_body(world, "hinge_cabinet")
+    body = RoboCasaDatasetLoader._find_body(world=world, name="hinge_cabinet")
 
     assert body is not None
     assert body.name.name == "hinge_cabinet_main"
@@ -239,9 +245,11 @@ def test_apply_object_semantics_annotates_body_with_collision_not_root():
     ).create_world()
 
     loader = RoboCasaDatasetLoader()
-    loader._apply_object_semantics(world, "cabinet")
+    loader._apply_object_semantics(world=world, category="cabinet")
 
-    annotations = world.get_semantic_annotations_by_type(Cabinet)
+    annotations = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Cabinet
+    )
     assert len(annotations) == 1
     assert annotations[0].root.name.name == "hinge_cabinet_main"
     assert annotations[0].root != world.root

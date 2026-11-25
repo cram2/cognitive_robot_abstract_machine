@@ -79,7 +79,7 @@ class FCLCollisionDetector(CollisionDetector):
             )
 
     def check_collisions(
-        self, collision_matrix: CollisionMatrix
+        self, *, collision_matrix: CollisionMatrix
     ) -> CollisionCheckingResult:
         """
         Checks for collisions in the current world state.

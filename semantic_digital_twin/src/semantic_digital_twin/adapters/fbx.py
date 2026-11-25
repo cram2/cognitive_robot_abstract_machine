@@ -39,7 +39,7 @@ class CoordinateAxis(Enum):
     NEGATIVE_Z = (2, -1)
 
     @classmethod
-    def from_fbx(cls, axis_value: int, sign: int) -> CoordinateAxis:
+    def from_fbx(cls, *, axis_value: int, sign: int) -> CoordinateAxis:
         """
         Map FBX axis index + sign into a CoordinateAxis enum.
 
@@ -94,18 +94,18 @@ class FBXGlobalSettings:
         fbx = self.fbx_loader
 
         self.up_axis = CoordinateAxis.from_fbx(
-            fbx.fbxtree["GlobalSettings"]["UpAxis"]["value"],
-            fbx.fbxtree["GlobalSettings"]["UpAxisSign"]["value"],
+            axis_value=fbx.fbxtree["GlobalSettings"]["UpAxis"]["value"],
+            sign=fbx.fbxtree["GlobalSettings"]["UpAxisSign"]["value"],
         )
 
         self.front_axis = CoordinateAxis.from_fbx(
-            fbx.fbxtree["GlobalSettings"]["FrontAxis"]["value"],
-            fbx.fbxtree["GlobalSettings"]["FrontAxisSign"]["value"],
+            axis_value=fbx.fbxtree["GlobalSettings"]["FrontAxis"]["value"],
+            sign=fbx.fbxtree["GlobalSettings"]["FrontAxisSign"]["value"],
         )
 
         self.coord_axis = CoordinateAxis.from_fbx(
-            fbx.fbxtree["GlobalSettings"]["CoordAxis"]["value"],
-            fbx.fbxtree["GlobalSettings"]["CoordAxisSign"]["value"],
+            axis_value=fbx.fbxtree["GlobalSettings"]["CoordAxis"]["value"],
+            sign=fbx.fbxtree["GlobalSettings"]["CoordAxisSign"]["value"],
         )
 
     def get_semantic_digital_twin_T_fbx(self) -> np.ndarray:
@@ -133,7 +133,7 @@ class FBXParser(MeshParser):
 
     @staticmethod
     def transform_vertices(
-        fbx_vertices: np.ndarray, semantic_digital_twin_T_fbx: np.ndarray
+        *, fbx_vertices: np.ndarray, semantic_digital_twin_T_fbx: np.ndarray
     ) -> np.ndarray:
         """
         Transform vertices from FBX coordinate system to Semantic Digital Twin
@@ -190,7 +190,8 @@ class FBXParser(MeshParser):
                         if isinstance(o, FBXMesh):
                             transformed_vertices = (
                                 self.transform_vertices(
-                                    o.vertices, semantic_digital_twin_T_fbx
+                                    fbx_vertices=o.vertices,
+                                    semantic_digital_twin_T_fbx=semantic_digital_twin_T_fbx,
                                 )
                                 / 100
                             )
@@ -208,7 +209,7 @@ class FBXParser(MeshParser):
                         collision=ShapeCollection(shapes=meshes),
                         visual=ShapeCollection(shapes=meshes),
                     )
-                    world.add_body(body)
+                    world.add_body(body=body)
 
             for obj in fbx.objects.values():
                 if type(obj) is Object3D:
@@ -225,8 +226,8 @@ class FBXParser(MeshParser):
                     if not parent_name:
                         continue
 
-                    obj_body = world.get_body_by_name(name)
-                    parent_body = world.get_body_by_name(parent_name)
+                    obj_body = world.get_body_by_name(name=name)
+                    parent_body = world.get_body_by_name(name=parent_name)
 
                     parent_T_child = HomogeneousTransformationMatrix(obj.matrix)
 
@@ -235,6 +236,6 @@ class FBXParser(MeshParser):
                         child=obj_body,
                         parent_T_connection_expression=parent_T_child,
                     )
-                    world.add_connection(connection)
+                    world.add_connection(connection=connection)
 
         return world

@@ -255,13 +255,15 @@ def _mounted_camera_bodies(world: World) -> tuple[Body, Body]:
     camera_body = Body(name=PrefixedName(name="color_optical_frame"))
     with world.modify_world():
         for body in (reference, robot_body, camera_body):
-            world.add_body(body)
+            world.add_body(body=body)
         for parent, child in (
             (reference, robot_body),
             (robot_body, camera_body),
         ):
             world.add_connection(
-                Connection6DoF.create_with_dofs(parent=parent, child=child, world=world)
+                connection=Connection6DoF.create_with_dofs(
+                    parent=parent, child=child, world=world
+                )
             )
     return reference, camera_body
 
@@ -339,10 +341,10 @@ def test_tf_binding_keeps_robot_camera_attached_to_the_world_frame(
     reference = Body(name=PrefixedName(name="map"))
     camera_body = Body(name=PrefixedName(name="color_optical_frame"))
     with runtime_world.modify_world():
-        runtime_world.add_body(reference)
-        runtime_world.add_body(camera_body)
+        runtime_world.add_body(body=reference)
+        runtime_world.add_body(body=camera_body)
         runtime_world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 parent=reference, child=camera_body, world=runtime_world
             )
         )
@@ -386,7 +388,10 @@ def test_mismatched_pose_child_is_rejected_at_acquisition(
             modalities=(CameraModality.COLOR,),
             world_T_camera=pose,
         )
-    assert runtime_world.get_semantic_annotations_by_type(Camera) == []
+    assert (
+        runtime_world.get_semantic_annotations_by_type(semantic_annotation_type=Camera)
+        == []
+    )
 
 
 def test_camera_observation_reuses_camera_rooted_in_stream_frame(
@@ -408,8 +413,8 @@ def test_camera_observation_reuses_camera_rooted_in_stream_frame(
         modalities=(CameraModality.COLOR,),
     )
     with runtime_world.modify_world():
-        runtime_world.add_body(camera_body)
-        runtime_world.add_semantic_annotation(camera)
+        runtime_world.add_body(body=camera_body)
+        runtime_world.add_semantic_annotation(semantic_annotation=camera)
     cas = CAS()
     world_T_camera = camera_body.global_transform
     interface = CameraInterface(BaseCameraConfig(interface_type="test"))
@@ -453,7 +458,9 @@ def test_camera_observation_creates_standalone_camera_without_world_pose(
         world_T_camera=None,
     )
 
-    cameras = runtime_world.get_semantic_annotations_by_type(Camera)
+    cameras = runtime_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Camera
+    )
     assert cameras == [cas.camera_observation.camera]
     assert cas.camera_observation.camera.root.name.name == camera_info.header.frame_id
     assert cas.camera_observation.world_T_camera is None
@@ -472,7 +479,7 @@ def test_camera_observation_connects_new_camera_in_rooted_world_without_pose(
     """
     world_root = Body(name=PrefixedName(name="world"))
     with runtime_world.modify_world():
-        runtime_world.add_body(world_root)
+        runtime_world.add_body(body=world_root)
     interface = CameraInterface(BaseCameraConfig(interface_type="test"))
     cas = CAS()
 
@@ -849,7 +856,7 @@ def test_tf_binding_attaches_existing_camera_root_to_new_reference(
     """
     camera_body = Body(name=PrefixedName(name="standalone_camera"))
     with runtime_world.modify_world():
-        runtime_world.add_body(camera_body)
+        runtime_world.add_body(body=camera_body)
     numeric_pose = HomogeneousTransformationMatrix()
 
     pose = CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(

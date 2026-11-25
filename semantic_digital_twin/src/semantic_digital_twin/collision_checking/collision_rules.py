@@ -66,7 +66,7 @@ class AvoidCollisionRule(CollisionRule, ABC):
     Collision checks computed by the last update of the rule.
     """
 
-    def applies_to(self, body_a: Body, body_b: Body) -> bool:
+    def applies_to(self, *, body_a: Body, body_b: Body) -> bool:
         """
         Returns True if the rule configures collision distances for the given body.
         """
@@ -76,20 +76,30 @@ class AvoidCollisionRule(CollisionRule, ABC):
             in self.added_collision_checks
         )
 
-    def buffer_zone_distance_for(self, body_a: Body, body_b: Body) -> float | None:
+    def buffer_zone_distance_for(self, *, body_a: Body, body_b: Body) -> float | None:
         """
         Returns the configured buffer-zone distance for the body or None if not applicable.
         """
-        return self.buffer_zone_distance if self.applies_to(body_a, body_b) else None
+        return (
+            self.buffer_zone_distance
+            if self.applies_to(body_a=body_a, body_b=body_b)
+            else None
+        )
 
-    def violated_distance_for(self, body_a: Body, body_b: Body) -> float | None:
+    def violated_distance_for(self, *, body_a: Body, body_b: Body) -> float | None:
         """
         Returns the configured violated distance for the body or None if not applicable.
         """
-        return self.violated_distance if self.applies_to(body_a, body_b) else None
+        return (
+            self.violated_distance
+            if self.applies_to(body_a=body_a, body_b=body_b)
+            else None
+        )
 
-    def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
-        collision_matrix.add_collision_checks(self.added_collision_checks)
+    def apply_to_collision_matrix(self, *, collision_matrix: CollisionMatrix):
+        collision_matrix.add_collision_checks(
+            collision_checks=self.added_collision_checks
+        )
 
 
 @dataclass(kw_only=True)
@@ -111,8 +121,10 @@ class AllowCollisionRule(CollisionRule, ABC):
     Set of bodies that are allowed to collide.
     """
 
-    def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
-        collision_matrix.remove_collision_checks(self.allowed_collision_pairs)
+    def apply_to_collision_matrix(self, *, collision_matrix: CollisionMatrix):
+        collision_matrix.remove_collision_checks(
+            collision_checks=self.allowed_collision_pairs
+        )
         collision_matrix.collision_checks = {
             collision_check
             for collision_check in collision_matrix.collision_checks
@@ -120,11 +132,11 @@ class AllowCollisionRule(CollisionRule, ABC):
             and collision_check.body_b not in self.allowed_collision_bodies
         }
 
-    def update(self, world: World):
-        if not self.is_up_to_date(world):
+    def update(self, *, world: World):
+        if not self.is_up_to_date(world=world):
             self.allowed_collision_pairs = set()
             self.allowed_collision_bodies = set()
-        super().update(world)
+        super().update(world=world)
 
 
 @dataclass(kw_only=True)
@@ -142,7 +154,7 @@ class AvoidCollisionBetweenGroups(AvoidCollisionRule):
     List of bodies that should not collide with bodies in `body_group_a`.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         self.added_collision_checks = set()
         for body_a in self.body_group_a:
             for body_b in self.body_group_b:
@@ -160,7 +172,7 @@ class AvoidAllCollisions(AvoidCollisionRule):
     Adds collision checks between all body pairs of the world managed by the rule to the collision matrix.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         self.added_collision_checks = set()
         for body_a, body_b in combinations(world.bodies_with_collision, 2):
             collision_check = CollisionCheck.create_for_bodies_with_collision(
@@ -195,7 +207,7 @@ class AvoidExternalCollisions(AvoidCollisionRule, SubclassJSONSerializer):
             return
         self.body_subset = {body for body in self.body_subset if body.has_collision()}
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         robot_bodies = set(self.robot.bodies_with_collision)
         external_bodies = set(world.bodies_with_collision) - robot_bodies
         if self.body_subset is not None:
@@ -256,10 +268,10 @@ class AvoidSelfCollisions(AvoidCollisionRule):
     The robot managed by the rule.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         self.added_collision_checks = set(
             CollisionCheck.create_for_bodies_with_collision(
-                body_a, body_b, distance=self.buffer_zone_distance
+                body_a=body_a, body_b=body_b, distance=self.buffer_zone_distance
             )
             for body_a, body_b in combinations(self.robot.bodies_with_collision, 2)
         )
@@ -271,7 +283,7 @@ class AllowAllCollisions(AllowCollisionRule):
     Removed all collision checks from the collision matrix.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         self.allowed_collision_bodies = set(world.bodies_with_collision)
 
 
@@ -286,7 +298,7 @@ class AllowCollisionForBodies(AllowCollisionRule):
     The set of bodies for which all collisions should be allowed.
     """
 
-    def _update(self, world: World): ...
+    def _update(self, *, world: World): ...
 
 
 @dataclass(kw_only=True)
@@ -304,7 +316,7 @@ class AllowCollisionBetweenGroups(AllowCollisionRule):
     The second group of bodies.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         self.allowed_collision_pairs = set()
         for body_a in self.body_group_a:
             for body_b in self.body_group_b:
@@ -332,7 +344,7 @@ class AllowCollisionForEndEffector(AllowCollisionRule):
     The end effector that may touch anything.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         self.allowed_collision_bodies = set(self.end_effector.bodies_with_collision)
 
 
@@ -347,13 +359,17 @@ class AllowCollisionBetweenEndEffectorsAndHeldBodies(AllowCollisionRule):
     of the robot.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         # robot_parts imports the world, which imports the collision rules
         from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
         self.allowed_collision_pairs = {
-            CollisionCheck.create_for_bodies_with_collision(held_body, body)
-            for robot in world.get_semantic_annotations_by_type(AbstractRobot)
+            CollisionCheck.create_for_bodies_with_collision(
+                body_a=held_body, body_b=body
+            )
+            for robot in world.get_semantic_annotations_by_type(
+                semantic_annotation_type=AbstractRobot
+            )
             for end_effector in robot.all_end_effectors
             for held_body in end_effector.held_bodies
             for body in end_effector.bodies_with_collision
@@ -367,7 +383,7 @@ class AllowNonRobotCollisions(AllowCollisionRule):
     Allows collision checks between all bodies that do not belong to any robot.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         """
         Disable collision checks between bodies that do not belong to any robot.
         """
@@ -398,9 +414,11 @@ class AllowSelfCollisions(AllowCollisionRule):
     The robot for which self-collisions should be allowed.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         self.allowed_collision_pairs = set(
-            CollisionCheck.create_for_bodies_with_collision(body_a, body_b)
+            CollisionCheck.create_for_bodies_with_collision(
+                body_a=body_a, body_b=body_b
+            )
             for body_a, body_b in combinations(self.robot.bodies_with_collision, 2)
         )
 
@@ -427,20 +445,20 @@ class AllowDefaultInCollision(AllowCollisionRule):
     The distance used for collision checking to decide if a robot is in collision by default.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         with world.reset_state_context():
-            self.set_robot_to_default_state(world)
+            self.set_robot_to_default_state(world=world)
             collision_matrix = CollisionMatrix()
             rule = AvoidCollisionBetweenGroups(
                 buffer_zone_distance=self.collision_threshold,
                 body_group_a=self.bodies,
                 body_group_b=self.bodies,
             )
-            rule.update(world)
-            rule.apply_to_collision_matrix(collision_matrix)
+            rule.update(world=world)
+            rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
             closest_points = (
                 world.collision_manager.collision_detector.check_collisions(
-                    collision_matrix
+                    collision_matrix=collision_matrix
                 )
             )
             self.allowed_collision_pairs = {
@@ -448,7 +466,7 @@ class AllowDefaultInCollision(AllowCollisionRule):
                 for closest_point in closest_points.contacts
             }
 
-    def set_robot_to_default_state(self, world: World):
+    def set_robot_to_default_state(self, *, world: World):
         for degree_of_freedom in self.robot.degrees_of_freedom_with_hardware_interface:
             if degree_of_freedom.has_position_limits():
                 lower_limit = degree_of_freedom.limits.lower.position
@@ -492,7 +510,7 @@ class AllowAlwaysInCollision(AllowCollisionRule):
     The percentage of tries that must result in collision for the rule to allow collision.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         collision_matrix = CollisionMatrix()
         collision_matrix.collision_checks = self.collision_checks
         for collision_check in self.collision_checks:
@@ -500,10 +518,10 @@ class AllowAlwaysInCollision(AllowCollisionRule):
         with world.reset_state_context():
             counts: dict[CollisionCheck, int] = defaultdict(int)
             for try_id in range(int(self.number_of_tries)):
-                self.set_robot_to_rnd_state(world)
+                self.set_robot_to_rnd_state(world=world)
                 closest_points = (
                     world.collision_manager.collision_detector.check_collisions(
-                        collision_matrix
+                        collision_matrix=collision_matrix
                     )
                 )
                 for closest_point in closest_points.contacts:
@@ -515,7 +533,7 @@ class AllowAlwaysInCollision(AllowCollisionRule):
                 if count > self.number_of_tries * self.almost_percentage:
                     self.allowed_collision_pairs.add(collision_check)
 
-    def set_robot_to_rnd_state(self, world: World):
+    def set_robot_to_rnd_state(self, *, world: World):
         for degree_of_freedom in self.robot.degrees_of_freedom_with_hardware_interface:
             if degree_of_freedom.has_position_limits():
                 lower_limit = degree_of_freedom.limits.lower.position
@@ -577,7 +595,7 @@ class AllowNeverInCollision(AllowCollisionRule):
         if self.progress_callback is None:
             self.progress_callback = lambda value, text: None
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         collision_matrix = CollisionMatrix()
         collision_matrix.collision_checks = self.collision_checks
         for collision_check in self.collision_checks:
@@ -586,10 +604,10 @@ class AllowNeverInCollision(AllowCollisionRule):
             one_percent = self.number_of_tries // 100
             distances_cache: dict[CollisionCheck, list[float]] = defaultdict(list)
             for try_id in range(int(self.number_of_tries)):
-                self.set_robot_to_rnd_state(world)
+                self.set_robot_to_rnd_state(world=world)
                 closest_points = (
                     world.collision_manager.collision_detector.check_collisions(
-                        collision_matrix
+                        collision_matrix=collision_matrix
                     )
                 )
                 self._update_collision_matrix(
@@ -599,11 +617,14 @@ class AllowNeverInCollision(AllowCollisionRule):
                 )
                 if try_id % one_percent == 0:
                     self.progress_callback(try_id // one_percent, "checking collisions")
-            self._allow_close_but_never_pairs(distances_cache)
-            self._allow_never_pairs(collision_matrix, distances_cache)
+            self._allow_close_but_never_pairs(distances_cache=distances_cache)
+            self._allow_never_pairs(
+                collision_matrix=collision_matrix, distances_cache=distances_cache
+            )
 
     def _update_collision_matrix(
         self,
+        *,
         closest_points: CollisionCheckingResult,
         collision_matrix: CollisionMatrix,
         distance_ranges: dict[CollisionCheck, list[float]],
@@ -621,7 +642,7 @@ class AllowNeverInCollision(AllowCollisionRule):
                 del distance_ranges[collision_check]
 
     def _allow_close_but_never_pairs(
-        self, distances_cache: dict[CollisionCheck, list[float]]
+        self, *, distances_cache: dict[CollisionCheck, list[float]]
     ):
         for key, distances in list(distances_cache.items()):
             mean = np.mean(distances)
@@ -636,13 +657,14 @@ class AllowNeverInCollision(AllowCollisionRule):
 
     def _allow_never_pairs(
         self,
+        *,
         collision_matrix: CollisionMatrix,
         distances_cache: dict[CollisionCheck, list[float]],
     ):
         never = collision_matrix.collision_checks - set(distances_cache.keys())
         self.allowed_collision_pairs.update(never)
 
-    def set_robot_to_rnd_state(self, world: World):
+    def set_robot_to_rnd_state(self, *, world: World):
         for degree_of_freedom in self.robot.degrees_of_freedom_with_hardware_interface:
             if degree_of_freedom.has_position_limits():
                 lower_limit = degree_of_freedom.limits.lower.position
@@ -671,12 +693,14 @@ class AllowCollisionBetweenFingers(AllowCollisionRule):
     The robot whose grippers' fingers may touch.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         # robot_part_mixins imports the robot parts, which import the world
         from semantic_digital_twin.robots.robot_part_mixins import HasFingers
 
         self.allowed_collision_pairs = {
-            CollisionCheck.create_for_bodies_with_collision(body_a, body_b)
+            CollisionCheck.create_for_bodies_with_collision(
+                body_a=body_a, body_b=body_b
+            )
             for end_effector in self.robot.all_end_effectors
             if isinstance(end_effector, HasFingers)
             for finger_a, finger_b in combinations(end_effector.fingers, 2)
@@ -703,28 +727,33 @@ class AllowCollisionForAdjacentPairs(AllowCollisionRule):
     Adjacent bodies in the kinematic chain that are not separated by a controlled joint are allowed to collide.
     """
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         bodies_with_collision = world.bodies_with_collision
         bodies_by_highest_uncontrolled_ancestor = defaultdict(list)
         for body in bodies_with_collision:
             bodies_by_highest_uncontrolled_ancestor[
-                self._highest_ancestor_reached_without_controlled_connection(body)
+                self._highest_ancestor_reached_without_controlled_connection(body=body)
             ].append(body)
         for bodies in bodies_by_highest_uncontrolled_ancestor.values():
             for body_a, body_b in combinations(bodies, 2):
                 self.allowed_collision_pairs.add(
-                    CollisionCheck.create_for_bodies_with_collision(body_a, body_b)
+                    CollisionCheck.create_for_bodies_with_collision(
+                        body_a=body_a, body_b=body_b
+                    )
                 )
         bodies_with_collision = set(bodies_with_collision)
         for body in bodies_with_collision:
             parent = body.parent_kinematic_structure_entity
             if parent in bodies_with_collision:
                 self.allowed_collision_pairs.add(
-                    CollisionCheck.create_for_bodies_with_collision(parent, body)
+                    CollisionCheck.create_for_bodies_with_collision(
+                        body_a=parent, body_b=body
+                    )
                 )
 
     @staticmethod
     def _highest_ancestor_reached_without_controlled_connection(
+        *,
         body: Body,
     ) -> KinematicStructureEntity:
         """
@@ -766,20 +795,20 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
     This is redeclared from super to set init=True
     """
 
-    def update(self, world: World):
+    def update(self, *, world: World):
         """
         Updates the rule based on the current world state.
         """
         ...
 
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         """
         Internal update method.
         """
         ...
 
     @classmethod
-    def from_collision_srdf(cls, file_path: str, world: World) -> Self:
+    def from_collision_srdf(cls, *, file_path: str, world: World) -> Self:
         """
         Creates a CollisionConfig instance from an SRDF file.
 
@@ -802,7 +831,7 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
         ]
 
         for c in child_disable_collisions:
-            body = world.get_body_by_name(c.attrib["link"])
+            body = world.get_body_by_name(name=c.attrib["link"])
             self.allowed_collision_bodies.add(body)
 
         child_disable_moveit_and_self_collision = [
@@ -815,9 +844,11 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
         disabled_collision_pairs = [
             (body_a, body_b)
             for child in child_disable_moveit_and_self_collision
-            if (body_a := world.get_body_by_name(child.attrib["link1"])).has_collision()
+            if (
+                body_a := world.get_body_by_name(name=child.attrib["link1"])
+            ).has_collision()
             and (
-                body_b := world.get_body_by_name(child.attrib["link2"])
+                body_b := world.get_body_by_name(name=child.attrib["link2"])
             ).has_collision()
         ]
 
@@ -825,7 +856,9 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
             if body_a == body_b:
                 continue
             self.allowed_collision_pairs.add(
-                CollisionCheck.create_for_bodies_with_collision(body_a, body_b)
+                CollisionCheck.create_for_bodies_with_collision(
+                    body_a=body_a, body_b=body_b
+                )
             )
         return self
 
@@ -853,6 +886,7 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
 
     def compute_self_collision_matrix(
         self,
+        *,
         robot: AbstractRobot,
         distance_threshold_zero: float = 0.0,
         distance_threshold_always: float = 0.005,
@@ -889,24 +923,24 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
         # %% 0. GENERATE ALL POSSIBLE LINK PAIRS
         collision_matrix = CollisionMatrix()
         rule = AvoidSelfCollisions(robot=robot)
-        rule.update(robot._world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=robot._world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
 
         rule = AllowCollisionForBodies(
             allowed_collision_bodies=self.allowed_collision_bodies
         )
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
 
         # %%
         rule = AllowCollisionForAdjacentPairs()
-        rule.update(robot._world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=robot._world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         self.allowed_collision_pairs.update(rule.allowed_collision_pairs)
 
         # %%
         rule = AllowCollisionBetweenFingers(robot=robot)
-        rule.update(robot._world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=robot._world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         self.allowed_collision_pairs.update(rule.allowed_collision_pairs)
 
         # %%
@@ -915,8 +949,8 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
             bodies=robot.bodies_with_collision,
             collision_threshold=distance_threshold_zero,
         )
-        rule.update(robot._world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=robot._world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         self.allowed_collision_pairs.update(rule.allowed_collision_pairs)
 
         # %%
@@ -927,8 +961,8 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
             almost_percentage=almost_percentage,
             collision_checks=collision_matrix.collision_checks,
         )
-        rule.update(robot._world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=robot._world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         self.allowed_collision_pairs.update(rule.allowed_collision_pairs)
 
         # %%
@@ -942,8 +976,8 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
             collision_checks=collision_matrix.collision_checks,
             progress_callback=progress_callback,
         )
-        rule.update(robot._world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=robot._world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         self.allowed_collision_pairs.update(rule.allowed_collision_pairs)
 
         self.allowed_collision_pairs = {
@@ -955,6 +989,7 @@ class SelfCollisionMatrixRule(AllowCollisionRule, SubclassJSONSerializer):
 
     def save_self_collision_matrix(
         self,
+        *,
         robot_name: str,
         file_name: str,
     ):

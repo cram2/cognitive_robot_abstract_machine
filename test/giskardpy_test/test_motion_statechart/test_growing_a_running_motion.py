@@ -21,7 +21,7 @@ def _torso_goal(world, position: float) -> Sequence:
         nodes=[
             JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {PR2Joint.TORSO_LIFT: position}, world=world
+                    mapping={PR2Joint.TORSO_LIFT: position}, world=world
                 )
             )
         ]
@@ -29,7 +29,7 @@ def _torso_goal(world, position: float) -> Sequence:
 
 
 def _torso_position(world) -> float:
-    return world.get_connection_by_name(PR2Joint.TORSO_LIFT).position
+    return world.get_connection_by_name(name=PR2Joint.TORSO_LIFT).position
 
 
 # %% growing a running motion

@@ -80,8 +80,8 @@ with world.modify_world():
     world_C_base = Connection6DoF.create_with_dofs(parent=root, child=base_body, world=world)
     base_C_camera = Connection6DoF.create_with_dofs(parent=base_body, child=camera_body, world=world)
 
-    world.add_connection(world_C_base)
-    world.add_connection(base_C_camera)
+    world.add_connection(connection=world_C_base)
+    world.add_connection(connection=base_C_camera)
 
 # Set origins in a separate modification block so FK is compiled first
 with world.modify_world():

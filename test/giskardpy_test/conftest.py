@@ -228,7 +228,7 @@ def pr2_with_box(pr2_world_copy) -> World:
                 x=1.2, z=0.3, reference_frame=pr2_world_copy.root
             ),
         )
-        pr2_world_copy.add_connection(root_C_box)
+        pr2_world_copy.add_connection(connection=root_C_box)
     return pr2_world_copy
 
 
@@ -236,14 +236,14 @@ def pr2_with_box(pr2_world_copy) -> World:
 def giskard_factory(init_background_node, robot: GiskardTester):
     def _create_giskard(seed_joint_state: dict[str, float]) -> GiskardTester:
         parse_seed_joint_state = {
-            robot.api.world.get_connection_by_name(name): target
+            robot.api.world.get_connection_by_name(name=name): target
             for name, target in seed_joint_state.items()
         }
         statechart = Statechart(context=robot.api.context)
 
         initial_config = SetSeedConfiguration(
             name="initial configuration",
-            seed_configuration=JointState.from_mapping(parse_seed_joint_state),
+            seed_configuration=JointState.from_mapping(mapping=parse_seed_joint_state),
         )
         statechart.add_node(node=initial_config)
 
@@ -318,9 +318,9 @@ def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
                 name=PrefixedName(name="robot" if index == 0 else f"robot{index + 1}")
             )
             dof = DegreeOfFreedom(limits=limits, has_hardware_interface=True)
-            world.add_degree_of_freedom(dof)
+            world.add_degree_of_freedom(dof=dof)
             world.add_connection(
-                ScrewAxisConnection(
+                connection=ScrewAxisConnection(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                         axis=Vector3.Z()
                     ),
@@ -329,7 +329,7 @@ def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
                     raw_dof=dof,
                 )
             )
-    MinimalRobot.from_world(world)
+    MinimalRobot.from_world(world=world)
     return world
 
 
@@ -417,7 +417,9 @@ def pr2_world_specification() -> WorldSpecification:
     """
     The PR2 alone, as Giskard sets it up.
     """
-    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(PR2)])
+    return WorldSpecification(
+        robots=[RobotSpecification.specify_real_robot(semantic_annotation_type=PR2)]
+    )
 
 
 @pytest.fixture()
@@ -425,7 +427,9 @@ def hsr_world_specification() -> WorldSpecification:
     """
     The HSR alone, as Giskard sets it up.
     """
-    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(HSRB)])
+    return WorldSpecification(
+        robots=[RobotSpecification.specify_real_robot(semantic_annotation_type=HSRB)]
+    )
 
 
 @pytest.fixture()
@@ -433,7 +437,9 @@ def stretch_world_specification() -> WorldSpecification:
     """
     Stretch alone, as Giskard sets it up.
     """
-    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(Stretch)])
+    return WorldSpecification(
+        robots=[RobotSpecification.specify_real_robot(semantic_annotation_type=Stretch)]
+    )
 
 
 @pytest.fixture()
@@ -441,7 +447,9 @@ def tracy_world_specification() -> WorldSpecification:
     """
     Tracy alone, as Giskard sets it up.
     """
-    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(Tracy)])
+    return WorldSpecification(
+        robots=[RobotSpecification.specify_real_robot(semantic_annotation_type=Tracy)]
+    )
 
 
 @pytest.fixture()
@@ -449,7 +457,9 @@ def daisy_world_specification() -> WorldSpecification:
     """
     DAiSy alone, as Giskard sets it up.
     """
-    return WorldSpecification(robots=[RobotSpecification.specify_real_robot(DAiSy)])
+    return WorldSpecification(
+        robots=[RobotSpecification.specify_real_robot(semantic_annotation_type=DAiSy)]
+    )
 
 
 # %% the ORM mappers the tests use

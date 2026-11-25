@@ -41,7 +41,7 @@ class NamedSpecification(ABC):
     ``None`` defers naming to materialization.
     """
 
-    def _resolved_name(self, name: str | None = None) -> PrefixedName | None:
+    def _resolved_name(self, *, name: str | None = None) -> PrefixedName | None:
         """
         Normalize the spawn-time name override, or the spec's own name, into a
         :class:`PrefixedName`.
@@ -71,6 +71,7 @@ class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
     @abstractmethod
     def spawn(
         self,
+        *,
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,

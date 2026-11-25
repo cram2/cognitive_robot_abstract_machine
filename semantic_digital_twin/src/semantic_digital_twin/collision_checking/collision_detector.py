@@ -154,7 +154,9 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
                     collision_fks.append(HomogeneousTransformationMatrix())
                 continue
             collision_fks.append(
-                self._world.compose_forward_kinematics_expression(world_root, body)
+                self._world.compose_forward_kinematics_expression(
+                    root=world_root, tip=body
+                )
             )
         collision_fks = Matrix.vstack(list_of_matrices=collision_fks)
 
@@ -216,7 +218,7 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     def get_all_collision_fks(self) -> np.ndarray:
         return self.world_model_updater.compiled_collision_fks._out
 
-    def get_collision_fk(self, body_id: UUID):
+    def get_collision_fk(self, *, body_id: UUID):
         pass
 
     @abc.abstractmethod
@@ -233,7 +235,7 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
 
     @abc.abstractmethod
     def check_collisions(
-        self, collision_matrix: CollisionMatrix
+        self, *, collision_matrix: CollisionMatrix
     ) -> CollisionCheckingResult:
         """
         Computes the collisions for all checks in the collision matrix.
@@ -244,7 +246,7 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
         """
 
     def check_collision_between_bodies(
-        self, body_a: Body, body_b: Body, distance: float = 0.0
+        self, *, body_a: Body, body_b: Body, distance: float = 0.0
     ) -> ClosestPoints | None:
         """
         Checks for collisions between two bodies.
@@ -256,9 +258,11 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
             None.
         """
         collision = self.check_collisions(
-            CollisionMatrix(
+            collision_matrix=CollisionMatrix(
                 collision_checks={
-                    CollisionCheck.create_and_validate(body_a, body_b, distance)
+                    CollisionCheck.create_and_validate(
+                        body_a=body_a, body_b=body_b, distance=distance
+                    )
                 }
             )
         )

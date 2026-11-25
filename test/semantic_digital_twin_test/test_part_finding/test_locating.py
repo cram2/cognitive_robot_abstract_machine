@@ -112,7 +112,9 @@ def all_around() -> CameraRing:
         directions=[
             direction
             for elevation in (-40.0, 25.0, 65.0)
-            for direction in ViewDirection.around(8, np.radians(elevation))
+            for direction in ViewDirection.around(
+                perspectives=8, elevation=np.radians(elevation)
+            )
         ],
         resolution=CameraResolution(width=128, height=128),
     )
@@ -174,7 +176,9 @@ def test_asking_for_a_relationship_the_annotation_does_not_have_fails():
 
 def test_a_query_survives_being_sent_as_json():
     mesh, _ = mug_with_handle()
-    query = PartQuery.from_mesh(mesh, Mug, ["handle"])
+    query = PartQuery.from_mesh(
+        mesh=mesh, whole_type=Mug, relationship_names=["handle"]
+    )
 
     received = from_json(json.loads(json.dumps(to_json(query))))
 
@@ -191,7 +195,11 @@ def test_the_faces_of_a_handle_are_located():
     mesh, handle_faces = mug_with_handle()
     locator = stand_in_locator({"handle": [handle_faces]})
 
-    [located] = locator.locate(PartQuery.from_mesh(mesh, Mug, ["handle"]))
+    [located] = locator.locate(
+        query=PartQuery.from_mesh(
+            mesh=mesh, whole_type=Mug, relationship_names=["handle"]
+        )
+    )
 
     assert located.relationship_name == "handle"
     assert set(located.faces) == set(handle_faces)
@@ -202,14 +210,25 @@ def test_a_part_no_view_shows_is_not_located():
     mesh, _ = mug_with_handle()
     locator = stand_in_locator({})
 
-    assert locator.locate(PartQuery.from_mesh(mesh, Mug, ["handle"])) == []
+    assert (
+        locator.locate(
+            query=PartQuery.from_mesh(
+                mesh=mesh, whole_type=Mug, relationship_names=["handle"]
+            )
+        )
+        == []
+    )
 
 
 def test_of_two_handles_found_for_one_the_most_likely_is_located():
     mesh, handle_faces = pot_with_handles()
     locator = stand_in_locator({"handle": handle_faces})
 
-    [located] = locator.locate(PartQuery.from_mesh(mesh, Mug, ["handle"]))
+    [located] = locator.locate(
+        query=PartQuery.from_mesh(
+            mesh=mesh, whole_type=Mug, relationship_names=["handle"]
+        )
+    )
 
     assert set(located.faces) == set(handle_faces[0])
 
@@ -218,7 +237,11 @@ def test_each_handle_of_a_pot_is_located_on_its_own():
     mesh, handle_faces = pot_with_handles()
     locator = stand_in_locator({"handle": handle_faces})
 
-    located = locator.locate(PartQuery.from_mesh(mesh, Pot, ["handles"]))
+    located = locator.locate(
+        query=PartQuery.from_mesh(
+            mesh=mesh, whole_type=Pot, relationship_names=["handles"]
+        )
+    )
 
     assert sorted(sorted(part.faces) for part in located) == sorted(
         sorted(faces) for faces in handle_faces
@@ -229,7 +252,11 @@ def test_each_of_many_parts_is_located_on_its_own():
     mesh, leg_faces = table_with_legs()
     locator = stand_in_locator({"leg": leg_faces})
 
-    located = locator.locate(PartQuery.from_mesh(mesh, DiningTable, ["legs"]))
+    located = locator.locate(
+        query=PartQuery.from_mesh(
+            mesh=mesh, whole_type=DiningTable, relationship_names=["legs"]
+        )
+    )
 
     assert sorted(sorted(part.faces) for part in located) == sorted(
         sorted(faces) for faces in leg_faces
@@ -241,7 +268,7 @@ def test_located_faces_are_found_again_by_where_they_are():
     finder = LocatedFacesFinder(face_centers=mesh.triangles_center[handle_faces])
     shuffled = mesh.submesh([np.random.default_rng(0).permutation(len(mesh.faces))])[0]
 
-    split = finder.split(shuffled)
+    split = finder.split(mesh=shuffled)
 
     assert len(split.part.faces) == len(handle_faces)
     assert np.allclose(split.part.bounds, mesh.submesh([handle_faces])[0].bounds)
@@ -270,8 +297,8 @@ def annotate(mesh: trimesh.Trimesh, annotation_type: type[HasRootBody]) -> HasRo
     body.collision = shapes
     annotation = annotation_type(root=body)
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -357,7 +384,7 @@ def test_the_pipeline_step_gives_every_mug_its_handle():
         ),
     )
 
-    step.apply(mug._world)
+    step.apply(world=mug._world)
 
     assert isinstance(mug.handle, Handle)
     assert len(mug._world.bodies) == 2
@@ -367,7 +394,7 @@ def test_the_pipeline_step_gives_every_mug_its_handle():
 
 
 def test_the_question_names_the_part_and_the_whole():
-    question = PartBoxPrompt().question("handle", "mug")
+    question = PartBoxPrompt().question(part_name="handle", whole_name="mug")
     assert question == (
         "Locate the handle of the mug in the image. Output its bounding boxes in JSON "
         'format as [{"bbox_2d": [x1, y1, x2, y2], "label": "handle"}]. If no handle is '
@@ -378,4 +405,4 @@ def test_the_question_names_the_part_and_the_whole():
 def test_a_question_with_an_unknown_placeholder_fails():
     prompt = PartBoxPrompt(template="Where is the {{ prat }} of the {{ whole }}?")
     with pytest.raises(jinja2.UndefinedError):
-        prompt.question("handle", "mug")
+        prompt.question(part_name="handle", whole_name="mug")

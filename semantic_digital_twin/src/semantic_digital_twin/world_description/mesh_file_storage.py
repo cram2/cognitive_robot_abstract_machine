@@ -40,7 +40,7 @@ class MeshFileSources(metaclass=SingletonMeta):
     The sources consulted, in order of precedence.
     """
 
-    def use(self, source: PathResolver) -> None:
+    def use(self, *, source: PathResolver) -> None:
         """
         Register a source, ahead of those registered before it.
 
@@ -48,14 +48,14 @@ class MeshFileSources(metaclass=SingletonMeta):
         """
         self.sources.insert(0, source)
 
-    def resolve(self, uri: str) -> Path:
+    def resolve(self, *, uri: str) -> Path:
         """
         :param uri: The reference a mesh records.
         :return: The readable local path of the file it names.
         """
         for source in self.sources:
-            if source.supports(uri):
-                return Path(source.resolve(uri))
+            if source.supports(uri=uri):
+                return Path(source.resolve(uri=uri))
         return Path(uri)
 
 
@@ -68,7 +68,7 @@ class ProcessLiveness(ABC):
     """
 
     @abstractmethod
-    def is_alive(self, process_id: int) -> bool:
+    def is_alive(self, *, process_id: int) -> bool:
         """
         :param process_id: The process to ask about.
         :return: Whether a process with that id is running.
@@ -81,7 +81,7 @@ class RunningProcessLiveness(ProcessLiveness):
     Answers from the process table of the machine this runs on.
     """
 
-    def is_alive(self, process_id: int) -> bool:
+    def is_alive(self, *, process_id: int) -> bool:
         return psutil.pid_exists(process_id)
 
 
@@ -137,7 +137,7 @@ class MeshFileStorage(metaclass=SingletonMeta):
         self.remove_abandoned_roots()
 
     @staticmethod
-    def create_mesh_directory(parent: Path) -> Path:
+    def create_mesh_directory(*, parent: Path) -> Path:
         """
         Create a directory holding a single mesh export.
 
@@ -155,7 +155,7 @@ class MeshFileStorage(metaclass=SingletonMeta):
 
         :return: The path of the created directory.
         """
-        return self.create_mesh_directory(self.root)
+        return self.create_mesh_directory(parent=self.root)
 
     def remove(self) -> None:
         """
@@ -186,6 +186,6 @@ class MeshFileStorage(metaclass=SingletonMeta):
             process_id = candidate.name[len(self.root_prefix) :].split("_")[0]
             if not process_id.isdigit():
                 continue
-            if self.process_liveness.is_alive(int(process_id)):
+            if self.process_liveness.is_alive(process_id=int(process_id)):
                 continue
             shutil.rmtree(candidate, ignore_errors=True)

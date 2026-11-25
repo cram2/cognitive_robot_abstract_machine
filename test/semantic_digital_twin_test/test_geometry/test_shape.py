@@ -269,7 +269,7 @@ def milk_file_outside_any_package(tmp_path) -> Path:
     """
     milk_file = tmp_path / "milk.stl"
     shutil.copy(
-        PackageUriResolver().resolve("package://iai_objects/objects/milk.stl"),
+        PackageUriResolver().resolve(uri="package://iai_objects/objects/milk.stl"),
         milk_file,
     )
     return milk_file
@@ -547,10 +547,10 @@ def test_mesh_in_frame_applies_the_owning_bodys_world_transform():
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName(name="map"))
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
         obstacle = Body(name=PrefixedName(name="obstacle"))
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=root,
                 child=obstacle,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -559,9 +559,9 @@ def test_mesh_in_frame_applies_the_owning_bodys_world_transform():
             )
         )
         shape = Box(scale=Scale(x=1.0, y=1.0, z=1.0))
-        obstacle.collision.append(shape)
+        obstacle.collision.append(shape=shape)
 
-    world_mesh = shape.mesh_in_frame(root)
+    world_mesh = shape.mesh_in_frame(target_frame=root)
 
     np.testing.assert_allclose(
         world_mesh.bounds, shape.mesh.bounds + np.array([2.0, 0.0, 0.0])
@@ -572,15 +572,17 @@ def test_mesh_in_frame_in_the_shapes_own_frame_matches_its_local_mesh():
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName(name="map"))
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
         obstacle = Body(name=PrefixedName(name="obstacle"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+            connection=FixedConnection.create_with_dofs(
+                world=world, parent=root, child=obstacle
+            )
         )
         shape = Box(scale=Scale(x=1.0, y=1.0, z=1.0))
-        obstacle.collision.append(shape)
+        obstacle.collision.append(shape=shape)
 
-    world_mesh = shape.mesh_in_frame(obstacle)
+    world_mesh = shape.mesh_in_frame(target_frame=obstacle)
 
     np.testing.assert_allclose(world_mesh.bounds, shape.mesh.bounds)
 

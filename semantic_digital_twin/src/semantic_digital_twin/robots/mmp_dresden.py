@@ -79,14 +79,16 @@ class MMPDresdenThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_left_knuckle_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_left_knuckle_link",
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_left_finger_tip_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_left_finger_tip_link",
             ),
         )
 
@@ -101,14 +103,16 @@ class MMPDresdenIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_right_knuckle_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_right_knuckle_link",
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_right_finger_tip_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_right_finger_tip_link",
             ),
         )
 
@@ -126,7 +130,7 @@ class MMPDresdenGripper(
         gripper mimics, at its lower limit and closed with it at its upper limit.
         """
         knuckle: ActiveConnection1DOF = self._world.get_connection_by_name(
-            MMPDresdenJoint.GRIPPER_LEFT_KNUCKLE
+            name=MMPDresdenJoint.GRIPPER_LEFT_KNUCKLE
         )
         limits = knuckle.raw_dof.limits
 
@@ -154,14 +158,14 @@ class MMPDresdenGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_flange"
+                branch_root=robot_root, name="arm_0_flange"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_tool_frame"
+                branch_root=robot_root, name="arm_0_tool_frame"
             ),
         )
 
@@ -170,11 +174,11 @@ class MMPDresdenGripper(
 class MMPDresdenCamera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "pan_and_tilt_camera_color_optical_frame"
+                branch_root=robot_root, name="pan_and_tilt_camera_color_optical_frame"
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
@@ -216,14 +220,14 @@ class MMPDresdenArm(Arm[MMPDresdenGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "hub_holder_link"
+                branch_root=robot_root, name="hub_holder_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_flange"
+                branch_root=robot_root, name="arm_0_flange"
             ),
         )
 
@@ -238,12 +242,14 @@ class MMPDresdenTorso(Torso, HasOneArm[MMPDresdenArm], HasSensors[MMPDresdenCame
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "hub_holder_link"
+                branch_root=robot_root, name="hub_holder_link"
             ),
         )
 
@@ -256,10 +262,12 @@ class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
         )
 
     def setup_hardware_interfaces(self) -> None:

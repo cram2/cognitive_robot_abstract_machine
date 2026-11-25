@@ -44,13 +44,15 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
     demo = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(demo)
     demonstration = demo.BulletWorldDemonstration(used_robot=PR2)
-    world = WorldSpecification.from_urdf(demo.SceneFile.APARTMENT.path).create_world()
+    world = WorldSpecification.from_urdf(
+        file_path=demo.SceneFile.APARTMENT.path
+    ).create_world()
     milk, bowl, spoon = demonstration.milk, demonstration.bowl, demonstration.spoon
     for placed_object in demonstration.place_setting:
         placed_object.spawn(world=world)
-    counter = world.get_body_by_name(ApartmentSurface.COUNTER)
-    spoon_drawer = world.get_body_by_name(ApartmentSurface.SPOON_DRAWER)
-    table = world.get_body_by_name(ApartmentSurface.TABLE)
+    counter = world.get_body_by_name(name=ApartmentSurface.COUNTER)
+    spoon_drawer = world.get_body_by_name(name=ApartmentSurface.SPOON_DRAWER)
+    table = world.get_body_by_name(name=ApartmentSurface.TABLE)
 
     assert SupportedBy(
         supported=milk.annotation_in(world=world).root, supporting=counter
@@ -66,9 +68,9 @@ def test_the_place_setting_rests_where_it_starts_and_where_it_is_laid():
         body = placed_object.annotation_in(world=world).root
         target = placed_object.target_location(world=world).homogeneous_matrix
         with world.modify_world():
-            world.remove_connection(body.parent_connection)
+            world.remove_connection(connection=body.parent_connection)
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=world.root, child=body, parent_T_connection_expression=target
                 )
             )

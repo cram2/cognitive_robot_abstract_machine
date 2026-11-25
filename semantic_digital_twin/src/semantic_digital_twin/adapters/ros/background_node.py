@@ -96,7 +96,7 @@ def init_node(node_name: str) -> None:
     if not rclpy.ok():
         rclpy.init()
     node = Node(node_name)
-    registry.register(node)
+    registry.register(node=node)
     # Registered before the spin thread starts, so a shutdown right after this call
     # already finds the executor to take away.
     executor = MultiThreadedExecutor()
@@ -132,7 +132,7 @@ def shutdown() -> None:
     if spun_executor is not None:
         spun_executor.shutdown()
     if node is not None:
-        registry.clear(node)
+        registry.clear(expected_node=node)
         node.destroy_node()
     if rclpy.ok():
         rclpy.shutdown()

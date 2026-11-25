@@ -51,9 +51,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 def _build_executor(world):
     context = StatechartContext(world=world)
-    milk = world.get_body_by_name("milk.stl")
-    box1 = world.get_body_by_name("box")
-    box2 = world.get_body_by_name("box_2")
+    milk = world.get_body_by_name(name="milk.stl")
+    box1 = world.get_body_by_name(name="box")
+    box2 = world.get_body_by_name(name="box_2")
     segmind_executor = StatechartExecutor(
         context=context, extensions=[EpisodeSegmentation()]
     )
@@ -726,7 +726,7 @@ def box_resting_on_another_beside_a_distant_one():
     distant = _unit_box("distant")
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=bottom,
                 child=top,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -735,7 +735,7 @@ def box_resting_on_another_beside_a_distant_one():
             )
         )
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=bottom,
                 child=distant,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(

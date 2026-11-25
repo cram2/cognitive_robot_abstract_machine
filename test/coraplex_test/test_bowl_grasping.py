@@ -58,9 +58,9 @@ def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
 @pytest.fixture
 def bowl() -> Bowl:
     world = STLParser(file_path=BOWL_MESH).create_world()
-    annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
+    annotation = Bowl(root=world.get_body_by_name(name="bowl.stl"))
     with world.modify_world():
-        world.add_semantic_annotation(annotation)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -136,14 +136,14 @@ def pr2_and_bowl(simple_pr2_context):
     bowl_world = STLParser(file_path=BOWL_MESH).create_world()
     with world.modify_world():
         world.merge_world_at_pose(
-            bowl_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            other=bowl_world,
+            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                 2.4, 2.2, 1, reference_frame=world.root
             ),
         )
-    annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
+    annotation = Bowl(root=world.get_body_by_name(name="bowl.stl"))
     with world.modify_world():
-        world.add_semantic_annotations([annotation])
+        world.add_semantic_annotations(semantic_annotations=[annotation])
     return world, robot, annotation
 
 

@@ -89,7 +89,7 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
         )
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         if isinstance(self.controlled_feature, Point3):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature

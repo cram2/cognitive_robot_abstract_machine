@@ -125,7 +125,7 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
         action whose goal it is.
         """
         gripper = plan_node.two_finger_gripper
-        if plan_node.width <= gripper.separation_in(GripperState.CLOSE):
+        if plan_node.width <= gripper.separation_in(state_type=GripperState.CLOSE):
             task = self.grasp(gripper=gripper)
         else:
             task = GripperMoveTask(

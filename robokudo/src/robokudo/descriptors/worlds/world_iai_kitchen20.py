@@ -27,7 +27,7 @@ class WorldDescriptor(BaseWorldDescriptor):
         root = self.world.root
 
         milk_path = Path(
-            PackageUriResolver().resolve("package://iai_objects/objects/milk.stl")
+            PackageUriResolver().resolve(uri="package://iai_objects/objects/milk.stl")
         )
 
         object_specs = [

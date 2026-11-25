@@ -18,14 +18,14 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 @pytest.fixture
 def simple_world():
-    world = World.create_with_root_body("map")
+    world = World.create_with_root_body(root_body_name="map")
 
     # Add a target body
     target = Body(name=PrefixedName(name="target"))
     with world.modify_world():
-        world.add_body(target)
+        world.add_body(body=target)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=target,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -40,9 +40,9 @@ def simple_world():
         collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.5, y=0.5, z=0.5))]),
     )
     with world.modify_world():
-        world.add_body(obstacle)
+        world.add_body(body=obstacle)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=obstacle,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -66,7 +66,7 @@ def test_spawn_as_region(simple_world):
     half_height = slab_height / 2
     floor = Floor(root=target, _world=world)
     boxes = BoundingBoxCollection(
-        shapes=[box.extrude(half_height) for box in gcs.graph.nodes()],
+        shapes=[box.extrude(half_height=half_height) for box in gcs.graph.nodes()],
         reference_frame=gcs.search_space.reference_frame,
     )
     region = floor.spawn_bounding_boxes_as_region(boxes=boxes)

@@ -34,9 +34,11 @@ def turn_on_microwave_task(robocasa_loader):
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     environment = robocasa_loader.build_task_environment(
-        "TurnOnMicrowave", layout_id=LayoutType.LAYOUT001, style_id=StyleType.STYLE001
+        task_name="TurnOnMicrowave",
+        layout_id=LayoutType.LAYOUT001,
+        style_id=StyleType.STYLE001,
     )
-    task = robocasa_loader.load_task_from_environment(environment)
+    task = robocasa_loader.load_task_from_environment(environment=environment)
     return environment, task
 
 
@@ -51,16 +53,16 @@ def test_placement_sampler_regions_are_annotated_and_attached_at_their_resolved_
     environment, task = turn_on_microwave_task
 
     regions = PlacementSamplerRegionReader().read_all(
-        environment, name_prefix="TurnOnMicrowave"
+        environment=environment, name_prefix="TurnOnMicrowave"
     )
     assert len(regions) > 0
 
     for region_data in regions:
-        annotation = region_data.attach_to(task.world)
+        annotation = region_data.attach_to(world=task.world)
         assert isinstance(annotation, PlacementArea)
         assert annotation in task.world.semantic_annotations
         assert annotation.placed_object is task.world.get_body_by_name(
-            region_data.body_name
+            name=region_data.body_name
         )
 
         region = annotation.root
@@ -87,14 +89,17 @@ def test_gripper_exclusion_zone_is_annotated_and_attached_at_the_bodys_resolved_
     environment, task = turn_on_microwave_task
 
     zone_data = GripperExclusionZoneReader.read(
-        environment, name_prefix="TurnOnMicrowave", object_name="obj", radius=0.25
+        environment=environment,
+        name_prefix="TurnOnMicrowave",
+        object_name="obj",
+        radius=0.25,
     )
-    annotation = zone_data.attach_to(task.world)
+    annotation = zone_data.attach_to(world=task.world)
 
     assert isinstance(annotation, GripperExclusionZone)
     assert annotation in task.world.semantic_annotations
     assert annotation.excluded_object is task.world.get_body_by_name(
-        zone_data.body_name
+        name=zone_data.body_name
     )
 
     region = annotation.root

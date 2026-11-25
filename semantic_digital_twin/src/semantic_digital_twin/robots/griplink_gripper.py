@@ -118,6 +118,7 @@ class GriplinkPresetConfiguration(GriplinkGripperConfiguration):
     @classmethod
     def from_state_type(
         cls,
+        *,
         end_effector: EndEffector,
         state_type: GripperState,
         grip_preset: GriplinkGripPreset = GriplinkGripPreset.PRESET_0,
@@ -131,7 +132,7 @@ class GriplinkPresetConfiguration(GriplinkGripperConfiguration):
         """
         return cls(
             end_effector=end_effector,
-            joint_state=end_effector.get_joint_state_by_type(state_type),
+            joint_state=end_effector.get_joint_state_by_type(state_type=state_type),
             grip_preset=grip_preset,
         )
 
@@ -195,6 +196,7 @@ class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
     @classmethod
     def from_state_type(
         cls,
+        *,
         end_effector: EndEffector,
         state_type: GripperState,
         grip_position: float | None = None,
@@ -219,13 +221,17 @@ class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
         :return: The configuration for the given state type, commanding the joint state
             the parameters describe.
         """
-        grip_position = cls._rounded(grip_position, decimals=4)
-        grip_force = cls._rounded(grip_force, decimals=1)
-        grip_velocity = cls._rounded(grip_velocity, decimals=4)
-        grip_acceleration = cls._rounded(grip_acceleration, decimals=4)
+        grip_position = cls._rounded(value=grip_position, decimals=4)
+        grip_force = cls._rounded(value=grip_force, decimals=1)
+        grip_velocity = cls._rounded(value=grip_velocity, decimals=4)
+        grip_acceleration = cls._rounded(value=grip_acceleration, decimals=4)
         return cls(
             end_effector=end_effector,
-            joint_state=cls._build_joint_state(end_effector, state_type, grip_position),
+            joint_state=cls._build_joint_state(
+                end_effector=end_effector,
+                state_type=state_type,
+                grip_position=grip_position,
+            ),
             grip_position=grip_position,
             grip_force=grip_force,
             grip_velocity=grip_velocity,
@@ -233,7 +239,7 @@ class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
         )
 
     @staticmethod
-    def _rounded(value: float | None, decimals: int) -> float | None:
+    def _rounded(*, value: float | None, decimals: int) -> float | None:
         """
         :param value: A gripper hardware parameter in its own unit.
         :param decimals: The number of decimals to keep.
@@ -246,6 +252,7 @@ class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
     @classmethod
     def _build_joint_state(
         cls,
+        *,
         end_effector: EndEffector,
         state_type: GripperState,
         grip_position: float | None,
@@ -269,8 +276,10 @@ class GriplinkFlexConfiguration(GriplinkGripperConfiguration):
                 if state_type is GripperState.FLEXCLOSE
                 else cls.maximum_opening_width
             )
-        open_state = end_effector.get_joint_state_by_type(GripperState.OPEN)
-        close_state = end_effector.get_joint_state_by_type(GripperState.CLOSE)
+        open_state = end_effector.get_joint_state_by_type(state_type=GripperState.OPEN)
+        close_state = end_effector.get_joint_state_by_type(
+            state_type=GripperState.CLOSE
+        )
         close_targets = dict(close_state.items())
         fraction = 1 - grip_position / cls.maximum_opening_width
         target_values = [
@@ -307,6 +316,7 @@ class GriplinkGripper(EndEffector, HasGripperActionServers, ABC):
 
     def default_configuration(
         self,
+        *,
         state_type: GripperState,
         finger_velocity: float | None = None,
     ) -> GripperConfiguration:
@@ -327,17 +337,21 @@ class GriplinkGripper(EndEffector, HasGripperActionServers, ABC):
         """
         if state_type in (GripperState.OPEN, GripperState.CLOSE):
             configuration = GriplinkPresetConfiguration.from_state_type(
-                self, state_type
+                end_effector=self, state_type=state_type
             )
         elif state_type in (GripperState.FLEXOPEN, GripperState.FLEXCLOSE):
-            configuration = GriplinkFlexConfiguration.from_state_type(self, state_type)
+            configuration = GriplinkFlexConfiguration.from_state_type(
+                end_effector=self, state_type=state_type
+            )
         else:
-            return super().default_configuration(state_type, finger_velocity)
+            return super().default_configuration(
+                state_type=state_type, finger_velocity=finger_velocity
+            )
         if finger_velocity is not None:
             configuration.finger_velocity = finger_velocity
         return configuration
 
-    def griplink_endpoint(self, state_type: GripperState) -> GriplinkEndpoint | None:
+    def griplink_endpoint(self, *, state_type: GripperState) -> GriplinkEndpoint | None:
         """
         :param state_type: The gripper state to command.
         :return: The endpoint the griplink server of this gripper listens on for the
@@ -345,8 +359,8 @@ class GriplinkGripper(EndEffector, HasGripperActionServers, ABC):
         """
         return self.griplink_endpoints.get(state_type)
 
-    def action_topic_serving(self, state_type: JointStateType | None) -> str | None:
-        endpoint = self.griplink_endpoint(state_type)
+    def action_topic_serving(self, *, state_type: JointStateType | None) -> str | None:
+        endpoint = self.griplink_endpoint(state_type=state_type)
         if endpoint is None:
             return None
         return endpoint.action_topic

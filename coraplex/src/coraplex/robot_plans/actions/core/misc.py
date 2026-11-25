@@ -181,7 +181,7 @@ class MoveToReach(
             NavigateAction(planar_goal_pose=self.standing_pose),
             MoveManipulatorAction(
                 goal_pose=self.arm.end_effector.tool_frame_goal_for_grasp(
-                    self.reference_T_grasp
+                    grasp_pose=self.reference_T_grasp
                 ),
                 arm=self.arm,
                 allow_gripper_collision=False,
@@ -216,5 +216,7 @@ class MoveToReach(
             reference_frame=self.reference_T_grasp.reference_frame,
         )
         reference_T_robot = reference_T_target @ target_T_robot
-        world_T_robot = self.world.transform(reference_T_robot.pose, self.world.root)
+        world_T_robot = self.world.transform(
+            spatial_object=reference_T_robot.pose, target_frame=self.world.root
+        )
         return Pose2D.from_pose(world_T_robot)

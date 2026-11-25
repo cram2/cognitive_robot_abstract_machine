@@ -78,7 +78,7 @@ class ObjectClassMesh:
             source_scene.bounds, self.shape.mesh.bounds
         ):
             return source_file
-        return Mesh.from_trimesh(self.shape.mesh).local_file
+        return Mesh.from_trimesh(mesh=self.shape.mesh).local_file
 
 
 @dataclass(kw_only=True)

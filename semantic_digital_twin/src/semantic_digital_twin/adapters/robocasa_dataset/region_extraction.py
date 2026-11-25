@@ -83,7 +83,7 @@ class PlacementSamplerRegion:
     unchanged.
     """
 
-    def attach_to(self, world: World) -> PlacementArea:
+    def attach_to(self, *, world: World) -> PlacementArea:
         """
         :param world: The world to attach the region to, connected to its root at this
             region's resolved world pose.
@@ -107,11 +107,11 @@ class PlacementSamplerRegion:
             ),
         )
         annotation = PlacementArea(
-            root=region, placed_object=world.get_body_by_name(self.body_name)
+            root=region, placed_object=world.get_body_by_name(name=self.body_name)
         )
         with world.modify_world():
-            world.add_connection(connection)
-            world.add_semantic_annotation(annotation)
+            world.add_connection(connection=connection)
+            world.add_semantic_annotation(semantic_annotation=annotation)
         return annotation
 
 
@@ -127,7 +127,7 @@ class PlacementSamplerRegionReader:
     """
 
     def read_all(
-        self, environment: Any, name_prefix: str
+        self, *, environment: Any, name_prefix: str
     ) -> list[PlacementSamplerRegion]:
         """
         :param environment: A reset RoboCasa/robosuite task environment.
@@ -148,7 +148,10 @@ class PlacementSamplerRegionReader:
             ):
                 continue
             region = self.read_one(
-                sampler, name_prefix, object_name, robocasa_object.root_body
+                sampler=sampler,
+                name_prefix=name_prefix,
+                object_name=object_name,
+                body_name=robocasa_object.root_body,
             )
             if region is not None:
                 regions.append(region)
@@ -156,7 +159,7 @@ class PlacementSamplerRegionReader:
 
     @staticmethod
     def read_one(
-        sampler: Any, name_prefix: str, object_name: str, body_name: str
+        *, sampler: Any, name_prefix: str, object_name: str, body_name: str
     ) -> PlacementSamplerRegion | None:
         """
         :param sampler: The sampler an environment built for an object.
@@ -224,7 +227,7 @@ class GripperExclusionZoneData:
     Distance from the centre the gripper must stay beyond.
     """
 
-    def attach_to(self, world: World) -> GripperExclusionZone:
+    def attach_to(self, *, world: World) -> GripperExclusionZone:
         """
         :param world: The world to attach the zone to, connected to its root at this
             zone's resolved world position.
@@ -243,11 +246,11 @@ class GripperExclusionZoneData:
             ),
         )
         annotation = GripperExclusionZone(
-            root=region, excluded_object=world.get_body_by_name(self.body_name)
+            root=region, excluded_object=world.get_body_by_name(name=self.body_name)
         )
         with world.modify_world():
-            world.add_connection(connection)
-            world.add_semantic_annotation(annotation)
+            world.add_connection(connection=connection)
+            world.add_semantic_annotation(semantic_annotation=annotation)
         return annotation
 
 
@@ -259,7 +262,7 @@ class GripperExclusionZoneReader:
 
     @staticmethod
     def read(
-        environment: Any, name_prefix: str, object_name: str, radius: float
+        *, environment: Any, name_prefix: str, object_name: str, radius: float
     ) -> GripperExclusionZoneData:
         """
         :param environment: A reset RoboCasa/robosuite task environment.

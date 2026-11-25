@@ -121,7 +121,7 @@ class GiskardClientExecutor(Executor):
             self.context = StatechartContext(world=self.world)
             MotionControl().extend_context(context=self.context)
         self.world_updates = ClientWorldUpdates(
-            world_synchronizer=WorldSynchronizer.of_world(self.world)
+            world_synchronizer=WorldSynchronizer.of_world(world=self.world)
         )
         if self.announces_presence:
             self.announce_presence()
@@ -171,7 +171,9 @@ class GiskardClientExecutor(Executor):
 
     @property
     def robot(self) -> AbstractRobot:
-        return self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        return self.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )[0]
 
     def compile(self, *, statechart: Statechart) -> None:
         """
@@ -293,7 +295,9 @@ class GiskardClientExecutor(Executor):
                 ).apply()
             raise self._client.create_abort_exception(
                 result=result,
-                **WorldEntityWithIDKwargsTracker.from_world(self.world).create_kwargs(),
+                **WorldEntityWithIDKwargsTracker.from_world(
+                    world=self.world
+                ).create_kwargs(),
             )
         self.world_updates.wait_for_the_changes_of_a_goal(result=result_json)
         StatechartStateUpdate.from_json(

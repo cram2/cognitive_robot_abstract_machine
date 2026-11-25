@@ -37,7 +37,9 @@ from ...plan_running import robot_executor, robot_extensions, world_of
 @pytest.fixture
 def daisy_extensions(daisy_world) -> list[ContextExtension]:
     world = deepcopy(daisy_world)
-    return robot_extensions(world.get_semantic_annotations_by_type(DAiSy)[0])
+    return robot_extensions(
+        world.get_semantic_annotations_by_type(semantic_annotation_type=DAiSy)[0]
+    )
 
 
 def real_daisy_executor(extensions: list[ContextExtension]) -> RealDAiSyPlanExecutor:
@@ -59,7 +61,7 @@ def left_gripper_of(extensions: list[ContextExtension]) -> DAiSyLeftGripper:
     """
     return (
         world_of(extensions)
-        .get_semantic_annotations_by_type(DAiSy)[0]
+        .get_semantic_annotations_by_type(semantic_annotation_type=DAiSy)[0]
         .left_arm.end_effector
     )
 
@@ -75,7 +77,7 @@ def test_the_real_daisy_moves_its_gripper_to_a_preset_state_through_the_griplink
     Griplink server for that state.
     """
     gripper = left_gripper_of(daisy_extensions)
-    configuration = gripper.default_configuration(GripperState.CLOSE)
+    configuration = gripper.default_configuration(state_type=GripperState.CLOSE)
 
     action = prepared(
         SetGripperAction(gripper_configuration=configuration),
@@ -85,7 +87,7 @@ def test_the_real_daisy_moves_its_gripper_to_a_preset_state_through_the_griplink
     assert type(action.goal) is GriplinkPresetActionServerTask
     assert (
         action.goal.action_topic
-        == gripper.griplink_endpoint(GripperState.CLOSE).action_topic
+        == gripper.griplink_endpoint(state_type=GripperState.CLOSE).action_topic
     )
 
 
@@ -98,7 +100,7 @@ def test_the_real_daisy_moves_its_gripper_to_a_width_through_the_griplink_server
     """
     gripper = left_gripper_of(daisy_extensions)
     configuration = GriplinkFlexConfiguration.from_state_type(
-        gripper, GripperState.FLEXCLOSE, grip_position=0.04
+        end_effector=gripper, state_type=GripperState.FLEXCLOSE, grip_position=0.04
     )
 
     action = prepared(
@@ -118,7 +120,7 @@ def test_a_daisy_driven_by_a_standalone_giskard_moves_its_fingers_with_a_giskard
     would use.
     """
     configuration = left_gripper_of(daisy_extensions).default_configuration(
-        GripperState.CLOSE
+        state_type=GripperState.CLOSE
     )
 
     action = prepared(
@@ -142,7 +144,11 @@ def test_the_real_daisy_opens_and_shuts_its_gripper_on_a_grasp_through_the_gripl
     actions of the Griplink server.
     """
     grasp = top_down_grasp_of_a_box(daisy_extensions)
-    arm = world_of(daisy_extensions).get_semantic_annotations_by_type(DAiSy)[0].left_arm
+    arm = (
+        world_of(daisy_extensions)
+        .get_semantic_annotations_by_type(semantic_annotation_type=DAiSy)[0]
+        .left_arm
+    )
 
     action = prepared(
         GraspingAction(grasp_candidate=grasp, arm=arm),
@@ -158,6 +164,6 @@ def test_the_real_daisy_opens_and_shuts_its_gripper_on_a_grasp_through_the_gripl
         for node in action.descendants
         if isinstance(node, GriplinkPresetActionServerTask)
     ] == [
-        arm.end_effector.griplink_endpoint(state).action_topic
+        arm.end_effector.griplink_endpoint(state_type=state).action_topic
         for state in (GripperState.OPEN, GripperState.CLOSE)
     ]

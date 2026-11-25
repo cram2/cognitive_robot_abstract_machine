@@ -60,8 +60,8 @@ with world.modify_world():
     apple_body.collision = [sphere]
     apple_body.visual = [sphere]
 
-    world.add_connection(Connection6DoF.create_with_dofs(parent=root, child=apple_body, world=world))
-    world.add_semantic_annotation(Apple(root=apple_body, name=PrefixedName(name="apple1")))
+    world.add_connection(connection=Connection6DoF.create_with_dofs(parent=root, child=apple_body, world=world))
+    world.add_semantic_annotation(semantic_annotation=Apple(root=apple_body, name=PrefixedName(name="apple1")))
 
     # Our second apple
     apple_body_2 = Body(name=PrefixedName(name="apple_body_2"))
@@ -69,13 +69,13 @@ with world.modify_world():
     apple_body_2.collision = [sphere2]
     apple_body_2.visual = [sphere2]
     c2 = Connection6DoF.create_with_dofs(parent=root, child=apple_body_2, world=world)
-    world.add_connection(c2)
+    world.add_connection(connection=c2)
     # Move it a bit so we can see both
     world.state[c2.x.id].position = 0.3
     world.state[c2.y.id].position = 0.2
-    world.add_semantic_annotation(Apple(root=apple_body_2, name=PrefixedName(name="apple2")))
+    world.add_semantic_annotation(semantic_annotation=Apple(root=apple_body_2, name=PrefixedName(name="apple2")))
 
-print(world.get_semantic_annotations_by_type(Apple))
+print(world.get_semantic_annotations_by_type(semantic_annotation_type=Apple))
 rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
@@ -121,7 +121,7 @@ with world.modify_world():
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3),
     )
-    produce_box_with_apples.produces = world.get_semantic_annotations_by_type(Apple)
+    produce_box_with_apples.produces = world.get_semantic_annotations_by_type(semantic_annotation_type=Apple)
 
 print(f"produce box with {len(produce_box_with_apples.produces)} produces")
 rt = RayTracer(world=world)

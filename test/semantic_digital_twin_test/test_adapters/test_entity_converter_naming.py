@@ -19,7 +19,7 @@ def test_mujoco_camera_converter_honors_a_given_string_name():
     body = Body(name=PrefixedName(name="world"))
     camera = MujocoCamera(name="my_named_camera", body=body)
 
-    properties = MujocoCameraConverter.convert(camera)
+    properties = MujocoCameraConverter.convert(entity=camera)
 
     assert properties["name"] == "my_named_camera"
 
@@ -28,6 +28,6 @@ def test_mujoco_camera_converter_falls_back_to_an_id_based_name_when_unnamed():
     body = Body(name=PrefixedName(name="world"))
     camera = MujocoCamera(name="", body=body)
 
-    properties = MujocoCameraConverter.convert(camera)
+    properties = MujocoCameraConverter.convert(entity=camera)
 
     assert properties["name"] == f"mujococamera_{id(camera)}"

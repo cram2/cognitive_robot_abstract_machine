@@ -216,7 +216,9 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
         :return: the publisher of the world's tf tree, started here while nothing
             publishes it.
         """
-        publishers = TFPublisher.all_callbacks_of_this_type_from_world(self._world)
+        publishers = TFPublisher.all_callbacks_of_this_type_from_world(
+            world=self._world
+        )
         if len(publishers) > 1:
             raise WorldHasMultipleTfPublishersError(
                 world=self._world, publisher_count=len(publishers)
@@ -249,7 +251,7 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
             node=self.node, world=self._world, **kwargs
         )
 
-    def _select_shapes(self, body):
+    def _select_shapes(self, *, body):
         if self.shape_source is ShapeSource.VISUAL_ONLY:
             return body.visual.shapes
         if self.shape_source is ShapeSource.COLLISION_ONLY:
@@ -263,15 +265,15 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
         frame_names = self.tf_publisher.tf_model_callback.frame_names
         for body in self._world.bodies:
             self._add_markers_for_shapes(
-                shapes=self._select_shapes(body),
-                marker_ns=frame_names.assign(body),
+                shapes=self._select_shapes(body=body),
+                marker_ns=frame_names.assign(entity=body),
                 frame_names=frame_names,
             )
 
         for region in self._world.regions:
             self._add_markers_for_shapes(
                 shapes=region.area.shapes,
-                marker_ns=frame_names.assign(region),
+                marker_ns=frame_names.assign(entity=region),
                 frame_names=frame_names,
                 force_alpha=self.region_alpha,
             )
@@ -297,8 +299,10 @@ class VizMarkerPublisher(ModelChangeCallback, HasROS2Node):
         """
         loadable_shapes = self._rviz_loadable_meshes.loadable_shapes(shapes=shapes)
         for i, shape in enumerate(loadable_shapes):
-            marker = SemDTToRos2Converter.convert(shape)
-            marker.header.frame_id = frame_names.assign(shape.origin.reference_frame)
+            marker = SemDTToRos2Converter.convert(data=shape)
+            marker.header.frame_id = frame_names.assign(
+                entity=shape.origin.reference_frame
+            )
             if force_alpha is not None:
                 marker.color.a = force_alpha
             elif not marker.mesh_use_embedded_materials:

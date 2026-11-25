@@ -103,7 +103,7 @@ def _cases() -> list[NodeRoundTripCase]:
                     action_topic=RosName.NAVIGATION_ACTION,
                     message_type=NavigateToPose,
                     target_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=world.root),
-                    base_link=world.get_kinematic_structure_entity_by_name("tip"),
+                    base_link=world.get_kinematic_structure_entity_by_name(name="tip"),
                 )
             ],
         ),

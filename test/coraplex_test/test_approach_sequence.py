@@ -63,12 +63,12 @@ def boxed_pr2_world(simple_pr2_context):
         connection = Connection6DoF.create_with_dofs(
             world=world, parent=world.root, child=box
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             1, 0, 1, reference_frame=world.root
         )
         graspable = Milk(root=box)
-        world.add_semantic_annotation(graspable)
+        world.add_semantic_annotation(semantic_annotation=graspable)
     return world, robot, graspable
 
 
@@ -169,9 +169,9 @@ def test_a_body_without_collision_is_approached_from_the_clearance_alone(
     world, _, _ = boxed_pr2_world
     with world.modify_world():
         body = Body(name=PrefixedName(name="no_collision_box"))
-        world.add_connection(FixedConnection(parent=world.root, child=body))
+        world.add_connection(connection=FixedConnection(parent=world.root, child=body))
         graspable = Milk(root=body)
-        world.add_semantic_annotation(graspable)
+        world.add_semantic_annotation(semantic_annotation=graspable)
     action = GraspApproachingAction()
 
     assert action._approach_distance(
@@ -240,7 +240,7 @@ def test_grasp_pose_is_the_middle_of_the_sequence(boxed_pr2_world):
 
     np.testing.assert_allclose(
         poses.grasp.to_np(),
-        end_effector.tool_frame_goal_for_grasp(grasp.grasp_pose).to_np(),
+        end_effector.tool_frame_goal_for_grasp(grasp_pose=grasp.grasp_pose).to_np(),
         atol=1e-9,
     )
 
@@ -266,10 +266,10 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
     )
 
     world_P_grasp = world.transform(
-        grasp.grasp_pose.homogeneous_matrix, world.root
+        spatial_object=grasp.grasp_pose.homogeneous_matrix, target_frame=world.root
     ).to_np()
     world_P_retreat = world.transform(
-        poses.retreat.homogeneous_matrix, world.root
+        spatial_object=poses.retreat.homogeneous_matrix, target_frame=world.root
     ).to_np()
     np.testing.assert_allclose(
         world_P_retreat[:3, 3] - world_P_grasp[:3, 3],
@@ -359,7 +359,9 @@ def test_a_tracy_gripper_approaches_along_the_grasp(tracy_world):
     Tracy's gripper points along its tool frame's z-axis rather than its x-axis, and the
     sequence has to follow it all the same.
     """
-    tracy = tracy_world.get_semantic_annotations_by_type(Tracy)[0]
+    tracy = tracy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tracy
+    )[0]
     _assert_the_gripper_approaches_along_the_grasp(
         tracy_world, tracy.left_arm.end_effector
     )
@@ -385,7 +387,7 @@ def test_a_grasp_is_aimed_at_the_point_the_fingers_meet_at(boxed_pr2_world):
 
     np.testing.assert_allclose(
         poses.grasp.to_np(),
-        end_effector.tool_frame_goal_for_grasp(grasp.grasp_pose).to_np(),
+        end_effector.tool_frame_goal_for_grasp(grasp_pose=grasp.grasp_pose).to_np(),
         atol=1e-9,
     )
 

@@ -29,7 +29,7 @@ Hand the reasoner a world and ask it what it can work out:
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-kitchen_world = URDFParser.from_file("package://iai_kitchen/urdf_obj/kitchen-small.urdf").create_world()
+kitchen_world = URDFParser.from_file(file_path="package://iai_kitchen/urdf_obj/kitchen-small.urdf").create_world()
 reasoner = WorldReasoner(world=kitchen_world)
 
 # The annotations this run inferred.

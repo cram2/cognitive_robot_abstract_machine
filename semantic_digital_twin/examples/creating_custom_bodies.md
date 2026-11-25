@@ -74,7 +74,7 @@ When modifying your world, keep in mind that you need to open a `world.modify_wo
 
 ```{code-cell} ipython3
 with world.modify_world():
-    world.add_body(body)
+    world.add_body(body=body)
 
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 rt = RayTracer(world=world)

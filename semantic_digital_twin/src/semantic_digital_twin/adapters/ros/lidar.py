@@ -34,5 +34,7 @@ class SubscribedLidarSource(LatestMessageSubscriber[LaserScan], LidarSource):
             raise NoLaserScanReceived(topic_name=self.topic_name)
         return self.latest_message
 
-    def get_lidar_reading(self, lidar: Lidar) -> LidarReading:
-        return LaserScanToSemDTConverter.convert(self.received_scan, lidar.root._world)
+    def get_lidar_reading(self, *, lidar: Lidar) -> LidarReading:
+        return LaserScanToSemDTConverter.convert(
+            data=self.received_scan, world=lidar.root._world
+        )

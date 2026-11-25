@@ -43,7 +43,7 @@ world = World()
 
 with world.modify_world():
     virtual_root = Body(name=PrefixedName(name="root"))
-    world.add_body(virtual_root)
+    world.add_body(body=virtual_root)
 ```
 
 ## 1. Define semantic annotations and create/annotate bodies
@@ -157,17 +157,17 @@ Your goals:
 :tags: [example-solution]
 # Register bodies and annotations then create free connections under a dedicated root body
 with world.modify_world():
-    world.add_semantic_annotation(cap)
-    world.add_semantic_annotation(bottle_large)
-    world.add_semantic_annotation(bottle_medium)
+    world.add_semantic_annotation(semantic_annotation=cap)
+    world.add_semantic_annotation(semantic_annotation=bottle_large)
+    world.add_semantic_annotation(semantic_annotation=bottle_medium)
 
     root_C_bottle_large = Connection6DoF.create_with_dofs(parent=virtual_root, child=bottle_large_body, world=world)
     bottle_large_C_cap = Connection6DoF.create_with_dofs(parent=bottle_large_body, child=cap_body, world=world)
     root_C_bottle_medium = Connection6DoF.create_with_dofs(parent=virtual_root, child=bottle_medium_body, world=world)
 
-    world.add_connection(root_C_bottle_large)
-    world.add_connection(bottle_large_C_cap)
-    world.add_connection(root_C_bottle_medium)
+    world.add_connection(connection=root_C_bottle_large)
+    world.add_connection(connection=bottle_large_C_cap)
+    world.add_connection(connection=root_C_bottle_medium)
     
 z_offset = bottle_large_cylinder.height / 2.0 + cap_cylinder.height / 2.0
 cap_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -181,9 +181,9 @@ bottle_large_C_cap.origin = cap_pose
 # There should be three free connections we just added
 from semantic_digital_twin.world_description.connections import Connection6DoF
 
-con_bottle = world.get_connection(world.root, bottle_large_body)
-con_cap = world.get_connection(bottle_large_body, cap_body)
-con_medium = world.get_connection(world.root, bottle_medium_body)
+con_bottle = world.get_connection(parent=world.root, child=bottle_large_body)
+con_cap = world.get_connection(parent=bottle_large_body, child=cap_body)
+con_medium = world.get_connection(parent=world.root, child=bottle_medium_body)
 
 if not isinstance(con_bottle, Connection6DoF): raise ExerciseVerificationFailed(requirement="The large bottle should be connected to the root with a Connection6DoF.")
 if not isinstance(con_cap, Connection6DoF): raise ExerciseVerificationFailed(requirement="The cap should be connected to the large bottle with a Connection6DoF.")
@@ -191,15 +191,15 @@ if not isinstance(con_medium, Connection6DoF): raise ExerciseVerificationFailed(
 
 # Bottle at origin, cap at computed z
 import numpy as np
-bottle_T = world.compute_forward_kinematics_np(world.root, bottle_large_body)
-cap_T = world.compute_forward_kinematics_np(world.root, cap_body)
+bottle_T = world.compute_forward_kinematics_np(root=world.root, tip=bottle_large_body)
+cap_T = world.compute_forward_kinematics_np(root=world.root, tip=cap_body)
 
 if not np.isclose(bottle_T[2, 3], 0.0): raise ExerciseVerificationFailed(requirement="The large bottle should stay at z=0.")
 if not np.isclose(cap_T[2, 3], z_offset): raise ExerciseVerificationFailed(requirement="The cap should sit at the computed z offset.")
 
 # Also verify semantic annotations are in the world now
-bottles = world.get_semantic_annotations_by_type(Bottle)
-caps = world.get_semantic_annotations_by_type(Cap)
+bottles = world.get_semantic_annotations_by_type(semantic_annotation_type=Bottle)
+caps = world.get_semantic_annotations_by_type(semantic_annotation_type=Cap)
 if len(bottles) != 2: raise ExerciseVerificationFailed(requirement="The world should contain exactly two Bottle annotations.")
 if len(caps) != 1: raise ExerciseVerificationFailed(requirement="The world should contain exactly one Cap annotation.")
 

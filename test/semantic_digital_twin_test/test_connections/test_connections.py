@@ -46,7 +46,7 @@ def _add_drive(world_with_two_bodies, drive_type):
         connection = drive_type.create_with_dofs(
             world=world, parent=parent, child=child
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     return connection
 
 
@@ -61,7 +61,7 @@ def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_
             child=child,
             parent_T_connection_expression=parent_T_connection,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     assert_allclose(connection.origin, parent_T_connection, atol=1e-9)
 
 
@@ -88,7 +88,7 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
             parent_T_connection_expression=parent_T_connection,
             connection_T_child_expression=connection_T_child,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     desired_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=-2.0, z=0.5, yaw=0.7, reference_frame=parent
@@ -104,7 +104,7 @@ def test_connection6dof_origin_setter_requires_a_reference_frame(world_with_two_
         connection = Connection6DoF.create_with_dofs(
             world=world, parent=parent, child=child
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     transformation_without_reference_frame = (
         HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
@@ -127,7 +127,7 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
     grandparent_T_parent = HomogeneousTransformationMatrix.from_xyz_rpy(x=2.0, y=1.0)
     with world.modify_world():
         world.add_connection(
-            FixedConnection.create_with_dofs(
+            connection=FixedConnection.create_with_dofs(
                 world=world,
                 parent=grandparent,
                 child=parent,
@@ -137,14 +137,16 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
         connection = Connection6DoF.create_with_dofs(
             world=world, parent=parent, child=child
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     desired_origin_in_grandparent = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=2.5, y=1.5, z=0.2, reference_frame=grandparent
     )
     connection.origin = desired_origin_in_grandparent
 
-    expected_origin_in_parent = world.transform(desired_origin_in_grandparent, parent)
+    expected_origin_in_parent = world.transform(
+        spatial_object=desired_origin_in_grandparent, target_frame=parent
+    )
     assert_allclose(connection.origin, expected_origin_in_parent, atol=1e-9)
 
 
@@ -166,7 +168,7 @@ def test_reference_origin_excludes_joint_state(world_with_two_bodies):
             child=child,
             parent_T_connection_expression=parent_T_connection,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     origin_at_zero = connection.origin_as_position_quaternion().evaluate()[0]
     reference_at_zero = connection.reference_origin_as_position_quaternion().evaluate()[
@@ -206,12 +208,12 @@ def test_has_hardware_interface_round_trip(world_with_two_bodies, drive_type):
     assert connection.controlled_dofs == []
 
     with world.modify_world():
-        world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+        world.set_dofs_has_hardware_interface(dofs=connection.active_dofs, value=True)
     assert connection.has_hardware_interface
     assert set(connection.controlled_dofs) == set(connection.active_dofs)
 
     with world.modify_world():
-        world.set_dofs_has_hardware_interface(connection.active_dofs, False)
+        world.set_dofs_has_hardware_interface(dofs=connection.active_dofs, value=False)
     assert not connection.has_hardware_interface
     assert connection.controlled_dofs == []
 
@@ -249,7 +251,7 @@ def _add_screw_connection(
             multiplier=multiplier,
             parent_T_connection_expression=parent_T_connection_expression,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     return connection
 
 
@@ -318,7 +320,7 @@ def test_screw_connection_numeric_forward_kinematics(
     with world.modify_world():
         world.state[connection.active_dofs[0].id].position = joint_position
 
-    parent_T_child = world.compute_forward_kinematics_np(parent, child)
+    parent_T_child = world.compute_forward_kinematics_np(root=parent, tip=child)
     assert_allclose(
         parent_T_child,
         _expected_screw_transform(joint_position, screw_pitch),
@@ -336,7 +338,7 @@ def test_screw_connection_negative_screw_pitch(world_with_two_bodies):
         world.state[connection.active_dofs[0].id].position = joint_position
 
     # A left-handed thread rotates the same way but translates in the opposite direction.
-    parent_T_child = world.compute_forward_kinematics_np(parent, child)
+    parent_T_child = world.compute_forward_kinematics_np(root=parent, tip=child)
     assert_allclose(
         parent_T_child,
         _expected_screw_transform(joint_position, screw_pitch),
@@ -356,7 +358,7 @@ def test_screw_connection_multiplier_mirrors_motion(world_with_two_bodies):
         world.state[connection.active_dofs[0].id].position = raw_position
 
     # The connection moves by multiplier * raw position.
-    parent_T_child = world.compute_forward_kinematics_np(parent, child)
+    parent_T_child = world.compute_forward_kinematics_np(root=parent, tip=child)
     assert_allclose(
         parent_T_child,
         _expected_screw_transform(-raw_position, screw_pitch),
@@ -376,7 +378,10 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
 
     new_parent = Body(name=PrefixedName(name="new_parent"))
     copied_connection = connection.copy_with_new_parent(
-        new_parent, HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1)
+        new_parent=new_parent,
+        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.1
+        ),
     )
 
     assert copied_connection.screw_axis is connection.screw_axis
@@ -432,10 +437,11 @@ def test_copy_with_new_parent_keeps_name(
             name=PrefixedName(name="named_connection"),
             **additional_arguments,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     copied_connection = connection.copy_with_new_parent(
-        Body(name=PrefixedName(name="new_parent")), HomogeneousTransformationMatrix()
+        new_parent=Body(name=PrefixedName(name="new_parent")),
+        parent_T_connection_expression=HomogeneousTransformationMatrix(),
     )
 
     assert copied_connection.name == connection.name
@@ -532,7 +538,7 @@ def test_create_with_dofs_applies_drive_velocity_limits(
             translation_velocity_limits=translation_velocity_limit,
             rotation_velocity_limits=rotation_velocity_limit,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     assert_allclose(
         connection.x_velocity.limits.upper.velocity, translation_velocity_limit
@@ -559,7 +565,7 @@ def test_create_with_dofs_applies_lateral_velocity_limit_of_omni_drive(
             child=child,
             translation_velocity_limits=translation_velocity_limit,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     assert_allclose(
         connection.y_velocity.limits.upper.velocity, translation_velocity_limit
@@ -585,7 +591,7 @@ def test_create_with_dofs_applies_multiplier_and_offset(world_with_two_bodies):
             multiplier=multiplier,
             offset=offset,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     assert_allclose(connection.multiplier, multiplier)
     assert_allclose(connection.offset, offset)
@@ -604,7 +610,7 @@ def test_create_with_dofs_registers_the_six_dof_state(world_with_two_bodies):
         connection = Connection6DoF.create_with_dofs(
             world=world, parent=parent, child=child
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     assert len(connection.passive_dofs) == 7
     assert set(connection.passive_dofs) <= set(world.degrees_of_freedom)
@@ -622,7 +628,7 @@ def test_create_with_dofs_of_fixed_connection_adds_no_degrees_of_freedom(
         connection = FixedConnection.create_with_dofs(
             world=world, parent=parent, child=child
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     assert connection.dofs == []
     assert world.degrees_of_freedom == []
@@ -703,10 +709,10 @@ def test_a_connection_survives_a_json_round_trip(
         connection = connection_type.create_with_dofs(
             world=world, parent=parent, child=child, **additional_arguments
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     payload = connection.to_json()
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     parsed_connection = from_json(payload, **tracker.create_kwargs())
 
     assert parsed_connection.to_json() == payload
@@ -797,13 +803,13 @@ def test_screw_axis_connection_places_the_child_along_its_screw_axis(
                 axis, rotation_per_position, translation_per_position
             ),
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     for raw_position in [-2.0, 0.0, 0.4, 3.0]:
         with world.modify_world():
             world.state[connection.raw_dof.id].position = raw_position
         assert_allclose(
-            world.compute_forward_kinematics_np(parent, child),
+            world.compute_forward_kinematics_np(root=parent, tip=child),
             _expected_screw_axis_transform(
                 parent_T_connection.to_np(),
                 axis,
@@ -954,13 +960,13 @@ def test_screw_axis_connection_turns_the_child_about_an_axis_off_the_connection_
             connection_T_child_expression=connection_T_child,
             screw_axis=screw_axis,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     for position in [-1.0, 0.0, 0.5, 2.5]:
         with world.modify_world():
             world.state[connection.raw_dof.id].position = position
         assert_allclose(
-            world.compute_forward_kinematics_np(parent, child),
+            world.compute_forward_kinematics_np(root=parent, tip=child),
             parent_T_connection.to_np()
             @ _matrix_exponential_of(screw_axis, position)
             @ connection_T_child.to_np(),
@@ -1027,13 +1033,13 @@ def test_moving_the_connection_frame_onto_the_axis_keeps_the_motion(
                 translation_per_radian=translation_per_radian,
             ),
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     positions = [-1.0, 0.0, 0.5, 2.5]
     poses_before = []
     for position in positions:
         with world.modify_world():
             world.state[connection.raw_dof.id].position = position
-        poses_before.append(world.compute_forward_kinematics_np(parent, child))
+        poses_before.append(world.compute_forward_kinematics_np(root=parent, tip=child))
     connection_count = len(world.connections)
 
     moved = connection.move_connection_frame_onto_axis()
@@ -1052,7 +1058,9 @@ def test_moving_the_connection_frame_onto_the_axis_keeps_the_motion(
         with world.modify_world():
             world.state[moved.raw_dof.id].position = position
         assert_allclose(
-            world.compute_forward_kinematics_np(parent, child), pose_before, atol=1e-12
+            world.compute_forward_kinematics_np(root=parent, tip=child),
+            pose_before,
+            atol=1e-12,
         )
 
 
@@ -1084,7 +1092,7 @@ def test_moving_the_connection_frame_of_a_connection_already_on_its_axis_changes
             ),
             screw_axis=screw_axis,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     model_manager = world.get_world_model_manager()
     version = model_manager.version
     history = list(model_manager.model_modification_blocks)
@@ -1132,7 +1140,7 @@ def test_position_for_translation_advances_the_child_by_that_distance(
             multiplier=2.0,
             offset=0.3,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     distance = 0.05
 
     connection.position = 0
@@ -1161,7 +1169,7 @@ def test_position_for_translation_of_a_revolute_connection_raises(
             child=child,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
     with pytest.raises(ScrewAxisWithoutTranslationError):
         connection.position_for_translation(distance=0.05)

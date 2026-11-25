@@ -62,7 +62,7 @@ def test_a_mesh_named_by_a_package_uri_is_read_from_that_package(milk_uri):
     world = STLParser(file_path=milk_uri).create_world()
 
     [mesh] = world.kinematic_structure_entities[0].collision
-    assert mesh.local_file == Path(PackageUriResolver().resolve(milk_uri))
+    assert mesh.local_file == Path(PackageUriResolver().resolve(uri=milk_uri))
 
 
 def test_parse_and_merge(milk_uri, cup_uri):
@@ -72,6 +72,6 @@ def test_parse_and_merge(milk_uri, cup_uri):
     milk_world = STLParser(file_path=milk_uri).create_world()
     cup_world = STLParser(file_path=cup_uri).create_world()
 
-    milk_world.merge_world(cup_world)
+    milk_world.merge_world(other=cup_world)
     assert len(milk_world.kinematic_structure_entities) == 2
     assert len(milk_world.kinematic_structure_entities[0].collision) == 1

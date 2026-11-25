@@ -92,8 +92,8 @@ class MilkTransportDemonstration(RobotDemonstration):
 
     floor: BodySpecification = field(
         default_factory=lambda: BodySpecification.box(
-            SceneBody.FLOOR,
-            Scale(x=4.0, y=4.0, z=0.02),
+            name=SceneBody.FLOOR,
+            scale=Scale(x=4.0, y=4.0, z=0.02),
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=-0.01),
         )
     )
@@ -103,8 +103,8 @@ class MilkTransportDemonstration(RobotDemonstration):
 
     counter: BodySpecification = field(
         default_factory=lambda: BodySpecification.box(
-            SceneBody.COUNTER,
-            Scale(x=0.6, y=1.0, z=0.75),
+            name=SceneBody.COUNTER,
+            scale=Scale(x=0.6, y=1.0, z=0.75),
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, z=0.375),
         )
     )
@@ -114,8 +114,8 @@ class MilkTransportDemonstration(RobotDemonstration):
 
     table: BodySpecification = field(
         default_factory=lambda: BodySpecification.box(
-            SceneBody.TABLE,
-            Scale(x=0.6, y=1.0, z=0.7),
+            name=SceneBody.TABLE,
+            scale=Scale(x=0.6, y=1.0, z=0.7),
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-1.0, z=0.35),
         )
     )
@@ -166,7 +166,7 @@ class MilkTransportDemonstration(RobotDemonstration):
         return RobotSpecification(semantic_annotation_type=self.used_robot)
 
     def is_scene_populated(self, *, world: World) -> bool:
-        return world.is_kinematic_structure_entity_in_world_by_name(SceneBody.MILK)
+        return world.is_kinematic_structure_entity_in_world_by_name(name=SceneBody.MILK)
 
     def populate_scene(self, *, world: World) -> None:
         """
@@ -176,20 +176,22 @@ class MilkTransportDemonstration(RobotDemonstration):
             name=SceneBody.MILK,
             semantic_annotation_type=Milk,
             root_specification=BodySpecification.mesh(
-                SceneBody.MILK,
-                SceneFile.MILK,
+                name=SceneBody.MILK,
+                filename=SceneFile.MILK,
                 connection_specification=Connection6DoFSpecification(),
             ),
-        ).spawn(world)
-        ContactParameters.create_for_grasped_object().apply_to([milk.root])
+        ).spawn(world=world)
+        ContactParameters.create_for_grasped_object().apply_to(bodies=[milk.root])
         milk.root.parent_connection.origin = self._milk_pose_on(
-            surface=world.get_body_by_name(SceneBody.COUNTER), milk=milk
+            surface=world.get_body_by_name(name=SceneBody.COUNTER), milk=milk
         ).homogeneous_matrix
 
     def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
-                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+                robot=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=self.used_robot
+                )[0]
             )
         ]
 
@@ -200,15 +202,15 @@ class MilkTransportDemonstration(RobotDemonstration):
         """
         world = context.world
         hsrb = context.require_extension(extension_type=RobotAccess).robot
-        [milk] = world.get_semantic_annotations_by_type(Milk)
+        [milk] = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)
         [arm] = hsrb.all_arms
         taking_pose = self._standing_pose_facing(
             milk_pose=self._milk_pose_on(
-                surface=world.get_body_by_name(SceneBody.COUNTER), milk=milk
+                surface=world.get_body_by_name(name=SceneBody.COUNTER), milk=milk
             )
         )
         target = self._milk_pose_on(
-            surface=world.get_body_by_name(SceneBody.TABLE), milk=milk
+            surface=world.get_body_by_name(name=SceneBody.TABLE), milk=milk
         )
         statechart = Statechart(context=context)
         statechart.add_node(
@@ -251,10 +253,10 @@ class MilkTransportDemonstration(RobotDemonstration):
         """
         world = surface._world
         surface_box = surface.collision.as_bounding_box_collection_in_frame(
-            world.root
+            reference_frame=world.root
         ).bounding_box()
         milk_box = milk.root.collision.as_bounding_box_collection_in_frame(
-            milk.root
+            reference_frame=milk.root
         ).bounding_box()
         if surface_box.min_x > 0:
             x, yaw = surface_box.min_x + self.milk_depth, 0.0
@@ -297,7 +299,7 @@ class MilkTransportDemonstration(RobotDemonstration):
                 z=self.grasp_height, reference_frame=milk.root
             )
             @ milk.root._world.transform(
-                closest.grasp_pose, milk.root
+                spatial_object=closest.grasp_pose, target_frame=milk.root
             ).homogeneous_matrix
         )
         return replace(closest, grasp_pose=milk_T_raised_grasp.pose)

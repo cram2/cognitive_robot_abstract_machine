@@ -165,7 +165,7 @@ class RoboKudo:
                     self.node,
                     timeout_seconds=self.world_fetch_timeout.total_seconds(),
                 )
-                self.synchronizer = WorldSynchronizer.of_world(self.world)
+                self.synchronizer = WorldSynchronizer.of_world(world=self.world)
             closing_on_failure.pop_all()
 
     # %% lifecycle

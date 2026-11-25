@@ -77,7 +77,7 @@ def parse_object(stl_file_name: str, color: Color | None = None) -> World:
         file_path=f"package://iai_objects/objects/{stl_file_name}"
     ).create_world()
     if color is not None:
-        object_world.root.visual.dye_shapes(color)
+        object_world.root.visual.dye_shapes(color=color)
     return object_world
 
 
@@ -103,6 +103,6 @@ def attach_sponge(world: World, arm: Arm) -> Body:
         ),
     )
     with world.modify_world():
-        world.add_kinematic_structure_entity(sponge_body)
-        world.add_connection(connection)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=sponge_body)
+        world.add_connection(connection=connection)
     return sponge_body

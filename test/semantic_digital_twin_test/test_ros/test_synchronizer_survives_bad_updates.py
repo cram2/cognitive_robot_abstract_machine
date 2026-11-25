@@ -142,11 +142,13 @@ def test_receiver_does_not_report_caught_up_with_a_publisher_it_diverged_from(
     unknown_to_receiver = Body(name=PrefixedName(name="unknown"))
     with publishing_world.modify_world(publish_changes=False):
         publishing_world.add_connection(
-            FixedConnection(parent=publishing_world.root, child=unknown_to_receiver)
+            connection=FixedConnection(
+                parent=publishing_world.root, child=unknown_to_receiver
+            )
         )
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=unknown_to_receiver, child=Body(name=PrefixedName(name="child"))
             )
         )
@@ -339,11 +341,13 @@ def test_reload_clears_the_divergence_from_the_reloaded_world(
     unknown_to_receiver = Body(name=PrefixedName(name="unknown"))
     with publishing_world.modify_world(publish_changes=False):
         publishing_world.add_connection(
-            FixedConnection(parent=publishing_world.root, child=unknown_to_receiver)
+            connection=FixedConnection(
+                parent=publishing_world.root, child=unknown_to_receiver
+            )
         )
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=unknown_to_receiver, child=Body(name=PrefixedName(name="child"))
             )
         )
@@ -457,11 +461,13 @@ def test_deferred_updates_building_on_each_other_are_applied(rclpy_node):
     receiving_world = World()
     with publishing_world.modify_world():
         publishing_world.add_kinematic_structure_entity(
-            Body(name=PrefixedName(name="root"))
+            kinematic_structure_entity=Body(name=PrefixedName(name="root"))
         )
     with receiving_world.modify_world():
         receiving_world.add_kinematic_structure_entity(
-            Body(name=PrefixedName(name="root"), id=publishing_world.root.id)
+            kinematic_structure_entity=Body(
+                name=PrefixedName(name="root"), id=publishing_world.root.id
+            )
         )
     publisher = WorldSynchronizer(
         node=rclpy_node, _world=publishing_world, topic_name=topic
@@ -475,11 +481,13 @@ def test_deferred_updates_building_on_each_other_are_applied(rclpy_node):
     tray = Body(name=PrefixedName(name="tray"))
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(parent=publishing_world.root, child=tray)
+            connection=FixedConnection(parent=publishing_world.root, child=tray)
         )
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(parent=tray, child=Body(name=PrefixedName(name="cup")))
+            connection=FixedConnection(
+                parent=tray, child=Body(name=PrefixedName(name="cup"))
+            )
         )
     wait_for_condition(lambda: receiver.has_buffered_model_modification)
     wait_for_condition(lambda: len(receiver.missed_messages) >= 4)

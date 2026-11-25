@@ -67,7 +67,9 @@ def _top_of(body: Body) -> float:
     :return: How high the top of ``body``'s collision geometry stands in the world.
     """
     world = body._world
-    boxes = body.collision.as_bounding_box_collection_in_frame(world.root)
+    boxes = body.collision.as_bounding_box_collection_in_frame(
+        reference_frame=world.root
+    )
     return max(box.max_z for box in boxes)
 
 
@@ -76,7 +78,9 @@ def _bottom_of(body: Body) -> float:
     :return: How low the bottom of ``body``'s collision geometry hangs in the world.
     """
     world = body._world
-    boxes = body.collision.as_bounding_box_collection_in_frame(world.root)
+    boxes = body.collision.as_bounding_box_collection_in_frame(
+        reference_frame=world.root
+    )
     return min(box.min_z for box in boxes)
 
 
@@ -97,7 +101,9 @@ def _box_resting_on(
     )
     with world.modify_world():
         world.add_connection(
-            Connection6DoF.create_with_dofs(world=world, parent=world.root, child=box)
+            connection=Connection6DoF.create_with_dofs(
+                world=world, parent=world.root, child=box
+            )
         )
     x, y, _ = supporter.global_pose.position.to_np()[:3]
     top = _top_of(supporter)
@@ -131,7 +137,7 @@ def _supporters_detected_for(
 
 
 def test_an_object_resting_on_the_environment_is_supported_by_it(cylinder_bot_world):
-    environment = cylinder_bot_world.get_body_by_name("environment")
+    environment = cylinder_bot_world.get_body_by_name(name="environment")
     box = _box_resting_on(cylinder_bot_world, environment)
 
     assert _supporters_detected_for(cylinder_bot_world, box) == [environment]
@@ -144,12 +150,14 @@ def test_an_object_on_a_gripper_is_not_supported_by_the_gripper(pr2_world_copy):
     disregarded for want of contact instead. With the robot left out there would be
     nothing to disregard, so the run is the one that reads the robot too.
     """
-    palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
+    palm = pr2_world_copy.get_body_by_name(name="l_gripper_palm_link")
     box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
     assert InContactWith(body1=box, body2=palm)()
     gripper_bodies = {
         body
-        for end_effector in pr2_world_copy.get_semantic_annotations_by_type(EndEffector)
+        for end_effector in pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        )
         for body in end_effector.bodies
     }
 
@@ -186,7 +194,7 @@ def test_nothing_of_the_robot_is_checked_against_an_object(pr2_world_copy):
     With the robot left out, a hand around an object is not read as the scene touching
     it.
     """
-    palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
+    palm = pr2_world_copy.get_body_by_name(name="l_gripper_palm_link")
     box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
 
     assert _contacts_detected_for(pr2_world_copy, box) == []
@@ -197,7 +205,7 @@ def test_the_robot_is_checked_against_an_object_when_it_is_not_left_out(pr2_worl
     The robot is left out because a run is asked to read the scene, not the robot; a run
     that wants it back says so.
     """
-    palm = pr2_world_copy.get_body_by_name("l_gripper_palm_link")
+    palm = pr2_world_copy.get_body_by_name(name="l_gripper_palm_link")
     box = _box_resting_on(pr2_world_copy, palm, sunk_by=SUNK_INTO_A_GRIPPER)
 
     assert palm in _contacts_detected_for(pr2_world_copy, box, exclude_robot=False)
@@ -209,7 +217,7 @@ def _box_inside(world: World, container: Body) -> Body:
     ``container``'s collision geometry, so it rests where it is.
     """
     bounds = container.collision.as_bounding_box_collection_in_frame(
-        world.root
+        reference_frame=world.root
     ).bounding_box()
     middle_x = (bounds.min_x + bounds.max_x) / 2
     middle_y = (bounds.min_y + bounds.max_y) / 2
@@ -228,7 +236,7 @@ def _box_inside(world: World, container: Body) -> Body:
     )
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=shelf,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -240,7 +248,9 @@ def _box_inside(world: World, container: Body) -> Body:
             )
         )
         world.add_connection(
-            Connection6DoF.create_with_dofs(world=world, parent=world.root, child=box)
+            connection=Connection6DoF.create_with_dofs(
+                world=world, parent=world.root, child=box
+            )
         )
     box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         middle_x, middle_y, middle_z, reference_frame=world.root
@@ -276,7 +286,7 @@ def test_an_object_is_not_contained_in_the_robot(pr2_world_copy):
     With the robot left out, an object the robot's body happens to enclose is not read
     as put into something.
     """
-    base = pr2_world_copy.get_body_by_name("base_link")
+    base = pr2_world_copy.get_body_by_name(name="base_link")
     box = _box_inside(pr2_world_copy, base)
 
     assert set(_containers_detected_for(pr2_world_copy, box)).isdisjoint(
@@ -289,7 +299,7 @@ def test_an_object_is_contained_in_the_robot_when_it_is_not_left_out(pr2_world_c
     A run that wants the robot read again says so, and then the body around the object
     is what contains it.
     """
-    base = pr2_world_copy.get_body_by_name("base_link")
+    base = pr2_world_copy.get_body_by_name(name="base_link")
     box = _box_inside(pr2_world_copy, base)
 
     assert base in _containers_detected_for(pr2_world_copy, box, exclude_robot=False)

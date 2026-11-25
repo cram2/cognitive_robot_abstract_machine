@@ -156,6 +156,7 @@ class DegreeOfFreedomLimits(Generic[T]):
     @classmethod
     def from_position_range_and_speed(
         cls,
+        *,
         lower_position: T | None = None,
         upper_position: T | None = None,
         maximum_speed: T | None = None,
@@ -298,6 +299,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     def _overwrite_dof_limits(
         self,
+        *,
         new_lower_limits: DerivativeMap[float],
         new_upper_limits: DerivativeMap[float],
     ):
@@ -317,7 +319,9 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
         """
         if not isinstance(self.variables.position, sm.FloatVariable):
             raise MimicDofLimitOverwriteError(dof_name=self.name)
-        for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
+        for derivative in Derivatives.range(
+            start=Derivatives.position, stop=Derivatives.jerk
+        ):
             if new_lower_limits[derivative] is not None:
                 if self.limits.lower[derivative] is None:
                     self.limits.lower[derivative] = new_lower_limits[derivative]

@@ -138,7 +138,7 @@ class PR2KinectV1(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Attach the camera to the Kinect RGB optical frame below the robot root.
@@ -148,7 +148,7 @@ class PR2KinectV1(RobotCamera[FieldOfViewCameraModel]):
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "head_mount_kinect_rgb_optical_frame"
+                branch_root=robot_root, name="head_mount_kinect_rgb_optical_frame"
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(
@@ -169,11 +169,11 @@ class PR2BaseLidar(Lidar):
 
     @classmethod
     def with_source(
-        cls, robot_root: KinematicStructureEntity, source: LidarSource
+        cls, *, robot_root: KinematicStructureEntity, source: LidarSource
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "base_laser_link"
+                branch_root=robot_root, name="base_laser_link"
             ),
             scan_pattern=ScanPattern(
                 minimum_angle=-2.2689,
@@ -196,14 +196,14 @@ class PR2RightGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_l_finger_link"
+                branch_root=robot_root, name="r_gripper_l_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_l_finger_tip_link"
+                branch_root=robot_root, name="r_gripper_l_finger_tip_link"
             ),
         )
 
@@ -218,14 +218,14 @@ class PR2RightGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_r_finger_link"
+                branch_root=robot_root, name="r_gripper_r_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_r_finger_tip_link"
+                branch_root=robot_root, name="r_gripper_r_finger_tip_link"
             ),
         )
 
@@ -240,14 +240,14 @@ class PR2LeftGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_l_finger_link"
+                branch_root=robot_root, name="l_gripper_l_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_l_finger_tip_link"
+                branch_root=robot_root, name="l_gripper_l_finger_tip_link"
             ),
         )
 
@@ -262,14 +262,14 @@ class PR2LeftGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_r_finger_link"
+                branch_root=robot_root, name="l_gripper_r_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_r_finger_tip_link"
+                branch_root=robot_root, name="l_gripper_r_finger_tip_link"
             ),
         )
 
@@ -338,14 +338,14 @@ class PR2RightGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_palm_link"
+                branch_root=robot_root, name="r_gripper_palm_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_tool_frame"
+                branch_root=robot_root, name="r_gripper_tool_frame"
             ),
         )
 
@@ -378,14 +378,14 @@ class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFin
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_palm_link"
+                branch_root=robot_root, name="l_gripper_palm_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_tool_frame"
+                branch_root=robot_root, name="l_gripper_tool_frame"
             ),
         )
 
@@ -403,9 +403,11 @@ class PR2Neck(Neck[PR2KinectV1], ServoedRobotPart):
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
+                name=joint_name
             )
-            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+            self._world.set_dofs_has_hardware_interface(
+                dofs=connection.active_dofs, value=True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         return []
@@ -425,14 +427,14 @@ class PR2Neck(Neck[PR2KinectV1], ServoedRobotPart):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "torso_lift_link"
+                branch_root=robot_root, name="torso_lift_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "head_tilt_link"
+                branch_root=robot_root, name="head_tilt_link"
             ),
         )
 
@@ -490,9 +492,11 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
+                name=joint_name
             )
-            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+            self._world.set_dofs_has_hardware_interface(
+                dofs=connection.active_dofs, value=True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         left_arm_park = JointState.from_mapping(
@@ -518,14 +522,14 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "torso_lift_link"
+                branch_root=robot_root, name="torso_lift_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_force_torque_link"
+                branch_root=robot_root, name="l_force_torque_link"
             ),
         )
 
@@ -544,9 +548,11 @@ class PR2RightArm(PR2Arm[PR2RightGripper]):
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
+                name=joint_name
             )
-            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+            self._world.set_dofs_has_hardware_interface(
+                dofs=connection.active_dofs, value=True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         right_arm_park = JointState.from_mapping(
@@ -564,14 +570,14 @@ class PR2RightArm(PR2Arm[PR2RightGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "torso_lift_link"
+                branch_root=robot_root, name="torso_lift_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_wrist_roll_link"
+                branch_root=robot_root, name="r_wrist_roll_link"
             ),
         )
 
@@ -585,12 +591,14 @@ class PR2Torso(
 ):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "torso_lift_link"
+                branch_root=robot_root, name="torso_lift_link"
             ),
         )
 
@@ -600,9 +608,11 @@ class PR2Torso(
         ]
         for joint_name in controlled_joints:
             connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
+                name=joint_name
             )
-            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+            self._world.set_dofs_has_hardware_interface(
+                dofs=connection.active_dofs, value=True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections
@@ -689,10 +699,12 @@ class PR2MobileBase(MobileBase[OmniDrive], HasTorso[PR2Torso], HasLidar[PR2BaseL
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
         )
 
 
@@ -719,11 +731,19 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
         vel_limits = defaultdict(
             lambda: 1.0,
             {
-                self._world.get_connection_by_name(PR2Joint.HEAD_TILT): 3.5,
-                self._world.get_connection_by_name(PR2Joint.RIGHT_SHOULDER_PAN): 0.15,
-                self._world.get_connection_by_name(PR2Joint.LEFT_SHOULDER_PAN): 0.15,
-                self._world.get_connection_by_name(PR2Joint.LEFT_SHOULDER_LIFT): 0.2,
-                self._world.get_connection_by_name(PR2Joint.RIGHT_SHOULDER_LIFT): 0.2,
+                self._world.get_connection_by_name(name=PR2Joint.HEAD_TILT): 3.5,
+                self._world.get_connection_by_name(
+                    name=PR2Joint.RIGHT_SHOULDER_PAN
+                ): 0.15,
+                self._world.get_connection_by_name(
+                    name=PR2Joint.LEFT_SHOULDER_PAN
+                ): 0.15,
+                self._world.get_connection_by_name(
+                    name=PR2Joint.LEFT_SHOULDER_LIFT
+                ): 0.2,
+                self._world.get_connection_by_name(
+                    name=PR2Joint.RIGHT_SHOULDER_LIFT
+                ): 0.2,
             },
         )
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
@@ -739,11 +759,13 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
             "pr2.srdf",
         )
         self._world.collision_manager.add_ignore_collision_rule(
-            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+            rule=SelfCollisionMatrixRule.from_collision_srdf(
+                file_path=srdf_path, world=self._world
+            )
         )
 
         self._world.collision_manager.extend_default_rules(
-            [
+            rules=[
                 AvoidExternalCollisions(
                     buffer_zone_distance=0.1, violated_distance=0.0, robot=self
                 ),
@@ -769,7 +791,9 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
                     violated_distance=0.05,
                     robot=self,
                     body_subset={
-                        self._world.get_body_in_branch_by_name(self.root, "base_link")
+                        self._world.get_body_in_branch_by_name(
+                            branch_root=self.root, name="base_link"
+                        )
                     },
                 ),
                 AvoidSelfCollisions(
@@ -779,26 +803,28 @@ class PR2(AbstractRobot, HasMobileBase[PR2MobileBase]):
         )
 
         self._world.collision_manager.extend_max_avoided_bodies_rules(
-            [
+            rules=[
                 MaxAvoidedCollisionsOverride(
                     value=2,
                     bodies={
-                        self._world.get_body_in_branch_by_name(self.root, "base_link")
+                        self._world.get_body_in_branch_by_name(
+                            branch_root=self.root, name="base_link"
+                        )
                     },
                 ),
                 MaxAvoidedCollisionsOverride(
                     value=4,
                     bodies=set(
                         self._world.get_direct_child_bodies_with_collision(
-                            self._world.get_body_in_branch_by_name(
-                                self.root, "r_wrist_roll_link"
+                            start_body=self._world.get_body_in_branch_by_name(
+                                branch_root=self.root, name="r_wrist_roll_link"
                             )
                         )
                     )
                     | set(
                         self._world.get_direct_child_bodies_with_collision(
-                            self._world.get_body_in_branch_by_name(
-                                self.root, "l_wrist_roll_link"
+                            start_body=self._world.get_body_in_branch_by_name(
+                                branch_root=self.root, name="l_wrist_roll_link"
                             )
                         )
                     ),

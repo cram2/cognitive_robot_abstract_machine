@@ -59,7 +59,7 @@ from krrood_spatial_math.spatial_types import Pose, Pose2D
 from cramph.composites import Sequence
 
 world = setup_world()
-pr2_view = PR2.from_world(world)
+pr2_view = PR2.from_world(world=world)
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
@@ -82,7 +82,7 @@ def run(plan):
     return executor
 
 
-milk = world.get_semantic_annotations_by_type(Milk)[0]
+milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 description = TransportAction(
     pick_up=MoveAndPickUpAction.from_standing_position(
         standing_position=Pose2D.from_xy_yaw(x=1.63, y=1.98, reference_frame=world.root),

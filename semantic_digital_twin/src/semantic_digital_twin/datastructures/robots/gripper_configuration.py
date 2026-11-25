@@ -75,7 +75,7 @@ class GripperConfiguration(SubClassSafeGeneric, ABC, Generic[TGripperConfigurati
 
     @classmethod
     def from_state_type(
-        cls, end_effector: EndEffector, state_type: GripperState
+        cls, *, end_effector: EndEffector, state_type: GripperState
     ) -> Self:
         """
         :param end_effector: The end effector whose declared state is used.
@@ -85,7 +85,7 @@ class GripperConfiguration(SubClassSafeGeneric, ABC, Generic[TGripperConfigurati
         """
         return cls(
             end_effector=end_effector,
-            joint_state=end_effector.get_joint_state_by_type(state_type),
+            joint_state=end_effector.get_joint_state_by_type(state_type=state_type),
         )
 
 

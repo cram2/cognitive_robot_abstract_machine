@@ -39,7 +39,7 @@ class ViewDirection:
     """
 
     @staticmethod
-    def around(perspectives: int, elevation: float) -> list[ViewDirection]:
+    def around(*, perspectives: int, elevation: float) -> list[ViewDirection]:
         """
         :param perspectives: How many directions.
         :param elevation: The elevation of each direction, in radians.
@@ -65,7 +65,7 @@ class ViewDirection:
         )
 
     def camera_pose(
-        self, target: NDArray[np.float64], distance: float
+        self, *, target: NDArray[np.float64], distance: float
     ) -> HomogeneousTransformationMatrix:
         """
         :param target: The point the camera looks at.
@@ -123,8 +123,8 @@ class CameraRing:
 
     directions: list[ViewDirection] = field(
         default_factory=lambda: (
-            ViewDirection.around(8, np.radians(25.0))
-            + ViewDirection.around(3, np.radians(65.0))
+            ViewDirection.around(perspectives=8, elevation=np.radians(25.0))
+            + ViewDirection.around(perspectives=3, elevation=np.radians(65.0))
         )
     )
     """
@@ -163,19 +163,22 @@ class CameraRing:
     The brightness of the background.
     """
 
-    def render(self, mesh: trimesh.Trimesh) -> RenderedViews:
+    def render(self, *, mesh: trimesh.Trimesh) -> RenderedViews:
         """
         :param mesh: The mesh, its z-axis pointing up.
         :return: One orthographic view of the mesh from each of :attr:`directions`.
         """
-        rendered = [self._render_view(mesh, direction) for direction in self.directions]
+        rendered = [
+            self._render_view(mesh=mesh, direction=direction)
+            for direction in self.directions
+        ]
         return RenderedViews(
             images=np.concatenate([view.images for view in rendered]),
             faces=np.concatenate([view.faces for view in rendered]),
         )
 
     def _render_view(
-        self, mesh: trimesh.Trimesh, direction: ViewDirection
+        self, *, mesh: trimesh.Trimesh, direction: ViewDirection
     ) -> RenderedViews:
         """
         :param mesh: The mesh.
@@ -183,7 +186,9 @@ class CameraRing:
         :return: The single orthographic view from there.
         """
         diagonal = float(np.linalg.norm(mesh.extents))
-        pose = direction.camera_pose(mesh.bounds.mean(axis=0), diagonal).to_np()
+        pose = direction.camera_pose(
+            target=mesh.bounds.mean(axis=0), distance=diagonal
+        ).to_np()
         forward, eye = pose[:3, 0], pose[:3, 3]
         up, right = -pose[:3, 1], -pose[:3, 2]
         half_width = diagonal / 2 * self.margin

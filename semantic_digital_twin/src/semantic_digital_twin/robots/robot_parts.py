@@ -167,9 +167,9 @@ class HasRobotParts(ABC):
 
         Returns a list of all robot parts assigned directly to this robot part.
         """
-        return self._aggregate_robot_parts(set())
+        return self._aggregate_robot_parts(seen=set())
 
-    def _aggregate_robot_parts(self, seen: set[UUID]) -> list[AbstractRobotPart]:
+    def _aggregate_robot_parts(self, *, seen: set[UUID]) -> list[AbstractRobotPart]:
         """
         Recursively aggregates all robot parts assigned to this robot part, including
         itself if it is a robot part.
@@ -193,9 +193,9 @@ class HasRobotParts(ABC):
                 for robot_part in value:
                     if not isinstance(robot_part, HasRobotParts):
                         continue
-                    robot_parts.extend(robot_part._aggregate_robot_parts(seen))
+                    robot_parts.extend(robot_part._aggregate_robot_parts(seen=seen))
             elif isinstance(value, HasRobotParts):
-                robot_parts.extend(value._aggregate_robot_parts(seen))
+                robot_parts.extend(value._aggregate_robot_parts(seen=seen))
 
         return robot_parts
 
@@ -214,7 +214,9 @@ class HasRobotParts(ABC):
             args = get_args(field_type)
 
             if origin in CollectionKind.ELEMENT_SEQUENCE.value and args:
-                self._initialize_list_field(field_name, args)
+                self._initialize_list_field(
+                    field_name=field_name, types_to_initialize=args
+                )
 
             elif (
                 inspect.isclass(field_type)
@@ -227,13 +229,15 @@ class HasRobotParts(ABC):
                     continue
 
                 part = field_type.setup_default_configuration_in_world_below_robot_root(
-                    self.root
+                    robot_root=self.root
                 )
                 setattr(self, field_name, part)
                 # Recursive call to trigger initialization for child part's fields
                 part.setup_robot_part_semantic_annotations()
 
-    def _initialize_list_field(self, field_name: str, types_to_initialize: list[Any]):
+    def _initialize_list_field(
+        self, *, field_name: str, types_to_initialize: list[Any]
+    ):
         """
         Helper to initialize all parts matching item_type and append them to a list
         field.
@@ -248,7 +252,9 @@ class HasRobotParts(ABC):
 
         for concrete_type in types_to_initialize:
             if get_origin(concrete_type) in [Union, types.UnionType]:
-                self._initialize_list_field(field_name, get_args(concrete_type))
+                self._initialize_list_field(
+                    field_name=field_name, types_to_initialize=get_args(concrete_type)
+                )
                 continue
 
             if (
@@ -261,7 +267,7 @@ class HasRobotParts(ABC):
 
                 part = (
                     concrete_type.setup_default_configuration_in_world_below_robot_root(
-                        self.root
+                        robot_root=self.root
                     )
                 )
                 current_list.append(part)
@@ -287,7 +293,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     @classmethod
     @abstractmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up a default configuration of this robot part in the world, below the given
@@ -316,21 +322,21 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         """
 
     @synchronized_attribute_modification
-    def add_joint_state(self, joint_state: JointState):
+    def add_joint_state(self, *, joint_state: JointState):
         """
         Adds a joint state to this semantic annotation.
         """
         self.joint_states.append(joint_state)
-        joint_state.assign_to_robot(self._robot)
+        joint_state.assign_to_robot(robot=self._robot)
 
-    def add_joint_states(self, joint_states: list[JointState]):
+    def add_joint_states(self, *, joint_states: list[JointState]):
         """
         Adds multiple joint states to this semantic annotation.
         """
         for joint_state in joint_states:
-            self.add_joint_state(joint_state)
+            self.add_joint_state(joint_state=joint_state)
 
-    def get_joint_state_by_type(self, state_type: JointStateType) -> JointState:
+    def get_joint_state_by_type(self, *, state_type: JointStateType) -> JointState:
         """
         Returns a JointState for a given joint state type.
 
@@ -342,7 +348,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
                 return j
         raise NoJointStateWithType(joint_state=state_type)
 
-    def has_joint_state_of_type(self, state_type: JointStateType) -> bool:
+    def has_joint_state_of_type(self, *, state_type: JointStateType) -> bool:
         """
         Whether this part can be commanded into the given joint state.
 
@@ -356,6 +362,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     @classmethod
     def create_with_new_body_in_world(
         cls,
+        *,
         name: str,
         world: World,
         world_root_T_self: HomogeneousTransformationMatrix | None = None,
@@ -376,6 +383,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -417,7 +425,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         for robot_part in self._robot_parts:
             for connection in robot_part.active_connections:
                 self._world.set_dofs_has_hardware_interface(
-                    connection.active_dofs, True
+                    dofs=connection.active_dofs, value=True
                 )
 
     @property
@@ -436,7 +444,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         """
 
     def _declare_servo(
-        self, connection: ActiveConnection1DOF, servo: JointServo
+        self, *, connection: ActiveConnection1DOF, servo: JointServo
     ) -> None:
         """
         Drive one of this part's joints with a position servo in a physical simulation:
@@ -455,17 +463,19 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         if servo.dynamics is not None:
             connection.dynamics = servo.dynamics
         self._add_servo(
-            PositionServo(
+            servo=PositionServo(
                 name=PrefixedName(
                     name=f"{connection.raw_dof.name.name}_servo",
                     prefix=connection.raw_dof.name.prefix,
                 ),
                 gains=servo.gains,
             ),
-            connection.raw_dof,
+            degree_of_freedom=connection.raw_dof,
         )
 
-    def _add_servo(self, servo: Actuator, degree_of_freedom: DegreeOfFreedom) -> None:
+    def _add_servo(
+        self, *, servo: Actuator, degree_of_freedom: DegreeOfFreedom
+    ) -> None:
         """
         Drive a degree of freedom with a servo in a physical simulation, unless a servo
         drives it already.
@@ -477,8 +487,8 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
             degree_of_freedom in actuator.dofs for actuator in self._world.actuators
         ):
             return
-        servo.add_dof(degree_of_freedom)
-        self._world.add_actuator(servo)
+        servo.add_dof(dof=degree_of_freedom)
+        self._world.add_actuator(actuator=servo)
 
     def _compensate_gravity(self) -> None:
         """
@@ -486,9 +496,13 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         part holds its own weight.
         """
         for body in self.bodies:
-            compensation = body.get_simulator_property_of_type(GravityCompensation)
+            compensation = body.get_simulator_property_of_type(
+                property_type=GravityCompensation
+            )
             if compensation is None:
-                body.add_simulator_property(GravityCompensation(fraction=1.0))
+                body.add_simulator_property(
+                    simulator_property=GravityCompensation(fraction=1.0)
+                )
                 continue
             compensation.fraction = 1.0
 
@@ -517,8 +531,10 @@ class ServoedRobotPart(AbstractRobotPart, ABC):
 
     def _setup_servos(self) -> None:
         for joint_name, drive in self.drive_of_each_joint.items():
-            connection = self._world.get_connection_by_name(joint_name)
-            self._declare_servo(connection, drive.servo_for(connection))
+            connection = self._world.get_connection_by_name(name=joint_name)
+            self._declare_servo(
+                connection=connection, servo=drive.servo_for(connection=connection)
+            )
         if self.holds_its_own_weight:
             self._compensate_gravity()
 
@@ -531,7 +547,7 @@ class HasGripperActionServers(AbstractRobotPart, ABC):
     """
 
     @abstractmethod
-    def action_topic_serving(self, state_type: JointStateType | None) -> str | None:
+    def action_topic_serving(self, *, state_type: JointStateType | None) -> str | None:
         """
         :param state_type: The state to bring the gripper into.
         :return: The name the driver serves the action bringing the gripper into
@@ -571,7 +587,7 @@ class RobotKinematicChain(
     def simulated_source(cls) -> JointPositionSource:
         return SimulatedJointPositionSource()
 
-    def real_source(self, node: Node) -> JointPositionSource:
+    def real_source(self, *, node: Node) -> JointPositionSource:
         from semantic_digital_twin.adapters.ros.input_synchronization import (
             PendingJointPositionSource,
         )
@@ -584,7 +600,7 @@ class RobotKinematicChain(
         )
 
     def _kinematic_structure_entities(
-        self, visited: set[int]
+        self, *, visited: set[int]
     ) -> list[KinematicStructureEntity]:
         """
         Computes the kinematic structure entities of this kinematic chain, which are the
@@ -597,7 +613,7 @@ class RobotKinematicChain(
         kinematic_structure_entities = [
             entity
             for entity in self._world.compute_chain_of_kinematic_structure_entities(
-                self.root, self.tip
+                root=self.root, tip=self.tip
             )
         ]
 
@@ -617,7 +633,7 @@ class RobotKinematicChain(
         """
         if self.root == self.tip:
             return []
-        return self._world.compute_chain_of_connections(self.root, self.tip)
+        return self._world.compute_chain_of_connections(root=self.root, tip=self.tip)
 
     def approximate_length(self) -> float:
         """
@@ -753,7 +769,7 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
 
     @staticmethod
     def create_optical_body(
-        mounting_body: Body, parent_T_optical: HomogeneousTransformationMatrix
+        *, mounting_body: Body, parent_T_optical: HomogeneousTransformationMatrix
     ) -> Body:
         """
         Add a geometry-free optical body when the robot description lacks an optical frame.
@@ -773,7 +789,7 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
         )
         with mounting_body._world.modify_world():
             mounting_body._world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=mounting_body,
                     child=optical_root,
                     parent_T_connection_expression=HomogeneousTransformationMatrix(
@@ -817,6 +833,7 @@ class EndEffector(AbstractRobotPart, ABC):
 
     def default_configuration(
         self,
+        *,
         state_type: GripperState,
         finger_velocity: float | None = None,
     ) -> GripperConfiguration:
@@ -828,7 +845,9 @@ class EndEffector(AbstractRobotPart, ABC):
             enforce during the motion.
         :return: The configuration carrying the declared joint state for that type.
         """
-        configuration = GripperStateConfiguration.from_state_type(self, state_type)
+        configuration = GripperStateConfiguration.from_state_type(
+            end_effector=self, state_type=state_type
+        )
         if finger_velocity is not None:
             configuration.finger_velocity = finger_velocity
         return configuration
@@ -875,7 +894,7 @@ class EndEffector(AbstractRobotPart, ABC):
             reference_frame=self.tool_frame,
         )
 
-    def tool_frame_goal(self, grasp_pose: Pose) -> Pose:
+    def tool_frame_goal(self, *, grasp_pose: Pose) -> Pose:
         """
         Express a grasp frame as a goal for this end effector's tool frame.
 
@@ -892,7 +911,9 @@ class EndEffector(AbstractRobotPart, ABC):
             reference_frame=grasp_pose.reference_frame,
         )
 
-    def tool_frame_goal_for_point(self, tool_P_point: Point3, grasp_pose: Pose) -> Pose:
+    def tool_frame_goal_for_point(
+        self, *, tool_P_point: Point3, grasp_pose: Pose
+    ) -> Pose:
         """
         Express a grasp frame as the goal that puts a point of this gripper on it, where
         :meth:`tool_frame_goal` puts the tool frame itself there.
@@ -901,7 +922,7 @@ class EndEffector(AbstractRobotPart, ABC):
         :param grasp_pose: The grasp frame to reach.
         :return: The pose the tool frame has to reach, in ``grasp_pose``'s frame.
         """
-        oriented = self.tool_frame_goal(grasp_pose)
+        oriented = self.tool_frame_goal(grasp_pose=grasp_pose)
         return Pose(
             position=grasp_pose.position
             - oriented.rotation_matrix @ tool_P_point.vector3,
@@ -925,7 +946,7 @@ class EndEffector(AbstractRobotPart, ABC):
             raise MoreThanOneBodyHeld(end_effector=self, held_bodies=children)
         return children[0]
 
-    def held_body_T_grasp_at(self, tool_P_point: Point3) -> Pose:
+    def held_body_T_grasp_at(self, *, tool_P_point: Point3) -> Pose:
         """
         The grasp this gripper has on the body it holds, read off the transform between
         the tool frame and that body, with the grasp sitting at a given point of the
@@ -949,7 +970,9 @@ class EndEffector(AbstractRobotPart, ABC):
         :param tool_P_grasp: The point of the gripper the grasp sits at.
         :return: The grasp frame, in the frame of `body`.
         """
-        body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
+        body_T_tool = self._world.transform(
+            spatial_object=self.tool_frame.global_transform, target_frame=body
+        )
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=body_T_tool @ tool_P_grasp,
             rotation_matrix=body_T_tool.rotation_matrix @ self.tool_R_grasp,
@@ -965,7 +988,7 @@ class EndEffector(AbstractRobotPart, ABC):
         return [
             entity
             for entity in self._world.get_kinematic_structure_entities_of_branch(
-                self.tool_frame
+                root=self.tool_frame
             )
             if entity != self.tool_frame
             and isinstance(entity, Body)
@@ -1018,7 +1041,7 @@ class MountingTable(Table, AbstractRobotPart, ABC):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(root=robot_root)
 
@@ -1052,7 +1075,7 @@ class MobileBase(
     def simulated_source(cls) -> BasePoseSource:
         return SimulatedBasePoseSource()
 
-    def real_source(self, node: Node) -> BasePoseSource:
+    def real_source(self, *, node: Node) -> BasePoseSource:
         """
         :raises MissingDriveConnectionError: If there is no drive the odometry could be
             written into.
@@ -1114,6 +1137,7 @@ class MobileBase(
     @classmethod
     def create_drive(
         cls,
+        *,
         world: World,
         parent: KinematicStructureEntity,
         child: KinematicStructureEntity,
@@ -1139,9 +1163,9 @@ class MobileBase(
         drive = self._robot.drive
         if drive is None:
             return
-        self.declare_drive_servos(drive)
+        self.declare_drive_servos(drive=drive)
 
-    def declare_drive_servos(self, drive: WheeledDrive) -> None:
+    def declare_drive_servos(self, *, drive: WheeledDrive) -> None:
         """
         Drive every degree of freedom the drive attaching this base to its ``odom`` is
         commanded with, such as its translational velocities and its yaw, with the
@@ -1154,7 +1178,7 @@ class MobileBase(
             return
         for degree_of_freedom in drive.active_dofs:
             self._add_servo(
-                VelocityServo(
+                servo=VelocityServo(
                     name=PrefixedName(
                         name=f"{drive.name.name}_{degree_of_freedom.name.name}_servo",
                         prefix=degree_of_freedom.name.prefix,
@@ -1165,7 +1189,7 @@ class MobileBase(
                         else drive_servos.translation_gains
                     ),
                 ),
-                degree_of_freedom,
+                degree_of_freedom=degree_of_freedom,
             )
 
     @property
@@ -1205,7 +1229,7 @@ class MobileBase(
     @property
     def bounding_box(self) -> VolumetricBoundingBox:
         return self.root.collision.as_bounding_box_collection_in_frame(
-            self._world.root
+            reference_frame=self._world.root
         ).bounding_box()
 
     @property
@@ -1295,7 +1319,9 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         collision_manager = self._world.collision_manager
         return any(
             contact.distance
-            < collision_manager.get_violated_distance(contact.body_a, contact.body_b)
+            < collision_manager.get_violated_distance(
+                body_a=contact.body_a, body_b=contact.body_b
+            )
             for contact in collision_manager.compute_collisions().contacts
             if contact.body_a in own_bodies or contact.body_b in own_bodies
         )
@@ -1310,7 +1336,9 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         collision_manager = self._world.collision_manager
         return any(
             contact.distance
-            < collision_manager.get_buffer_zone_distance(contact.body_a, contact.body_b)
+            < collision_manager.get_buffer_zone_distance(
+                body_a=contact.body_a, body_b=contact.body_b
+            )
             for contact in collision_manager.compute_collisions().contacts
             if (contact.body_a in own_bodies) != (contact.body_b in own_bodies)
         )
@@ -1331,7 +1359,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         """
         try:
             return os.path.isfile(
-                CompositePathResolver().resolve(cls.get_ros_file_path())
+                CompositePathResolver().resolve(uri=cls.get_ros_file_path())
             )
         except PathResolutionError:
             return False
@@ -1361,8 +1389,8 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         if not description_file_path:
             raise RobotDescriptionMissingError(robot_class=cls)
         return cls.from_world(
-            URDFParser.from_file(
-                description_file_path,
+            world=URDFParser.from_file(
+                file_path=description_file_path,
                 use_visual_as_collision_backup=cls.uses_visual_as_collision_backup,
             ).create_world()
         )
@@ -1382,14 +1410,14 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         super().setup_robot_part_semantic_annotations()
 
     @classmethod
-    def from_world(cls, world: World) -> Self:
+    def from_world(cls, *, world: World) -> Self:
         """
         Creates a robot from a world.
         """
-        return cls.from_branch_in_world(world.root)
+        return cls.from_branch_in_world(branch_root=world.root)
 
     @classmethod
-    def from_branch_in_world(cls, branch_root: KinematicStructureEntity) -> Self:
+    def from_branch_in_world(cls, *, branch_root: KinematicStructureEntity) -> Self:
         """
         Creates a robot from a branch in a world.
 
@@ -1405,10 +1433,12 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
                 root=robot_root,
             )
             self.setup_robot_part_semantic_annotations()
-            world.add_semantic_annotation_recursively(self)
+            world.add_semantic_annotation_recursively(semantic_annotation=self)
             for robot_part in self._robot_parts:
                 robot_part.setup_hardware_interfaces()
-                robot_part.add_joint_states(robot_part.setup_joint_states())
+                robot_part.add_joint_states(
+                    joint_states=robot_part.setup_joint_states()
+                )
                 robot_part._setup_servos()
             self._setup_collision_rules()
             self._setup_velocity_limits()
@@ -1499,7 +1529,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             return parent_connection
         return None
 
-    def set_root_pose(self, pose: Pose) -> None:
+    def set_root_pose(self, *, pose: Pose) -> None:
         """
         Place the robot's root at ``pose``.
 
@@ -1515,7 +1545,9 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         connection = self.root.parent_connection
         parent_kinematic_structure_entity = connection.parent
         if pose.reference_frame is not parent_kinematic_structure_entity:
-            pose = self._world.transform(pose, parent_kinematic_structure_entity)
+            pose = self._world.transform(
+                spatial_object=pose, target_frame=parent_kinematic_structure_entity
+            )
 
         connection.origin = pose.homogeneous_matrix
 
@@ -1535,6 +1567,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
 
     def tighten_dof_velocity_limits_of_1dof_connections(
         self,
+        *,
         new_limits: defaultdict[ActiveConnection1DOF, float],
     ) -> None:
         """
@@ -1566,7 +1599,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             )
 
     def tighten_dof_velocity_limits_proportionally(
-        self, maximum_velocity: float
+        self, *, maximum_velocity: float
     ) -> None:
         """
         Tightens the velocity limits of all 1-DOF active connections proportionally,
@@ -1643,7 +1676,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             if isinstance(robot_part, HasInputSource)
         ]
 
-    def use_real_sources(self, node: Node) -> None:
+    def use_real_sources(self, *, node: Node) -> None:
         """
         Read every part that declares a topic from what this robot publishes there.
 
@@ -1654,7 +1687,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         for robot_part in self._parts_with_input_source:
             if robot_part.topic_name is None:
                 continue
-            robot_part.use_real_source(node)
+            robot_part.use_real_source(node=node)
 
     def use_simulated_sources(self) -> None:
         """

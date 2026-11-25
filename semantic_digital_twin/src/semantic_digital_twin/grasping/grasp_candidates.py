@@ -81,7 +81,7 @@ class GraspCandidate:
         if not body.has_collision():
             raise ObjectHasNoWidthWithoutCollision(object_name=body.name)
         bounding_box = body.collision.as_bounding_box_collection_in_frame(
-            body
+            reference_frame=body
         ).bounding_box()
         extents = np.array(
             [
@@ -102,9 +102,9 @@ class GraspCandidate:
         :return: The grasp frame in the world frame, where the object is now.
         """
         world = self.graspable.root._world
-        return world.transform(self.grasp_pose, world.root)
+        return world.transform(spatial_object=self.grasp_pose, target_frame=world.root)
 
-    def moved_to(self, reference_T_object: Pose) -> Pose:
+    def moved_to(self, *, reference_T_object: Pose) -> Pose:
         """
         Transform this grasp candidate to where it would be, once the object is placed.
 

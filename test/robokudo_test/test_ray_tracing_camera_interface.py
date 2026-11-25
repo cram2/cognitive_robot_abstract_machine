@@ -78,8 +78,8 @@ def test_rendering_camera_is_placed_in_the_world_perception_perceives_into() -> 
     interface.set_data(cas=cas, world=world)
 
     scene_camera = interface.context_resolver.resolve(perception_world=world).camera
-    camera_body = world.get_body_by_name(scene_camera.root.name.name)
-    assert world.get_semantic_annotations_by_type(Camera) == [
+    camera_body = world.get_body_by_name(name=scene_camera.root.name.name)
+    assert world.get_semantic_annotations_by_type(semantic_annotation_type=Camera) == [
         cas.camera_observation.camera
     ]
     assert cas.camera_observation.camera.root is camera_body
@@ -157,7 +157,7 @@ def test_interface_publishes_shared_rendered_frame(monkeypatch: MonkeyPatch) -> 
     interface.set_data(cas=cas, world=world)
 
     render.assert_called_once_with(
-        context.camera, rgb_mode=interface.camera_config.rgb_mode
+        camera=context.camera, rgb_mode=interface.camera_config.rgb_mode
     )
     assert interface.camera_config.rgb_mode == BodyColorRenderingMode()
     np.testing.assert_array_equal(cas.color_image, frame.color_bgr.swapaxes(0, 1))

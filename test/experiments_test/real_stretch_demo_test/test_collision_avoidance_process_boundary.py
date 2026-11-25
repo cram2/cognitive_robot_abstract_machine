@@ -27,7 +27,9 @@ def test_a_plan_avoiding_collisions_runs_against_a_controller_in_another_process
     session = stretch_controller_process.session
     world = session.fetch_world()
     WorldSynchronizer(_world=world, node=session.node)
-    stretch = world.get_semantic_annotations_by_type(Stretch)[0]
+    stretch = world.get_semantic_annotations_by_type(semantic_annotation_type=Stretch)[
+        0
+    ]
     executor = RealRobotPlanExecutor(
         context=StatechartContext.with_extensions(
             world=world, extensions=[RobotAccess(robot=stretch)]

@@ -14,7 +14,9 @@ from semantic_digital_twin.world import World
 def test_the_servers_of_tracys_grippers_command_the_knuckle_joint_of_each_gripper(
     tracy_world: World,
 ) -> None:
-    tracy = tracy_world.get_semantic_annotations_by_type(Tracy)[0]
+    tracy = tracy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tracy
+    )[0]
 
     assert [
         arm.end_effector.commanded_connection.name.name
@@ -25,7 +27,9 @@ def test_the_servers_of_tracys_grippers_command_the_knuckle_joint_of_each_grippe
 def test_the_servers_of_tiagos_grippers_command_the_finger_joint_of_each_gripper(
     _tiago_world_setup: World,
 ) -> None:
-    tiago = _tiago_world_setup.get_semantic_annotations_by_type(Tiago)[0]
+    tiago = _tiago_world_setup.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tiago
+    )[0]
 
     assert [
         arm.end_effector.commanded_connection.name.name for arm in tiago.all_arms

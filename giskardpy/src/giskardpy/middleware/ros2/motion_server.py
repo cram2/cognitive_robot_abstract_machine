@@ -315,7 +315,7 @@ class MotionServer:
         background_node.get_node().get_logger().info(
             f"Parsing goal #{self.action_server.goal_id} message."
         )
-        tracker = WorldEntityWithIDKwargsTracker.from_world(self.world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world=self.world)
         kwargs = tracker.create_kwargs()
         kwargs["world"] = self.world
         motion_statechart = goal.parse_motion_statechart(

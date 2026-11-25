@@ -63,7 +63,9 @@ def remove_root_and_move_children_into_new_worlds(world: World) -> list[World]:
     ]
 
     with world.modify_world():
-        worlds = [world.move_branch_to_new_world(child) for child in root_children]
+        worlds = [
+            world.move_branch_to_new_world(new_root=child) for child in root_children
+        ]
         for world in worlds:
             if world.root is None:
                 ...
@@ -97,7 +99,7 @@ def replace_dresser_meshes_with_factories(
             )
         ]
     )
-    worlds = [procthor_replace_pipeline.apply(w) for w in worlds]
+    worlds = [procthor_replace_pipeline.apply(world=w) for w in worlds]
     return worlds
 
 
@@ -117,17 +119,19 @@ def parse_fbx_file_to_world_mapping_daos(fbx_file_path: str) -> list[WorldMappin
 
     parser = FBXParser(file_path=fbx_file_path)
     world = parser.create_world()
-    world = pipeline.apply(world)
+    world = pipeline.apply(world=world)
 
     worlds = remove_root_and_move_children_into_new_worlds(world)
 
     worlds = replace_dresser_meshes_with_factories(worlds, dresser_pattern)
     resolver = ProcthorResolver(classes=recursive_subclasses(HasRootBody))
     for world in worlds:
-        resolved = resolver.resolve(world.name)
+        resolved = resolver.resolve(name=world.name)
         if resolved:
             with world.modify_world():
-                world.add_semantic_annotation(resolved(root=world.root))
+                world.add_semantic_annotation(
+                    semantic_annotation=resolved(root=world.root)
+                )
 
     return [to_dao(world) for world in worlds]
 

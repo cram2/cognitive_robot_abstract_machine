@@ -159,19 +159,19 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
 
     with world.modify_world():
         world.merge_world_at_pose(
-            bowl,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            other=bowl,
+            pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                 2.4, 2.2, 1, reference_frame=world.root
             ),
         )
         connection = FixedConnection(
-            parent=world.get_body_by_name("cabinet10_drawer_top"),
+            parent=world.get_body_by_name(name="cabinet10_drawer_top"),
             child=spoon.root,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 -0.05, -0.05, 0
             ),
         )
-        world.merge_world(spoon, connection)
+        world.merge_world(other=spoon, root_connection=connection)
 
     try:
         import rclpy
@@ -186,7 +186,7 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     except ImportError:
         ros_node = None
 
-    pr2 = PR2.from_world(world)
+    pr2 = PR2.from_world(world=world)
     executor = KinematicallySimulatedPlanExecutor(
         context=StatechartContext.with_extensions(
             world=world, extensions=[RobotAccess(robot=pr2)]
@@ -197,13 +197,15 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     with world.modify_world():
         world_reasoner = WorldReasoner(world=world)
         world_reasoner.reason()
-        bowl_annotation = Bowl(root=world.get_body_by_name("bowl.stl"))
-        spoon_annotation = Spoon(root=world.get_body_by_name("spoon.stl"))
-        world.add_semantic_annotations([bowl_annotation, spoon_annotation])
+        bowl_annotation = Bowl(root=world.get_body_by_name(name="bowl.stl"))
+        spoon_annotation = Spoon(root=world.get_body_by_name(name="spoon.stl"))
+        world.add_semantic_annotations(
+            semantic_annotations=[bowl_annotation, spoon_annotation]
+        )
         world.add_semantic_annotation_recursively(
-            Drawer(
-                root=world.get_body_by_name("cabinet10_drawer_top"),
-                handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
+            semantic_annotation=Drawer(
+                root=world.get_body_by_name(name="cabinet10_drawer_top"),
+                handle=Handle(root=world.get_body_by_name(name="handle_cab10_t")),
             )
         )
 
@@ -235,7 +237,9 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
                 nodes=[
                     FunctionCall(function=_failing_step, failure_types=(PlanFailure,)),
                     TransportAction.from_graspable_by_closest_grasps(
-                        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+                        graspable=world.get_semantic_annotations_by_type(
+                            semantic_annotation_type=Milk
+                        )[0],
                         goal_pose=Pose.from_xyz_rpy(
                             4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root
                         ),
@@ -245,7 +249,9 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
                 ]
             ),
             TransportAction.from_graspable_by_closest_grasps(
-                graspable=world.get_semantic_annotations_by_type(Bowl)[0],
+                graspable=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=Bowl
+                )[0],
                 goal_pose=Pose.from_xyz_rpy(
                     5.0, 3.3, 0.75, yaw=1.57, reference_frame=world.root
                 ),
@@ -253,7 +259,9 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
                 context=executor.context,
             ),
             TransportAction.from_graspable_by_closest_grasps(
-                graspable=world.get_semantic_annotations_by_type(Spoon)[0],
+                graspable=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=Spoon
+                )[0],
                 goal_pose=Pose.from_xyz_rpy(
                     5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root
                 ),

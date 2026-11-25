@@ -354,7 +354,9 @@ class DebugExpressionPublishing(TickingExecutorExtension):
             and expression.reference_frame is not None
             and expression.visualisation_frame is not expression.reference_frame
         ):
-            expression = world.transform(expression, expression.visualisation_frame)
+            expression = world.transform(
+                spatial_object=expression, target_frame=expression.visualisation_frame
+            )
         return SpatialTypeVisualization(
             spatial_type=expression,
             color=debug_expression.color,

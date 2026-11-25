@@ -106,7 +106,7 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     camera_model = PinholeCameraModel.from_field_of_view(
         resolution=CameraResolution(width=640, height=480),
         field_of_view=FieldOfView(),
@@ -121,8 +121,8 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
         camera_model=camera_model,
     )
     with world.modify_world():
-        world.add_semantic_annotation(camera)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+        world.add_semantic_annotation(semantic_annotation=camera)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     observation = CameraObservation(
         camera=camera,
         effective_camera_model=camera_model,
@@ -209,7 +209,7 @@ def test_krrood_codec_resolves_world_entities_against_the_given_world() -> None:
     world = World()
     world_body = Body(name=PrefixedName(name="map"))
     with world.modify_world():
-        world.add_body(world_body)
+        world.add_body(body=world_body)
     transform = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, reference_frame=world_body
     )
@@ -217,7 +217,7 @@ def test_krrood_codec_resolves_world_entities_against_the_given_world() -> None:
 
     decoded = codec.decode(
         payload=codec.encode(value=transform),
-        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
     )
 
     assert decoded.reference_frame is world_body

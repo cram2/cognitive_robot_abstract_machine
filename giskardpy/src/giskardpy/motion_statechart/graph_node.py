@@ -497,7 +497,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
         """
         self._goal_reference_frame_binding.bind(world=self.context.world)
         root_chain, tip_chain = self.context.world.compute_split_chain_of_connections(
-            self.goal_binding_root, self.goal_reference_frame
+            root=self.goal_binding_root, tip=self.goal_reference_frame
         )
         chain = [*root_chain, *tip_chain]
         self._goal_binding_world_access = WorldAccess(

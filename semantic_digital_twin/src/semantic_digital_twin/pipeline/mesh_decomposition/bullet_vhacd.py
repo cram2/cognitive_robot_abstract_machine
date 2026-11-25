@@ -92,16 +92,16 @@ class BulletVHACDMeshDecomposer(MeshDecomposer):
     Path to a file where V-HACD writes its log output.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> list[Mesh]:
+    def apply_to_mesh(self, *, mesh: Mesh) -> list[Mesh]:
         """
         Decompose the mesh and return the resulting convex parts as ``Mesh`` objects.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             output_path = os.path.join(tmp_dir, "output.obj")
-            self.apply_to_mesh_and_save(mesh, output_path)
-            return self._load_convex_parts(output_path, origin=mesh.origin)
+            self.apply_to_mesh_and_save(mesh=mesh, output_path=output_path)
+            return self._load_convex_parts(path=output_path, origin=mesh.origin)
 
-    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+    def apply_to_mesh_and_save(self, *, mesh: Mesh, output_path: str) -> str:
         """
         Decompose the mesh and write the resulting multi-hull .obj directly to
         ``output_path``.
@@ -131,7 +131,7 @@ class BulletVHACDMeshDecomposer(MeshDecomposer):
         return output_path
 
     @staticmethod
-    def _load_convex_parts(path: str, origin) -> list[Mesh]:
+    def _load_convex_parts(*, path: str, origin) -> list[Mesh]:
         loaded = trimesh.load(path, process=False)
         return [
             Mesh.from_trimesh(mesh=part, origin=origin)

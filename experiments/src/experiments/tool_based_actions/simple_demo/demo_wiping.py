@@ -34,19 +34,19 @@ def main() -> None:
     Build the demo world and run the plan on the simulated robot.
     """
     world = setup_world()
-    pr2 = PR2.from_world(world)
+    pr2 = PR2.from_world(world=world)
 
     sponge_body = attach_sponge(world, pr2.right_arm)
 
     sponge = Sponge(root=sponge_body)
     with world.modify_world():
-        world.add_semantic_annotations([sponge])
+        world.add_semantic_annotations(semantic_annotations=[sponge])
 
     plan = Sequence(
         nodes=[
             SetGripperAction(
                 gripper_configuration=pr2.right_arm.end_effector.default_configuration(
-                    GripperState.CLOSE
+                    state_type=GripperState.CLOSE
                 )
             ),
             ParkArmsAction(arms=pr2.all_arms),

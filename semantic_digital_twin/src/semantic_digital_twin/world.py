@@ -436,7 +436,7 @@ def atomic_world_modification(func=None, modification: type[WorldModification] =
             # only record the modification after the function succeeded, otherwise a
             # caught exception leaves a phantom modification in the history
             current_world.get_world_model_manager().current_model_modification_block.append(
-                recorded_modification
+                modification=recorded_modification
             )
             return result
 
@@ -759,7 +759,7 @@ class World(HasSimulatorProperties):
 
     @classmethod
     def create_with_root_body(
-        cls, root_body_name: str = "map", prefix: str | None = None
+        cls, *, root_body_name: str = "map", prefix: str | None = None
     ) -> World:
         """
         Creates a new instance of the World class with a root body.
@@ -770,17 +770,17 @@ class World(HasSimulatorProperties):
         root_body = Body(name=PrefixedName(name=root_body_name, prefix=prefix))
         world = World()
         with world.modify_world():
-            world.add_body(root_body)
+            world.add_body(body=root_body)
         return world
 
-    def force_root_name(self, name: PrefixedName) -> None:
+    def force_root_name(self, *, name: PrefixedName) -> None:
         """
         Rename the world's root body.
 
         :param name: The new name for the root body.
         """
         with self.modify_world():
-            self.root.update_name(name)
+            self.root.update_name(name=name)
 
     def __hash__(self):
         return hash((id(self), self._model_manager.version))
@@ -873,7 +873,7 @@ class World(HasSimulatorProperties):
         """
         :return: A list of all regions in the world.
         """
-        return self.get_kinematic_structure_entity_by_type(Region)
+        return self.get_kinematic_structure_entity_by_type(entity_type=Region)
 
     @property
     def robot_bodies_with_collision(self) -> list[Body]:
@@ -881,7 +881,9 @@ class World(HasSimulatorProperties):
 
         return [
             body
-            for robot in self.get_semantic_annotations_by_type(AbstractRobot)
+            for robot in self.get_semantic_annotations_by_type(
+                semantic_annotation_type=AbstractRobot
+            )
             for body in robot.bodies_with_collision
         ]
 
@@ -891,7 +893,9 @@ class World(HasSimulatorProperties):
 
         return {
             body: robot
-            for robot in self.get_semantic_annotations_by_type(AbstractRobot)
+            for robot in self.get_semantic_annotations_by_type(
+                semantic_annotation_type=AbstractRobot
+            )
             for body in robot.bodies
         }
 
@@ -900,7 +904,7 @@ class World(HasSimulatorProperties):
         """
         :return: A list of all bodies in the world.
         """
-        return self.get_kinematic_structure_entity_by_type(Body)
+        return self.get_kinematic_structure_entity_by_type(entity_type=Body)
 
     @property
     def bodies_with_collision(self) -> list[Body]:
@@ -961,10 +965,13 @@ class World(HasSimulatorProperties):
         Return a list of all semantic annotations in the world, sorted topologically
         based on their dependencies.
         """
-        return self._topologically_sort_semantic_annotations(self.semantic_annotations)
+        return self._topologically_sort_semantic_annotations(
+            annotations=self.semantic_annotations
+        )
 
     def _topologically_sort_semantic_annotations(
         self,
+        *,
         annotations: list[SemanticAnnotation],
     ) -> list[SemanticAnnotation]:
         """
@@ -1010,20 +1017,24 @@ class World(HasSimulatorProperties):
         return sorted_annotations
 
     # %% Adding WorldEntities to the World
-    def add_connection(self, connection: Connection) -> None:
+    def add_connection(self, *, connection: Connection) -> None:
         """
         Add a connection and the entities it connects to the world.
 
         :param connection: The connection to add.
         """
-        self._raise_error_if_belongs_to_other_world(connection)
-        if not self.is_connection_in_world(connection):
-            self.add_kinematic_structure_entity(connection.parent)
-            self.add_kinematic_structure_entity(connection.child)
-            self._add_connection(connection)
+        self._raise_error_if_belongs_to_other_world(world_entity=connection)
+        if not self.is_connection_in_world(connection=connection):
+            self.add_kinematic_structure_entity(
+                kinematic_structure_entity=connection.parent
+            )
+            self.add_kinematic_structure_entity(
+                kinematic_structure_entity=connection.child
+            )
+            self._add_connection(connection=connection)
 
     @atomic_world_modification(modification=AddConnectionModification)
-    def _add_connection(self, connection: Connection):
+    def _add_connection(self, *, connection: Connection):
         """
         Adds a connection to the kinematic structure.
 
@@ -1040,18 +1051,21 @@ class World(HasSimulatorProperties):
 
     def add_body(
         self,
+        *,
         body: KinematicStructureEntity,
     ):
-        return self.add_kinematic_structure_entity(body)
+        return self.add_kinematic_structure_entity(kinematic_structure_entity=body)
 
     def add_region(
         self,
+        *,
         region: KinematicStructureEntity,
     ):
-        return self.add_kinematic_structure_entity(region)
+        return self.add_kinematic_structure_entity(kinematic_structure_entity=region)
 
     def add_kinematic_structure_entity(
         self,
+        *,
         kinematic_structure_entity: KinematicStructureEntity,
     ):
         """
@@ -1059,13 +1073,19 @@ class World(HasSimulatorProperties):
 
         :param kinematic_structure_entity: The kinematic_structure_entity to add.
         """
-        self._raise_error_if_belongs_to_other_world(kinematic_structure_entity)
-        if not self.is_kinematic_structure_entity_in_world(kinematic_structure_entity):
-            self._add_kinematic_structure_entity(kinematic_structure_entity)
+        self._raise_error_if_belongs_to_other_world(
+            world_entity=kinematic_structure_entity
+        )
+        if not self.is_kinematic_structure_entity_in_world(
+            kinematic_structure_entity=kinematic_structure_entity
+        ):
+            self._add_kinematic_structure_entity(
+                kinematic_structure_entity=kinematic_structure_entity
+            )
 
     @atomic_world_modification(modification=AddKinematicStructureEntityModification)
     def _add_kinematic_structure_entity(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ):
         """
         Add a kinematic_structure_entity to the world.
@@ -1079,7 +1099,7 @@ class World(HasSimulatorProperties):
             kinematic_structure_entity
         )
 
-    def add_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
+    def add_degree_of_freedom(self, *, dof: DegreeOfFreedom) -> None:
         """
         Adds degree of freedom in the world.
 
@@ -1087,12 +1107,12 @@ class World(HasSimulatorProperties):
         the world model.
         :param dof: The degree of freedom to register.
         """
-        self._raise_error_if_belongs_to_other_world(dof)
-        if not self.is_degree_of_freedom_in_world(dof):
-            self._add_degree_of_freedom(dof)
+        self._raise_error_if_belongs_to_other_world(world_entity=dof)
+        if not self.is_degree_of_freedom_in_world(degree_of_freedom=dof):
+            self._add_degree_of_freedom(dof=dof)
 
     @atomic_world_modification(modification=AddDegreeOfFreedomModification)
-    def _add_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
+    def _add_degree_of_freedom(self, *, dof: DegreeOfFreedom) -> None:
         """
         Adds a degree of freedom to the current system and initializes its state.
 
@@ -1105,10 +1125,12 @@ class World(HasSimulatorProperties):
         :return: None
         """
         dof.add_to_world(world=self)
-        self.state.add_degree_of_freedom(dof)
+        self.state.add_degree_of_freedom(dof=dof)
         self.degrees_of_freedom.append(dof)
 
-    def add_semantic_annotation(self, semantic_annotation: SemanticAnnotation) -> None:
+    def add_semantic_annotation(
+        self, *, semantic_annotation: SemanticAnnotation
+    ) -> None:
         """
         Adds a semantic annotation to the current list of semantic annotations if it
         doesn't already exist.
@@ -1116,13 +1138,15 @@ class World(HasSimulatorProperties):
         :param semantic_annotation: The semantic annotation instance to be added. Its
             name must be unique within the current context.
         """
-        self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        self._raise_error_if_belongs_to_other_world(world_entity=semantic_annotation)
+        if self.is_semantic_annotation_in_world(
+            semantic_annotation=semantic_annotation
+        ):
             return
-        self._add_semantic_annotation(semantic_annotation)
+        self._add_semantic_annotation(semantic_annotation=semantic_annotation)
 
     def add_semantic_annotation_recursively(
-        self, semantic_annotation: SemanticAnnotation
+        self, *, semantic_annotation: SemanticAnnotation
     ) -> None:
         """
         Recursively adds a semantic annotation to the current list of semantic
@@ -1133,8 +1157,10 @@ class World(HasSimulatorProperties):
         :param semantic_annotation: The semantic annotation instance to be added. Its
             name must be unique within the current context.
         """
-        self._raise_error_if_belongs_to_other_world(semantic_annotation)
-        if self.is_semantic_annotation_in_world(semantic_annotation):
+        self._raise_error_if_belongs_to_other_world(world_entity=semantic_annotation)
+        if self.is_semantic_annotation_in_world(
+            semantic_annotation=semantic_annotation
+        ):
             return
         introspector = DataclassOnlyIntrospector()
 
@@ -1145,13 +1171,14 @@ class World(HasSimulatorProperties):
                 for value_ in value:
                     if not isinstance(value_, SemanticAnnotation):
                         continue
-                    self.add_semantic_annotation_recursively(value_)
+                    self.add_semantic_annotation_recursively(semantic_annotation=value_)
             elif isinstance(value, SemanticAnnotation):
-                self.add_semantic_annotation_recursively(value)
-        self._add_semantic_annotation(semantic_annotation)
+                self.add_semantic_annotation_recursively(semantic_annotation=value)
+        self._add_semantic_annotation(semantic_annotation=semantic_annotation)
 
     def add_semantic_annotations(
         self,
+        *,
         semantic_annotations: list[SemanticAnnotation],
     ) -> None:
         """
@@ -1164,11 +1191,11 @@ class World(HasSimulatorProperties):
         """
         for semantic_annotation in semantic_annotations:
             self.add_semantic_annotation(
-                semantic_annotation,
+                semantic_annotation=semantic_annotation,
             )
 
     @atomic_world_modification(modification=AddSemanticAnnotationModification)
-    def _add_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
+    def _add_semantic_annotation(self, *, semantic_annotation: SemanticAnnotation):
         """
         The atomic method that adds a semantic annotation to the current list of
         semantic annotations.
@@ -1177,7 +1204,7 @@ class World(HasSimulatorProperties):
         self.semantic_annotations.append(semantic_annotation)
         self._world_entity_hash_table[hash(semantic_annotation)] = semantic_annotation
 
-    def add_actuator(self, actuator: Actuator) -> None:
+    def add_actuator(self, *, actuator: Actuator) -> None:
         """
         Adds an actuator in the world.
 
@@ -1192,10 +1219,10 @@ class World(HasSimulatorProperties):
             raise AlreadyBelongsToAWorldError(
                 world=actuator._world, type_trying_to_add=Actuator
             )
-        self._add_actuator(actuator)
+        self._add_actuator(actuator=actuator)
 
     @atomic_world_modification(modification=AddActuatorModification)
-    def _add_actuator(self, actuator: Actuator) -> None:
+    def _add_actuator(self, *, actuator: Actuator) -> None:
         """
         Adds an actuator to the current system.
 
@@ -1208,7 +1235,7 @@ class World(HasSimulatorProperties):
         actuator.add_to_world(world=self)
         self.actuators.append(actuator)
 
-    def _raise_error_if_belongs_to_other_world(self, world_entity: WorldEntity):
+    def _raise_error_if_belongs_to_other_world(self, *, world_entity: WorldEntity):
         """
         Raises an AlreadyBelongsToAWorldError if the world_entity already belongs to
         another world.
@@ -1221,7 +1248,7 @@ class World(HasSimulatorProperties):
             )
 
     # %% Remove WorldEntities from the World
-    def remove_connection(self, connection: Connection) -> None:
+    def remove_connection(self, *, connection: Connection) -> None:
         """
         Removes a connection.
 
@@ -1240,10 +1267,10 @@ class World(HasSimulatorProperties):
         """
         if connection._world is not self:
             return
-        self._remove_connection(connection)
+        self._remove_connection(connection=connection)
 
     @atomic_world_modification(modification=RemoveConnectionModification)
-    def _remove_connection(self, connection: Connection) -> None:
+    def _remove_connection(self, *, connection: Connection) -> None:
         parent_index = connection.parent.index
         child_index = connection.child.index
         if parent_index is not None and child_index is not None:
@@ -1254,7 +1281,7 @@ class World(HasSimulatorProperties):
         connection.remove_from_world()
 
     def remove_kinematic_structure_entity(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ) -> None:
         """
         Removes a kinematic_structure_entity from the world, together with the
@@ -1276,12 +1303,14 @@ class World(HasSimulatorProperties):
             )
         )
         for _, _, connection in attached_edges:
-            self.remove_connection(connection)
-        self._remove_kinematic_structure_entity(kinematic_structure_entity)
+            self.remove_connection(connection=connection)
+        self._remove_kinematic_structure_entity(
+            kinematic_structure_entity=kinematic_structure_entity
+        )
 
     @atomic_world_modification(modification=RemoveKinematicStructureEntityModification)
     def _remove_kinematic_structure_entity(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ) -> None:
         """
         Removes a kinematic_structure_entity from the world.
@@ -1294,7 +1323,7 @@ class World(HasSimulatorProperties):
         self.kinematic_structure.remove_node(kinematic_structure_entity.index)
         kinematic_structure_entity.remove_from_world()
 
-    def remove_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
+    def remove_degree_of_freedom(self, *, dof: DegreeOfFreedom) -> None:
         """
         Removes a degree of freedom from the world.
 
@@ -1306,17 +1335,17 @@ class World(HasSimulatorProperties):
         """
         if dof._world is not self:
             return
-        self._remove_degree_of_freedom(dof)
+        self._remove_degree_of_freedom(dof=dof)
         clear_memoization_cache(self)
 
     @atomic_world_modification(modification=RemoveDegreeOfFreedomModification)
-    def _remove_degree_of_freedom(self, dof: DegreeOfFreedom) -> None:
+    def _remove_degree_of_freedom(self, *, dof: DegreeOfFreedom) -> None:
         dof.remove_from_world()
         self.degrees_of_freedom.remove(dof)
         del self.state[dof.id]
 
     def remove_semantic_annotation(
-        self, semantic_annotation: SemanticAnnotation
+        self, *, semantic_annotation: SemanticAnnotation
     ) -> None:
         """
         Removes a semantic annotation from the current list of semantic annotations if
@@ -1330,10 +1359,10 @@ class World(HasSimulatorProperties):
         """
         if semantic_annotation._world is not self:
             return
-        self._remove_semantic_annotation(semantic_annotation)
+        self._remove_semantic_annotation(semantic_annotation=semantic_annotation)
 
     @atomic_world_modification(modification=RemoveSemanticAnnotationModification)
-    def _remove_semantic_annotation(self, semantic_annotation: SemanticAnnotation):
+    def _remove_semantic_annotation(self, *, semantic_annotation: SemanticAnnotation):
         """
         The atomic method that removes a semantic annotation from the current list of
         semantic annotations.
@@ -1346,7 +1375,7 @@ class World(HasSimulatorProperties):
         del self.semantic_annotations[index]
         semantic_annotation.remove_from_world()
 
-    def remove_actuator(self, actuator: Actuator) -> None:
+    def remove_actuator(self, *, actuator: Actuator) -> None:
         """
         Removes an actuator from the current list of actuators if it exists.
 
@@ -1357,17 +1386,17 @@ class World(HasSimulatorProperties):
         """
         if actuator._world is not self:
             return
-        self._remove_actuator(actuator)
+        self._remove_actuator(actuator=actuator)
 
     @atomic_world_modification(modification=RemoveActuatorModification)
-    def _remove_actuator(self, actuator: Actuator) -> None:
+    def _remove_actuator(self, *, actuator: Actuator) -> None:
         """
         The atomic method that removes an actuator from the current list of actuators.
         """
         actuator.remove_from_world()
         self.actuators.remove(actuator)
 
-    def remove_branch_from_world(self, root: KinematicStructureEntity):
+    def remove_branch_from_world(self, *, root: KinematicStructureEntity):
         """
         Removes the subtree rooted at ``root`` from the world.
 
@@ -1382,9 +1411,9 @@ class World(HasSimulatorProperties):
         :param root: The root entity of the branch to be removed.
         """
         kinematic_structure_entities = self.get_kinematic_structure_entities_of_branch(
-            root
+            root=root
         )
-        connections = self.get_connections_of_branch(root)
+        connections = self.get_connections_of_branch(root=root)
         parent_connection = root.parent_connection
         connections = (
             connections + [parent_connection]
@@ -1399,26 +1428,28 @@ class World(HasSimulatorProperties):
         ]
         with self.modify_world():
             for actuator in actuators:
-                self.remove_actuator(actuator)
+                self.remove_actuator(actuator=actuator)
             for connection in connections:
-                self.remove_connection(connection)
+                self.remove_connection(connection=connection)
             for kinematic_structure_entity in kinematic_structure_entities:
-                self.remove_kinematic_structure_entity(kinematic_structure_entity)
+                self.remove_kinematic_structure_entity(
+                    kinematic_structure_entity=kinematic_structure_entity
+                )
 
     # %% Other Atomic World Modifications
     @atomic_world_modification(modification=AddWorldSimulatorPropertyModification)
     def add_simulator_property(
-        self, simulator_property: SimulatorAdditionalProperty
+        self, *, simulator_property: SimulatorAdditionalProperty
     ) -> None:
         """
         :meth:`HasSimulatorProperties.add_simulator_property`, recorded as a
         modification of the world, so that it is published and can be rolled back.
         """
-        super().add_simulator_property(simulator_property)
+        super().add_simulator_property(simulator_property=simulator_property)
 
     @atomic_world_modification(modification=RemoveWorldSimulatorPropertyModification)
     def remove_simulator_property(
-        self, simulator_property: SimulatorAdditionalProperty
+        self, *, simulator_property: SimulatorAdditionalProperty
     ) -> None:
         """
         Detach a property from the world itself, recorded as a modification.
@@ -1429,7 +1460,7 @@ class World(HasSimulatorProperties):
 
     @atomic_world_modification(modification=SetDofHasHardwareInterface)
     def set_dofs_has_hardware_interface(
-        self, dofs: Iterable[DegreeOfFreedom], value: bool
+        self, *, dofs: Iterable[DegreeOfFreedom], value: bool
     ):
         """
         Sets whether the specified degrees of freedom (DOFs) have a hardware interface
@@ -1451,7 +1482,7 @@ class World(HasSimulatorProperties):
 
     # %% Getter
     def get_connection(
-        self, parent: KinematicStructureEntity, child: KinematicStructureEntity
+        self, *, parent: KinematicStructureEntity, child: KinematicStructureEntity
     ) -> Connection:
         """
         Retrieves the connection between a parent and child kinematic_structure_entity
@@ -1461,7 +1492,7 @@ class World(HasSimulatorProperties):
 
     @memoize
     def get_connections_by_type(
-        self, connection_type: type[GenericConnection]
+        self, *, connection_type: type[GenericConnection]
     ) -> list[GenericConnection]:
         """
         Retrieves the connections of a given type.
@@ -1470,12 +1501,12 @@ class World(HasSimulatorProperties):
         :return: A list of connections of the given type.
         """
         return self._get_world_entity_by_type_from_iterable(
-            connection_type, self.connections
+            world_entity_type=connection_type, iterable=self.connections
         )
 
     @memoize
     def get_semantic_annotations_by_type(
-        self, semantic_annotation_type: type[GenericSemanticAnnotation]
+        self, *, semantic_annotation_type: type[GenericSemanticAnnotation]
     ) -> list[GenericSemanticAnnotation]:
         """
         Retrieves all semantic annotations of a specific type from the world.
@@ -1485,12 +1516,13 @@ class World(HasSimulatorProperties):
         :return: A list of `SemanticAnnotation` objects that match the given type.
         """
         return self._get_world_entity_by_type_from_iterable(
-            semantic_annotation_type, self.semantic_annotations
+            world_entity_type=semantic_annotation_type,
+            iterable=self.semantic_annotations,
         )
 
     @memoize
     def get_kinematic_structure_entity_by_type(
-        self, entity_type: type[GenericKinematicStructureEntity]
+        self, *, entity_type: type[GenericKinematicStructureEntity]
     ) -> list[GenericKinematicStructureEntity]:
         """
         Retrieves all kinematic structure entities of a specific type from the world.
@@ -1500,12 +1532,12 @@ class World(HasSimulatorProperties):
         :return: A list of `KinematicStructureEntity` objects that match the given type.
         """
         return self._get_world_entity_by_type_from_iterable(
-            entity_type, self.kinematic_structure_entities
+            world_entity_type=entity_type, iterable=self.kinematic_structure_entities
         )
 
     @staticmethod
     def _get_world_entity_by_type_from_iterable(
-        world_entity_type: type[GenericWorldEntity], iterable: Iterable[WorldEntity]
+        *, world_entity_type: type[GenericWorldEntity], iterable: Iterable[WorldEntity]
     ) -> list[GenericWorldEntity]:
         """
         Helper function to retrieve all world entities of a specific type from an
@@ -1520,40 +1552,42 @@ class World(HasSimulatorProperties):
 
     @memoize
     def get_semantic_annotation_by_name(
-        self, name: str | PrefixedName
+        self, *, name: str | PrefixedName
     ) -> SemanticAnnotation:
         semantic_annotation: SemanticAnnotation = (
             self._get_world_entity_by_name_from_iterable(
-                name, self.semantic_annotations
+                name=name, world_entity_iterable=self.semantic_annotations
             )
         )
         return semantic_annotation
 
     @memoize
     def get_kinematic_structure_entity_by_name(
-        self, name: str | PrefixedName
+        self, *, name: str | PrefixedName
     ) -> KinematicStructureEntity:
         return self._get_world_entity_by_name_from_iterable(
-            name, self.kinematic_structure_entities
+            name=name, world_entity_iterable=self.kinematic_structure_entities
         )
 
     @memoize
     def get_kinematic_structure_entity_in_branch_by_name(
-        self, branch_root: KinematicStructureEntity, name: str | PrefixedName
+        self, *, branch_root: KinematicStructureEntity, name: str | PrefixedName
     ) -> KinematicStructureEntity:
         kinematic_structure_entities = self.get_kinematic_structure_entities_of_branch(
-            branch_root
+            root=branch_root
         )
         return self._get_world_entity_by_name_from_iterable(
-            name, kinematic_structure_entities
+            name=name, world_entity_iterable=kinematic_structure_entities
         )
 
     @memoize
-    def get_body_by_name(self, name: str | PrefixedName) -> Body:
-        return self._get_world_entity_by_name_from_iterable(name, self.bodies)
+    def get_body_by_name(self, *, name: str | PrefixedName) -> Body:
+        return self._get_world_entity_by_name_from_iterable(
+            name=name, world_entity_iterable=self.bodies
+        )
 
     def get_bodies_by_global_position(
-        self, world_P_body: Point3, maximum_distance: float = 1e-6
+        self, *, world_P_body: Point3, maximum_distance: float = 1e-6
     ) -> list[Body]:
         return [
             body
@@ -1564,29 +1598,34 @@ class World(HasSimulatorProperties):
 
     @memoize
     def get_body_in_branch_by_name(
-        self, branch_root: KinematicStructureEntity, name: str | PrefixedName
+        self, *, branch_root: KinematicStructureEntity, name: str | PrefixedName
     ) -> Body:
         bodies = [
             kse
-            for kse in self.get_kinematic_structure_entities_of_branch(branch_root)
+            for kse in self.get_kinematic_structure_entities_of_branch(root=branch_root)
             if isinstance(kse, Body)
         ]
-        return self._get_world_entity_by_name_from_iterable(name, bodies)
-
-    @memoize
-    def get_degree_of_freedom_by_name(
-        self, name: str | PrefixedName
-    ) -> DegreeOfFreedom:
         return self._get_world_entity_by_name_from_iterable(
-            name, self.degrees_of_freedom
+            name=name, world_entity_iterable=bodies
         )
 
     @memoize
-    def get_connection_by_name(self, name: str | PrefixedName) -> Connection:
-        return self._get_world_entity_by_name_from_iterable(name, self.connections)
+    def get_degree_of_freedom_by_name(
+        self, *, name: str | PrefixedName
+    ) -> DegreeOfFreedom:
+        return self._get_world_entity_by_name_from_iterable(
+            name=name, world_entity_iterable=self.degrees_of_freedom
+        )
+
+    @memoize
+    def get_connection_by_name(self, *, name: str | PrefixedName) -> Connection:
+        return self._get_world_entity_by_name_from_iterable(
+            name=name, world_entity_iterable=self.connections
+        )
 
     def _get_world_entity_by_name_from_iterable(
         self,
+        *,
         name: str | PrefixedName,
         world_entity_iterable: list[GenericWorldEntity],
     ) -> GenericWorldEntity:
@@ -1603,14 +1642,14 @@ class World(HasSimulatorProperties):
             name exist.
         """
         matches = self._get_world_entities_by_name_from_iterable(
-            name, world_entity_iterable
+            name=name, world_entity_iterable=world_entity_iterable
         )
         match matches:
             case []:
                 raise WorldEntityNotFoundError(
                     name_or_hash=name,
                     suggestions=self._suggest_world_entity_names(
-                        name, world_entity_iterable
+                        name=name, world_entity_iterable=world_entity_iterable
                     ),
                 )
             case [entity]:
@@ -1620,38 +1659,43 @@ class World(HasSimulatorProperties):
 
     @memoize
     def get_semantic_annotations_by_name(
-        self, name: str | PrefixedName
+        self, *, name: str | PrefixedName
     ) -> list[SemanticAnnotation]:
         return self._get_world_entities_by_name_from_iterable(
-            name, self.semantic_annotations
+            name=name, world_entity_iterable=self.semantic_annotations
         )
 
     @memoize
     def get_kinematic_structure_entities_by_name(
-        self, name: str | PrefixedName
+        self, *, name: str | PrefixedName
     ) -> list[KinematicStructureEntity]:
         return self._get_world_entities_by_name_from_iterable(
-            name, self.kinematic_structure_entities
+            name=name, world_entity_iterable=self.kinematic_structure_entities
         )
 
     @memoize
-    def get_bodies_by_name(self, name: str | PrefixedName) -> list[Body]:
-        return self._get_world_entities_by_name_from_iterable(name, self.bodies)
+    def get_bodies_by_name(self, *, name: str | PrefixedName) -> list[Body]:
+        return self._get_world_entities_by_name_from_iterable(
+            name=name, world_entity_iterable=self.bodies
+        )
 
     @memoize
     def get_degrees_of_freedom_by_name(
-        self, name: str | PrefixedName
+        self, *, name: str | PrefixedName
     ) -> list[DegreeOfFreedom]:
         return self._get_world_entities_by_name_from_iterable(
-            name, self.degrees_of_freedom
+            name=name, world_entity_iterable=self.degrees_of_freedom
         )
 
     @memoize
-    def get_connections_by_name(self, name: str | PrefixedName) -> list[Connection]:
-        return self._get_world_entities_by_name_from_iterable(name, self.connections)
+    def get_connections_by_name(self, *, name: str | PrefixedName) -> list[Connection]:
+        return self._get_world_entities_by_name_from_iterable(
+            name=name, world_entity_iterable=self.connections
+        )
 
     @staticmethod
     def _suggest_world_entity_names(
+        *,
         name: str | PrefixedName,
         world_entity_iterable: Iterable[GenericWorldEntity],
         max_suggestions: int = 3,
@@ -1686,6 +1730,7 @@ class World(HasSimulatorProperties):
 
     @staticmethod
     def _get_world_entities_by_name_from_iterable(
+        *,
         name: str | PrefixedName,
         world_entity_iterable: Iterable[GenericWorldEntity],
     ) -> list[GenericWorldEntity]:
@@ -1717,10 +1762,10 @@ class World(HasSimulatorProperties):
                     if world_entity.name.name == name
                 ]
 
-    def get_degree_of_freedom_by_id(self, id: UUID) -> DegreeOfFreedom:
-        return self._get_world_entity_by_hash(hash(id))
+    def get_degree_of_freedom_by_id(self, *, id: UUID) -> DegreeOfFreedom:
+        return self._get_world_entity_by_hash(entity_hash=hash(id))
 
-    def get_world_entity_with_id_by_id(self, id: UUID) -> WorldEntityWithID:
+    def get_world_entity_with_id_by_id(self, *, id: UUID) -> WorldEntityWithID:
         """
         Get this world's entity with the given id.
 
@@ -1728,12 +1773,12 @@ class World(HasSimulatorProperties):
         :return: The entity of this world carrying that id.
         :raises WorldEntityWithIDNotFoundError: If this world holds no such entity.
         """
-        entity = self.find_world_entity_with_id(id)
+        entity = self.find_world_entity_with_id(entity_id=id)
         if entity is None:
             raise WorldEntityWithIDNotFoundError(name_or_hash=id)
         return entity
 
-    def find_world_entity_with_id(self, entity_id: UUID) -> WorldEntityWithID | None:
+    def find_world_entity_with_id(self, *, entity_id: UUID) -> WorldEntityWithID | None:
         """
         Find this world's entity with the given id, if it holds one.
 
@@ -1759,7 +1804,7 @@ class World(HasSimulatorProperties):
             None,
         )
 
-    def rebind_world_entities(self, obj: RelocatableType) -> RelocatableType:
+    def rebind_world_entities(self, *, obj: RelocatableType) -> RelocatableType:
         """
         Replace every world entity reachable from `obj` with this world's own instance
         of it.
@@ -1792,23 +1837,23 @@ class World(HasSimulatorProperties):
             entity that reports belonging elsewhere, rather than letting it fail later
             wherever it ends up being used.
         """
-        return WorldEntityRebinding(world=self).rebind(obj)
+        return WorldEntityRebinding(world=self).rebind(obj=obj)
 
     def get_kinematic_structure_entity_by_id(
-        self, id: UUID
+        self, *, id: UUID
     ) -> KinematicStructureEntity:
-        return self._get_world_entity_by_hash(hash(id))
+        return self._get_world_entity_by_hash(entity_hash=hash(id))
 
-    def get_actuator_by_id(self, id: UUID) -> Actuator:
-        return self._get_world_entity_by_hash(hash(id))
+    def get_actuator_by_id(self, *, id: UUID) -> Actuator:
+        return self._get_world_entity_by_hash(entity_hash=hash(id))
 
-    def get_semantic_annotation_by_id(self, id: UUID) -> SemanticAnnotation:
+    def get_semantic_annotation_by_id(self, *, id: UUID) -> SemanticAnnotation:
         matches = [s for s in self.semantic_annotations if s.id == id]
         if not matches:
             raise WorldEntityWithIDNotFoundError(name_or_hash=id)
         return matches[0]
 
-    def _get_world_entity_by_hash(self, entity_hash: int) -> GenericWorldEntity:
+    def _get_world_entity_by_hash(self, *, entity_hash: int) -> GenericWorldEntity:
         """
         Retrieve a WorldEntity by its hash.
 
@@ -1822,7 +1867,7 @@ class World(HasSimulatorProperties):
 
     # %% Existence Checks
     def is_semantic_annotation_in_world(
-        self, semantic_annotation: SemanticAnnotation
+        self, *, semantic_annotation: SemanticAnnotation
     ) -> bool:
         return (
             semantic_annotation._world == self
@@ -1830,7 +1875,7 @@ class World(HasSimulatorProperties):
         )
 
     def get_semantic_annotation_equal_to(
-        self, semantic_annotation: SemanticAnnotation
+        self, *, semantic_annotation: SemanticAnnotation
     ) -> SemanticAnnotation | None:
         """
         The annotation this world holds that describes the same thing, if it holds one.
@@ -1853,29 +1898,37 @@ class World(HasSimulatorProperties):
             None,
         )
 
-    def is_body_in_world(self, body: Body) -> bool:
-        return self._is_world_entity_with_hash_in_world_from_iterable(hash(body))
+    def is_body_in_world(self, *, body: Body) -> bool:
+        return self._is_world_entity_with_hash_in_world_from_iterable(
+            entity_hash=hash(body)
+        )
 
     def is_kinematic_structure_entity_in_world(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ) -> bool:
         return self._is_world_entity_with_hash_in_world_from_iterable(
-            hash(kinematic_structure_entity)
+            entity_hash=hash(kinematic_structure_entity)
         )
 
-    def is_connection_in_world(self, connection: Connection) -> bool:
-        return self._is_world_entity_with_hash_in_world_from_iterable(hash(connection))
-
-    def is_degree_of_freedom_in_world(self, degree_of_freedom: DegreeOfFreedom) -> bool:
+    def is_connection_in_world(self, *, connection: Connection) -> bool:
         return self._is_world_entity_with_hash_in_world_from_iterable(
-            hash(degree_of_freedom)
+            entity_hash=hash(connection)
         )
 
-    def is_actuator_in_world(self, actuator: Actuator) -> bool:
-        return self._is_world_entity_with_hash_in_world_from_iterable(hash(actuator))
+    def is_degree_of_freedom_in_world(
+        self, *, degree_of_freedom: DegreeOfFreedom
+    ) -> bool:
+        return self._is_world_entity_with_hash_in_world_from_iterable(
+            entity_hash=hash(degree_of_freedom)
+        )
+
+    def is_actuator_in_world(self, *, actuator: Actuator) -> bool:
+        return self._is_world_entity_with_hash_in_world_from_iterable(
+            entity_hash=hash(actuator)
+        )
 
     def _is_world_entity_with_hash_in_world_from_iterable(
-        self, entity_hash: int
+        self, *, entity_hash: int
     ) -> bool:
         """
         Check if a world entity with a given hash exists in the world based on a given
@@ -1888,7 +1941,7 @@ class World(HasSimulatorProperties):
 
     # %% World Merging
     def merge_world_at_pose(
-        self, other: World, pose: HomogeneousTransformationMatrix
+        self, *, other: World, pose: HomogeneousTransformationMatrix
     ) -> None:
         """
         Merge another world into the existing one, creates a 6DoF connection between the
@@ -1903,9 +1956,9 @@ class World(HasSimulatorProperties):
             root_connection = Connection6DoF.create_with_dofs(
                 parent=self.root, child=other.root, world=self
             )
-            self.merge_world(other, root_connection)
+            self.merge_world(other=other, root_connection=root_connection)
         root_connection = self.get_kinematic_structure_entity_by_id(
-            other_root_id
+            id=other_root_id
         ).parent_connection
         root_connection.origin = pose.copy_with_new_reference_frames(
             new_reference_frame=self.root, new_child_frame=root_connection.child
@@ -1913,9 +1966,9 @@ class World(HasSimulatorProperties):
 
     def merge_world(
         self,
+        *,
         other: World,
         root_connection: Connection | None = None,
-        *,
         publish_changes: bool = True,
     ) -> None:
         """
@@ -1933,7 +1986,9 @@ class World(HasSimulatorProperties):
         if other is self:
             raise WorldMergedWithItselfError(world=self)
         for simulator_property in other.simulator_additional_properties:
-            self.check_simulator_property_attachable(simulator_property)
+            self.check_simulator_property_attachable(
+                simulator_property=simulator_property
+            )
 
         with self.modify_world(publish_changes=publish_changes), other.modify_world():
             self_root = self.root
@@ -1944,24 +1999,24 @@ class World(HasSimulatorProperties):
             for modification in other._model_manager.model_modification_blocks:
                 modification.apply(world=self)
 
-            self.state.merge_state(other_state)
+            self.state.merge_state(other=other_state)
 
             if root_connection is not None:
-                root_connection.update_references_for_world(self)
+                root_connection.update_references_for_world(world=self)
 
             if not root_connection and self_root:
-                other_root = self.get_kinematic_structure_entity_by_id(other_root_id)
+                other_root = self.get_kinematic_structure_entity_by_id(id=other_root_id)
                 root_connection = Connection6DoF.create_with_dofs(
                     parent=self_root, child=other_root, world=self
                 )
 
             if root_connection:
-                self.add_connection(root_connection)
+                self.add_connection(connection=root_connection)
 
             other.simulator_additional_properties.clear()
             other.clear()
 
-    def _replace_with(self, other: World) -> None:
+    def _replace_with(self, *, other: World) -> None:
         """
         Replace all entities, kinematic structure, and state with those of `other`,
         preserving registered callbacks and listeners.
@@ -1975,9 +2030,9 @@ class World(HasSimulatorProperties):
             self.clear()
             self._model_manager.model_change_callbacks.extend(model_change_callbacks)
             self.state.state_change_callbacks.extend(state_change_callbacks)
-            self.merge_world(other, publish_changes=False)
+            self.merge_world(other=other, publish_changes=False)
 
-    def is_kinematic_structure_entity_in_world_by_name(self, name: str) -> bool:
+    def is_kinematic_structure_entity_in_world_by_name(self, *, name: str) -> bool:
         """
         Checks if there is a kinematic structure entity with the given name in the
         world.
@@ -1991,6 +2046,7 @@ class World(HasSimulatorProperties):
 
     def move_branch_with_fixed_connection(
         self,
+        *,
         branch_root: KinematicStructureEntity,
         new_parent: KinematicStructureEntity,
         enable_unsafe_inside_world_block: bool = False,
@@ -2013,11 +2069,13 @@ class World(HasSimulatorProperties):
             # called mid-block, e.g. from a mount strategy inside a still-open modify_world block.
             self.update_forward_kinematics()
         new_parent_T_child = self.compute_forward_kinematics(
-            new_parent, branch_root, enable_unsafe_inside_world_block
+            root=new_parent,
+            tip=branch_root,
+            enable_unsafe_inside_world_block=enable_unsafe_inside_world_block,
         )
-        self.remove_connection(branch_root.parent_connection)
+        self.remove_connection(connection=branch_root.parent_connection)
         self.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=new_parent,
                 child=branch_root,
                 parent_T_connection_expression=new_parent_T_child,
@@ -2025,7 +2083,7 @@ class World(HasSimulatorProperties):
         )
 
     def get_connections_of_branch(
-        self, root: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity
     ) -> list[Connection]:
         """
         Collect all connections that are below root in the tree.
@@ -2034,12 +2092,12 @@ class World(HasSimulatorProperties):
         :return: List of all connections in the subtree rooted at the given body
         """
         visitor = ConnectionCollector(self)
-        self._travel_branch(root, visitor)
+        self._travel_branch(root_kinematic_structure_entity=root, visitor=visitor)
         return visitor.connections
 
     @memoize
     def get_kinematic_structure_entities_of_branch(
-        self, root: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity
     ) -> list[KinematicStructureEntity]:
         """
         Collect all bodies that are below root in the tree.
@@ -2053,7 +2111,7 @@ class World(HasSimulatorProperties):
             self.kinematic_structure[index] for index in descendants_indices
         ]
 
-    def get_direct_child_bodies_with_collision(self, start_body: Body) -> set[Body]:
+    def get_direct_child_bodies_with_collision(self, *, start_body: Body) -> set[Body]:
         """
         Collect all child Bodies until a movable connection is found.
 
@@ -2061,11 +2119,12 @@ class World(HasSimulatorProperties):
         :return: A set of Bodies that are moved directly by only this connection.
         """
         visitor = CollisionBodyCollector(self)
-        self._travel_branch(start_body, visitor)
+        self._travel_branch(root_kinematic_structure_entity=start_body, visitor=visitor)
         return visitor.bodies
 
     def _travel_branch(
         self,
+        *,
         root_kinematic_structure_entity: KinematicStructureEntity,
         visitor: rustworkx.visit.DFSVisitor,
     ) -> None:
@@ -2081,6 +2140,7 @@ class World(HasSimulatorProperties):
 
     def move_branch(
         self,
+        *,
         branch_root: KinematicStructureEntity,
         new_parent: KinematicStructureEntity,
         enable_unsafe_inside_world_block: bool = False,
@@ -2122,12 +2182,15 @@ class World(HasSimulatorProperties):
 
         if isinstance(old_connection, Connection6DoF):
             new_parent_T_branch_root = self.compute_forward_kinematics(
-                new_parent, branch_root, enable_unsafe_inside_world_block
+                root=new_parent,
+                tip=branch_root,
+                enable_unsafe_inside_world_block=enable_unsafe_inside_world_block,
             )
             # The pose lives entirely in the degrees of freedom, so the connection sits
             # right on the new parent and the offset below is set from it afterwards.
             new_connection = old_connection.copy_with_new_parent(
-                new_parent, HomogeneousTransformationMatrix()
+                new_parent=new_parent,
+                parent_T_connection_expression=HomogeneousTransformationMatrix(),
             )
         else:
             # Relocate the connection frame so the branch keeps its world pose, then let the connection
@@ -2135,19 +2198,20 @@ class World(HasSimulatorProperties):
             new_parent_T_connection = HomogeneousTransformationMatrix(
                 (
                     self.compute_forward_kinematics(
-                        new_parent,
-                        old_connection.parent,
-                        enable_unsafe_inside_world_block,
+                        root=new_parent,
+                        tip=old_connection.parent,
+                        enable_unsafe_inside_world_block=enable_unsafe_inside_world_block,
                     )
                     @ old_connection.parent_T_connection_expression
                 ).evaluate()
             )
             new_connection = old_connection.copy_with_new_parent(
-                new_parent, new_parent_T_connection
+                new_parent=new_parent,
+                parent_T_connection_expression=new_parent_T_connection,
             )
         with self.modify_world():
-            self.add_connection(new_connection)
-            self.remove_connection(old_connection)
+            self.add_connection(connection=new_connection)
+            self.remove_connection(connection=old_connection)
 
         if isinstance(old_connection, Connection6DoF):
             new_connection.origin = new_parent_T_branch_root
@@ -2159,7 +2223,7 @@ class World(HasSimulatorProperties):
                 self.state[degree_of_freedom.id].jerk = 0
             self.notify_state_change()
 
-    def move_branch_to_new_world(self, new_root: KinematicStructureEntity) -> World:
+    def move_branch_to_new_world(self, *, new_root: KinematicStructureEntity) -> World:
         """
         Copies the subgraph of the kinematic structure from the root body to a new world
         and removes it from the old world.
@@ -2172,16 +2236,20 @@ class World(HasSimulatorProperties):
         """
         new_world = World(name=self.name)
         child_bodies = self.compute_descendent_child_kinematic_structure_entities(
-            new_root
+            kinematic_structure_entity=new_root
         )
         root_connection = new_root.parent_connection
 
         if not child_bodies:
             with self.modify_world(), new_world.modify_world():
-                self.remove_connection(root_connection)
-                self.remove_kinematic_structure_entity(new_root)
+                self.remove_connection(connection=root_connection)
+                self.remove_kinematic_structure_entity(
+                    kinematic_structure_entity=new_root
+                )
 
-                new_world.add_kinematic_structure_entity(new_root)
+                new_world.add_kinematic_structure_entity(
+                    kinematic_structure_entity=new_root
+                )
                 return new_world
 
         child_body_parent_connections = [
@@ -2198,20 +2266,22 @@ class World(HasSimulatorProperties):
 
         with self.modify_world(), new_world.modify_world():
             for dof in child_body_dofs:
-                self.remove_degree_of_freedom(dof)
-                new_world.add_degree_of_freedom(dof)
+                self.remove_degree_of_freedom(dof=dof)
+                new_world.add_degree_of_freedom(dof=dof)
                 new_world.state[dof.id] = branch_state[dof.id]
 
-            self.remove_connection(root_connection)
+            self.remove_connection(connection=root_connection)
             for connection in child_body_parent_connections:
-                self.remove_connection(connection)
+                self.remove_connection(connection=connection)
 
-            self.remove_kinematic_structure_entity(new_root)
+            self.remove_kinematic_structure_entity(kinematic_structure_entity=new_root)
             for child_body in child_bodies:
-                self.remove_kinematic_structure_entity(child_body)
+                self.remove_kinematic_structure_entity(
+                    kinematic_structure_entity=child_body
+                )
 
             for connection in child_body_parent_connections:
-                new_world.add_connection(connection)
+                new_world.add_connection(connection=connection)
 
         return new_world
 
@@ -2266,12 +2336,12 @@ class World(HasSimulatorProperties):
         removed_dofs = set(self.degrees_of_freedom) - self.used_degrees_of_freedom
 
         for dof in removed_dofs:
-            self.remove_degree_of_freedom(dof)
+            self.remove_degree_of_freedom(dof=dof)
 
     # %% Kinematic Structure Computations
     @memoize
     def compute_descendent_child_kinematic_structure_entities(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ) -> list[KinematicStructureEntity]:
         """
         Computes the entities below a given KinematicStructureEntity in the world.
@@ -2282,17 +2352,19 @@ class World(HasSimulatorProperties):
         """
         descendants = []
         for child in self.compute_child_kinematic_structure_entities(
-            kinematic_structure_entity
+            kinematic_structure_entity=kinematic_structure_entity
         ):
             descendants.append(child)
             descendants.extend(
-                self.compute_descendent_child_kinematic_structure_entities(child)
+                self.compute_descendent_child_kinematic_structure_entities(
+                    kinematic_structure_entity=child
+                )
             )
         return descendants
 
     @memoize
     def compute_child_kinematic_structure_entities(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ) -> list[KinematicStructureEntity]:
         """
         Computes the child entities of a given KinematicStructureEntity in the world.
@@ -2306,7 +2378,7 @@ class World(HasSimulatorProperties):
         )
 
     def compute_parent_connection(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ) -> Connection | None:
         """
         Computes the parent connection of a given KinematicStructureEntity in the world.
@@ -2316,7 +2388,7 @@ class World(HasSimulatorProperties):
         :return: The parent connection of the given KinematicStructureEntity.
         """
         parent = self.compute_parent_kinematic_structure_entity(
-            kinematic_structure_entity
+            kinematic_structure_entity=kinematic_structure_entity
         )
         return (
             None
@@ -2327,7 +2399,7 @@ class World(HasSimulatorProperties):
         )
 
     def compute_parent_kinematic_structure_entity(
-        self, kinematic_structure_entity: KinematicStructureEntity
+        self, *, kinematic_structure_entity: KinematicStructureEntity
     ) -> KinematicStructureEntity | None:
         """
         Computes the parent KinematicStructureEntity of a given KinematicStructureEntity
@@ -2344,31 +2416,35 @@ class World(HasSimulatorProperties):
 
     @memoize
     def compute_chain_of_connections(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> list[Connection]:
         """
         Computes the chain of connections between root and tip.
 
         Can handle chains that start and end anywhere in the tree.
         """
-        entity_chain = self.compute_chain_of_kinematic_structure_entities(root, tip)
+        entity_chain = self.compute_chain_of_kinematic_structure_entities(
+            root=root, tip=tip
+        )
         return [
-            self.get_connection(entity_chain[i], entity_chain[i + 1])
+            self.get_connection(parent=entity_chain[i], child=entity_chain[i + 1])
             for i in range(len(entity_chain) - 1)
         ]
 
-    def is_body_controlled(self, body: KinematicStructureEntity) -> bool:
-        return self.is_controlled_connection_in_chain(self.root, body)
+    def is_body_controlled(self, *, body: KinematicStructureEntity) -> bool:
+        return self.is_controlled_connection_in_chain(root=self.root, tip=body)
 
     def is_controlled_connection_in_chain(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> bool:
-        root_part, tip_part = self.compute_split_chain_of_connections(root, tip)
+        root_part, tip_part = self.compute_split_chain_of_connections(
+            root=root, tip=tip
+        )
         connections = root_part + tip_part
         return any(connection.is_controlled for connection in connections)
 
     def compute_chain_reduced_to_controlled_connections(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> tuple[KinematicStructureEntity, KinematicStructureEntity]:
         """
         Removes root and tip links until they are both connected with a controlled
@@ -2408,7 +2484,7 @@ class World(HasSimulatorProperties):
 
     @memoize
     def compute_split_chain_of_connections(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> tuple[list[Connection], list[Connection]]:
         """
         Computes split chains of connections between 'root' and 'tip' bodies.
@@ -2424,25 +2500,25 @@ class World(HasSimulatorProperties):
         if root == tip:
             return [], []
         root_chain, common_ancestor, tip_chain = (
-            self.compute_split_chain_of_kinematic_structure_entities(root, tip)
+            self.compute_split_chain_of_kinematic_structure_entities(root=root, tip=tip)
         )
         root_chain = root_chain + [common_ancestor[0]]
         tip_chain = [common_ancestor[0]] + tip_chain
 
         root_connections = [
-            self.get_connection(root_chain[i + 1], root_chain[i])
+            self.get_connection(parent=root_chain[i + 1], child=root_chain[i])
             for i in range(len(root_chain) - 1)
         ]
 
         tip_connections = [
-            self.get_connection(tip_chain[i], tip_chain[i + 1])
+            self.get_connection(parent=tip_chain[i], child=tip_chain[i + 1])
             for i in range(len(tip_chain) - 1)
         ]
         return root_connections, tip_connections
 
     @memoize
     def compute_split_chain_of_kinematic_structure_entities(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> tuple[
         list[KinematicStructureEntity],
         list[KinematicStructureEntity],
@@ -2463,14 +2539,16 @@ class World(HasSimulatorProperties):
 
         # Paths from the tree's true root to each endpoint (inclusive).
         root_path = self._compute_chain_of_kinematic_structure_entities_indexes(
-            self.root, root
+            root=self.root, tip=root
         )
         tip_path = self._compute_chain_of_kinematic_structure_entities_indexes(
-            self.root, tip
+            root=self.root, tip=tip
         )
 
         # Find the lowest common ancestor (LCA) index in the paths.
-        LCA_index = self._find_lowest_common_ancestor(root_path, tip_path)
+        LCA_index = self._find_lowest_common_ancestor(
+            root_path=root_path, tip_path=tip_path
+        )
 
         # The last common ancestor is the last common node.
         common_ancestor_node_index = root_path[LCA_index]
@@ -2487,7 +2565,7 @@ class World(HasSimulatorProperties):
         return up_from_root, [common_ancestor], down_to_tip
 
     def _find_lowest_common_ancestor(
-        self, root_path: list[int], tip_path: list[int]
+        self, *, root_path: list[int], tip_path: list[int]
     ) -> int:
         """
         Find the index of the lowest common ancestor, which is the index where the two
@@ -2509,7 +2587,7 @@ class World(HasSimulatorProperties):
 
     @memoize
     def compute_chain_of_kinematic_structure_entities(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> list[KinematicStructureEntity]:
         """
         Computes the chain between root and tip.
@@ -2517,13 +2595,13 @@ class World(HasSimulatorProperties):
         Can handle chains that start and end anywhere in the tree.
         """
         path_indeces = self._compute_chain_of_kinematic_structure_entities_indexes(
-            root, tip
+            root=root, tip=tip
         )
         return [self.kinematic_structure[index] for index in path_indeces]
 
     @memoize
     def _compute_chain_of_kinematic_structure_entities_indexes(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> list[int]:
         """
         Computes the chain between root and tip.
@@ -2543,6 +2621,7 @@ class World(HasSimulatorProperties):
     # %% Forward Kinematics
     def compute_forward_kinematics(
         self,
+        *,
         root: KinematicStructureEntity,
         tip: KinematicStructureEntity,
         enable_unsafe_inside_world_block: bool = False,
@@ -2563,11 +2642,11 @@ class World(HasSimulatorProperties):
             KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
         if not enable_unsafe_inside_world_block:
-            return self._forward_kinematic_manager.compute(root, tip)
-        return self._manually_compute_entity_a_T_entity_b(root, tip)
+            return self._forward_kinematic_manager.compute(root=root, tip=tip)
+        return self._manually_compute_entity_a_T_entity_b(entity_a=root, entity_b=tip)
 
     def compose_forward_kinematics_expression(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> HomogeneousTransformationMatrix:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
@@ -2576,10 +2655,10 @@ class World(HasSimulatorProperties):
             It determines the endpoint of the forward kinematics calculation.
         :return: An expression representing the computed forward kinematics of the tip KinematicStructureEntity relative to the root KinematicStructureEntity.
         """
-        return self._forward_kinematic_manager.compose_expression(root, tip)
+        return self._forward_kinematic_manager.compose_expression(root=root, tip=tip)
 
     def compute_forward_kinematics_np(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> NpMatrix4x4:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip
@@ -2595,7 +2674,7 @@ class World(HasSimulatorProperties):
         :return: Transformation matrix representing the relative pose of the tip
             KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
-        return self._forward_kinematic_manager.compute_np(root, tip).copy()
+        return self._forward_kinematic_manager.compute_np(root=root, tip=tip).copy()
 
     def update_forward_kinematics(self) -> None:
         """
@@ -2618,6 +2697,7 @@ class World(HasSimulatorProperties):
 
     def _manually_compute_entity_a_T_entity_b(
         self,
+        *,
         entity_a: KinematicStructureEntity,
         entity_b: KinematicStructureEntity,
     ) -> HomogeneousTransformationMatrix:
@@ -2633,12 +2713,12 @@ class World(HasSimulatorProperties):
         root_T_reference = (
             HomogeneousTransformationMatrix()
             if entity_a == self.root
-            else self._manually_compute_world_root_T_self(entity_a)
+            else self._manually_compute_world_root_T_self(entity=entity_a)
         )
         root_T_target = (
             HomogeneousTransformationMatrix()
             if entity_b == self.root
-            else self._manually_compute_world_root_T_self(entity_b)
+            else self._manually_compute_world_root_T_self(entity=entity_b)
         )
         return HomogeneousTransformationMatrix(
             (root_T_reference.inverse() @ root_T_target).evaluate(),
@@ -2647,7 +2727,7 @@ class World(HasSimulatorProperties):
         )
 
     def _manually_compute_world_root_T_self(
-        self, entity: KinematicStructureEntity
+        self, *, entity: KinematicStructureEntity
     ) -> HomogeneousTransformationMatrix:
         """
         Computes world_root_T_self without using the world's forward kinematics manager.
@@ -2703,23 +2783,25 @@ class World(HasSimulatorProperties):
         # semantic_annotations need to be reversed because they are in order in which they are added, and they need to
         # be removed in reverse order
         for semantic_annotation in reversed(self.semantic_annotations):
-            self.remove_semantic_annotation(semantic_annotation)
+            self.remove_semantic_annotation(semantic_annotation=semantic_annotation)
 
         # connections must be removed before the kinematic structure entities:
         # removing a node makes rustworkx silently drop its edges, so the
         # connections would never be detached from the world otherwise
         for connection in self.connections:
-            self.remove_connection(connection)
+            self.remove_connection(connection=connection)
 
         for kinematic_structure_entity in self.kinematic_structure_entities:
-            self.remove_kinematic_structure_entity(kinematic_structure_entity)
+            self.remove_kinematic_structure_entity(
+                kinematic_structure_entity=kinematic_structure_entity
+            )
 
         # actuators reference degrees of freedom, so they go first
         for actuator in copy(self.actuators):
-            self.remove_actuator(actuator)
+            self.remove_actuator(actuator=actuator)
 
         for degree_of_freedom in copy(self.degrees_of_freedom):
-            self.remove_degree_of_freedom(degree_of_freedom)
+            self.remove_degree_of_freedom(dof=degree_of_freedom)
 
     def is_empty(self):
         """
@@ -2729,6 +2811,7 @@ class World(HasSimulatorProperties):
 
     def transform(
         self,
+        *,
         spatial_object: GenericSpatialType,
         target_frame: KinematicStructureEntity,
     ) -> GenericSpatialType:
@@ -2769,7 +2852,7 @@ class World(HasSimulatorProperties):
                     world=new_world
                 )
 
-            new_world.state.merge_state(self.state)
+            new_world.state.merge_state(other=self.state)
 
         return new_world
 
@@ -2803,7 +2886,7 @@ class World(HasSimulatorProperties):
     # %% Associations
 
     def modify_world(
-        self, publish_changes: bool = True
+        self, *, publish_changes: bool = True
     ) -> WorldModelUpdateContextManager:
         """
         Open a block of modifications that the world records, announces and publishes as
@@ -2821,7 +2904,7 @@ class World(HasSimulatorProperties):
         )
 
     def batch_state_changes(
-        self, publish_changes: bool = True
+        self, *, publish_changes: bool = True
     ) -> WorldStateBatchContextManager:
         """
         Collect the state changes made inside the context into a single notification.
@@ -2850,7 +2933,7 @@ class World(HasSimulatorProperties):
         return self._model_manager.model_modification_blocks
 
     def rollback_modification_blocks(
-        self, count: int = 1
+        self, *, count: int = 1
     ) -> list[WorldModelModificationBlock]:
         """
         Revert the most recently completed modification blocks, restoring the world to
@@ -2883,7 +2966,7 @@ class World(HasSimulatorProperties):
                 block.revert(world=self)
         return blocks_to_roll_back
 
-    def rollback_to_version(self, version: int) -> list[WorldModelModificationBlock]:
+    def rollback_to_version(self, *, version: int) -> list[WorldModelModificationBlock]:
         """
         Roll back the world's modification history to the given version, undoing every
         modification block completed since.
@@ -2913,7 +2996,7 @@ class World(HasSimulatorProperties):
                 target_version=version,
                 version_at_last_clear=version_at_last_clear,
             )
-        return self.rollback_modification_blocks(current_version - version)
+        return self.rollback_modification_blocks(count=current_version - version)
 
     @cached_property
     def ray_tracer(self) -> RayTracer:
@@ -2925,7 +3008,7 @@ class World(HasSimulatorProperties):
         return RayTracer(world=self)
 
     def apply_control_commands(
-        self, commands: np.ndarray, dt: float, derivative: Derivatives
+        self, *, commands: np.ndarray, dt: float, derivative: Derivatives
     ) -> None:
         """
         Updates the state of a system by applying control commands at a specified
@@ -2938,11 +3021,13 @@ class World(HasSimulatorProperties):
         :param derivative: The derivative level to which the control commands are
             applied.
         """
-        self.state._apply_control_commands(commands, dt, derivative)
+        self.state._apply_control_commands(
+            commands=commands, dt=dt, derivative=derivative
+        )
         for connection in self.connections:
             match connection:
                 case HasUpdateState():
-                    connection.update_state(dt)
+                    connection.update_state(dt=dt)
                 case _:
                     pass
         self.notify_state_change()

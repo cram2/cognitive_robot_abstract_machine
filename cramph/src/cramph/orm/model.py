@@ -158,7 +158,7 @@ class StatechartMapping(AlternativeMapping[Statechart]):
             data=json.loads(self.structure),
             context=self.context,
             world=world,
-            **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+            **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
         )
         statechart.pass_limit = self.pass_limit
         statechart.passes_per_nesting_level = self.passes_per_nesting_level

@@ -49,7 +49,7 @@ Base.metadata.create_all(bind=session.bind)
 
 # load the table world from urdf
 table = "package://iai_objects/urdf/table.urdf"
-world = URDFParser.from_file(table).create_world()
+world = URDFParser.from_file(file_path=table).create_world()
 ```
 
 Next, we create a semantic annotation that describes the table.
@@ -57,7 +57,7 @@ Next, we create a semantic annotation that describes the table.
 ```{code-cell} ipython3
 table_semantic_annotation = Table(root=[b for b in world.bodies if "top" in str(b.name)][0])
 with world.modify_world():
-    world.add_semantic_annotation(table_semantic_annotation)
+    world.add_semantic_annotation(semantic_annotation=table_semantic_annotation)
 print(table_semantic_annotation)
 ```
 

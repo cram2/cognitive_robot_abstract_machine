@@ -28,7 +28,7 @@ class TestPointingDebugExpressions:
         in the goal and the current colour.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         task = Pointing(
             kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),
@@ -52,7 +52,7 @@ class TestPointingDebugExpressions:
         vectors in the goal and the current colour.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         task = PointingCone(
             kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),

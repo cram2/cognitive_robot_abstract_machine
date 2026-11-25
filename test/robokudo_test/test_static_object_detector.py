@@ -105,7 +105,7 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
     body.collision = ShapeCollection(shapes=[shape], reference_frame=body)
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=root,
                 child=body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(

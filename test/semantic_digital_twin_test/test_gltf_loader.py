@@ -34,7 +34,7 @@ class TestGLTFLoader:
         loader = GLTFLoader(file_path=invalid_path)
 
         with pytest.raises(ValueError, match=invalid_path) as exc_info:
-            loader.apply(world)
+            loader.apply(world=world)
 
         # Verify exception chaining preserves original error
         assert exc_info.value.__cause__ is not None
@@ -52,7 +52,7 @@ class TestGLTFLoader:
             loader = GLTFLoader(file_path=temp_path)
 
             with pytest.raises(ValueError, match=temp_path) as exc_info:
-                loader.apply(world)
+                loader.apply(world=world)
 
             # Verify exception chaining preserves original error
             assert exc_info.value.__cause__ is not None
@@ -76,7 +76,7 @@ class TestGLTFLoader:
         try:
             world = World()
             loader = GLTFLoader(file_path=temp_path)
-            world = loader.apply(world)
+            world = loader.apply(world=world)
 
             # Should create body with empty collision shapes
             assert world.root is not None
@@ -119,7 +119,7 @@ class TestGLTFLoader:
         try:
             world = World()
             loader = GLTFLoader(file_path=temp_path)
-            world = loader.apply(world)
+            world = loader.apply(world=world)
 
             # Should skip transform_node and connect leaf directly to root
             assert len(list(world.kinematic_structure_entities)) == 2
@@ -138,7 +138,7 @@ class TestGLTFLoader:
         """
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         loader = GLTFLoader(file_path="/dummy/path.gltf")
-        body = loader._trimesh_to_body(mesh, "test_cube")
+        body = loader._trimesh_to_body(mesh=mesh, name="test_cube")
 
         assert isinstance(body, Body)
         assert body.name == PrefixedName(name="test_cube")
@@ -158,7 +158,7 @@ class TestGLTFLoader:
         loader = GLTFLoader(file_path="/dummy/path.gltf")
         loader.scene = scene
 
-        fused = loader._fusion_meshes({"box"})
+        fused = loader._fusion_meshes(object_nodes={"box"})
 
         assert isinstance(fused, trimesh.Trimesh)
         assert len(fused.vertices) > 0
@@ -183,7 +183,7 @@ class TestGLTFLoader:
         loader = GLTFLoader(file_path="/dummy/path.gltf")
         loader.scene = scene
 
-        fused = loader._fusion_meshes({"box", "cylinder"})
+        fused = loader._fusion_meshes(object_nodes={"box", "cylinder"})
 
         assert isinstance(fused, trimesh.Trimesh)
         assert len(fused.vertices) == len(mesh1.vertices) + len(mesh2.vertices)
@@ -225,7 +225,7 @@ class TestGLTFLoader:
         """
         mesh = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
         loader = GLTFLoader(file_path="/dummy/path.gltf")
-        body = loader._trimesh_to_body(mesh, "root_body")
+        body = loader._trimesh_to_body(mesh=mesh, name="root_body")
 
         scene = trimesh.Scene()
         scene.add_geometry(mesh, node_name="root_body", geom_name="geom")
@@ -237,7 +237,9 @@ class TestGLTFLoader:
 
         # Fixed: wrap in modify_world context
         with world.modify_world():
-            world = loader._build_world_from_elements(world_elements, connection, world)
+            world = loader._build_world_from_elements(
+                world_elements=world_elements, connection=connection, world=world
+            )
 
         assert world.root is not None
         assert world.root.name == PrefixedName(name="root_body")
@@ -251,8 +253,8 @@ class TestGLTFLoader:
         mesh2 = trimesh.creation.icosphere(radius=0.5)
 
         loader = GLTFLoader(file_path="/dummy/path.gltf")
-        parent_body = loader._trimesh_to_body(mesh1, "parent")
-        child_body = loader._trimesh_to_body(mesh2, "child")
+        parent_body = loader._trimesh_to_body(mesh=mesh1, name="parent")
+        child_body = loader._trimesh_to_body(mesh=mesh2, name="child")
 
         scene = trimesh.Scene()
         scene.add_geometry(mesh1, node_name="parent", geom_name="geom1")
@@ -267,7 +269,9 @@ class TestGLTFLoader:
 
         # Wrap in modify_world context
         with world.modify_world():
-            world = loader._build_world_from_elements(world_elements, connection, world)
+            world = loader._build_world_from_elements(
+                world_elements=world_elements, connection=connection, world=world
+            )
 
         assert world.root is not None
         assert world.root.name == PrefixedName(name="parent")
@@ -297,7 +301,9 @@ class TestGLTFLoader:
         loader = GLTFLoader(file_path="/dummy/path.gltf")
         loader.scene = scene
 
-        object_nodes, new_objects = loader._grouping_similar_meshes("Bolt_001")
+        object_nodes, new_objects = loader._grouping_similar_meshes(
+            base_node="Bolt_001"
+        )
 
         assert "Bolt_001" in object_nodes
         assert len(object_nodes) >= 1
@@ -326,7 +332,9 @@ class TestGLTFLoader:
         loader = GLTFLoader(file_path="/dummy/path.gltf")
         loader.scene = scene
 
-        relative = loader._get_relative_transform("parent", "child")
+        relative = loader._get_relative_transform(
+            parent_node="parent", child_node="child"
+        )
 
         assert relative is not None
 
@@ -361,7 +369,7 @@ def test_readme_example():
     try:
         world = World()
         loader = GLTFLoader(file_path=temp_path)
-        world = loader.apply(world)
+        world = loader.apply(world=world)
 
         assert world.root is not None
         assert len(list(world.kinematic_structure_entities)) >= 1

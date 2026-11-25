@@ -22,7 +22,7 @@ collision_detectors = [BulletCollisionDetector, FCLCollisionDetector]
 def test_simple_collision(world_setup_simple, collision_detector):
     world, body1, body2, body3, body4, body5 = world_setup_simple
     tcd = collision_detector(_world=world)
-    collision = tcd.check_collision_between_bodies(body1, body2)
+    collision = tcd.check_collision_between_bodies(body_a=body1, body_b=body2)
     assert collision
     assert {collision.body_a, collision.body_b} == {body1, body2}
 
@@ -34,7 +34,9 @@ def test_contact_distance(world_setup_simple, collision_detector):
         1, 0, 0, reference_frame=cylinder.parent_connection.parent
     )
     tcd = collision_detector(_world=world)
-    collision = tcd.check_collision_between_bodies(cylinder, sphere, distance=10)
+    collision = tcd.check_collision_between_bodies(
+        body_a=cylinder, body_b=sphere, distance=10
+    )
     assert collision
 
     if collision.body_a == cylinder:
@@ -69,9 +71,11 @@ def test_contact_distance_compound_front(
     )
     tcd = collision_detector(_world=world)
     collision_compound = tcd.check_collision_between_bodies(
-        sphere, compound, distance=10
+        body_a=sphere, body_b=compound, distance=10
     )
-    collision_box = tcd.check_collision_between_bodies(sphere, box, distance=10)
+    collision_box = tcd.check_collision_between_bodies(
+        body_a=sphere, body_b=box, distance=10
+    )
 
     if collision_box.body_a == sphere:
         map_P_sphere1 = collision_box.root_P_point_on_body_a
@@ -100,7 +104,7 @@ def test_no_collision(world_setup_simple, collision_detector):
         1, 1, 1, reference_frame=body1.parent_connection.parent
     )
     tcd = collision_detector(_world=world)
-    collision = tcd.check_collision_between_bodies(body1, body2)
+    collision = tcd.check_collision_between_bodies(body_a=body1, body_b=body2)
     assert not collision
 
 
@@ -119,7 +123,7 @@ def test_all_collisions(world_setup_simple, collision_detector):
     )
 
     collisions = tcd.check_collisions(
-        CollisionMatrix.create_all_checks(distance=0.0001, world=world)
+        collision_matrix=CollisionMatrix.create_all_checks(distance=0.0001, world=world)
     ).contacts
     assert len(collisions) == 1
     assert {collisions[0].body_a, collisions[0].body_b} == {body1, body2}

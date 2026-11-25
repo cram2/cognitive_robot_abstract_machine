@@ -100,7 +100,7 @@ class DrivenBaseTask(ConvergingTask, HasGoalPoseParameter, ABC):
             the degrees of freedom of the drive.
         """
         return self.context.world.compose_forward_kinematics_expression(
-            self.drive_parent, self.driven_body
+            root=self.drive_parent, tip=self.driven_body
         )
 
 

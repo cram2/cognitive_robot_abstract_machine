@@ -30,6 +30,7 @@ from semantic_digital_twin.adapters.ros.exceptions import (
     TopicNotFoundError,
 )
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from krrood.patterns.called_positionally import called_positionally
 
 # %% types and futures
 
@@ -80,6 +81,7 @@ class _MessageInbox:
     The first message, ``None`` until it arrived.
     """
 
+    @called_positionally
     def receive(self, message: Any) -> None:
         """
         Subscription callback that keeps ``message`` if it is the first one.
@@ -114,9 +116,9 @@ class RosGraph:
 
     def wait_for_message(
         self,
+        *,
         message_type: type,
         topic: str,
-        *,
         qos_profile: QoSProfile | None = None,
         timeout: timedelta | None = None,
     ) -> Any:
@@ -143,7 +145,7 @@ class RosGraph:
             raise NoMessageReceivedError(topic=topic)
         return inbox.message
 
-    def robot_description(self, topic: str = "/robot_description") -> str:
+    def robot_description(self, *, topic: str = "/robot_description") -> str:
         """
         Wait for the robot description a robot state publisher latches on ``topic``.
 
@@ -154,12 +156,14 @@ class RosGraph:
         qos_profile = QoSProfile(
             depth=10, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL
         )
-        return self.wait_for_message(String, topic, qos_profile=qos_profile).data
+        return self.wait_for_message(
+            message_type=String, topic=topic, qos_profile=qos_profile
+        ).data
 
     # %% finding topics
 
     def publisher_of_node_with_type(
-        self, node_name: str, topic_type: type, namespace: str = "/"
+        self, *, node_name: str, topic_type: type, namespace: str = "/"
     ) -> str:
         """
         :param node_name: The name of the node that publishes the topic.
@@ -169,13 +173,15 @@ class RosGraph:
         :raises TopicNotFoundError: If the node publishes no topic of that type.
         """
         return self._first_topic_of_node(
-            self.node.get_publisher_names_and_types_by_node(node_name, namespace),
-            topic_type,
-            node_name,
+            topic_names_and_types=self.node.get_publisher_names_and_types_by_node(
+                node_name, namespace
+            ),
+            topic_type=topic_type,
+            node_name=node_name,
         )
 
     def subscriber_of_node_with_type(
-        self, node_name: str, topic_type: type, namespace: str = "/"
+        self, *, node_name: str, topic_type: type, namespace: str = "/"
     ) -> str:
         """
         :param node_name: The name of the node that subscribes to the topic.
@@ -185,12 +191,14 @@ class RosGraph:
         :raises TopicNotFoundError: If the node subscribes to no topic of that type.
         """
         return self._first_topic_of_node(
-            self.node.get_subscriber_names_and_types_by_node(node_name, namespace),
-            topic_type,
-            node_name,
+            topic_names_and_types=self.node.get_subscriber_names_and_types_by_node(
+                node_name, namespace
+            ),
+            topic_type=topic_type,
+            node_name=node_name,
         )
 
-    def publishers_of_type(self, topic_type: type) -> list[str]:
+    def publishers_of_type(self, *, topic_type: type) -> list[str]:
         """
         :param topic_type: The message type of the topics.
         :return: The topics of ``topic_type`` that some node publishes.
@@ -198,12 +206,13 @@ class RosGraph:
         return [
             topic
             for topic in self._topics_of_type(
-                self.node.get_topic_names_and_types(), topic_type
+                topic_names_and_types=self.node.get_topic_names_and_types(),
+                topic_type=topic_type,
             )
             if self.node.get_publishers_info_by_topic(topic)
         ]
 
-    def subscribers_of_type(self, topic_type: type) -> list[str]:
+    def subscribers_of_type(self, *, topic_type: type) -> list[str]:
         """
         :param topic_type: The message type of the topics.
         :return: The topics of ``topic_type`` that some node subscribes to.
@@ -211,32 +220,38 @@ class RosGraph:
         return [
             topic
             for topic in self._topics_of_type(
-                self.node.get_topic_names_and_types(), topic_type
+                topic_names_and_types=self.node.get_topic_names_and_types(),
+                topic_type=topic_type,
             )
             if self.node.get_subscriptions_info_by_topic(topic)
         ]
 
-    def unique_publisher_of_type(self, topic_type: type) -> str:
+    def unique_publisher_of_type(self, *, topic_type: type) -> str:
         """
         :param topic_type: The message type of the topic.
         :return: The only topic of ``topic_type`` that some node publishes.
         :raises TopicNotFoundError: If no node publishes a topic of that type.
         :raises AmbiguousTopicError: If nodes publish several topics of that type.
         """
-        return self._unique_topic(self.publishers_of_type(topic_type), topic_type)
+        return self._unique_topic(
+            topics=self.publishers_of_type(topic_type=topic_type), topic_type=topic_type
+        )
 
-    def unique_subscriber_of_type(self, topic_type: type) -> str:
+    def unique_subscriber_of_type(self, *, topic_type: type) -> str:
         """
         :param topic_type: The message type of the topic.
         :return: The only topic of ``topic_type`` that some node subscribes to.
         :raises TopicNotFoundError: If no node subscribes to a topic of that type.
         :raises AmbiguousTopicError: If nodes subscribe to several topics of that type.
         """
-        return self._unique_topic(self.subscribers_of_type(topic_type), topic_type)
+        return self._unique_topic(
+            topics=self.subscribers_of_type(topic_type=topic_type),
+            topic_type=topic_type,
+        )
 
     @staticmethod
     def _topics_of_type(
-        topic_names_and_types: TopicNamesAndTypes, topic_type: type
+        *, topic_names_and_types: TopicNamesAndTypes, topic_type: type
     ) -> list[str]:
         """
         :param topic_names_and_types: The topics to look through.
@@ -253,6 +268,7 @@ class RosGraph:
     @classmethod
     def _first_topic_of_node(
         cls,
+        *,
         topic_names_and_types: TopicNamesAndTypes,
         topic_type: type,
         node_name: str,
@@ -264,7 +280,9 @@ class RosGraph:
         :return: The first topic whose type is ``topic_type``.
         :raises TopicNotFoundError: If no topic has that type.
         """
-        topics = cls._topics_of_type(topic_names_and_types, topic_type)
+        topics = cls._topics_of_type(
+            topic_names_and_types=topic_names_and_types, topic_type=topic_type
+        )
         if not topics:
             raise TopicNotFoundError(
                 message_type_name=message_type_name(topic_type), node_name=node_name
@@ -272,7 +290,7 @@ class RosGraph:
         return topics[0]
 
     @staticmethod
-    def _unique_topic(topics: list[str], topic_type: type) -> str:
+    def _unique_topic(*, topics: list[str], topic_type: type) -> str:
         """
         :param topics: The topics of ``topic_type`` that were found.
         :param topic_type: The message type that was looked for.
@@ -291,6 +309,7 @@ class RosGraph:
 
     def call_service(
         self,
+        *,
         service_type: type,
         service_name: str,
         request: Any,
@@ -317,7 +336,7 @@ class RosGraph:
         return response
 
     def get_parameters(
-        self, node_name: str, parameter_names: list[str]
+        self, *, node_name: str, parameter_names: list[str]
     ) -> GetParameters.Response:
         """
         :param node_name: The node whose parameters are read, including its namespace.
@@ -327,7 +346,7 @@ class RosGraph:
             time.
         """
         return self.call_service(
-            GetParameters,
-            f"{node_name}/get_parameters",
-            GetParameters.Request(names=parameter_names),
+            service_type=GetParameters,
+            service_name=f"{node_name}/get_parameters",
+            request=GetParameters.Request(names=parameter_names),
         )

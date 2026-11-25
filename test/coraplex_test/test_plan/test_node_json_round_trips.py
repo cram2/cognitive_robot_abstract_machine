@@ -129,7 +129,9 @@ class ActionRoundTripCase(NodeRoundTripCase):
 
 
 def _robot(world: World) -> AbstractRobot:
-    return world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    return world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
 
 
 def _arm(world: World) -> Arm:
@@ -137,7 +139,7 @@ def _arm(world: World) -> Arm:
 
 
 def _milk(world: World) -> Milk:
-    return world.get_semantic_annotations_by_type(Milk)[0]
+    return world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
 
 def _pose(world: World) -> Pose:
@@ -165,7 +167,7 @@ def _tool(world: World, tool_type: type[Tool]) -> Tool:
     """
     tool = tool_type(root=_tool_body(world))
     with world.modify_world():
-        world.add_semantic_annotation(tool)
+        world.add_semantic_annotation(semantic_annotation=tool)
     return tool
 
 
@@ -293,7 +295,7 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
                 SetGripperAction(
                     gripper_configuration=_arm(
                         world
-                    ).end_effector.default_configuration(GripperState.OPEN)
+                    ).end_effector.default_configuration(state_type=GripperState.OPEN)
                 )
             ],
         ),

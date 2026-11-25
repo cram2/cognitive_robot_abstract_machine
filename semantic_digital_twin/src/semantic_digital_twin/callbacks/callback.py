@@ -36,7 +36,7 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
 
     @classmethod
     @abstractmethod
-    def _all_callbacks_from_world(cls, world: World) -> list[Callback]:
+    def _all_callbacks_from_world(cls, *, world: World) -> list[Callback]:
         """
         The list a world notifies when the change this kind of callback reacts to
         happens.
@@ -52,7 +52,7 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
         raise NotImplementedError
 
     @classmethod
-    def all_callbacks_of_this_type_from_world(cls, world: World) -> list[Self]:
+    def all_callbacks_of_this_type_from_world(cls, *, world: World) -> list[Self]:
         """
         The callbacks of this class that the given world still notifies.
 
@@ -67,7 +67,7 @@ class Callback(WorldEntityWithClassBasedID, SubclassJSONSerializer, ABC):
         """
         return [
             callback
-            for callback in cls._all_callbacks_from_world(world)
+            for callback in cls._all_callbacks_from_world(world=world)
             if isinstance(callback, cls)
         ]
 
@@ -118,7 +118,7 @@ class StateChangeCallback(Callback, ABC):
         self.update_previous_world_state()
 
     @classmethod
-    def _all_callbacks_from_world(cls, world: World) -> list[Callback]:
+    def _all_callbacks_from_world(cls, *, world: World) -> list[Callback]:
         """
         :param world: The world whose state change callbacks are asked for.
         :return: everything the world notifies whenever its state changes.
@@ -158,7 +158,7 @@ class ModelChangeCallback(Callback, ABC):
         self._world.get_world_model_manager().model_change_callbacks.append(self)
 
     @classmethod
-    def _all_callbacks_from_world(cls, world: World) -> list[Callback]:
+    def _all_callbacks_from_world(cls, *, world: World) -> list[Callback]:
         """
         :param world: The world whose model change callbacks are asked for.
         :return: everything the world notifies whenever its model changes.

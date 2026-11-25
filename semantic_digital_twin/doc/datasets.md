@@ -43,8 +43,8 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
 loader = RoboCasaDatasetLoader()
 
 kitchen_world = loader.load_kitchen(layout_id=..., style_id=...)  # a full kitchen scene
-appliance_world = loader.load_kitchen_appliance(RoboCasaKitchenApplianceCategory.CABINET)  # a single appliance
-object_world = loader.load_object(RoboCasaObjectCategory.APPLE)  # a single object
+appliance_world = loader.load_kitchen_appliance(category=RoboCasaKitchenApplianceCategory.CABINET)  # a single appliance
+object_world = loader.load_object(category=RoboCasaObjectCategory.APPLE)  # a single object
 ```
 
 A RoboCasa task (for example `"TurnOnMicrowave"`) can be loaded together with the scene it is defined
@@ -53,7 +53,7 @@ instruction, the bodies to be manipulated, and the pose the robot should start a
 robot is stripped from the world, since `semantic_digital_twin` owns the robot.
 
 ```python
-task = loader.load_task("TurnOnMicrowave", layout_id=..., style_id=...)
+task = loader.load_task(task_name="TurnOnMicrowave", layout_id=..., style_id=...)
 task.instruction          # e.g. "Press the start button on the microwave."
 task.manipulated_objects  # the bodies the task requires the robot to interact with
 task.robot_base_pose      # where to spawn the semantic_digital_twin-owned robot
@@ -74,9 +74,9 @@ from semantic_digital_twin.adapters.artvip_dataset.loader import ArtVipDatasetLo
 from semantic_digital_twin.adapters.artvip_dataset.schema import ArtVipCategory
 
 loader = ArtVipDatasetLoader()
-loader.available_objects(ArtVipCategory.IKEA_FURNITURE)  # every object name in a category
+loader.available_objects(category=ArtVipCategory.IKEA_FURNITURE)  # every object name in a category
 
-obj = loader.load(ArtVipCategory.IKEA_FURNITURE, "EKET_Cabinet_with_door_brown_walnut_effect_35x35x35cm")
+obj = loader.load(category=ArtVipCategory.IKEA_FURNITURE, name="EKET_Cabinet_with_door_brown_walnut_effect_35x35x35cm")
 obj.world  # one Body per rigid link
 ```
 
@@ -125,7 +125,7 @@ loader = GraspClutter6DDatasetLoader()
 scene_id = loader.available_scene_ids(
     object_set=GraspClutter6DObjectSet.GRASP, split=GraspClutter6DSplit.TRAIN
 )[0]
-models_directory = loader.download_models(GraspClutter6DModelVariant.EVAL)
+models_directory = loader.download_models(variant=GraspClutter6DModelVariant.EVAL)
 
 # scene = loader.load_scene(scene_id)  # only after download_scenes() - see below
 ```
@@ -156,7 +156,7 @@ an entry at a time, with a local cache holding only what has actually been used.
 from semantic_digital_twin.adapters.dataset_server import DatasetServer
 from semantic_digital_twin.world_description.mesh_file_storage import MeshFileSources
 
-MeshFileSources().use(DatasetServer.from_environment())
+MeshFileSources().use(source=DatasetServer.from_environment())
 ```
 
 `DatasetServer.from_environment` reads the server's address from
@@ -170,7 +170,7 @@ For a description parsed from a file, pass the server as a path resolver instead
 needs no registration:
 
 ```python
-WorldSpecification.from_urdf(path, path_resolver=CompositePathResolver([server]))
+WorldSpecification.from_urdf(file_path=path, path_resolver=CompositePathResolver([server]))
 ```
 
 Anything that serves a directory tree and answers a directory with a json listing can be

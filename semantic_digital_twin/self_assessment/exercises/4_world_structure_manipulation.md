@@ -74,8 +74,8 @@ with world.modify_world():
             child=body,
             world=world
         )
-    world.add_connection(root_C_base)    
-    world.add_connection(base_C_body)
+    world.add_connection(connection=root_C_base)    
+    world.add_connection(connection=base_C_body)
 ```
 
 ```{code-cell} ipython3
@@ -107,8 +107,8 @@ base_C_body = base_C_body_query.first()
 body = base_C_body.child
 
 with world.modify_world():
-    world.remove_connection(base_C_body)
-    world.remove_kinematic_structure_entity(body)
+    world.remove_connection(connection=base_C_body)
+    world.remove_kinematic_structure_entity(kinematic_structure_entity=body)
 ```
 
 ```{code-cell} ipython3

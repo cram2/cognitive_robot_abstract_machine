@@ -75,7 +75,7 @@ with world.modify_world():
         child=slider,
         world=world,
     )
-    world.add_connection(root_C_slider)
+    world.add_connection(connection=root_C_slider)
 rt = RayTracer(world=world); rt.update_scene(); rt.scene.show("jupyter")
 ```
 ```{code-cell} ipython3

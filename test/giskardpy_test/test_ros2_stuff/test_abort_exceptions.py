@@ -89,7 +89,7 @@ def test_an_error_about_a_body_is_rebuilt_with_the_body_of_the_client_world() ->
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(
-            body := Body(name=PrefixedName(name="arm"))
+            kinematic_structure_entity=(body := Body(name=PrefixedName(name="arm")))
         )
     result = ResultMessageMimic.with_payload(
         payload={"error": to_json(ErrorAboutABody(body=body))}
@@ -97,7 +97,7 @@ def test_an_error_about_a_body_is_rebuilt_with_the_body_of_the_client_world() ->
 
     error = GiskardActionClient.create_abort_exception(
         result=result,
-        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
     )
 
     assert error.body is body

@@ -89,7 +89,9 @@ def test_table_world(session, table_world):
 
     revolute_connection = [
         connection
-        for connection in table_world.get_connections_by_type(ScrewAxisConnection)
+        for connection in table_world.get_connections_by_type(
+            connection_type=ScrewAxisConnection
+        )
         if connection.behaves_like_a_revolute_connection
     ][0]
     revolute_connection.position = 1
@@ -116,7 +118,9 @@ def test_table_world(session, table_world):
     assert np.allclose(fk, fk2)
     reconstructed_connection = [
         connection
-        for connection in reconstructed.get_connections_by_type(ScrewAxisConnection)
+        for connection in reconstructed.get_connections_by_type(
+            connection_type=ScrewAxisConnection
+        )
         if connection.behaves_like_a_revolute_connection
     ][0]
     assert reconstructed_connection.position == revolute_connection.position
@@ -242,7 +246,7 @@ def test_part_whole_relationship_field_survives_deepcopy():
     """
     copy_functions = [copy, deepcopy]
     for copy_function in copy_functions:
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
                 name="door", scale=Scale(x=0.03, y=1, z=2), world=world
@@ -304,7 +308,9 @@ def test_hsrb_world(hsr_world_state_reset, session):
     queried_world = session.scalar(select(WorldMappingDAO))
     reconstructed: World = queried_world.from_dao()
 
-    [hsrb] = reconstructed.get_semantic_annotations_by_type(HSRB)
+    [hsrb] = reconstructed.get_semantic_annotations_by_type(
+        semantic_annotation_type=HSRB
+    )
     assert hsrb.mobile_base is not None
     assert hsrb.mobile_base.torso is not None
     assert hsrb.mobile_base.torso.arm is not None
@@ -322,7 +328,7 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     """
     from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
             name="door", scale=Scale(x=0.03, y=1, z=2), world=world
@@ -339,7 +345,9 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
     session.commit()
 
     reconstructed: World = session.scalar(select(WorldMappingDAO)).from_dao()
-    [reconstructed_door] = reconstructed.get_semantic_annotations_by_type(Door)
+    [reconstructed_door] = reconstructed.get_semantic_annotations_by_type(
+        semantic_annotation_type=Door
+    )
 
     # The reconstructed object is a real Door, so its fields still carry the marker.
     assert isinstance(reconstructed_door, Door)
@@ -368,7 +376,7 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
 
     hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     with world.modify_world():
         Door.create_with_new_body_in_world(
             name="door",
@@ -385,7 +393,9 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     session.add(to_dao(world))
     session.commit()
     reconstructed: World = session.scalar(select(WorldMappingDAO)).from_dao()
-    [reconstructed_door] = reconstructed.get_semantic_annotations_by_type(Door)
+    [reconstructed_door] = reconstructed.get_semantic_annotations_by_type(
+        semantic_annotation_type=Door
+    )
 
     np.testing.assert_allclose(
         reconstructed_door.movable_joint.connection_T_child_expression.to_np(),
@@ -414,7 +424,7 @@ def test_screw_axis_connection_survives_an_orm_round_trip(
                 axis=Vector3.Y(), pitch=0.25
             ),
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     connection.position = 2.5
     parent_T_child = world.compute_forward_kinematics_np(root=parent, tip=child)
 
@@ -423,7 +433,7 @@ def test_screw_axis_connection_survives_an_orm_round_trip(
     reconstructed: World = session.scalar(select(WorldMappingDAO)).from_dao()
 
     reconstructed_connection = reconstructed.get_connections_by_type(
-        ScrewAxisConnection
+        connection_type=ScrewAxisConnection
     )[0]
     assert np.allclose(reconstructed_connection.screw_axis, connection.screw_axis)
     assert np.allclose(
@@ -445,9 +455,11 @@ def test_a_pose_given_by_the_world_state_is_stored_as_it_stands(
     has when it is stored.
     """
     world = pr2_world_state_reset
-    tool_frame = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    tool_frame = world.get_kinematic_structure_entity_by_name(
+        name="r_gripper_tool_frame"
+    )
     world_T_tool_frame = world.compose_forward_kinematics_expression(
-        world.root, tool_frame
+        root=world.root, tip=tool_frame
     )
 
     stored = to_dao(world_T_tool_frame).from_dao()
@@ -477,7 +489,7 @@ def world_with_box() -> World:
         ),
     )
     with world.modify_world():
-        world.add_kinematic_structure_entity(box)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=box)
     return world
 
 
@@ -496,11 +508,11 @@ def test_the_inertia_tensor_of_a_body_survives_a_round_trip(session, world_with_
     """
     A body read back from the database has the inertia tensor it was stored with.
     """
-    box = world_with_box.get_body_by_name("box")
+    box = world_with_box.get_body_by_name(name="box")
 
     loaded = load_after_storing(world_with_box, session)
 
-    loaded_box = loaded.get_body_by_name("box")
+    loaded_box = loaded.get_body_by_name(name="box")
     assert np.array_equal(loaded_box.inertial.inertia.data, box.inertial.inertia.data)
 
 
@@ -510,13 +522,15 @@ def test_a_camera_keeps_the_body_it_is_attached_to_through_a_round_trip(
     """
     A camera read back from the database is attached to the body read back with it.
     """
-    box = world_with_box.get_body_by_name("box")
+    box = world_with_box.get_body_by_name(name="box")
     with world_with_box.modify_world():
-        box.add_simulator_property(MujocoCamera(name="eye", body=box))
+        box.add_simulator_property(
+            simulator_property=MujocoCamera(name="eye", body=box)
+        )
 
     loaded = load_after_storing(world_with_box, session)
 
-    loaded_box = loaded.get_body_by_name("box")
+    loaded_box = loaded.get_body_by_name(name="box")
     [camera] = [
         simulator_property
         for simulator_property in loaded_box.simulator_additional_properties
@@ -532,20 +546,20 @@ def test_an_actuator_keeps_the_degree_of_freedom_it_drives_through_a_round_trip(
     An actuator read back from the database drives the degree of freedom it drove when
     it was stored.
     """
-    box = world_with_box.get_body_by_name("box")
+    box = world_with_box.get_body_by_name(name="box")
     arm = Body(name=PrefixedName(name="arm"))
     actuator = Actuator(name=PrefixedName(name="servo"))
     with world_with_box.modify_world():
-        world_with_box.add_kinematic_structure_entity(arm)
+        world_with_box.add_kinematic_structure_entity(kinematic_structure_entity=arm)
         joint = ScrewAxisConnection.create_with_dofs(
             world=world_with_box,
             parent=box,
             child=arm,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         )
-        world_with_box.add_connection(joint)
-        actuator.add_dof(joint.dof)
-        world_with_box.add_actuator(actuator)
+        world_with_box.add_connection(connection=joint)
+        actuator.add_dof(dof=joint.dof)
+        world_with_box.add_actuator(actuator=actuator)
 
     loaded = load_after_storing(world_with_box, session)
 

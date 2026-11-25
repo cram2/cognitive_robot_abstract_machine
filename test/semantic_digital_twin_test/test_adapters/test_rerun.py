@@ -21,7 +21,7 @@ def test_records_every_body(world_setup_simple, tmp_path) -> None:
     )
     adapter.stop()
 
-    recorded = RerunAdapter.read_recording_entities(str(recording_file_path))
+    recorded = RerunAdapter.read_recording_entities(path=str(recording_file_path))
     for body in world.bodies:
         entity = f"/world/{body.name.name}"
         assert any(
@@ -57,7 +57,7 @@ def test_batched_body_fks_match_per_body(world_setup_simple) -> None:
         world_transform_body = batched_body_fks[index * 4 : index * 4 + 4]
         assert np.allclose(
             world_transform_body,
-            world.compute_forward_kinematics_np(world.root, body),
+            world.compute_forward_kinematics_np(root=world.root, tip=body),
         )
 
     adapter.stop()

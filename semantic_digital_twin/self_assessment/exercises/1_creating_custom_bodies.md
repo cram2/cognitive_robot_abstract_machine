@@ -74,7 +74,7 @@ visual = ShapeCollection(shapes=[visual_sphere])
 
 body = Body(name=PrefixedName(name="exercise_body"), collision=collision, visual=visual)
 with world.modify_world():
-    world.add_body(body)
+    world.add_body(body=body)
 ```
 
 ```{code-cell} ipython3

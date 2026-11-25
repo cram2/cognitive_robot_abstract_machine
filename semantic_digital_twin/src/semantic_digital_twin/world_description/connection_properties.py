@@ -130,7 +130,7 @@ class JointDrive:
     the description states.
     """
 
-    def servo_for(self, connection: ActiveConnection1DOF) -> JointServo:
+    def servo_for(self, *, connection: ActiveConnection1DOF) -> JointServo:
         """
         :param connection: The joint to drive.
         :return: The servo driving the joint, with the passive dynamics the description

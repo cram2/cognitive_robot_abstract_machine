@@ -95,7 +95,9 @@ class SemanticPositionDescription:
     """
 
     @staticmethod
-    def _zoom_interval(base: SimpleInterval, target: SimpleInterval) -> SimpleInterval:
+    def _zoom_interval(
+        *, base: SimpleInterval, target: SimpleInterval
+    ) -> SimpleInterval:
         """
         Zoom 'base' interval by the percentage interval 'target' (0..1), preserving the
         base's boundary styles.
@@ -111,7 +113,7 @@ class SemanticPositionDescription:
             lower=new_lower, upper=new_upper, left=base.left, right=base.right
         )
 
-    def _apply_zoom(self, simple_event: SimpleEvent) -> SimpleEvent:
+    def _apply_zoom(self, *, simple_event: SimpleEvent) -> SimpleEvent:
         """
         Apply zooms in order and return the resulting intervals.
 
@@ -121,8 +123,8 @@ class SemanticPositionDescription:
         """
         simple_events = [
             self._apply_zoom_in_one_direction(
-                axis,
-                assignment.simple_sets[0],
+                axis=axis,
+                current_interval=assignment.simple_sets[0],
             )
             for axis, assignment in simple_event.items()
         ]
@@ -133,7 +135,7 @@ class SemanticPositionDescription:
         return reduce(or_, simple_events)
 
     def _apply_zoom_in_one_direction(
-        self, axis: Continuous, current_interval: SimpleInterval
+        self, *, axis: Continuous, current_interval: SimpleInterval
     ) -> SimpleEvent:
         """
         Apply zooms in one direction (Y, horizontal or Z, vertical) in order and return
@@ -152,11 +154,13 @@ class SemanticPositionDescription:
             raise NotImplementedError
 
         for step in directions:
-            current_interval = self._zoom_interval(current_interval, step.value)
+            current_interval = self._zoom_interval(
+                base=current_interval, target=step.value
+            )
 
         return SimpleEvent.from_data({axis: current_interval})
 
-    def sample_point_from_event(self, event: Event) -> tuple[float, float]:
+    def sample_point_from_event(self, *, event: Event) -> tuple[float, float]:
         """
         Sample a 2D point from the given event by applying the zooms defined in the
         semantic position description.
@@ -164,6 +168,6 @@ class SemanticPositionDescription:
         :param event: The event to sample from.
         :return: A sampled 2D point as a tuple (y, z).
         """
-        simple_event = self._apply_zoom(event.bounding_box())
+        simple_event = self._apply_zoom(simple_event=event.bounding_box())
         event_circuit = uniform_measure_of_simple_event(simple_event)
         return event_circuit.sample(amount=1)[0]

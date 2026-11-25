@@ -72,7 +72,9 @@ def _left_gripper(world: World) -> EndEffector:
     """
     [gripper] = [
         end_effector
-        for end_effector in world.get_semantic_annotations_by_type(EndEffector)
+        for end_effector in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        )
         if end_effector.root.name.name.startswith("l_")
     ]
     return gripper
@@ -82,7 +84,9 @@ def _bottom_of(body: Body) -> float:
     """
     :return: How low the bottom of ``body``'s collision geometry hangs in the world.
     """
-    boxes = body.collision.as_bounding_box_collection_in_frame(body._world.root)
+    boxes = body.collision.as_bounding_box_collection_in_frame(
+        reference_frame=body._world.root
+    )
     return min(box.min_z for box in boxes)
 
 
@@ -100,7 +104,9 @@ def _box_at(
     )
     with world.modify_world():
         world.add_connection(
-            Connection6DoF.create_with_dofs(world=world, parent=world.root, child=box)
+            connection=Connection6DoF.create_with_dofs(
+                world=world, parent=world.root, child=box
+            )
         )
     _move_to(box, position)
     return box
@@ -311,7 +317,7 @@ def _surface_under(world: World, box: Body, aside: float = 0.0) -> Body:
     bottom = _bottom_of(box)
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=surface,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(

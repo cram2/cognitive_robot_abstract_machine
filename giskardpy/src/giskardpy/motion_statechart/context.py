@@ -57,7 +57,7 @@ class MotionControlContext(ContextExtension):
                 float_variable_data=context.float_variable_data
             )
             context.world.collision_manager.add_collision_consumer(
-                self.self_collision_manager
+                consumer=self.self_collision_manager
             )
         return self.self_collision_manager
 
@@ -74,7 +74,7 @@ class MotionControlContext(ContextExtension):
                 float_variable_data=context.float_variable_data
             )
             context.world.collision_manager.add_collision_consumer(
-                self.external_collision_manager
+                consumer=self.external_collision_manager
             )
         return self.external_collision_manager
 
@@ -108,6 +108,6 @@ class MotionControlContext(ContextExtension):
         added to.
         """
         for manager in self._registered_collision_variable_managers:
-            manager.collision_manager.remove_collision_consumer(manager)
+            manager.collision_manager.remove_collision_consumer(consumer=manager)
         self.self_collision_manager = None
         self.external_collision_manager = None

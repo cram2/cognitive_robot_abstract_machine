@@ -166,6 +166,7 @@ class URDFParser(WorldModelParser):
     @classmethod
     def from_file(
         cls,
+        *,
         file_path: str,
         prefix: str | None = None,
         path_resolver: PathResolver | None = None,
@@ -173,14 +174,14 @@ class URDFParser(WorldModelParser):
     ) -> URDFParser:
         if file_path.endswith(".xacro"):
             return cls.from_xacro(
-                file_path,
-                prefix,
+                xacro_path=file_path,
+                prefix=prefix,
                 use_visual_as_collision_backup=use_visual_as_collision_backup,
             )
 
         path_resolver = path_resolver or CompositePathResolver()
 
-        file_path = path_resolver.resolve(file_path)
+        file_path = path_resolver.resolve(uri=file_path)
         if file_path is not None:
             with open(file_path, "r") as file:
                 # Since parsing URDF causes a lot of warning messages which can't be deactivated, we suppress them
@@ -197,6 +198,7 @@ class URDFParser(WorldModelParser):
     @classmethod
     def from_xacro(
         cls,
+        *,
         xacro_path: str,
         prefix: str | None = None,
         mappings: dict[str, str] | None = None,
@@ -216,7 +218,7 @@ class URDFParser(WorldModelParser):
             collision geometry collides with its visual geometry instead.
         :return: A parser for the world described by the expanded xacro file.
         """
-        xacro_path = CompositePathResolver().resolve(xacro_path)
+        xacro_path = CompositePathResolver().resolve(uri=xacro_path)
         urdf = process_file(xacro_path, mappings=mappings).toxml()
         return URDFParser(
             urdf=urdf,
@@ -231,14 +233,16 @@ class URDFParser(WorldModelParser):
 
         prefix = self.parsed.name
         links = [
-            self.parse_link(link, PrefixedName(name=link.name, prefix=prefix))
+            self.parse_link(
+                link=link, parent_frame=PrefixedName(name=link.name, prefix=prefix)
+            )
             for link in self.parsed.links
         ]
         root = [link for link in links if link.name.name == self.parsed.get_root()][0]
         world = World()
         world.name = self.prefix
         with world.modify_world():
-            world.add_kinematic_structure_entity(root)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=root)
             main_joints = []
             mimic_joints = []
 
@@ -252,15 +256,23 @@ class URDFParser(WorldModelParser):
             for joint in main_joints + mimic_joints:
                 parent = [link for link in links if link.name.name == joint.parent][0]
                 child = [link for link in links if link.name.name == joint.child][0]
-                parsed_joint = self.parse_joint(joint, parent, child, world, prefix)
+                parsed_joint = self.parse_joint(
+                    joint=joint, parent=parent, child=child, world=world, prefix=prefix
+                )
                 parsed_joints.append(parsed_joint)
 
-            [world.add_connection(joint) for joint in parsed_joints]
+            [world.add_connection(connection=joint) for joint in parsed_joints]
 
         return world
 
     def parse_joint(
-        self, joint: urdfpy.Joint, parent: Body, child: Body, world: World, prefix: str
+        self,
+        *,
+        joint: urdfpy.Joint,
+        parent: Body,
+        child: Body,
+        world: World,
+        prefix: str,
     ) -> Connection:
         """
         Parses a given URDF joint and creates a corresponding connection object.
@@ -319,9 +331,9 @@ class URDFParser(WorldModelParser):
 
         if dof_name not in [d.name for d in world.degrees_of_freedom]:
             dof = DegreeOfFreedom(name=dof_name, limits=urdf_joint_to_limits(joint))
-            world.add_degree_of_freedom(dof)
+            world.add_degree_of_freedom(dof=dof)
         else:
-            dof = world.get_degree_of_freedom_by_name(dof_name)
+            dof = world.get_degree_of_freedom_by_name(name=dof_name)
 
         result = connection_type(
             name=connection_name,
@@ -331,7 +343,7 @@ class URDFParser(WorldModelParser):
             multiplier=multiplier,
             offset=offset,
             raw_dof=dof,
-            dynamics=self.parse_dynamics(joint),
+            dynamics=self.parse_dynamics(joint=joint),
             screw_axis=(
                 ScrewAxisConnection.create_prismatic_screw_axis(
                     axis=Vector3(*urdf_joint_axis(joint))
@@ -344,7 +356,7 @@ class URDFParser(WorldModelParser):
         )
         return result
 
-    def parse_dynamics(self, joint: urdfpy.Joint) -> JointDynamics:
+    def parse_dynamics(self, *, joint: urdfpy.Joint) -> JointDynamics:
         """
         Parses the dynamic properties of a URDF joint.
 
@@ -365,7 +377,7 @@ class URDFParser(WorldModelParser):
             dry_friction=dry_friction if dry_friction is not None else 0.0,
         )
 
-    def parse_link(self, link: urdfpy.Link, parent_frame: PrefixedName) -> Body:
+    def parse_link(self, *, link: urdfpy.Link, parent_frame: PrefixedName) -> Body:
         """
         Parses a URDF link to a link object.
 
@@ -376,18 +388,18 @@ class URDFParser(WorldModelParser):
         """
         name = PrefixedName(prefix=self.prefix, name=link.name)
         body = Body(name=name)
-        visuals = self.parse_geometry(link.visuals, body)
-        collisions = self.parse_geometry(link.collisions, body)
+        visuals = self.parse_geometry(geometry=link.visuals, body=body)
+        collisions = self.parse_geometry(geometry=link.collisions, body=body)
         if not collisions.shapes and self.use_visual_as_collision_backup:
-            collisions = self.parse_geometry(link.visuals, body)
+            collisions = self.parse_geometry(geometry=link.visuals, body=body)
         body.visual = visuals
         body.collision = collisions
-        inertial = self.parse_inertial(link, body)
+        inertial = self.parse_inertial(link=link, body=body)
         if inertial is not None:
             body.inertial = inertial
         return body
 
-    def parse_inertial(self, link: urdfpy.Link, body: Body) -> Inertial | None:
+    def parse_inertial(self, *, link: urdfpy.Link, body: Body) -> Inertial | None:
         """
         Parses the inertial properties of a URDF link.
 
@@ -426,6 +438,7 @@ class URDFParser(WorldModelParser):
 
     def parse_geometry(
         self,
+        *,
         geometry: list[urdfpy.Collision] | list[urdfpy.Visual],
         body: Body,
     ) -> ShapeCollection:
@@ -459,19 +472,19 @@ class URDFParser(WorldModelParser):
                 x, y, z = geom.geometry.scale or (1, 1, 1)
                 shape = Mesh(
                     origin=origin_transform,
-                    filename=self.path_resolver.resolve(geom.geometry.filename),
+                    filename=self.path_resolver.resolve(uri=geom.geometry.filename),
                     scale=Scale(x=x, y=y, z=z),
                 )
             else:
                 continue
-            color = self.color_of(geom, shape)
+            color = self.color_of(geometry_element=geom, shape=shape)
             if color is not None:
                 shape.color = color
             res.append(shape)
         return ShapeCollection(shapes=res, reference_frame=body)
 
     def color_of(
-        self, geometry_element: urdfpy.Visual | urdfpy.Collision, shape: Shape
+        self, *, geometry_element: urdfpy.Visual | urdfpy.Collision, shape: Shape
     ) -> Color | None:
         """
         :param geometry_element: A visual or collision element of the description.
@@ -488,7 +501,7 @@ class URDFParser(WorldModelParser):
         if material is None:
             return None
         if material.color is not None:
-            color = Color.from_rgba(*material.color.rgba)
+            color = Color.from_list(color=material.color.rgba)
         else:
             named_colors = {
                 named.name: named.color
@@ -497,7 +510,7 @@ class URDFParser(WorldModelParser):
             }
             if material.name not in named_colors:
                 return None
-            color = Color.from_rgba(*named_colors[material.name].rgba)
+            color = Color.from_list(color=named_colors[material.name].rgba)
         # The mesh's file is read only when there is a color to give.
         if isinstance(shape, Mesh) and shape.is_textured:
             return None

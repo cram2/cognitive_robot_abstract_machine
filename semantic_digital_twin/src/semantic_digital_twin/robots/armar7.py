@@ -99,14 +99,14 @@ class Armar7LeftThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand L Palm_link"
+                branch_root=robot_root, name="Hand L Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Thumb L Tip_link"
+                branch_root=robot_root, name="Thumb L Tip_link"
             ),
         )
 
@@ -121,14 +121,14 @@ class Armar7LeftRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand L Palm_link"
+                branch_root=robot_root, name="Hand L Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Ring L Tip_link"
+                branch_root=robot_root, name="Ring L Tip_link"
             ),
         )
 
@@ -143,14 +143,14 @@ class Armar7LeftPinkyFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand L Palm_link"
+                branch_root=robot_root, name="Hand L Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Pinky L Tip_link"
+                branch_root=robot_root, name="Pinky L Tip_link"
             ),
         )
 
@@ -165,14 +165,14 @@ class Armar7LeftMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand L Palm_link"
+                branch_root=robot_root, name="Hand L Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Middle L Tip_link"
+                branch_root=robot_root, name="Middle L Tip_link"
             ),
         )
 
@@ -187,14 +187,14 @@ class Armar7LeftIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand L Palm_link"
+                branch_root=robot_root, name="Hand L Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Index L Tip_link"
+                branch_root=robot_root, name="Index L Tip_link"
             ),
         )
 
@@ -209,14 +209,14 @@ class Armar7RightThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand R Palm_link"
+                branch_root=robot_root, name="Hand R Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Thumb R Tip_link"
+                branch_root=robot_root, name="Thumb R Tip_link"
             ),
         )
 
@@ -231,14 +231,14 @@ class Armar7RightRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand R Palm_link"
+                branch_root=robot_root, name="Hand R Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Ring R Tip_link"
+                branch_root=robot_root, name="Ring R Tip_link"
             ),
         )
 
@@ -253,14 +253,14 @@ class Armar7RightPinkyFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand R Palm_link"
+                branch_root=robot_root, name="Hand R Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Pinky R Tip_link"
+                branch_root=robot_root, name="Pinky R Tip_link"
             ),
         )
 
@@ -275,14 +275,14 @@ class Armar7RightMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand R Palm_link"
+                branch_root=robot_root, name="Hand R Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Middle R Tip_link"
+                branch_root=robot_root, name="Middle R Tip_link"
             ),
         )
 
@@ -297,14 +297,14 @@ class Armar7RightIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand R Palm_link"
+                branch_root=robot_root, name="Hand R Palm_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Index R Tip_link"
+                branch_root=robot_root, name="Index R Tip_link"
             ),
         )
 
@@ -350,14 +350,14 @@ class Armar7LeftGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "ArmL8_Wrist_Hemisphere_B_link"
+                branch_root=robot_root, name="ArmL8_Wrist_Hemisphere_B_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand L TCP_link"
+                branch_root=robot_root, name="Hand L TCP_link"
             ),
         )
 
@@ -403,14 +403,14 @@ class Armar7RightGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "ArmR8_Wrist_Hemisphere_B_link"
+                branch_root=robot_root, name="ArmR8_Wrist_Hemisphere_B_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Hand R TCP_link"
+                branch_root=robot_root, name="Hand R TCP_link"
             ),
         )
 
@@ -431,14 +431,14 @@ class Armar7LeftArm(Arm[Armar7LeftGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "CenterArms_fixed_link"
+                branch_root=robot_root, name="CenterArms_fixed_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "ArmL8_Wrist_Hemisphere_B_link"
+                branch_root=robot_root, name="ArmL8_Wrist_Hemisphere_B_link"
             ),
         )
 
@@ -459,14 +459,14 @@ class Armar7RightArm(Arm[Armar7RightGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "CenterArms_fixed_link"
+                branch_root=robot_root, name="CenterArms_fixed_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "ArmR8_Wrist_Hemisphere_B_link"
+                branch_root=robot_root, name="ArmR8_Wrist_Hemisphere_B_link"
             ),
         )
 
@@ -475,14 +475,14 @@ class Armar7RightArm(Arm[Armar7RightGripper]):
 class AzureKinectRGB(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=cls.create_optical_body(
-                robot_root._world.get_body_in_branch_by_name(
-                    robot_root, "AzureKinect_RGB_link"
+                mounting_body=robot_root._world.get_body_in_branch_by_name(
+                    branch_root=robot_root, name="AzureKinect_RGB_link"
                 ),
-                HomogeneousTransformationMatrix(),
+                parent_T_optical=HomogeneousTransformationMatrix(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(
@@ -511,14 +511,14 @@ class Armar7Neck(Neck[AzureKinectRGB]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Neck_Root_link"
+                branch_root=robot_root, name="Neck_Root_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Head_Root_link"
+                branch_root=robot_root, name="Head_Root_link"
             ),
         )
 
@@ -551,14 +551,14 @@ class Armar7Torso(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Platform_link"
+                branch_root=robot_root, name="Platform_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "CenterArms_fixed_link"
+                branch_root=robot_root, name="CenterArms_fixed_link"
             ),
         )
 
@@ -577,11 +577,11 @@ class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "Dummy_Platform_link"
+                branch_root=robot_root, name="Dummy_Platform_link"
             ),
         )
 

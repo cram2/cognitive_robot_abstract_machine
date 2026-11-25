@@ -286,7 +286,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         geom has to stand in for it.
         """
         return WorldSpecification.from_mjcf(
-            SceneFile.APARTMENT, use_visual_as_collision_backup=True
+            file_path=SceneFile.APARTMENT, use_visual_as_collision_backup=True
         )
 
     def robot_specification(self) -> RobotSpecification:
@@ -300,7 +300,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
 
     def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(
-            SceneBody.APARTMENT.value
+            name=SceneBody.APARTMENT.value
         )
 
     def populate_scene(self, *, world: World) -> None:
@@ -313,25 +313,27 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         world_reasoner = WorldReasoner(world=world)
         inferred = world_reasoner.infer_semantic_annotations()
         with world.modify_world():
-            world.add_semantic_annotations(inferred)
+            world.add_semantic_annotations(semantic_annotations=inferred)
 
         # The milk is picked up and carried, and a pose can only be written to a
         # connection that has the degrees of freedom to carry it, so it hangs off a 6DoF
         # connection rather than the default fixed one.
         Milk.get_annotation_specification(
-            SceneBody.MILK.value,
-            BodySpecification.mesh(
-                SceneBody.MILK.value,
-                SceneFile.MILK,
+            name=SceneBody.MILK.value,
+            root_specification=BodySpecification.mesh(
+                name=SceneBody.MILK.value,
+                filename=SceneFile.MILK,
                 parent_T_self=ScenePose.MILK_START.value.transform,
             ),
             parent_connection_specification=Connection6DoFSpecification(),
-        ).spawn(world, parent=world.root)
+        ).spawn(world=world, parent=world.root)
 
     def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
-                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+                robot=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=self.used_robot
+                )[0]
             ),
         ]
 
@@ -346,17 +348,19 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         left_arm = robot.get_left_arm_if_specified()
         right_arm = robot.get_right_arm_if_specified()
         left_hand = left_arm.end_effector
-        storage_drawer = world.get_body_by_name(SceneBody.STORAGE_DRAWER.value)
-        apartment = world.get_body_by_name(SceneBody.APARTMENT.value)
+        storage_drawer = world.get_body_by_name(name=SceneBody.STORAGE_DRAWER.value)
+        apartment = world.get_body_by_name(name=SceneBody.APARTMENT.value)
         [drawer] = [
             drawer
-            for drawer in world.get_semantic_annotations_by_type(Drawer)
+            for drawer in world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Drawer
+            )
             if drawer.root is storage_drawer
         ]
         drawer_mechanism = drawer.handle.root.get_first_parent_connection_of_type(
-            ActiveConnection1DOF
+            connection_type=ActiveConnection1DOF
         )
-        [milk] = world.get_semantic_annotations_by_type(Milk)
+        [milk] = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)
         milk_grasp = GraspCandidate(
             graspable=milk,
             grasp_pose=Pose.from_xyz_quaternion(
@@ -408,7 +412,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                                     ),
                                     SetGripperAction(
                                         gripper_configuration=left_hand.default_configuration(
-                                            GripperState.OPEN
+                                            state_type=GripperState.OPEN
                                         )
                                     ),
                                 ]
@@ -606,7 +610,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             return laying_down
         right_hand = right_arm.end_effector
         tool_at_place = right_hand.tool_frame_goal_for_grasp(
-            milk_grasp.moved_to(milk_in_drawer)
+            grasp_pose=milk_grasp.moved_to(reference_T_object=milk_in_drawer)
         )
         tool_above_place = (
             HomogeneousTransformationMatrix.from_xyz_rpy(

@@ -45,8 +45,8 @@ class TestWorldDescriptorBootstrapAnnotator:
             world_T_camera=HomogeneousTransformationMatrix(),
         )
 
-        camera_body = runtime_world.get_body_by_name("camera")
-        map_body = runtime_world.get_body_by_name("map")
+        camera_body = runtime_world.get_body_by_name(name="camera")
+        map_body = runtime_world.get_body_by_name(name="map")
         camera_body_id = camera_body.id
         map_body_id = map_body.id
 
@@ -66,13 +66,13 @@ class TestWorldDescriptorBootstrapAnnotator:
         result = annotator.update()
 
         assert result is Status.SUCCESS
-        assert runtime_world.get_body_by_name("camera").id == camera_body_id
-        assert runtime_world.get_body_by_name("map").id == map_body_id
+        assert runtime_world.get_body_by_name(name="camera").id == camera_body_id
+        assert runtime_world.get_body_by_name(name="map").id == map_body_id
         assert transform.child_frame.id == camera_body_id
         assert transform.reference_frame.id == map_body_id
 
         predefined_objects = runtime_world.get_semantic_annotations_by_type(
-            PredefinedObject
+            semantic_annotation_type=PredefinedObject
         )
         predefined_object_names = {
             annotation.body.name.name
@@ -83,7 +83,9 @@ class TestWorldDescriptorBootstrapAnnotator:
 
         region_names = {
             str(region.name)
-            for region in runtime_world.get_kinematic_structure_entity_by_type(Region)
+            for region in runtime_world.get_kinematic_structure_entity_by_type(
+                entity_type=Region
+            )
         }
         assert "kitchen_island" in region_names
 
@@ -96,11 +98,13 @@ class TestWorldDescriptorBootstrapAnnotator:
 
         assert first is Status.SUCCESS
         assert second is Status.SUCCESS
-        assert len(runtime_world.get_bodies_by_name("cereal")) == 1
-        assert len(runtime_world.get_bodies_by_name("milk")) == 1
+        assert len(runtime_world.get_bodies_by_name(name="cereal")) == 1
+        assert len(runtime_world.get_bodies_by_name(name="milk")) == 1
         assert (
             len(
-                runtime_world.get_kinematic_structure_entities_by_name("kitchen_island")
+                runtime_world.get_kinematic_structure_entities_by_name(
+                    name="kitchen_island"
+                )
             )
             == 1
         )

@@ -38,7 +38,7 @@ def test_resolves_texture_from_material_name_when_it_is_a_real_file(tmp_path):
     material = FakeMaterial(name=str(texture_file), image=PIL.Image.new("RGB", (1, 1)))
 
     assert MujocoMeshConverter._resolve_texture_file_path(
-        material, str(tmp_path)
+        material=material, mesh_directory=str(tmp_path)
     ) == str(texture_file)
 
 
@@ -50,7 +50,7 @@ def test_resolves_texture_from_image_filename_when_material_name_is_not_a_file(
     material = FakeMaterial(name="material_0", image=PIL.Image.open(texture_file))
 
     assert MujocoMeshConverter._resolve_texture_file_path(
-        material, str(tmp_path)
+        material=material, mesh_directory=str(tmp_path)
     ) == str(texture_file)
 
 
@@ -62,7 +62,7 @@ def test_resolves_texture_from_image_info_file_path(tmp_path):
     material = FakeMaterial(name="material_0", image=image)
 
     assert MujocoMeshConverter._resolve_texture_file_path(
-        material, str(tmp_path)
+        material=material, mesh_directory=str(tmp_path)
     ) == str(texture_file)
 
 
@@ -72,7 +72,10 @@ def test_returns_none_for_a_programmatically_generated_texture_with_no_backing_f
     material = FakeMaterial(name="material_0", image=PIL.Image.new("RGB", (1, 1)))
 
     assert (
-        MujocoMeshConverter._resolve_texture_file_path(material, str(tmp_path)) is None
+        MujocoMeshConverter._resolve_texture_file_path(
+            material=material, mesh_directory=str(tmp_path)
+        )
+        is None
     )
 
 
@@ -92,5 +95,5 @@ def test_resolves_texture_named_relative_to_its_mesh(tmp_path):
     material = FakeMaterial(name="material_0", image=image)
 
     assert MujocoMeshConverter._resolve_texture_file_path(
-        material, str(tmp_path)
+        material=material, mesh_directory=str(tmp_path)
     ) == str(texture_file)

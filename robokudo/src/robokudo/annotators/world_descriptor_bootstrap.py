@@ -162,22 +162,26 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
                         annotation.id
                         in self._merged_descriptor_entities.semantic_annotation_ids
                     ):
-                        self.world.remove_semantic_annotation(annotation)
+                        self.world.remove_semantic_annotation(
+                            semantic_annotation=annotation
+                        )
 
                 for connection in reversed(list(self.world.connections)):
                     if id(connection) in connection_object_ids:
-                        self.world.remove_connection(connection)
+                        self.world.remove_connection(connection=connection)
 
                 for dof in list(self.world.degrees_of_freedom):
                     if dof.id in self._merged_descriptor_entities.degree_of_freedom_ids:
-                        self.world.remove_degree_of_freedom(dof)
+                        self.world.remove_degree_of_freedom(dof=dof)
 
                 for entity in reversed(list(self.world.kinematic_structure_entities)):
                     if (
                         entity.id
                         in self._merged_descriptor_entities.kinematic_structure_entity_ids
                     ):
-                        self.world.remove_kinematic_structure_entity(entity)
+                        self.world.remove_kinematic_structure_entity(
+                            kinematic_structure_entity=entity
+                        )
         except Exception as error:
             raise WorldDescriptorBootstrapError(
                 operation="remove previous world descriptor contribution"
@@ -202,7 +206,7 @@ class WorldDescriptorBootstrapAnnotator(BaseAnnotator):
 
         try:
             before = self._snapshot_world_entities(world=self.world)
-            self.world.merge_world(world_descriptor.world)
+            self.world.merge_world(other=world_descriptor.world)
             self._merged_descriptor_entities = self._entities_added_since(
                 world=self.world, before=before
             )

@@ -179,7 +179,7 @@ def align_planes_task(world: World) -> AlignPlanes:
     A task aligning the z axis of the bot with the z axis of the root, named ``align``.
     """
     root = world.root
-    tip = world.get_body_by_name("bot")
+    tip = world.get_body_by_name(name="bot")
     return AlignPlanes(
         kinematic_chain=KinematicChain(root=root, tip=tip),
         reference_normal=Vector3.Z(reference_frame=root),
@@ -194,7 +194,7 @@ def cartesian_orientation_task(world: World) -> CartesianOrientation:
     """
     return CartesianOrientation(
         kinematic_chain=KinematicChain(
-            root=world.root, tip=world.get_body_by_name("bot")
+            root=world.root, tip=world.get_body_by_name(name="bot")
         ),
         goal_orientation=RotationMatrix.from_rpy(yaw=1, reference_frame=world.root),
         name="orientation",
@@ -207,9 +207,9 @@ def align_perpendicular_task(world: World) -> AlignPerpendicular:
     """
     return AlignPerpendicular(
         kinematic_chain=KinematicChain(
-            root=world.root, tip=world.get_body_by_name("bot")
+            root=world.root, tip=world.get_body_by_name(name="bot")
         ),
-        tip_normal=Vector3.X(reference_frame=world.get_body_by_name("bot")),
+        tip_normal=Vector3.X(reference_frame=world.get_body_by_name(name="bot")),
         reference_normal=Vector3.X(reference_frame=world.root),
         name="perpendicular",
     )
@@ -222,8 +222,10 @@ def marker_origins_in_root(markers: list[Marker], world: World) -> list[list[flo
     origins = []
     for marker in markers:
         root_T_frame = world.compute_forward_kinematics_np(
-            world.root,
-            world.get_kinematic_structure_entity_by_name(marker.header.frame_id),
+            root=world.root,
+            tip=world.get_kinematic_structure_entity_by_name(
+                name=marker.header.frame_id
+            ),
         )
         position = marker.pose.position
         origins.append(
@@ -318,7 +320,7 @@ def test_align_planes_sets_visualisation_frame(cylinder_bot_world):
     )
 
     assert current_normal.expression.visualisation_frame is (
-        cylinder_bot_world.get_body_by_name("bot")
+        cylinder_bot_world.get_body_by_name(name="bot")
     )
 
 
@@ -353,7 +355,7 @@ def test_vector_is_expressed_in_its_visualisation_frame(cylinder_bot_world):
     its visualisation frame.
     """
     root = cylinder_bot_world.root
-    bot = cylinder_bot_world.get_body_by_name("bot")
+    bot = cylinder_bot_world.get_body_by_name(name="bot")
     vector = Vector3(x=1, y=0, z=0, reference_frame=root, visualisation_frame=bot)
 
     visualization = DebugExpressionPublishing._create_visualization(
@@ -825,7 +827,7 @@ def test_orientations_and_vectors_of_a_task_are_drawn_at_its_tip(
     A task's debug markers that have no position of their own start at its tip, not at
     the origin of the frame they are expressed in.
     """
-    drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
+    drive = cylinder_bot_world.get_connections_by_type(connection_type=OmniDrive)[0]
     cylinder_bot_world.state[drive.x.id].position = 1.0
     cylinder_bot_world.state[drive.y.id].position = 0.5
     cylinder_bot_world.state[drive.yaw.id].position = 0.3
@@ -845,7 +847,7 @@ def test_orientations_and_vectors_of_a_task_are_drawn_at_its_tip(
     publishing._marker_publisher.wait_until_published()
 
     root_P_tip = cylinder_bot_world.compute_forward_kinematics_np(
-        cylinder_bot_world.root, task.kinematic_chain.tip
+        root=cylinder_bot_world.root, tip=task.kinematic_chain.tip
     )[:3, 3]
     origins = marker_origins_in_root(fake.published[-1].markers, cylinder_bot_world)
     assert len(origins) > 0

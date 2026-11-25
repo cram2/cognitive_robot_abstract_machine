@@ -39,14 +39,16 @@ class StretchVelocityInterface(ClosedLoopRobotInterfaceConfig):
 
     def setup(self):
         self.sync_6dof_joint_with_tf_frame(
-            joint=self.world.get_connections_by_type(Connection6DoF)[0],
+            joint=self.world.get_connections_by_type(connection_type=Connection6DoF)[0],
             tf_parent_frame="map",
             tf_child_frame=self.robot.mobile_base.odometry_body_name,
         )
 
         self.sync_robot_parts()
 
-        diff_drive = self.world.get_connections_by_type(DifferentialDrive)[0]
+        diff_drive = self.world.get_connections_by_type(
+            connection_type=DifferentialDrive
+        )[0]
         self.add_drive_velocity_command_topic(
             command_topic="/stretch/cmd_vel", drive=diff_drive
         )

@@ -73,11 +73,11 @@ def parse_procthor_worlds_and_calculate_containment_ratio():
             ]
         )
         for body in world.bodies:
-            resolved = resolver.resolve(body.name.name)
+            resolved = resolver.resolve(name=body.name.name)
             if resolved:
                 with world.modify_world():
                     world.add_semantic_annotation(
-                        resolved(body=body), skip_duplicates=True
+                        semantic_annotation=resolved(body=body), skip_duplicates=True
                     )
 
         state = ToDAOState()

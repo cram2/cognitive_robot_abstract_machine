@@ -90,7 +90,7 @@ def test_render_preserves_optical_orientation(
         )
     )
     monkeypatch.setattr(ray_tracer, "ray_test", query)
-    ray_tracer.render(optical_camera)
+    ray_tracer.render(camera=optical_camera)
     np.testing.assert_allclose(
         ray_tracer.scene.camera_transform,
         optical_camera.root.global_transform.to_np() @ np.diag([1.0, -1.0, -1.0, 1.0]),
@@ -139,7 +139,7 @@ def test_render_places_top_left_optical_ray_at_top_left_pixel(
         )
 
     monkeypatch.setattr(ray_tracer, "ray_test", intersect_top_left)
-    frame = ray_tracer.render(optical_camera)
+    frame = ray_tracer.render(camera=optical_camera)
     expected = np.full(
         (model.resolution.width, model.resolution.height), -1, dtype=np.int32
     )
@@ -207,8 +207,9 @@ def test_render_preserves_off_center_projection(
         )
     )
     monkeypatch.setattr(tracer, "ray_test", query)
-    frame = tracer.render(optical_camera)
-    origins, targets = query.call_args.args
+    frame = tracer.render(camera=optical_camera)
+    origins = query.call_args.kwargs["origin_points"]
+    targets = query.call_args.kwargs["target_points"]
     optical_V_rays = (targets - origins) @ optical_camera.root.global_transform.to_np()[
         :3, :3
     ]

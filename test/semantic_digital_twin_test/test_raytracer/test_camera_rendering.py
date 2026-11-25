@@ -142,7 +142,7 @@ def test_combined_render_uses_requested_depth_convention(
     """
     fixture = camera_intersections
     frame = fixture.ray_tracer.create_segmentation_and_depth(
-        fixture.camera.world_T_forward_view,
+        camera_pose=fixture.camera.world_T_forward_view,
         resolution=fixture.resolution,
         min_distance=fixture.camera.camera_range.minimum_distance,
         max_distance=fixture.camera.camera_range.maximum_distance,
@@ -182,7 +182,7 @@ def test_combined_render_handles_no_hits(
         hit_points=np.empty((0, 3)), ray_indices=np.array([], dtype=int), bodies=[]
     )
     frame = fixture.ray_tracer.create_segmentation_and_depth(
-        fixture.camera.world_T_forward_view,
+        camera_pose=fixture.camera.world_T_forward_view,
         resolution=fixture.resolution,
         depth_mode=depth_mode,
     )
@@ -219,7 +219,7 @@ def test_body_color_assignments_preserve_bodies_sharing_a_color(
     second_body.collision[0].color = color
     fixture.query.return_value.bodies = [first_body, second_body]
 
-    frame = fixture.ray_tracer.render(fixture.camera)
+    frame = fixture.ray_tracer.render(camera=fixture.camera)
 
     assert frame.body_colors == [
         BodyColorAssignment(
@@ -237,7 +237,9 @@ def test_body_color_rgbd_render_preserves_encodings(
     """
     fixture = camera_intersections
     fixture.body.collision[0].color = Color.from_rgba(red=1.0, green=0.0, blue=0.0)
-    frame = fixture.ray_tracer.render(fixture.camera, rgb_mode=BodyColorRenderingMode())
+    frame = fixture.ray_tracer.render(
+        camera=fixture.camera, rgb_mode=BodyColorRenderingMode()
+    )
     expected_color = np.zeros(
         (fixture.resolution.width, fixture.resolution.height, 3), dtype=np.uint8
     )
@@ -247,7 +249,7 @@ def test_body_color_rgbd_render_preserves_encodings(
         (fixture.resolution.width, fixture.resolution.height), dtype=np.uint16
     )
     expected_depth[:2, 0] = RayTracer.convert_depth_to_millimeters(
-        -fixture.query.return_value.hit_points[:, 2]
+        depth_in_meters=-fixture.query.return_value.hit_points[:, 2]
     )
     np.testing.assert_array_equal(frame.depth_in_millimeters, expected_depth)
     assert frame.body_colors == [
@@ -270,7 +272,7 @@ def test_render_derives_pinhole_calibration(
         angular_extent=FieldOfView(), image_resolution=fixture.resolution
     )
     fixture.camera.camera_model = model
-    frame = fixture.ray_tracer.render(fixture.camera)
+    frame = fixture.ray_tracer.render(camera=fixture.camera)
     expected = PinholeCameraModel.from_field_of_view(
         resolution=model.resolution, field_of_view=model.field_of_view
     )
@@ -284,7 +286,7 @@ def test_depth_conversion_preserves_millimeter_encoding() -> None:
     """
     depths = np.array([[-1.0, 0.0, 1.2346, 100.0]], dtype=np.float32)
     np.testing.assert_array_equal(
-        RayTracer.convert_depth_to_millimeters(depths),
+        RayTracer.convert_depth_to_millimeters(depth_in_meters=depths),
         np.array([[0, 0, 1235, 65535]], dtype=np.uint16),
     )
 
@@ -307,7 +309,7 @@ def test_mesh_render_preserves_rgb_channels(
         Mock(return_value=image_bytes.getvalue()),
     )
     frame = fixture.ray_tracer.render(
-        fixture.camera, rgb_mode=TexturedColorRenderingMode()
+        camera=fixture.camera, rgb_mode=TexturedColorRenderingMode()
     )
     expected = np.zeros(
         (fixture.resolution.width, fixture.resolution.height, 3), dtype=np.uint8
@@ -339,7 +341,9 @@ def test_textured_render_propagates_backend_errors(
         fixture.ray_tracer.scene, "save_image", Mock(side_effect=rendering_error)
     )
     with pytest.raises(rendering_error):
-        fixture.ray_tracer.render(fixture.camera, rgb_mode=TexturedColorRenderingMode())
+        fixture.ray_tracer.render(
+            camera=fixture.camera, rgb_mode=TexturedColorRenderingMode()
+        )
 
 
 # %% Shared hit selection
@@ -355,7 +359,9 @@ def test_textured_render_generates_camera_rays_once(
         fixture.ray_tracer.scene, "save_image", Mock(side_effect=OSError)
     )
     with pytest.raises(OSError):
-        fixture.ray_tracer.render(fixture.camera, rgb_mode=TexturedColorRenderingMode())
+        fixture.ray_tracer.render(
+            camera=fixture.camera, rgb_mode=TexturedColorRenderingMode()
+        )
     fixture.ray_tracer.create_camera_rays.assert_called_once()
     fixture.query.assert_called_once()
 
@@ -378,7 +384,7 @@ def test_combined_render_uses_same_first_hit_for_depth_and_segmentation(
         bodies=[fixture.body, other_body, fixture.body],
     )
     frame = fixture.ray_tracer.create_segmentation_and_depth(
-        fixture.camera.world_T_forward_view,
+        camera_pose=fixture.camera.world_T_forward_view,
         resolution=fixture.resolution,
         depth_mode=depth_mode,
     )
@@ -396,7 +402,7 @@ def test_depth_map_supports_explicit_depth_mode(
     """
     fixture = camera_intersections
     depth = fixture.ray_tracer.create_depth_map(
-        fixture.camera.world_T_forward_view,
+        camera_pose=fixture.camera.world_T_forward_view,
         resolution=fixture.resolution,
         depth_mode=depth_mode,
     )
@@ -412,10 +418,12 @@ def test_rgbd_render_supports_explicit_depth_mode(
     RGB-D rendering applies the selected depth convention before millimeter encoding.
     """
     fixture = camera_intersections
-    frame = fixture.ray_tracer.render(fixture.camera, depth_mode=depth_mode)
+    frame = fixture.ray_tracer.render(camera=fixture.camera, depth_mode=depth_mode)
     assert frame.depth_in_millimeters[1, 0] == (
         RayTracer.convert_depth_to_millimeters(
-            np.array(2.5 if isinstance(depth_mode, RayDistanceDepthMode) else 2.0)
+            depth_in_meters=np.array(
+                2.5 if isinstance(depth_mode, RayDistanceDepthMode) else 2.0
+            )
         )
     )
 
@@ -430,7 +438,7 @@ def test_body_color_uses_collision_geometry() -> None:
     geometry.color = Color.from_rgba(red=1.0, green=0.5, blue=0.0)
     body.collision = [geometry]
     np.testing.assert_array_equal(
-        BodyColorRenderingMode.get_body_color(body),
+        BodyColorRenderingMode.get_body_color(body=body),
         np.array([255, 128, 0], dtype=np.uint8),
     )
 
@@ -450,7 +458,7 @@ def test_camera_intersections_return_nearest_surface_first(
         (first_sphere, [0.0, 10.0, 0.0]),
         (second_sphere, [0.0, -10.0, 0.0]),
     ):
-        connection = world.get_connection(world.root, body)
+        connection = world.get_connection(parent=world.root, child=body)
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=position[0],
             y=position[1],
@@ -460,8 +468,8 @@ def test_camera_intersections_return_nearest_surface_first(
         )
     ray_origin = np.array([[-2.5, 0.0, 0.0]])
     ray_intersections = world.ray_tracer.ray_test(
-        ray_origin,
-        np.array([[2.5, 0.0, 0.0]]),
+        origin_points=ray_origin,
+        target_points=np.array([[2.5, 0.0, 0.0]]),
         multiple_hits=True,
     )
     hit_points = ray_intersections.hit_points
@@ -486,7 +494,7 @@ def test_ray_query_rejects_mismatched_point_counts(
     origins = np.zeros((1, 3))
     targets = np.zeros((2, 3))
     with pytest.raises(RayPointShapeMismatch) as error:
-        fixture.ray_tracer.ray_test(origins, targets)
+        fixture.ray_tracer.ray_test(origin_points=origins, target_points=targets)
     assert error.value.origin_shape == origins.shape
     assert error.value.target_shape == targets.shape
 
@@ -505,7 +513,7 @@ def test_render_rejects_distorted_calibration(
         distortion=PlumbBobCameraDistortion(radial_coefficient_1=radial_coefficient),
     )
     with pytest.raises(UnsupportedCameraProjection):
-        fixture.ray_tracer.render(fixture.camera)
+        fixture.ray_tracer.render(camera=fixture.camera)
     fixture.query.assert_not_called()
 
 
@@ -541,5 +549,7 @@ def test_textured_render_rejects_incompatible_projection(
         ),
     )
     with pytest.raises(UnsupportedCameraProjection):
-        fixture.ray_tracer.render(fixture.camera, rgb_mode=TexturedColorRenderingMode())
+        fixture.ray_tracer.render(
+            camera=fixture.camera, rgb_mode=TexturedColorRenderingMode()
+        )
     fixture.query.assert_not_called()

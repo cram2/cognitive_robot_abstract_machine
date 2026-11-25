@@ -131,7 +131,7 @@ class GraphOfBoundingBoxes(
         """
         return self.box_type().dimensionality()
 
-    def create_subgraph(self, nodes: Sequence[int]) -> Self:
+    def create_subgraph(self, *, nodes: Sequence[int]) -> Self:
         """
         Create a subgraph of the current graph containing only the given nodes.
 
@@ -145,13 +145,13 @@ class GraphOfBoundingBoxes(
         }
         return subgraph
 
-    def add_node(self, box: BoxT):
+    def add_node(self, *, box: BoxT):
         """
         :param box: The box to add as a node.
         """
         self.box_to_index_map[box] = self.graph.add_node(box)
 
-    def calculate_connectivity(self, tolerance: float = 0.001):
+    def calculate_connectivity(self, *, tolerance: float = 0.001):
         """
         Calculate the connectivity of the graph by checking for intersections between
         the bounding boxes of the nodes. This uses an R-tree for efficient spatial
@@ -200,9 +200,9 @@ class GraphOfBoundingBoxes(
                 lower = np.maximum(bounds_i.lower, bounds_j.lower)
                 upper = np.minimum(bounds_i.upper, bounds_j.upper)
                 box = type(node_list[i]).from_array_bounds(
-                    lower,
-                    upper,
-                    HomogeneousTransformationMatrix(
+                    lower=lower,
+                    upper=upper,
+                    origin=HomogeneousTransformationMatrix(
                         reference_frame=self.search_space.reference_frame
                     ),
                 )
@@ -252,18 +252,18 @@ class GraphOfBoundingBoxes(
 
         go.Figure(self.plot_occupied_space()).show()
 
-    def _node_of_point(self, point: PointT) -> BoxT | None:
+    def _node_of_point(self, *, point: PointT) -> BoxT | None:
         """
         Find the node that contains a point, without checking the search space.
 
         :return: The node that contains the point or None if no node contains the point.
         """
         for node in self.graph.nodes():
-            if node.contains(point):
+            if node.contains(point=point):
                 return node
         return None
 
-    def node_of_point(self, point: PointT) -> BoxT:
+    def node_of_point(self, *, point: PointT) -> BoxT:
         """
         Find the free-space node that contains a point.
 
@@ -274,11 +274,11 @@ class GraphOfBoundingBoxes(
         :raises PointOccupiedError: If the point lies within that region but in none of
             its free-space nodes.
         """
-        if not self.search_space.contains(point):
+        if not self.search_space.contains(point=point):
             raise PointOutsideSearchSpaceError(
                 point=point, search_space=self.search_space.bounding_box()
             )
-        node = self._node_of_point(point)
+        node = self._node_of_point(point=point)
         if node is None:
             raise PointOccupiedError(point=point)
         return node
@@ -290,7 +290,8 @@ class GraphOfBoundingBoxes(
             point beyond the region this graph was built over is not.
         """
         return (
-            self.search_space.contains(point) and self._node_of_point(point) is not None
+            self.search_space.contains(point=point)
+            and self._node_of_point(point=point) is not None
         )
 
     def nearest_free_point(self, *, point: PointT) -> PointT:
@@ -303,9 +304,9 @@ class GraphOfBoundingBoxes(
         if self.graph.num_nodes() == 0:
             raise NoFreeSpaceError(point=point)
         reference_frame = self.search_space.reference_frame
-        coordinates = self.world.transform(point, reference_frame).to_np()[
-            : self.dimensionality
-        ]
+        coordinates = self.world.transform(
+            spatial_object=point, target_frame=reference_frame
+        ).to_np()[: self.dimensionality]
         nearest = min(
             (
                 np.clip(coordinates, bounds.lower, bounds.upper)
@@ -315,7 +316,7 @@ class GraphOfBoundingBoxes(
         )
         return type(point)(*nearest, reference_frame=reference_frame)
 
-    def path_from_to(self, start: PointT, goal: PointT) -> list[PointT] | None:
+    def path_from_to(self, *, start: PointT, goal: PointT) -> list[PointT] | None:
         """
         Calculate a connected path from a start point to a goal point.
 
@@ -342,11 +343,11 @@ class GraphOfBoundingBoxes(
             of its free-space nodes.
         """
         reference_frame = self.search_space.reference_frame
-        start = self.world.transform(start, reference_frame)
-        goal = self.world.transform(goal, reference_frame)
+        start = self.world.transform(spatial_object=start, target_frame=reference_frame)
+        goal = self.world.transform(spatial_object=goal, target_frame=reference_frame)
 
-        start_node = self.node_of_point(start)
-        goal_node = self.node_of_point(goal)
+        start_node = self.node_of_point(point=start)
+        goal_node = self.node_of_point(point=goal)
 
         if start_node == goal_node:
             return [start, goal]
@@ -373,9 +374,9 @@ class GraphOfBoundingBoxes(
             waypoints.append(intersection.center)
         waypoints.append(goal)
 
-        return self._shortcut_waypoints(waypoints)
+        return self._shortcut_waypoints(waypoints=waypoints)
 
-    def _shortcut_waypoints(self, waypoints: list[PointT]) -> list[PointT]:
+    def _shortcut_waypoints(self, *, waypoints: list[PointT]) -> list[PointT]:
         """
         Drop waypoints that a straight line can bypass without leaving free space.
 
@@ -398,7 +399,9 @@ class GraphOfBoundingBoxes(
         anchor_index = 0
         for index in range(2, len(waypoints)):
             if not self._segment_is_collision_free(
-                waypoints[anchor_index], waypoints[index], node_bounds
+                start=waypoints[anchor_index],
+                end=waypoints[index],
+                node_bounds=node_bounds,
             ):
                 result.append(waypoints[index - 1])
                 anchor_index = index - 1
@@ -406,7 +409,7 @@ class GraphOfBoundingBoxes(
         return result
 
     def _segment_is_collision_free(
-        self, start: PointT, end: PointT, node_bounds: list[CoordinateBounds]
+        self, *, start: PointT, end: PointT, node_bounds: list[CoordinateBounds]
     ) -> bool:
         """
         Check whether a straight-line segment stays entirely within free space.
@@ -425,7 +428,8 @@ class GraphOfBoundingBoxes(
         covered_intervals = [
             interval
             for bounds in node_bounds
-            if (interval := bounds.clip_segment(coordinates, deltas)) is not None
+            if (interval := bounds.clip_segment(start=coordinates, direction=deltas))
+            is not None
         ]
         if not covered_intervals:
             return False
@@ -438,7 +442,7 @@ class GraphOfBoundingBoxes(
             *[node.simple_event for node in self.graph.nodes()]
         )
 
-    def constrain_to_free_space(self, variable: MappedVariable) -> ConditionType:
+    def constrain_to_free_space(self, *, variable: MappedVariable) -> ConditionType:
         """
         Add a where condition to ``variable``'s query, restricting it to lie within this
         graph's free space.
@@ -464,7 +468,7 @@ class GraphOfBoundingBoxes(
         chain_root = (
             variable._chain_root_ if isinstance(variable, MappedVariable) else variable
         )
-        selected_variable = GraphOfBoundingBoxes._selected_variable_of(chain_root)
+        selected_variable = GraphOfBoundingBoxes._selected_variable_of(root=chain_root)
         if selected_variable is not None:
             variable = (
                 variable._reroot_on_(root=selected_variable, replaced=chain_root)
@@ -483,7 +487,9 @@ class GraphOfBoundingBoxes(
         simple_event_conditions = [
             and_(
                 *(
-                    self._axis_condition(fields[name], simple_event[name].simple_sets)
+                    self._axis_condition(
+                        field=fields[name], intervals=simple_event[name].simple_sets
+                    )
                     for name in fields
                 )
             )
@@ -496,7 +502,7 @@ class GraphOfBoundingBoxes(
 
     @staticmethod
     def _axis_condition(
-        field: MappedVariable, intervals: Sequence[SimpleInterval]
+        *, field: MappedVariable, intervals: Sequence[SimpleInterval]
     ) -> ConditionType:
         """
         Build the condition constraining one coordinate to a union of intervals.
@@ -532,7 +538,7 @@ class GraphOfBoundingBoxes(
         )
 
     @staticmethod
-    def _selected_variable_of(root) -> CanBehaveLikeAVariable | None:
+    def _selected_variable_of(*, root) -> CanBehaveLikeAVariable | None:
         """
         :param root: The chain root of an eql variable.
         :return: The single variable ``root`` selects, or None if ``root`` is not a
@@ -588,6 +594,7 @@ class VolumetricGraphOfBoundingBoxes(
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
+        *,
         bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         search_space_event: Event,
     ) -> Event:
@@ -664,7 +671,9 @@ class VolumetricGraphOfBoundingBoxes(
 
         start_time = time.time_ns()
         # compute free space via bounded incremental subtraction (avoids complement in ℝ³)
-        free_space = cls.free_space_from_bounding_boxes(bloated_obstacles, search_event)
+        free_space = cls.free_space_from_bounding_boxes(
+            bounding_boxes=bloated_obstacles, search_space_event=search_event
+        )
         logger.info(
             f"Free space calculated in {(time.time_ns() - start_time) / 1e6} ms"
         )
@@ -674,16 +683,16 @@ class VolumetricGraphOfBoundingBoxes(
             search_space=search_space, world=semantic_obstacle_annotation._world
         )
         [
-            result.add_node(bounding_box)
+            result.add_node(box=bounding_box)
             for bounding_box in BoundingBoxCollection.from_event(
-                cls.box_type(),
+                box_type=cls.box_type(),
                 reference_frame=search_space.reference_frame,
                 event=free_space,
             )
         ]
 
         start_time = time.time_ns()
-        result.calculate_connectivity(tolerance)
+        result.calculate_connectivity(tolerance=tolerance)
         logger.info(
             f"Connectivity calculated in {(time.time_ns() - start_time) / 1e6} ms"
         )
@@ -765,6 +774,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
+        *,
         bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         search_space_event: Event,
     ) -> Event:
@@ -846,9 +856,9 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
         """
         world = search_space.reference_frame._world
         floor_search_space = BoundingBoxCollection.from_event(
-            cls.box_type(),
-            search_space.reference_frame,
-            search_space.event.marginal(variables=SpatialVariables.xy),
+            box_type=cls.box_type(),
+            reference_frame=search_space.reference_frame,
+            event=search_space.event.marginal(variables=SpatialVariables.xy),
         )
 
         nav_obstacles = semantic_obstacle_annotation.build_bloated_obstacle_collection(
@@ -864,22 +874,25 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
             return cls(world=world, search_space=floor_search_space)
 
         free_space = cls.free_space_from_bounding_boxes(
-            nav_obstacles, search_space.event
+            bounding_boxes=nav_obstacles, search_space_event=search_space.event
         )
 
         # create a connectivity graph from the free space and calculate the edges
         result = cls(world=world, search_space=floor_search_space)
         free_space_boxes = BoundingBoxCollection.from_event(
-            cls.box_type(), search_space.reference_frame, free_space
+            box_type=cls.box_type(),
+            reference_frame=search_space.reference_frame,
+            event=free_space,
         )
-        [result.add_node(bounding_box) for bounding_box in free_space_boxes]
-        result.calculate_connectivity(tolerance)
+        [result.add_node(box=bounding_box) for bounding_box in free_space_boxes]
+        result.calculate_connectivity(tolerance=tolerance)
 
         return result
 
     @classmethod
     def navigation_map_from_world(
         cls,
+        *,
         world: World,
         tolerance=0.001,
         search_space: (
@@ -919,6 +932,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
     @classmethod
     def navigation_map_at_target(
         cls,
+        *,
         target: Body,
         search_range_x: float = 2.0,
         search_range_y: float = 2.0,
@@ -940,7 +954,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
         :return: The navigation map.
         """
         search_space = BoundingBoxCollection.from_simple_event(
-            VolumetricBoundingBox,
+            box_type=VolumetricBoundingBox,
             reference_frame=target,
             simple_event=SimpleEvent.from_data(
                 {

@@ -51,10 +51,10 @@ from semantic_digital_twin.world_description.connections import (
 
 def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):
     root_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_footprint"
+        name="base_footprint"
     )
     tip_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     real = pr2_world_state_reset.compute_chain_of_kinematic_structure_entities(
         root=root_link, tip=tip_link
@@ -80,10 +80,10 @@ def test_compute_chain_of_bodies_pr2(pr2_world_state_reset):
 
 def test_compute_chain_of_connections_pr2(pr2_world_state_reset):
     root_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_footprint"
+        name="base_footprint"
     )
     tip_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     real = pr2_world_state_reset.compute_chain_of_connections(
         root=root_link, tip=tip_link
@@ -107,34 +107,38 @@ def test_compute_chain_of_connections_pr2(pr2_world_state_reset):
 
 
 def test_duplicate_robot_assignments_error_pr2(pr2_world_state_reset):
-    [pr2] = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)
+    [pr2] = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )
     assert pr2 is not None, "PR2 robot not found in world state reset"
 
     # Create another robot
     with pytest.raises(PartiallyAppliedWorldModificationError) as error_info:
-        pr2_2 = PR2.from_world(pr2_world_state_reset)
+        pr2_2 = PR2.from_world(world=pr2_world_state_reset)
     assert isinstance(error_info.value.cause, DuplicateRobotAssignmentsError)
 
 
 def test_compute_chain_of_connections_error_pr2(pr2_world_state_reset):
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
+    tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="base_footprint"
+    )
     with pytest.raises(AssertionError):
-        pr2_world_state_reset.compute_chain_of_connections(root, tip)
+        pr2_world_state_reset.compute_chain_of_connections(root=root, tip=tip)
 
 
 def test_compute_split_chain_of_bodies_pr2(pr2_world_state_reset):
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_gripper_r_finger_tip_link"
+        name="l_gripper_r_finger_tip_link"
     )
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_gripper_l_finger_tip_link"
+        name="l_gripper_l_finger_tip_link"
     )
     chain1, connection, chain2 = (
         pr2_world_state_reset.compute_split_chain_of_kinematic_structure_entities(
-            root, tip
+            root=root, tip=tip
         )
     )
     chain1 = [n.name.name for n in chain1]
@@ -150,12 +154,14 @@ def test_compute_split_chain_of_bodies_pr2(pr2_world_state_reset):
 
 def test_get_split_chain_pr2(pr2_world_state_reset):
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_gripper_r_finger_tip_link"
+        name="l_gripper_r_finger_tip_link"
     )
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_gripper_l_finger_tip_link"
+        name="l_gripper_l_finger_tip_link"
     )
-    chain1, chain2 = pr2_world_state_reset.compute_split_chain_of_connections(root, tip)
+    chain1, chain2 = pr2_world_state_reset.compute_split_chain_of_connections(
+        root=root, tip=tip
+    )
     chain1 = [n.name.name for n in chain1]
     chain2 = [n.name.name for n in chain2]
     assert chain1 == ["l_gripper_r_finger_tip_joint", "l_gripper_r_finger_joint"]
@@ -164,13 +170,13 @@ def test_get_split_chain_pr2(pr2_world_state_reset):
 
 def test_compute_fk_np_pr2(pr2_world_state_reset):
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_gripper_tool_frame"
+        name="l_gripper_tool_frame"
     )
     pr2_world_state_reset.notify_state_change()
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+    fk = pr2_world_state_reset.compute_forward_kinematics_np(root=root, tip=tip)
     # fk = pr2_world_state_reset.compose_forward_kinematics_expression(root, tip).evaluate()
     # print(pr2_world_state_reset.state.to_position_dict())
     np.testing.assert_array_almost_equal(
@@ -189,13 +195,15 @@ def test_compute_fk_np_pr2(pr2_world_state_reset):
 def test_compute_fk_np_pr2_root_left_hand(pr2_world_state_reset):
     tip = pr2_world_state_reset.root
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_gripper_tool_frame"
+        name="l_gripper_tool_frame"
     )
 
-    connection = pr2_world_state_reset.get_connections_by_type(OmniDrive)[0]
+    connection = pr2_world_state_reset.get_connections_by_type(
+        connection_type=OmniDrive
+    )[0]
     connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=1)
 
-    fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+    fk = pr2_world_state_reset.compute_forward_kinematics_np(root=root, tip=tip)
     np.testing.assert_array_almost_equal(
         fk,
         np.array(
@@ -212,13 +220,15 @@ def test_compute_fk_np_pr2_root_left_hand(pr2_world_state_reset):
 
 def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world_state_reset):
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_elbow_flex_link"
+        name="l_elbow_flex_link"
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_upper_arm_link"
+        name="l_upper_arm_link"
     )
 
-    fk_expr = pr2_world_state_reset.compose_forward_kinematics_expression(root, tip)
+    fk_expr = pr2_world_state_reset.compose_forward_kinematics_expression(
+        root=root, tip=tip
+    )
     fk2 = fk_expr.evaluate()
 
     np.testing.assert_array_almost_equal(
@@ -236,14 +246,16 @@ def test_compute_fk_np_l_elbow_flex_joint_pr2(pr2_world_state_reset):
 
 def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
     omni_drive: OmniDrive = pr2_world_state_reset.get_connection_by_name(
-        "odom_combined_T_base_footprint"
+        name="odom_combined_T_base_footprint"
     )
     cmd = np.zeros((len(pr2_world_state_reset.degrees_of_freedom)), dtype=float)
     cmd[pr2_world_state_reset.state._index[omni_drive.x_velocity.id]] = 100
     cmd[pr2_world_state_reset.state._index[omni_drive.y_velocity.id]] = 100
     cmd[pr2_world_state_reset.state._index[omni_drive.yaw.id]] = 100
     dt = 0.1
-    pr2_world_state_reset.apply_control_commands(cmd, dt, Derivatives.jerk)
+    pr2_world_state_reset.apply_control_commands(
+        commands=cmd, dt=dt, derivative=Derivatives.jerk
+    )
     assert pr2_world_state_reset.state[omni_drive.yaw.id].jerk == 100.0
     assert pr2_world_state_reset.state[omni_drive.yaw.id].acceleration == 100.0 * dt
     assert pr2_world_state_reset.state[omni_drive.yaw.id].velocity == 100.0 * dt * dt
@@ -284,13 +296,15 @@ def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
 
 def test_apply_control_commands_diff_drive(cylinder_bot_diff_world):
     diff_drive: DifferentialDrive = cylinder_bot_diff_world.get_connection_by_name(
-        "map_T_bot"
+        name="map_T_bot"
     )
     cmd = np.zeros((len(cylinder_bot_diff_world.degrees_of_freedom)), dtype=float)
     cmd[cylinder_bot_diff_world.state._index[diff_drive.x_velocity.id]] = 100
     cmd[cylinder_bot_diff_world.state._index[diff_drive.yaw.id]] = 100
     dt = 0.1
-    cylinder_bot_diff_world.apply_control_commands(cmd, dt, Derivatives.jerk)
+    cylinder_bot_diff_world.apply_control_commands(
+        commands=cmd, dt=dt, derivative=Derivatives.jerk
+    )
     assert cylinder_bot_diff_world.state[diff_drive.yaw.id].jerk == 100.0
     assert cylinder_bot_diff_world.state[diff_drive.yaw.id].acceleration == 100.0 * dt
     assert cylinder_bot_diff_world.state[diff_drive.yaw.id].velocity == 100.0 * dt * dt
@@ -331,7 +345,9 @@ def test_apply_control_commands_diff_drive(cylinder_bot_diff_world):
 
 def test_search_for_connections_of_type(pr2_world_state_reset: World):
 
-    connections = pr2_world_state_reset.get_connections_by_type(OmniDrive)
+    connections = pr2_world_state_reset.get_connections_by_type(
+        connection_type=OmniDrive
+    )
     assert len(connections) == 1
     assert connections[0].name == PrefixedName(
         name="odom_combined_T_base_footprint", prefix="pr2"
@@ -343,13 +359,13 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
     assert connections[
         0
     ].child == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_footprint"
+        name="base_footprint"
     )
 
     connections = [
         connection
         for connection in pr2_world_state_reset.get_connections_by_type(
-            ScrewAxisConnection
+            connection_type=ScrewAxisConnection
         )
         if connection.behaves_like_a_prismatic_connection
     ]
@@ -358,12 +374,12 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
     assert connections[
         0
     ].parent == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_link"
+        name="base_link"
     )
     assert connections[
         0
     ].child == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "torso_lift_link"
+        name="torso_lift_link"
     )
     assert connections[1].name == PrefixedName(
         name="r_gripper_motor_slider_joint", prefix="pr2"
@@ -371,29 +387,29 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
     assert connections[
         1
     ].parent == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_palm_link"
+        name="r_gripper_palm_link"
     )
     assert connections[
         1
     ].child == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_motor_slider_link"
+        name="r_gripper_motor_slider_link"
     )
     assert connections[2].name == PrefixedName(name="r_gripper_joint", prefix="pr2")
     assert connections[
         2
     ].parent == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_r_finger_tip_link"
+        name="r_gripper_r_finger_tip_link"
     )
     assert connections[
         2
     ].child == pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_l_finger_tip_frame"
+        name="r_gripper_l_finger_tip_frame"
     )
 
     connections = [
         connection
         for connection in pr2_world_state_reset.get_connections_by_type(
-            ScrewAxisConnection
+            connection_type=ScrewAxisConnection
         )
         if connection.behaves_like_a_revolute_connection
     ]
@@ -401,7 +417,9 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
 
 
 def test_pr2_semantic_annotation(pr2_world_state_reset):
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     pr2.validate()
     # Ensure there are no loose bodies
     pr2_world_state_reset._notify_model_change()
@@ -418,7 +436,9 @@ def test_pr2_semantic_annotation(pr2_world_state_reset):
 
 
 def test_has_left_right_arm_mixin(pr2_world_state_reset):
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     left_arm_chain = list(pr2.left_arm.bodies)
     right_arm_chain = list(pr2.right_arm.bodies)
     assert LeftOf(
@@ -437,12 +457,14 @@ def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset)
     of the robot at all, and anything written for the arm or for its end effector passes
     it by.
     """
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     for arm in (pr2.left_arm, pr2.right_arm):
         carrying_chain = (
             pr2_world_state_reset.compute_chain_of_kinematic_structure_entities(
-                arm.root, arm.end_effector.root
+                root=arm.root, tip=arm.end_effector.root
             )
         )
 
@@ -454,7 +476,9 @@ def test_kinematic_chains(pr2_world_state_reset):
     Every kinematic chain of the PR2 has a root and a tip.
     """
     semantic_kinematic_chain_annotation: list[RobotKinematicChain] = (
-        pr2_world_state_reset.get_semantic_annotations_by_type(RobotKinematicChain)
+        pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=RobotKinematicChain
+        )
     )
     for chain in semantic_kinematic_chain_annotation:
         assert chain.root
@@ -466,14 +490,18 @@ def test_a_robot_kinematic_chain_is_a_kinematic_chain(pr2_world_state_reset):
     An arm stands wherever a chain from a root to a tip is taken, and stays usable as a
     key while doing so.
     """
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     assert isinstance(pr2.left_arm, KinematicChain)
     assert {pr2.left_arm, pr2.right_arm} == {pr2.right_arm, pr2.left_arm}
 
 
 def test_tracy_semantic_annotation(tracy_world):
-    tracy = tracy_world.get_semantic_annotations_by_type(Tracy)[0]
+    tracy = tracy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tracy
+    )[0]
 
     tracy_world._notify_model_change()
 
@@ -482,7 +510,9 @@ def test_tracy_semantic_annotation(tracy_world):
 
 
 def test_hsrb_semantic_annotation(_hsr_world_setup):
-    hsrb = _hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
+    hsrb = _hsr_world_setup.get_semantic_annotations_by_type(
+        semantic_annotation_type=HSRB
+    )[0]
     _hsr_world_setup._notify_model_change()
 
     assert len(hsrb.all_end_effectors) == 1
@@ -493,29 +523,39 @@ def test_hsrb_semantic_annotation(_hsr_world_setup):
 
 
 def test_pr2_tighten_dof_velocity_limits_of_1dof_connections(pr2_world_state_reset):
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     # set all joints to vel limit 1
-    pr2.tighten_dof_velocity_limits_of_1dof_connections(defaultdict(lambda: 1))
+    pr2.tighten_dof_velocity_limits_of_1dof_connections(
+        new_limits=defaultdict(lambda: 1)
+    )
 
     # try spacial case for specific joint
     new_limits = defaultdict(
-        lambda: 0.5, {pr2._world.get_connection_by_name(PR2Joint.HEAD_PAN): 23}
+        lambda: 0.5, {pr2._world.get_connection_by_name(name=PR2Joint.HEAD_PAN): 23}
     )
-    pr2.tighten_dof_velocity_limits_of_1dof_connections(new_limits)
+    pr2.tighten_dof_velocity_limits_of_1dof_connections(new_limits=new_limits)
     # if spacial case triggers, but the new limit is above the old one, nothing happens
     assert (
-        pr2._world.get_connection_by_name(PR2Joint.HEAD_PAN).dof.limits.upper.velocity
+        pr2._world.get_connection_by_name(
+            name=PR2Joint.HEAD_PAN
+        ).dof.limits.upper.velocity
         == 1
     )
     # new limit is applied to joint without spacial case
     assert (
-        pr2._world.get_connection_by_name(PR2Joint.HEAD_TILT).dof.limits.upper.velocity
+        pr2._world.get_connection_by_name(
+            name=PR2Joint.HEAD_TILT
+        ).dof.limits.upper.velocity
         == 0.5
     )
     # non-spacial case where the old limit is below 1
     assert (
-        pr2._world.get_connection_by_name(PR2Joint.TORSO_LIFT).dof.limits.upper.velocity
+        pr2._world.get_connection_by_name(
+            name=PR2Joint.TORSO_LIFT
+        ).dof.limits.upper.velocity
         == 0.013
     )
 
@@ -525,11 +565,15 @@ def test_pr2_tighten_dof_velocity_limits_proportionally(pr2_world_state_reset):
     All limits scale by the same factor; the joint with the highest limit reaches
     maximum_velocity.
     """
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     connections_with_limits = [
         (connection, connection.raw_dof.limits.upper.velocity)
-        for connection in pr2._world.get_connections_by_type(ActiveConnection1DOF)
+        for connection in pr2._world.get_connections_by_type(
+            connection_type=ActiveConnection1DOF
+        )
         if connection.raw_dof.limits.upper.velocity is not None
     ]
     initial_maximum = max(velocity for _, velocity in connections_with_limits)
@@ -551,11 +595,15 @@ def test_pr2_tighten_dof_velocity_limits_proportionally_preserves_ratios(
     The ratio between any two joints with different limits is identical before and after
     scaling.
     """
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     initial_limits = {
         connection: connection.raw_dof.limits.upper.velocity
-        for connection in pr2._world.get_connections_by_type(ActiveConnection1DOF)
+        for connection in pr2._world.get_connections_by_type(
+            connection_type=ActiveConnection1DOF
+        )
         if connection.raw_dof.limits.upper.velocity is not None
     }
     initial_maximum = max(initial_limits.values())
@@ -588,11 +636,15 @@ def test_pr2_tighten_dof_velocity_limits_proportionally_no_op_when_within_bounds
     """
     When maximum_velocity is at or above the current maximum, no limits are changed.
     """
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     initial_limits = {
         connection: connection.raw_dof.limits.upper.velocity
-        for connection in pr2._world.get_connections_by_type(ActiveConnection1DOF)
+        for connection in pr2._world.get_connections_by_type(
+            connection_type=ActiveConnection1DOF
+        )
         if connection.raw_dof.limits.upper.velocity is not None
     }
     initial_maximum = max(initial_limits.values())
@@ -610,10 +662,10 @@ def test_pr2_tighten_dof_velocity_limits_proportionally_no_op_when_within_bounds
 
 def test_split_chain_of_connections(pr2_world_state_reset):
     body1 = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_r_finger_link"
+        name="r_gripper_r_finger_link"
     )
     body2 = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "l_gripper_l_finger_link"
+        name="l_gripper_l_finger_link"
     )
     result = pr2_world_state_reset.compute_split_chain_of_connections(
         root=body1, tip=body2
@@ -656,14 +708,18 @@ def test_split_chain_of_connections(pr2_world_state_reset):
 def test_robots_and_validate(supported_abstract_robots):
     for abstract_robot in supported_abstract_robots:
         print(f"Testing robot: {abstract_robot.__name__}")
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
-        robot = abstract_robot.from_world(world)
+        world = URDFParser.from_file(
+            file_path=abstract_robot.get_ros_file_path()
+        ).create_world()
+        robot = abstract_robot.from_world(world=world)
         robot.validate()
 
 
 def test_kinematic_chain_approximate_length(pr2_world_state_reset):
     # Retrieve the PR2 robot from the world
-    robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     left_arm_length = robot.left_arm.approximate_length()
 
@@ -675,7 +731,9 @@ def test_kinematic_chain_approximate_length(pr2_world_state_reset):
 
 
 def test_kinematic_chain_length_stretch(stretch_apartment_world):
-    robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
+    robot = stretch_apartment_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Stretch
+    )[0]
 
     arm_length = robot.all_arms[0].approximate_length()
 
@@ -691,7 +749,9 @@ def test_pr2_automatic_setup_correctly(pr2_world_state_reset):
     intended semantic attributes and have correct back-references.
     """
     # Retrieve the PR2 robot from the world
-    robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     verified_parts = set()
 
@@ -778,7 +838,9 @@ def test_pr2_degrees_of_freedom_with_hardware_interface(pr2_world_state_reset):
     Tests that the degrees_of_freedom_with_hardware_interface property correctly
     identifies all controlled joints of the PR2 robot.
     """
-    robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     dofs = robot.degrees_of_freedom_with_hardware_interface
 
     # PR2 has:
@@ -822,7 +884,7 @@ def test_pr2_degrees_of_freedom_with_hardware_interface(pr2_world_state_reset):
 
 def test_pr2_joint_names_resolve_to_connections(pr2_world_state_reset):
     resolved = {
-        joint: pr2_world_state_reset.get_connection_by_name(joint).name.name
+        joint: pr2_world_state_reset.get_connection_by_name(name=joint).name.name
         for joint in PR2Joint
     }
 

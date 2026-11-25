@@ -55,7 +55,7 @@ def _world_with_root() -> tuple[World, Body]:
     world = World()
     root = Body(name=PrefixedName(name="map"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     return world, root
 
 
@@ -69,7 +69,7 @@ def test_shelf_object_mesh_is_centered_on_its_body_frame(
     source PLY's local origin happens to be.
     """
     world, root = _world_with_root()
-    body = _object_2d().spawn(world, parent=root, mesh_path=off_center_mesh_path)
+    body = _object_2d().spawn(world=world, parent=root, mesh_path=off_center_mesh_path)
 
     minimum_bound, maximum_bound = body.collision.combined_mesh.bounds
     assert (minimum_bound[0] + maximum_bound[0]) / 2 == pytest.approx(0.0, abs=1e-6)

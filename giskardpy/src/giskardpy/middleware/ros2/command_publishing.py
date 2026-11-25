@@ -203,7 +203,7 @@ class StateVelocityReader:
         """
         Resolve where the degrees of freedom live in the state data.
         """
-        self.columns = self.world.state.column_indices(self.degrees_of_freedom)
+        self.columns = self.world.state.column_indices(dofs=self.degrees_of_freedom)
         self.model_version = self.world.get_world_model_manager().version
 
 
@@ -453,12 +453,12 @@ class JointGroupVelocityCommandPublisher(CommandPublisher):
         )
         with self.world.modify_world():
             self.world.set_dofs_has_hardware_interface(
-                [
+                dofs=[
                     dof
                     for connection in self.connections
                     for dof in connection.active_dofs
                 ],
-                True,
+                value=True,
             )
         self.commands = JointVelocityCommand.for_connections(
             connections=self.connections, minimum_velocities=self.minimum_velocities
@@ -548,7 +548,7 @@ class DriveVelocityCommandPublisher(CommandPublisher):
         )
         with self.world.modify_world():
             self.world.set_dofs_has_hardware_interface(
-                self.connection.active_dofs, True
+                dofs=self.connection.active_dofs, value=True
             )
         self.velocity_reader = StateVelocityReader(
             world=self.world,

@@ -100,7 +100,7 @@ class GraspsByCloseness(SymbolicFunction):
     def __call__(self) -> list[GraspCandidate]:
         world = self.graspable.root._world
         world_P_standing = world.transform(
-            self.standing_position.pose, world.root
+            spatial_object=self.standing_position.pose, target_frame=world.root
         ).to_np()[:, 3]
         world_T_object = self.graspable.root.global_transform.to_np()
         grasps_by_closeness = sorted(

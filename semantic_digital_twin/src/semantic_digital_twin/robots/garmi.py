@@ -193,15 +193,17 @@ class GarmiCamera(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the camera.
         """
         return cls(
             root=cls.create_optical_body(
-                robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-                HomogeneousTransformationMatrix(
+                mounting_body=robot_root._world.get_body_in_branch_by_name(
+                    branch_root=robot_root, name="head"
+                ),
+                parent_T_optical=HomogeneousTransformationMatrix(
                     data=RotationMatrix.from_vectors(
                         x=-Vector3.Y(), y=-Vector3.Z(), z=Vector3.X()
                     )
@@ -230,7 +232,8 @@ class GarmiNeck(Neck[GarmiCamera]):
         """
         for joint_name in GarmiJoint.head():
             self._world.set_dofs_has_hardware_interface(
-                self._world.get_connection_by_name(joint_name).active_dofs, True
+                dofs=self._world.get_connection_by_name(name=joint_name).active_dofs,
+                value=True,
             )
 
     def setup_joint_states(self) -> list[JointState]:
@@ -241,14 +244,18 @@ class GarmiNeck(Neck[GarmiCamera]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the neck.
         """
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "neck_1"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="neck_1"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="head"
+            ),
         )
 
 
@@ -271,17 +278,17 @@ class GarmiLeftGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the finger.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_fr3_hand"
+                branch_root=robot_root, name="left_fr3_hand"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_fr3_leftfinger_tip"
+                branch_root=robot_root, name="left_fr3_leftfinger_tip"
             ),
         )
 
@@ -305,17 +312,17 @@ class GarmiLeftGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the finger.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_fr3_hand"
+                branch_root=robot_root, name="left_fr3_hand"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_fr3_rightfinger_tip"
+                branch_root=robot_root, name="left_fr3_rightfinger_tip"
             ),
         )
 
@@ -339,17 +346,17 @@ class GarmiRightGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the finger.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_fr3_hand"
+                branch_root=robot_root, name="right_fr3_hand"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_fr3_leftfinger_tip"
+                branch_root=robot_root, name="right_fr3_leftfinger_tip"
             ),
         )
 
@@ -373,17 +380,17 @@ class GarmiRightGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the finger.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_fr3_hand"
+                branch_root=robot_root, name="right_fr3_hand"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_fr3_rightfinger_tip"
+                branch_root=robot_root, name="right_fr3_rightfinger_tip"
             ),
         )
 
@@ -402,7 +409,8 @@ class GarmiLeftGripper(
         """
         for joint_name in GarmiJoint.left_fingers():
             self._world.set_dofs_has_hardware_interface(
-                self._world.get_connection_by_name(joint_name).active_dofs, True
+                dofs=self._world.get_connection_by_name(name=joint_name).active_dofs,
+                value=True,
             )
 
     def setup_joint_states(self) -> list[JointState]:
@@ -432,17 +440,17 @@ class GarmiLeftGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the gripper.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_fr3_link8"
+                branch_root=robot_root, name="left_fr3_link8"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_fr3_hand_tcp"
+                branch_root=robot_root, name="left_fr3_hand_tcp"
             ),
         )
 
@@ -462,7 +470,8 @@ class GarmiRightGripper(
         """
         for joint_name in GarmiJoint.right_fingers():
             self._world.set_dofs_has_hardware_interface(
-                self._world.get_connection_by_name(joint_name).active_dofs, True
+                dofs=self._world.get_connection_by_name(name=joint_name).active_dofs,
+                value=True,
             )
 
     def setup_joint_states(self) -> list[JointState]:
@@ -492,17 +501,17 @@ class GarmiRightGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the gripper.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_fr3_link8"
+                branch_root=robot_root, name="right_fr3_link8"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_fr3_hand_tcp"
+                branch_root=robot_root, name="right_fr3_hand_tcp"
             ),
         )
 
@@ -519,7 +528,8 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
         """
         for joint_name in GarmiJoint.left_arm():
             self._world.set_dofs_has_hardware_interface(
-                self._world.get_connection_by_name(joint_name).active_dofs, True
+                dofs=self._world.get_connection_by_name(name=joint_name).active_dofs,
+                value=True,
             )
 
     def setup_joint_states(self) -> list[JointState]:
@@ -539,7 +549,7 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
         arm_park = JointState.from_mapping(
             name=PrefixedName(name="park", prefix=self.name.name),
             mapping={
-                self._world.get_connection_by_name(joint_name): position
+                self._world.get_connection_by_name(name=joint_name): position
                 for joint_name, position in park_configuration.items()
             },
             state_type=StaticJointState.PARK,
@@ -548,17 +558,17 @@ class GarmiLeftArm(Arm[GarmiLeftGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the arm.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_mount_left_link"
+                branch_root=robot_root, name="arm_mount_left_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_fr3_link8"
+                branch_root=robot_root, name="left_fr3_link8"
             ),
         )
 
@@ -575,7 +585,8 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
         """
         for joint_name in GarmiJoint.right_arm():
             self._world.set_dofs_has_hardware_interface(
-                self._world.get_connection_by_name(joint_name).active_dofs, True
+                dofs=self._world.get_connection_by_name(name=joint_name).active_dofs,
+                value=True,
             )
 
     def setup_joint_states(self) -> list[JointState]:
@@ -595,7 +606,7 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
         arm_park = JointState.from_mapping(
             name=PrefixedName(name="park", prefix=self.name.name),
             mapping={
-                self._world.get_connection_by_name(joint_name): position
+                self._world.get_connection_by_name(name=joint_name): position
                 for joint_name, position in park_configuration.items()
             },
             state_type=StaticJointState.PARK,
@@ -604,17 +615,17 @@ class GarmiRightArm(Arm[GarmiRightGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the arm.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_mount_right_link"
+                branch_root=robot_root, name="arm_mount_right_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_fr3_link8"
+                branch_root=robot_root, name="right_fr3_link8"
             ),
         )
 
@@ -633,7 +644,8 @@ class GarmiTorso(
         """
         for joint_name in GarmiJoint.lift():
             self._world.set_dofs_has_hardware_interface(
-                self._world.get_connection_by_name(joint_name).active_dofs, True
+                dofs=self._world.get_connection_by_name(name=joint_name).active_dofs,
+                value=True,
             )
 
     def setup_joint_states(self) -> list[JointState]:
@@ -641,7 +653,7 @@ class GarmiTorso(
         Sets up torso states (low, mid, high).
         """
         lift_joints = [
-            self._world.get_connection_by_name(joint_name)
+            self._world.get_connection_by_name(name=joint_name)
             for joint_name in GarmiJoint.lift()
         ]
         torso_states = (
@@ -660,17 +672,17 @@ class GarmiTorso(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the torso.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "lift_0_base_link"
+                branch_root=robot_root, name="lift_0_base_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "lift_0_mount_rotated_link"
+                branch_root=robot_root, name="lift_0_mount_rotated_link"
             ),
         )
 
@@ -699,7 +711,8 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
         """
         for joint_name in GarmiJoint.wheels():
             self._world.set_dofs_has_hardware_interface(
-                self._world.get_connection_by_name(joint_name).active_dofs, True
+                dofs=self._world.get_connection_by_name(name=joint_name).active_dofs,
+                value=True,
             )
 
     def setup_joint_states(self) -> list[JointState]:
@@ -710,14 +723,14 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Sets up the default configuration for the mobile base.
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "chassis_link"
+                branch_root=robot_root, name="chassis_link"
             ),
             full_body_controlled=True,
         )
@@ -759,9 +772,9 @@ class Garmi(AbstractRobot, HasMobileBase[GarmiMobileBase]):
         """
         vel_limits = defaultdict(lambda: 0.2)
         for joint_name in GarmiJoint.wheels():
-            vel_limits[self._world.get_connection_by_name(joint_name)] = 1.3
+            vel_limits[self._world.get_connection_by_name(name=joint_name)] = 1.3
         for joint_name in GarmiJoint.head():
-            vel_limits[self._world.get_connection_by_name(joint_name)] = 1.0
+            vel_limits[self._world.get_connection_by_name(name=joint_name)] = 1.0
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)
 
     def _setup_collision_rules(self):
@@ -776,16 +789,18 @@ class Garmi(AbstractRobot, HasMobileBase[GarmiMobileBase]):
             "garmi.srdf",
         )
         self._world.collision_manager.add_ignore_collision_rule(
-            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+            rule=SelfCollisionMatrixRule.from_collision_srdf(
+                file_path=srdf_path, world=self._world
+            )
         )
 
         self._world.collision_manager.add_default_rule(
-            AvoidExternalCollisions(
+            rule=AvoidExternalCollisions(
                 buffer_zone_distance=0.05, violated_distance=0.0, robot=self
             )
         )
         self._world.collision_manager.add_default_rule(
-            AvoidSelfCollisions(
+            rule=AvoidSelfCollisions(
                 buffer_zone_distance=0.03,
                 violated_distance=0.0,
                 robot=self,
@@ -795,12 +810,14 @@ class Garmi(AbstractRobot, HasMobileBase[GarmiMobileBase]):
         # The base's shell is what bumps into furniture first, so it keeps a wider berth
         # than the rest of the robot.
         self._world.collision_manager.add_default_rule(
-            AvoidExternalCollisions(
+            rule=AvoidExternalCollisions(
                 buffer_zone_distance=0.2,
                 violated_distance=0.05,
                 robot=self,
                 body_subset={
-                    self._world.get_body_in_branch_by_name(self.root, body_name)
+                    self._world.get_body_in_branch_by_name(
+                        branch_root=self.root, name=body_name
+                    )
                     for body_name in (
                         "right_side_cover_link",
                         "left_side_cover_link",

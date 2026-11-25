@@ -347,7 +347,7 @@ def test_every_expected_body_exists(
     Every body this module expects an annotation on is really in the apartment.
     """
     for name in expected_body_names(expected):
-        assert apartment_world_copy.get_body_by_name(name).name.name == name
+        assert apartment_world_copy.get_body_by_name(name=name).name.name == name
 
 
 @pytest.mark.parametrize(
@@ -388,7 +388,9 @@ def test_a_drawer_is_wired_to_the_handle_mounted_on_it(
     """
     drawers_by_body = {
         drawer.root.name.name: drawer
-        for drawer in reasoned_apartment.get_semantic_annotations_by_type(Drawer)
+        for drawer in reasoned_apartment.get_semantic_annotations_by_type(
+            semantic_annotation_type=Drawer
+        )
     }
 
     handled = drawers_by_body[ApartmentDrawer.CABINET5_DRAWER_TOP]
@@ -405,7 +407,9 @@ def test_a_door_is_wired_to_the_handle_mounted_on_it(
     """
     doors_by_body = {
         door.root.name.name: door
-        for door in reasoned_apartment.get_semantic_annotations_by_type(Door)
+        for door in reasoned_apartment.get_semantic_annotations_by_type(
+            semantic_annotation_type=Door
+        )
     }
 
     handled = doors_by_body[ApartmentDoor.WARDROBE_DOOR_LEFT]
@@ -423,7 +427,9 @@ def test_a_container_holds_the_parts_that_open_out_of_it(
     """
     cabinets_by_body = {
         cabinet.root.name.name: cabinet
-        for cabinet in reasoned_apartment.get_semantic_annotations_by_type(Cabinet)
+        for cabinet in reasoned_apartment.get_semantic_annotations_by_type(
+            semantic_annotation_type=Cabinet
+        )
     }
 
     both = cabinets_by_body[ApartmentCabinet.CABINET1]
@@ -448,7 +454,9 @@ def test_the_dishwasher_is_named_by_the_part_that_opens_out_of_it(
     A container takes its kind from its parts, so the cabinet holding the dishwasher
     front is a dishwasher rather than a plain cabinet.
     """
-    [dishwasher] = reasoned_apartment.get_semantic_annotations_by_type(Dishwasher)
+    [dishwasher] = reasoned_apartment.get_semantic_annotations_by_type(
+        semantic_annotation_type=Dishwasher
+    )
 
     assert {drawer.root.name.name for drawer in dishwasher.drawers} == {
         ApartmentDrawer.DISHWASHER_DRAWER_MIDDLE.value
@@ -485,7 +493,9 @@ def test_an_annotation_the_world_already_held_keeps_hanging_on_its_own_joint(
     """
     drawers = [
         drawer
-        for drawer in reasoned_apartment.get_semantic_annotations_by_type(Drawer)
+        for drawer in reasoned_apartment.get_semantic_annotations_by_type(
+            semantic_annotation_type=Drawer
+        )
         if drawer.root.name.name == PREANNOTATED_DRAWER_BODY_NAME
     ]
 
@@ -500,8 +510,12 @@ def test_every_openable_part_hangs_on_the_joint_that_moves_it(
     Every drawer and door the world ends up holding hangs on the active connection that
     moves it, and the world stays valid after reasoning.
     """
-    drawers = reasoned_apartment.get_semantic_annotations_by_type(Drawer)
-    doors = reasoned_apartment.get_semantic_annotations_by_type(Door)
+    drawers = reasoned_apartment.get_semantic_annotations_by_type(
+        semantic_annotation_type=Drawer
+    )
+    doors = reasoned_apartment.get_semantic_annotations_by_type(
+        semantic_annotation_type=Door
+    )
     assert drawers and doors
 
     for drawer in drawers:
@@ -516,7 +530,11 @@ def test_the_inferred_annotations_are_in_the_symbol_graph(reasoned_apartment: Wo
     """
     Queries over the symbol graph find the annotations the reasoner inferred.
     """
-    drawers = set(reasoned_apartment.get_semantic_annotations_by_type(Drawer))
+    drawers = set(
+        reasoned_apartment.get_semantic_annotations_by_type(
+            semantic_annotation_type=Drawer
+        )
+    )
     assert drawers
     assert drawers <= set(SymbolGraph().get_instances_of_type(type_=Drawer))
 

@@ -33,7 +33,7 @@ def test_pick_up_takes_the_grasp_it_is_given(pr2_apartment_context):
     -- has the pick-up take that one instead of ranking the object's grasps again.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     given = GraspCandidate(
         graspable=milk,
         grasp_pose=Pose.from_xyz_rpy(yaw=np.pi / 3, reference_frame=milk.root),
@@ -51,7 +51,7 @@ def test_pick_up_reaches_for_the_grasp_it_settled_on(pr2_apartment_context):
     reaches the motions rather than stopping at the action.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     given = GraspCandidate(
         graspable=milk,
         grasp_pose=Pose.from_xyz_rpy(yaw=np.pi / 3, reference_frame=milk.root),
@@ -71,7 +71,7 @@ def test_pick_up_keeps_its_grasp_even_when_it_cannot_be_reached(pr2_apartment_co
     described.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     arm = view.left_arm
     view.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         10, 10, 0

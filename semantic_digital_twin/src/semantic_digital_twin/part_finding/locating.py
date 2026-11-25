@@ -59,6 +59,7 @@ class PartQuery:
     @classmethod
     def from_mesh(
         cls,
+        *,
         mesh: trimesh.Trimesh,
         whole_type: type[HasParts],
         relationship_names: list[str],
@@ -129,7 +130,7 @@ class PartLocator(ABC):
     """
 
     @abstractmethod
-    def locate(self, query: PartQuery) -> list[LocatedPart]:
+    def locate(self, *, query: PartQuery) -> list[LocatedPart]:
         """
         :param query: The mesh and the parts wanted.
         :return: The parts found: for a relationship that holds a single part at most
@@ -155,7 +156,7 @@ class KnownPartLocator(PartLocator):
     The queries asked so far, oldest first.
     """
 
-    def locate(self, query: PartQuery) -> list[LocatedPart]:
+    def locate(self, *, query: PartQuery) -> list[LocatedPart]:
         self.queries.append(query)
         return list(self.parts)
 
@@ -181,6 +182,8 @@ class LocatedFacesFinder(PartFinder):
     the part's faces, in meters.
     """
 
-    def split(self, mesh: trimesh.Trimesh) -> MeshSplit | None:
+    def split(self, *, mesh: trimesh.Trimesh) -> MeshSplit | None:
         distances, _ = cKDTree(self.face_centers).query(mesh.triangles_center)
-        return MeshSplit.from_mesh(mesh, distances <= self.tolerance)
+        return MeshSplit.from_mesh(
+            mesh=mesh, belongs_to_part_mask=distances <= self.tolerance
+        )

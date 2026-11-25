@@ -263,7 +263,7 @@ class GriplinkActionServerTask(
             action other than :attr:`commanded_actions`.
         """
         state_type = configuration.joint_state.state_type
-        endpoint = configuration.end_effector.griplink_endpoint(state_type)
+        endpoint = configuration.end_effector.griplink_endpoint(state_type=state_type)
         if endpoint is None or endpoint.command not in cls.commanded_actions:
             raise NoGriplinkEndpoint(
                 end_effector=configuration.end_effector, state_type=state_type

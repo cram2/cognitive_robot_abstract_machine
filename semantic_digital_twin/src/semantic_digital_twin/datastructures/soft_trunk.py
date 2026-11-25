@@ -116,7 +116,7 @@ class SoftEndEffector(EndEffector):
         return Vector3.Y(reference_frame=self.tool_frame)
 
     @classmethod
-    def setup_default_configuration_in_world_below_robot_root(cls, robot_root):
+    def setup_default_configuration_in_world_below_robot_root(cls, *, robot_root):
         pass
 
     def setup_hardware_interfaces(self):
@@ -133,7 +133,7 @@ class SoftArm(Arm):
     """
 
     @classmethod
-    def setup_default_configuration_in_world_below_robot_root(cls, robot_root):
+    def setup_default_configuration_in_world_below_robot_root(cls, *, robot_root):
         pass
 
     def setup_hardware_interfaces(self):
@@ -197,6 +197,7 @@ class SoftTrunk(SemanticAnnotation):
     @classmethod
     def build_piecewise_constant_curvature(
         cls,
+        *,
         world: World,
         sections: list[SoftTrunkSection],
     ) -> SoftTrunk:
@@ -219,7 +220,7 @@ class SoftTrunk(SemanticAnnotation):
         prefix = "piecewise_constant_curvature"
         with world.modify_world():
             root_body = Body(name=PrefixedName(name="base", prefix=prefix))
-            world.add_body(root_body)
+            world.add_body(body=root_body)
 
             trunk = cls(
                 name=PrefixedName(name="robot", prefix=prefix),
@@ -241,8 +242,8 @@ class SoftTrunk(SemanticAnnotation):
                     name=PrefixedName(name=f"phi_{section_index}", prefix=prefix),
                     limits=limits,
                 )
-                world.add_degree_of_freedom(curvature)
-                world.add_degree_of_freedom(bending_plane)
+                world.add_degree_of_freedom(dof=curvature)
+                world.add_degree_of_freedom(dof=bending_plane)
 
                 # Store references to preserve order
                 trunk.piecewise_constant_curvature_sections.append(
@@ -272,7 +273,7 @@ class SoftTrunk(SemanticAnnotation):
                         visual=ShapeCollection(shapes=[visual_shape]),
                         collision=ShapeCollection(shapes=[visual_shape]),
                     )
-                    world.add_body(curr_body)
+                    world.add_body(body=curr_body)
 
                     connection = PiecewiseConstantCurvatureConnection(
                         parent=prev_body,
@@ -281,7 +282,7 @@ class SoftTrunk(SemanticAnnotation):
                         phi_dof_id=bending_plane.id,
                         segment_length=segment_length,
                     )
-                    world.add_connection(connection)
+                    world.add_connection(connection=connection)
                     prev_body = curr_body
 
             effector = SoftEndEffector(
@@ -298,13 +299,14 @@ class SoftTrunk(SemanticAnnotation):
                 end_effector=effector,
             )
             trunk.arms.append(arm)
-            world.add_semantic_annotation_recursively(trunk)
+            world.add_semantic_annotation_recursively(semantic_annotation=trunk)
 
         return trunk
 
     @classmethod
     def build_cosserat(
         cls,
+        *,
         world: World,
         sections: list[SoftTrunkSection],
     ) -> SoftTrunk:
@@ -328,7 +330,7 @@ class SoftTrunk(SemanticAnnotation):
         prefix = "cosserat"
         with world.modify_world():
             root_body = Body(name=PrefixedName(name="base", prefix=prefix))
-            world.add_body(root_body)
+            world.add_body(body=root_body)
 
             trunk = cls(
                 name=PrefixedName(name="robot", prefix=prefix),
@@ -363,7 +365,7 @@ class SoftTrunk(SemanticAnnotation):
                 )
 
                 for dof in [bending_x, bending_y, torsion, extension]:
-                    world.add_degree_of_freedom(dof)
+                    world.add_degree_of_freedom(dof=dof)
 
                 world.state[extension.id].position = 1.0
 
@@ -398,7 +400,7 @@ class SoftTrunk(SemanticAnnotation):
                         visual=ShapeCollection(shapes=[visual_shape]),
                         collision=ShapeCollection(shapes=[visual_shape]),
                     )
-                    world.add_body(curr_body)
+                    world.add_body(body=curr_body)
 
                     connection = CosseratRodConnection(
                         parent=prev_body,
@@ -409,7 +411,7 @@ class SoftTrunk(SemanticAnnotation):
                         extension_dof_id=extension.id,
                         segment_length=segment_length,
                     )
-                    world.add_connection(connection)
+                    world.add_connection(connection=connection)
                     prev_body = curr_body
 
             effector = SoftEndEffector(
@@ -426,6 +428,6 @@ class SoftTrunk(SemanticAnnotation):
                 end_effector=effector,
             )
             trunk.arms.append(arm)
-            world.add_semantic_annotation_recursively(trunk)
+            world.add_semantic_annotation_recursively(semantic_annotation=trunk)
 
         return trunk

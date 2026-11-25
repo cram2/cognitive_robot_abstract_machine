@@ -128,7 +128,7 @@ class JSONPlayer(FilePlayer):
                     quat_w=orientation[3],
                 )
                 obj_pose.timestamp = det["time"]
-                body = self.world.get_body_by_name(body_name)
+                body = self.world.get_body_by_name(name=body_name)
                 objects_poses[body] = obj_pose
 
         return objects_poses

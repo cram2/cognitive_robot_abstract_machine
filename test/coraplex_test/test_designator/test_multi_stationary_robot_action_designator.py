@@ -126,12 +126,14 @@ def robot_setup(request):
             parent_T_connection_expression=box2_transformationmatrix,
         )
 
-        world.add_connection(box1_connection)
-        world.add_connection(box2_connection)
+        world.add_connection(connection=box1_connection)
+        world.add_connection(connection=box2_connection)
 
         # The boxes stand in for any graspable object; the plans only need an annotation
         # to name them by, not a particular kind of object.
-        world.add_semantic_annotations([IsGraspable(root=box1), IsGraspable(root=box2)])
+        world.add_semantic_annotations(
+            semantic_annotations=[IsGraspable(root=box1), IsGraspable(root=box2)]
+        )
     return world, request.param[1]
 
 
@@ -177,7 +179,9 @@ def stationary_block_context(robot_setup):
     """
     block_world, robot_class = robot_setup
     snapshot = WorldSnapshot.capture(world=block_world)
-    view = block_world.get_semantic_annotations_by_type(robot_class)[0]
+    view = block_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=robot_class
+    )[0]
     yield block_world, view, robot_extensions(view)
     snapshot.restore()
 
@@ -194,7 +198,7 @@ def test_park_arms_multi(stationary_block_context):
     joints = []
     states = []
     for arm in view.all_arms:
-        joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
+        joint_state = arm.get_joint_state_by_type(state_type=StaticJointState.PARK)
         joints.extend(joint_state.connections)
         states.extend(joint_state.target_values)
     for connection, value in zip(joints, states):
@@ -215,7 +219,7 @@ def test_reach_action_multi(stationary_block_context):
     world, view, extensions = stationary_block_context
     left_arm = left_or_only_arm(view)
 
-    box_body = world.get_body_by_name("box1")
+    box_body = world.get_body_by_name(name="box1")
     box = graspable_annotation(world, box_body)
     position = box_body.global_pose.position.to_np()
     grasp_pose = Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box_body)
@@ -234,7 +238,9 @@ def test_reach_action_multi(stationary_block_context):
     end_effector_pose = left_arm.end_effector.tool_frame.global_transform
     end_effector_orientation = end_effector_pose.quaternion.to_np()
 
-    target_orientation = left_arm.end_effector.tool_frame_goal(grasp_pose).quaternion
+    target_orientation = left_arm.end_effector.tool_frame_goal(
+        grasp_pose=grasp_pose
+    ).quaternion
 
     assert grasp_point_of(left_arm) == pytest.approx(position[:3], abs=0.01)
     assert_same_orientation(
@@ -250,21 +256,23 @@ def test_move_gripper_multi(stationary_block_context):
 
     plan = SetGripperAction(
         gripper_configuration=left_or_only_arm(view).end_effector.default_configuration(
-            GripperState.OPEN
+            state_type=GripperState.OPEN
         )
     )
 
     executor = run_plan(plan, extensions)
     arm = view.all_arms[0]
-    open_state = arm.end_effector.get_joint_state_by_type(GripperState.OPEN)
-    close_state = arm.end_effector.get_joint_state_by_type(GripperState.CLOSE)
+    open_state = arm.end_effector.get_joint_state_by_type(state_type=GripperState.OPEN)
+    close_state = arm.end_effector.get_joint_state_by_type(
+        state_type=GripperState.CLOSE
+    )
 
     for connection, target in open_state.items():
         assert connection.position == pytest.approx(target, abs=0.01)
 
     plan = SetGripperAction(
         gripper_configuration=left_or_only_arm(view).end_effector.default_configuration(
-            GripperState.CLOSE
+            state_type=GripperState.CLOSE
         )
     )
 
@@ -280,7 +288,7 @@ def test_grasping(stationary_block_context):
     world, robot_view, extensions = stationary_block_context
     left_arm = left_or_only_arm(robot_view)
 
-    box_body = world.get_body_by_name("box1")
+    box_body = world.get_body_by_name(name="box1")
     description = GraspingAction(
         grasp_candidate=top_down_grasp(world, box_body),
         arm=left_or_only_arm(robot_view),
@@ -302,7 +310,7 @@ def test_pick_up_multi(stationary_block_context):
     world, view, extensions = stationary_block_context
 
     left_arm = left_or_only_arm(view)
-    box_body = world.get_body_by_name("box1")
+    box_body = world.get_body_by_name(name="box1")
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=view.all_arms),
@@ -316,8 +324,8 @@ def test_pick_up_multi(stationary_block_context):
     run_plan(plan, extensions)
     assert (
         world.get_connection(
-            left_arm.end_effector.tool_frame,
-            world.get_body_by_name("box1"),
+            parent=left_arm.end_effector.tool_frame,
+            child=world.get_body_by_name(name="box1"),
         )
         is not None
     )
@@ -342,7 +350,7 @@ def test_place_multi(stationary_block_context, place_position):
     world, view, extensions = stationary_block_context
 
     left_arm = left_or_only_arm(view)
-    box_body = world.get_body_by_name("box1")
+    box_body = world.get_body_by_name(name="box1")
 
     plan = Sequence(
         nodes=[
@@ -362,10 +370,10 @@ def test_place_multi(stationary_block_context, place_position):
     run_plan(plan, extensions)
     with pytest.raises(NoEdgeBetweenNodes):
         world.get_connection(
-            left_arm.end_effector.tool_frame,
-            world.get_body_by_name("box1"),
+            parent=left_arm.end_effector.tool_frame,
+            child=world.get_body_by_name(name="box1"),
         )
-    box_body = world.get_body_by_name("box1")
+    box_body = world.get_body_by_name(name="box1")
     milk_position = box_body.global_transform.position.to_np()
 
     assert milk_position[:3] == pytest.approx(place_position.to_list()[:3], abs=0.01)
@@ -431,7 +439,7 @@ def physically_simulated_block_context(stationary_block_context):
     )
     with world.modify_world():
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=narrow_box,
@@ -441,9 +449,13 @@ def physically_simulated_block_context(stationary_block_context):
                 ),
             )
         )
-        world.add_semantic_annotations([IsGraspable(root=narrow_box)])
+        world.add_semantic_annotations(
+            semantic_annotations=[IsGraspable(root=narrow_box)]
+        )
     for arm in view.all_arms:
-        arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
+        arm.get_joint_state_by_type(state_type=StaticJointState.PARK).apply_to(
+            world=world
+        )
     world.notify_state_change()
     # Under the default pyramidal friction cone, a held box creeps down in the grip.
     simulation = MujocoSim(
@@ -494,7 +506,7 @@ def test_a_pick_in_physics_leaves_the_box_to_the_grip(
 
     assert box.parent_connection.parent is stood_on
     with pytest.raises(NoEdgeBetweenNodes):
-        world.get_connection(arm.end_effector.tool_frame, box)
+        world.get_connection(parent=arm.end_effector.tool_frame, child=box)
     lifted_by = box.global_pose.position.to_np().flatten()[2] - resting_height
     assert lifted_by == pytest.approx(pick.retreat_distance, abs=0.01)
 
@@ -587,7 +599,7 @@ def test_a_pick_up_failing_after_its_grasp_grasps_the_held_box_again(
     """
     world, view, extensions = stationary_block_context
     arm = left_or_only_arm(view)
-    box_body = world.get_body_by_name("box1")
+    box_body = world.get_body_by_name(name="box1")
     pick_up = StatementNode(
         statement=a(PickUpAction)(
             grasp_candidate=variable(

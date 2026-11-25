@@ -46,9 +46,11 @@ def world_with_bodies(*names: PrefixedName) -> World:
     world = World()
     root = Body(name=PrefixedName(name="root"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
         for name in names:
-            world.add_connection(FixedConnection(parent=root, child=Body(name=name)))
+            world.add_connection(
+                connection=FixedConnection(parent=root, child=Body(name=name))
+            )
     return world
 
 
@@ -62,7 +64,7 @@ def test_frame_names_the_body_of_its_full_name() -> None:
     )
 
     assert find_bodies_for_ros_frame(world, str(full_name)) == [
-        world.get_body_by_name(full_name)
+        world.get_body_by_name(name=full_name)
     ]
 
 
@@ -75,7 +77,7 @@ def test_frame_without_a_prefix_names_the_prefixed_body_of_that_name() -> None:
     world = world_with_bodies(full_name)
 
     assert find_bodies_for_ros_frame(world, full_name.name) == [
-        world.get_body_by_name(full_name)
+        world.get_body_by_name(name=full_name)
     ]
 
 
@@ -88,7 +90,7 @@ def test_frame_names_the_body_of_its_full_name_before_prefixed_ones() -> None:
     world = world_with_bodies(unprefixed_name, PrefixedName(name="map", prefix="robot"))
 
     assert find_bodies_for_ros_frame(world, unprefixed_name.name) == [
-        world.get_body_by_name(unprefixed_name)
+        world.get_body_by_name(name=unprefixed_name)
     ]
 
 
@@ -104,5 +106,5 @@ def test_frame_without_a_prefix_names_every_prefixed_body_of_that_name() -> None
     world = world_with_bodies(*names)
 
     assert find_bodies_for_ros_frame(world, "camera") == [
-        world.get_body_by_name(name) for name in names
+        world.get_body_by_name(name=name) for name in names
     ]

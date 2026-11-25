@@ -30,7 +30,7 @@ def box_in_the_tray_beside_an_outlet(box_and_trays) -> tuple:
     outlet = Body(name=PrefixedName(name="outlet"))
     with world.modify_world():
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 world=world, parent=world.root, child=outlet
             )
         )

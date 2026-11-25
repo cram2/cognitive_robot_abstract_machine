@@ -105,9 +105,9 @@ def test_converging_task_without_error_signal_is_rejected():
 
 
 def test_two_goals(pr2_world_state_reset: World):
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
+    torso_joint = pr2_world_state_reset.get_connection_by_name(name=PR2Joint.TORSO_LIFT)
     r_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.RIGHT_WRIST_ROLL
+        name=PR2Joint.RIGHT_WRIST_ROLL
     )
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -116,7 +116,9 @@ def test_two_goals(pr2_world_state_reset: World):
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
         nodes=[
-            JointPositionList(goal_state=JointState.from_mapping({torso_joint: 0.1})),
+            JointPositionList(
+                goal_state=JointState.from_mapping(mapping={torso_joint: 0.1})
+            ),
             local_min := LocalMinimumReached(),
         ]
     )
@@ -135,7 +137,7 @@ def test_two_goals(pr2_world_state_reset: World):
     statechart.add_node(
         node=(
             joint_goal := JointPositionList(
-                goal_state=JointState.from_mapping({r_wrist_roll_joint: 1})
+                goal_state=JointState.from_mapping(mapping={r_wrist_roll_joint: 1})
             )
         )
     )
@@ -165,7 +167,7 @@ def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: W
     observation: the goal's observation still means "goal reached", nothing else, and
     the ``Parallel`` node is what tolerates the stall.
     """
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
+    torso_joint = pr2_world_state_reset.get_connection_by_name(name=PR2Joint.TORSO_LIFT)
     torso_joint.raw_dof.limits.lower.velocity = -1e-3
     torso_joint.raw_dof.limits.upper.velocity = 1e-3
 
@@ -179,7 +181,7 @@ def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: W
             combined := Parallel(
                 nodes=[
                     joint_goal := JointPositionList(
-                        goal_state=JointState.from_mapping({torso_joint: 1.0}),
+                        goal_state=JointState.from_mapping(mapping={torso_joint: 1.0}),
                     ),
                     LocalMinimumReached(
                         degrees_of_freedom=[torso_joint.raw_dof],
@@ -216,7 +218,7 @@ def test_joint_position_list_alone_times_out_on_stall(
     :class:`LocalMinimumReached`, must never reach EndMotion in the same stalled
     scenario -- proving the monitor is what unblocks it, not some unrelated change.
     """
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
+    torso_joint = pr2_world_state_reset.get_connection_by_name(name=PR2Joint.TORSO_LIFT)
     torso_joint.raw_dof.limits.lower.velocity = -1e-3
     torso_joint.raw_dof.limits.upper.velocity = 1e-3
 
@@ -228,7 +230,7 @@ def test_joint_position_list_alone_times_out_on_stall(
     statechart.add_node(
         node=(
             joint_goal := JointPositionList(
-                goal_state=JointState.from_mapping({torso_joint: 1.0}),
+                goal_state=JointState.from_mapping(mapping={torso_joint: 1.0}),
             )
         )
     )
@@ -249,9 +251,9 @@ def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
     subset to tolerate a stall on one joint could be defeated by unrelated motion
     elsewhere in the robot.
     """
-    torso_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.TORSO_LIFT)
+    torso_joint = pr2_world_state_reset.get_connection_by_name(name=PR2Joint.TORSO_LIFT)
     moving_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.RIGHT_WRIST_ROLL
+        name=PR2Joint.RIGHT_WRIST_ROLL
     )
 
     executor = StatechartExecutor(
@@ -261,7 +263,9 @@ def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
         nodes=[
-            JointPositionList(goal_state=JointState.from_mapping({moving_joint: 2.0})),
+            JointPositionList(
+                goal_state=JointState.from_mapping(mapping={moving_joint: 2.0})
+            ),
             local_min := LocalMinimumReached(
                 degrees_of_freedom=[torso_joint.raw_dof], minimum_time=0.1
             ),
@@ -330,7 +334,7 @@ def test_long_goal(pr2_world_state_reset: World):
                 kinematic_chain=KinematicChain(
                     root=pr2_world_state_reset.root,
                     tip=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-                        "base_footprint"
+                        name="base_footprint"
                     ),
                 ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -339,7 +343,7 @@ def test_long_goal(pr2_world_state_reset: World):
             ),
             JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {
+                    mapping={
                         PR2Joint.TORSO_LIFT: 0.2999225173357618,
                         PR2Joint.HEAD_PAN: 0.042,
                         PR2Joint.HEAD_TILT: -0.37,
@@ -384,7 +388,7 @@ class TestTemplates:
         until five seconds have passed and paused while a human is close.
         """
         map_link = hsr_world_state_reset.root
-        gripper = hsr_world_state_reset.get_body_by_name("hand_gripper_tool_frame")
+        gripper = hsr_world_state_reset.get_body_by_name(name="hand_gripper_tool_frame")
         with hsr_world_state_reset.modify_world():
             knife = Body(
                 name=PrefixedName(name="knife"),
@@ -398,7 +402,7 @@ class TestTemplates:
                 ),
             )
             hsr_world_state_reset.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=gripper,
                     child=knife,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -418,7 +422,7 @@ class TestTemplates:
                 ),
             )
             hsr_world_state_reset.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=map_link,
                     child=loaf,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -526,7 +530,7 @@ class TestTemplates:
         """
         map = pr2_world_state_reset.root
         r_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -568,9 +572,11 @@ def test_constraint_collection(pr2_world_state_reset: World):
     """
     col = ConstraintCollection()
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
 
     expr = Vector3.X(tip).angle_between(Vector3.Y(root))
 
@@ -667,8 +673,8 @@ class TestMaxManipulability:
         Maximizing manipulability until a pose goal of the PR2's right gripper is
         reached still brings the gripper to that pose.
         """
-        root = pr2_world_state_reset.get_body_by_name("base_footprint")
-        tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
+        root = pr2_world_state_reset.get_body_by_name(name="base_footprint")
+        tip = pr2_world_state_reset.get_body_by_name(name="r_gripper_tool_frame")
 
         goal_pose = Pose.from_xyz_rpy(
             x=0.8, y=-0.3, z=1.0, reference_frame=pr2_world_state_reset.root
@@ -697,6 +703,6 @@ class TestMaxManipulability:
         executor.tick_until_end()
 
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
-            pr2_world_state_reset.root, tip
+            root=pr2_world_state_reset.root, tip=tip
         )
         assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.position_threshold)

@@ -140,7 +140,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             self._index = {}
             self.version += 1
 
-    def _add_dof(self, uuid: UUID) -> None:
+    def _add_dof(self, *, uuid: UUID) -> None:
         with self.world_lock:
             idx = len(self._ids)
             self._ids.append(uuid)
@@ -262,7 +262,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
     def to_position_dict(self) -> dict[PrefixedName, float]:
         with self.world_lock:
             return {
-                self._world.get_degree_of_freedom_by_id(dof_id).name: self[
+                self._world.get_degree_of_freedom_by_id(id=dof_id).name: self[
                     dof_id
                 ].position
                 for dof_id in self._ids
@@ -289,21 +289,21 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
 
     @property
     def positions(self) -> np.ndarray:
-        return self.get_derivative(Derivatives.position)
+        return self.get_derivative(derivative=Derivatives.position)
 
     @property
     def velocities(self) -> np.ndarray:
-        return self.get_derivative(Derivatives.velocity)
+        return self.get_derivative(derivative=Derivatives.velocity)
 
     @property
     def accelerations(self) -> np.ndarray:
-        return self.get_derivative(Derivatives.acceleration)
+        return self.get_derivative(derivative=Derivatives.acceleration)
 
     @property
     def jerks(self) -> np.ndarray:
-        return self.get_derivative(Derivatives.jerk)
+        return self.get_derivative(derivative=Derivatives.jerk)
 
-    def column_indices(self, dofs: list[DegreeOfFreedom]) -> list[int]:
+    def column_indices(self, *, dofs: list[DegreeOfFreedom]) -> list[int]:
         """
         Retrieve the columns of the given degrees of freedom in the state data.
 
@@ -320,14 +320,14 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
                     raise DofNotInWorldStateError(dof_id=dof.id)
             return [self._index[dof.id] for dof in dofs]
 
-    def get_derivative(self, derivative: Derivatives) -> np.ndarray:
+    def get_derivative(self, *, derivative: Derivatives) -> np.ndarray:
         """
         Retrieve the data for a whole derivative row.
         """
         with self.world_lock:
             return self._data[derivative, :]
 
-    def set_derivative(self, derivative: Derivatives, new_state: np.ndarray):
+    def set_derivative(self, *, derivative: Derivatives, new_state: np.ndarray):
         """
         Overwrite the data for a whole derivative row.
 
@@ -347,7 +347,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             new_state._index = self._index.copy()
             return new_state
 
-    def add_degree_of_freedom(self, dof: DegreeOfFreedom):
+    def add_degree_of_freedom(self, *, dof: DegreeOfFreedom):
         """
         Adds a degree of freedom to the world state, initializing its position to 0 or
         the nearest limit.
@@ -364,7 +364,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
             if upper is not None:
                 initial_position = min(upper, initial_position)
 
-            self._add_dof(dof.id)
+            self._add_dof(uuid=dof.id)
             self[dof.id].position = initial_position
 
     def get_variables(self) -> list[FloatVariable]:
@@ -382,19 +382,19 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         """
         with self.world_lock:
             positions = [
-                self._world.get_degree_of_freedom_by_id(v_id).variables.position
+                self._world.get_degree_of_freedom_by_id(id=v_id).variables.position
                 for v_id in self
             ]
             velocities = [
-                self._world.get_degree_of_freedom_by_id(v_id).variables.velocity
+                self._world.get_degree_of_freedom_by_id(id=v_id).variables.velocity
                 for v_id in self
             ]
             accelerations = [
-                self._world.get_degree_of_freedom_by_id(v_id).variables.acceleration
+                self._world.get_degree_of_freedom_by_id(id=v_id).variables.acceleration
                 for v_id in self
             ]
             jerks = [
-                self._world.get_degree_of_freedom_by_id(v_id).variables.jerk
+                self._world.get_degree_of_freedom_by_id(id=v_id).variables.jerk
                 for v_id in self
             ]
             return positions + velocities + accelerations + jerks
@@ -404,7 +404,7 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         return [v.variables.position for v in self._world.degrees_of_freedom]
 
     def _apply_control_commands(
-        self, commands: np.ndarray, dt: float, derivative: Derivatives
+        self, *, commands: np.ndarray, dt: float, derivative: Derivatives
     ):
         """
         Apply control commands to the specified derivative level, and integrate down to
@@ -425,15 +425,16 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
                     actual_length=len(commands),
                 )
 
-            self.set_derivative(derivative, commands)
+            self.set_derivative(derivative=derivative, new_state=commands)
 
             for i in range(derivative - 1, -1, -1):
                 self.set_derivative(
-                    i,
-                    self.get_derivative(i) + self.get_derivative(i + 1) * dt,
+                    derivative=i,
+                    new_state=self.get_derivative(derivative=i)
+                    + self.get_derivative(derivative=i + 1) * dt,
                 )
 
-    def merge_state(self, other: WorldState):
+    def merge_state(self, *, other: WorldState):
         """
         Merges another WorldState into this one, overwriting values for any DOFs that
         are present in both states.
@@ -593,7 +594,7 @@ class WorldStateTrajectory:
             return self._data_cache
 
     @classmethod
-    def from_world_state(cls, state: WorldState, time: float):
+    def from_world_state(cls, *, state: WorldState, time: float):
         """
         Creates an instance of the class using the given world state and timestamp.
 
@@ -615,7 +616,7 @@ class WorldStateTrajectory:
     def world_lock(self):
         return self.world._world_lock
 
-    def append(self, state: WorldState, time: float):
+    def append(self, *, state: WorldState, time: float):
         """
         Appends a new state and corresponding time to the internal data structure,
         ensuring that the time values are monotonically increasing and world model
@@ -641,7 +642,7 @@ class WorldStateTrajectory:
             self._times_cache = None
             self._data_cache = None
 
-    def records_degrees_of_freedom_of(self, state: WorldState) -> bool:
+    def records_degrees_of_freedom_of(self, *, state: WorldState) -> bool:
         """
         :param state: The state to compare the recorded states with.
         :return: Whether `state` holds the degrees of freedom of the recorded states, in
@@ -650,7 +651,7 @@ class WorldStateTrajectory:
         with self.world_lock():
             return state.ids == self._ids
 
-    def adopt_world_model_of(self, state: WorldState) -> None:
+    def adopt_world_model_of(self, *, state: WorldState) -> None:
         """
         Take the current model of the world of `state` as the one every appended state
         must have.
@@ -661,7 +662,7 @@ class WorldStateTrajectory:
         """
         with self.world_lock():
             current_world_model_version = state._world.get_world_model_manager().version
-            if not self.records_degrees_of_freedom_of(state):
+            if not self.records_degrees_of_freedom_of(state=state):
                 raise WrongWorldModelVersion(
                     expected_version=self._world_version,
                     actual_version=current_world_model_version,

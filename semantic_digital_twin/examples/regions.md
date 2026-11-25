@@ -63,7 +63,7 @@ table_top.visual = table_top_shapes
 
 with world.modify_world():
     root_to_leg = Connection6DoF.create_with_dofs(parent=root, child=table_leg, world=world)
-    world.add_connection(root_to_leg)
+    world.add_connection(connection=root_to_leg)
 
     leg_to_top = FixedConnection(
         parent=table_leg,
@@ -72,7 +72,7 @@ with world.modify_world():
             z=0.3, reference_frame=table_leg
         ),
     )
-    world.add_connection(leg_to_top)
+    world.add_connection(connection=leg_to_top)
 ```
 
 Next, we create a region describing the top of the table. We declare that the region is a very thin box that sits on top of the table-top.
@@ -95,9 +95,9 @@ We will now say the the region moves exactly as the table top moves.
 
 ```{code-cell} ipython3
 with world.modify_world():
-    world.add_kinematic_structure_entity(table_surface)
+    world.add_kinematic_structure_entity(kinematic_structure_entity=table_surface)
     connection = FixedConnection(parent=table_top, child=table_surface)
-    world.add_connection(connection)
+    world.add_connection(connection=connection)
 print(world.regions)
 ```
 

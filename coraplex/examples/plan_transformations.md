@@ -36,7 +36,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 
 world = setup_world()
 
-pr2 = PR2.from_world(world)
+pr2 = PR2.from_world(world=world)
 
 plan_transformations = []
 
@@ -88,7 +88,7 @@ from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import Pose2D
 
-milk = world.get_semantic_annotations_by_type(Milk)[0]
+milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 grasp = milk.grasp_candidates()[0]
 
 reach = expand(Sequence(nodes=[ReachAction(grasp_candidate=grasp, arm=pr2.right_arm)]))
@@ -158,9 +158,9 @@ spoon = STLParser(
 
 with world.modify_world():
     world.merge_world(
-        spoon,
-        FixedConnection(
-            parent=world.get_body_by_name("cabinet10_drawer_top"),
+        other=spoon,
+        root_connection=FixedConnection(
+            parent=world.get_body_by_name(name="cabinet10_drawer_top"),
             child=spoon.root,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 -0.05, -0.05, 0
@@ -169,11 +169,11 @@ with world.modify_world():
     )
 
 with world.modify_world():
-    world.add_semantic_annotation(Spoon(root=world.get_body_by_name("spoon.stl")))
+    world.add_semantic_annotation(semantic_annotation=Spoon(root=world.get_body_by_name(name="spoon.stl")))
     world.add_semantic_annotation_recursively(
-        Drawer(
-            root=world.get_body_by_name("cabinet10_drawer_top"),
-            handle=Handle(root=world.get_body_by_name("handle_cab10_t")),
+        semantic_annotation=Drawer(
+            root=world.get_body_by_name(name="cabinet10_drawer_top"),
+            handle=Handle(root=world.get_body_by_name(name="handle_cab10_t")),
         )
     )
 ```
@@ -186,7 +186,7 @@ from coraplex.robot_plans.plan_transformations import OpenDrawerBeforePickUp
 
 plan_transformations = [OpenDrawerBeforePickUp()]
 
-spoon_annotation = world.get_semantic_annotations_by_type(Spoon)[0]
+spoon_annotation = world.get_semantic_annotations_by_type(semantic_annotation_type=Spoon)[0]
 
 pick_up = expand(
     Sequence(nodes=[PickUpAction(grasp_candidate=spoon_annotation.grasp_candidates()[0], arm=pr2.right_arm)])
@@ -363,7 +363,7 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
 
     def is_applicable(self, plan_node: NavigateAction) -> bool:
         navigate = plan_node
-        target = navigate.world.transform(navigate.planar_goal_pose, navigate.world.root)
+        target = navigate.world.transform(spatial_object=navigate.planar_goal_pose, target_frame=navigate.world.root)
         distance = navigate.robot.root.global_pose.position.euclidean_distance(
             target.pose.position
         )

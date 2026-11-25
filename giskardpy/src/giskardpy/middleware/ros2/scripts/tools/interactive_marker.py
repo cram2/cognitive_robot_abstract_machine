@@ -205,10 +205,10 @@ class InteractiveMarkerNode:
         """
         for chain in self.chains:
             root_body = self.giskard.world.get_kinematic_structure_entity_by_name(
-                chain.root_link
+                name=chain.root_link
             )
             tip_body = self.giskard.world.get_kinematic_structure_entity_by_name(
-                chain.tip_link
+                name=chain.tip_link
             )
             kinematic_chain = KinematicChainMarker(
                 root_link=chain.root_link,

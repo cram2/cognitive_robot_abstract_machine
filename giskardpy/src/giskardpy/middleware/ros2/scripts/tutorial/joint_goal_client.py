@@ -37,7 +37,7 @@ def main() -> None:
         node=(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    goal_positions_in_radians, giskard.world
+                    mapping=goal_positions_in_radians, world=giskard.world
                 )
             )
         )

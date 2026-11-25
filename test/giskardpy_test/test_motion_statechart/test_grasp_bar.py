@@ -28,9 +28,11 @@ def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
     """
     VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
 
     bar_center = Point3(0.6, -0.3, 1.0, reference_frame=root)
     bar_axis = Vector3.Z(reference_frame=root)

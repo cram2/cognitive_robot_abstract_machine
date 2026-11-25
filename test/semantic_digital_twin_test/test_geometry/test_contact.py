@@ -65,10 +65,10 @@ def test_contact_parameters_reach_every_collision_geometry():
     )
     contact = ContactParameters.create_for_grasped_object(sliding_friction=0.4)
 
-    contact.apply_to([body])
+    contact.apply_to(bodies=[body])
 
     for shape in body.collision:
-        attached = shape.get_simulator_property_of_type(ContactParameters)
+        attached = shape.get_simulator_property_of_type(property_type=ContactParameters)
         assert attached == contact
         assert attached is not contact
         assert attached.friction == ContactFriction(
@@ -82,11 +82,11 @@ def test_a_surface_leaves_the_geometrys_own_stiffness_and_impedance():
     body.collision = ShapeCollection(shapes=[shape], reference_frame=body)
     own_stiffness = ContactStiffness(time_constant=timedelta(milliseconds=50))
     own = ContactParameters(friction=ContactFriction(), stiffness=own_stiffness)
-    shape.add_simulator_property(own)
+    shape.add_simulator_property(simulator_property=own)
 
-    ContactParameters.create_for_surface(sliding_friction=0.2).apply_to([body])
+    ContactParameters.create_for_surface(sliding_friction=0.2).apply_to(bodies=[body])
 
-    assert shape.get_simulator_property_of_type(ContactParameters) is own
+    assert shape.get_simulator_property_of_type(property_type=ContactParameters) is own
     assert own.friction == ContactFriction(sliding=0.2)
     assert own.stiffness == own_stiffness
     assert own.impedance is None
@@ -97,6 +97,6 @@ def test_a_body_without_collision_geometry_is_skipped():
     shape = Box(origin=HomogeneousTransformationMatrix(), scale=Scale(x=1, y=1, z=1))
     body.visual = ShapeCollection(shapes=[shape], reference_frame=body)
 
-    ContactParameters.create_for_surface().apply_to([body])
+    ContactParameters.create_for_surface().apply_to(bodies=[body])
 
-    assert shape.get_simulator_property_of_type(ContactParameters) is None
+    assert shape.get_simulator_property_of_type(property_type=ContactParameters) is None

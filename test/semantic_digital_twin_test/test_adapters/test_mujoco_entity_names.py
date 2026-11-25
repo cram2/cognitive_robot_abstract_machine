@@ -131,10 +131,10 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
         name=PrefixedName(name="hinge_servo"),
         gains=ServoGains(stiffness=50.0, damping=5.0, torque_limit=2.0),
     )
-    servo.add_dof(degree_of_freedom)
+    servo.add_dof(dof=degree_of_freedom)
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=root,
                 child=base,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -142,7 +142,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
                 ),
             )
         )
-        world.add_degree_of_freedom(degree_of_freedom)
+        world.add_degree_of_freedom(dof=degree_of_freedom)
         hinge = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=arm)
@@ -152,7 +152,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
             child=arm,
             raw_dof=degree_of_freedom,
         )
-        world.add_connection(hinge)
+        world.add_connection(connection=hinge)
         mirrored_hinge = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=mirrored_arm)
@@ -163,8 +163,8 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
             raw_dof=degree_of_freedom,
             multiplier=-1.0,
         )
-        world.add_connection(mirrored_hinge)
-        world.add_actuator(servo)
+        world.add_connection(connection=mirrored_hinge)
+        world.add_actuator(actuator=servo)
     return Pendulum(arm=arm, hinge=hinge, mirrored_hinge=mirrored_hinge, servo=servo)
 
 
@@ -173,7 +173,7 @@ def twin_pendulum_world() -> TwinPendulumWorld:
     world = World()
     root = Body(name=PrefixedName(name="root"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     pendulums = [
         add_pendulum(world, root, sideways_offset) for sideways_offset in (-0.5, 0.5)
     ]
@@ -195,7 +195,7 @@ def built_twin_pendulums(twin_pendulum_world, tmp_path) -> MujocoBuilder:
 def test_an_element_is_named_after_the_short_name_of_its_entity():
     handle = Body(name=PrefixedName(name="handle", prefix="mug"))
 
-    assert SimulatorElementNames().assign(handle) == handle.name.name
+    assert SimulatorElementNames().assign(entity=handle) == handle.name.name
 
 
 def test_the_second_of_two_equally_named_entities_is_told_apart_by_its_id():
@@ -203,8 +203,8 @@ def test_the_second_of_two_equally_named_entities_is_told_apart_by_its_id():
     second = Body(name=PrefixedName(name="handle", prefix="mug_b"))
     element_names = SimulatorElementNames()
 
-    assert element_names.assign(first) == "handle"
-    assert element_names.assign(second) == f"handle_{second.id.hex}"
+    assert element_names.assign(entity=first) == "handle"
+    assert element_names.assign(entity=second) == f"handle_{second.id.hex}"
 
 
 # %% building
@@ -217,16 +217,16 @@ def test_equally_named_entities_are_each_built_under_their_own_name(
     pendulums = twin_pendulum_world.pendulums
 
     assert sorted(body.name for body in built_twin_pendulums.spec.bodies) == sorted(
-        element_names.of(body) for body in twin_pendulum_world.world.bodies
+        element_names.of(entity=body) for body in twin_pendulum_world.world.bodies
     )
     assert sorted(joint.name for joint in built_twin_pendulums.spec.joints) == sorted(
-        element_names.of(connection)
+        element_names.of(entity=connection)
         for pendulum in pendulums
         for connection in (pendulum.hinge, pendulum.mirrored_hinge)
     )
     assert sorted(
         actuator.name for actuator in built_twin_pendulums.spec.actuators
-    ) == sorted(element_names.of(pendulum.servo) for pendulum in pendulums)
+    ) == sorted(element_names.of(entity=pendulum.servo) for pendulum in pendulums)
 
 
 def test_one_of_equally_named_entities_keeps_the_short_name_a_unique_one_would_get(
@@ -242,9 +242,13 @@ def test_one_of_equally_named_entities_keeps_the_short_name_a_unique_one_would_g
     [hinge_name] = {pendulum.hinge.name.name for pendulum in pendulums}
     [servo_name] = {pendulum.servo.name.name for pendulum in pendulums}
 
-    assert arm_name in {element_names.of(pendulum.arm) for pendulum in pendulums}
-    assert hinge_name in {element_names.of(pendulum.hinge) for pendulum in pendulums}
-    assert servo_name in {element_names.of(pendulum.servo) for pendulum in pendulums}
+    assert arm_name in {element_names.of(entity=pendulum.arm) for pendulum in pendulums}
+    assert hinge_name in {
+        element_names.of(entity=pendulum.hinge) for pendulum in pendulums
+    }
+    assert servo_name in {
+        element_names.of(entity=pendulum.servo) for pendulum in pendulums
+    }
 
 
 def test_a_shape_is_built_into_the_body_of_its_own_entity(
@@ -254,7 +258,7 @@ def test_a_shape_is_built_into_the_body_of_its_own_entity(
     spec = built_twin_pendulums.spec
 
     for pendulum in twin_pendulum_world.pendulums:
-        assert len(spec.body(element_names.of(pendulum.arm)).geoms) == len(
+        assert len(spec.body(element_names.of(entity=pendulum.arm)).geoms) == len(
             pendulum.arm.collision.shapes
         )
 
@@ -266,8 +270,8 @@ def test_a_joint_is_built_into_the_body_of_its_own_child(
     spec = built_twin_pendulums.spec
 
     for pendulum in twin_pendulum_world.pendulums:
-        [joint] = spec.body(element_names.of(pendulum.arm)).joints
-        assert joint.name == element_names.of(pendulum.hinge)
+        [joint] = spec.body(element_names.of(entity=pendulum.arm)).joints
+        assert joint.name == element_names.of(entity=pendulum.hinge)
 
 
 def test_a_servo_drives_the_joint_of_its_own_degree_of_freedom(
@@ -277,8 +281,8 @@ def test_a_servo_drives_the_joint_of_its_own_degree_of_freedom(
     spec = built_twin_pendulums.spec
 
     for pendulum in twin_pendulum_world.pendulums:
-        actuator = spec.actuator(element_names.of(pendulum.servo))
-        assert actuator.target == element_names.of(pendulum.hinge)
+        actuator = spec.actuator(element_names.of(entity=pendulum.servo))
+        assert actuator.target == element_names.of(entity=pendulum.hinge)
         assert actuator.trntype == mujoco.mjtTrn.mjTRN_JOINT
 
 
@@ -292,8 +296,8 @@ def test_a_mimic_joint_follows_the_joint_of_its_own_degree_of_freedom(
         for equality in built_twin_pendulums.spec.equalities
     ) == sorted(
         (
-            element_names.of(pendulum.mirrored_hinge),
-            element_names.of(pendulum.hinge),
+            element_names.of(entity=pendulum.mirrored_hinge),
+            element_names.of(entity=pendulum.hinge),
         )
         for pendulum in twin_pendulum_world.pendulums
     )
@@ -304,14 +308,16 @@ def test_a_camera_is_built_into_the_body_it_is_attached_to(
 ):
     [_, second] = twin_pendulum_world.pendulums
     camera = MujocoCamera(name="arm_camera", body=second.arm)
-    second.arm.add_simulator_property(camera)
+    second.arm.add_simulator_property(simulator_property=camera)
     builder = MujocoBuilder()
 
     builder.build_world(
         world=twin_pendulum_world.world, file_path=str(tmp_path / "scene.xml")
     )
 
-    [built_camera] = builder.spec.body(builder.element_names.of(second.arm)).cameras
+    [built_camera] = builder.spec.body(
+        builder.element_names.of(entity=second.arm)
+    ).cameras
     assert built_camera.name == camera.name
 
 
@@ -355,10 +361,10 @@ def twin_falling_box_world() -> TwinFallingBoxWorld:
     root = Body(name=PrefixedName(name="root"))
     boxes = [box_body(PrefixedName(name="box")) for _ in range(2)]
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
         for box, (sideways_offset, height) in zip(boxes, ((-0.5, 1.0), (0.5, 2.0))):
             world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     world=world,
                     parent=root,
                     child=box,
@@ -376,7 +382,7 @@ def height_of(world: World, body: Body) -> float:
     :param body: The body to measure.
     :return: The height of the body above the root of the world.
     """
-    return float(world.compute_forward_kinematics_np(world.root, body)[2, 3])
+    return float(world.compute_forward_kinematics_np(root=world.root, tip=body)[2, 3])
 
 
 @pytest.mark.skipif(
@@ -391,7 +397,7 @@ def test_equally_named_boxes_each_fall_from_their_own_height(twin_falling_box_wo
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(duration)
+        simulation.step_simulation(duration=duration)
     finally:
         simulation.stop_simulation()
 
@@ -417,10 +423,10 @@ def test_each_equally_named_servo_is_commanded_with_its_own_set_point(
         for pendulum, set_point in zip(pendulums, set_points):
             world.state[pendulum.hinge.raw_dof.id].position = set_point
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=2))
+        simulation.step_simulation(duration=timedelta(seconds=2))
         reached = [
             simulation.simulator.get_joint_value(
-                simulation.synchronizer.element_names.of(pendulum.hinge)
+                simulation.synchronizer.element_names.of(entity=pendulum.hinge)
             ).result
             for pendulum in pendulums
         ]

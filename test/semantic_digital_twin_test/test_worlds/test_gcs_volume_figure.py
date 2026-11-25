@@ -93,7 +93,7 @@ def add_box_body(
     """
     body = Body(name=PrefixedName(name=name))
     world.add_connection(
-        FixedConnection.create_with_dofs(
+        connection=FixedConnection.create_with_dofs(
             world=world,
             parent=world.root,
             child=body,
@@ -102,7 +102,7 @@ def add_box_body(
             ),
         )
     )
-    body.collision.append(Box(scale=scale))
+    body.collision.append(shape=Box(scale=scale))
     return body
 
 
@@ -116,7 +116,9 @@ def barrier_world() -> World:
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName(name="map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
         add_box_body(
             world,
@@ -182,10 +184,10 @@ def navigation_scene_of(
     """
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     query = hardest_path_query(graph)
-    waypoints = graph.path_from_to(query.start, query.goal)
+    waypoints = graph.path_from_to(start=query.start, goal=query.goal)
     obstacles = SemanticEnvironmentAnnotation(
         root=world.root, _world=world
-    ).as_bounding_box_collection_at_origin(origin)
+    ).as_bounding_box_collection_at_origin(origin=origin)
     return NavigationScene(
         graph_of_convex_sets=graph,
         environment_name="barrier",
@@ -295,7 +297,7 @@ def test_the_path_panel_reports_how_much_of_the_path_is_vertical(
     The subtitle names the height the path changes, which is the quantity a floor plan
     has no way to report.
     """
-    assert OptimalPathVolumePanel().subtitle(barrier_scene) == (
+    assert OptimalPathVolumePanel().subtitle(scene=barrier_scene) == (
         f"{barrier_scene.path.length:.2f} m over "
         f"{len(barrier_scene.path.waypoints)} waypoints, "
         f"{barrier_scene.path.vertical_travel:.2f} m of it vertical"
@@ -306,7 +308,7 @@ def test_the_convex_sets_panel_counts_what_it_draws(barrier_scene: NavigationSce
     """
     The subtitle reports the size of the decomposition the panel shows.
     """
-    subtitle = ConvexSetsVolumePanel().subtitle(barrier_scene)
+    subtitle = ConvexSetsVolumePanel().subtitle(scene=barrier_scene)
 
     assert subtitle == (
         f"{len(barrier_scene.convex_sets)} convex sets, "
@@ -320,7 +322,7 @@ def test_the_environment_panel_reports_the_volume_it_frames(
     """
     The subtitle reports all three extents, since a volume is what this figure is about.
     """
-    subtitle = EnvironmentVolumePanel().subtitle(barrier_scene)
+    subtitle = EnvironmentVolumePanel().subtitle(scene=barrier_scene)
 
     assert subtitle == (
         f"{len(barrier_scene.obstacles)} obstacle boxes in "
@@ -416,7 +418,7 @@ def test_the_figure_is_saved_as_an_interactive_page(barrier_scene, tmp_path):
     """
     written = GraphOfConvexSetsVolumeFigure(
         scene=barrier_scene, theme=Theme.DARK, image_formats=()
-    ).save(tmp_path / "figures")
+    ).save(output_directory=tmp_path / "figures")
 
     assert [path.name for path in written] == [
         "graph_of_convex_sets_volume_barrier_dark.html"
