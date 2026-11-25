@@ -1,3 +1,9 @@
+"""
+Parsing of MuJoCo MJCF files into a world.
+"""
+
+from __future__ import annotations
+
 import logging
 import os
 import tempfile
@@ -531,12 +537,25 @@ class MJCFParser(WorldModelParser):
                     mujoco_geom.material
                 )
                 meshscale = Scale(*mujoco_mesh.scale)
+                reference_orientation = mujoco_mesh.refquat / numpy.linalg.norm(
+                    mujoco_mesh.refquat
+                )
+                file_T_mesh = HomogeneousTransformationMatrix.from_xyz_quaternion(
+                    pos_x=mujoco_mesh.refpos[0],
+                    pos_y=mujoco_mesh.refpos[1],
+                    pos_z=mujoco_mesh.refpos[2],
+                    quat_w=reference_orientation[0],
+                    quat_x=reference_orientation[1],
+                    quat_y=reference_orientation[2],
+                    quat_z=reference_orientation[3],
+                )
                 if mujoco_material is None:
                     return Mesh(
                         filename=filename,
                         origin=origin_transform,
                         color=color,
                         scale=meshscale,
+                        file_T_mesh=file_T_mesh,
                     )
                 else:
                     texture_name = mujoco_material.textures[1]
@@ -548,6 +567,7 @@ class MJCFParser(WorldModelParser):
                             origin=origin_transform,
                             color=color,
                             scale=meshscale,
+                            file_T_mesh=file_T_mesh,
                         )
                     texturedir = os.path.join(
                         os.path.dirname(self.file_path), self.spec.texturedir
@@ -560,6 +580,7 @@ class MJCFParser(WorldModelParser):
                             color=color,
                             texture_file_path=texture_file_path,
                             scale=meshscale,
+                            file_T_mesh=file_T_mesh,
                         )
                     else:
                         return Mesh(
@@ -567,6 +588,7 @@ class MJCFParser(WorldModelParser):
                             origin=origin_transform,
                             color=color,
                             scale=meshscale,
+                            file_T_mesh=file_T_mesh,
                         )
 
         raise NotImplementedError(f"Geometry type {mujoco_geom.type} not implemented.")
