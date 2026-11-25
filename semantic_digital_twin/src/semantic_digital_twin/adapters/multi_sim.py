@@ -763,7 +763,7 @@ class Connection1DOFConverter(ConnectionConverter, ABC):
         if dof.name.name != joint_props["name"] and dof.name.name != "dof":
             joint_props["equality_joint"] = {
                 "joint": dof.name.name,
-                "data": [entity.offset, entity.multiplier, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                "polynomial_coefficients": [entity.offset, entity.multiplier, 0, 0, 0],
             }
         return joint_props
 
@@ -1955,7 +1955,12 @@ class MujocoSingleJoint(MujocoConnectionJoints[ConnectionType]):
             equality.objtype = mujoco.mjtObj.mjOBJ_JOINT
             equality.name1 = joint_name
             equality.name2 = self._mimicked_joint_name()
-            equality.data = equality_joint["data"]
+            # a joint equality reads only its polynomial's coefficients off the front
+            # of the data, whose length differs between MuJoCo versions
+            coefficients = equality_joint["polynomial_coefficients"]
+            data = numpy.array(equality.data)
+            data[: len(coefficients)] = coefficients
+            equality.data = data
         mujoco_joint = self.connection.get_simulator_property_of_type(MujocoJoint)
         if mujoco_joint is not None:
             joint_props["stiffness"] = (
@@ -2818,7 +2823,11 @@ class MujocoBuilder(MultiSimBuilder):
             body_spec = self.spec.bodies[body_id + 1]
             if numpy.isclose(body_spec.mass, 0.0):
                 continue
-            inertial_element = ET.SubElement(body_element, "inertial")
+            # MuJoCo 4 writes a body's inertial itself, which may stand only once
+            inertial_element = body_element.find("inertial")
+            if inertial_element is None:
+                inertial_element = ET.SubElement(body_element, "inertial")
+            inertial_element.attrib.clear()
             inertial_element.set("mass", f"{body_spec.mass}")
             inertial_element.set(
                 "diaginertia", " ".join(map(str, body_spec.inertia.tolist()))
