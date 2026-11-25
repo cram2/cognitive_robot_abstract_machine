@@ -938,14 +938,22 @@ class EQLTranslator:
         """
         Evaluate the translated SQL query.
 
-        For entity() queries, returns a list of DAO objects. For set_of() queries with
-        multiple variables, returns a list of dicts mapping each EQL variable to its
-        corresponding DAO object.
+        For entity() queries, returns what :attr:`result_loading` asks for of every
+        selected object. For set_of() queries with multiple variables, returns a list of
+        dicts mapping each EQL variable to its corresponding DAO object.
 
         :return: Query results
         """
-        if isinstance(self.select_like, SetOf):
-            return self._evaluate_set_of()
+        with self.result_loading.evaluation_context():
+            if isinstance(self.select_like, SetOf):
+                return self._evaluate_set_of()
+            return self._evaluate_entity()
+
+    def _evaluate_entity(self) -> list[Any]:
+        """
+        :return: What :attr:`result_loading` asks for of every object an entity() query
+            selects, in its order.
+        """
         if not issubclass(self.quantifier_type, (The, An)):
             raise UnsupportedQuantifierError(quantifier_type=self.quantifier_type)
         if self.result_loading.loads_selected_rows:
@@ -955,29 +963,31 @@ class EQLTranslator:
             if issubclass(self.quantifier_type, The):
                 return self._object_daos(results=[bound_query.one()])
             return self._object_daos(results=bound_query.all())
-        selected_objects = self._selected_objects()
+        selection = self._selection_of_ids_and_types()
+        rows = self.session.execute(selection)
+        if issubclass(self.quantifier_type, The):
+            selected_objects = [rows.one()]
+        else:
+            selected_objects = list(rows.all())
         if self.result_loading.result_content == ResultContent.DATABASE_IDS:
             return [selected_object.database_id for selected_object in selected_objects]
-        return self.result_loading.load_data_access_objects(
-            session=self.session, selected_objects=selected_objects
+        return self.result_loading.load_selected_objects(
+            session=self.session,
+            selection=selection,
+            selected_objects=selected_objects,
         )
 
-    def _selected_objects(self) -> list[sqlalchemy.Row]:
+    def _selection_of_ids_and_types(self) -> Select:
         """
-        :return: The ``database_id`` and ``polymorphic_type`` of every object the query
-            selects, in its order.
+        :return: The translated query, selecting the ``database_id`` and
+            ``polymorphic_type`` of every object instead of the object.
         """
         selected_entity = self.sql_query.column_descriptions[0]["entity"]
-        rows = self.session.execute(
-            self.sql_query.with_only_columns(
-                selected_entity.database_id.label("database_id"),
-                selected_entity.polymorphic_type.label("polymorphic_type"),
-                maintain_column_froms=True,
-            )
+        return self.sql_query.with_only_columns(
+            selected_entity.database_id.label("database_id"),
+            selected_entity.polymorphic_type.label("polymorphic_type"),
+            maintain_column_froms=True,
         )
-        if issubclass(self.quantifier_type, The):
-            return [rows.one()]
-        return list(rows.all())
 
     def _object_daos(self, *, results: list[Any]) -> list[Any]:
         """

@@ -5,6 +5,8 @@ table of every one of them, and comes back through a field typed with any of the
 
 from __future__ import annotations
 
+import gc
+
 import pytest
 from sqlalchemy import func, inspect, select
 
@@ -15,9 +17,11 @@ from krrood.ormatic.exceptions import (
     UnsupportedResultLoadingError,
 )
 from krrood.ormatic.result_loading import (
+    GarbageCollectionPause,
     RelationshipLoading,
     ResultContent,
     ResultLoading,
+    SelectedObjectRestriction,
     SubclassLoading,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
@@ -362,10 +366,15 @@ def test_conditions_on_one_path_share_its_join(session, database):
 
 EVERY_RESULT_LOADING = [
     ResultLoading(
-        relationship_loading=relationship_loading, subclass_loading=subclass_loading
+        relationship_loading=relationship_loading,
+        subclass_loading=subclass_loading,
+        selected_object_restriction=selected_object_restriction,
+        pauses_garbage_collection=pauses_garbage_collection,
     )
     for relationship_loading in RelationshipLoading
     for subclass_loading in SubclassLoading
+    for selected_object_restriction in SelectedObjectRestriction
+    for pauses_garbage_collection in [False, True]
 ]
 
 
@@ -539,3 +548,39 @@ def test_a_translation_without_a_result_loading_takes_the_one_suited_to_its_quer
     translator = eql_to_sql(query, session)
 
     assert translator.result_loading == ResultLoading.from_query(query=query)
+
+
+@pytest.mark.parametrize("selected_object_restriction", SelectedObjectRestriction)
+def test_columns_are_the_values_of_each_selected_objects_own_class(
+    session, database, selected_object_restriction
+):
+    """
+    Evaluating for columns gives every selected object's values, including those of
+    columns only its own class has, in the order of the query.
+    """
+    items = store_items_of_one_hierarchy(session)
+    item = variable(InventoryItem, domain=None)
+    query = an(entity(item).ordered_by(variable=item.label))
+
+    rows = eql_to_sql(
+        query,
+        session,
+        result_loading=ResultLoading(
+            result_content=ResultContent.COLUMNS,
+            selected_object_restriction=selected_object_restriction,
+        ),
+    ).evaluate()
+
+    assert [row.label for row in rows] == [stored.label for stored in items]
+    [walk_in_closet] = [stored for stored in items if isinstance(stored, WalkInCloset)]
+    assert rows[items.index(walk_in_closet)].floor_area == walk_in_closet.floor_area
+
+
+def test_the_garbage_collector_is_paused_only_inside_the_pause():
+    """
+    The garbage collector does not run inside a pause and runs again after it.
+    """
+    with GarbageCollectionPause():
+        collector_running_inside = gc.isenabled()
+
+    assert (collector_running_inside, gc.isenabled()) == (False, True)

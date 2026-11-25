@@ -5,14 +5,17 @@ which statements.
 
 from __future__ import annotations
 
+import gc
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import batched
 
 import sqlalchemy
+from sqlalchemy import Select
 from sqlalchemy.orm import Session, lazyload
 from sqlalchemy.sql.base import ExecutableOption
-from typing_extensions import Any, Sequence
+from typing_extensions import Any, Iterator, Sequence
 
 from krrood.entity_query_language.core.base_expressions import HasExpression
 from krrood.entity_query_language.query.query import Entity
@@ -58,6 +61,22 @@ class SubclassLoading(StrEnum):
     """
 
 
+class SelectedObjectRestriction(StrEnum):
+    """
+    How a statement that loads the objects of one class keeps to the selected ones.
+    """
+
+    BOUND_IDS = "bound_ids"
+    """
+    It binds the ids of the selected objects, in batches.
+    """
+
+    SELECTION_JOIN = "selection_join"
+    """
+    It joins the query's selection, which the database evaluates again for it.
+    """
+
+
 class ResultContent(StrEnum):
     """
     What a query's evaluation returns for every selected object.
@@ -68,10 +87,40 @@ class ResultContent(StrEnum):
     The data access object, loaded as the class of the object.
     """
 
+    COLUMNS = "columns"
+    """
+    A row with the value of every column of the object's own class, without building
+    its data access object.
+    """
+
     DATABASE_IDS = "database_ids"
     """
     The id of the object, without loading any of its rows.
     """
+
+
+# %% pausing the garbage collector
+
+
+@dataclass(kw_only=True)
+class GarbageCollectionPause(AbstractContextManager):
+    """
+    Keeps Python's cyclic garbage collector from running inside a ``with`` block.
+    """
+
+    collector_was_running: bool = False
+    """
+    Whether the collector ran when the block was entered, so it runs again after it.
+    """
+
+    def __enter__(self) -> GarbageCollectionPause:
+        self.collector_was_running = gc.isenabled()
+        gc.disable()
+        return self
+
+    def __exit__(self, *exception_information: Any) -> None:
+        if self.collector_was_running:
+            gc.enable()
 
 
 # %% configuration
@@ -93,9 +142,22 @@ class ResultLoading:
     How the columns of the selected objects' own classes are loaded.
     """
 
+    selected_object_restriction: SelectedObjectRestriction = (
+        SelectedObjectRestriction.BOUND_IDS
+    )
+    """
+    How a statement loading the objects of one class keeps to the selected ones.
+    """
+
     result_content: ResultContent = ResultContent.DATA_ACCESS_OBJECTS
     """
     What the evaluation returns for every selected object.
+    """
+
+    pauses_garbage_collection: bool = False
+    """
+    Whether Python's cyclic garbage collector is kept from running during the
+    evaluation.
     """
 
     ids_per_statement: int = 10_000
@@ -155,14 +217,28 @@ class ResultLoading:
             return (lazyload("*"),)
         return ()
 
-    def load_data_access_objects(
-        self, *, session: Session, selected_objects: Sequence[sqlalchemy.Row]
-    ) -> list[DataAccessObject]:
+    def evaluation_context(self) -> AbstractContextManager:
+        """
+        :return: The context an evaluation with this result loading runs in.
+        """
+        if self.pauses_garbage_collection:
+            return GarbageCollectionPause()
+        return nullcontext()
+
+    def load_selected_objects(
+        self,
+        *,
+        session: Session,
+        selection: Select,
+        selected_objects: Sequence[sqlalchemy.Row],
+    ) -> list[Any]:
         """
         :param session: The session to load with.
+        :param selection: The statement that selected the objects.
         :param selected_objects: The ``database_id`` and ``polymorphic_type`` of every
-            selected object, in the order of the query.
-        :return: The data access objects of the selected objects, in the same order.
+            selected object, as *selection* gave them.
+        :return: The data access object or the row of every selected object, in the
+            order of *selected_objects*.
         """
         ids_by_class: dict[type[DataAccessObject], list[int]] = {}
         for selected_object in selected_objects:
@@ -170,17 +246,46 @@ class ResultLoading:
                 table_name=selected_object.polymorphic_type
             )
             ids_by_class.setdefault(dao_class, []).append(selected_object.database_id)
-        daos_by_id = {}
+        loaded_by_id = {}
         for dao_class, ids in ids_by_class.items():
-            for batch in batched(ids, self.ids_per_statement):
-                statement = (
-                    sqlalchemy.select(dao_class)
-                    .where(dao_class.database_id.in_(batch))
-                    .options(*self.loader_options)
-                )
-                for dao in session.scalars(statement):
-                    daos_by_id[dao.database_id] = dao
+            for statement in self._statements_loading(
+                dao_class=dao_class, ids=ids, selection=selection
+            ):
+                for loaded in self._execute(session=session, statement=statement):
+                    loaded_by_id[loaded.database_id] = loaded
         return [
-            daos_by_id[selected_object.database_id]
+            loaded_by_id[selected_object.database_id]
             for selected_object in selected_objects
         ]
+
+    def _statements_loading(
+        self, *, dao_class: type[DataAccessObject], ids: list[int], selection: Select
+    ) -> Iterator[Select]:
+        """
+        :param dao_class: The class the objects load as.
+        :param ids: The ids of the selected objects of that class.
+        :param selection: The statement that selected the objects.
+        :return: The statements that load those objects.
+        """
+        if self.result_content == ResultContent.COLUMNS:
+            statement = sqlalchemy.select(sqlalchemy.inspect(dao_class).selectable)
+        else:
+            statement = sqlalchemy.select(dao_class).options(*self.loader_options)
+        if self.selected_object_restriction == SelectedObjectRestriction.BOUND_IDS:
+            for batch in batched(ids, self.ids_per_statement):
+                yield statement.where(dao_class.database_id.in_(batch))
+            return
+        selected = selection.subquery()
+        yield statement.join(
+            selected, selected.c.database_id == dao_class.database_id
+        ).where(selected.c.polymorphic_type == dao_class.__tablename__)
+
+    def _execute(self, *, session: Session, statement: Select) -> Iterator[Any]:
+        """
+        :param session: The session to execute with.
+        :param statement: A statement :meth:`_statements_loading` made.
+        :return: What the statement loads: data access objects or rows.
+        """
+        if self.result_content == ResultContent.COLUMNS:
+            return iter(session.execute(statement))
+        return iter(session.scalars(statement))
