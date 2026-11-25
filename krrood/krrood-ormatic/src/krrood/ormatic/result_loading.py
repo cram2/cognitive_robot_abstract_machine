@@ -21,7 +21,7 @@ from krrood.entity_query_language.core.base_expressions import HasExpression
 from krrood.entity_query_language.query.query import Entity
 from krrood.ormatic.data_access_objects.dao import DataAccessObject, StoredObjectRow
 from krrood.ormatic.data_access_objects.helper import (
-    get_data_access_object_class,
+    get_mapping_data_access_object_class,
     get_part_class,
 )
 
@@ -192,7 +192,7 @@ class ResultLoading:
         """
         if domain_type is None or get_part_class(domain_type) is not None:
             return True
-        dao_class = get_data_access_object_class(domain_type)
+        dao_class = get_mapping_data_access_object_class(domain_type)
         if dao_class is None:
             return False
         return len(sqlalchemy.inspect(dao_class).self_and_descendants) > 1

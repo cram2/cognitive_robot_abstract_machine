@@ -8,6 +8,11 @@ from __future__ import annotations
 from krrood.entity_query_language.factories import an, entity, variable
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
+from krrood.ormatic.result_loading import (
+    RelationshipLoading,
+    ResultLoading,
+    SubclassLoading,
+)
 from ..dataset.classes_with_generic import RoverBase, WheeledBase
 
 # %% queries
@@ -24,3 +29,16 @@ def test_a_query_for_a_generic_base_selects_its_subclasses_objects(session, data
     result = eql_to_sql(an(entity(base)), session).evaluate()
 
     assert [dao.label for dao in result] == ["rover"]
+
+
+def test_the_result_loading_of_a_query_for_a_generic_base_loads_by_class():
+    """
+    The objects of a generic base class may be of its subclasses, so the result loading
+    suited to a query for it loads them one statement per class.
+    """
+    query = an(entity(variable(WheeledBase, domain=None)))
+
+    assert ResultLoading.from_query(query=query) == ResultLoading(
+        relationship_loading=RelationshipLoading.ON_ACCESS,
+        subclass_loading=SubclassLoading.ONE_QUERY_PER_CLASS,
+    )
