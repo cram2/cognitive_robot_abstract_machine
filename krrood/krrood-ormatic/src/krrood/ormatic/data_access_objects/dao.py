@@ -16,6 +16,7 @@ from functools import lru_cache
 import sqlalchemy.inspection
 import sqlalchemy.orm
 from sqlalchemy import event
+from sqlalchemy.sql.base import ExecutableOption
 from sqlalchemy.orm import (
     MANYTOONE,
     MANYTOMANY,
@@ -1708,11 +1709,16 @@ class StoredObjectRow:
 
     @classmethod
     def object_daos(
-        cls, *, session: sqlalchemy.orm.Session, stored_objects: list[StoredObjectRow]
+        cls,
+        *,
+        session: sqlalchemy.orm.Session,
+        stored_objects: list[StoredObjectRow],
+        loader_options: tuple[ExecutableOption, ...] = (),
     ) -> list[DataAccessObject]:
         """
         :param session: The session the rows were loaded with.
         :param stored_objects: Rows of this table.
+        :param loader_options: The options of the statements that load the DAOs.
         :return: The DAOs of the rows' objects, in the same order, loaded with one query
             per DAO class.
         """
@@ -1725,7 +1731,9 @@ class StoredObjectRow:
         for table_name, ids in ids_by_table.items():
             dao_class = cls.dao_class_of_table(table_name=table_name)
             for dao in session.scalars(
-                sqlalchemy.select(dao_class).where(dao_class.database_id.in_(ids))
+                sqlalchemy.select(dao_class)
+                .where(dao_class.database_id.in_(ids))
+                .options(*loader_options)
             ):
                 daos_by_id[dao.database_id] = dao
         return [

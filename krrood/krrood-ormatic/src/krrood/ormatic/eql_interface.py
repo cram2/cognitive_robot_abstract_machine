@@ -67,7 +67,9 @@ from krrood.ormatic.data_access_objects.helper import (
 from krrood.ormatic.exceptions import (
     NoDAOFoundForTypeError,
     NoDAOFoundForSelectionError,
+    UnsupportedResultLoadingError,
 )
+from krrood.ormatic.result_loading import ResultContent, ResultLoading
 
 
 @dataclass(kw_only=True)
@@ -636,6 +638,10 @@ class EQLTranslator:
 
     sql_query: Select | None = None
     join_manager: JoinManager = field(default_factory=JoinManager)
+    result_loading: ResultLoading = field(default_factory=ResultLoading)
+    """
+    How the evaluation loads the objects the query selects.
+    """
 
     @property
     def quantifier_type(self) -> type[ResultQuantifier]:
@@ -940,16 +946,38 @@ class EQLTranslator:
         """
         if isinstance(self.select_like, SetOf):
             return self._evaluate_set_of()
-
-        bound_query = self.session.scalars(self.sql_query)
-
-        if issubclass(self.quantifier_type, The):
-            return self._object_daos(results=[bound_query.one()])
-
-        elif issubclass(self.quantifier_type, An):
+        if not issubclass(self.quantifier_type, (The, An)):
+            raise UnsupportedQuantifierError(quantifier_type=self.quantifier_type)
+        if self.result_loading.loads_selected_rows:
+            bound_query = self.session.scalars(
+                self.sql_query.options(*self.result_loading.loader_options)
+            )
+            if issubclass(self.quantifier_type, The):
+                return self._object_daos(results=[bound_query.one()])
             return self._object_daos(results=bound_query.all())
+        selected_objects = self._selected_objects()
+        if self.result_loading.result_content == ResultContent.DATABASE_IDS:
+            return [selected_object.database_id for selected_object in selected_objects]
+        return self.result_loading.load_data_access_objects(
+            session=self.session, selected_objects=selected_objects
+        )
 
-        raise UnsupportedQuantifierError(quantifier_type=self.quantifier_type)
+    def _selected_objects(self) -> list[sqlalchemy.Row]:
+        """
+        :return: The ``database_id`` and ``polymorphic_type`` of every object the query
+            selects, in its order.
+        """
+        selected_entity = self.sql_query.column_descriptions[0]["entity"]
+        rows = self.session.execute(
+            self.sql_query.with_only_columns(
+                selected_entity.database_id.label("database_id"),
+                selected_entity.polymorphic_type.label("polymorphic_type"),
+                maintain_column_froms=True,
+            )
+        )
+        if issubclass(self.quantifier_type, The):
+            return [rows.one()]
+        return list(rows.all())
 
     def _object_daos(self, *, results: list[Any]) -> list[Any]:
         """
@@ -964,7 +992,9 @@ class EQLTranslator:
             return results
         object_daos = iter(
             StoredObjectDAO.object_daos(
-                session=self.session, stored_objects=stored_objects
+                session=self.session,
+                stored_objects=stored_objects,
+                loader_options=self.result_loading.loader_options,
             )
         )
         return [
@@ -988,7 +1018,11 @@ class EQLTranslator:
             isinstance(v, Variable) and not isinstance(v, Attribute) for v in selected
         )
 
-        rows = self.session.execute(self.sql_query).all()
+        if not self.result_loading.loads_selected_rows:
+            raise UnsupportedResultLoadingError(result_loading=self.result_loading)
+        rows = self.session.execute(
+            self.sql_query.options(*self.result_loading.loader_options)
+        ).all()
 
         if all_variables:
             # Entity variables — map each variable to its DAO object per row
@@ -1659,7 +1693,12 @@ class EQLTranslator:
         return []
 
 
-def eql_to_sql(query: HasExpression, session: Session) -> EQLTranslator:
+def eql_to_sql(
+    query: HasExpression,
+    session: Session,
+    *,
+    result_loading: ResultLoading | None = None,
+) -> EQLTranslator:
     """
     Translate an EQL query, or an object standing for one such as a match, to SQL.
 
@@ -1677,6 +1716,8 @@ def eql_to_sql(query: HasExpression, session: Session) -> EQLTranslator:
 
     :param query: The EQL query, or the object standing for it
     :param session: The SQLAlchemy session
+    :param result_loading: How the evaluation loads the selected objects; by default
+        as the mappers declare.
     :return: The translator holding the translated query
     :raises UnsupportedQueryTypeError: When *query* stands for an expression that is not
         a query.
@@ -1685,7 +1726,11 @@ def eql_to_sql(query: HasExpression, session: Session) -> EQLTranslator:
     if not isinstance(expression, Query):
         raise UnsupportedQueryTypeError(query=expression)
     expression.build()
-    result = EQLTranslator(eql_query=expression, session=session)
+    result = EQLTranslator(
+        eql_query=expression,
+        session=session,
+        result_loading=result_loading or ResultLoading(),
+    )
     result.translate()
     return result
 

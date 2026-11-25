@@ -8,9 +8,18 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import func, inspect, select
 
-from krrood.entity_query_language.factories import an, entity, variable
+from krrood.entity_query_language.factories import an, entity, set_of, variable
 from krrood.ormatic.data_access_objects.dao import StoredObjectRow
-from krrood.ormatic.exceptions import PartOfDetachedObjectNotLoadedError
+from krrood.ormatic.exceptions import (
+    PartOfDetachedObjectNotLoadedError,
+    UnsupportedResultLoadingError,
+)
+from krrood.ormatic.result_loading import (
+    RelationshipLoading,
+    ResultContent,
+    ResultLoading,
+    SubclassLoading,
+)
 from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
@@ -19,11 +28,13 @@ from ..dataset.multiple_inheritance import (
     HasHinges,
     Hinge,
     InspectedCloset,
+    InventoryItem,
     Inventory,
     LandmarkFrame,
     TaggedFurnishing,
     WalkInCloset,
     Closet,
+    Furnishing,
 )
 
 # %% generated schema
@@ -345,3 +356,136 @@ def test_conditions_on_one_path_share_its_join(session, database):
 
     assert str(translator.sql_query).count('"HasHingesDAO" AS') == 1
     assert [dao.from_dao().hinged.label for dao in translator.evaluate()] == ["bedroom"]
+
+
+# %% result loading
+
+EVERY_RESULT_LOADING = [
+    ResultLoading(
+        relationship_loading=relationship_loading, subclass_loading=subclass_loading
+    )
+    for relationship_loading in RelationshipLoading
+    for subclass_loading in SubclassLoading
+]
+
+
+def store_items_of_one_hierarchy(session) -> list:
+    """
+    Store items of four classes below one mapped root, one of them holding the part of a
+    secondary base.
+
+    :param session: The session to store them with.
+    :return: The stored items, ordered by label.
+    """
+    items = [
+        Closet(label="bedroom", leg_count=4, shelf_count=3, hinge_count=4),
+        HasHinges(label="gate", hinge_count=1),
+        WalkInCloset(
+            label="hall", leg_count=4, shelf_count=6, hinge_count=2, floor_area=3.5
+        ),
+        Furnishing(label="stool", leg_count=3),
+    ]
+    for item in items:
+        session.add(to_dao(item))
+    session.commit()
+    return items
+
+
+@pytest.mark.parametrize("result_loading", EVERY_RESULT_LOADING, ids=repr)
+def test_every_result_loading_loads_the_objects_of_a_primary_root_as_their_classes(
+    session, database, result_loading
+):
+    """
+    Selecting the root of a hierarchy loads each object as its own class, however the
+    result is loaded.
+    """
+    items = store_items_of_one_hierarchy(session)
+    item = variable(InventoryItem, domain=None)
+    query = an(entity(item).ordered_by(variable=item.label))
+
+    result = eql_to_sql(query, session, result_loading=result_loading).evaluate()
+
+    assert [dao.from_dao() for dao in result] == items
+
+
+@pytest.mark.parametrize("result_loading", EVERY_RESULT_LOADING, ids=repr)
+def test_every_result_loading_loads_the_objects_of_a_secondary_base_as_their_classes(
+    session, database, result_loading
+):
+    """
+    Selecting a secondary base class loads each object as its own primary class,
+    however the result is loaded.
+    """
+    items = store_items_of_one_hierarchy(session)
+    hinged = variable(HasHinges, domain=None)
+    query = an(entity(hinged).where(hinged.hinge_count > 1))
+
+    result = eql_to_sql(query, session, result_loading=result_loading).evaluate()
+
+    assert sorted(
+        (dao.from_dao() for dao in result), key=lambda loaded: loaded.label
+    ) == [item for item in items if item.hinge_count > 1]
+
+
+def test_database_ids_are_the_ids_of_the_selected_objects_in_their_order(
+    session, database
+):
+    """
+    Evaluating for the database ids gives the ids of the data access objects the query
+    selects, in the same order.
+    """
+    store_items_of_one_hierarchy(session)
+    item = variable(InventoryItem, domain=None)
+    query = an(entity(item).ordered_by(variable=item.label))
+
+    ids = eql_to_sql(
+        query,
+        session,
+        result_loading=ResultLoading(result_content=ResultContent.DATABASE_IDS),
+    ).evaluate()
+
+    assert ids == [dao.database_id for dao in eql_to_sql(query, session).evaluate()]
+
+
+@pytest.mark.parametrize(
+    "relationship_loading, hinges_unloaded",
+    [(RelationshipLoading.AS_MAPPED, False), (RelationshipLoading.ON_ACCESS, True)],
+)
+def test_relationships_load_on_access_only_when_asked_to(
+    session, database, relationship_loading, hinges_unloaded
+):
+    """
+    Loading relationships on access leaves a relationship its mapping loads eagerly
+    unloaded.
+    """
+    session.add(to_dao(HasHinges(label="gate", hinges=[Hinge(stiffness=1.0)])))
+    session.commit()
+    session.expunge_all()
+    hinged = variable(HasHinges, domain=None)
+    query = an(entity(hinged))
+
+    [dao] = eql_to_sql(
+        query,
+        session,
+        result_loading=ResultLoading(relationship_loading=relationship_loading),
+    ).evaluate()
+
+    assert ("hinges" in inspect(dao).unloaded) == hinges_unloaded
+
+
+def test_a_set_of_query_refuses_to_load_its_rows_by_class(session, database):
+    """
+    A ``set_of`` query loads the rows it selects as they are.
+    """
+    store_items_of_one_hierarchy(session)
+    item = variable(InventoryItem, domain=None)
+    translator = eql_to_sql(
+        an(set_of(item)),
+        session,
+        result_loading=ResultLoading(
+            subclass_loading=SubclassLoading.ONE_QUERY_PER_CLASS
+        ),
+    )
+
+    with pytest.raises(UnsupportedResultLoadingError):
+        translator.evaluate()
