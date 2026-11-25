@@ -91,7 +91,7 @@ class QPController:
                 f'prediction horizon: "{self.config.prediction_horizon}"\n'
                 f'QP solver: "{self.config.qp_solver_class.__name__}"'
             )
-        self._set_active_dofs(degrees_of_freedom=degrees_of_freedom)
+        self._set_active_degrees_of_freedom(degrees_of_freedom=degrees_of_freedom)
         if self.has_not_free_variables():
             raise EmptyProblemException()
         generic_qp_data_symbolic = QPDataSymbolic(
@@ -113,41 +113,37 @@ class QPController:
             qp_data_symbolic=self.qp_data_factory.qp_data
         )
 
-    def _set_active_dofs(self, *, degrees_of_freedom: list[DegreeOfFreedom]) -> None:
-        all_active_float_variables = set().union(
-            *[
-                {
-                    dof.variables.position.name,
-                    dof.variables.velocity.name,
-                    dof.variables.acceleration.name,
-                    dof.variables.jerk.name,
-                }
-                for dof in degrees_of_freedom
-            ]
-        )
+    def _set_active_degrees_of_freedom(
+        self, *, degrees_of_freedom: list[DegreeOfFreedom]
+    ) -> None:
+        """
+        Sets :attr:`active_degrees_of_freedom` and :attr:`active_world_state_indices` to
+        the degrees of freedom and world state variables the constraints depend on.
+
+        :param degrees_of_freedom: The degrees of freedom the QP may move.
+        """
         float_variable_names = self.constraint_collection.get_all_float_variable_names()
-        active_float_variables = all_active_float_variables & float_variable_names
-
-        def dof_used(dof: DegreeOfFreedom) -> bool:
-            vars_ = dof.variables
-            return (
-                vars_.position.name in float_variable_names
-                or vars_.velocity.name in float_variable_names
-                or vars_.acceleration.name in float_variable_names
-                or vars_.jerk.name in float_variable_names
-            )
-
+        self.active_degrees_of_freedom = []
+        active_float_variable_names = set()
+        for degree_of_freedom in degrees_of_freedom:
+            variables = degree_of_freedom.variables
+            used_variable_names = float_variable_names & {
+                variables.position.name,
+                variables.velocity.name,
+                variables.acceleration.name,
+                variables.jerk.name,
+            }
+            if used_variable_names:
+                self.active_degrees_of_freedom.append(degree_of_freedom)
+                active_float_variable_names |= used_variable_names
         self.active_world_state_indices = np.array(
             [
-                i
-                for i, v in enumerate(self.world_state_symbols)
-                if v.name in active_float_variables
+                index
+                for index, variable in enumerate(self.world_state_symbols)
+                if variable.name in active_float_variable_names
             ],
             dtype=np.intp,
         )
-        self.active_degrees_of_freedom = [
-            dof for dof in degrees_of_freedom if dof_used(dof)
-        ]
 
     def has_not_free_variables(self) -> bool:
         return len(self.active_degrees_of_freedom) == 0
