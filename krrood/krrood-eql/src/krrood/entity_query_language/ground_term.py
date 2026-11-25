@@ -401,10 +401,10 @@ class BoundValueTerm(CallTerm):
 GroundTermType = TypeVar("GroundTermType", bound=GroundTerm)
 
 
-class GroundTermExpression(Generic[GroundTermType], SubClassSafeGeneric):
+class GroundTermExpression(Generic[GroundTermType, T], SubClassSafeGeneric):
     """
     An expression whose value, for each binding of its operands, is the value of one
-    ground term of the bound type.
+    ground term of the bound ground term type, a value of the bound value type.
     """
 
     @property

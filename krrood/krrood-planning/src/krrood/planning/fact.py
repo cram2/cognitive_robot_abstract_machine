@@ -20,6 +20,7 @@ from krrood.planning.exceptions import (
     AssignmentBypassesSetter,
     ComparisonIsNotAnEquality,
     ConditionIsNotAFact,
+    FactHasVariables,
     MissingGroundTerm,
 )
 
@@ -99,6 +100,20 @@ class Fact:
         if isinstance(self.value, SymbolicExpression):
             return (*operands, self.value)
         return operands
+
+    @property
+    def ground_term(self) -> GroundTerm:
+        """
+        :return: The one ground term :attr:`expression` reads, for a fact whose operands
+            are all literals.
+        :raises FactHasVariables: If an operand of :attr:`expression` is not a literal.
+        """
+        operands = self.expression._ground_term_operands_
+        if not all(isinstance(operand, Literal) for operand in operands):
+            raise FactHasVariables(expression=self.expression)
+        return self.expression._ground_term_(
+            operand_values=tuple(operand._value_ for operand in operands)
+        )
 
     def assignments(
         self, *, bindings: Iterable[Mapping[SymbolicExpression, Any]]

@@ -103,6 +103,14 @@ class MethodsRules(Section):
         "otherwise inline it"
     )
 
+    DIRECT_ACCESS_TO_OWNED_VALUES = (
+        "Never make a caller, a test included, reach a value through a chain of "
+        "steps - reading another object's internals, then feeding them back into it "
+        "to rebuild what it already knows. Give the class that owns the value one "
+        "direct accessor for it, and where the steps cannot be shortened, take them "
+        "there once"
+    )
+
     GUARD_CLAUSES = (
         "Reduce nesting and complexity with guard clauses: handle alternative "
         "outputs first by inverting conditions and returning early, so the main "

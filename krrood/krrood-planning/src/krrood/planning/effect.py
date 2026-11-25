@@ -9,7 +9,7 @@ import copy
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from typing_extensions import Any, Mapping
+from typing_extensions import Any, Collection, Mapping
 
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -37,7 +37,7 @@ class CollectionInsertion:
         """
         :param collection: A collection of elements, which is left unchanged.
         :return: A copy of *collection* with :attr:`elements` inserted by its own
-            ``append`` or ``add``, or rebuilt with them where it has neither.
+            ``extend`` or ``update``, or rebuilt with them where it has neither.
         """
         inserted = copy.copy(collection)
         if isinstance(inserted, collections.abc.MutableSequence):
@@ -48,12 +48,13 @@ class CollectionInsertion:
             return inserted
         return type(collection)((*collection, *self.elements))
 
-    def followed_by(self, *, later: CollectionInsertion) -> CollectionInsertion:
+    def extend(self, *, later_insertion: CollectionInsertion) -> CollectionInsertion:
         """
-        :param later: Elements inserted after these.
-        :return: The insertion of these elements and then those of *later*.
+        :param later_insertion: Elements inserted after these.
+        :return: The insertion of these elements and then those of *later_insertion*;
+            this insertion is left unchanged.
         """
-        return CollectionInsertion(elements=(*self.elements, *later.elements))
+        return CollectionInsertion(elements=(*self.elements, *later_insertion.elements))
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -166,7 +167,7 @@ class ElementInsertion(Effect):
     :attr:`collection` is not a collection of elements.
     """
 
-    collection: GroundTermExpression
+    collection: GroundTermExpression[GroundTerm, Collection[Any]]
     """
     The expression whose ground terms hold the collections.
     """

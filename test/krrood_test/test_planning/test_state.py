@@ -29,14 +29,17 @@ from krrood.entity_query_language.factories import (
     variable,
     variable_from,
 )
+from krrood.entity_query_language.ground_term import AttributeTerm
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.planning.exceptions import (
     AssignedValueHasWrongType,
     AssignmentBypassesSetter,
     ComparisonIsNotAnEquality,
     ConditionIsNotAFact,
+    FactHasVariables,
     MissingGroundTerm,
 )
+from krrood.planning.fact import Fact
 from krrood.planning.state import State
 
 from ..dataset.setting_with_side_effects import (
@@ -297,6 +300,32 @@ def test_fact_with_an_expression_index_assigns_every_element_it_reaches(two_towe
     result = a(Shelf).from_(domain=[two_towers.shelf]).slots[slot].tolist(state=state)
 
     assert result == [two_towers.c, two_towers.c]
+
+
+# %% the ground term of a fact on literals
+
+
+def test_fact_on_literals_names_its_ground_term(two_towers):
+    """
+    A fact whose operands are literals stands for exactly one ground term.
+    """
+    fact = Fact.from_condition(condition=literal(two_towers.a).support == two_towers.c)
+
+    assert fact.ground_term == AttributeTerm(
+        instance=two_towers.a, attribute_name="support"
+    )
+
+
+def test_fact_about_a_variable_has_no_single_ground_term(two_towers):
+    """
+    A fact rooted at a variable stands for one ground term per binding.
+    """
+    fact = Fact.from_condition(
+        condition=variable(Block, [two_towers.a, two_towers.b]).support == two_towers.c
+    )
+
+    with pytest.raises(FactHasVariables):
+        fact.ground_term
 
 
 # %% conditions that are not facts

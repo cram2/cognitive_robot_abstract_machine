@@ -888,16 +888,19 @@ def get_true_statements(
     ).true_statements
 
 
-def evaluate_condition(condition: ConditionType) -> bool:
+def evaluate_condition(
+    condition: ConditionType, *, state: TermReader | None = None
+) -> bool:
     """
-    Evaluates the condition to True or False.
-
-    :param condition: The condition to evaluate.
-    :return: True if there is a possible solution, False otherwise.
+    :param condition: The condition to evaluate, which may name variables.
+    :param state: What the evaluation reads ground terms with; their live values when
+        omitted.
+    :return: Whether *condition* holds for some binding of its variables, stopping at
+        the first one.
     """
     if type(condition) is bool:
         return condition
-    return any(condition.evaluate())
+    return any(condition.evaluate(state=state))
 
 
 @dataclass(kw_only=True, eq=False)

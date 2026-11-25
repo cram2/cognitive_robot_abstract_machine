@@ -67,6 +67,29 @@ class ComparisonIsNotAnEquality(ConditionIsNotAFact):
 
 
 @dataclass(kw_only=True)
+class FactHasVariables(DataclassException):
+    """
+    The one ground term of a fact was asked for, but the fact names a variable, so it
+    stands for one ground term per binding.
+    """
+
+    expression: SymbolicExpression
+    """
+    The expression of the fact, which has an operand that is not a literal.
+    """
+
+    def error_message(self) -> str:
+        return f"{self.expression} names a variable, so it has no single ground term."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Ask for the single ground term only of a fact on literals, such as a "
+            "condition of a ground action; read the ground terms of a fact with "
+            "variables from its bindings."
+        )
+
+
+@dataclass(kw_only=True)
 class MissingGroundTerm(DataclassException):
     """
     A fact gives a value to a ground term that does not exist, such as an attribute the

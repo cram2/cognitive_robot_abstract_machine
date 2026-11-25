@@ -15,7 +15,6 @@ from krrood.entity_query_language.core.variable import Literal
 from krrood.entity_query_language.factories import (
     ConditionType,
     an,
-    entity,
     inference,
     literal,
     variable,
@@ -83,9 +82,7 @@ class ActionSchema(ABC):
             parameter.name: variable(get_field_type_endpoint(cls, parameter.name))
             for parameter in fields(cls)
         }
-        return an(
-            entity(inference(cls)(**variables)).where(cls(**variables).precondition())
-        )
+        return an(inference(cls)(**variables)).where(cls(**variables).precondition())
 
     def to_symbolic(self) -> Self:
         """

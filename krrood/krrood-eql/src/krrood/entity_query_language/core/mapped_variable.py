@@ -734,7 +734,9 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class SingleValueMapping(MappedVariable[T], GroundTermExpression[GroundTermType], ABC):
+class SingleValueMapping(
+    MappedVariable[T], GroundTermExpression[GroundTermType, T], ABC
+):
     """
     A mapping that reaches a single value, fully determined by the expression it is
     applied to and its own arguments.
@@ -910,7 +912,7 @@ class IndexByValue(Index[T], SingleValueMapping[T, IndexTerm]):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class IndexByExpression(Index[T], GroundTermExpression[IndexTerm]):
+class IndexByExpression(Index[T], GroundTermExpression[IndexTerm, T]):
     """
     Indexing by a key that is itself an expression, which reaches one element per value
     that expression takes.
@@ -1009,7 +1011,7 @@ class CallWithValueArguments(Call[T], SingleValueMapping[T, CallTerm]):
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class CallWithExpressionArguments(Call[T], GroundTermExpression[CallTerm]):
+class CallWithExpressionArguments(Call[T], GroundTermExpression[CallTerm, T]):
     """
     A call some of whose arguments are expressions, which reaches one value per
     combination of the values those expressions take in the current bindings.

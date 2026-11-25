@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from krrood.entity_query_language.factories import a, literal
+from krrood.entity_query_language.factories import a, evaluate_condition, literal
 from krrood.entity_query_language.ground_term import AttributeTerm
 from krrood.entity_query_language.query.query import Entity
 from krrood.planning.exceptions import ActionIsNotApplicable
@@ -142,7 +142,7 @@ def test_ground_action_whose_precondition_holds_is_applicable(stacking_world):
     Both blocks are clear and distinct.
     """
     action = Stack(block=stacking_world.b, target=stacking_world.c)
-    assert State().satisfies(condition=action.to_symbolic().precondition())
+    assert evaluate_condition(action.to_symbolic().precondition(), state=State())
 
 
 def test_ground_action_whose_precondition_fails_is_not_applicable(stacking_world):
@@ -150,7 +150,7 @@ def test_ground_action_whose_precondition_fails_is_not_applicable(stacking_world
     Block ``a`` carries ``c``, so it is not clear.
     """
     action = Stack(block=stacking_world.a, target=stacking_world.b)
-    assert not State().satisfies(condition=action.to_symbolic().precondition())
+    assert not evaluate_condition(action.to_symbolic().precondition(), state=State())
 
 
 def test_applying_an_action_that_is_not_applicable_is_rejected(stacking_world):
@@ -172,13 +172,7 @@ def test_rejected_action_names_the_conditions_that_fail(stacking_world):
         State().apply_action(action=action)
     (failed,) = raised.value.failed_conditions
     fact = Fact.from_condition(condition=failed)
-    operand_values = tuple(
-        operand._value_ for operand in fact.expression._ground_term_operands_
-    )
-    assert (
-        fact.expression._ground_term_(operand_values=operand_values),
-        fact.value,
-    ) == (
+    assert (fact.ground_term, fact.value) == (
         AttributeTerm(instance=stacking_world.a, attribute_name="clear"),
         True,
     )
@@ -194,13 +188,9 @@ def test_rejected_action_names_the_conditions_that_fail_in_the_state(stacking_wo
             action=Stack(block=stacking_world.b, target=stacking_world.c)
         )
     (failed,) = raised.value.failed_conditions
-    fact = Fact.from_condition(condition=failed)
-    operand_values = tuple(
-        operand._value_ for operand in fact.expression._ground_term_operands_
+    assert Fact.from_condition(condition=failed).ground_term == AttributeTerm(
+        instance=stacking_world.b, attribute_name="clear"
     )
-    assert fact.expression._ground_term_(
-        operand_values=operand_values
-    ) == AttributeTerm(instance=stacking_world.b, attribute_name="clear")
 
 
 # %% applying effects

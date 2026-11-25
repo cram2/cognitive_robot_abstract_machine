@@ -13,12 +13,6 @@ from typing_extensions import TYPE_CHECKING, Any, Iterable, Iterator
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.evaluation import ConditionEvaluation
-from krrood.entity_query_language.factories import (
-    ConditionType,
-    an,
-    entity,
-    literal,
-)
 from krrood.entity_query_language.ground_term import (
     FunctionKey,
     GroundTerm,
@@ -162,14 +156,6 @@ class State(TermReader):
             )
         return self.apply_effects(*symbolic_action.effects())
 
-    def satisfies(self, *, condition: ConditionType) -> bool:
-        """
-        :param condition: A condition, which may name variables.
-        :return: Whether *condition* holds in this state for some binding of them.
-        """
-        query = an(entity(literal(True)).where(condition))
-        return next(iter(query.evaluate(state=self)), False)
-
     def _apply_change_(self, *, change: StateChange) -> State:
         """
         :param change: What an effect changes.
@@ -184,7 +170,9 @@ class State(TermReader):
         for term, insertion in change.insertions.items():
             earlier = insertions.get(term)
             insertions[term] = (
-                insertion if earlier is None else earlier.followed_by(later=insertion)
+                insertion
+                if earlier is None
+                else earlier.extend(later_insertion=insertion)
             )
         return (
             State(

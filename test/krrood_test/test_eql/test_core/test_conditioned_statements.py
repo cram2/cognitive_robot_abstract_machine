@@ -5,6 +5,7 @@ Selecting the statements of a condition by whether they hold.
 from krrood.entity_query_language.evaluation import ConditionEvaluation
 from krrood.entity_query_language.factories import (
     and_,
+    evaluate_condition,
     get_false_statements,
     get_true_statements,
     literal,
@@ -273,3 +274,19 @@ def test_a_condition_is_evaluated_in_the_given_state():
     assert [
         statement._id_ for statement in get_true_statements(condition, state=state)
     ] == [condition._id_]
+
+
+def test_whether_a_condition_holds_is_decided_in_the_given_state():
+    """
+    The state reads the position's ``x`` as large, though the live position's is not.
+    """
+    position = KRROODPosition(x=0.0, y=0.0, z=0.0)
+    condition = literal(position).x > 1.0
+    state = AssignedValueReader(
+        assigned_values={AttributeTerm(instance=position, attribute_name="x"): 2.0}
+    )
+
+    assert (
+        evaluate_condition(condition),
+        evaluate_condition(condition, state=state),
+    ) == (False, True)
