@@ -65,7 +65,7 @@ logger = logging.getLogger(__name__)
 # %% Snapshot restoration
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RestoredWorld:
     """
     Capture the lookup context and duration of one snapshot restoration.
@@ -151,7 +151,7 @@ class StorageReaderInterface(CameraInterface):
         )
         projection_started = perf_counter()
         self._check_sensor_conflicts(observation, world)
-        RecordedCameraWorld(observation).install(world)
+        RecordedCameraWorld(observation=observation).install(world)
         self._recorded_camera_id = observation.camera.id
         logger.debug(
             "MongoDB sensor replay restored full world in %.6f s and projected camera in %.6f s",

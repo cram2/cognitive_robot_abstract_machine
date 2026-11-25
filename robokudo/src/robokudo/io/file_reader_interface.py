@@ -45,7 +45,7 @@ Timestamp text extracted from a recorded frame's filename.
 # %% File playback
 
 
-@dataclass(init=False, eq=False)
+@dataclass(init=False, eq=False, kw_only=True)
 class FileReaderInterface(CameraInterface):
     """
     A camera interface for reading stored data from the local filesystem.
@@ -227,7 +227,7 @@ class FileReaderInterface(CameraInterface):
 # %% RGB-D playback
 
 
-@dataclass(init=False, eq=False)
+@dataclass(init=False, eq=False, kw_only=True)
 class RGBDFileReaderInterface(FileReaderInterface):
     """
     Specialized file reader interface for RGB-D camera data.

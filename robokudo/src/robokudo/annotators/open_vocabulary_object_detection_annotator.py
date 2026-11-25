@@ -97,7 +97,7 @@ def get_box_text(object_hypothesis: ObjectHypothesis) -> str:
 # %% Open-vocabulary object detection
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class OpenVocabularyObjectDetectionAnnotator(
     robokudo.annotators.core.ThreadedAnnotator
 ):

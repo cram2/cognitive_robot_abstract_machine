@@ -6,14 +6,16 @@ from robokudo.annotators.storage import StorageWriter
 # %% storage preparation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StorageResetRecorder:
     """
     Record database resets requested by a storage writer.
     """
 
     database_name: str
-    """Name of the database associated with the recorder."""
+    """
+    Name of the database associated with the recorder.
+    """
 
     reset_count: int = 0
     """

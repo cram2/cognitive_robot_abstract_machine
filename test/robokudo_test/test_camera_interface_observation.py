@@ -79,7 +79,7 @@ class SynchronizedImageConfiguration(TfComponent):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LiveColorCameraConfig:
     """
     Provide the options consumed by the RGB-only reader's frame conversion.
@@ -96,7 +96,7 @@ class LiveColorCameraConfig:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenCVCameraTestConfig:
     """
     Provide the options consumed by one OpenCV frame conversion.
@@ -138,7 +138,7 @@ class OpenCVCameraTestConfig:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SeekableImageSequence:
     """
     Provide the metadata operations used after an OpenCV frame is retrieved.

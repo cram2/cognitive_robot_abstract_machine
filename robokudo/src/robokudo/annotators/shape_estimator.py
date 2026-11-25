@@ -42,7 +42,7 @@ from robokudo.utils.shape_fitting import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CylinderAxisCandidate:
     """Candidate axis direction together with a refitted cylinder."""
 

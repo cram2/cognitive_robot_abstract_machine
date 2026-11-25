@@ -82,7 +82,7 @@ class PoseKeypoint(IntEnum):
 # %% depth
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DepthFrame:
     """
     The depth measurements point clouds are built from, with matching color.

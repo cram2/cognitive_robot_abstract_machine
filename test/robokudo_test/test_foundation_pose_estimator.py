@@ -23,7 +23,7 @@ from robokudo.annotators.object_observation import (  # noqa: E402
 # %% Scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlateOnPlane:
     """
     A thin square plate lying on the plane of the warm-up observation, covering its

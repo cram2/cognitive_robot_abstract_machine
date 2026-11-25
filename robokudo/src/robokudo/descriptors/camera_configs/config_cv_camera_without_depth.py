@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class OpenCVCameraConfig(BaseCameraConfig):
     """
     Configuration class for OpenCV-based cameras without depth information.

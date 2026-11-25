@@ -19,7 +19,7 @@ from robokudo.types.human import BodyKeypoint
 # %% detection model
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NormalizedBox:
     """
     A bounding box given as fractions of the image width and height.
@@ -58,7 +58,7 @@ class NormalizedBox:
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NormalizedKeypoint:
     """
     A body keypoint given as fractions of the image width and height.
@@ -89,7 +89,7 @@ class NormalizedKeypoint:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockDetection:
     """
     A detection the mock model reports on every image.
@@ -116,7 +116,7 @@ class MockDetection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockDetectionModel:
     """
     YOLO mock reporting its predefined detections on any image.
@@ -195,7 +195,7 @@ class MockDetectionModel:
 # %% segmentation model
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TopHalfSegmentationModel:
     """
     SAM mock segmenting the upper half of every prompted bounding box.
@@ -221,7 +221,7 @@ class TopHalfSegmentationModel:
 # %% model loading
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockModelLoader:
     """
     The models handed out in place of the ones ultralytics would load.

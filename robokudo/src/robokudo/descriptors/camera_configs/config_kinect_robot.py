@@ -12,7 +12,7 @@ from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraCon
 from robokudo.types.cv import ColorToDepthRatio
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class KinectCameraConfig(
     BaseCameraConfig,
     RGBDComponent,

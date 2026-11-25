@@ -7,14 +7,16 @@ from rclpy.node import Node
 from robokudo.scripts import query_test_client
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeForActionClient:
     """
     Record the node associated with an action client.
     """
 
     node: Node
-    """Node supplied while constructing the action client."""
+    """
+    Node supplied while constructing the action client.
+    """
 
     action_type: Any
     """
@@ -22,7 +24,9 @@ class NodeForActionClient:
     """
 
     action_name: str
-    """Name through which the action is reached."""
+    """
+    Name through which the action is reached.
+    """
 
     destroyed: bool = field(init=False, default=False)
     """
@@ -45,7 +49,7 @@ class NodeForActionClient:
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedReadiness:
     """
     Record whether client readiness was reported.

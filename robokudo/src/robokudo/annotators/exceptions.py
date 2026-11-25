@@ -13,7 +13,7 @@ from robokudo.exceptions import RoboKudoError
 
 
 # %% Collection reader placement
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCollectionReaderParent(RoboKudoError):
     """
     A collection reader has no parent sequence to initialize.
@@ -33,7 +33,7 @@ class InvalidCollectionReaderParent(RoboKudoError):
 
 
 # %% Analysis contracts
-@dataclass
+@dataclass(kw_only=True)
 class InvalidAnalysisData(RoboKudoError):
     """
     Analysis data does not satisfy its required type.
@@ -43,6 +43,7 @@ class InvalidAnalysisData(RoboKudoError):
     """
     Type required by the analysis operation.
     """
+
     actual_type: type
     """
     Type of the supplied data.
@@ -55,7 +56,7 @@ class InvalidAnalysisData(RoboKudoError):
         return "Provide analysis data of the required type."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyAnalysisScope(RoboKudoError, ValueError):
     """
     An analysis scope selects no data.
@@ -76,7 +77,7 @@ class EmptyAnalysisScope(RoboKudoError, ValueError):
 # %% model configuration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotAPoseModelException(RoboKudoError, ValueError):
     """
     Raised when an annotator that reads body keypoints loaded a model reporting none.
@@ -102,7 +103,7 @@ class NotAPoseModelException(RoboKudoError, ValueError):
 # %% object pose estimation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplicateObjectClassMesh(RoboKudoError, ValueError):
     """
     Raised when more than one mesh is configured for an object class.
@@ -120,7 +121,7 @@ class DuplicateObjectClassMesh(RoboKudoError, ValueError):
         return "Configure exactly one mesh per class name."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ImageResolutionMismatch(RoboKudoError, ValueError):
     """
     Raised when the color and the depth image of a frame differ in resolution.

@@ -19,7 +19,7 @@ from robokudo.types.annotation import (
 from robokudo.types.scene import ObjectHypothesis
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class QueryAttributeMatcher:
     """
     Connect an ObjectDesignator field extractor with its matcher.

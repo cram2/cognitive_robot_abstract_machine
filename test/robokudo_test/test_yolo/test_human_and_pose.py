@@ -37,14 +37,16 @@ from ._yolo_mock import (
 # %% scene setup
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PersonScene(BlackWallScene):
     """
     The black wall scene, in which the mock pose model detects a person.
     """
 
     person_class_name: str = field(
-        default_factory=lambda: HumanAndPoseAnnotator.Descriptor.Parameters().person_class_name
+        default_factory=lambda: (
+            HumanAndPoseAnnotator.Descriptor.Parameters().person_class_name
+        )
     )
     """
     Name of the class the mock pose model reports persons as.

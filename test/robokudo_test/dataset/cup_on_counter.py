@@ -18,7 +18,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 
 
 # %% Recorded frames
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RecordedFrame:
     """
     One RGB-D frame of a file recording, identified by the name its files share.
@@ -36,7 +36,7 @@ class RecordedFrame:
 
 
 # %% Cup on counter recording
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CupOnCounterRecording:
     """
     Two Kinect frames of a single cup standing on a kitchen counter, recorded in the

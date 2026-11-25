@@ -123,7 +123,7 @@ def _load_type(type_name: str) -> type[Any]:
     return getattr(module, class_name)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ViewPayload:
     """
     Persistence envelope for a single CAS view.
@@ -468,7 +468,7 @@ class HomogeneousTransformationMatrixCodec(ViewCodec):
 
 
 # %% Recorded camera observations
-@dataclass
+@dataclass(kw_only=True)
 class RecordedCameraObservation:
     """
     Image calibration and optical pose linked to a recorded camera.
@@ -495,7 +495,7 @@ class RecordedCameraObservation:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraObservationCodec(ViewCodec):
     """
     Persist optical image observations linked to recorded cameras.
@@ -604,7 +604,7 @@ class KrroodCodec(ViewCodec):
         return krrood_from_json(payload.payload, **kwargs)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CASViewCodecRegistry:
     """
     Registry that routes CAS views to matching codecs.

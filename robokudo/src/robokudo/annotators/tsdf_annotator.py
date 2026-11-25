@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 # %% Volume integration inputs
-@dataclass
+@dataclass(kw_only=True)
 class VolumeIntegrationInput:
     """An object's pose and image region for volume integration."""
 

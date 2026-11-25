@@ -117,7 +117,7 @@ class CASViews(StrEnum):
 
 
 # %% Common analysis structure
-@dataclass
+@dataclass(kw_only=True)
 class CAS:
     """
     The main data representation in RoboKudo.

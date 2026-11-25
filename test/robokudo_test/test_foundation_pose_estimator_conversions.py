@@ -20,7 +20,7 @@ from typing_extensions import Any
 # %% Engines without a GPU
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScriptedFoundationPose:
     """
     Stands in for the GPU engines: answers with a preset pose matrix and records the

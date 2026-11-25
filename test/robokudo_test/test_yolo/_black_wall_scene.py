@@ -26,7 +26,7 @@ from robokudo.types.cv import ColorToDepthRatio
 # %% black wall scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BlackWallScene:
     """
     A camera facing a black wall square-on: a black color image and a depth image that

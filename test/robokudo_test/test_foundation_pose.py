@@ -53,7 +53,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% Scripted pose estimation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScriptedPoseEstimator(MeshBasedPoseEstimator):
     """
     Answers every estimate and track with a preset pose and records what it was asked.
@@ -113,7 +113,7 @@ def object_pose_at_depth(depth: float) -> Pose:
 # %% Pose estimators with and without meshes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PoseEstimatorWithoutMeshes(ObjectPoseEstimator):
     """
     Poses objects without knowing any mesh.
@@ -148,7 +148,7 @@ def test_mesh_based_pose_estimator_has_to_load_and_select_meshes() -> None:
 # %% Scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FlatSurfaceScene:
     """
     A camera looking at a flat surface one meter away, with classified objects on it.

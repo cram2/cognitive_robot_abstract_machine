@@ -12,7 +12,7 @@ from semantic_digital_twin.datastructures.camera_model import CameraDistortionMo
 
 
 # %% Image rotation
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedImageRotation(RoboKudoError, ValueError):
     """
     A requested image rotation is outside the supported orientations.
@@ -38,7 +38,7 @@ class UnsupportedImageRotation(RoboKudoError, ValueError):
 
 
 # %% Camera distortion metadata
-@dataclass
+@dataclass(kw_only=True)
 class CameraDistortionModelMissing(InvalidCameraObservation):
     """
     Nonzero distortion coefficients have no declared distortion model.
@@ -67,7 +67,7 @@ class CameraDistortionModelMissing(InvalidCameraObservation):
         return "Declare the distortion model matching the supplied camera coefficients."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedCameraDistortionModel(InvalidCameraObservation):
     """
     Camera calibration declares a distortion model the adapter cannot interpret.
@@ -172,7 +172,7 @@ class FrameNamesSeveralBodies(InvalidCameraObservation):
 # %% Semantic robot selection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotAnnotationMissing(RoboKudoError):
     """
     Raised when no semantic robot matches the runtime-world selection.
@@ -200,7 +200,7 @@ class RobotAnnotationMissing(RoboKudoError):
         return "synchronize a robot into the runtime world or select an existing robot."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotAnnotationAmbiguous(RoboKudoError):
     """
     Raised when runtime-world robot selection has multiple valid results.
@@ -227,7 +227,7 @@ class RobotAnnotationAmbiguous(RoboKudoError):
 # %% Semantic camera selection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraAnnotationMissing(RoboKudoError):
     """
     Raised when no semantic camera matches the configured selection.
@@ -247,7 +247,7 @@ class CameraAnnotationMissing(RoboKudoError):
         return "add a Camera annotation to the world or select an existing camera."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraAnnotationAmbiguous(RoboKudoError):
     """
     Raised when camera selection has more than one valid result.
@@ -265,7 +265,7 @@ class CameraAnnotationAmbiguous(RoboKudoError):
         return "configure the name of the camera that should provide perception data."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraPoseOverrideUnavailable(RoboKudoError):
     """
     Raised when the selected camera attachment cannot accept a pose override.
@@ -300,7 +300,7 @@ class CameraPoseOverrideUnavailable(RoboKudoError):
 
 
 # %% Recorded storage
-@dataclass
+@dataclass(kw_only=True)
 class RecordedViewMissing(RoboKudoError):
     """
     A recorded CAS references a view absent from storage.
@@ -339,7 +339,7 @@ class ReplayWorldShared(RoboKudoError, RuntimeError):
         return "Stop the process serving the shared world before replaying a recording."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CASViewCodecMissing(RoboKudoError, TypeError):
     """
     A CAS view has no registered codec.
@@ -362,7 +362,7 @@ class CASViewCodecMissing(RoboKudoError, TypeError):
         return "Register a codec for this view type."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownViewSerializer(RoboKudoError, ValueError):
     """
     A recorded serializer identifier has no registered decoder.
@@ -380,7 +380,7 @@ class UnknownViewSerializer(RoboKudoError, ValueError):
         return "Register the recorded serializer before playback."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ViewStorageFailed(RoboKudoError, RuntimeError):
     """
     Storage did not acknowledge a CAS view write.
@@ -398,7 +398,7 @@ class ViewStorageFailed(RoboKudoError, RuntimeError):
         return "Check the storage connection and write acknowledgement settings."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedViewNameMismatch(RoboKudoError, RuntimeError):
     """
     A stored view has a different name than its reference.
@@ -421,7 +421,7 @@ class RecordedViewNameMismatch(RoboKudoError, RuntimeError):
         return "Select a recording with consistent CAS view references."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidFileSequence(RoboKudoError, ValueError):
     """
     File playback keys do not match its data.
@@ -446,7 +446,7 @@ class InvalidFileSequence(RoboKudoError, ValueError):
         return "Supply one playback key for each data entry."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidFileSource(RoboKudoError, ValueError):
     """
     The configured file source cannot be read.

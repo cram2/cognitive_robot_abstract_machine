@@ -28,7 +28,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 # %% ROS camera information
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RosCameraModelAdapter:
     """
     Convert pinhole calibration at the ROS message boundary.
@@ -119,7 +119,7 @@ class RosCameraModelAdapter:
 # %% Open3D camera information
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Open3DCameraModelAdapter:
     """
     Convert pinhole calibration at the Open3D boundary.

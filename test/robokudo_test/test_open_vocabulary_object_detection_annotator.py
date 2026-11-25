@@ -389,7 +389,7 @@ def test_precision_mode_loads_segmentation_model(
     descriptor = OpenVocabularyObjectDetectionAnnotator.Descriptor()
     descriptor.parameters.precision_mode = True
     annotator = OpenVocabularyObjectDetectionAnnotator(
-        numpy_image_annotator.name, descriptor
+        name=numpy_image_annotator.name, descriptor=descriptor
     )
     assert annotator.name == numpy_image_annotator.name
     assert annotator.descriptor is descriptor

@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 # %% Resolved camera context
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RayTracingContext:
     """
     Pair the semantic world with the camera used to render it.
@@ -48,7 +48,7 @@ class RayTracingContext:
 # %% Context resolution
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RayTracingContextResolver:
     """
     Resolve and cache a ray-tracing context from a configured world source.

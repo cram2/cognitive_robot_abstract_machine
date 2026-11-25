@@ -1,4 +1,6 @@
-"""Camera model calculations shared by camera interfaces."""
+"""
+Camera model calculations shared by camera interfaces.
+"""
 
 from __future__ import annotations
 
@@ -6,33 +8,48 @@ from dataclasses import dataclass
 from math import radians, tan
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PinholeCameraParameters:
-    """Intrinsic pinhole camera parameters."""
+    """
+    Intrinsic pinhole camera parameters.
+    """
 
     width: int
-    """Image width in pixels."""
+    """
+    Image width in pixels.
+    """
 
     height: int
-    """Image height in pixels."""
+    """
+    Image height in pixels.
+    """
 
     focal_length_x: float
-    """Horizontal focal length in pixels."""
+    """
+    Horizontal focal length in pixels.
+    """
 
     focal_length_y: float
-    """Vertical focal length in pixels."""
+    """
+    Vertical focal length in pixels.
+    """
 
     center_x: float
-    """Horizontal principal point in pixels."""
+    """
+    Horizontal principal point in pixels.
+    """
 
     center_y: float
-    """Vertical principal point in pixels."""
+    """
+    Vertical principal point in pixels.
+    """
 
 
 def pinhole_camera_parameters_from_horizontal_field_of_view(
     width: int, height: int, horizontal_field_of_view_degrees: float
 ) -> PinholeCameraParameters:
-    """Calculate pinhole intrinsics from image size and horizontal field of view.
+    """
+    Calculate pinhole intrinsics from image size and horizontal field of view.
 
     :param width: Image width in pixels.
     :param height: Image height in pixels.

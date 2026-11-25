@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 # %% Camera definitions
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CameraObservation:
     """
     Describe the camera state used to produce one perception frame.

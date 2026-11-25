@@ -21,7 +21,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% Camera definitions
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RecordedCameraWorld:
     """
     Restore the recorded camera and its pose for reprocessing sensor data.

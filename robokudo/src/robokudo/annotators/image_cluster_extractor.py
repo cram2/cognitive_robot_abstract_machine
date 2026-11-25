@@ -59,7 +59,7 @@ class ColorRangeBound(StrEnum):
 
 
 # %% Cluster extraction result
-@dataclass
+@dataclass(kw_only=True)
 class ImageClusters:
     """Object hypotheses and visualization data extracted from an image."""
 

@@ -45,7 +45,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% Recorded scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedScene:
     """
     Test scene containing a camera and unrelated inferred geometry.
@@ -167,7 +167,7 @@ def test_sensor_world_projection_excludes_inferred_entities() -> None:
     """
     scene = _recorded_scene()
 
-    sensor_world = RecordedCameraWorld(scene.observation).project()
+    sensor_world = RecordedCameraWorld(observation=scene.observation).project()
 
     camera = sensor_world.get_semantic_annotations_by_type(Camera)[0]
     assert camera.id == scene.observation.camera.id
@@ -197,7 +197,7 @@ def test_full_snapshot_replays_only_camera_context() -> None:
         ViewPayload.from_document(document), tracker
     )
     reasoning_world = World()
-    RecordedCameraWorld(restored_observation).install(reasoning_world)
+    RecordedCameraWorld(observation=restored_observation).install(reasoning_world)
     _, replayed = Storage.decode_view_document(
         view_document=document, world=reasoning_world
     )
@@ -271,7 +271,7 @@ def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool) -> N
     """
     scene = _recorded_scene(pose_frame_alias=pose_frame_alias)
     reasoning_world = World()
-    RecordedCameraWorld(scene.observation).install(reasoning_world)
+    RecordedCameraWorld(observation=scene.observation).install(reasoning_world)
     first_document = Storage.encode_view_document(
         CASViews.CAMERA_OBSERVATION, scene.observation
     )
@@ -318,7 +318,7 @@ def test_missing_pose_merges_camera_into_existing_world() -> None:
     unrelated = Body(name=PrefixedName(name="runtime_entity"))
     with reasoning_world.modify_world():
         reasoning_world.add_body(unrelated)
-    RecordedCameraWorld(scene.observation).install(reasoning_world)
+    RecordedCameraWorld(observation=scene.observation).install(reasoning_world)
 
     _, replayed = Storage.decode_view_document(
         view_document=Storage.encode_view_document(
@@ -345,7 +345,7 @@ def test_camera_pose_child_must_match_camera_root() -> None:
 
     with pytest.raises(InvalidCameraObservation):
         RecordedCameraWorld(
-            replace(scene.observation, world_T_camera=wrong_pose)
+            observation=replace(scene.observation, world_T_camera=wrong_pose)
         ).project()
 
 
@@ -357,7 +357,9 @@ def test_camera_pose_requires_a_reference_frame() -> None:
     pose = HomogeneousTransformationMatrix(child_frame=scene.observation.camera.root)
 
     with pytest.raises(InvalidCameraObservation):
-        RecordedCameraWorld(replace(scene.observation, world_T_camera=pose)).project()
+        RecordedCameraWorld(
+            observation=replace(scene.observation, world_T_camera=pose)
+        ).project()
 
 
 # %% Reader behavior
@@ -489,7 +491,7 @@ def test_sensor_projection_copies_camera_data_and_sampled_pose(
     Projection preserves the sampled optical pose without sharing camera calibration.
     """
     scene = _recorded_scene(pose_frame_alias=pose_frame_alias)
-    projected_world = RecordedCameraWorld(scene.observation).project()
+    projected_world = RecordedCameraWorld(observation=scene.observation).project()
     projected_camera = projected_world.get_semantic_annotation_by_id(
         scene.observation.camera.id
     )

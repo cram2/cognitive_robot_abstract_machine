@@ -35,7 +35,7 @@ from ._yolo_mock import (
 # %% scene setup
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CupScene(BlackWallScene):
     """
     The black wall scene, in which the mock model detects a cup.

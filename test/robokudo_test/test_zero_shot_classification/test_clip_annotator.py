@@ -68,7 +68,7 @@ class DeviceRecordingEncoding(BatchEncoding):
         return self
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorTokenizer:
     """
     Tokenizer stand-in that encodes each text as the color it names.
@@ -87,7 +87,7 @@ class ColorTokenizer:
         return DeviceRecordingEncoding(torch.tensor(colors, dtype=torch.float32))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorProcessor:
     """
     CLIP processor stand-in that encodes each image as its mean color.
@@ -110,7 +110,7 @@ class ColorProcessor:
         return DeviceRecordingEncoding(torch.tensor(mean_colors, dtype=torch.float32))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorModelConfiguration:
     """
     Model configuration stand-in exposing the embedding size.
@@ -122,7 +122,7 @@ class ColorModelConfiguration:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorEmbeddingModel:
     """
     CLIP model stand-in whose image and text embeddings are the encoded colors.
@@ -174,7 +174,7 @@ class ColorEmbeddingModel:
         return BaseModelOutputWithPooling(pooler_output=colors.clone())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorEmbeddingClip:
     """
     The stand-in model and processor handed out in place of pretrained CLIP weights.

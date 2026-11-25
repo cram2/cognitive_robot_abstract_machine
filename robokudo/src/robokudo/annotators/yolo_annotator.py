@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 # %% detections
 
 
-@dataclass
+@dataclass(kw_only=True)
 class YoloDetection:
     """
     An object the YOLO model detected in the detection image.
@@ -71,7 +71,7 @@ class YoloDetection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnnotatedDetection:
     """
     A detection together with the object hypothesis it annotates.

@@ -35,7 +35,7 @@ LOGGING_IDENTIFIER_QUERY: str = "robokudo.query"
 """Logging name constant for core RoboKudo functionality. Other RK packages may choose to use others!"""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Region3DWithName:
     """
     A named 3D region with position, orientation and size.

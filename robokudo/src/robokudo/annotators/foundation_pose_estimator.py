@@ -54,7 +54,7 @@ class EnginePrecision(StrEnum):
 # %% FoundationPose estimator
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FoundationPoseEstimator(MeshBasedPoseEstimator):
     """
     FoundationPose with its refine and score networks running as TensorRT engines.

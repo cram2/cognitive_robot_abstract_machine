@@ -36,7 +36,7 @@ from typing_extensions import Any
 # %% Camera definitions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectSpec:
     """
     Data structure to define typical object properties for predefined objects.
@@ -59,7 +59,7 @@ class ObjectSpec:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionSpec:
     """
     Data structure to define typical properties for predefined regions.
@@ -75,7 +75,7 @@ class RegionSpec:
     color: Color = field(default_factory=Color)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraPlacement:
     """
     Describe a standalone camera and its pose relative to a parent body.
@@ -92,7 +92,7 @@ class CameraPlacement:
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PredefinedObject(SemanticAnnotation):
     body: Body = field(default=None)
 

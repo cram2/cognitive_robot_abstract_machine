@@ -63,7 +63,7 @@ class PrettyResultPrinter:
         return json.dumps(result_dict, indent=2)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RoboKudoActionClient:
     """
     Send dynamic goals to the RoboKudo query action server.

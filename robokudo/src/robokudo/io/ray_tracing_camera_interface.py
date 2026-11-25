@@ -38,7 +38,7 @@ class RayTracingCameraInterface(CameraInterface):
         :param camera_config: Ray-tracer camera configuration descriptor.
         """
         super().__init__(camera_config)
-        self.context_resolver = RayTracingContextResolver(camera_config)
+        self.context_resolver = RayTracingContextResolver(camera_config=camera_config)
         """
         Resolver for the configured world and semantic camera.
         """

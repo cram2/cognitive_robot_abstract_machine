@@ -5,7 +5,7 @@ from typing_extensions import ClassVar
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class UnrealVisionBridgeCameraConfig(BaseCameraConfig):
     """
     Configuration class for the Unreal Vision Bridge interface.

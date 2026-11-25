@@ -35,7 +35,7 @@ from ._perception_world import camera_interface
 # %% Camera behavior
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CustomDataclassView:
     label: str
     confidence: float
@@ -388,7 +388,7 @@ class TestStorage:
         assert retrieved_cas_record is not None
         retrieved_cas_record["views"] = {}
         replay_world = World()
-        RecordedCameraWorld(observation).install(replay_world)
+        RecordedCameraWorld(observation=observation).install(replay_world)
         storage_instance.load_views_from_mongo_in_cas(
             cas_document=retrieved_cas_record, world=replay_world
         )

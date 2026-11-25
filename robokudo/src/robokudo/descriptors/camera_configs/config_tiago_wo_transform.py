@@ -5,7 +5,7 @@ from typing_extensions import ClassVar
 from robokudo.descriptors.camera_configs.config_tiago import TiagoCameraConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class TiagoWoTfCameraConfig(TiagoCameraConfig):
     """
     Configuration class for the TIAGo robot's Xtion camera without transform lookup.

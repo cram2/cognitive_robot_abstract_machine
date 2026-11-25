@@ -162,7 +162,7 @@ def test_sensor_projection_preserves_optical_root_pose(
     )
     cas = CAS()
     optical_interface.set_data(cas=cas, world=perception_world)
-    world = RecordedCameraWorld(cas.camera_observation).project()
+    world = RecordedCameraWorld(observation=cas.camera_observation).project()
     camera = world.get_semantic_annotation_by_id(cas.camera_observation.camera.id)
     np.testing.assert_allclose(
         camera.root.global_transform.to_np(),
@@ -193,7 +193,7 @@ def test_replayed_optical_pose_updates_camera_root(
     )
     cas = CAS()
     optical_interface.set_data(cas=cas, world=perception_world)
-    world = RecordedCameraWorld(cas.camera_observation).project()
+    world = RecordedCameraWorld(observation=cas.camera_observation).project()
     camera = world.get_semantic_annotation_by_id(cas.camera_observation.camera.id)
     world_T_optical = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1.0, y=2.0, z=3.0, roll=0.2, reference_frame=world.root
@@ -235,7 +235,7 @@ def test_optical_observation_roundtrip_preserves_root_pose(
         codec.encode(cas.camera_observation),
         WorldEntityWithIDKwargsTracker.from_world(perception_world),
     )
-    world = RecordedCameraWorld(restored).project()
+    world = RecordedCameraWorld(observation=restored).project()
     camera = world.get_semantic_annotation_by_id(cas.camera_observation.camera.id)
     np.testing.assert_allclose(
         camera.root.global_transform.to_np(),
