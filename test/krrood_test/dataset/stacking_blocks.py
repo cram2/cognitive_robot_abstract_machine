@@ -260,3 +260,33 @@ class Discard(ActionSchema):
             ObjectRemoval(objects=self.block),
             Assignment(fact=self.block.support.clear == True),
         ]
+
+
+@dataclass(kw_only=True)
+class Touch(ActionSchema):
+    """
+    Marks a block as clear, applicable to every block whatever the state.
+    """
+
+    block: StackingBlock
+    """
+    The block touched.
+    """
+
+    def precondition(self) -> ConditionType:
+        return True
+
+    def effects(self) -> list[Effect]:
+        return [Assignment(fact=self.block.clear == True)]
+
+
+@dataclass(kw_only=True)
+class CostedDiscard(Discard):
+    """
+    A :class:`Discard` with a cost that is a field but not a parameter.
+    """
+
+    cost: float = field(init=False, default=1.0)
+    """
+    What discarding the block costs.
+    """

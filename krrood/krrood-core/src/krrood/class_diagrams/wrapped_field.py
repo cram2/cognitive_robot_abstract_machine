@@ -7,6 +7,7 @@ from __future__ import annotations
 import enum
 import inspect
 import logging
+import numbers
 import re
 import sys
 from collections.abc import Sequence
@@ -246,13 +247,27 @@ class WrappedField:
     def accepts_value(self, *, value: Any) -> bool:
         """
         :param value: A value the field may be given.
-        :return: Whether *value* is an instance of a member of the field's annotation, an
-            ``int`` standing for a ``float``. A member no instance check can decide, such
-            as a type variable or ``Any``, accepts every value.
+        :return: Whether *value* is an instance of a member of the field's annotation, any
+            real number standing for a ``float`` and any integral number for an ``int``.
+            A member no instance check can decide, such as a type variable or ``Any``,
+            accepts every value.
         """
         return any(
             self._annotation_accepts_value_(annotation=annotation, value=value)
             for annotation in self._union_members_
+        )
+
+    def accepts_element(self, *, element: Any) -> bool:
+        """
+        :param element: A value that may be inserted into the collection the field holds.
+        :return: Whether *element* is of the field's contained type, as
+            :meth:`accepts_value` decides it; ``True`` for a field that declares no
+            collection.
+        """
+        if not self.is_container or self.is_optional:
+            return True
+        return self._annotation_accepts_value_(
+            annotation=self.contained_type, value=element
         )
 
     @staticmethod
@@ -267,7 +282,9 @@ class WrappedField:
         if not isinstance(annotated_class, type):
             return True
         if annotated_class is float:
-            return isinstance(value, (float, int))
+            return isinstance(value, numbers.Real)
+        if annotated_class is int:
+            return isinstance(value, numbers.Integral)
         return isinstance(value, annotated_class)
 
     @cached_property

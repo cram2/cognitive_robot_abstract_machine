@@ -10,12 +10,16 @@ import pytest
 from krrood.entity_query_language.factories import a, evaluate_condition, literal
 from krrood.entity_query_language.ground_term import AttributeTerm
 from krrood.entity_query_language.query.query import Entity
-from krrood.planning.exceptions import ActionIsNotApplicable
+from krrood.planning.exceptions import (
+    ActionIsNotApplicable,
+    ActionParameterIsRemoved,
+)
 from krrood.planning.fact import Fact
 from krrood.planning.state import State
 
 from ..dataset.stacking_blocks import (
     BuildBlock,
+    CostedDiscard,
     Discard,
     MoveToTable,
     PlannedBlock,
@@ -23,6 +27,7 @@ from ..dataset.stacking_blocks import (
     Stack,
     StackingBlock,
     StackingWorld,
+    Touch,
     Tray,
 )
 
@@ -310,3 +315,46 @@ def test_removal_effect_removes_the_object(stacking_world):
     """
     state = State().apply_action(action=Discard(block=stacking_world.c))
     assert a(StackingBlock).tolist(state=state) == [stacking_world.a, stacking_world.b]
+
+
+# %% preconditions that are plain booleans
+
+
+def test_action_whose_precondition_is_true_is_applied(stacking_world):
+    """
+    A precondition of ``True`` holds in every state, so the effect is applied.
+    """
+    state = State().add_facts(literal(stacking_world.a).clear == False)
+    state = state.apply_action(action=Touch(block=stacking_world.a))
+    assert is_clear(block=stacking_world.a, state=state)
+
+
+# %% parameters the state removes
+
+
+def test_applying_an_action_on_a_removed_object_is_rejected(stacking_world):
+    """
+    Block ``c`` was discarded, so it cannot be stacked anymore.
+    """
+    state = State().apply_action(action=Discard(block=stacking_world.c))
+    with pytest.raises(ActionParameterIsRemoved):
+        state.apply_action(
+            action=Stack(block=stacking_world.c, target=stacking_world.b)
+        )
+
+
+# %% fields that are not parameters
+
+
+def test_fields_that_are_not_passed_to_the_constructor_are_no_parameters(
+    stacking_world,
+):
+    """
+    The cost of a discard is not a parameter, so grounding and applying ignore it.
+    """
+    actions = CostedDiscard.applicable_actions().tolist(state=State())
+    state = State().apply_action(action=CostedDiscard(block=stacking_world.c))
+    assert (
+        [action.block for action in actions],
+        a(StackingBlock).name.tolist(state=state),
+    ) == ([stacking_world.b, stacking_world.c], ["a", "b"])

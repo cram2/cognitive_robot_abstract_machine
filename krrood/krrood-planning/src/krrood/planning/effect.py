@@ -16,7 +16,10 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.factories import ConditionType, set_of
 from krrood.entity_query_language.ground_term import GroundTerm, GroundTermExpression
 from krrood.entity_query_language.query.query import Query
-from krrood.planning.exceptions import ValueIsNotACollection
+from krrood.planning.exceptions import (
+    InsertedElementHasWrongType,
+    ValueIsNotACollection,
+)
 from krrood.planning.fact import Fact
 
 # %% changes
@@ -36,8 +39,8 @@ class CollectionInsertion:
     def insert_into(self, *, collection: Any) -> Any:
         """
         :param collection: A collection of elements, which is left unchanged.
-        :return: A copy of *collection* with :attr:`elements` inserted by its own
-            ``extend`` or ``update``, or rebuilt with them where it has neither.
+        :return: A copy of *collection*, of the same type, that also holds
+            :attr:`elements`.
         """
         inserted = copy.copy(collection)
         if isinstance(inserted, collections.abc.MutableSequence):
@@ -121,9 +124,10 @@ class Effect(ABC):
         """
         :return: The query whose results, each evaluated in the state the action is
             applied in, are the bindings :meth:`change_of_binding` turns into changes:
-            the values of :attr:`selected_expressions` where :attr:`condition` holds.
+            the distinct values of :attr:`selected_expressions` where :attr:`condition`
+            holds.
         """
-        query = set_of(*self.selected_expressions)
+        query = set_of(*self.selected_expressions).distinct()
         if self.condition is None:
             return query
         return query.where(self.condition)
@@ -159,12 +163,10 @@ class Assignment(Effect):
 @dataclass(kw_only=True)
 class ElementInsertion(Effect):
     """
-    Inserts an element into a collection, after the elements it already holds where it is
-    ordered.
-
-    Turning a binding into a change raises
-    :class:`~krrood.planning.exceptions.ValueIsNotACollection` where the value of
-    :attr:`collection` is not a collection of elements.
+    Inserts an element into a collection, last where it is ordered. Turning a binding
+    into a change raises :class:`~krrood.planning.exceptions.ValueIsNotACollection`,
+    :class:`~krrood.planning.exceptions.InsertedElementHasWrongType` and what
+    :meth:`~krrood.planning.fact.Fact.check_term_can_change` raises.
     """
 
     collection: GroundTermExpression[GroundTerm, Collection[Any]]
@@ -192,9 +194,11 @@ class ElementInsertion(Effect):
                 binding[operand] for operand in self.collection._ground_term_operands_
             )
         )
-        return StateChange(
-            insertions={term: CollectionInsertion(elements=(binding[self.element],))}
-        )
+        Fact.check_term_can_change(term=term)
+        element = binding[self.element]
+        if not term.accepts_element(element=element):
+            raise InsertedElementHasWrongType(term=term, element=element)
+        return StateChange(insertions={term: CollectionInsertion(elements=(element,))})
 
 
 @dataclass(kw_only=True)

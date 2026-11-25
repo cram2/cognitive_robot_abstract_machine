@@ -7,6 +7,7 @@ without the objects it removes.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 
 import pytest
@@ -15,6 +16,7 @@ from krrood.entity_query_language.factories import a, literal, variable, variabl
 from krrood.planning.state import State
 
 from ..dataset.objects_created_for_a_state import PlannedFixedConnection
+from ..dataset.stacking_blocks import PlannedBlock, StackingTable
 from ..dataset.semantic_world_like_classes import (
     Connection,
     FixedConnection,
@@ -372,3 +374,16 @@ def test_connections_of_every_kind_follow_the_state(planned_connection_world):
     state = State().with_objects_removed(removed)
 
     assert a(Connection).tolist(state=state) == live[1:]
+
+
+# %% copies of objects kept out of the symbol graph
+
+
+def test_copy_of_an_object_kept_out_of_the_symbol_graph_stays_out_of_it():
+    """
+    Neither the planned block nor its copy is among the live instances.
+    """
+    table = StackingTable(name="table")
+    planned = PlannedBlock(name="planned", support=table, _persist_instance_=False)
+    copy.deepcopy(planned)
+    assert a(PlannedBlock).tolist() == []

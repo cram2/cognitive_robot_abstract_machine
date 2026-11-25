@@ -82,6 +82,13 @@ class Symbol(DataclassFieldDescriptorOwner):
             SymbolGraph().add_node(wrapped_instance=WrappedInstance(instance=instance))
         return instance
 
+    def __getnewargs_ex__(self) -> tuple[tuple[Any, ...], dict[str, Any]]:
+        """
+        :return: The arguments a copy or an unpickled instance is created with, which
+            keep it out of the symbol graph where this instance is kept out of it.
+        """
+        return (), {"_persist_instance_": self._persist_instance_}
+
 
 TSymbol = TypeVar("TSymbol", bound=Symbol)
 

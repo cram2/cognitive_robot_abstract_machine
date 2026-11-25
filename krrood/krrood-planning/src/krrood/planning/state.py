@@ -13,6 +13,7 @@ from typing_extensions import TYPE_CHECKING, Any, Iterable, Iterator
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.evaluation import ConditionEvaluation
+from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.ground_term import (
     FunctionKey,
     GroundTerm,
@@ -26,7 +27,11 @@ from krrood.planning.effect import (
     Effect,
     StateChange,
 )
-from krrood.planning.exceptions import ActionIsNotApplicable
+from krrood.planning.exceptions import (
+    ActionIsNotApplicable,
+    ActionParameterIsRemoved,
+    ConflictingAssignments,
+)
 
 if TYPE_CHECKING:
     from krrood.planning.action_schema import ActionSchema
@@ -126,35 +131,85 @@ class State(TermReader):
         """
         :param effects: The effects to apply.
         :return: A new state that makes the change of every effect, each read in this
-            state, a later change winning where two assign a ground term.
+            state, a later effect winning where two assign a ground term.
+        :raises ConflictingAssignments: If one effect gives a ground term two different
+            values.
         """
         changes = [
-            effect.change_of_binding(binding=binding)
+            change
             for effect in effects
-            for binding in effect.get_change_to_state().evaluate(state=self)
+            for change in self._changes_of_effect_(effect=effect)
         ]
         state = self
         for change in changes:
             state = state._apply_change_(change=change)
         return state
 
+    def _changes_of_effect_(self, *, effect: Effect) -> list[StateChange]:
+        """
+        :param effect: An effect read in this state.
+        :return: The change of *effect* for each of its bindings.
+        :raises ConflictingAssignments: If two of these changes give a ground term
+            different values.
+        """
+        changes = [
+            effect.change_of_binding(binding=binding)
+            for binding in effect.get_change_to_state().evaluate(state=self)
+        ]
+        assigned = {}
+        for change in changes:
+            for term, value in change.assignments.items():
+                if term in assigned and assigned[term] != value:
+                    raise ConflictingAssignments(
+                        term=term, first_value=assigned[term], second_value=value
+                    )
+                assigned[term] = value
+        return changes
+
     def apply_action(self, *, action: ActionSchema) -> State:
         """
         :param action: A ground action.
         :return: A new state that makes the change of every effect of *action*, as
             :meth:`apply_effects` does.
+        :raises ActionParameterIsRemoved: If this state removes an object a parameter of
+            *action* holds.
         :raises ActionIsNotApplicable: If this state does not satisfy the precondition
             of *action*.
         """
-        symbolic_action = action.to_symbolic()
-        precondition = ConditionEvaluation.from_condition(
-            condition=symbolic_action.precondition(), state=self
-        )
-        if not precondition.is_satisfied:
-            raise ActionIsNotApplicable(
-                action=action, failed_conditions=precondition.false_statements
+        removed_objects = [
+            value
+            for value in action.parameter_values.values()
+            if id(value) in self.removed_objects
+        ]
+        if removed_objects:
+            raise ActionParameterIsRemoved(
+                action=action, removed_objects=removed_objects
             )
+        symbolic_action = action.to_symbolic()
+        self._check_precondition_(
+            action=action, precondition=symbolic_action.precondition()
+        )
         return self.apply_effects(*symbolic_action.effects())
+
+    def _check_precondition_(
+        self, *, action: ActionSchema, precondition: ConditionType
+    ) -> None:
+        """
+        :param action: The ground action applied in this state.
+        :param precondition: The precondition of *action* on its literals.
+        :raises ActionIsNotApplicable: If this state does not satisfy *precondition*.
+        """
+        if precondition is True:
+            return
+        if precondition is False:
+            raise ActionIsNotApplicable(action=action, failed_conditions=[])
+        evaluation = ConditionEvaluation.from_condition(
+            condition=precondition, state=self
+        )
+        if not evaluation.is_satisfied:
+            raise ActionIsNotApplicable(
+                action=action, failed_conditions=evaluation.false_statements
+            )
 
     def _apply_change_(self, *, change: StateChange) -> State:
         """

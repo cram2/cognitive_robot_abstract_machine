@@ -170,6 +170,15 @@ class GroundTerm(ABC):
         """
         return True
 
+    def accepts_element(self, *, element: Any) -> bool:
+        """
+        :param element: A value that may be inserted into the collection this ground
+            term holds.
+        :return: Whether *element* is of the element type the class diagram declares for
+            this ground term, ``True`` where it declares none.
+        """
+        return True
+
     @abstractmethod
     def live_value(self) -> Any:
         """
@@ -236,6 +245,14 @@ class AttributeTerm(GroundTerm):
         """
         wrapped_field = get_wrapped_field(type(self.instance), self.attribute_name)
         return wrapped_field is None or wrapped_field.accepts_value(value=value)
+
+    def accepts_element(self, *, element: Any) -> bool:
+        """
+        :meth:`GroundTerm.accepts_element`, with the element type the class diagram
+        declares for the field of this attribute.
+        """
+        wrapped_field = get_wrapped_field(type(self.instance), self.attribute_name)
+        return wrapped_field is None or wrapped_field.accepts_element(element=element)
 
     def live_value(self) -> Any:
         return getattr(self.instance, self.attribute_name)

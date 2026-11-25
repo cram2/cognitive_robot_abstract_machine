@@ -139,11 +139,21 @@ class Fact:
                 if isinstance(self.value, SymbolicExpression)
                 else self.value
             )
-            if not term.has_live_value():
-                raise MissingGroundTerm(term=term)
-            if term.setting_runs_code():
-                raise AssignmentBypassesSetter(term=term)
+            self.check_term_can_change(term=term)
             if not term.accepts_value(value=value):
                 raise AssignedValueHasWrongType(term=term, value=value)
             assignments[term] = value
         return assignments
+
+    @staticmethod
+    def check_term_can_change(*, term: GroundTerm) -> None:
+        """
+        :param term: A ground term an effect changes.
+        :raises MissingGroundTerm: If *term* does not exist.
+        :raises AssignmentBypassesSetter: If live objects set *term* through code of
+            their own class.
+        """
+        if not term.has_live_value():
+            raise MissingGroundTerm(term=term)
+        if term.setting_runs_code():
+            raise AssignmentBypassesSetter(term=term)

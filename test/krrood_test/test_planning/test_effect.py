@@ -5,6 +5,7 @@ under which bindings, and which changes they reject.
 
 from __future__ import annotations
 
+import numpy
 import pytest
 
 from krrood.entity_query_language.factories import a, literal, variable
@@ -15,9 +16,15 @@ from krrood.planning.effect import (
     ElementInsertion,
     ObjectRemoval,
 )
-from krrood.planning.exceptions import AssignedValueHasWrongType, ValueIsNotACollection
+from krrood.planning.exceptions import (
+    AssignedValueHasWrongType,
+    ConflictingAssignments,
+    InsertedElementHasWrongType,
+    ValueIsNotACollection,
+)
 from krrood.planning.state import State
 
+from ..dataset.example_classes import KRROODPosition
 from ..dataset.stacking_blocks import StackingBlock, Tray
 
 # %% conditional effects
@@ -67,7 +74,46 @@ def test_conditional_removal_removes_only_the_matching_objects(stacking_world):
     assert a(StackingBlock).name.tolist(state=state) == ["c"]
 
 
+def test_effect_changes_each_selected_binding_once(stacking_world):
+    """
+    Two blocks rest on the table, but ``b`` is put on the tray only once.
+    """
+    other = variable(StackingBlock)
+    state = State().apply_effects(
+        ElementInsertion(
+            collection=literal(stacking_world.tray).blocks,
+            element=literal(stacking_world.b),
+            condition=other.support == stacking_world.table,
+        )
+    )
+    assert a(Tray).blocks.tolist(state=state) == [[stacking_world.b]]
+
+
 # %% rejected changes
+
+
+def test_one_effect_giving_a_ground_term_two_values_is_rejected(stacking_world):
+    """
+    Every block would give the table its own name.
+    """
+    block = variable(StackingBlock)
+    with pytest.raises(ConflictingAssignments):
+        State().apply_effects(
+            Assignment(fact=literal(stacking_world.table).name == block.name)
+        )
+
+
+def test_inserting_an_element_of_the_wrong_type_is_rejected(stacking_world):
+    """
+    A tray holds blocks, never another tray.
+    """
+    with pytest.raises(InsertedElementHasWrongType):
+        State().apply_effects(
+            ElementInsertion(
+                collection=literal(stacking_world.tray).blocks,
+                element=literal(Tray(name="other")),
+            )
+        )
 
 
 def test_assigning_a_value_of_the_wrong_type_is_rejected(stacking_world):
@@ -90,6 +136,16 @@ def test_inserting_into_a_value_that_is_not_a_collection_is_rejected(stacking_wo
                 collection=literal(stacking_world.tray).name, element=literal("x")
             )
         )
+
+
+def test_numpy_number_is_accepted_for_a_float_field():
+    """
+    A numpy float is a real number, so a float field takes it.
+    """
+    position = KRROODPosition(x=0.0, y=0.0, z=0.0)
+    value = numpy.float32(0.5)
+    state = State().add_facts(literal(position).x == value)
+    assert literal(position).x.first(state=state) == value
 
 
 # %% insertions

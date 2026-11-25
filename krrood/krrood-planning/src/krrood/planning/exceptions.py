@@ -160,7 +160,69 @@ class AssignedValueHasWrongType(DataclassException):
         return "Give the ground term a value of the type its field declares."
 
 
+@dataclass(kw_only=True)
+class ConflictingAssignments(DataclassException):
+    """
+    One effect gives a ground term two different values under different bindings.
+    """
+
+    term: GroundTerm
+    """
+    The ground term given both values.
+    """
+
+    first_value: Any
+    """
+    The value one binding gives it.
+    """
+
+    second_value: Any
+    """
+    The different value a later binding gives it.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"One effect gives {self.term} both {self.first_value!r} and "
+            f"{self.second_value!r}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Constrain the effect so every binding that reaches this ground term gives it "
+            "the same value, for example with a condition that selects one binding."
+        )
+
+
 # %% effects
+
+
+@dataclass(kw_only=True)
+class InsertedElementHasWrongType(DataclassException):
+    """
+    An effect inserts an element of another type than the class diagram declares for the
+    elements of a ground term's collection.
+    """
+
+    term: GroundTerm
+    """
+    The ground term whose collection the element is inserted into.
+    """
+
+    element: Any
+    """
+    The inserted element.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.term} was given the element {self.element!r} of type "
+            f"{type(self.element).__name__}, which its declared element type does not "
+            "admit."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Insert only elements of the type the collection's field declares."
 
 
 @dataclass(kw_only=True)
@@ -222,4 +284,32 @@ class ActionIsNotApplicable(DataclassException):
         return (
             "Apply only actions whose precondition the state satisfies, such as the "
             "results of applicable_actions evaluated in that state."
+        )
+
+
+@dataclass(kw_only=True)
+class ActionParameterIsRemoved(DataclassException):
+    """
+    A ground action was applied in a state that removes an object one of its parameters
+    holds.
+    """
+
+    action: ActionSchema
+    """
+    The action that was applied.
+    """
+
+    removed_objects: list[Any]
+    """
+    The parameter values the state removes.
+    """
+
+    def error_message(self) -> str:
+        removed = ", ".join(repr(removed) for removed in self.removed_objects)
+        return f"{self.action} acts on objects the state removes: {removed}."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Apply only actions on objects that exist in the state, such as the results "
+            "of applicable_actions evaluated in that state."
         )
