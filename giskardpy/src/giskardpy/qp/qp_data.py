@@ -173,7 +173,8 @@ class QPDataExplicit(QPData):
         )
 
     def apply_filters(self, *, submatrix_cache: SubmatrixCache | None = None) -> Self:
-        submatrix_cache = submatrix_cache or SubmatrixCache()
+        if submatrix_cache is None:
+            submatrix_cache = SubmatrixCache()
         zero_quadratic_weight_filter: np.ndarray = self.quadratic_weights != 0
         number_non_slack_variables = (
             zero_quadratic_weight_filter.shape[0] - self.num_slack_variables
@@ -234,7 +235,8 @@ class QPDataExplicit(QPData):
         .. warning:: With a `submatrix_cache`, the constraint matrices of the returned
             problem are valid only until the next call with the same cache.
         """
-        submatrix_cache = submatrix_cache or SubmatrixCache()
+        if submatrix_cache is None:
+            submatrix_cache = SubmatrixCache()
         kept_variables = ~removed_variables
         kept_equalities = self._rows_keeping_coefficients(
             matrix=self.equality_matrix, kept_variables=kept_variables

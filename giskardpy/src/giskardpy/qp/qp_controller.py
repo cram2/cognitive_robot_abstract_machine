@@ -49,10 +49,28 @@ class QPController:
     life_cycle_variables: list[sm.FloatVariable]
     float_variables: list[sm.FloatVariable]
 
-    qp_data_factory: QPDataFactory = field(default=None, init=False)
-    qp_solver: QPSolver = field(default=None, init=False)
-    debugger: QuadraticProgramDebugger = field(default=None, init=False)
-    dof_filter: np.ndarray = field(default=None, init=False)
+    qp_data_factory: QPDataFactory = field(init=False)
+    """
+    Evaluates the compiled QP for the current world state, in the problem format the
+    solver expects.
+    """
+
+    qp_solver: QPSolver = field(init=False)
+    """
+    Solves the QP once every control cycle.
+    """
+
+    debugger: QuadraticProgramDebugger = field(init=False)
+    """
+    Labels the rows and columns of the QP with the names of its constraints and degrees
+    of freedom, for debugging.
+    """
+
+    active_world_state_indices: NDArray[np.intp] = field(init=False)
+    """
+    Positions in :attr:`world_state_symbols` of the variables the constraints depend on.
+    """
+
     submatrix_cache: SubmatrixCache = field(default_factory=SubmatrixCache, init=False)
     """
     Remembers the constraint matrices filtered in earlier control cycles, whose sparsity
@@ -119,12 +137,13 @@ class QPController:
                 or vars_.jerk.name in float_variable_names
             )
 
-        self.dof_filter = np.array(
+        self.active_world_state_indices = np.array(
             [
                 i
                 for i, v in enumerate(self.world_state_symbols)
                 if v.name in active_float_variables
-            ]
+            ],
+            dtype=np.intp,
         )
         self.active_degrees_of_freedom = [
             dof for dof in degrees_of_freedom if dof_used(dof)
@@ -315,5 +334,5 @@ class QPController:
         )
         # divide by 4 because the world state has pos/vel/acc/jerk variables
         full_control_commands = np.zeros(len(self.world_state_symbols) // 4)
-        full_control_commands[self.dof_filter] = control_commands
+        full_control_commands[self.active_world_state_indices] = control_commands
         return full_control_commands
