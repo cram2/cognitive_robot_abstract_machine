@@ -424,7 +424,9 @@ def test_every_result_loading_loads_the_objects_of_a_secondary_base_as_their_cla
 
     assert sorted(
         (dao.from_dao() for dao in result), key=lambda loaded: loaded.label
-    ) == [item for item in items if item.hinge_count > 1]
+    ) == [
+        item for item in items if isinstance(item, HasHinges) and item.hinge_count > 1
+    ]
 
 
 def test_database_ids_are_the_ids_of_the_selected_objects_in_their_order(
