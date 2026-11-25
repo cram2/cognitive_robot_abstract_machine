@@ -567,6 +567,7 @@ class TiagoMobileBase(
     HasTorso[TiagoTorso],
     HasLidar[TiagoBaseLidar],
 ):
+    """Differential-drive mobile base of the Tiago robot carrying its torso"""
 
     @classproperty
     def topic_name(cls) -> str:
