@@ -12,6 +12,7 @@ This module provides an annotator for:
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import open3d as o3d
@@ -27,6 +28,8 @@ from robokudo.utils.region import (
     region_obb_in_camera_coordinates,
     region_pose_annotation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RegionFilter(ThreadedAnnotator):
@@ -103,7 +106,7 @@ class RegionFilter(ThreadedAnnotator):
         if query is not None:
             queried_location = query.obj.location
             if queried_location != "" and queried_location != self.active_region:
-                self.rk_logger.info(
+                logger.info(
                     f"Setting region filter to check for location '{queried_location}'"
                 )
                 active_regions = dict()
@@ -117,14 +120,16 @@ class RegionFilter(ThreadedAnnotator):
         visualized_geometries = []
         filtered_indices = set()
 
-        self.rk_logger.debug(f"Analyzing {len(active_regions.keys())}")
+        logger.debug(f"Analyzing {len(active_regions.keys())}")
 
         try:
             world_to_camera_transform = get_world_to_camera_transform_matrix(
                 self.get_cas()
             )
         except KeyError as err:
-            self.rk_logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(
+                f"Couldn't find viewpoint in the common analysis structure: {err}"
+            )
             return Status.FAILURE
 
         for key, region in active_regions.items():

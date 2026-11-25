@@ -15,6 +15,7 @@ This module provides an annotator for:
 # %% Imports
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import cv2
@@ -33,6 +34,8 @@ from robokudo.utils.o3d_helper import get_mask_from_pointcloud
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 # %% Point cloud cropping
@@ -108,7 +111,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.color: npt.NDArray | None = None
         """
@@ -123,7 +126,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
         :return: Processing status, with failures recorded on the blackboard.
         """
         start_timer = default_timer()
-        self.rk_logger.warning(f"{self.__class__.__name__} called for update()")
+        logger.warning(f"{self.__class__.__name__} called for update()")
 
         cloud = self.get_cas().get(CASViews.CLOUD)
         self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
