@@ -6,7 +6,7 @@ Launch Giskard with closed-loop velocity control for the TIAGo robot.
 from __future__ import annotations
 
 from rclpy.node import Node
-
+from datetime import timedelta
 from giskardpy.middleware.ros2.giskard import Giskard
 from giskardpy.middleware.ros2.scripts.iai_robots.tiago.configs import (
     TiagoVelocityInterface,
@@ -34,6 +34,7 @@ def create_giskard(node: Node) -> Giskard:
         server_config=GiskardServerConfig(),
         qp_controller_config=QPControllerConfig(
             target_frequency=40,
+            braking_time=timedelta(seconds=0.9),
         ),
     )
 
