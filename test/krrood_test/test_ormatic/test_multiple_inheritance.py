@@ -422,8 +422,8 @@ def test_every_result_loading_loads_the_objects_of_a_secondary_base_as_their_cla
     session, database, result_loading
 ):
     """
-    Selecting a secondary base class loads each object as its own primary class,
-    however the result is loaded.
+    Selecting a secondary base class loads each object as its own primary class, however
+    the result is loaded.
     """
     items = store_items_of_one_hierarchy(session)
     hinged = variable(HasHinges, domain=None)
