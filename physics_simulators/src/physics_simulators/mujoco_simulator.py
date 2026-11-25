@@ -593,7 +593,6 @@ class MujocoSimulator(BaseSimulator):
         result = [
             self._mj_model.joint(joint_id).name
             for joint_id in range(self._mj_model.njnt)
-            # MuJoCo 4's enums are not found by `in`, which compares from their side
             if any(
                 self._mj_model.jnt_type[joint_id] == joint_type
                 for joint_type in joint_types

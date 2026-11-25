@@ -1955,8 +1955,6 @@ class MujocoSingleJoint(MujocoConnectionJoints[ConnectionType]):
             equality.objtype = mujoco.mjtObj.mjOBJ_JOINT
             equality.name1 = joint_name
             equality.name2 = self._mimicked_joint_name()
-            # a joint equality reads only its polynomial's coefficients off the front
-            # of the data, whose length differs between MuJoCo versions
             coefficients = equality_joint["polynomial_coefficients"]
             data = numpy.array(equality.data)
             data[: len(coefficients)] = coefficients
@@ -2823,7 +2821,6 @@ class MujocoBuilder(MultiSimBuilder):
             body_spec = self.spec.bodies[body_id + 1]
             if numpy.isclose(body_spec.mass, 0.0):
                 continue
-            # MuJoCo 4 writes a body's inertial itself, which may stand only once
             inertial_element = body_element.find("inertial")
             if inertial_element is None:
                 inertial_element = ET.SubElement(body_element, "inertial")

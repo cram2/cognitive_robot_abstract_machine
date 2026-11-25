@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
 from numpy.typing import NDArray
 
 from krrood.exceptions import DataclassException
@@ -108,7 +109,7 @@ class MeshFileNotPlaceableByAPose(DataclassException, ValueError):
     The mesh's file.
     """
 
-    scale: NDArray
+    scale: NDArray[np.float64]
     """
     The scale along the mesh's x, y and z axes.
     """
