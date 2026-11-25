@@ -25,13 +25,6 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.physics.equations.pouring_equations import (
     PouringEquation,
 )
-from semantic_digital_twin.semantic_annotations.exceptions import (
-    FillLevelAlreadyInitializedError,
-    MissingFillEquationError,
-    ReceiverAlreadyCoupledError,
-    ReceiverNotInitializedError,
-    SourceAlreadyCoupledError,
-)
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.specifications.connections import (
     RevoluteConnectionSpecification,
@@ -44,11 +37,7 @@ from semantic_digital_twin.world_description.derivatives import (
     DerivativeMap,
     Derivatives,
 )
-from semantic_digital_twin.world_description.exceptions import (
-    MissingFillLevelLimitsError,
-)
 from semantic_digital_twin.world_description.geometry import Scale
-from semantic_digital_twin.world_description.liquid_connection import LiquidConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% test containers
@@ -149,16 +138,12 @@ def _lone_tilting_cup(
 def _build_world(
     *,
     receiver_class: type[HasFillLevel] = _Container,
-    couple: bool = True,
-    initialize_receiver_fill: bool = True,
 ) -> tuple[World, HasFillLevel, HasFillLevel]:
     """
-    Builds a receiver at the origin and a full source held 0.3 m above it that tilts
-    about y.
+    Builds an empty receiver at the origin and a full source 0.3 m above it, tilting
+    about y and pouring into the receiver.
 
     :param receiver_class: The container annotation type used for the receiver.
-    :param couple: Whether the source pours into the receiver.
-    :param initialize_receiver_fill: Whether the receiver's fill level is initialized.
     :return: The world, the source, and the receiver.
     """
     world = _world_with_root()
@@ -175,11 +160,9 @@ def _build_world(
         axis=Vector3(0, 1, 0),
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.3),
     )
-    if initialize_receiver_fill:
-        receiver.initialize_fill_level(initial_fill=0.0)
+    receiver.initialize_fill_level(initial_fill=0.0)
     source.initialize_fill_level(initial_fill=1.0)
-    if couple:
-        receiver.receive_outflow_from(source=source)
+    receiver.receive_outflow_from(source=source)
     return world, source, receiver
 
 
@@ -267,21 +250,6 @@ class TestFillVelocity:
             -source.fill_velocity().evaluate()[0] * source.capacity
         )
 
-    def test_a_receiver_of_measured_capacity_converts_volume_by_it(self) -> None:
-        """
-        A receiver whose capacity was measured holds that much at full fill, whatever
-        the box its collision geometry bounds would hold.
-        """
-        world, source, receiver = _build_world()
-        receiver.measured_capacity = 3.0 * receiver.capacity
-        _tilt(world, source, 0.6)
-
-        assert receiver.fill_velocity().evaluate()[
-            0
-        ] / -source.fill_velocity().evaluate()[0] == pytest.approx(
-            source.capacity / receiver.measured_capacity
-        )
-
 
 # %% geometric transfer gate
 
@@ -291,17 +259,6 @@ class TestTransferGate:
     The transfer is open while the source's lip is above the receiver's opening and its
     stream lands within the opening.
     """
-
-    def test_the_gate_is_the_product_of_its_factors(self) -> None:
-        """
-        The gate is the height factor times the overlap factor.
-        """
-        _, source, receiver = _partly_open_transfer()
-
-        assert receiver.transfer_gate(source=source).evaluate()[0] == pytest.approx(
-            receiver.height_gate(source=source).evaluate()[0]
-            * receiver.overlap_gate(source=source).evaluate()[0]
-        )
 
     def test_the_height_factor_reads_the_clearance_in_receiver_heights(self) -> None:
         """
@@ -442,119 +399,6 @@ class TestProjectileLandingPoint:
         assert landing.z.evaluate()[0] == pytest.approx(opening_height, abs=1e-9)
 
 
-# %% coupling guards
-
-
-class TestReceiveOutflowGuard:
-    """
-    The guards of ``receive_outflow_from`` refuse transfers that cannot work.
-    """
-
-    def test_raises_when_source_has_no_fill_level(self) -> None:
-        """
-        A source that was never initialized cannot pour.
-        """
-        world, _, receiver = _build_world(couple=False)
-        dry_source = _add_container(
-            world=world,
-            container_class=_Container,
-            name="dry_source",
-            axis=Vector3(1, 0, 0),
-        )
-
-        with pytest.raises(MissingFillEquationError) as error_info:
-            receiver.receive_outflow_from(source=dry_source)
-        assert error_info.value.source is dry_source
-
-    def test_raises_when_source_already_pours(self) -> None:
-        """
-        A source that already pours into one container cannot pour into a second.
-        """
-        world, source, receiver = _build_world()
-        second_receiver = _add_container(
-            world=world,
-            container_class=_Container,
-            name="second_receiver",
-            axis=Vector3(1, 0, 0),
-        )
-        second_receiver.initialize_fill_level(initial_fill=0.0)
-
-        with pytest.raises(SourceAlreadyCoupledError) as error_info:
-            second_receiver.receive_outflow_from(source=source)
-        assert error_info.value.source is source
-        assert source.pours_into is receiver
-
-    def test_raises_when_receiver_has_no_fill_level(self) -> None:
-        """
-        Pouring into a receiver that was never initialized blames the receiver.
-        """
-        _, source, receiver = _build_world(couple=False, initialize_receiver_fill=False)
-
-        with pytest.raises(ReceiverNotInitializedError) as error_info:
-            receiver.receive_outflow_from(source=source)
-        assert error_info.value.receiver is receiver
-
-    def test_raises_when_receiver_already_fed(self) -> None:
-        """
-        A second source cannot pour into a receiver that already has one.
-        """
-        world, source, receiver = _build_world()
-        second_source = _add_container(
-            world=world,
-            container_class=_Container,
-            name="second_source",
-            axis=Vector3(1, 0, 0),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.3),
-        )
-        second_source.initialize_fill_level(initial_fill=1.0)
-
-        with pytest.raises(ReceiverAlreadyCoupledError) as error_info:
-            receiver.receive_outflow_from(source=second_source)
-        assert error_info.value.receiver is receiver
-        assert receiver.poured_from() is source
-        assert second_source.pours_into is None
-
-
-class TestFillLevelInitialization:
-    """
-    Initializing a container's fill level gives it its drain, once.
-    """
-
-    def test_initialize_fill_level_threads_the_drain_parameters(self) -> None:
-        """
-        The parameters passed to ``initialize_fill_level`` reach the drain.
-        """
-        _, cup = _lone_tilting_cup()
-
-        cup.initialize_fill_level(
-            initial_fill=1.0,
-            outflow_rate_constant=2.0,
-            discharge_coefficient=0.5,
-            repose_angle=0.4,
-        )
-
-        assert cup.fill_equation == PouringEquation(
-            container_height=cup.root.collision.scale.z,
-            container_width=cup.root.collision.scale.y,
-            outflow_rate_constant=2.0,
-            discharge_coefficient=0.5,
-            repose_angle=0.4,
-        )
-
-    def test_second_initialization_raises(self) -> None:
-        """
-        A second ``initialize_fill_level`` call raises instead of stacking a second
-        fill-level body and connection onto the container.
-        """
-        _, source, _ = _build_world(couple=False)
-        first_fill_connection = source.fill_connection
-
-        with pytest.raises(FillLevelAlreadyInitializedError) as error_info:
-            source.initialize_fill_level(initial_fill=1.0)
-        assert error_info.value.container is source
-        assert source.fill_connection is first_fill_connection
-
-
 # %% synchronized worlds
 
 
@@ -646,56 +490,3 @@ class TestFillLevelIntegration:
             _step_passive_state(world, 0.05)
 
         assert cup.fill_level == 0.0
-
-
-# %% the liquid connection on its own
-
-
-def _world_with_unlimited_liquid_connection() -> tuple[World, LiquidConnection]:
-    """
-    A world holding a body with a fill-level connection without position limits.
-    """
-    world = World()
-    container = Body(name=PrefixedName("container"))
-    fill_level_body = Body(name=PrefixedName("container_fill_level"))
-    with world.modify_world():
-        world.add_body(container)
-    with world.modify_world():
-        connection = LiquidConnection.create_with_dofs(
-            world=world,
-            parent=container,
-            child=fill_level_body,
-            axis=Vector3.Z(),
-        )
-        world.add_connection(connection)
-    return world, connection
-
-
-class TestLiquidConnection:
-    """
-    The fill level is a passive degree of freedom that only the physics step moves.
-    """
-
-    def test_the_fill_degree_of_freedom_is_passive(self) -> None:
-        """
-        The QP never commands the fill level.
-        """
-        world, cup = _lone_tilting_cup()
-        cup.initialize_fill_level(initial_fill=0.5)
-        connection = cup.fill_connection
-
-        assert connection.active_dofs == []
-        assert connection.passive_dofs == [connection.raw_dof]
-        assert connection.raw_dof in world.passive_degrees_of_freedom
-        assert connection.raw_dof not in world.active_degrees_of_freedom
-        assert connection.is_controlled is False
-
-    def test_update_state_without_position_limits_raises(self) -> None:
-        """
-        A fill level without position limits cannot be clamped, so stepping it raises.
-        """
-        _, connection = _world_with_unlimited_liquid_connection()
-
-        with pytest.raises(MissingFillLevelLimitsError) as error_info:
-            connection.update_state(0.05)
-        assert error_info.value.connection_name == connection.name

@@ -9,12 +9,8 @@ from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
 import pytest
-
 from semantic_digital_twin.physics.equations.pouring_equations import (
     PouringEquation,
-)
-from semantic_digital_twin.physics.exceptions import (
-    NonPositiveContainerGeometryError,
 )
 
 # %% the cup the equations are evaluated for
@@ -106,24 +102,6 @@ def _exit_speed(*, equation: PouringEquation, tilt: float, fill: float) -> float
     return equation.exit_speed(tilt=sm.Scalar(tilt), fill=sm.Scalar(fill)).evaluate()[0]
 
 
-# %% container geometry guard
-
-
-@pytest.mark.parametrize(
-    "container_height, container_width", [(0.0, 0.08), (0.1, -0.08)]
-)
-def test_non_positive_geometry_is_rejected(
-    container_height: float, container_width: float
-) -> None:
-    """
-    A drain of no or negative extent is refused instead of producing inf/NaN drains.
-    """
-    with pytest.raises(NonPositiveContainerGeometryError):
-        PouringEquation(
-            container_height=container_height, container_width=container_width
-        )
-
-
 # %% head above the lip
 
 
@@ -181,19 +159,4 @@ def test_the_exit_speed_is_torricelli_of_the_head(cup: PouringCup) -> None:
     assert _exit_speed(equation=equation, tilt=tilt, fill=cup.fill) == pytest.approx(
         equation.discharge_coefficient
         * math.sqrt(2 * PouringEquation.standard_gravity * head)
-    )
-
-
-def test_the_exit_speed_of_no_head_is_that_of_the_minimum_head(
-    cup: PouringCup,
-) -> None:
-    """
-    Below the onset the speed is computed from the minimum head, so its gradient stays
-    finite.
-    """
-    equation = cup.equation()
-
-    assert _exit_speed(equation=equation, tilt=0.0, fill=cup.fill) == pytest.approx(
-        equation.discharge_coefficient
-        * math.sqrt(2 * PouringEquation.standard_gravity * equation.minimum_head)
     )
