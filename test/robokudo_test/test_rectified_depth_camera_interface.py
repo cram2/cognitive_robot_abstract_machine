@@ -11,11 +11,14 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from py_trees.common import Status
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo
 from semantic_digital_twin.world import World
+from typing_extensions import TYPE_CHECKING
 
+from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_stereo import StereoCameraConfig
 from robokudo.descriptors.camera_configs.config_foundation_stereo import (
@@ -32,7 +35,11 @@ from robokudo.io.rectified_depth_camera_interface import (
     RectifiedDepthCameraInterface,
     RectifiedDepthFrame,
 )
+from robokudo.pipeline import Pipeline
 from robokudo.utils.cv_bridge_workaround import CVBridgeWorkaround
+
+if TYPE_CHECKING:
+    from robokudo.annotators.outputs import AnnotatorOutputPerPipelineMap
 
 # %% Acquisitions
 
@@ -81,6 +88,36 @@ def test_rectified_depth_uses_projection_and_millimeters(
     assert cas.camera_observation.effective_camera_model.focal_length_x == original.p[0]
     assert stereo_frame.calibration == original
     assert interface.has_new_data() is False
+
+
+@pytest.mark.parametrize("depth_dtype", [np.float32, np.uint16])
+def test_rectified_depth_preprocessor_preserves_metric_pointcloud(
+    node: Node,
+    stereo_frame: RectifiedDepthFrame,
+    annotator_output_buffer: AnnotatorOutputPerPipelineMap,
+    depth_dtype: type[np.float32] | type[np.uint16],
+) -> None:
+    """
+    Floating-point and unsigned millimeter depths produce correctly scaled points.
+    """
+    interface = RectifiedDepthCameraInterface(
+        camera_config=StereoCameraConfig(lookup_viewpoint=False), node=node
+    )
+    preprocessor = ImagePreprocessorAnnotator()
+    pipeline = Pipeline(children=[preprocessor])
+    pipeline.setup()
+    interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
+    assert interface.set_data(cas=pipeline.cas, world=pipeline.world) is True
+    pipeline.cas.set(
+        CASViews.DEPTH_IMAGE,
+        pipeline.cas.get(CASViews.DEPTH_IMAGE).astype(depth_dtype),
+    )
+
+    assert preprocessor.update() is Status.SUCCESS
+
+    np.testing.assert_allclose(
+        np.asarray(pipeline.cas.get(CASViews.CLOUD).points), [[-0.015, -0.015, 1.5]]
+    )
 
 
 def test_rectified_depth_rejects_mismatched_acquisitions(
