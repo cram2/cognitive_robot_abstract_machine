@@ -268,7 +268,8 @@ class ResultLoading:
         :return: The statements that load those objects.
         """
         if self.result_content == ResultContent.COLUMNS:
-            statement = sqlalchemy.select(sqlalchemy.inspect(dao_class).selectable)
+            tables = sqlalchemy.inspect(dao_class).selectable
+            statement = sqlalchemy.select(tables).select_from(tables)
         else:
             statement = sqlalchemy.select(dao_class).options(*self.loader_options)
         if self.selected_object_restriction == SelectedObjectRestriction.BOUND_IDS:
