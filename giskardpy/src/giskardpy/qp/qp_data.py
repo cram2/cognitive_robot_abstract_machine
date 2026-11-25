@@ -47,6 +47,9 @@ class QPData(ABC):
 
         :param submatrix_cache: May remember the filtered constraint matrices across
             calls; ``None`` filters them from scratch.
+
+        .. warning:: With a `submatrix_cache`, the constraint matrices of the returned
+            problem are valid only until the next call with the same cache.
         """
 
 
@@ -198,13 +201,13 @@ class QPDataExplicit(QPData):
             box_upper_constraints=self.box_upper_constraints[
                 zero_quadratic_weight_filter
             ],
-            equality_matrix=submatrix_cache.submatrix(
+            equality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.equality_matrix,
                 kept_rows=bE_filter,
                 kept_columns=zero_quadratic_weight_filter,
             ),
             equality_bounds=self.equality_bounds[bE_filter],
-            inequality_matrix=submatrix_cache.submatrix(
+            inequality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.inequality_matrix,
                 kept_rows=bA_filter,
                 kept_columns=zero_quadratic_weight_filter,
@@ -227,6 +230,9 @@ class QPDataExplicit(QPData):
             ``None`` reduces them from scratch.
         :return: This problem without the flagged variables and without the
             constraints that have no coefficient left once they are gone.
+
+        .. warning:: With a `submatrix_cache`, the constraint matrices of the returned
+            problem are valid only until the next call with the same cache.
         """
         submatrix_cache = submatrix_cache or SubmatrixCache()
         kept_variables = ~removed_variables
@@ -241,13 +247,13 @@ class QPDataExplicit(QPData):
             linear_weights=self.linear_weights[kept_variables],
             box_lower_constraints=self.box_lower_constraints[kept_variables],
             box_upper_constraints=self.box_upper_constraints[kept_variables],
-            equality_matrix=submatrix_cache.submatrix(
+            equality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.equality_matrix,
                 kept_rows=kept_equalities,
                 kept_columns=kept_variables,
             ),
             equality_bounds=self.equality_bounds[kept_equalities],
-            inequality_matrix=submatrix_cache.submatrix(
+            inequality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.inequality_matrix,
                 kept_rows=kept_inequalities,
                 kept_columns=kept_variables,
@@ -279,9 +285,9 @@ class QPDataExplicit(QPData):
         )
         return ~with_coefficients
 
-    @classmethod
+    @staticmethod
     def _columns_with_coefficients(
-        cls, *, matrix: sp.csc_matrix, first_row: int, number_of_columns: int
+        *, matrix: sp.csc_matrix, first_row: int, number_of_columns: int
     ) -> NDArray[np.bool_]:
         """
         :param matrix: A constraint matrix.
@@ -299,15 +305,15 @@ class QPDataExplicit(QPData):
         coefficients = (matrix.data[:entries_in_checked_columns] != 0) & (
             matrix.indices[:entries_in_checked_columns] >= first_row
         )
-        column_of_entry = SubmatrixSelection.column_of_each_entry(matrix=matrix)
+        column_of_entry = SubmatrixSelection.find_column_of_each_entry(matrix=matrix)
         with_coefficients[
             column_of_entry[:entries_in_checked_columns][coefficients]
         ] = True
         return with_coefficients
 
-    @classmethod
+    @staticmethod
     def _rows_keeping_coefficients(
-        cls, *, matrix: sp.csc_matrix, kept_variables: np.ndarray
+        *, matrix: sp.csc_matrix, kept_variables: np.ndarray
     ) -> np.ndarray:
         """
         :param matrix: A constraint matrix.
@@ -318,7 +324,7 @@ class QPDataExplicit(QPData):
         if matrix.shape[0] == 0:
             return np.ones(0, dtype=bool)
         kept_entries = kept_variables[
-            SubmatrixSelection.column_of_each_entry(matrix=matrix)
+            SubmatrixSelection.find_column_of_each_entry(matrix=matrix)
         ]
         had_entries = np.bincount(matrix.indices, minlength=matrix.shape[0]) > 0
         has_entries = (

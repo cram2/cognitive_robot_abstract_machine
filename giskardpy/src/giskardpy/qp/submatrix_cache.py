@@ -48,9 +48,8 @@ class SubmatrixSelection:
 
     source_row_indices: NDArray[np.int32]
     """
-    The row index array of the matrix the submatrix is taken from.
-
-    Held so that its identity in a :class:`SubmatrixKey` names no other array.
+    The row index array of the matrix the submatrix is taken from, kept alive for as
+    long as the selection is cached.
     """
 
     kept_entries: NDArray[np.intp]
@@ -77,7 +76,7 @@ class SubmatrixSelection:
         :param kept_columns: Which columns of `matrix` are kept, one flag per column.
         :return: The selection of the kept rows and columns of `matrix`.
         """
-        column_of_entry = cls.column_of_each_entry(matrix=matrix)
+        column_of_entry = cls.find_column_of_each_entry(matrix=matrix)
         kept_entries = np.flatnonzero(
             kept_columns[column_of_entry] & kept_rows[matrix.indices]
         )
@@ -107,11 +106,11 @@ class SubmatrixSelection:
         :param matrix: A matrix with the sparsity pattern this selection was made for.
         :return: :attr:`submatrix`, now holding the values of `matrix`.
         """
-        np.take(matrix.data, self.kept_entries, out=self.submatrix.data)
+        np.take(matrix.data, self.kept_entries, out=self.submatrix.data, mode="clip")
         return self.submatrix
 
     @staticmethod
-    def column_of_each_entry(*, matrix: sp.csc_matrix) -> NDArray[np.intp]:
+    def find_column_of_each_entry(*, matrix: sp.csc_matrix) -> NDArray[np.intp]:
         """
         :param matrix: A matrix in compressed sparse column format.
         :return: The column of every stored entry of `matrix`, in storage order.
@@ -144,7 +143,7 @@ class SubmatrixCache:
     The remembered selections, the most recently used one last.
     """
 
-    def submatrix(
+    def take_submatrix(
         self,
         *,
         matrix: sp.csc_matrix,
@@ -157,6 +156,11 @@ class SubmatrixCache:
         :param kept_columns: Which columns of `matrix` are kept, one flag per column.
         :return: `matrix` with only the kept rows and columns, or `matrix` itself if it
             has no rows or columns.
+
+        .. warning:: A matrix is recognised by its row index array alone, so the row
+            indices of a matrix must never change in place once a submatrix was taken
+            from it, for example by
+            :meth:`scipy.sparse.csc_matrix.sort_indices`.
         """
         if matrix.shape[0] * matrix.shape[1] == 0:
             return matrix

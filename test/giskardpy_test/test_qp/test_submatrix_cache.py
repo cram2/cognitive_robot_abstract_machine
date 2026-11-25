@@ -52,7 +52,7 @@ def test_submatrix_holds_the_kept_rows_and_columns() -> None:
     kept_rows = np.array([True, False, True])
     kept_columns = np.array([True, True, False, True])
 
-    submatrix = SubmatrixCache().submatrix(
+    submatrix = SubmatrixCache().take_submatrix(
         matrix=matrix, kept_rows=kept_rows, kept_columns=kept_columns
     )
 
@@ -68,7 +68,7 @@ def test_stored_zeros_stay_stored_in_the_submatrix() -> None:
     """
     matrix = constraint_matrix()
 
-    submatrix = SubmatrixCache().submatrix(
+    submatrix = SubmatrixCache().take_submatrix(
         matrix=matrix,
         kept_rows=np.ones(3, dtype=bool),
         kept_columns=np.ones(4, dtype=bool),
@@ -86,12 +86,12 @@ def test_taking_the_same_submatrix_again_reads_the_new_values() -> None:
     matrix = constraint_matrix()
     kept_rows = np.array([False, True, True])
     kept_columns = np.array([True, True, True, False])
-    first = cache.submatrix(
+    first = cache.take_submatrix(
         matrix=matrix, kept_rows=kept_rows, kept_columns=kept_columns
     )
 
     matrix.data[:] = np.arange(1.0, matrix.nnz + 1.0)
-    second = cache.submatrix(
+    second = cache.take_submatrix(
         matrix=matrix, kept_rows=kept_rows, kept_columns=kept_columns
     )
 
@@ -109,10 +109,10 @@ def test_other_rows_and_columns_give_their_own_submatrix() -> None:
     first_columns = np.array([True, False, True, True])
     second_columns = np.array([False, True, True, False])
 
-    first = cache.submatrix(
+    first = cache.take_submatrix(
         matrix=matrix, kept_rows=kept_rows, kept_columns=first_columns
     )
-    second = cache.submatrix(
+    second = cache.take_submatrix(
         matrix=matrix, kept_rows=kept_rows, kept_columns=second_columns
     )
 
@@ -128,7 +128,7 @@ def test_keeping_no_row_gives_a_submatrix_without_rows() -> None:
     """
     matrix = constraint_matrix()
 
-    submatrix = SubmatrixCache().submatrix(
+    submatrix = SubmatrixCache().take_submatrix(
         matrix=matrix,
         kept_rows=np.zeros(3, dtype=bool),
         kept_columns=np.ones(4, dtype=bool),
@@ -143,7 +143,7 @@ def test_a_matrix_without_rows_is_its_own_submatrix() -> None:
     """
     matrix = sp.csc_matrix((0, 4))
 
-    submatrix = SubmatrixCache().submatrix(
+    submatrix = SubmatrixCache().take_submatrix(
         matrix=matrix,
         kept_rows=np.zeros(0, dtype=bool),
         kept_columns=np.ones(4, dtype=bool),
@@ -168,14 +168,18 @@ def test_the_least_recently_used_selection_is_forgotten() -> None:
         np.array([False, True, False, False]),
         np.array([False, False, True, False]),
     ]
-    first = cache.submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[0])
-    cache.submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[1])
-    cache.submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[0])
-    cache.submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[2])
+    first = cache.take_submatrix(
+        matrix=matrix, kept_rows=kept_rows, kept_columns=columns[0]
+    )
+    cache.take_submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[1])
+    cache.take_submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[0])
+    cache.take_submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[2])
 
     assert len(cache.selections) == cache.maximum_number_of_selections
     assert (
-        cache.submatrix(matrix=matrix, kept_rows=kept_rows, kept_columns=columns[0])
+        cache.take_submatrix(
+            matrix=matrix, kept_rows=kept_rows, kept_columns=columns[0]
+        )
         is first
     )
 
