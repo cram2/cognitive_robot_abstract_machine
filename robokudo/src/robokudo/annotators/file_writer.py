@@ -22,6 +22,7 @@ The module uses:
 from __future__ import annotations
 
 # %% Imports
+import logging
 import json
 from pathlib import Path
 from timeit import default_timer
@@ -32,6 +33,8 @@ from py_trees.common import Status
 from krrood.adapters.json_serializer import to_json
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+
+logger = logging.getLogger(__name__)
 
 
 class FileWriter(BaseAnnotator):
@@ -87,16 +90,14 @@ class FileWriter(BaseAnnotator):
         super().__init__(name, descriptor)
         self.initialized = False
 
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        self.rk_logger.debug(
-            f"Writing files to {self.descriptor.parameters.target_dir}"
-        )
+        logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug(f"Writing files to {self.descriptor.parameters.target_dir}")
         self.target_dir_path: Path = Path(self.descriptor.parameters.target_dir)
 
         if self.target_dir_path.exists() and self.target_dir_path.is_dir():
             self.initialized = True
         else:
-            self.rk_logger.error(
+            logger.error(
                 f"{self.descriptor.parameters.target_dir} is not existing or not a directory"
             )
 
@@ -140,7 +141,7 @@ class FileWriter(BaseAnnotator):
         start_timer = default_timer()
 
         if not self.initialized:
-            self.rk_logger(
+            logger.error(
                 "FileWriter has not been properly instantiated. Check error log for __init__ errors."
             )
             return Status.FAILURE

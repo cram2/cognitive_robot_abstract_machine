@@ -170,7 +170,7 @@ class PerClassConfidenceModel:
         for index, name in enumerate(variable_names):
             if name in dataframe.columns:
                 event[0, index] = dataframe[name].iloc[0]
-        return float(grounded.log_likelihood(event)[0])
+        return float(grounded.log_likelihood(events=event)[0])
 
 
 # %% confidence model

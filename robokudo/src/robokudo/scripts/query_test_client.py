@@ -1,3 +1,7 @@
+"""
+Action client that sends test queries to the RoboKudo query action server.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -19,13 +23,14 @@ from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 from robokudo_msgs.action import Query
 
-from robokudo.defs import PACKAGE_NAME
 
 if TYPE_CHECKING:
     from rclpy.action.client import ClientGoalHandle
     from rclpy.task import Future
     from rclpy.timer import Timer
     from robokudo_msgs.action._query import Query_FeedbackMessage, Query_Result
+
+logger = logging.getLogger(__name__)
 
 
 class ResultQueue(Protocol):
@@ -74,13 +79,6 @@ class RoboKudoActionClient:
     preempt_timer: float | None = None
     """
     Delay before automatically cancelling an active goal.
-    """
-
-    rk_logger: logging.Logger = field(
-        init=False, default_factory=lambda: logging.getLogger(PACKAGE_NAME)
-    )
-    """
-    Logger receiving action progress and result messages.
     """
 
     _action_client: ActionClient = field(init=False)
@@ -136,9 +134,9 @@ class RoboKudoActionClient:
         :param goal_type: Content of the type field in the goal sent to the action
             server.
         """
-        self.rk_logger.info("Waiting for action server...")
+        logger.info("Waiting for action server...")
         if not self._action_client.wait_for_server(timeout_sec=5.0):
-            self.rk_logger.error("Action server not available!")
+            logger.error("Action server not available!")
             self.done = True
             return
 
@@ -146,7 +144,7 @@ class RoboKudoActionClient:
         goal_msg = Query.Goal()
         goal_msg.obj.type = goal_type
 
-        self.rk_logger.info(f"Sending goal request with type: '{goal_type}'")
+        logger.info(f"Sending goal request with type: '{goal_type}'")
         send_goal_future = self._action_client.send_goal_async(
             goal_msg, feedback_callback=self.feedback_callback
         )
@@ -161,11 +159,11 @@ class RoboKudoActionClient:
         """
         self._goal_handle = future.result()
         if not self._goal_handle.accepted:
-            self.rk_logger.error("Goal rejected by the action server.")
+            logger.error("Goal rejected by the action server.")
             self.done = True
             return
 
-        self.rk_logger.info("Goal accepted by the action server.")
+        logger.info("Goal accepted by the action server.")
 
         # Scheduling of cancellation after X seconds
         if self.preempt_timer is not None:
@@ -185,17 +183,17 @@ class RoboKudoActionClient:
         """
         feedback = feedback_msg.feedback
         self.last_feedback = feedback
-        self.rk_logger.info(f"Received feedback: {feedback.feedback}")
+        logger.info(f"Received feedback: {feedback.feedback}")
 
     def cancel_goal(self) -> None:
         """
         Sends a cancel request for the active goal.
         """
         if not self._goal_handle:
-            self.rk_logger.error("No active goal to cancel.")
+            logger.error("No active goal to cancel.")
             return
 
-        self.rk_logger.info("Sending cancel request...")
+        logger.info("Sending cancel request...")
         cancel_future = self._goal_handle.cancel_goal_async()
         cancel_future.add_done_callback(self.cancel_done_callback)
 
@@ -213,9 +211,9 @@ class RoboKudoActionClient:
         cancel_response = future.result()
         self.cancel_response = cancel_response
         if len(cancel_response.goals_canceling) > 0:
-            self.rk_logger.info("Goal cancellation accepted by the server.")
+            logger.info("Goal cancellation accepted by the server.")
         else:
-            self.rk_logger.warning("Goal cancellation was not successful.")
+            logger.warning("Goal cancellation was not successful.")
 
     def result_callback(self, future: Future) -> None:
         """
@@ -236,17 +234,17 @@ class RoboKudoActionClient:
             self.goal_result = result
 
             if status == GoalStatus.STATUS_CANCELED:
-                self.rk_logger.info("Goal was successfully canceled by the server.")
+                logger.info("Goal was successfully canceled by the server.")
             elif status == GoalStatus.STATUS_SUCCEEDED:
-                self.rk_logger.info("Goal succeeded.")
+                logger.info("Goal succeeded.")
             else:
-                self.rk_logger.info(f"Goal finished with status code: {status}")
+                logger.info(f"Goal finished with status code: {status}")
 
-            self.rk_logger.info(f"Formatted Result: \n{pretty_result_str}")
+            logger.info(f"Formatted Result: \n{pretty_result_str}")
         except Exception as e:
-            self.rk_logger.error(f"Error receiving result: {e}")
+            logger.error(f"Error receiving result: {e}")
         finally:
-            self.rk_logger.info("Shutting down after receiving the final result.")
+            logger.info("Shutting down after receiving the final result.")
             self.done = True
 
     def close(self) -> None:

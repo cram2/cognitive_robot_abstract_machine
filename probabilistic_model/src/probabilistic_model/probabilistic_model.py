@@ -1,3 +1,7 @@
+"""
+The interface of probabilistic models and the queries every model answers.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -116,10 +120,10 @@ class ProbabilisticModel(ABC):
         The shape of the array has to be (n, len(self.variables)).
         :return: The likelihood of the events as an array with shape (n,).
         """
-        return np.exp(self.log_likelihood(events))
+        return np.exp(self.log_likelihood(events=events))
 
     @abstractmethod
-    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
+    def log_likelihood(self, *, events: npt.NDArray) -> npt.NDArray:
         """
         Calculate the log-likelihood of an event.
 
@@ -337,7 +341,7 @@ class ProbabilisticModel(ABC):
             {variable: variable.domain for variable in self.variables}
         )
 
-    def apply_translation(self, translation: dict[Variable, float]):
+    def apply_translation(self, *, translation: dict[Variable, float]) -> None:
         """
         Translate the model in-place.
 
@@ -349,7 +353,7 @@ class ProbabilisticModel(ABC):
         """
         raise NotImplementedError
 
-    def apply_scaling(self, scaling: dict[Variable, float]):
+    def apply_scaling(self, *, scaling: dict[Variable, float]) -> None:
         """
         Scale the model in-place.
 

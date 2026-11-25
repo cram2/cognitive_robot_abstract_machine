@@ -23,6 +23,7 @@ The module uses:
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import open3d
@@ -31,6 +32,8 @@ from py_trees.common import Status
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.types import annotation, scene
+
+logger = logging.getLogger(__name__)
 
 # %% position estimation
 
@@ -84,7 +87,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """
@@ -113,7 +116,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
                     )
                 )
                 if len(cloud_annotations) == 0:
-                    self.rk_logger.warning(
+                    logger.warning(
                         "CloudAnnotation mode, but no CloudAnnotation found on object"
                     )
                     continue

@@ -71,8 +71,9 @@ class KrroodIsolationRules(Section):
         "`krrood`, including its tests under `test/krrood_test`, never imports "
         "another workspace package - in particular not `coraplex`, "
         "`semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or "
-        "`experiments`. The only exceptions are `random_events` and "
-        "`probabilistic_model`, which `krrood`'s source already depends on"
+        "`experiments`. The only exceptions are `random_events`, "
+        "`probabilistic_model` and `krrood_compute_resources`, which `krrood`'s "
+        "source already depends on"
     )
 
     MIMIC_OTHER_PACKAGES_IN_KRROOD_TESTS = (
@@ -83,8 +84,8 @@ class KrroodIsolationRules(Section):
     )
 
     MIMICS_IMPORT_ONLY_KRROOD_DEPENDENCIES = (
-        "Those mimic classes import only `krrood`, `random_events` and "
-        "`probabilistic_model`"
+        "Those mimic classes import only `krrood`, `random_events`, "
+        "`probabilistic_model` and `krrood_compute_resources`"
     )
 
 

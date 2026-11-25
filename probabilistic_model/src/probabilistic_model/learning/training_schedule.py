@@ -48,12 +48,29 @@ class ConvergenceHistory:
     The wall-clock time of the epochs.
     """
 
+    epoch_durations: list[timedelta] = field(default_factory=list)
+    """
+    The wall-clock time of each epoch, in the order they ran.
+    """
+
     @property
     def epochs(self) -> int:
         """
         :return: The number of epochs training ran.
         """
         return len(self.epoch_losses)
+
+    @property
+    def average_epoch_duration(self) -> timedelta | None:
+        """
+        :return: The mean duration of the epochs after the first, which also compiles
+            the training step, the first epoch's alone if it is the only one, ``None``
+            without epochs.
+        """
+        if not self.epoch_durations:
+            return None
+        durations = self.epoch_durations[1:] or self.epoch_durations
+        return sum(durations, timedelta()) / len(durations)
 
 
 @dataclass(kw_only=True)
@@ -106,6 +123,7 @@ class Convergence:
         :return: The losses of the epochs trained until convergence or the epoch limit.
         """
         epoch_losses: list[float] = []
+        epoch_durations: list[timedelta] = []
         start = time.perf_counter()
 
         def elapsed() -> timedelta:
@@ -117,14 +135,22 @@ class Convergence:
         while len(epoch_losses) < self.maximum_epochs and not self.is_out_of_time(
             elapsed=elapsed()
         ):
+            epoch_start = time.perf_counter()
             epoch_losses.append(training.train_one_epoch())
             training.finish_epoch(average_loss=epoch_losses[-1])
+            epoch_durations.append(timedelta(seconds=time.perf_counter() - epoch_start))
             if training.has_settled() and self.has_converged(epoch_losses=epoch_losses):
                 return ConvergenceHistory(
-                    epoch_losses=epoch_losses, converged=True, duration=elapsed()
+                    epoch_losses=epoch_losses,
+                    converged=True,
+                    duration=elapsed(),
+                    epoch_durations=epoch_durations,
                 )
         return ConvergenceHistory(
-            epoch_losses=epoch_losses, converged=False, duration=elapsed()
+            epoch_losses=epoch_losses,
+            converged=False,
+            duration=elapsed(),
+            epoch_durations=epoch_durations,
         )
 
     def is_out_of_time(self, *, elapsed: timedelta) -> bool:
@@ -311,12 +337,13 @@ class MiniBatchTraining(ABC):
     """
 
     @abstractmethod
-    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> float:
+    def step_on_batch(self, *, batch: tuple[BackendArray, ...]) -> float | BackendArray:
         """
         Update the parameters by one step on a batch.
 
         :param batch: The same rows of every training array.
-        :return: The loss of the batch before the step.
+        :return: The loss of the batch before the step, a float or a scalar array of the
+            backend that may still be computed on its device.
         """
 
     def finish_epoch(self, *, average_loss: float) -> None:
@@ -341,7 +368,7 @@ class MiniBatchTraining(ABC):
         total_loss = 0.0
         for batch in self.mini_batches.batches_of_epoch(arguments=self.arguments):
             total_loss += self.step_on_batch(batch=batch) * batch[0].shape[0]
-        return total_loss / self.arguments[0].shape[0]
+        return float(total_loss) / self.arguments[0].shape[0]
 
 
 @dataclass(kw_only=True)

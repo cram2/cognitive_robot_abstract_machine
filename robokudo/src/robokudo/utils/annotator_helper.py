@@ -14,6 +14,7 @@ It supports:
 from __future__ import annotations
 
 # %% Imports
+import logging
 from copy import deepcopy
 
 import cv2
@@ -37,6 +38,8 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from robokudo.annotators.core import BaseAnnotator
     from robokudo.cas import CAS
+
+logger = logging.getLogger(__name__)
 
 
 def transform_pose_from_camera_to_world(
@@ -243,7 +246,7 @@ def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
                 annotator.get_cas(), img
             )
         except ColorToDepthRatioMissing as e:  # pylint: disable=invalid-name
-            annotator.rk_logger.error(
+            logger.error(
                 f"No color to depth ratio set by your camera driver! Can't preprocess: {e}"
             )
     else:

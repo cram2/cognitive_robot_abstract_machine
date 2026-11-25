@@ -73,3 +73,32 @@ class MissingGraphicsProcessorError(DataclassException, LookupError):
             "Give the machine the memory of its GPU, or divide it into shares of the "
             "processor cores only."
         )
+
+
+# %% workers
+
+
+@dataclass(kw_only=True)
+class NotEnoughMemoryForWorkers(DataclassException):
+    """
+    Raised when not even one worker of a pool fits into the free memory.
+    """
+
+    memory_per_worker: int
+    """
+    How many bytes each worker needs.
+    """
+
+    free_bytes: int
+    """
+    How many bytes the workers may use.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A worker of {self.memory_per_worker / 1e9:.1f} GB needs more than the "
+            f"{self.free_bytes / 1e9:.1f} GB the workers may use."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Raise the memory budget, or free memory first."

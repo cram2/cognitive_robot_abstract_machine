@@ -285,13 +285,6 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
     ) -> LearnedCircuit:
         host = self.random_circuit(dataset=dataset)
         rows = dataset.encoded(frame=dataset.train)
-        mini_batches = MiniBatches(
-            batch_size=min(
-                self.batch_size,
-                context.rows_per_step(circuit=host, setting=setting, rows=rows),
-            ),
-            seed=self.seed,
-        )
         circuit = setting.placed(circuit=host)
         data = setting.asarray(rows=circuit.encoded(rows))
         if setting.array_library is ArrayLibrary.TORCH:
@@ -299,6 +292,7 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
                 circuit.root,
                 AverageNegativeLogLikelihood(),
                 learning_rate=self.learning_rate,
+                records_cuda_graphs=True,
             )
         else:
             trainer = JaxGradientDescent(
@@ -306,6 +300,15 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
                 AverageNegativeLogLikelihood(),
                 optax.inject_hyperparams(optax.adam)(learning_rate=self.learning_rate),
             )
+        mini_batches = MiniBatches(
+            batch_size=trainer.largest_even_batch_size(
+                rows=min(
+                    self.batch_size,
+                    context.rows_per_step(circuit=host, setting=setting, rows=rows),
+                )
+            ),
+            seed=self.seed,
+        )
         run = trainer.minimize_until_converged(
             data,
             convergence=context.convergence,
@@ -402,7 +405,11 @@ class JointProbabilityTreeBaseline(BenchmarkMethod):
             minimum_samples_per_leaf=self.minimum_samples_per_leaf
         ).fit(dataset.train, variables)
         return LearnedCircuit(
-            circuit=CircuitRepresentations().convert(tree, LayeredProbabilisticCircuit),
+            circuit=setting.placed(
+                circuit=CircuitRepresentations().convert(
+                    tree, LayeredProbabilisticCircuit
+                )
+            ),
             history=None,
         )
 

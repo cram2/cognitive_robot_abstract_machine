@@ -14,6 +14,7 @@ Covers:
 """
 
 import inspect
+import sys
 from dataclasses import dataclass
 
 import pytest
@@ -371,6 +372,21 @@ def test_root_frame_in_outermost_wins():
     # The outermost test_stack frame is the test function itself, not inner()
     assert root is not None
     assert root.function_name == "test_root_frame_in_outermost_wins"
+
+
+# %% a name cls that is no class
+
+
+def test_a_local_named_cls_that_is_no_class_is_no_owner_class():
+    """
+    A local named cls that is no class is not taken for the class owning the frame's
+    function.
+    """
+    cls = "not a class"
+
+    frame = StackFrame.from_raw_frame(frame=sys._getframe())
+
+    assert frame.class_object is None
 
 
 # %% frames inside krrood

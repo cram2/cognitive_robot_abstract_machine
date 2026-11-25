@@ -290,9 +290,9 @@ class GaussianMixtureBenchmark:
         ):
             samples = rustworkx_circuit.sample(amount)
             rustworkx_call = TimedCall.of(
-                lambda: rustworkx_circuit.log_likelihood(samples)
+                lambda: rustworkx_circuit.log_likelihood(events=samples)
             )
-            layered_call = TimedCall.of(lambda: layered.log_likelihood(samples))
+            layered_call = TimedCall.of(lambda: layered.log_likelihood(events=samples))
             raise_if_answers_disagree(
                 query.value, rustworkx_call.result, layered_call.result
             )
@@ -383,9 +383,11 @@ class GaussianMixtureBenchmark:
 
         samples = rustworkx_truncated.sample(1000)
         rustworkx_call = TimedCall.of(
-            lambda: rustworkx_truncated.log_likelihood(samples)
+            lambda: rustworkx_truncated.log_likelihood(events=samples)
         )
-        layered_call = TimedCall.of(lambda: layered_truncated.log_likelihood(samples))
+        layered_call = TimedCall.of(
+            lambda: layered_truncated.log_likelihood(events=samples)
+        )
         raise_if_answers_disagree(
             GaussianMixtureQuery.LOG_LIKELIHOOD_AFTER_TRUNCATION.value,
             rustworkx_call.result,

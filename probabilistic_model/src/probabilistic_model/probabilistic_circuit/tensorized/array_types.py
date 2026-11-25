@@ -45,6 +45,18 @@ SampleNodeValues: TypeAlias = BackendArray
 One value per sample and node of a layer, shape (#samples, #nodes).
 """
 
+LeafValues: TypeAlias = BackendArray
+"""
+The values a leaf layer reads in a set of samples: of its one variable, shape
+(#samples,), or of the variable of every node, shape (#samples, #nodes).
+"""
+
+LeafStateIndices: TypeAlias = BackendArray
+"""
+An index into the states of a discrete layer for every value of a :data:`LeafValues`
+array, in its shape.
+"""
+
 SampleNodeMask: TypeAlias = BackendArray
 """
 One flag per sample and node of a layer, shape (#samples, #nodes).
@@ -83,6 +95,16 @@ NodeIndices: TypeAlias = npt.NDArray[np.int64]
 Indices of nodes of a layer.
 """
 
+NodeIntegers: TypeAlias = npt.NDArray[np.int64]
+"""
+One whole number per node of a layer, shape (#nodes,).
+"""
+
+NodeStateMask: TypeAlias = npt.NDArray[np.bool_]
+"""
+One flag per node of a layer and state of a discrete variable, shape (#nodes, #states).
+"""
+
 NodeMask: TypeAlias = npt.NDArray[np.bool_]
 """
 One flag per node of a layer, shape (#nodes,).
@@ -91,6 +113,12 @@ One flag per node of a layer, shape (#nodes,).
 NodeSelection: TypeAlias = NodeIndices | NodeMask
 """
 Which nodes of a layer to keep: their indices, or one flag per node.
+"""
+
+ArraySelection: TypeAlias = npt.NDArray[np.int64] | npt.NDArray[np.bool_]
+"""
+Which elements of an array to keep along its last axes: their positions, or one flag per
+element.
 """
 
 NodeIntervalBounds: TypeAlias = npt.NDArray[np.int64]
@@ -145,6 +173,11 @@ The values of the variables in the scope of a layer in a set of samples, shape
 VariableValues: TypeAlias = npt.NDArray[np.number]
 """
 One number per variable of a circuit, shape (#variables of the circuit,).
+"""
+
+NodeVariableMask: TypeAlias = npt.NDArray[np.bool_]
+"""
+One flag per node of a layer and variable of a circuit, shape (#nodes, #variables).
 """
 
 VariableMask: TypeAlias = npt.NDArray[np.bool_]
