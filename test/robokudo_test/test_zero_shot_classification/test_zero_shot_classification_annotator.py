@@ -39,7 +39,7 @@ class ChannelMeanClassificationAnnotator(ZeroShotClassificationAnnotator):
     names.
     """
 
-    def classify(self, images: list[Image.Image]) -> list[list[Classification]]:
+    def classify(self, *, images: list[Image.Image]) -> list[list[Classification]]:
         return [self._rank_colors(np.asarray(image)) for image in images]
 
     def _rank_colors(self, image: np.ndarray) -> list[Classification]:
@@ -89,14 +89,16 @@ def _annotator_in_pipeline(
     pipeline = Pipeline("Sequence")
     pipeline.add_child(annotator)
     pipeline.setup()
-    annotator.get_cas().set(CASViews.COLOR_IMAGE, color_image)
+    annotator.get_cas().set(view_name=CASViews.COLOR_IMAGE, value=color_image)
     return annotator
 
 
 def _scene_classifications(
     annotator: ZeroShotClassificationAnnotator,
 ) -> list[Classification]:
-    return annotator.get_cas().filter_annotations_by_type(Classification)
+    return annotator.get_cas().filter_annotations_by_type(
+        type_to_include=Classification
+    )
 
 
 def _classnames(classifications: list[Classification]) -> list[str]:
@@ -114,7 +116,7 @@ def test_scene_scope_adds_the_image_classifications_to_the_cas():
 
     assert status == Status.SUCCESS
     assert _classnames(_scene_classifications(annotator)) == _classnames(
-        annotator.classify([Image.fromarray(solid_image(rgb(color)))])[0]
+        annotator.classify(images=[Image.fromarray(solid_image(rgb(color)))])[0]
     )
 
 
@@ -152,8 +154,8 @@ def test_object_hypothesis_scope_classifies_each_hypothesis_by_its_region():
 def test_object_hypothesis_scope_skips_hypotheses_rejected_by_filter():
     descriptor = _object_hypothesis_descriptor()
     rejected_object = object_hypothesis(x=0, y=0, width=10, height=10)
-    descriptor.parameters.filter_fn = (
-        lambda hypothesis: hypothesis is not rejected_object
+    descriptor.parameters.filter_fn = lambda hypothesis: (
+        hypothesis is not rejected_object
     )
     annotator = _annotator_in_pipeline(descriptor, two_color_scene())
     accepted_object = object_hypothesis(x=30, y=0, width=10, height=10)

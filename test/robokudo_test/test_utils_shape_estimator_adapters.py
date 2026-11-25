@@ -22,7 +22,7 @@ class TestUtilsShapeEstimatorAdapters:
             score=0.98765,
         )
 
-        summary = SPHERE_FIT_ADAPTER.summary(fit)
+        summary = SPHERE_FIT_ADAPTER.summary(fit_result=fit)
 
         assert isinstance(summary, SphereFitSummary)
         assert summary.radius == 0.12345
@@ -43,7 +43,7 @@ class TestUtilsShapeEstimatorAdapters:
             score=0.98765,
         )
 
-        summary = CYLINDER_FIT_ADAPTER.summary(fit)
+        summary = CYLINDER_FIT_ADAPTER.summary(fit_result=fit)
 
         assert isinstance(summary, CylinderFitSummary)
         assert summary.height == 1.23456
@@ -63,7 +63,7 @@ class TestUtilsShapeEstimatorAdapters:
             score=0.98765,
         )
 
-        summary = CUBOID_FIT_ADAPTER.summary(fit)
+        summary = CUBOID_FIT_ADAPTER.summary(fit_result=fit)
 
         assert isinstance(summary, CuboidFitSummary)
         assert summary.extents == [0.123, 1.235, 2.346]

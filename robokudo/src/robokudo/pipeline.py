@@ -20,6 +20,7 @@ import robokudo.annotators.core
 import robokudo.annotators.outputs
 import robokudo.cas as cas
 import robokudo.utils.tree
+from krrood.patterns.called_positionally import called_positionally
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +173,7 @@ class Pipeline(Sequence):
             )
             annotator_output_pipeline_map_buffer.map[self.name].redraw = True
 
+    @called_positionally
     def terminate(self, new_status: Status) -> None:
         """
         Handle pipeline termination.

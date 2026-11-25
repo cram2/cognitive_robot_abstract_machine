@@ -27,7 +27,7 @@ class ObjectPoseEstimator(ABC):
     """
 
     @abstractmethod
-    def estimate_pose(self, object_observation: ObjectObservation) -> Pose | None:
+    def estimate_pose(self, *, object_observation: ObjectObservation) -> Pose | None:
         """
         Estimate the pose of an object without prior knowledge.
 
@@ -38,7 +38,7 @@ class ObjectPoseEstimator(ABC):
 
     @abstractmethod
     def track_pose(
-        self, object_observation: ObjectObservation, previous_pose: Pose
+        self, *, object_observation: ObjectObservation, previous_pose: Pose
     ) -> Pose:
         """
         Refine a known pose of an object to an observation of the object that moved a
@@ -60,7 +60,7 @@ class MeshBasedPoseEstimator(ObjectPoseEstimator, ABC):
     """
 
     @abstractmethod
-    def load_meshes(self, mesh_files: list[Path]) -> None:
+    def load_meshes(self, *, mesh_files: list[Path]) -> None:
         """
         Load meshes so that selecting any of them with :meth:`select_mesh` is immediate.
 
@@ -68,7 +68,7 @@ class MeshBasedPoseEstimator(ObjectPoseEstimator, ABC):
         """
 
     @abstractmethod
-    def select_mesh(self, mesh_file: Path) -> None:
+    def select_mesh(self, *, mesh_file: Path) -> None:
         """
         Use a mesh for the following pose estimates and tracks.
 

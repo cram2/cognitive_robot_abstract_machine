@@ -55,9 +55,9 @@ def test_deserialize_annotations_forwards_kwargs_for_single_item(monkeypatch):
 
 def test_numpy_scalar_json_serializer_roundtrip():
     scalar = np.int16(42)
-    encoded = cas_annotation_codecs.NumpyScalarJSONSerializer.to_json(scalar)
+    encoded = cas_annotation_codecs.NumpyScalarJSONSerializer.to_json(instance=scalar)
     restored = cas_annotation_codecs.NumpyScalarJSONSerializer.from_json(
-        encoded, np.generic
+        data=encoded, clazz=np.generic
     )
 
     assert encoded["dtype"] == "int16"

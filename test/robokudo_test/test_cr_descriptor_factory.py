@@ -19,7 +19,7 @@ class TestCrDescriptorFactory(object):
         """
         Test the creation of a valid cr descriptor config.
         """
-        descriptor = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        descriptor = CollectionReaderDescriptorFactory.create_descriptor(camera="mongo")
 
         assert type(descriptor.parameters.camera_config) == MongoCameraConfig
         assert type(descriptor.parameters.camera_interface) == StorageReaderInterface
@@ -30,7 +30,7 @@ class TestCrDescriptorFactory(object):
         """
         with pytest.raises(ValueError):
             CollectionReaderDescriptorFactory.create_descriptor(
-                "invalid_interface_name"
+                camera="invalid_interface_name"
             )
 
     @pytest.mark.skipif(
@@ -46,7 +46,7 @@ class TestCrDescriptorFactory(object):
         db_name = "other_db_name"
 
         descriptor = CollectionReaderDescriptorFactory.create_descriptor(
-            "mongo",
+            camera="mongo",
             loop=loop,
             db_name=db_name,
         )
@@ -64,5 +64,5 @@ class TestCrDescriptorFactory(object):
         """
         with pytest.raises(TypeError):
             CollectionReaderDescriptorFactory.create_descriptor(
-                "mongo", invalid_config_key="any_value"
+                camera="mongo", invalid_config_key="any_value"
             )

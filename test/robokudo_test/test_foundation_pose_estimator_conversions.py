@@ -110,7 +110,9 @@ def estimator_module(monkeypatch: pytest.MonkeyPatch) -> Iterator[ModuleType]:
 def test_estimate_returns_the_pose_of_the_engine_matrix(estimator_module: ModuleType):
     estimator = estimator_module.FoundationPoseEstimator()
 
-    pose = estimator.estimate_pose(estimator.warm_up_object_observation)
+    pose = estimator.estimate_pose(
+        object_observation=estimator.warm_up_object_observation
+    )
 
     numpy.testing.assert_allclose(pose.to_np(), estimator.foundation_pose.pose_matrix)
 
@@ -121,7 +123,10 @@ def test_track_hands_the_engine_a_matrix_and_returns_a_pose(
     estimator = estimator_module.FoundationPoseEstimator()
     previous_pose = Pose.from_xyz_quaternion(pos_z=0.5)
 
-    pose = estimator.track_pose(estimator.warm_up_object_observation, previous_pose)
+    pose = estimator.track_pose(
+        object_observation=estimator.warm_up_object_observation,
+        previous_pose=previous_pose,
+    )
 
     numpy.testing.assert_allclose(
         estimator.foundation_pose.track_arguments["previous_pose"],

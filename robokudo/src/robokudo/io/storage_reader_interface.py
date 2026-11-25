@@ -141,17 +141,17 @@ class StorageReaderInterface(CameraInterface):
         :raises InvalidCameraObservation: If recorded sensor identities or names
             conflict.
         """
-        camera_payload = self._load_camera_payload(cas_frame)
+        camera_payload = self._load_camera_payload(cas_frame=cas_frame)
         recorded_world = World()
         restored = self._restore_world(
-            cas_frame[StorageDocumentField.WORLD], recorded_world
+            snapshot=cas_frame[StorageDocumentField.WORLD], target_world=recorded_world
         )
         observation = CameraObservationCodec().decode_with_tracker(
-            camera_payload, restored.tracker
+            payload=camera_payload, tracker=restored.tracker
         )
         projection_started = perf_counter()
-        self._check_sensor_conflicts(observation, world)
-        RecordedCameraWorld(observation=observation).install(world)
+        self._check_sensor_conflicts(observation=observation, reasoning_world=world)
+        RecordedCameraWorld(observation=observation).install(reasoning_world=world)
         self._recorded_camera_id = observation.camera.id
         logger.debug(
             "MongoDB sensor replay restored full world in %.6f s and projected camera in %.6f s",
@@ -159,7 +159,7 @@ class StorageReaderInterface(CameraInterface):
             perf_counter() - projection_started,
         )
 
-    def _load_camera_payload(self, cas_frame: dict[str, Any]) -> ViewPayload:
+    def _load_camera_payload(self, *, cas_frame: dict[str, Any]) -> ViewPayload:
         """
         Load the camera observation document referenced by a recorded frame.
 
@@ -170,13 +170,13 @@ class StorageReaderInterface(CameraInterface):
         if CASViews.CAMERA_OBSERVATION not in cas_frame[StorageDocumentField.VIEW_IDS]:
             raise CameraObservationMissing()
         camera_document = self.storage.load_view_document(
-            cas_frame, CASViews.CAMERA_OBSERVATION
+            cas_document=cas_frame, view_name=CASViews.CAMERA_OBSERVATION
         )
-        return ViewPayload.from_document(camera_document)
+        return ViewPayload.from_document(document=camera_document)
 
     @staticmethod
     def _check_sensor_conflicts(
-        observation: CameraObservation, reasoning_world: World
+        *, observation: CameraObservation, reasoning_world: World
     ) -> None:
         """
         Reject recorded sensor identities or names already present in the target world.
@@ -210,7 +210,7 @@ class StorageReaderInterface(CameraInterface):
             )
 
     @staticmethod
-    def _restore_world(snapshot: str, target_world: World) -> RestoredWorld:
+    def _restore_world(*, snapshot: str, target_world: World) -> RestoredWorld:
         """
         Apply a recorded snapshot into the supplied world.
 
@@ -235,7 +235,9 @@ class StorageReaderInterface(CameraInterface):
         :param world: The world perception perceives into.
         """
         world.clear()
-        restored = self._restore_world(cas_frame[StorageDocumentField.WORLD], world)
+        restored = self._restore_world(
+            snapshot=cas_frame[StorageDocumentField.WORLD], target_world=world
+        )
         logger.debug(
             "MongoDB full replay restored world in %.3f ms",
             restored.duration.total_seconds() * 1000.0,
@@ -294,14 +296,14 @@ class StorageReaderInterface(CameraInterface):
             if view_name == CASViews.CAMERA_OBSERVATION:
                 cas.camera_observation = view_content
             else:
-                cas.set(view_name, view_content)
+                cas.set(view_name=view_name, value=view_content)
         observation = cas.require_camera_observation()
         if self.camera_config.replay_mode == MongoReplayMode.SENSOR_CONTEXT:
             if observation.camera.id != self._recorded_camera_id:
                 raise InvalidCameraObservation(
                     reason="recorded camera identity changed during playback"
                 )
-            RecordedCameraWorld.apply_pose(world, observation)
+            RecordedCameraWorld.apply_pose(world=world, observation=observation)
 
         # Restore annotations
         if self.camera_config.restore_annotations:

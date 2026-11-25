@@ -43,7 +43,9 @@ def test_resolver_selects_named_descriptor_camera() -> None:
     [camera] = world.get_semantic_annotations_by_type(Camera)
     source = WorldDescriptorSource(camera_name=camera.name)
 
-    selected_camera = RayTracingContextResolver._select_descriptor_camera(world, source)
+    selected_camera = RayTracingContextResolver._select_descriptor_camera(
+        world=world, source=source
+    )
 
     assert selected_camera is camera
 
@@ -53,7 +55,7 @@ def test_resolver_rejects_unknown_camera_name() -> None:
     source = WorldDescriptorSource(camera_name=PrefixedName(name="unknown_camera"))
 
     with pytest.raises(CameraAnnotationMissing):
-        RayTracingContextResolver._select_descriptor_camera(world, source)
+        RayTracingContextResolver._select_descriptor_camera(world=world, source=source)
 
 
 def test_resolver_rejects_world_without_camera_annotation() -> None:
@@ -63,7 +65,7 @@ def test_resolver_rejects_world_without_camera_annotation() -> None:
     world = World()
     with pytest.raises(CameraAnnotationMissing):
         RayTracingContextResolver._select_descriptor_camera(
-            world, WorldDescriptorSource()
+            world=world, source=WorldDescriptorSource()
         )
 
 
@@ -128,7 +130,7 @@ def test_resolver_selects_named_robot_default_camera() -> None:
     ]
     source = RuntimeRobotWorldSource(robot_name=selected_robot.name)
     selected_camera = RayTracingContextResolver._select_runtime_robot_camera(
-        world, source
+        world=world, source=source
     )
 
     assert selected_camera is camera
@@ -144,7 +146,9 @@ def test_resolver_rejects_ambiguous_runtime_robot_selection() -> None:
     world.get_semantic_annotations_by_type.return_value = [first_robot, second_robot]
     source = RuntimeRobotWorldSource()
     with pytest.raises(RobotAnnotationAmbiguous):
-        RayTracingContextResolver._select_runtime_robot_camera(world, source)
+        RayTracingContextResolver._select_runtime_robot_camera(
+            world=world, source=source
+        )
 
 
 # %% Camera pose
@@ -238,7 +242,7 @@ def test_resolver_rejects_pose_override_for_world_root_camera() -> None:
         world.add_semantic_annotation(camera)
     with pytest.raises(CameraPoseOverrideUnavailable):
         RayTracingContextResolver._apply_camera_pose(
-            world,
-            camera,
+            world=world,
+            camera=camera,
             camera_pose=HomogeneousTransformationMatrix(),
         )

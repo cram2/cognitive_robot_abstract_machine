@@ -25,8 +25,10 @@ def test_threshold_accepts_normalized_hue_saturation_value() -> None:
     )
 
     mask = annotator._threshold_color_image(
-        Color(hue=150 / 255, saturation=130 / 255, value=85 / 255),
-        Color(hue=200 / 255, saturation=1.0, value=1.0),
+        minimum_hue_saturation_value=Color(
+            hue=150 / 255, saturation=130 / 255, value=85 / 255
+        ),
+        maximum_hue_saturation_value=Color(hue=200 / 255, saturation=1.0, value=1.0),
     )
 
     assert mask.tolist() == [[0, 255, 255, 0]]
@@ -73,7 +75,7 @@ class TestHueThresholds:
     def annotator(self) -> ImageClusterExtractor:
         return ImageClusterExtractor("test")
 
-    def image_with_hues(self, hue_values: list[int]) -> np.ndarray:
+    def image_with_hues(self, *, hue_values: list[int]) -> np.ndarray:
         """
         A 1-pixel-tall hue, saturation, and value image with one pixel per given hue,
         full saturation/value.
@@ -90,13 +92,13 @@ class TestHueThresholds:
         """
         annotator = self.annotator()
         annotator.hue_saturation_value_image = self.image_with_hues(
-            [100, 150, 170, 210]
+            hue_values=[100, 150, 170, 210]
         )
 
         bounds = annotator.descriptor.parameters.color_ranges[ColorName.BLUE]
         mask = annotator._threshold_color_image(
-            bounds[ColorRangeBound.LOWER],
-            bounds[ColorRangeBound.UPPER],
+            minimum_hue_saturation_value=bounds[ColorRangeBound.LOWER],
+            maximum_hue_saturation_value=bounds[ColorRangeBound.UPPER],
         )
 
         assert list(mask[0]) == [0, 255, 255, 0]
@@ -108,13 +110,13 @@ class TestHueThresholds:
         """
         annotator = self.annotator()
         annotator.hue_saturation_value_image = self.image_with_hues(
-            [0, 10, 15, 16, 200, 244, 245, 255]
+            hue_values=[0, 10, 15, 16, 200, 244, 245, 255]
         )
 
         bounds = annotator.descriptor.parameters.color_ranges[ColorName.RED]
         mask = annotator._threshold_color_image(
-            bounds[ColorRangeBound.LOWER],
-            bounds[ColorRangeBound.UPPER],
+            minimum_hue_saturation_value=bounds[ColorRangeBound.LOWER],
+            maximum_hue_saturation_value=bounds[ColorRangeBound.UPPER],
         )
 
         assert list(mask[0]) == [255, 255, 255, 0, 0, 0, 255, 255]
@@ -136,8 +138,8 @@ class TestHueThresholds:
 
         bounds = annotator.descriptor.parameters.color_ranges[ColorName.RED]
         mask = annotator._threshold_color_image(
-            bounds[ColorRangeBound.LOWER],
-            bounds[ColorRangeBound.UPPER],
+            minimum_hue_saturation_value=bounds[ColorRangeBound.LOWER],
+            maximum_hue_saturation_value=bounds[ColorRangeBound.UPPER],
         )
 
         assert list(mask[0]) == [0, 255]

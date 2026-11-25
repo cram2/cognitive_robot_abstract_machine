@@ -56,7 +56,7 @@ class VisualizationManager(Behaviour):
         Mapping of pipeline name to list of Visualizers.
         """
 
-    def create_visualizers_for_pipeline(self, pipeline: Pipeline) -> None:
+    def create_visualizers_for_pipeline(self, *, pipeline: Pipeline) -> None:
         """
         Create visualizer instances for a pipeline.
 
@@ -140,7 +140,9 @@ class VisualizationManager(Behaviour):
             assert pipeline_name in self.pipelines
 
             if pipeline_name not in self.visualizers:
-                self.create_visualizers_for_pipeline(self.pipelines[pipeline_name])
+                self.create_visualizers_for_pipeline(
+                    pipeline=self.pipelines[pipeline_name]
+                )
 
             # Ping Visualizers if there is new data for this Pipeline
             if annotator_output_pipeline_map_visualized.map[pipeline_name].redraw:

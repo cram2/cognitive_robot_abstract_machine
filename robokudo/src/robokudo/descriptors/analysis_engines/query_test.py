@@ -81,7 +81,7 @@ class CheckQueryType(BaseAnnotator):
 
     def update(self) -> Status:
         # Retrieve the query from the CAS
-        query = self.get_cas().get(CASViews.QUERY)
+        query = self.get_cas().get(view_name=CASViews.QUERY)
 
         # Check if the query type is 'numbers'
         if query and getattr(query.obj, "type", None) == "numbers":

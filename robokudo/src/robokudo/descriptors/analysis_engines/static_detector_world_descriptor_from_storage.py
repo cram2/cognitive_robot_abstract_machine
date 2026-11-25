@@ -37,7 +37,9 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
         return "static_detector_world_descriptor_from_storage"
 
     def implementation(self):
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"

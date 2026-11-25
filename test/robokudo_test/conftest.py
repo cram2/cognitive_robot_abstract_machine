@@ -240,4 +240,4 @@ def cup_on_counter_directory(tmp_path: Path) -> Path:
     """
     Provide a directory holding the :class:`CupOnCounterRecording` frames.
     """
-    return CupOnCounterRecording().write_to(tmp_path)
+    return CupOnCounterRecording().write_to(directory=tmp_path)

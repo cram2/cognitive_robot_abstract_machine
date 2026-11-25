@@ -78,7 +78,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         # device = "https://raw.githubusercontent.com/cram2/coraplex/refs/heads/dev/doc/images/boxy.gif"
 
         cv_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "opencv",
+            camera="opencv",
             device=device,
             loop_mode=1,
             update_global_with_depth_parameter=True,

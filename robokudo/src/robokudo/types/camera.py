@@ -137,7 +137,7 @@ class CameraObservation:
         return self.world_T_camera_or_raise().inverse()
 
     def with_world_T_camera(
-        self, world_T_camera: HomogeneousTransformationMatrix
+        self, *, world_T_camera: HomogeneousTransformationMatrix
     ) -> CameraObservation:
         """
         Return a copy carrying the supplied sampled camera pose.

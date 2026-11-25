@@ -33,7 +33,7 @@ class TestUtilsQuery:
     def test_send_feedback(self):
         fb = Query.Feedback()
         fb.feedback = "Test Feedback"
-        QueryHandler.send_feedback(fb)
+        QueryHandler.send_feedback(feedback=fb)
 
         fb_queue = Blackboard().get(BBIdentifier.QUERY_FEEDBACK)
         fb_item = fb_queue.get()
@@ -51,7 +51,7 @@ class TestUtilsQuery:
     def test_send_answer(self):
         answer = Query.Result()
         answer.text_result = "Test Answer"
-        QueryHandler.send_answer(answer)
+        QueryHandler.send_answer(result=answer)
 
         answer_item = Blackboard().get(BBIdentifier.QUERY_ANSWER)
         assert answer_item == answer
@@ -59,11 +59,11 @@ class TestUtilsQuery:
 
     def test_send_answer_invalid_type(self):
         answer = "Test Answer"
-        assert pytest.raises(TypeError, QueryHandler.send_answer, answer)
+        assert pytest.raises(TypeError, QueryHandler.send_answer, result=answer)
 
     @pytest.mark.parametrize("answer", ["Test Answer", 42, 42.0])
-    def test_send_arbitrary_answer(self, answer):
-        QueryHandler.send_arbitrary_answer(answer)
+    def test_send_arbitrary_answer(self, *, answer):
+        QueryHandler.send_arbitrary_answer(result=answer)
 
         answer_item = Blackboard().get(BBIdentifier.QUERY_ANSWER)
         assert answer_item == answer

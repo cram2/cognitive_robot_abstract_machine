@@ -11,7 +11,6 @@ from robokudo.utils.logging_configuration import (
 
 
 class TestUtilsLoggingConfiguration:
-
     def test_dynamic_compact_formatter_line_width_calculation(self):
         formatter = DynamicCompactFormatter("%(name)s %(filename_line)-50s %(message)s")
         assert formatter.max_file_line_width == 50
@@ -90,7 +89,7 @@ class TestUtilsLoggingConfiguration:
             (50, logging.CRITICAL),
         ],
     )
-    def test_configure_logging(self, level: int, name: int):
+    def test_configure_logging(self, *, level: int, name: int):
         config = {
             "root": level,
             "module0": 10,

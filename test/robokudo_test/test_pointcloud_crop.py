@@ -95,10 +95,12 @@ def cas_with_cloud_at_world_origin(
         np.vstack([points_inside_the_crop, points_outside_the_crop])
     )
 
-    cas.set_ref(CASViews.CLOUD, cloud)
-    cas.set(CASViews.COLOR_IMAGE, np.zeros((200, 200, 3), dtype=np.uint8))
+    cas.set_ref(view_name=CASViews.CLOUD, value=cloud)
+    cas.set(
+        view_name=CASViews.COLOR_IMAGE, value=np.zeros((200, 200, 3), dtype=np.uint8)
+    )
     cas.pointcloud_camera_model = camera_model
-    cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+    cas.set(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ColorToDepthRatio())
     return cas
 
 
@@ -142,7 +144,7 @@ def test_world_relative_crop_actually_crops_the_cloud(
 ):
     crop_annotator_in_pipeline.update()
 
-    cropped_cloud = crop_annotator_in_pipeline.get_cas().get(CASViews.CLOUD)
+    cropped_cloud = crop_annotator_in_pipeline.get_cas().get(view_name=CASViews.CLOUD)
 
     assert len(cropped_cloud.points) == 2
 

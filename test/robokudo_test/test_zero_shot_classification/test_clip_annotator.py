@@ -24,6 +24,7 @@ from robokudo.annotators.clip_annotator import CLIPAnnotator
 from robokudo.types.annotation import Classification
 
 from ._color_scenes import COLOR_BY_WORD, COLOR_VOCABULARY, rgb, solid_image
+from krrood.patterns.called_positionally import called_positionally
 
 # %% color embedding stand-in for CLIP
 
@@ -61,6 +62,7 @@ class DeviceRecordingEncoding(BatchEncoding):
     def __init__(self, colors: torch.Tensor) -> None:
         super().__init__({"colors": colors, "device": torch.device("cpu")})
 
+    @called_positionally
     def to(
         self, device: str | torch.device | int, *, non_blocking: bool = False
     ) -> DeviceRecordingEncoding:
@@ -145,22 +147,23 @@ class ColorEmbeddingModel:
     Logarithm of the temperature the similarity logits are scaled with.
     """
 
+    @called_positionally
     def to(self, device: torch.device) -> ColorEmbeddingModel:
         self.device = device
         return self
 
     def get_text_features(
-        self, colors: torch.Tensor, device: torch.device
+        self, *, colors: torch.Tensor, device: torch.device
     ) -> BaseModelOutputWithPooling:
-        return self._embed(colors, device)
+        return self._embed(colors=colors, device=device)
 
     def get_image_features(
-        self, colors: torch.Tensor, device: torch.device
+        self, *, colors: torch.Tensor, device: torch.device
     ) -> BaseModelOutputWithPooling:
-        return self._embed(colors, device)
+        return self._embed(colors=colors, device=device)
 
     def _embed(
-        self, colors: torch.Tensor, device: torch.device
+        self, *, colors: torch.Tensor, device: torch.device
     ) -> BaseModelOutputWithPooling:
         """
         :return: The encoded colors as embeddings.
@@ -230,7 +233,7 @@ def _classify_solid_image(
     """
     :return: The classifications of an image filled with the given CAS color.
     """
-    return annotator.classify([Image.fromarray(solid_image(rgb(color)))])[0]
+    return annotator.classify(images=[Image.fromarray(solid_image(rgb(color)))])[0]
 
 
 # %% construction
@@ -289,7 +292,7 @@ def test_each_image_of_a_batch_is_classified_by_its_own_color(color_embedding_cl
         Image.fromarray(solid_image(rgb(COLOR_BY_WORD["blue"]))),
     ]
 
-    classifications = annotator.classify(images)
+    classifications = annotator.classify(images=images)
 
     assert [
         image_classifications[0].classname for image_classifications in classifications

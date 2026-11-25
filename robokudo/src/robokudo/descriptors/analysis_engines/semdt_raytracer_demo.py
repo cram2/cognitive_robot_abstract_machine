@@ -40,7 +40,7 @@ class AnalysisEngine(AnalysisEngineInterface):
 
     def implementation(self) -> Pipeline:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            RayTracingCameraConfiguration.registry_name,
+            camera=RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
                 descriptor_name="world_semdt_raytracer_tabletop"
             ),

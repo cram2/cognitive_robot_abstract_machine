@@ -256,7 +256,7 @@ class CameraInterface(object):
                 parent=reference_body,
                 child=camera_body,
                 world=world,
-                name=self._standalone_mount_name(camera_body),
+                name=self._standalone_mount_name(camera_body=camera_body),
             )
             world.add_connection(mount)
         return mount
@@ -270,11 +270,11 @@ class CameraInterface(object):
         return (
             camera_body.parent_connection is not None
             and camera_body.parent_connection.name
-            == cls._standalone_mount_name(camera_body)
+            == cls._standalone_mount_name(camera_body=camera_body)
         )
 
     @staticmethod
-    def _standalone_mount_name(camera_body: Body) -> PrefixedName:
+    def _standalone_mount_name(*, camera_body: Body) -> PrefixedName:
         """
         Identify the adjustable mount created for one standalone camera.
         """
@@ -341,7 +341,7 @@ class CameraInterface(object):
         )
         if world_T_camera is not None and world_T_camera.child_frame is not camera.root:
             observation = observation.with_world_T_camera(
-                HomogeneousTransformationMatrix(
+                world_T_camera=HomogeneousTransformationMatrix(
                     data=world_T_camera,
                     reference_frame=world_T_camera.reference_frame,
                     child_frame=camera.root,
@@ -420,7 +420,7 @@ class CameraInterface(object):
                             parent=existing_root,
                             child=camera_body,
                             world=world,
-                            name=self._standalone_mount_name(camera_body),
+                            name=self._standalone_mount_name(camera_body=camera_body),
                         )
                     )
             world.add_semantic_annotation(camera)
@@ -644,11 +644,13 @@ class ROSCameraInterface(CameraInterface):
         """
         frame = self.latest_frame
         camera_frame = frame.camera_info.header.frame_id or self.camera_config.tf_from
-        self.validate_camera_frame_for_tf(camera_frame)
+        self.validate_camera_frame_for_tf(camera_frame=camera_frame)
         self.store_camera_observation(
             cas=cas,
             world=world,
-            camera_model=RosCameraModelAdapter.from_camera_info(frame.camera_info),
+            camera_model=RosCameraModelAdapter.from_camera_info(
+                camera_info=frame.camera_info
+            ),
             camera_frame=camera_frame,
             timestamp_nanoseconds=Time.from_msg(frame.timestamp).nanoseconds,
             modalities=frame.modalities,
@@ -657,7 +659,7 @@ class ROSCameraInterface(CameraInterface):
             ),
         )
 
-    def validate_camera_frame_for_tf(self, camera_frame: str) -> None:
+    def validate_camera_frame_for_tf(self, *, camera_frame: str) -> None:
         """
         Require the image optical frame to match the configured TF source.
         """
@@ -785,14 +787,16 @@ class CameraFrame:
         color_image = (
             cv2.imdecode(np.frombuffer(color_data.data, np.uint8), cv2.IMREAD_COLOR)
             if isinstance(color_data, CompressedImage)
-            else bridge.imgmsg_to_cv2(color_data, "bgr8")
+            else bridge.imgmsg_to_cv2(img_msg=color_data, desired_encoding="bgr8")
         )
         if depth_data is None:
             depth_image = None
         elif isinstance(depth_data, CompressedImage):
             depth_image = depth_convert_workaround(depth_data)
         else:
-            depth_image = bridge.imgmsg_to_cv2(depth_data, "32FC1")
+            depth_image = bridge.imgmsg_to_cv2(
+                img_msg=depth_data, desired_encoding="32FC1"
+            )
         return cls(
             color_image=color_image,
             depth_image=depth_image,
@@ -887,7 +891,7 @@ class KinectCameraInterface(ROSCameraInterface):
     def get_node(self) -> rclpy.node.Node:
         return self.node
 
-    def blackhole_callback(self, data: Any) -> None:
+    def blackhole_callback(self, *, data: Any) -> None:
         """
         This callback is just a dummy to receive data coming from a workaround
         subscription to handle problems with the ApproximateTimeSynchronizer.
@@ -964,9 +968,11 @@ class KinectCameraInterface(ROSCameraInterface):
 
             self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
 
-            cas.set(CASViews.COLOR_IMAGE, color_image)
-            cas.set(CASViews.DEPTH_IMAGE, frame.depth_image)
-            cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
+            cas.set(view_name=CASViews.COLOR_IMAGE, value=color_image)
+            cas.set(view_name=CASViews.DEPTH_IMAGE, value=frame.depth_image)
+            cas.set(
+                view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=self.color_to_depth_ratio
+            )
             self.store_latest_frame_observation(cas=cas, world=world)
 
             self._has_new_data = False

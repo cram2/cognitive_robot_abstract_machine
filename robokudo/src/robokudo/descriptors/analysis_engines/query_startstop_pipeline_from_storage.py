@@ -110,7 +110,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             The pipeline will automatically fail after 30 iterations to
             demonstrate error handling mechanisms.
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         processing_sequence = Sequence(name="Stored Data Processing", memory=True)
         processing_sequence.add_children(

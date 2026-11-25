@@ -326,11 +326,13 @@ class SIFTAnnotation(Annotation):
     @classmethod
     def from_cv2(
         cls,
+        *,
         keypoints: Sequence[cv2.KeyPoint],
         descriptors: Sequence[npt.NDArray[np.float32]],
     ) -> SIFTAnnotation:
         return cls(
-            keypoints=[KeyPoint.from_cv(k) for k in keypoints], descriptors=descriptors
+            keypoints=[KeyPoint.from_cv(keypoint=k) for k in keypoints],
+            descriptors=descriptors,
         )
 
     def cv2_keypoints(self) -> list[cv2.KeyPoint]:

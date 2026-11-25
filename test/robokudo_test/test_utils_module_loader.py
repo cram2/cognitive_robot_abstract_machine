@@ -15,59 +15,86 @@ class TestUtilsModuleLoader(object):
     ]
 
     def test_load_ae(self, module_loader: ModuleLoader):
-        assert module_loader.load_ae("robokudo", "demo.py")
+        assert module_loader.load_ae(ros_pkg_name="robokudo", module_name="demo.py")
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
     def test_load_ae_invalid_input(
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
-        assert pytest.raises(ImportError, module_loader.load_ae, pkg_name, module_name)
+        assert pytest.raises(
+            ImportError,
+            module_loader.load_ae,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
+        )
 
     def test_load_annotator(self, module_loader: ModuleLoader):
-        assert module_loader.load_annotator("robokudo", "query.py")
+        assert module_loader.load_annotator(
+            ros_pkg_name="robokudo", module_name="query.py"
+        )
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
     def test_load_annotator_invalid_input(
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
         assert pytest.raises(
-            ImportError, module_loader.load_annotator, pkg_name, module_name
+            ImportError,
+            module_loader.load_annotator,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
         )
 
     def test_load_camera_config(self, module_loader: ModuleLoader):
-        assert module_loader.load_camera_config("robokudo", "config_tiago.py")
+        assert module_loader.load_camera_config(
+            ros_pkg_name="robokudo", module_name="config_tiago.py"
+        )
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
     def test_load_camera_config_invalid_input(
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
         assert pytest.raises(
-            ImportError, module_loader.load_camera_config, pkg_name, module_name
+            ImportError,
+            module_loader.load_camera_config,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
         )
 
     def test_load_io(self, module_loader: ModuleLoader):
-        assert module_loader.load_io("robokudo", "camera_interface.py")
+        assert module_loader.load_io(
+            ros_pkg_name="robokudo", module_name="camera_interface.py"
+        )
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
     def test_load_io_invalid_input(
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
-        assert pytest.raises(ImportError, module_loader.load_io, pkg_name, module_name)
+        assert pytest.raises(
+            ImportError,
+            module_loader.load_io,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
+        )
 
     def test_load_world_descriptor(self, module_loader: ModuleLoader):
-        assert module_loader.load_world_descriptor("robokudo", "world_iai_kitchen20.py")
+        assert module_loader.load_world_descriptor(
+            ros_pkg_name="robokudo", module_name="world_iai_kitchen20.py"
+        )
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
     def test_load_world_descriptor_invalid_input(
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
         assert pytest.raises(
-            ImportError, module_loader.load_world_descriptor, pkg_name, module_name
+            ImportError,
+            module_loader.load_world_descriptor,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
         )
 
     def test_load_tree_components(self, module_loader: ModuleLoader):
         assert module_loader.load_tree_components(
-            "robokudo", "query_based_task_scheduler.py"
+            ros_pkg_name="robokudo", module_name="query_based_task_scheduler.py"
         )
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
@@ -75,27 +102,40 @@ class TestUtilsModuleLoader(object):
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
         assert pytest.raises(
-            ImportError, module_loader.load_tree_components, pkg_name, module_name
+            ImportError,
+            module_loader.load_tree_components,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
         )
 
     def test_load_types(self, module_loader: ModuleLoader):
-        assert module_loader.load_types("robokudo", "annotation.py")
+        assert module_loader.load_types(
+            ros_pkg_name="robokudo", module_name="annotation.py"
+        )
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
     def test_load_types_invalid_input(
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
         assert pytest.raises(
-            ImportError, module_loader.load_types, pkg_name, module_name
+            ImportError,
+            module_loader.load_types,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
         )
 
     def test_load_utils(self, module_loader: ModuleLoader):
-        assert module_loader.load_utils("robokudo", "module_loader.py")
+        assert module_loader.load_utils(
+            ros_pkg_name="robokudo", module_name="module_loader.py"
+        )
 
     @pytest.mark.parametrize(["pkg_name", "module_name"], invalid_modules)
     def test_load_utils_invalid_input(
         self, module_loader: ModuleLoader, pkg_name: str, module_name: str
     ):
         assert pytest.raises(
-            ImportError, module_loader.load_utils, pkg_name, module_name
+            ImportError,
+            module_loader.load_utils,
+            ros_pkg_name=pkg_name,
+            module_name=module_name,
         )

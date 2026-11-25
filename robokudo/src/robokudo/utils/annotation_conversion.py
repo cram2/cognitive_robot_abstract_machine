@@ -50,7 +50,9 @@ class Annotation2AnnotationConverter(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def can_convert(self, annotation: Annotation, target_annotation_type: type) -> bool:
+    def can_convert(
+        self, *, annotation: Annotation, target_annotation_type: type
+    ) -> bool:
         """
         Checks whether the converter can convert the given annotation to the given
         target annotation type.
@@ -64,7 +66,7 @@ class Annotation2AnnotationConverter(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    def convert(self, annotation: T, cas: CAS | None = None) -> Annotation:
+    def convert(self, *, annotation: T, cas: CAS | None = None) -> Annotation:
         """
         Converts the given annotation to the given target annotation type.
 
@@ -84,7 +86,7 @@ class Annotation2ODConverter(ABC, Generic[T]):
     """
 
     @abstractmethod
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         """
         Checks whether the converter can convert the given annotation to an object
         designator.
@@ -96,7 +98,7 @@ class Annotation2ODConverter(ABC, Generic[T]):
 
     @abstractmethod
     def convert(
-        self, annotation: T, cas: CAS, object_designator: ObjectDesignator
+        self, *, annotation: T, cas: CAS, object_designator: ObjectDesignator
     ) -> None:
         """
         Converts the data of the given annotation to data in the given object
@@ -127,14 +129,16 @@ class PoseAnnotationToStampedPoseAnnotationConverter(
     `StampedPoseAnnotation`.
     """
 
-    def can_convert(self, annotation: Annotation, target_annotation_type: type) -> bool:
+    def can_convert(
+        self, *, annotation: Annotation, target_annotation_type: type
+    ) -> bool:
         return (
             isinstance(annotation, PoseAnnotation)
             and target_annotation_type == StampedPoseAnnotation
         )
 
     def convert(
-        self, annotation: PoseAnnotation, cas: CAS | None = None
+        self, *, annotation: PoseAnnotation, cas: CAS | None = None
     ) -> StampedPoseAnnotation:
         spa = StampedPoseAnnotation()
         spa.source = annotation.source
@@ -152,14 +156,16 @@ class PositionAnnotationToStampedPoseAnnotationConverter(
     `StampedPoseAnnotation`.
     """
 
-    def can_convert(self, annotation: Annotation, target_annotation_type: type) -> bool:
+    def can_convert(
+        self, *, annotation: Annotation, target_annotation_type: type
+    ) -> bool:
         return (
             isinstance(annotation, PositionAnnotation)
             and target_annotation_type == StampedPoseAnnotation
         )
 
     def convert(
-        self, annotation: PositionAnnotation, cas: CAS | None = None
+        self, *, annotation: PositionAnnotation, cas: CAS | None = None
     ) -> StampedPoseAnnotation:
         spa = StampedPoseAnnotation()
         spa.source = annotation.source
@@ -179,11 +185,15 @@ class SemanticColor2ODConverter(Annotation2ODConverter[SemanticColor]):
     to `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, SemanticColor)
 
     def convert(
-        self, annotation: SemanticColor, cas: CAS, object_designator: ObjectDesignator
+        self,
+        *,
+        annotation: SemanticColor,
+        cas: CAS,
+        object_designator: ObjectDesignator,
     ) -> None:
         object_designator.color.append(annotation.color)
 
@@ -194,11 +204,15 @@ class Classification2ODConverter(Annotation2ODConverter[Classification]):
     annotation to `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, Classification)
 
     def convert(
-        self, annotation: Classification, cas: CAS, object_designator: ObjectDesignator
+        self,
+        *,
+        annotation: Classification,
+        cas: CAS,
+        object_designator: ObjectDesignator,
     ) -> None:
         object_designator.type = annotation.classname
 
@@ -235,11 +249,12 @@ class StampedPose2ODConverter(Annotation2ODConverter[StampedPoseAnnotation]):
     `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, StampedPoseAnnotation)
 
     def convert(
         self,
+        *,
         annotation: StampedPoseAnnotation,
         cas: CAS,
         object_designator: ObjectDesignator,
@@ -271,11 +286,15 @@ class Pose2ODConverter(Annotation2ODConverter[PoseAnnotation]):
         self.pose_converter = PoseAnnotationToStampedPoseAnnotationConverter()
         self.stamped_pose_converter = StampedPose2ODConverter()
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, PoseAnnotation)
 
     def convert(
-        self, annotation: PoseAnnotation, cas: CAS, object_designator: ObjectDesignator
+        self,
+        *,
+        annotation: PoseAnnotation,
+        cas: CAS,
+        object_designator: ObjectDesignator,
     ) -> None:
         """
         Converts the data of the given annotation to data in the given object
@@ -298,7 +317,7 @@ class Pose2ODConverter(Annotation2ODConverter[PoseAnnotation]):
             pose_annotation = transform_pose_from_camera_to_world(cas, annotation)
 
         # First, convert the PoseAnnotation to a StampedPose
-        spa = self.pose_converter.convert(pose_annotation)
+        spa = self.pose_converter.convert(annotation=pose_annotation)
         # Fill the missing header information
         spa.timestamp = Time(
             sec=int(observation.timestamp_nanoseconds // 1_000_000_000),
@@ -314,7 +333,9 @@ class Pose2ODConverter(Annotation2ODConverter[PoseAnnotation]):
                 spa.frame = str(world_T_camera.reference_frame.name)
 
         # Second, do the actual conversion and place info in ObjectDesignator
-        self.stamped_pose_converter.convert(spa, cas, object_designator)
+        self.stamped_pose_converter.convert(
+            annotation=spa, cas=cas, object_designator=object_designator
+        )
 
 
 class Position2ODConverter(Annotation2ODConverter[PositionAnnotation]):
@@ -323,11 +344,12 @@ class Position2ODConverter(Annotation2ODConverter[PositionAnnotation]):
     `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, PositionAnnotation)
 
     def convert(
         self,
+        *,
         annotation: PositionAnnotation,
         cas: CAS,
         object_designator: ObjectDesignator,
@@ -390,11 +412,12 @@ class StampedPosition2ODConverter(Annotation2ODConverter[StampedPositionAnnotati
     `StampedPositionAnnotation` to `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, StampedPositionAnnotation)
 
     def convert(
         self,
+        *,
         annotation: StampedPositionAnnotation,
         cas: CAS,
         object_designator: ObjectDesignator,
@@ -451,11 +474,15 @@ class BoundingBox3DForShapeSizeConverter(Annotation2ODConverter[BoundingBox3D]):
     `robokudo.types.cv.BoundingBox3D` to `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, BoundingBox3D)
 
     def convert(
-        self, annotation: BoundingBox3D, cas: CAS, object_designator: ObjectDesignator
+        self,
+        *,
+        annotation: BoundingBox3D,
+        cas: CAS,
+        object_designator: ObjectDesignator,
     ) -> None:
         # TODO A (new!) Annotator should infer semantic size.
         #  Find a good decision criteria for size. This should be a semantic label! (small, large etc.)
@@ -476,11 +503,11 @@ class Shape2ODConverter(Annotation2ODConverter[Shape]):
     `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, Shape)
 
     def convert(
-        self, annotation: Shape, cas: CAS, object_designator: ObjectDesignator
+        self, *, annotation: Shape, cas: CAS, object_designator: ObjectDesignator
     ) -> None:
         object_designator.shape.append(annotation.shape_name)
 
@@ -494,13 +521,15 @@ class Cuboid2ODConverter(Annotation2ODConverter[Cuboid]):
     def __init__(self) -> None:
         self.shape_converter = Shape2ODConverter()
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, Cuboid)
 
     def convert(
-        self, annotation: Cuboid, cas: CAS, object_designator: ObjectDesignator
+        self, *, annotation: Cuboid, cas: CAS, object_designator: ObjectDesignator
     ) -> None:
-        self.shape_converter.convert(annotation, cas, object_designator)
+        self.shape_converter.convert(
+            annotation=annotation, cas=cas, object_designator=object_designator
+        )
 
 
 class Cylinder2ODConverter(Annotation2ODConverter[Cylinder]):
@@ -512,13 +541,15 @@ class Cylinder2ODConverter(Annotation2ODConverter[Cylinder]):
     def __init__(self) -> None:
         self.shape_converter = Shape2ODConverter()
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, Cylinder)
 
     def convert(
-        self, annotation: Cylinder, cas: CAS, object_designator: ObjectDesignator
+        self, *, annotation: Cylinder, cas: CAS, object_designator: ObjectDesignator
     ) -> None:
-        self.shape_converter.convert(annotation, cas, object_designator)
+        self.shape_converter.convert(
+            annotation=annotation, cas=cas, object_designator=object_designator
+        )
 
 
 class Sphere2ODConverter(Annotation2ODConverter[Sphere]):
@@ -530,11 +561,11 @@ class Sphere2ODConverter(Annotation2ODConverter[Sphere]):
     def __init__(self) -> None:
         self.shape_converter = Shape2ODConverter()
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, Sphere)
 
     def convert(
-        self, annotation: Sphere, cas: CAS, object_designator: ObjectDesignator
+        self, *, annotation: Sphere, cas: CAS, object_designator: ObjectDesignator
     ) -> None:
         size = ShapeSize(radius=annotation.geometry.radius)
 
@@ -543,7 +574,9 @@ class Sphere2ODConverter(Annotation2ODConverter[Sphere]):
         )
 
         object_designator.shape_size.append(size)
-        self.shape_converter.convert(annotation, cas, object_designator)
+        self.shape_converter.convert(
+            annotation=annotation, cas=cas, object_designator=object_designator
+        )
 
 
 class Location2ODConverter(Annotation2ODConverter[LocationAnnotation]):
@@ -552,11 +585,12 @@ class Location2ODConverter(Annotation2ODConverter[LocationAnnotation]):
     `ObjectDesignator` data.
     """
 
-    def can_convert(self, annotation: Annotation) -> bool:
+    def can_convert(self, *, annotation: Annotation) -> bool:
         return isinstance(annotation, LocationAnnotation)
 
     def convert(
         self,
+        *,
         annotation: LocationAnnotation,
         cas: CAS,
         object_designator: ObjectDesignator,

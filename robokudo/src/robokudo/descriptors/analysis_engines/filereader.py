@@ -90,7 +90,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             in your ROS workspace before running this pipeline.
         """
         cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "file_reader",
+            camera="file_reader",
             loop=True,
             target_ros_package="robokudo_test_data",
             target_dir="data",

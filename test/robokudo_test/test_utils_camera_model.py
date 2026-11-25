@@ -28,7 +28,7 @@ class TestUtilsCameraModel:
         ],
     )
     def test_pinhole_camera_parameters_from_horizontal_field_of_view_rejects_invalid_values(
-        self, width: int, height: int, horizontal_field_of_view_degrees: float
+        self, *, width: int, height: int, horizontal_field_of_view_degrees: float
     ) -> None:
         with pytest.raises(ValueError):
             pinhole_camera_parameters_from_horizontal_field_of_view(

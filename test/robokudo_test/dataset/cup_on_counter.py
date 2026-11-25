@@ -80,7 +80,7 @@ class CupOnCounterRecording:
     Recorded frames in playback order.
     """
 
-    def write_to(self, directory: Path) -> Path:
+    def write_to(self, *, directory: Path) -> Path:
         """
         Write the recording's images and camera observations into a directory.
 

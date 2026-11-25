@@ -93,7 +93,7 @@ class ObjectClassMeshes:
     """
 
     @classmethod
-    def from_class_meshes(cls, class_meshes: list[ObjectClassMesh]) -> Self:
+    def from_class_meshes(cls, *, class_meshes: list[ObjectClassMesh]) -> Self:
         """
         :param class_meshes: The meshes.
         :return: The meshes by the name of their class.
@@ -157,7 +157,7 @@ class PreviousFramePoses:
     """
 
     def take_match(
-        self, class_name: str, mask_region: Rect, minimum_overlap: float
+        self, *, class_name: str, mask_region: Rect, minimum_overlap: float
     ) -> Pose | None:
         """
         Remove and return the pose of the unmatched object of a class whose mask region
@@ -178,7 +178,9 @@ class PreviousFramePoses:
             return None
         region_comparator = RoiComparator(weight=1.0)
         overlaps = [
-            region_comparator.compute_similarity(candidate.mask_region, mask_region)
+            region_comparator.compute_similarity(
+                query_value=candidate.mask_region, obj_value=mask_region
+            )
             for candidate in candidates
         ]
         best_overlap = max(overlaps)
@@ -317,7 +319,7 @@ class PoseVisualization:
     Named geometries of the 3D view.
     """
 
-    def draw(self, shape: Mesh, pose: Pose, label: str) -> None:
+    def draw(self, *, shape: Mesh, pose: Pose, label: str) -> None:
         """
         Draw a posed mesh into the color image and add it to the 3D view.
 
@@ -325,10 +327,10 @@ class PoseVisualization:
         :param pose: Pose of the mesh in the camera frame.
         :param label: Unique text identifying the object.
         """
-        bounding_box = self.bounding_box(shape, pose)
-        axes_pose = self.axes_pose(shape, pose)
-        self.draw_bounding_box(bounding_box, label)
-        self.draw_axes(axes_pose)
+        bounding_box = self.bounding_box(shape=shape, pose=pose)
+        axes_pose = self.axes_pose(shape=shape, pose=pose)
+        self.draw_bounding_box(bounding_box=bounding_box, label=label)
+        self.draw_axes(axes_pose=axes_pose)
 
         axes = open3d.geometry.TriangleMesh.create_coordinate_frame(
             size=self.axis_length
@@ -343,12 +345,13 @@ class PoseVisualization:
         if self.show_object_mesh:
             self.geometries.append(
                 NamedGeometry(
-                    geometry_name=f"{label} mesh", geometry=self.posed_mesh(shape, pose)
+                    geometry_name=f"{label} mesh",
+                    geometry=self.posed_mesh(shape=shape, pose=pose),
                 )
             )
 
     def bounding_box(
-        self, shape: Mesh, pose: Pose
+        self, *, shape: Mesh, pose: Pose
     ) -> open3d.geometry.OrientedBoundingBox:
         """
         :param shape: The mesh.
@@ -370,7 +373,7 @@ class PoseVisualization:
         )
         return create_oriented_bounding_box(mesh_box.scale.to_np(), box_pose.to_np())
 
-    def axes_pose(self, shape: Mesh, pose: Pose) -> HomogeneousTransformationMatrix:
+    def axes_pose(self, *, shape: Mesh, pose: Pose) -> HomogeneousTransformationMatrix:
         """
         :param shape: The mesh.
         :param pose: Pose of the mesh in the camera frame.
@@ -386,7 +389,7 @@ class PoseVisualization:
         return pose.homogeneous_matrix @ smallest_box_pose.translation_matrix
 
     def draw_bounding_box(
-        self, bounding_box: open3d.geometry.OrientedBoundingBox, label: str
+        self, *, bounding_box: open3d.geometry.OrientedBoundingBox, label: str
     ) -> None:
         """
         Draw the edges of a bounding box in front of the camera into the color image,
@@ -398,7 +401,7 @@ class PoseVisualization:
         edges = open3d.geometry.LineSet.create_from_oriented_bounding_box(bounding_box)
         corners = numpy.asarray(edges.points)
         for start, end in numpy.asarray(edges.lines):
-            self.draw_line(corners[start], corners[end], Color.GREEN())
+            self.draw_line(start=corners[start], end=corners[end], color=Color.GREEN())
         corners_in_front = corners[corners[:, 2] > 0]
         if len(corners_in_front) == 0:
             return
@@ -411,11 +414,11 @@ class PoseVisualization:
             (int(left), int(top)),
             cv2.FONT_HERSHEY_SIMPLEX,
             self.label_font_scale,
-            self.blue_green_red_bytes(Color.WHITE()),
+            self.blue_green_red_bytes(color=Color.WHITE()),
             lineType=cv2.LINE_AA,
         )
 
-    def draw_axes(self, axes_pose: HomogeneousTransformationMatrix) -> None:
+    def draw_axes(self, *, axes_pose: HomogeneousTransformationMatrix) -> None:
         """
         Draw the x, y and z axes of a pose in red, green and blue into the color image,
         unless the end of an axis is not in front of the camera.
@@ -444,6 +447,7 @@ class PoseVisualization:
 
     def draw_line(
         self,
+        *,
         start: numpy_typing.NDArray[numpy.float64],
         end: numpy_typing.NDArray[numpy.float64],
         color: Color,
@@ -465,12 +469,12 @@ class PoseVisualization:
             self.color_image,
             (int(start_pixel[0]), int(start_pixel[1])),
             (int(end_pixel[0]), int(end_pixel[1])),
-            self.blue_green_red_bytes(color),
+            self.blue_green_red_bytes(color=color),
             self.line_thickness,
             cv2.LINE_AA,
         )
 
-    def posed_mesh(self, shape: Mesh, pose: Pose) -> open3d.geometry.TriangleMesh:
+    def posed_mesh(self, *, shape: Mesh, pose: Pose) -> open3d.geometry.TriangleMesh:
         """
         :param shape: The mesh.
         :param pose: Pose of the mesh in the camera frame.
@@ -482,7 +486,7 @@ class PoseVisualization:
         return posed_mesh
 
     @staticmethod
-    def blue_green_red_bytes(color: Color) -> tuple[int, int, int]:
+    def blue_green_red_bytes(*, color: Color) -> tuple[int, int, int]:
         """
         :param color: A color.
         :return: The color as OpenCV byte channels in blue, green, red order.
@@ -588,6 +592,7 @@ class PoseCandidate:
 
     def to_request(
         self,
+        *,
         previous_pose: Pose | None = None,
         pose_annotation: PoseAnnotation | None = None,
     ) -> PoseRequest:
@@ -616,7 +621,7 @@ class PoseUpdateMode(ABC):
     """
 
     @abstractmethod
-    def pose_request(self, candidate: PoseCandidate) -> PoseRequest | None:
+    def pose_request(self, *, candidate: PoseCandidate) -> PoseRequest | None:
         """
         :param candidate: The object hypothesis to decide on; a track from the previous
             frame removes the matching object from it.
@@ -630,7 +635,7 @@ class EstimateUnposedObjects(PoseUpdateMode):
     Only objects without a :class:`PoseAnnotation` are estimated.
     """
 
-    def pose_request(self, candidate: PoseCandidate) -> PoseRequest | None:
+    def pose_request(self, *, candidate: PoseCandidate) -> PoseRequest | None:
         if candidate.pose_annotation is not None:
             return None
         return candidate.to_request()
@@ -642,7 +647,7 @@ class EstimateAllObjects(PoseUpdateMode):
     Every object is estimated, ignoring the poses it already has.
     """
 
-    def pose_request(self, candidate: PoseCandidate) -> PoseRequest | None:
+    def pose_request(self, *, candidate: PoseCandidate) -> PoseRequest | None:
         return candidate.to_request()
 
 
@@ -671,7 +676,7 @@ class TrackingPoseUpdateMode(PoseUpdateMode, ABC):
     object of the previous frame.
     """
 
-    def annotation_tracking_request(self, candidate: PoseCandidate) -> PoseRequest:
+    def annotation_tracking_request(self, *, candidate: PoseCandidate) -> PoseRequest:
         """
         :param candidate: An object hypothesis holding a pose annotation.
         :return: The request to track it from that annotation.
@@ -687,7 +692,7 @@ class TrackingPoseUpdateMode(PoseUpdateMode, ABC):
         )
 
     def previous_frame_tracking_request(
-        self, candidate: PoseCandidate
+        self, *, candidate: PoseCandidate
     ) -> PoseRequest | None:
         """
         :param candidate: An object hypothesis without a pose annotation.
@@ -712,10 +717,13 @@ class EstimateAndTrack(TrackingPoseUpdateMode):
     Objects with a known pose are tracked, the others are estimated.
     """
 
-    def pose_request(self, candidate: PoseCandidate) -> PoseRequest | None:
+    def pose_request(self, *, candidate: PoseCandidate) -> PoseRequest | None:
         if candidate.pose_annotation is not None:
-            return self.annotation_tracking_request(candidate)
-        return self.previous_frame_tracking_request(candidate) or candidate.to_request()
+            return self.annotation_tracking_request(candidate=candidate)
+        return (
+            self.previous_frame_tracking_request(candidate=candidate)
+            or candidate.to_request()
+        )
 
 
 @dataclass(kw_only=True)
@@ -724,10 +732,10 @@ class TrackPosedObjects(TrackingPoseUpdateMode):
     Only objects with a known pose are tracked.
     """
 
-    def pose_request(self, candidate: PoseCandidate) -> PoseRequest | None:
+    def pose_request(self, *, candidate: PoseCandidate) -> PoseRequest | None:
         if candidate.pose_annotation is not None:
-            return self.annotation_tracking_request(candidate)
-        return self.previous_frame_tracking_request(candidate)
+            return self.annotation_tracking_request(candidate=candidate)
+        return self.previous_frame_tracking_request(candidate=candidate)
 
 
 # %% FoundationPose annotator
@@ -826,9 +834,11 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         """
         super().__init__(self.name, self.descriptor)
         self.class_meshes = ObjectClassMeshes.from_class_meshes(
-            self.descriptor.parameters.class_meshes
+            class_meshes=self.descriptor.parameters.class_meshes
         )
-        self.pose_estimator.load_meshes(self.class_meshes.estimator_mesh_files)
+        self.pose_estimator.load_meshes(
+            mesh_files=self.class_meshes.estimator_mesh_files
+        )
 
     @catch_and_raise_to_blackboard
     @record_time
@@ -846,11 +856,13 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         requests = [
             request
             for object_hypothesis in self.get_cas().filter_annotations_by_type(
-                ObjectHypothesis
+                type_to_include=ObjectHypothesis
             )
             if (
                 request := self.pose_request(
-                    object_hypothesis, frame, previous_frame_poses
+                    object_hypothesis=object_hypothesis,
+                    frame=frame,
+                    previous_frame_poses=previous_frame_poses,
                 )
             )
             is not None
@@ -858,10 +870,10 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         estimated_poses = [
             EstimatedPose(request=request, pose=pose)
             for request in requests
-            if (pose := self.object_pose(request)) is not None
+            if (pose := self.object_pose(request=request)) is not None
         ]
         for estimated_pose in estimated_poses:
-            self.annotate_pose(estimated_pose)
+            self.annotate_pose(estimated_pose=estimated_pose)
         self.previous_frame_objects = [
             PosedObject(
                 class_name=estimated_pose.request.class_mesh.class_name,
@@ -871,7 +883,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
             for estimated_pose in estimated_poses
         ]
         if self.descriptor.parameters.global_with_visualization:
-            self.visualize(frame, estimated_poses)
+            self.visualize(frame=frame, estimated_poses=estimated_poses)
         self.feedback_message = (
             f"Posed {len(estimated_poses)} of {len(requests)} objects in "
             f"{default_timer() - start_time:.4f}s"
@@ -884,11 +896,11 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         """
         cas = self.get_cas()
         depth_image = (
-            cas.get(CASViews.DEPTH_IMAGE).astype(numpy.float32)
+            cas.get(view_name=CASViews.DEPTH_IMAGE).astype(numpy.float32)
             / self.descriptor.parameters.depth_units_per_meter
         )
         color_image = get_scaled_color_image_for_depth_image(
-            cas, cas.get(CASViews.COLOR_IMAGE)
+            cas, cas.get(view_name=CASViews.COLOR_IMAGE)
         )
         color_to_depth_ratio = cas.color_to_depth_ratio
         camera_model = cas.require_camera_observation().effective_camera_model.scaled(
@@ -903,6 +915,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
 
     def pose_request(
         self,
+        *,
         object_hypothesis: ObjectHypothesis,
         frame: ColorAndDepthFrame,
         previous_frame_poses: PreviousFramePoses,
@@ -918,7 +931,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         """
         cas = self.get_cas()
         classifications = cas.filter_by_type(
-            Classification, object_hypothesis.annotations
+            type_to_include=Classification, input_list=object_hypothesis.annotations
         )
         if object_hypothesis.roi.mask is None or not classifications:
             return None
@@ -931,14 +944,17 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         if class_mesh is None:
             return None
         pose_annotations = cas.filter_by_type(
-            PoseAnnotation, object_hypothesis.annotations
+            type_to_include=PoseAnnotation, input_list=object_hypothesis.annotations
         )
         return self.descriptor.parameters.pose_update_mode.pose_request(
-            PoseCandidate(
+            candidate=PoseCandidate(
                 object_hypothesis=object_hypothesis,
                 class_mesh=class_mesh,
                 object_observation=ObjectObservation(
-                    frame=frame, mask=self.depth_image_mask(object_hypothesis, frame)
+                    frame=frame,
+                    mask=self.depth_image_mask(
+                        object_hypothesis=object_hypothesis, frame=frame
+                    ),
                 ),
                 pose_annotation=pose_annotations[-1] if pose_annotations else None,
                 previous_frame_poses=previous_frame_poses,
@@ -946,7 +962,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         )
 
     def depth_image_mask(
-        self, object_hypothesis: ObjectHypothesis, frame: ColorAndDepthFrame
+        self, *, object_hypothesis: ObjectHypothesis, frame: ColorAndDepthFrame
     ) -> numpy_typing.NDArray[numpy.bool_]:
         """
         :param object_hypothesis: Object hypothesis whose mask covers its region of
@@ -955,7 +971,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         :return: The mask of the object hypothesis over the whole depth image.
         """
         region = self.get_cas().color_to_depth_ratio.depth_region(
-            object_hypothesis.roi.roi
+            region=object_hypothesis.roi.roi
         )
         region_mask = cv2.resize(
             object_hypothesis.roi.mask.astype(numpy.uint8),
@@ -972,7 +988,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         ]
         return mask
 
-    def object_pose(self, request: PoseRequest) -> Pose | None:
+    def object_pose(self, *, request: PoseRequest) -> Pose | None:
         """
         Track the pose of a request from its previous pose if the tracked pose is
         plausible, and estimate it otherwise.
@@ -980,20 +996,25 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         :param request: The object hypothesis to pose.
         :return: Pose of the mesh in the camera frame, or ``None`` if none was found.
         """
-        self.pose_estimator.select_mesh(request.class_mesh.estimator_mesh_file)
+        self.pose_estimator.select_mesh(
+            mesh_file=request.class_mesh.estimator_mesh_file
+        )
         if request.previous_pose is not None:
             tracked_pose = self.pose_estimator.track_pose(
-                request.object_observation, request.previous_pose
+                object_observation=request.object_observation,
+                previous_pose=request.previous_pose,
             )
-            if self.is_plausible_track(request, tracked_pose):
+            if self.is_plausible_track(request=request, tracked_pose=tracked_pose):
                 return tracked_pose
             logger.debug(
                 f"Tracked pose of {request.class_mesh.class_name} left its mask, "
                 f"estimating it anew."
             )
-        return self.pose_estimator.estimate_pose(request.object_observation)
+        return self.pose_estimator.estimate_pose(
+            object_observation=request.object_observation
+        )
 
-    def is_plausible_track(self, request: PoseRequest, tracked_pose: Pose) -> bool:
+    def is_plausible_track(self, *, request: PoseRequest, tracked_pose: Pose) -> bool:
         """
         :param request: The tracked object hypothesis.
         :param tracked_pose: Tracked pose of the mesh in the camera frame.
@@ -1016,7 +1037,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
             and top - vertical_margin <= y <= bottom + vertical_margin
         )
 
-    def annotate_pose(self, estimated_pose: EstimatedPose) -> None:
+    def annotate_pose(self, *, estimated_pose: EstimatedPose) -> None:
         """
         Write an estimated pose into the pose annotation of its request, adding one if the
         request has none.
@@ -1033,7 +1054,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         pose_annotation.rotation = estimated_pose.pose.orientation.to_np().tolist()
 
     def visualize(
-        self, frame: ColorAndDepthFrame, estimated_poses: list[EstimatedPose]
+        self, *, frame: ColorAndDepthFrame, estimated_poses: list[EstimatedPose]
     ) -> None:
         """
         Show the posed meshes in the color image and, with the point cloud of the CAS, in
@@ -1045,7 +1066,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         cas = self.get_cas()
         parameters = self.descriptor.parameters
         visualization = PoseVisualization(
-            color_image=cas.get_copy(CASViews.COLOR_IMAGE),
+            color_image=cas.get_copy(view_name=CASViews.COLOR_IMAGE),
             color_to_depth_ratio=cas.color_to_depth_ratio,
             camera_model=frame.camera_model,
             frame=parameters.visualization_frame,
@@ -1054,16 +1075,16 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
         )
         for estimated_pose in estimated_poses:
             visualization.draw(
-                estimated_pose.request.class_mesh.shape,
-                estimated_pose.pose,
-                estimated_pose.label,
+                shape=estimated_pose.request.class_mesh.shape,
+                pose=estimated_pose.pose,
+                label=estimated_pose.label,
             )
         if cas.cloud is not None:
             visualization.geometries.append(
                 NamedGeometry(geometry_name=CASViews.CLOUD, geometry=cas.cloud)
             )
         output = self.get_annotator_output_struct()
-        output.set_image(visualization.color_image)
+        output.set_image(img=visualization.color_image)
         output.set_geometries(
-            [geometry.to_drawable() for geometry in visualization.geometries]
+            geometries=[geometry.to_drawable() for geometry in visualization.geometries]
         )

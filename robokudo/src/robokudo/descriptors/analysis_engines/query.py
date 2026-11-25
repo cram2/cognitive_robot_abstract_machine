@@ -81,7 +81,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         :return: The configured pipeline for query processing
         """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "kinect_wo_tf"
+            camera="kinect_wo_tf"
         )
 
         seq = Pipeline("RWPipeline")

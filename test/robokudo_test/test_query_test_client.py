@@ -39,7 +39,7 @@ class NodeForActionClient:
         """
         self.destroyed = True
 
-    def wait_for_server(self, timeout_sec: float) -> bool:
+    def wait_for_server(self, *, timeout_sec: float) -> bool:
         """
         Report that no action server is available.
 

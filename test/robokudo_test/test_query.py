@@ -58,7 +58,7 @@ class QueryWorkerThread(threading.Thread):
 
 def query_simple_pipeline(node, recording_directory: Path):
     cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
-        "file_reader",
+        camera="file_reader",
         loop=True,
         target_dir=recording_directory,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
@@ -99,13 +99,13 @@ def tree_run(node, cup_on_counter_directory: Path):
 
 # %% Query interface tests
 class TestQueryInterface:
-    def test_query_annotator_returns_running(self, tree_run):
+    def test_query_annotator_returns_running(self, *, tree_run):
         seq, tree_result = tree_run
 
         # We are not sending a query just yet. So the QueryAnnotator should block indefinitely with RUNNING
         assert tree_result is py_trees.common.Status.RUNNING
 
-    def test_query(self, node, cup_on_counter_directory: Path):
+    def test_query(self, *, node, cup_on_counter_directory: Path):
         # seq, tree_result = query_simple_pipeline(node)
         multiprocessing.set_start_method("spawn", force=True)
 
@@ -147,8 +147,8 @@ class TestQueryInterface:
 # %% query annotator before initialise
 def test_query_annotator_update_before_initialise_raises_query_server_not_started():
     """
-    A query annotator ticked before it is initialised has no query action server to
-    read queries from.
+    A query annotator ticked before it is initialised has no query action server to read
+    queries from.
     """
     with pytest.raises(QueryServerNotStarted):
         QueryAnnotator().update()

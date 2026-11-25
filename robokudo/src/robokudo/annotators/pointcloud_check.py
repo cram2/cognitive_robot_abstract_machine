@@ -95,7 +95,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         assert isinstance(cloud, o3d.geometry.PointCloud)
         point_count = len(cloud.points)
         if point_count < self.descriptor.parameters.point_threshold:

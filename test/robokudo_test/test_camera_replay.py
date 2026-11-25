@@ -186,7 +186,7 @@ def test_full_snapshot_replays_only_camera_context() -> None:
     """
     scene = _recorded_scene()
     document = Storage.encode_view_document(
-        CASViews.CAMERA_OBSERVATION, scene.observation
+        view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
     )
     recorded_world = World()
     tracker = WorldEntityWithIDKwargsTracker.from_world(recorded_world)
@@ -194,14 +194,16 @@ def test_full_snapshot_replays_only_camera_context() -> None:
         recorded_world, _snapshot(scene.world), **tracker.create_kwargs()
     )
     restored_observation = CameraObservationCodec().decode_with_tracker(
-        ViewPayload.from_document(document), tracker
+        payload=ViewPayload.from_document(document=document), tracker=tracker
     )
     reasoning_world = World()
-    RecordedCameraWorld(observation=restored_observation).install(reasoning_world)
+    RecordedCameraWorld(observation=restored_observation).install(
+        reasoning_world=reasoning_world
+    )
     _, replayed = Storage.decode_view_document(
         view_document=document, world=reasoning_world
     )
-    RecordedCameraWorld.apply_pose(reasoning_world, replayed)
+    RecordedCameraWorld.apply_pose(world=reasoning_world, observation=replayed)
 
     assert replayed.camera is not scene.observation.camera
     assert replayed.camera.id == scene.observation.camera.id
@@ -229,7 +231,7 @@ def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
     """
     scene = _recorded_scene(pose_frame_alias=True)
     document = Storage.encode_view_document(
-        CASViews.CAMERA_OBSERVATION, scene.observation
+        view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
     )
     frame = {StorageDocumentField.WORLD: json.dumps(_snapshot(scene.world))}
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
@@ -246,7 +248,7 @@ def test_replay_resolves_leading_slash_pose_frame_alias() -> None:
     _, replayed = Storage.decode_view_document(
         view_document=document, world=reasoning_world
     )
-    RecordedCameraWorld.apply_pose(reasoning_world, replayed)
+    RecordedCameraWorld.apply_pose(world=reasoning_world, observation=replayed)
 
     assert replayed.camera.root.id == scene.observation.camera.root.id
     assert replayed.world_T_camera.child_frame.id == (
@@ -271,9 +273,11 @@ def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool) -> N
     """
     scene = _recorded_scene(pose_frame_alias=pose_frame_alias)
     reasoning_world = World()
-    RecordedCameraWorld(observation=scene.observation).install(reasoning_world)
+    RecordedCameraWorld(observation=scene.observation).install(
+        reasoning_world=reasoning_world
+    )
     first_document = Storage.encode_view_document(
-        CASViews.CAMERA_OBSERVATION, scene.observation
+        view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
     )
     _, first = Storage.decode_view_document(
         view_document=first_document, world=reasoning_world
@@ -294,12 +298,12 @@ def test_later_frame_updates_same_camera_connection(pose_frame_alias: bool) -> N
         scene.observation, world_T_camera=moved_pose, timestamp_nanoseconds=124
     )
     second_document = Storage.encode_view_document(
-        CASViews.CAMERA_OBSERVATION, second_observation
+        view_name=CASViews.CAMERA_OBSERVATION, view_value=second_observation
     )
     _, second = Storage.decode_view_document(
         view_document=second_document, world=reasoning_world
     )
-    RecordedCameraWorld.apply_pose(reasoning_world, second)
+    RecordedCameraWorld.apply_pose(world=reasoning_world, observation=second)
 
     assert second.camera is first.camera
     assert second.timestamp_nanoseconds == second_observation.timestamp_nanoseconds
@@ -318,11 +322,13 @@ def test_missing_pose_merges_camera_into_existing_world() -> None:
     unrelated = Body(name=PrefixedName(name="runtime_entity"))
     with reasoning_world.modify_world():
         reasoning_world.add_body(unrelated)
-    RecordedCameraWorld(observation=scene.observation).install(reasoning_world)
+    RecordedCameraWorld(observation=scene.observation).install(
+        reasoning_world=reasoning_world
+    )
 
     _, replayed = Storage.decode_view_document(
         view_document=Storage.encode_view_document(
-            CASViews.CAMERA_OBSERVATION, scene.observation
+            view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
         ),
         world=reasoning_world,
     )
@@ -407,7 +413,7 @@ def test_sensor_replay_skips_recorded_nonsensor_views() -> None:
     storage = Storage.__new__(Storage)
     collection = Mock()
     collection.find_one.return_value = Storage.encode_view_document(
-        CASViews.COLOR_IMAGE, 7
+        view_name=CASViews.COLOR_IMAGE, view_value=7
     )
     storage.db = {Storage.VIEW_COLLECTION_NAME: collection}
     frame = {
@@ -446,7 +452,7 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
     }
     reader.reader = Mock(get_next_frame=Mock(return_value=frame))
     camera_document = Storage.encode_view_document(
-        CASViews.CAMERA_OBSERVATION, scene.observation
+        view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
     )
 
     def load_views(
@@ -477,7 +483,7 @@ def test_explicit_full_world_replay_restores_recorded_objects() -> None:
         cas.require_camera_observation().camera
         is reasoning_world.get_semantic_annotation_by_id(scene.observation.camera.id)
     )
-    assert cas.contains(CASViews.QUERY)
+    assert cas.contains(view_name=CASViews.QUERY)
 
 
 # %% Projection isolation
@@ -540,7 +546,7 @@ def test_sensor_replay_rejects_conflicting_camera_root_without_changing_world(
     with reasoning_world.modify_world():
         reasoning_world.add_body(conflict)
     document = Storage.encode_view_document(
-        CASViews.CAMERA_OBSERVATION, scene.observation
+        view_name=CASViews.CAMERA_OBSERVATION, view_value=scene.observation
     )
     reader = StorageReaderInterface.__new__(StorageReaderInterface)
     reader.storage = Mock(load_view_document=Mock(return_value=document))
@@ -567,6 +573,6 @@ def test_storage_reports_missing_view_document() -> None:
     storage.db = {Storage.VIEW_COLLECTION_NAME: collection}
     with pytest.raises(RecordedViewMissing):
         storage.load_view_document(
-            {StorageDocumentField.VIEW_IDS: {CASViews.COLOR_IMAGE: 42}},
-            CASViews.COLOR_IMAGE,
+            cas_document={StorageDocumentField.VIEW_IDS: {CASViews.COLOR_IMAGE: 42}},
+            view_name=CASViews.COLOR_IMAGE,
         )

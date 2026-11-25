@@ -98,7 +98,7 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
         ]
 
-        self.build_objects(root, object_specs)
+        self.build_objects(root=root, specs=object_specs)
 
         cup_color = Color.from_rgba(red=0.18, green=0.78, blue=0.28, opacity=1.0)
         milk_color = Color.from_rgba(red=0.95, green=0.85, blue=0.10, opacity=1.0)
@@ -161,11 +161,11 @@ class WorldDescriptor(BaseWorldDescriptor):
                 reference_frame=root,
             )
 
-        self.build_regions(root, region_specs)
+        self.build_regions(root=root, specs=region_specs)
         camera_name = PrefixedName(name="semdt_camera_optical_frame")
         self.build_camera(
-            root,
-            CameraPlacement(
+            parent=root,
+            placement=CameraPlacement(
                 camera=Camera(
                     name=camera_name,
                     root=Body(name=camera_name),

@@ -24,7 +24,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "storage"
 
     def implementation(self) -> Pipeline:
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         seq = Pipeline()
         seq.add_children(

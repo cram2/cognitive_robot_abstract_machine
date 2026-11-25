@@ -92,7 +92,7 @@ class TestTreeComponents:
         assert all([leaf_behaviour1._setup, leaf_behaviour2._setup])
 
         query_goal = {"query": "detect"}
-        scheduler.get_cas().set(CASViews.QUERY, query_goal)
+        scheduler.get_cas().set(view_name=CASViews.QUERY, value=query_goal)
 
         status = scheduler.update()
         assert status == py_trees.common.Status.SUCCESS
@@ -100,7 +100,7 @@ class TestTreeComponents:
         assert task.children[0].name == par1.name
 
         query_goal = {"query": "track"}
-        scheduler.get_cas().set(CASViews.QUERY, query_goal)
+        scheduler.get_cas().set(view_name=CASViews.QUERY, value=query_goal)
 
         status = scheduler.update()
         assert status == py_trees.common.Status.SUCCESS
@@ -108,7 +108,7 @@ class TestTreeComponents:
         assert task.children[0].name == par2.name
 
         query_goal = {"query": "non-existent-query-goal"}
-        scheduler.get_cas().set(CASViews.QUERY, query_goal)
+        scheduler.get_cas().set(view_name=CASViews.QUERY, value=query_goal)
 
         status = scheduler.update()
         assert status == py_trees.common.Status.FAILURE

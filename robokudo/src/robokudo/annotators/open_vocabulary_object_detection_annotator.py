@@ -203,16 +203,18 @@ class OpenVocabularyObjectDetectionAnnotator(
         :return: ``py_trees.common.Status.SUCCESS`` after processing the color image.
         """
         start_timer = default_timer()
-        image = self.get_cas().get(CASViews.COLOR_IMAGE)
-        object_hypotheses = self.detect_objects(image)
-        visualization = self.visualize_objects(image, object_hypotheses)
+        image = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
+        object_hypotheses = self.detect_objects(image=image)
+        visualization = self.visualize_objects(
+            image=image, object_hypotheses=object_hypotheses
+        )
         self.get_cas().annotations.extend(object_hypotheses)
-        self.get_annotator_output_struct().set_image(visualization)
+        self.get_annotator_output_struct().set_image(img=visualization)
         self.feedback_message = f"Processing took {default_timer() - start_timer:.4f}s"
         return py_trees.common.Status.SUCCESS
 
     def detect_objects(
-        self, image: numpy_typing.NDArray[numpy.uint8]
+        self, *, image: numpy_typing.NDArray[numpy.uint8]
     ) -> list[ObjectHypothesis]:
         """
         Detect configured classes with optional masks cropped to their regions.
@@ -258,9 +260,9 @@ class OpenVocabularyObjectDetectionAnnotator(
             object_hypothesis.roi.roi.width = int(right - left)
             object_hypothesis.roi.roi.height = int(bottom - top)
             if self.descriptor.parameters.precision_mode:
-                object_hypothesis.roi.mask = self.predict_mask(image, box)
+                object_hypothesis.roi.mask = self.predict_mask(image=image, box=box)
                 if self.descriptor.parameters.refine_bounding_boxes:
-                    self.refine_bounding_box(object_hypothesis)
+                    self.refine_bounding_box(object_hypothesis=object_hypothesis)
                 object_hypothesis.roi.mask = robokudo.utils.cv_helper.crop_image_roi(
                     object_hypothesis.roi.mask, object_hypothesis.roi
                 )
@@ -275,7 +277,7 @@ class OpenVocabularyObjectDetectionAnnotator(
         return object_hypotheses
 
     def predict_mask(
-        self, image: numpy_typing.NDArray[numpy.uint8], box: list[float]
+        self, *, image: numpy_typing.NDArray[numpy.uint8], box: list[float]
     ) -> numpy_typing.NDArray[numpy.uint8]:
         """
         Predict a mask at the original color-image resolution.
@@ -290,7 +292,7 @@ class OpenVocabularyObjectDetectionAnnotator(
         mask = result.masks.data.cpu().numpy()[0].astype(numpy.uint8)
         return mask * numpy.iinfo(numpy.uint8).max
 
-    def refine_bounding_box(self, object_hypothesis: ObjectHypothesis) -> None:
+    def refine_bounding_box(self, *, object_hypothesis: ObjectHypothesis) -> None:
         """
         Adjust a hypothesis's bounding box to the first contour of its mask.
 
@@ -313,6 +315,7 @@ class OpenVocabularyObjectDetectionAnnotator(
 
     def visualize_objects(
         self,
+        *,
         image: numpy_typing.NDArray[numpy.uint8],
         object_hypotheses: list[ObjectHypothesis],
     ) -> numpy_typing.NDArray[numpy.uint8]:

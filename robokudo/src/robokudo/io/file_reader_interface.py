@@ -252,11 +252,14 @@ class RGBDFileReaderInterface(FileReaderInterface):
         if data is None:
             return
 
-        cas.set(CASViews.COLOR_IMAGE, data[CASViews.COLOR_IMAGE])
-        cas.set(CASViews.DEPTH_IMAGE, data[CASViews.DEPTH_IMAGE])
+        cas.set(view_name=CASViews.COLOR_IMAGE, value=data[CASViews.COLOR_IMAGE])
+        cas.set(view_name=CASViews.DEPTH_IMAGE, value=data[CASViews.DEPTH_IMAGE])
 
         recorded_observation = data[CASViews.CAMERA_OBSERVATION]
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
+        cas.set(
+            view_name=CASViews.COLOR_TO_DEPTH_RATIO,
+            value=self.camera_config.color_to_depth_ratio,
+        )
         camera_frame = recorded_observation["camera_frame"]
         world_T_camera = self.static_world_T_camera_if_configured(
             world=world, camera_frame=camera_frame

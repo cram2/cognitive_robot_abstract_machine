@@ -114,7 +114,8 @@ class PersonScene(BlackWallScene):
         """
         :return: The box of the person in pixels of the given image.
         """
-        return Rect.from_corner_points(*self.person_box.corners_in(image))
+        x1, y1, x2, y2 = self.person_box.corners_in(image=image)
+        return Rect.from_corner_points(x1=x1, y1=y1, x2=x2, y2=y2)
 
     def person_box_shrunk_by(self, fraction: float) -> Rect:
         """
@@ -162,7 +163,9 @@ class PersonScene(BlackWallScene):
         :return: An annotator whose CAS holds a color image and a matching depth image.
         """
         annotator = HumanAndPoseAnnotator(descriptor=descriptor)
-        self.place_in_pipeline(annotator, color_to_depth_ratio)
+        self.place_in_pipeline(
+            annotator=annotator, color_to_depth_ratio=color_to_depth_ratio
+        )
         return annotator
 
 
@@ -194,7 +197,9 @@ def model_loader(
 
 
 def _only_hypothesis(annotator: HumanAndPoseAnnotator) -> HumanHypothesis:
-    (hypothesis,) = annotator.get_cas().filter_annotations_by_type(HumanHypothesis)
+    (hypothesis,) = annotator.get_cas().filter_annotations_by_type(
+        type_to_include=HumanHypothesis
+    )
     return hypothesis
 
 
@@ -320,7 +325,9 @@ def test_each_person_is_identified_by_its_detection_index(
 
     annotator.compute()
 
-    hypotheses = annotator.get_cas().filter_annotations_by_type(HumanHypothesis)
+    hypotheses = annotator.get_cas().filter_annotations_by_type(
+        type_to_include=HumanHypothesis
+    )
     assert [hypothesis.id for hypothesis in hypotheses] == [0, 1]
 
 
@@ -337,7 +344,7 @@ def test_hypothesis_carries_two_dimensional_keypoints_in_pixels(
     np.testing.assert_allclose(
         [astuple(keypoint) for keypoint in keypoints.keypoints],
         [
-            astuple(keypoint.in_pixels_of(scene.color_image()))
+            astuple(keypoint.in_pixels_of(image=scene.color_image()))
             for keypoint in scene.person_keypoints()
         ],
         rtol=1e-5,
@@ -443,7 +450,7 @@ def test_point_cloud_is_built_on_smaller_depth_resolution(
 
     annotator.compute()
 
-    depth_image = annotator.get_cas().get(CASViews.DEPTH_IMAGE)
+    depth_image = annotator.get_cas().get(view_name=CASViews.DEPTH_IMAGE)
     points = np.asarray(_only_hypothesis(annotator).points.points)
     assert len(points) == _area(scene.person_box_in(depth_image))
 
@@ -496,7 +503,9 @@ def test_keypoint_clouds_cover_disc_around_confident_keypoints_only(
         keypoint: len(keypoint_cloud.points.points)
         for keypoint, keypoint_cloud in zip(PoseKeypoint, keypoints.keypoints)
     }
-    nose = scene.person_keypoints()[PoseKeypoint.NOSE].in_pixels_of(scene.color_image())
+    nose = scene.person_keypoints()[PoseKeypoint.NOSE].in_pixels_of(
+        image=scene.color_image()
+    )
     nose_disc = cv2.circle(
         np.zeros((scene.resolution.height, scene.resolution.width), dtype=np.uint8),
         (int(nose.x), int(nose.y)),

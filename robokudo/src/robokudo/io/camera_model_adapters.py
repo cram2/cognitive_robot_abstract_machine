@@ -35,7 +35,7 @@ class RosCameraModelAdapter:
     """
 
     @staticmethod
-    def from_camera_info(camera_info: CameraInfo) -> PinholeCameraModel:
+    def from_camera_info(*, camera_info: CameraInfo) -> PinholeCameraModel:
         """
         Return a semantic model parsed from a ROS camera-info message.
 
@@ -77,6 +77,7 @@ class RosCameraModelAdapter:
 
     @staticmethod
     def to_camera_info(
+        *,
         camera_model: PinholeCameraModel,
         frame_id: str,
     ) -> CameraInfo:
@@ -127,6 +128,7 @@ class Open3DCameraModelAdapter:
 
     @staticmethod
     def to_intrinsic(
+        *,
         camera_model: PinholeCameraModel,
     ) -> open3d.camera.PinholeCameraIntrinsic:
         """

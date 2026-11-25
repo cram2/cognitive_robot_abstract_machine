@@ -28,7 +28,7 @@ class FeatureComparator:
         self.weight = weight
         """Weight of this comparator in the final similarity score."""
 
-    def compute_similarity(self, query_value: Any, obj_value: Any) -> float:
+    def compute_similarity(self, *, query_value: Any, obj_value: Any) -> float:
         """Computes similarity between query and object values.
 
         :param query_value: The translation to use as a baseline for comparison.
@@ -49,6 +49,7 @@ class TranslationComparator(FeatureComparator):
 
     def compute_similarity(
         self,
+        *,
         query_value: Iterable[float] | PositionAnnotation,
         obj_value: Iterable[float] | PositionAnnotation,
     ) -> float:
@@ -77,6 +78,7 @@ class OrientationComparator(FeatureComparator):
 
     def compute_similarity(
         self,
+        *,
         query_value: Iterable[float] | npt.NDArray[np.float64],
         obj_value: Iterable[float] | npt.NDArray[np.float64],
     ) -> float:
@@ -99,7 +101,10 @@ class BboxComparator(FeatureComparator):
     """Extended FeatureComparator that computes similarity based on the bounding box size difference between query and object values."""
 
     def compute_similarity(
-        self, query_value: BoundingBox3DAnnotation, obj_value: BoundingBox3DAnnotation
+        self,
+        *,
+        query_value: BoundingBox3DAnnotation,
+        obj_value: BoundingBox3DAnnotation,
     ) -> float:
         """Computes similarity between bounding boxes based on their sizes.
 
@@ -120,7 +125,7 @@ class BboxComparator(FeatureComparator):
 class SizeComparator(FeatureComparator):
     """Extended FeatureComparator that computes similarity based on the sum difference between query and object values."""
 
-    def compute_similarity(self, query_value: list, obj_value: list) -> float:
+    def compute_similarity(self, *, query_value: list, obj_value: list) -> float:
         """Computes similarity of two lists based on their sum differences.
 
         :param query_value: The list to use as a baseline for comparison.
@@ -137,7 +142,7 @@ class HistogramComparator(FeatureComparator):
     """Extended FeatureComparator that computes similarity based on the cv2.HISTCMP_CORREL comparison between query and object values."""
 
     def compute_similarity(
-        self, query_value: ColorHistogram, obj_value: ColorHistogram
+        self, *, query_value: ColorHistogram, obj_value: ColorHistogram
     ) -> float:
         """Computes similarity between ColorHistogram objects based on the cv2.HISTCMP_CORREL metric.
 
@@ -154,7 +159,7 @@ class SemanticColorComparator(FeatureComparator):
     """Extended `FeatureComparator` that computes similarity based on string similarity and color ratio difference between query and object values."""
 
     def compute_similarity(
-        self, query_value: SemanticColor, obj_value: SemanticColor
+        self, *, query_value: SemanticColor, obj_value: SemanticColor
     ) -> float:
         """Computes similarity between SemanticColor objects based on the cv2.HISTCMP_CORREL metric.
 
@@ -172,7 +177,7 @@ class ClassificationComparator(FeatureComparator):
     """Extended `FeatureComparator` that computes similarity based on type, classname and confidence."""
 
     def compute_similarity(
-        self, query_value: Classification, obj_value: Classification
+        self, *, query_value: Classification, obj_value: Classification
     ) -> float:
         """Computes similarity between SemanticColor objects based on the cv2.HISTCMP_CORREL metric.
 
@@ -204,7 +209,7 @@ class SIFTComparator(FeatureComparator):
         self.distance_threshold = distance_threshold
         """Distance threshold for Lowe's ratio test."""
 
-    def compute_similarity(self, query_value: Any, obj_value: Any) -> float:
+    def compute_similarity(self, *, query_value: Any, obj_value: Any) -> float:
         """Compute similarity between SIFT annotations based on Lowe's ratio test and kNN matching ratio."""
         all_matches = self._matcher.knnMatch(
             query_value.descriptors, obj_value.descriptors, k=2
@@ -220,7 +225,7 @@ class SIFTComparator(FeatureComparator):
 class AdditionalDataComparator(FeatureComparator):
     """Extended `FeatureComparator` that computes similarity based on numerical difference or simple value comparison between query and object values."""
 
-    def compute_similarity(self, query_value: Any, obj_value: Any) -> float:
+    def compute_similarity(self, *, query_value: Any, obj_value: Any) -> float:
         """Computes similarity between any value or object based on numerical difference or value equality.
 
         If `query_value` and `obj_value` are numerical this FeatureComparator will normalize their numerical difference.
@@ -243,7 +248,7 @@ class AdditionalDataComparator(FeatureComparator):
 class RoiComparator(FeatureComparator):
     """Extended `FeatureComparator` that computes similarity based on overlap percentage between query and object values."""
 
-    def compute_similarity(self, query_value: Rect, obj_value: Rect) -> float:
+    def compute_similarity(self, *, query_value: Rect, obj_value: Rect) -> float:
         """Computes the similarity of two Region of Interests by calculating their IoU.
 
         :param query_value: The rectangle to use as a baseline for comparison.
@@ -257,7 +262,7 @@ class MaskComparator(FeatureComparator):
     """Extended `FeatureComparator` that computes the IoU of two masks."""
 
     def compute_similarity(
-        self, query_value: npt.NDArray, obj_value: npt.NDArray
+        self, *, query_value: npt.NDArray, obj_value: npt.NDArray
     ) -> float:
         """Computes the similarity of two masks by calculating their IoU.
 
@@ -286,7 +291,9 @@ class ImageROIComparator(FeatureComparator):
         self.mask_comparator = MaskComparator(weight=1.0)
         """Comparator to compute the IoU of two image masks."""
 
-    def compute_similarity(self, query_value: ImageROI, obj_value: ImageROI) -> float:
+    def compute_similarity(
+        self, *, query_value: ImageROI, obj_value: ImageROI
+    ) -> float:
         """Computes the similarity of two ImageROI annotations by calculating the average IoU of both bounding boxes and masks.
 
         :param query_value: The ImageROI to use as a baseline for comparison.
@@ -296,7 +303,9 @@ class ImageROIComparator(FeatureComparator):
         query_roi = query_value.roi
         obj_roi = obj_value.roi
 
-        roi_sim = self.roi_comparator.compute_similarity(query_roi, obj_roi)
+        roi_sim = self.roi_comparator.compute_similarity(
+            query_value=query_roi, obj_value=obj_roi
+        )
 
         query_mask = query_value.mask
         obj_mask = obj_value.mask
@@ -334,7 +343,9 @@ class ImageROIComparator(FeatureComparator):
             constant_values=0,
         )
 
-        mask_sim = self.mask_comparator.compute_similarity(padded_query, padded_obj)
+        mask_sim = self.mask_comparator.compute_similarity(
+            query_value=padded_query, obj_value=padded_obj
+        )
         return (roi_sim + mask_sim) / 2.0
 
 
@@ -352,7 +363,7 @@ class PoseComparator(FeatureComparator):
         self.orientation_comparator = OrientationComparator(weight=1.0)
         """Comparator to compute the similarity of two orientations."""
 
-    def compute_similarity(self, query_value: Pose, obj_value: Pose) -> float:
+    def compute_similarity(self, *, query_value: Pose, obj_value: Pose) -> float:
         """Computes the similarity of two poses by comparing translation and orientation values.
 
         :param query_value: The Pose to use as a baseline for comparison.
@@ -360,11 +371,11 @@ class PoseComparator(FeatureComparator):
         :returns: A similarity score between 0.0 (no similarity at all) and 1.0 (completely identical).
         """
         position_sim = self.translation_comparator.compute_similarity(
-            query_value.translation, obj_value.translation
+            query_value=query_value.translation, obj_value=obj_value.translation
         )
 
         orientation_sim = self.orientation_comparator.compute_similarity(
-            query_value.rotation, obj_value.rotation
+            query_value=query_value.rotation, obj_value=obj_value.rotation
         )
 
         return (position_sim + orientation_sim) / 2.0

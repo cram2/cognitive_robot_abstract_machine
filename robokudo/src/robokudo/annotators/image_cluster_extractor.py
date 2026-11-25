@@ -200,7 +200,7 @@ class ImageClusterExtractor(BaseAnnotator):
         """Select color bounds matching the first color in the current query."""
         if CASViews.QUERY not in self.get_cas().views:
             return
-        self.query = self.get_cas().get(CASViews.QUERY)
+        self.query = self.get_cas().get(view_name=CASViews.QUERY)
 
         if not self.query:
             return
@@ -221,6 +221,7 @@ class ImageClusterExtractor(BaseAnnotator):
 
     def _threshold_color_image(
         self,
+        *,
         minimum_hue_saturation_value: Color,
         maximum_hue_saturation_value: Color,
     ) -> npt.NDArray:
@@ -272,11 +273,13 @@ class ImageClusterExtractor(BaseAnnotator):
         )
         self.adjust_color_bounds_to_query()
         color_mask = self._threshold_color_image(
-            self.descriptor.parameters.minimum_hue_saturation_value,
-            self.descriptor.parameters.maximum_hue_saturation_value,
+            minimum_hue_saturation_value=self.descriptor.parameters.minimum_hue_saturation_value,
+            maximum_hue_saturation_value=self.descriptor.parameters.maximum_hue_saturation_value,
         )
-        contours = self._select_contours(color_mask)
-        clusters = self._extract_clusters(resized_color, contours)
+        contours = self._select_contours(color_mask=color_mask)
+        clusters = self._extract_clusters(
+            resized_color=resized_color, contours=contours
+        )
         visualization_image = cv2.bitwise_and(
             resized_color, resized_color, mask=color_mask
         )
@@ -286,10 +289,13 @@ class ImageClusterExtractor(BaseAnnotator):
         ):
             visualization_image = clusters.depth_mask
         visualization_image = self._draw_hypotheses(
-            visualization_image, clusters.object_hypotheses
+            visualization_image=visualization_image,
+            object_hypotheses=clusters.object_hypotheses,
         )
-        self.get_annotator_output_struct().set_image(visualization_image)
-        self.get_annotator_output_struct().set_geometries(clusters.point_clouds)
+        self.get_annotator_output_struct().set_image(img=visualization_image)
+        self.get_annotator_output_struct().set_geometries(
+            geometries=clusters.point_clouds
+        )
         self.feedback_message = (
             f"Processing took {(default_timer() - start_timer):.4f}s"
         )
@@ -301,8 +307,8 @@ class ImageClusterExtractor(BaseAnnotator):
 
         :return: BGR color image resized to the depth image resolution.
         """
-        self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
+        self.color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
+        self.depth = self.get_cas().get(view_name=CASViews.DEPTH_IMAGE)
         cas = self.get_cas()
 
         resized_color = get_scaled_color_image_for_depth_image(cas, self.color)
@@ -314,12 +320,12 @@ class ImageClusterExtractor(BaseAnnotator):
             )
         )
         self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
-            pointcloud_camera_model
+            camera_model=pointcloud_camera_model
         )
 
         return resized_color
 
-    def _select_contours(self, color_mask: npt.NDArray) -> list[npt.NDArray]:
+    def _select_contours(self, *, color_mask: npt.NDArray) -> list[npt.NDArray]:
         """Select the largest outer contours that exceed the configured minimum area.
 
         :param color_mask: Binary image marking pixels within the selected color range.
@@ -357,6 +363,7 @@ class ImageClusterExtractor(BaseAnnotator):
     # %% Point clouds and annotations
     def _create_point_cloud(
         self,
+        *,
         resized_color: npt.NDArray,
         contour_mask: npt.NDArray,
         maximum_depth: float = 9.0,
@@ -393,6 +400,7 @@ class ImageClusterExtractor(BaseAnnotator):
 
     def _extract_clusters(
         self,
+        *,
         resized_color: npt.NDArray,
         contours: list[npt.NDArray],
         erosion_kernel_size: int = 5,
@@ -424,7 +432,9 @@ class ImageClusterExtractor(BaseAnnotator):
             )
             clusters.depth_mask = cv2.cvtColor(contour_mask, cv2.COLOR_GRAY2BGR)
 
-            cloud = self._create_point_cloud(resized_color, contour_mask)
+            cloud = self._create_point_cloud(
+                resized_color=resized_color, contour_mask=contour_mask
+            )
             clusters.point_clouds.append(cloud)
 
             if len(cloud.points) < self.descriptor.parameters.min_points_threshold:
@@ -449,6 +459,7 @@ class ImageClusterExtractor(BaseAnnotator):
     # %% Visualization
     def _draw_hypotheses(
         self,
+        *,
         visualization_image: npt.NDArray,
         object_hypotheses: list[ObjectHypothesis],
     ) -> npt.NDArray:
@@ -487,7 +498,7 @@ class ImageClusterExtractor(BaseAnnotator):
 
         return visualization_image
 
-    def key_callback(self, key: int) -> None:
+    def key_callback(self, *, key: int) -> None:
         """
         Handle keyboard input to change visualization mode.
 

@@ -93,12 +93,12 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
         ]
 
-        self.build_objects(root, object_specs)
-        self.build_regions(root, region_specs)
+        self.build_objects(root=root, specs=object_specs)
+        self.build_regions(root=root, specs=region_specs)
         camera_name = PrefixedName(name="semdt_camera_optical_frame")
         self.build_camera(
-            root,
-            CameraPlacement(
+            parent=root,
+            placement=CameraPlacement(
                 camera=Camera(
                     name=camera_name,
                     root=Body(name=camera_name),

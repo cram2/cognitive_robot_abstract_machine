@@ -63,9 +63,9 @@ def assert_mesh_equal(mesh1, mesh2) -> None:
     :param mesh1: The first mesh to compare.
     :param mesh2: The second mesh to compare.
     """
-    assert type(mesh1) == type(
-        mesh2
-    ), f"Meshes must be of the same type but are mesh1={type(mesh1)} mesh2={type(mesh2)}"
+    assert type(mesh1) == type(mesh2), (
+        f"Meshes must be of the same type but are mesh1={type(mesh1)} mesh2={type(mesh2)}"
+    )
 
     assert np.all(np.asarray(mesh2.vertices) == np.asarray(mesh1.vertices))
     assert np.all(np.asarray(mesh2.vertex_colors) == np.asarray(mesh1.vertex_colors))
@@ -134,7 +134,7 @@ class TestVisGeometryMaps(object):
         iterations = 3
 
         write_manager = SharedMemoryManager.with_shm(
-            (1000 * np.dtype(np.float64).itemsize * (3 + 3 + 3 + 9)) * iterations
+            size=(1000 * np.dtype(np.float64).itemsize * (3 + 3 + 3 + 9)) * iterations
         )
 
         inputs_pcds = []
@@ -149,9 +149,9 @@ class TestVisGeometryMaps(object):
             assert input_pcd.has_covariances(), "PointCloud should have covariances"
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "PointCloud", input_pcd
+                name="PointCloud", geometry=input_pcd
             )
-            write_manager.write_geometry(input_pcd, memory_map)
+            write_manager.write_geometry(geometry_dict=input_pcd, memory_map=memory_map)
 
             inputs_pcds.append(input_pcd)
 
@@ -159,9 +159,9 @@ class TestVisGeometryMaps(object):
             input_pcd = inputs_pcds[i]
             output_pcd = geometry_dict["geometry"]
 
-            assert (
-                output_pcd != input_pcd
-            ), "Output and input point clouds should be different objects"
+            assert output_pcd != input_pcd, (
+                "Output and input point clouds should be different objects"
+            )
 
             assert output_pcd.has_normals(), "PointCloud should have normals"
             assert output_pcd.has_covariances(), "PointCloud should have covariances"
@@ -182,16 +182,18 @@ class TestVisGeometryMaps(object):
         iterations = 3
 
         mesh_size = (np.dtype(np.float64).itemsize * (3 + 3 + 3)) * 1000
-        write_manager = SharedMemoryManager.with_shm(mesh_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
 
         input_meshes = []
         for _ in range(iterations):
             input_mesh = get_random_mesh(o3d.geometry.MeshBase, rng)
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "MeshBase", input_mesh
+                name="MeshBase", geometry=input_mesh
             )
-            write_manager.write_geometry(input_mesh, memory_map)
+            write_manager.write_geometry(
+                geometry_dict=input_mesh, memory_map=memory_map
+            )
 
             input_meshes.append(input_mesh)
 
@@ -199,9 +201,9 @@ class TestVisGeometryMaps(object):
             input_mesh = input_meshes[i]
             output_mesh = geometry_dict["geometry"]
 
-            assert (
-                output_mesh != input_mesh
-            ), "Output and input meshes should be different objects"
+            assert output_mesh != input_mesh, (
+                "Output and input meshes should be different objects"
+            )
 
             assert_mesh_equal(output_mesh, input_mesh)
 
@@ -216,16 +218,18 @@ class TestVisGeometryMaps(object):
             + (np.dtype(np.int32).itemsize * (3 + 1))
             + (np.dtype(np.int64).itemsize * (3 + 2 + 3))
         ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
-        write_manager = SharedMemoryManager.with_shm(mesh_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
 
         input_meshes = []
         for _ in range(iterations):
             input_mesh = get_random_mesh(o3d.geometry.TriangleMesh, rng)
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "TriangleMesh", input_mesh
+                name="TriangleMesh", geometry=input_mesh
             )
-            write_manager.write_geometry(input_mesh, memory_map)
+            write_manager.write_geometry(
+                geometry_dict=input_mesh, memory_map=memory_map
+            )
 
             input_meshes.append(input_mesh)
 
@@ -233,9 +237,9 @@ class TestVisGeometryMaps(object):
             input_mesh = input_meshes[i]
             output_mesh = geometry_dict["geometry"]
 
-            assert (
-                output_mesh != input_mesh
-            ), "Output and input meshes should be different objects"
+            assert output_mesh != input_mesh, (
+                "Output and input meshes should be different objects"
+            )
 
             assert_mesh_equal(output_mesh, input_mesh)
 
@@ -249,16 +253,18 @@ class TestVisGeometryMaps(object):
             (np.dtype(np.float64).itemsize * (3 + 3 + 3))
             + (np.dtype(np.int64).itemsize * 4)
         ) * 1000
-        write_manager = SharedMemoryManager.with_shm(mesh_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
 
         input_meshes = []
         for _ in range(iterations):
             input_mesh = get_random_mesh(o3d.geometry.TetraMesh, rng)
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "TetraMesh", input_mesh
+                name="TetraMesh", geometry=input_mesh
             )
-            write_manager.write_geometry(input_mesh, memory_map)
+            write_manager.write_geometry(
+                geometry_dict=input_mesh, memory_map=memory_map
+            )
 
             input_meshes.append(input_mesh)
 
@@ -266,9 +272,9 @@ class TestVisGeometryMaps(object):
             input_mesh = input_meshes[i]
             output_mesh = geometry_dict["geometry"]
 
-            assert (
-                output_mesh != input_mesh
-            ), "Output and input meshes should be different objects"
+            assert output_mesh != input_mesh, (
+                "Output and input meshes should be different objects"
+            )
 
             assert_mesh_equal(output_mesh, input_mesh)
 
@@ -283,7 +289,7 @@ class TestVisGeometryMaps(object):
             + (np.dtype(np.int32).itemsize * (3 + 1))
             + (np.dtype(np.int64).itemsize * (3 + 2 + 3))
         ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
-        write_manager = SharedMemoryManager.with_shm(mesh_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
 
         input_meshes = []
         for _ in range(iterations):
@@ -302,9 +308,11 @@ class TestVisGeometryMaps(object):
             )
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "HalfEdgeTriangleMesh", input_mesh
+                name="HalfEdgeTriangleMesh", geometry=input_mesh
             )
-            write_manager.write_geometry(input_mesh, memory_map)
+            write_manager.write_geometry(
+                geometry_dict=input_mesh, memory_map=memory_map
+            )
 
             input_meshes.append(input_mesh)
 
@@ -312,9 +320,9 @@ class TestVisGeometryMaps(object):
             input_mesh = input_meshes[i]
             output_mesh = geometry_dict["geometry"]
 
-            assert (
-                output_mesh != input_mesh
-            ), "Output and input meshes should be different objects"
+            assert output_mesh != input_mesh, (
+                "Output and input meshes should be different objects"
+            )
 
             assert_mesh_equal(output_mesh, input_mesh)
 
@@ -325,7 +333,7 @@ class TestVisGeometryMaps(object):
         iterations = 3
 
         bbox_size = (3 + 3 + 3 + 9) * np.dtype(np.float64).itemsize
-        write_manager = SharedMemoryManager.with_shm(bbox_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=bbox_size * iterations)
 
         input_obbs = []
         for _ in range(iterations):
@@ -336,9 +344,9 @@ class TestVisGeometryMaps(object):
             input_obb.R = rng.random((3, 3))
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "OrientedBoundingBox", input_obb
+                name="OrientedBoundingBox", geometry=input_obb
             )
-            write_manager.write_geometry(input_obb, memory_map)
+            write_manager.write_geometry(geometry_dict=input_obb, memory_map=memory_map)
 
             input_obbs.append(input_obb)
 
@@ -346,9 +354,9 @@ class TestVisGeometryMaps(object):
             input_obb = input_obbs[i]
             output_obb = geometry_dict["geometry"]
 
-            assert (
-                output_obb != input_obb
-            ), "Output and input boxes should be different objects"
+            assert output_obb != input_obb, (
+                "Output and input boxes should be different objects"
+            )
             assert np.all(np.asarray(output_obb.center) == np.asarray(input_obb.center))
             assert np.all(np.asarray(output_obb.color) == np.asarray(input_obb.color))
             assert np.all(np.asarray(output_obb.extent) == np.asarray(input_obb.extent))
@@ -362,7 +370,7 @@ class TestVisGeometryMaps(object):
         iterations = 3
 
         bbox_size = (3 + 3 + 3) * np.dtype(np.float64).itemsize
-        write_manager = SharedMemoryManager.with_shm(bbox_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=bbox_size * iterations)
 
         input_obbs = []
         for _ in range(iterations):
@@ -372,9 +380,9 @@ class TestVisGeometryMaps(object):
             input_obb.color = rng.random(3)
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "AxisAlignedBoundingBox", input_obb
+                name="AxisAlignedBoundingBox", geometry=input_obb
             )
-            write_manager.write_geometry(input_obb, memory_map)
+            write_manager.write_geometry(geometry_dict=input_obb, memory_map=memory_map)
 
             input_obbs.append(input_obb)
 
@@ -382,9 +390,9 @@ class TestVisGeometryMaps(object):
             input_obb = input_obbs[i]
             output_obb = geometry_dict["geometry"]
 
-            assert (
-                output_obb != input_obb
-            ), "Output and input boxes should be different objects"
+            assert output_obb != input_obb, (
+                "Output and input boxes should be different objects"
+            )
             assert np.all(
                 np.asarray(output_obb.max_bound) == np.asarray(input_obb.max_bound)
             )
@@ -403,7 +411,7 @@ class TestVisGeometryMaps(object):
             ((3 + 3) * np.dtype(np.float64).itemsize)
             + (2 * np.dtype(np.int32).itemsize)
         ) * 1000
-        write_manager = SharedMemoryManager.with_shm(lineset_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=lineset_size * iterations)
 
         input_linesets = []
         for _ in range(iterations):
@@ -413,9 +421,11 @@ class TestVisGeometryMaps(object):
             input_lineset.lines = o3d.utility.Vector2iVector(rng.random((1000, 2)))
 
             memory_map = Geometry3DMemoryMapFactory.from_geometry(
-                "LineSet", input_lineset
+                name="LineSet", geometry=input_lineset
             )
-            write_manager.write_geometry(input_lineset, memory_map)
+            write_manager.write_geometry(
+                geometry_dict=input_lineset, memory_map=memory_map
+            )
 
             input_linesets.append(input_lineset)
 
@@ -423,9 +433,9 @@ class TestVisGeometryMaps(object):
             input_lineset = input_linesets[i]
             output_lineset = geometry_dict["geometry"]
 
-            assert (
-                output_lineset != input_lineset
-            ), "Output and input line sets should be different objects"
+            assert output_lineset != input_lineset, (
+                "Output and input line sets should be different objects"
+            )
 
             assert np.all(
                 np.asarray(output_lineset.points) == np.asarray(input_lineset.points)
@@ -451,7 +461,7 @@ class TestVisGeometryMaps(object):
             + (np.dtype(np.int32).itemsize * (3 + 1))
             + (np.dtype(np.int64).itemsize * (3 + 2 + 3))
         ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
-        write_manager = SharedMemoryManager.with_shm(mesh_size * iterations)
+        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
 
         input_dicts: list[dict] = []
         for _ in range(iterations):
@@ -518,8 +528,12 @@ class TestVisGeometryMaps(object):
                 "is_visible": True,
             }
 
-            memory_map = Geometry3DMemoryMapFactory.from_geometry_dict(input_dict)
-            write_manager.write_geometry(input_dict, memory_map)
+            memory_map = Geometry3DMemoryMapFactory.from_geometry_dict(
+                geometry=input_dict
+            )
+            write_manager.write_geometry(
+                geometry_dict=input_dict, memory_map=memory_map
+            )
 
             input_dicts.append(input_dict)
 
@@ -528,9 +542,9 @@ class TestVisGeometryMaps(object):
             input_mesh = input_dict["geometry"]
             output_mesh = geometry_dict["geometry"]
 
-            assert (
-                output_mesh != input_mesh
-            ), "Output and input meshes should be different objects"
+            assert output_mesh != input_mesh, (
+                "Output and input meshes should be different objects"
+            )
 
             assert_mesh_equal(output_mesh, input_mesh)
 

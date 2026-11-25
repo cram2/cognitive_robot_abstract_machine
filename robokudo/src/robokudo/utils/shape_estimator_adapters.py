@@ -213,39 +213,41 @@ class ShapeFitAdapter(ABC):
     shape_name: str
 
     @abstractmethod
-    def matches(self, fit_result: FittedShape) -> bool:
+    def matches(self, *, fit_result: FittedShape) -> bool:
         """
         Return whether this adapter handles the fit result.
         """
 
     @abstractmethod
     def fit(
-        self, points: np.ndarray, parameters: ShapeFitParameters
+        self, *, points: np.ndarray, parameters: ShapeFitParameters
     ) -> FittedShape | None:
         """
         Fit this primitive using shape-specific fit parameters.
         """
 
     @abstractmethod
-    def to_annotation(self, fit_result: FittedShape) -> Shape:
+    def to_annotation(self, *, fit_result: FittedShape) -> Shape:
         """
         Convert a fit result into a RoboKudo shape annotation.
         """
 
     @abstractmethod
-    def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
+    def to_o3d_geometry(self, *, fit_result: FittedShape) -> o3d.geometry.Geometry:
         """
         Convert a fitted primitive into an Open3D geometry.
         """
 
     @abstractmethod
-    def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
+    def to_coordinate_frame(
+        self, *, fit_result: FittedShape
+    ) -> o3d.geometry.TriangleMesh:
         """
         Create a coordinate frame located at the fitted primitive center.
         """
 
     @abstractmethod
-    def summary(self, fit_result: FittedShape) -> ShapeFitSummary:
+    def summary(self, *, fit_result: FittedShape) -> ShapeFitSummary:
         """
         Return compact metrics for one fitted candidate.
         """
@@ -258,14 +260,14 @@ class SphereFitAdapter(ShapeFitAdapter):
 
     shape_name = "Sphere"
 
-    def matches(self, fit_result: FittedShape) -> bool:
+    def matches(self, *, fit_result: FittedShape) -> bool:
         """
         Return whether this adapter handles the fit result.
         """
         return isinstance(fit_result, SphereFit)
 
     def fit(
-        self, points: np.ndarray, parameters: ShapeFitParameters
+        self, *, points: np.ndarray, parameters: ShapeFitParameters
     ) -> SphereFit | None:
         """
         Fit one sphere candidate.
@@ -288,7 +290,7 @@ class SphereFitAdapter(ShapeFitAdapter):
             min_inlier_ratio=fit_parameters.min_inlier_ratio,
         )
 
-    def to_annotation(self, fit_result: FittedShape) -> Sphere:
+    def to_annotation(self, *, fit_result: FittedShape) -> Sphere:
         """
         Create a sphere annotation from a sphere fit.
         """
@@ -309,7 +311,7 @@ class SphereFitAdapter(ShapeFitAdapter):
             )
         )
 
-    def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
+    def to_o3d_geometry(self, *, fit_result: FittedShape) -> o3d.geometry.Geometry:
         """
         Convert a fitted sphere into an Open3D geometry.
         """
@@ -319,7 +321,9 @@ class SphereFitAdapter(ShapeFitAdapter):
         sphere.paint_uniform_color([0.2, 0.4, 1.0])
         return sphere
 
-    def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
+    def to_coordinate_frame(
+        self, *, fit_result: FittedShape
+    ) -> o3d.geometry.TriangleMesh:
         """
         Create a coordinate frame at the fitted sphere center.
         """
@@ -331,7 +335,7 @@ class SphereFitAdapter(ShapeFitAdapter):
             frame_size=frame_size,
         )
 
-    def summary(self, fit_result: FittedShape) -> SphereFitSummary:
+    def summary(self, *, fit_result: FittedShape) -> SphereFitSummary:
         """
         Return compact metrics for one sphere fit.
         """
@@ -351,14 +355,14 @@ class CylinderFitAdapter(ShapeFitAdapter):
 
     shape_name = "Cylinder"
 
-    def matches(self, fit_result: FittedShape) -> bool:
+    def matches(self, *, fit_result: FittedShape) -> bool:
         """
         Return whether this adapter handles the fit result.
         """
         return isinstance(fit_result, CylinderFit)
 
     def fit(
-        self, points: np.ndarray, parameters: ShapeFitParameters
+        self, *, points: np.ndarray, parameters: ShapeFitParameters
     ) -> CylinderFit | None:
         """
         Fit one cylinder candidate.
@@ -385,7 +389,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
             inlier_polishing_iterations=(fit_parameters.inlier_polishing_iterations),
         )
 
-    def to_annotation(self, fit_result: FittedShape) -> Cylinder:
+    def to_annotation(self, *, fit_result: FittedShape) -> Cylinder:
         """
         Create a cylinder annotation from a cylinder fit.
         """
@@ -409,7 +413,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
             )
         )
 
-    def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
+    def to_o3d_geometry(self, *, fit_result: FittedShape) -> o3d.geometry.Geometry:
         """
         Convert a fitted cylinder into an Open3D geometry.
         """
@@ -424,7 +428,9 @@ class CylinderFitAdapter(ShapeFitAdapter):
         cylinder.paint_uniform_color([0.95, 0.6, 0.2])
         return cylinder
 
-    def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
+    def to_coordinate_frame(
+        self, *, fit_result: FittedShape
+    ) -> o3d.geometry.TriangleMesh:
         """
         Create a coordinate frame at the fitted cylinder center.
         """
@@ -436,7 +442,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
             frame_size=frame_size,
         )
 
-    def summary(self, fit_result: FittedShape) -> CylinderFitSummary:
+    def summary(self, *, fit_result: FittedShape) -> CylinderFitSummary:
         """
         Return compact metrics for one cylinder fit.
         """
@@ -457,14 +463,14 @@ class CuboidFitAdapter(ShapeFitAdapter):
 
     shape_name = "Cuboid"
 
-    def matches(self, fit_result: FittedShape) -> bool:
+    def matches(self, *, fit_result: FittedShape) -> bool:
         """
         Return whether this adapter handles the fit result.
         """
         return isinstance(fit_result, CuboidFit)
 
     def fit(
-        self, points: np.ndarray, parameters: ShapeFitParameters
+        self, *, points: np.ndarray, parameters: ShapeFitParameters
     ) -> CuboidFit | None:
         """
         Fit one cuboid candidate.
@@ -477,7 +483,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
             min_inlier_ratio=fit_parameters.min_inlier_ratio,
         )
 
-    def to_annotation(self, fit_result: FittedShape) -> Cuboid:
+    def to_annotation(self, *, fit_result: FittedShape) -> Cuboid:
         """
         Create a cuboid annotation from a cuboid fit.
         """
@@ -503,7 +509,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
             )
         )
 
-    def to_o3d_geometry(self, fit_result: FittedShape) -> o3d.geometry.Geometry:
+    def to_o3d_geometry(self, *, fit_result: FittedShape) -> o3d.geometry.Geometry:
         """
         Convert a fitted cuboid into an Open3D geometry.
         """
@@ -517,7 +523,9 @@ class CuboidFitAdapter(ShapeFitAdapter):
         line_set.paint_uniform_color([0.2, 0.4, 1.0])
         return line_set
 
-    def to_coordinate_frame(self, fit_result: FittedShape) -> o3d.geometry.TriangleMesh:
+    def to_coordinate_frame(
+        self, *, fit_result: FittedShape
+    ) -> o3d.geometry.TriangleMesh:
         """
         Create a coordinate frame at the fitted cuboid center.
         """
@@ -529,7 +537,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
             frame_size=frame_size,
         )
 
-    def summary(self, fit_result: FittedShape) -> CuboidFitSummary:
+    def summary(self, *, fit_result: FittedShape) -> CuboidFitSummary:
         """
         Return compact metrics for one cuboid fit.
         """
@@ -558,7 +566,7 @@ def adapter_for_fit(fit_result: FittedShape) -> ShapeFitAdapter:
     Return the adapter for a fitted primitive.
     """
     for adapter in SHAPE_FIT_ADAPTERS:
-        if adapter.matches(fit_result):
+        if adapter.matches(fit_result=fit_result):
             return adapter
     raise TypeError(f"Unsupported fitted shape type: {type(fit_result)!r}")
 
