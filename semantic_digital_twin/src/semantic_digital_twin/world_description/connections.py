@@ -420,39 +420,20 @@ class ScrewAxisConnection(ActiveConnection1DOF):
             return self
         world = self._world
         connection_T_frame_on_axis = self.connection_T_frame_on_axis
-        parent_T_connection = (
-            self.parent_T_connection_expression @ connection_T_frame_on_axis
-        )
-        parent_T_connection.reference_frame = (
-            self.parent_T_connection_expression.reference_frame
-        )
-        parent_T_connection.child_frame = (
-            self.parent_T_connection_expression.child_frame
-        )
-        connection_T_child = (
-            connection_T_frame_on_axis.inverse() @ self.connection_T_child_expression
-        )
-        connection_T_child.reference_frame = (
-            self.connection_T_child_expression.reference_frame
-        )
-        connection_T_child.child_frame = self.connection_T_child_expression.child_frame
         rotation = self.screw_axis.rotation_per_unit_position
-        screw_axis = (
-            ScrewAxis(
+        moved = replace(
+            self,
+            name=PrefixedName(self.name.name, prefix=self.name.prefix),
+            parent_T_connection_expression=self.parent_T_connection_expression
+            @ connection_T_frame_on_axis,
+            connection_T_child_expression=connection_T_frame_on_axis.inverse()
+            @ self.connection_T_child_expression,
+            screw_axis=ScrewAxis(
                 rotation_per_unit_position=rotation,
                 translation_per_unit_position=rotation
                 * self.screw_axis.translation_per_radian,
                 reference_frame=self.screw_axis.reference_frame,
-            )
-            if self.screw_axis.turns_body()
-            else self.screw_axis
-        )
-        moved = replace(
-            self,
-            name=PrefixedName(self.name.name, prefix=self.name.prefix),
-            parent_T_connection_expression=parent_T_connection,
-            connection_T_child_expression=connection_T_child,
-            screw_axis=screw_axis,
+            ),
             simulator_additional_properties=deepcopy(
                 self.simulator_additional_properties
             ),

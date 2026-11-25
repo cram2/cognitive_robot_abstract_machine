@@ -1028,6 +1028,8 @@ def test_moving_the_connection_frame_onto_the_axis_keeps_the_motion(
     assert child.parent_connection is moved
     assert moved.name == connection.name
     assert moved.raw_dof is connection.raw_dof
+    assert moved.parent_T_connection_expression.reference_frame is parent
+    assert moved.connection_T_child_expression.child_frame is child
     assert len(world.connections) == connection_count
     assert_allclose(moved.connection_T_frame_on_axis.to_np(), np.eye(4), atol=1e-12)
     assert float(moved.screw_axis.translation_per_radian) == pytest.approx(
