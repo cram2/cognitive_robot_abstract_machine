@@ -1,3 +1,8 @@
+"""
+The input of a QP solver in the formats the solvers take, and the filters that remove
+unused variables and constraints from it.
+"""
+
 from __future__ import annotations
 
 import logging

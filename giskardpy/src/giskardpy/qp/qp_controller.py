@@ -1,3 +1,8 @@
+"""
+The QP controller, which turns the constraints of a motion into a QP and solves it once
+every control cycle.
+"""
+
 from __future__ import annotations
 
 import logging
