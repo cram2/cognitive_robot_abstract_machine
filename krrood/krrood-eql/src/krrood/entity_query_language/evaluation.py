@@ -19,7 +19,7 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     TruthValueOperator,
 )
-from krrood.entity_query_language.core.variable import InstantiatedVariable
+from krrood.entity_query_language.core.variable import InstantiatedVariable, Literal
 from krrood.entity_query_language.evaluation_context import (
     EvaluationContext,
     EvaluationObserver,
@@ -236,19 +236,27 @@ class ConditionEvaluation:
 
     @classmethod
     def from_condition(
-        cls, *, condition: SymbolicExpression, state: TermReader | None = None
+        cls, *, condition: SymbolicExpression | bool, state: TermReader | None = None
     ) -> Self:
         """
-        :param condition: The condition to evaluate.
+        :param condition: The condition to evaluate; a plain boolean is evaluated as
+            the literal it stands for.
         :param state: What the evaluation reads ground terms with; as the current
             evaluation does when omitted.
         :return: The evaluation of *condition*.
         """
+        symbolic_condition = (
+            Literal(_value_=condition, _type_=bool)
+            if type(condition) is bool
+            else condition
+        )
         evaluation_context = create_default_evaluation_context()
         if state is not None:
             evaluation_context.term_reader = state
         results = list(
-            condition._evaluate_in_new_context_(evaluation_context=evaluation_context)
+            symbolic_condition._evaluate_in_new_context_(
+                evaluation_context=evaluation_context
+            )
         )
         steps = [
             step
@@ -268,14 +276,16 @@ class ConditionEvaluation:
             if not isinstance(step.operand, (AND, OR))
             and step.operand._id_ not in negated_ids
             and (
-                step.operand._id_ == condition._id_
+                step.operand._id_ == symbolic_condition._id_
                 or evaluation_context.is_child_of_truth_value_operator(
                     expression=step.operand
                 )
             )
         ]
         return cls(
-            condition=condition, results=results, statement_results=statement_results
+            condition=symbolic_condition,
+            results=results,
+            statement_results=statement_results,
         )
 
     @cached_property

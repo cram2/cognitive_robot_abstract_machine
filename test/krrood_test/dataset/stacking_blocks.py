@@ -1,5 +1,5 @@
 """
-Mimics of a blocksworld whose blocks are symbols, with action schemas that stack them,
+Mimics of a blocksworld whose blocks are symbols, with assertive knowledge actions that stack them,
 put them on trays, build new blocks and discard old ones.
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from krrood.entity_query_language.factories import ConditionType, and_, inference
-from krrood.planning.action_schema import ActionSchema
+from krrood.planning.assertive_knowledge_action import AssertiveKnowledgeAction
 from krrood.planning.effect import (
     Assignment,
     Effect,
@@ -62,7 +62,7 @@ class StackingBlock(Surface):
 @dataclass(kw_only=True, eq=False)
 class PlannedBlock(StackingBlock):
     """
-    A block that action schemas build.
+    A block that assertive knowledge actions build.
     """
 
 
@@ -133,11 +133,11 @@ class StackingWorld:
         )
 
 
-# %% action schemas
+# %% assertive knowledge actions
 
 
 @dataclass(kw_only=True)
-class Stack(ActionSchema):
+class Stack(AssertiveKnowledgeAction):
     """
     Moves a clear block onto another clear block.
     """
@@ -168,7 +168,7 @@ class Stack(ActionSchema):
 
 
 @dataclass(kw_only=True)
-class MoveToTable(ActionSchema):
+class MoveToTable(AssertiveKnowledgeAction):
     """
     Moves a clear block from another block onto the table.
     """
@@ -194,7 +194,7 @@ class MoveToTable(ActionSchema):
 
 
 @dataclass(kw_only=True)
-class PutOnTray(ActionSchema):
+class PutOnTray(AssertiveKnowledgeAction):
     """
     Records a block on a tray.
     """
@@ -217,7 +217,7 @@ class PutOnTray(ActionSchema):
 
 
 @dataclass(kw_only=True)
-class BuildBlock(ActionSchema):
+class BuildBlock(AssertiveKnowledgeAction):
     """
     Builds a new block, named after the block it is built on, on top of a clear block.
     """
@@ -242,7 +242,7 @@ class BuildBlock(ActionSchema):
 
 
 @dataclass(kw_only=True)
-class Discard(ActionSchema):
+class Discard(AssertiveKnowledgeAction):
     """
     Discards a clear block, which clears what it rested on.
     """
@@ -263,7 +263,7 @@ class Discard(ActionSchema):
 
 
 @dataclass(kw_only=True)
-class Touch(ActionSchema):
+class Touch(AssertiveKnowledgeAction):
     """
     Marks a block as clear, applicable to every block whatever the state.
     """
@@ -290,3 +290,16 @@ class CostedDiscard(Discard):
     """
     What discarding the block costs.
     """
+
+
+@dataclass(kw_only=True)
+class ImpossibleTouch(Touch):
+    """
+    A :class:`Touch` that is applicable in no state.
+    """
+
+    def precondition(self) -> ConditionType:
+        """
+        :return: ``False`` instead of :meth:`Touch.precondition`'s ``True``.
+        """
+        return False

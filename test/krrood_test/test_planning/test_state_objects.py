@@ -86,7 +86,7 @@ def test_match_without_domain_ranges_over_objects_the_state_adds(
     An object the live symbol graph never holds is an instance of its type in a state
     that adds it, after the live instances.
     """
-    state = State().with_objects_added(planned_connection_world.planned_connection)
+    state = State().add_objects(planned_connection_world.planned_connection)
 
     assert fixed_connections_in(state) == [
         *planned_connection_world.fixed_connections,
@@ -101,7 +101,7 @@ def test_match_without_domain_skips_objects_the_state_removes(
     A live instance the state removes is not a value of a match without a domain.
     """
     removed, *kept = planned_connection_world.fixed_connections
-    state = State().with_objects_removed(removed)
+    state = State().remove_objects(removed)
 
     assert fixed_connections_in(state) == kept
 
@@ -116,8 +116,8 @@ def test_match_without_domain_ranges_over_objects_added_and_removed_together(
     removed, *kept = planned_connection_world.fixed_connections
     state = (
         State()
-        .with_objects_removed(removed)
-        .with_objects_added(planned_connection_world.planned_connection)
+        .remove_objects(removed)
+        .add_objects(planned_connection_world.planned_connection)
     )
 
     result = a(FixedConnection).tolist(state=state)
@@ -135,7 +135,7 @@ def test_one_query_reads_the_objects_of_each_state_it_is_evaluated_with(
     removed, *kept = planned_connection_world.fixed_connections
     query = a(FixedConnection)
 
-    assert query.tolist(state=State().with_objects_removed(removed)) == kept
+    assert query.tolist(state=State().remove_objects(removed)) == kept
     assert query.tolist() == planned_connection_world.fixed_connections
 
 
@@ -143,7 +143,7 @@ def test_objects_of_another_type_are_not_in_the_domain(planned_connection_world)
     """
     An added object is a value only of a match whose type it is an instance of.
     """
-    state = State().with_objects_added(planned_connection_world.planned_connection)
+    state = State().add_objects(planned_connection_world.planned_connection)
 
     result = a(World).tolist(state=state)
 
@@ -159,7 +159,7 @@ def test_state_objects_never_change_the_live_objects(planned_connection_world):
     were.
     """
     removed = planned_connection_world.fixed_connections[0]
-    State().with_objects_removed(removed).with_objects_added(
+    State().remove_objects(removed).add_objects(
         planned_connection_world.planned_connection
     )
 
@@ -176,7 +176,7 @@ def test_removed_object_leaves_the_collections_that_hold_it(
     A live collection read through a state leaves out the objects the state removes.
     """
     removed, *kept = planned_connection_world.fixed_connections
-    state = State().with_objects_removed(removed)
+    state = State().remove_objects(removed)
 
     result = (
         a(FixedConnection)
@@ -199,9 +199,9 @@ def test_removed_object_leaves_the_collections_the_state_assigns(
     planned = planned_connection_world.planned_connection
     state = (
         State()
-        .with_objects_added(planned)
+        .add_objects(planned)
         .add_facts(literal(world).connections == [*world.connections, planned])
-        .with_objects_removed(removed)
+        .remove_objects(removed)
     )
 
     result = (
@@ -217,7 +217,7 @@ def test_removed_object_leaves_a_captured_list(planned_connection_world):
     state removes.
     """
     removed, *kept = planned_connection_world.fixed_connections
-    state = State().with_objects_removed(removed)
+    state = State().remove_objects(removed)
 
     result = (
         a(FixedConnection)
@@ -234,7 +234,7 @@ def test_removed_object_leaves_an_untyped_domain(planned_connection_world):
     removes.
     """
     removed, *kept = planned_connection_world.fixed_connections
-    state = State().with_objects_removed(removed)
+    state = State().remove_objects(removed)
 
     result = variable_from(planned_connection_world.fixed_connections).tolist(
         state=state
@@ -249,7 +249,7 @@ def test_literal_still_names_a_removed_object(planned_connection_world):
     removes the object leaves the literal's value unchanged.
     """
     removed = planned_connection_world.fixed_connections[0]
-    state = State().with_objects_removed(removed)
+    state = State().remove_objects(removed)
 
     result = literal(removed).tolist(state=state)
 
@@ -267,7 +267,7 @@ def test_world_collection_reads_the_collection_the_state_assigns(
     planned = planned_connection_world.planned_connection
     state = (
         State()
-        .with_objects_added(planned)
+        .add_objects(planned)
         .add_facts(literal(world).connections == [*world.connections, planned])
     )
 
@@ -289,7 +289,7 @@ def test_adding_a_removed_object_restores_it(planned_connection_world):
     its live position.
     """
     removed = planned_connection_world.fixed_connections[0]
-    state = State().with_objects_removed(removed).with_objects_added(removed)
+    state = State().remove_objects(removed).add_objects(removed)
 
     assert fixed_connections_in(state) == planned_connection_world.fixed_connections
 
@@ -299,7 +299,7 @@ def test_removing_an_added_object_drops_it(planned_connection_world):
     Removing an object the state added leaves only the live instances.
     """
     planned = planned_connection_world.planned_connection
-    state = State().with_objects_added(planned).with_objects_removed(planned)
+    state = State().add_objects(planned).remove_objects(planned)
 
     assert fixed_connections_in(state) == planned_connection_world.fixed_connections
 
@@ -310,7 +310,7 @@ def test_adding_an_object_twice_adds_it_once(planned_connection_world):
     objects as they were.
     """
     planned = planned_connection_world.planned_connection
-    state = State().with_objects_added(planned).with_objects_added(planned)
+    state = State().add_objects(planned).add_objects(planned)
 
     assert fixed_connections_in(state) == [
         *planned_connection_world.fixed_connections,
@@ -324,7 +324,7 @@ def test_adding_a_live_object_leaves_it_where_it_is(planned_connection_world):
     it.
     """
     live = planned_connection_world.fixed_connections[0]
-    state = State().with_objects_added(live)
+    state = State().add_objects(live)
 
     assert fixed_connections_in(state) == planned_connection_world.fixed_connections
 
@@ -339,8 +339,8 @@ def test_states_with_the_same_objects_are_equal_and_hash_alike(
     Two states built from the same additions are equal and have the same hash.
     """
     planned = planned_connection_world.planned_connection
-    first = State().with_objects_added(planned)
-    second = State().with_objects_added(planned)
+    first = State().add_objects(planned)
+    second = State().add_objects(planned)
 
     assert first == second
     assert hash(first) == hash(second)
@@ -352,7 +352,7 @@ def test_states_with_different_objects_differ(planned_connection_world):
     """
     removed = planned_connection_world.fixed_connections[0]
 
-    assert State().with_objects_removed(removed) != State()
+    assert State().remove_objects(removed) != State()
 
 
 def test_states_with_equal_but_distinct_objects_differ(planned_connection_world):
@@ -362,7 +362,7 @@ def test_states_with_equal_but_distinct_objects_differ(planned_connection_world)
     planned = planned_connection_world.planned_connection
     equal_copy = PlannedFixedConnection(parent=planned.parent, child=planned.child)
 
-    assert State().with_objects_added(planned) != State().with_objects_added(equal_copy)
+    assert State().add_objects(planned) != State().add_objects(equal_copy)
 
 
 def test_connections_of_every_kind_follow_the_state(planned_connection_world):
@@ -371,7 +371,7 @@ def test_connections_of_every_kind_follow_the_state(planned_connection_world):
     """
     live = a(Connection).tolist()
     removed = live[0]
-    state = State().with_objects_removed(removed)
+    state = State().remove_objects(removed)
 
     assert a(Connection).tolist(state=state) == live[1:]
 

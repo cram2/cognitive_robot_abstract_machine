@@ -1,6 +1,7 @@
 """
-Tests for :class:`~krrood.planning.action_schema.ActionSchema`: grounding a schema in a
-state, checking a ground action's precondition, and applying its effects to a state.
+Tests for :class:`~krrood.planning.assertive_knowledge_action.AssertiveKnowledgeAction`:
+grounding an action in a state, checking a ground action's precondition, and applying
+its effects to a state.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from ..dataset.stacking_blocks import (
     StackingBlock,
     StackingWorld,
     Touch,
+    ImpossibleTouch,
     Tray,
 )
 
@@ -68,7 +70,7 @@ def discardable_blocks(*, state: State) -> list[StackingBlock]:
     return [action.block for action in Discard.applicable_actions().tolist(state=state)]
 
 
-# %% grounding a schema
+# %% grounding an action
 
 
 def test_applicable_actions_is_a_query(stacking_world):
@@ -107,9 +109,9 @@ def test_applicable_actions_read_the_state(stacking_world):
     assert stacked_pairs(Stack.applicable_actions().tolist(state=state)) == set()
 
 
-def test_applicable_actions_are_ground_actions_of_the_schema(stacking_world):
+def test_applicable_actions_are_instances_of_the_action_class(stacking_world):
     """
-    Grounding builds instances of the schema whose fields hold the bound objects.
+    Grounding builds instances of the action class whose fields hold the bound objects.
     """
     actions = MoveToTable.applicable_actions().tolist(state=State())
     assert actions == [MoveToTable(block=stacking_world.c, table=stacking_world.table)]
@@ -327,6 +329,17 @@ def test_action_whose_precondition_is_true_is_applied(stacking_world):
     state = State().add_facts(literal(stacking_world.a).clear == False)
     state = state.apply_action(action=Touch(block=stacking_world.a))
     assert is_clear(block=stacking_world.a, state=state)
+
+
+def test_action_whose_precondition_is_false_is_not_applicable(stacking_world):
+    """
+    A precondition of ``False`` holds in no state, and it is the condition that fails.
+    """
+    with pytest.raises(ActionIsNotApplicable) as raised:
+        State().apply_action(action=ImpossibleTouch(block=stacking_world.a))
+    assert [condition._value_ for condition in raised.value.failed_conditions] == [
+        False
+    ]
 
 
 # %% parameters the state removes

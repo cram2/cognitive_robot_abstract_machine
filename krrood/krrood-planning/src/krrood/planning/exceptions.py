@@ -14,7 +14,7 @@ from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
-    from krrood.planning.action_schema import ActionSchema
+    from krrood.planning.assertive_knowledge_action import AssertiveKnowledgeAction
 
 # %% facts
 
@@ -189,8 +189,10 @@ class ConflictingAssignments(DataclassException):
 
     def suggest_correction(self) -> str:
         return (
-            "Constrain the effect so every binding that reaches this ground term gives it "
-            "the same value, for example with a condition that selects one binding."
+            "The value names variables the ground term does not, so one state would hold "
+            "several values for it. Name those variables in the ground term as well, so "
+            "each binding assigns its own ground term, or write the value from the "
+            "ground term's own variables alone."
         )
 
 
@@ -201,7 +203,8 @@ class ConflictingAssignments(DataclassException):
 class InsertedElementHasWrongType(DataclassException):
     """
     An effect inserts an element of another type than the class diagram declares for the
-    elements of a ground term's collection.
+    elements of a ground term's collection, or into a ground term the class diagram does
+    not declare a collection.
     """
 
     term: GroundTerm
@@ -217,8 +220,8 @@ class InsertedElementHasWrongType(DataclassException):
     def error_message(self) -> str:
         return (
             f"{self.term} was given the element {self.element!r} of type "
-            f"{type(self.element).__name__}, which its declared element type does not "
-            "admit."
+            f"{type(self.element).__name__}, which its declared type does not admit as "
+            "an element."
         )
 
     def suggest_correction(self) -> str:
@@ -264,7 +267,7 @@ class ActionIsNotApplicable(DataclassException):
     A ground action was applied in a state that does not satisfy its precondition.
     """
 
-    action: ActionSchema
+    action: AssertiveKnowledgeAction
     """
     The action that was applied.
     """
@@ -294,7 +297,7 @@ class ActionParameterIsRemoved(DataclassException):
     holds.
     """
 
-    action: ActionSchema
+    action: AssertiveKnowledgeAction
     """
     The action that was applied.
     """

@@ -116,11 +116,11 @@ class Effect(ABC):
     ) -> StateChange:
         """
         :param binding: The values of :attr:`selected_expressions` for one result of
-            :meth:`get_change_to_state`.
+            :meth:`get_change_to_state_query`.
         :return: What the effect changes for *binding*.
         """
 
-    def get_change_to_state(self) -> Query:
+    def get_change_to_state_query(self) -> Query:
         """
         :return: The query whose results, each evaluated in the state the action is
             applied in, are the bindings :meth:`change_of_binding` turns into changes:

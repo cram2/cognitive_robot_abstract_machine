@@ -2,6 +2,8 @@
 Selecting the statements of a condition by whether they hold.
 """
 
+import pytest
+
 from krrood.entity_query_language.evaluation import ConditionEvaluation
 from krrood.entity_query_language.factories import (
     and_,
@@ -224,6 +226,10 @@ def test_statements_skipped_after_a_false_statement_are_neither_true_nor_false()
 
 
 def test_a_conjunction_whose_conjunct_fails_is_not_satisfied():
+    """
+    One evaluation of a conjunction reports it unsatisfied and names the conjunct that
+    fails.
+    """
     position = variable(KRROODPosition, [KRROODPosition(x=2.0, y=0.0, z=0.0)])
     large_x = IsGreaterThan(value=position.x, bound=1.0)
     large_y = IsGreaterThan(value=position.y, bound=1.0)
@@ -290,3 +296,26 @@ def test_whether_a_condition_holds_is_decided_in_the_given_state():
         evaluate_condition(condition),
         evaluate_condition(condition, state=state),
     ) == (False, True)
+
+
+# %% conditions that are plain booleans
+
+
+@pytest.mark.parametrize("condition", [True, False])
+def test_a_boolean_condition_is_satisfied_when_it_is_true(condition):
+    """
+    A plain boolean is evaluated like any other condition: it holds exactly when it is
+    ``True``.
+    """
+    assert (
+        ConditionEvaluation.from_condition(condition=condition).is_satisfied
+        is condition
+    )
+
+
+def test_a_false_boolean_condition_is_its_own_false_statement():
+    """
+    ``False`` is the one statement of the condition, and it does not hold.
+    """
+    evaluation = ConditionEvaluation.from_condition(condition=False)
+    assert [statement._value_ for statement in evaluation.false_statements] == [False]

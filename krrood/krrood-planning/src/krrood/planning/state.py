@@ -13,7 +13,6 @@ from typing_extensions import TYPE_CHECKING, Any, Iterable, Iterator
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.evaluation import ConditionEvaluation
-from krrood.entity_query_language.factories import ConditionType
 from krrood.entity_query_language.ground_term import (
     FunctionKey,
     GroundTerm,
@@ -34,7 +33,7 @@ from krrood.planning.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from krrood.planning.action_schema import ActionSchema
+    from krrood.planning.assertive_knowledge_action import AssertiveKnowledgeAction
 
 # %% states
 
@@ -93,6 +92,9 @@ class State(TermReader):
     """
 
     def __hash__(self) -> int:
+        """
+        :return: A hash of what this state changes, so equal states hash alike.
+        """
         return hash(
             (
                 frozenset(self.assignments),
@@ -154,7 +156,7 @@ class State(TermReader):
         """
         changes = [
             effect.change_of_binding(binding=binding)
-            for binding in effect.get_change_to_state().evaluate(state=self)
+            for binding in effect.get_change_to_state_query().evaluate(state=self)
         ]
         assigned = {}
         for change in changes:
@@ -166,7 +168,7 @@ class State(TermReader):
                 assigned[term] = value
         return changes
 
-    def apply_action(self, *, action: ActionSchema) -> State:
+    def apply_action(self, *, action: AssertiveKnowledgeAction) -> State:
         """
         :param action: A ground action.
         :return: A new state that makes the change of every effect of *action*, as
@@ -186,30 +188,14 @@ class State(TermReader):
                 action=action, removed_objects=removed_objects
             )
         symbolic_action = action.to_symbolic()
-        self._check_precondition_(
-            action=action, precondition=symbolic_action.precondition()
-        )
-        return self.apply_effects(*symbolic_action.effects())
-
-    def _check_precondition_(
-        self, *, action: ActionSchema, precondition: ConditionType
-    ) -> None:
-        """
-        :param action: The ground action applied in this state.
-        :param precondition: The precondition of *action* on its literals.
-        :raises ActionIsNotApplicable: If this state does not satisfy *precondition*.
-        """
-        if precondition is True:
-            return
-        if precondition is False:
-            raise ActionIsNotApplicable(action=action, failed_conditions=[])
         evaluation = ConditionEvaluation.from_condition(
-            condition=precondition, state=self
+            condition=symbolic_action.precondition(), state=self
         )
         if not evaluation.is_satisfied:
             raise ActionIsNotApplicable(
                 action=action, failed_conditions=evaluation.false_statements
             )
+        return self.apply_effects(*symbolic_action.effects())
 
     def _apply_change_(self, *, change: StateChange) -> State:
         """
@@ -236,11 +222,11 @@ class State(TermReader):
                 added_objects=self.added_objects,
                 removed_objects=self.removed_objects,
             )
-            .with_objects_added(*change.added_objects)
-            .with_objects_removed(*change.removed_objects)
+            .add_objects(*change.added_objects)
+            .remove_objects(*change.removed_objects)
         )
 
-    def with_objects_added(self, *objects: Any) -> State:
+    def add_objects(self, *objects: Any) -> State:
         """
         :param objects: The objects to add.
         :return: A new state in which *objects* exist, whether this state removed them
@@ -258,7 +244,7 @@ class State(TermReader):
             },
         )
 
-    def with_objects_removed(self, *objects: Any) -> State:
+    def remove_objects(self, *objects: Any) -> State:
         """
         :param objects: The objects to remove.
         :return: A new state in which *objects* do not exist, whether they are live or

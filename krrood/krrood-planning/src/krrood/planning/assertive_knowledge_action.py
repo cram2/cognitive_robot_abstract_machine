@@ -1,5 +1,5 @@
 """
-Action schemas - actions whose parameters an EQL precondition constrains and whose
+Assertive knowledge actions - actions whose parameters an EQL precondition constrains and whose
 effects change a state - and the ground actions they stand for.
 """
 
@@ -23,36 +23,35 @@ from krrood.entity_query_language.query.query import Entity
 from krrood.patterns.classproperty import classproperty
 from krrood.planning.effect import Effect
 
-# %% action schemas
+# %% assertive knowledge actions
 
 
 @dataclass(kw_only=True)
-class ActionSchema(ABC):
+class AssertiveKnowledgeAction(ABC):
     """
     An action whose init dataclass fields are its parameters; an instance whose fields
     hold objects is a *ground action*. :meth:`precondition` and :meth:`effects` read the
     parameters as EQL expressions: variables in :meth:`applicable_actions`, or the
-    literals :meth:`to_symbolic` gives a ground action.
+    literals :meth:`to_symbolic` gives a ground action, as in this example::
 
-    >>> from dataclasses import dataclass
-    >>> from krrood.entity_query_language.factories import a
-    >>> from krrood.planning.effect import Assignment
-    >>> from krrood.planning.state import State
-    >>> from krrood.symbol_graph.symbol_graph import Symbol
-    >>> @dataclass(kw_only=True, eq=False)
-    ... class Lamp(Symbol):
-    ...     on: bool
-    >>> @dataclass(kw_only=True)
-    ... class SwitchOn(ActionSchema):
-    ...     lamp: Lamp
-    ...     def precondition(self):
-    ...         return self.lamp.on == False
-    ...     def effects(self):
-    ...         return [Assignment(fact=self.lamp.on == True)]
-    >>> lamp = Lamp(on=False)
-    >>> (action,) = SwitchOn.applicable_actions().tolist(state=State())
-    >>> a(Lamp).on.tolist(state=State().apply_action(action=action))
-    [True]
+        from dataclasses import dataclass
+        from krrood.entity_query_language.factories import a
+        from krrood.planning.effect import Assignment
+        from krrood.planning.state import State
+        from krrood.symbol_graph.symbol_graph import Symbol
+        @dataclass(kw_only=True, eq=False)
+        class Lamp(Symbol):
+            on: bool
+        @dataclass(kw_only=True)
+        class SwitchOn(AssertiveKnowledgeAction):
+            lamp: Lamp
+            def precondition(self):
+                return self.lamp.on == False
+            def effects(self):
+                return [Assignment(fact=self.lamp.on == True)]
+        lamp = Lamp(on=False)
+        (action,) = SwitchOn.applicable_actions().tolist(state=State())
+        a(Lamp).on.tolist(state=State().apply_action(action=action))  # [True]
     """
 
     @abstractmethod
