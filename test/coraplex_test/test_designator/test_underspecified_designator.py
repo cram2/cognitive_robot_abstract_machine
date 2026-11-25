@@ -779,7 +779,7 @@ def test_every_candidate_that_failed_its_trial_is_kept_with_its_statechart(
     failed_trials = executor.child_chooser.trial.failed_trials
     assert len(failed_trials) == len(failing_attempts)
     for failed_trial in failed_trials:
-        assert plan in failed_trial.build.candidates
+        assert plan in failed_trial.builder.candidates
         assert len(failed_trial.statechart.state_history) > 0
 
 
@@ -807,7 +807,10 @@ def test_a_failed_trial_records_the_statement_it_tried_and_when(
 
     [run] = executor.statechart.state_history.get_runs_of_node(node=plan)
     assert [
-        (failed_trial.tried, run.start_tick <= failed_trial.plan_tick <= run.last_tick)
+        (
+            failed_trial.tried_statements,
+            run.start_tick <= failed_trial.tick_in_plan <= run.last_tick,
+        )
         for failed_trial in executor.child_chooser.trial.failed_trials
     ] == [(frozenset({plan}), True)] * len(failing_attempts)
 

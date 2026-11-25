@@ -26,7 +26,7 @@ class StatechartRuns:
     """
 
     @cached_property
-    def runs_of_node(self) -> dict[StatechartNode, list[NodeRun]]:
+    def runs_by_node(self) -> dict[StatechartNode, list[NodeRun]]:
         """
         :return: The runs of each node of the statechart, in the order they started.
         """
@@ -40,16 +40,16 @@ class StatechartRuns:
         """
         :return: Every run of every node.
         """
-        return [run for runs in self.runs_of_node.values() for run in runs]
+        return [run for runs in self.runs_by_node.values() for run in runs]
 
     @property
-    def last_tick(self) -> int:
+    def newest_tick(self) -> int:
         """
         :return: The tick of the newest snapshot of the statechart.
         """
         return self.statechart.state_history.latest_item.tick_count
 
-    def latest_run_started_by(
+    def latest_run_started_at_or_before(
         self, *, node: StatechartNode, tick: float
     ) -> NodeRun | None:
         """
@@ -57,12 +57,12 @@ class StatechartRuns:
         :param tick: A tick.
         :return: The last run of `node` that started at or before `tick`, None if none.
         """
-        started = [run for run in self.runs_of_node[node] if run.start_tick <= tick]
+        started = [run for run in self.runs_by_node[node] if run.start_tick <= tick]
         return started[-1] if started else None
 
-    def latest_run(self, *, node: StatechartNode) -> NodeRun:
+    def latest_run_of_node(self, *, node: StatechartNode) -> NodeRun:
         """
         :param node: A node of the statechart that ran.
         :return: Its most recent run.
         """
-        return self.runs_of_node[node][-1]
+        return self.runs_by_node[node][-1]

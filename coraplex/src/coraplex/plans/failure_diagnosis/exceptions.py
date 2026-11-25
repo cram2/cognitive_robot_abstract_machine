@@ -48,12 +48,12 @@ class FailureDiagnosis(PlanFailure, ABC):
     Each subclass is one way the run where the failure started can fail.
     """
 
-    symptom: NodeRun
+    reported_run: NodeRun
     """
     The run the failure was reported for.
     """
 
-    origin: NodeRun
+    origin_run: NodeRun
     """
     The run where the failure started.
     """
@@ -65,19 +65,20 @@ class FailureDiagnosis(PlanFailure, ABC):
 
     @classmethod
     @abstractmethod
-    def found_at(
-        cls, *, symptom: NodeRun, origin: NodeRun, diagnoser: FailureDiagnoser
+    def diagnose_if_failed_this_way(
+        cls, *, reported_run: NodeRun, origin_run: NodeRun, diagnoser: FailureDiagnoser
     ) -> Self | None:
         """
-        :param symptom: A run a failure is reported for.
-        :param origin: The run where that failure started.
+        :param reported_run: A run a failure is reported for.
+        :param origin_run: The run where that failure started.
         :param diagnoser: The diagnoser of the statechart the runs belong to.
-        :return: The diagnosis of the failure if `origin` failed this way, else None.
+        :return: The diagnosis of the failure if `origin_run` failed this way, else
+            None.
         """
 
     @classproperty
     @abstractmethod
-    def how_the_origin_failed(cls) -> str:
+    def failure_description(cls) -> str:
         """
         :return: How the origin failed, as the verb phrase following it.
         """
@@ -87,53 +88,56 @@ class FailureDiagnosis(PlanFailure, ABC):
         """
         :return: What this diagnosis could say about the cause.
         """
-        causing_nodes = {root.run.node for root in self.root_causes}
+        causing_nodes = {root.causing_run.node for root in self.root_causes}
         if not causing_nodes:
             return Verdict.NO_OTHER_NODE
         if len(causing_nodes) == 1:
             return Verdict.ONE_CAUSING_NODE
         return Verdict.SEVERAL_CANDIDATES
 
-    def inputs_from_before(self, *, access: WorldAccess) -> frozenset[DegreeOfFreedom]:
+    def degrees_of_freedom_left_by_earlier_nodes(
+        self, *, access: WorldAccess
+    ) -> frozenset[DegreeOfFreedom]:
         """
-        :param access: What the node of :attr:`origin` does to the world.
-        :return: What :attr:`origin` read whose state its statechart was given from
+        :param access: What the node of :attr:`origin_run` does to the world.
+        :return: What :attr:`origin_run` read whose state its statechart was given from
             before it.
         """
-        return access.read
+        return access.read_degrees_of_freedom
 
     @staticmethod
-    def described(*, run: NodeRun) -> str:
+    def describe_run(*, run: NodeRun) -> str:
         """
         :param run: A run.
         :return: `run`, with the action holding its node if that is another node.
         """
-        action = Action.enclosing(node=run.node)
+        action = Action.enclosing_action_of(node=run.node)
         if action is None or action is run.node:
             return str(run)
         return f"{run} in {action.name}"
 
     def report_lines(self) -> list[str]:
         """
-        :return: The symptom, the origin and how it failed, one per line.
+        :return: The reported run, the origin run and how it failed, one per line.
         """
         return [
-            f"symptom  {self.described(run=self.symptom)}",
-            f"origin   {self.described(run=self.origin)} {self.how_the_origin_failed}",
+            f"reported {self.describe_run(run=self.reported_run)}",
+            f"origin   {self.describe_run(run=self.origin_run)} "
+            f"{self.failure_description}",
         ]
 
     def error_message(self) -> str:
         """
-        :return: The symptom, the origin and how it failed, the verdict and each cause
-            with the edges from it to the origin, one per line.
+        :return: The reported run, the origin run and how it failed, the verdict and
+            each cause with the edges from it to the origin run, one per line.
         """
         lines = [*self.report_lines(), f"verdict  {self.verdict.value}"]
         for rank, root in enumerate(self.root_causes, start=1):
-            lines.append(f"cause {rank}  {self.described(run=root.run)}")
+            lines.append(f"cause {rank}  {self.describe_run(run=root.causing_run)}")
             lines.extend(
-                f"           {edge.cause.node.name} {edge.describe()} "
+                f"           {edge.cause.node.name} {edge.describe_relation()} "
                 f"{edge.effect.node.name}"
-                for edge in root.chain
+                for edge in root.edges_to_origin
             )
         return "\n".join(lines)
 
@@ -159,29 +163,32 @@ class TaskStalled(FailureDiagnosis):
     """
 
     @classmethod
-    def found_at(
-        cls, *, symptom: NodeRun, origin: NodeRun, diagnoser: FailureDiagnoser
+    def diagnose_if_failed_this_way(
+        cls, *, reported_run: NodeRun, origin_run: NodeRun, diagnoser: FailureDiagnoser
     ) -> Self | None:
-        if origin.node not in diagnoser.stalled_nodes:
+        if origin_run.node not in diagnoser.stalled_nodes:
             return None
-        root_causes, counterfactual = diagnoser.causes_of_stall(stalled=origin)
+        root_causes, counterfactual = diagnoser.find_causes_of_stall(stalled=origin_run)
         return cls(
-            symptom=symptom,
-            origin=origin,
+            reported_run=reported_run,
+            origin_run=origin_run,
             root_causes=root_causes,
             counterfactual=counterfactual,
         )
 
     @classproperty
-    def how_the_origin_failed(cls) -> str:
+    def failure_description(cls) -> str:
         return "stopped approaching its goal"
 
-    def inputs_from_before(self, *, access: WorldAccess) -> frozenset[DegreeOfFreedom]:
+    def degrees_of_freedom_left_by_earlier_nodes(
+        self, *, access: WorldAccess
+    ) -> frozenset[DegreeOfFreedom]:
         """
-        Differs from :meth:`FailureDiagnosis.inputs_from_before` in leaving out what the
-        task moves or holds itself.
+        Differs from
+        :meth:`FailureDiagnosis.degrees_of_freedom_left_by_earlier_nodes` in leaving
+        out what the task moves or holds itself.
         """
-        return access.read - access.driven
+        return access.read_degrees_of_freedom - access.moved_or_held_degrees_of_freedom
 
     def report_lines(self) -> list[str]:
         lines = super().report_lines()
@@ -197,19 +204,19 @@ class TaskCollided(FailureDiagnosis):
     """
 
     @classmethod
-    def found_at(
-        cls, *, symptom: NodeRun, origin: NodeRun, diagnoser: FailureDiagnoser
+    def diagnose_if_failed_this_way(
+        cls, *, reported_run: NodeRun, origin_run: NodeRun, diagnoser: FailureDiagnoser
     ) -> Self | None:
-        if origin.node not in diagnoser.colliding_nodes:
+        if origin_run.node not in diagnoser.colliding_nodes:
             return None
         return cls(
-            symptom=symptom,
-            origin=origin,
-            root_causes=diagnoser.causes_of_collision(colliding=origin),
+            reported_run=reported_run,
+            origin_run=origin_run,
+            root_causes=diagnoser.find_causes_of_collision(colliding=origin_run),
         )
 
     @classproperty
-    def how_the_origin_failed(cls) -> str:
+    def failure_description(cls) -> str:
         return "brought bodies closer than collision avoidance allows"
 
 
@@ -220,19 +227,21 @@ class StatementRanOutOfCandidates(FailureDiagnosis):
     """
 
     @classmethod
-    def found_at(
-        cls, *, symptom: NodeRun, origin: NodeRun, diagnoser: FailureDiagnoser
+    def diagnose_if_failed_this_way(
+        cls, *, reported_run: NodeRun, origin_run: NodeRun, diagnoser: FailureDiagnoser
     ) -> Self | None:
-        if not isinstance(origin.node, StatementNode):
+        if not isinstance(origin_run.node, StatementNode):
             return None
         return cls(
-            symptom=symptom,
-            origin=origin,
-            root_causes=diagnoser.causes_shared_by_candidates(statement=origin),
+            reported_run=reported_run,
+            origin_run=origin_run,
+            root_causes=diagnoser.find_causes_shared_by_candidates(
+                statement=origin_run
+            ),
         )
 
     @classproperty
-    def how_the_origin_failed(cls) -> str:
+    def failure_description(cls) -> str:
         return "ran out of candidates to try"
 
 
@@ -243,19 +252,19 @@ class NodeFailedByACondition(FailureDiagnosis):
     """
 
     @classmethod
-    def found_at(
-        cls, *, symptom: NodeRun, origin: NodeRun, diagnoser: FailureDiagnoser
+    def diagnose_if_failed_this_way(
+        cls, *, reported_run: NodeRun, origin_run: NodeRun, diagnoser: FailureDiagnoser
     ) -> Self | None:
-        if not diagnoser.failing_conditions_into(run=origin):
+        if not diagnoser.edges_from_conditions_that_ended(run=origin_run):
             return None
         return cls(
-            symptom=symptom,
-            origin=origin,
-            root_causes=diagnoser.causes_of_failing_condition(run=origin),
+            reported_run=reported_run,
+            origin_run=origin_run,
+            root_causes=diagnoser.find_causes_of_failing_condition(run=origin_run),
         )
 
     @classproperty
-    def how_the_origin_failed(cls) -> str:
+    def failure_description(cls) -> str:
         return "was failed by a condition reading another node"
 
 
@@ -267,15 +276,15 @@ class NodeFailedOnItsOwn(FailureDiagnosis):
     """
 
     @classmethod
-    def found_at(
-        cls, *, symptom: NodeRun, origin: NodeRun, diagnoser: FailureDiagnoser
+    def diagnose_if_failed_this_way(
+        cls, *, reported_run: NodeRun, origin_run: NodeRun, diagnoser: FailureDiagnoser
     ) -> Self:
         return cls(
-            symptom=symptom,
-            origin=origin,
-            root_causes=diagnoser.causes_of_observation(run=origin),
+            reported_run=reported_run,
+            origin_run=origin_run,
+            root_causes=diagnoser.find_causes_of_observation(run=origin_run),
         )
 
     @classproperty
-    def how_the_origin_failed(cls) -> str:
+    def failure_description(cls) -> str:
         return "failed on what it observed itself"

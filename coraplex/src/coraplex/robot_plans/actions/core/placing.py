@@ -136,18 +136,16 @@ class PlaceAction(
     def variable_poses(self) -> list[Pose]:
         return self._tool_goals.poses
 
-    def world_access(self) -> WorldAccess:
+    def compute_world_access(self) -> WorldAccess:
         """
-        Differs from :meth:`~cramph.node.StatechartNode.world_access` in also reading
-        where :attr:`graspable` is attached, since the grasp it releases is measured
-        there when it starts.
+        Differs from :meth:`~cramph.node.StatechartNode.compute_world_access` in also
+        reading where :attr:`graspable` is attached, since the grasp it releases is
+        measured there when it starts.
         """
         return (
             super()
-            .world_access()
-            .merged_with(
-                other=WorldAccess(read_frames=frozenset({self.graspable.root}))
-            )
+            .compute_world_access()
+            .union_with(other=WorldAccess(read_frames=frozenset({self.graspable.root})))
         )
 
     def on_start(self) -> None:

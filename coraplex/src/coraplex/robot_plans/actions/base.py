@@ -130,7 +130,7 @@ class Action(CompositeNode, ABC):
         ).controlled_root
 
     @classmethod
-    def enclosing(cls, *, node: StatechartNode) -> Action | None:
+    def enclosing_action_of(cls, *, node: StatechartNode) -> Action | None:
         """
         :param node: A node of a plan.
         :return: The action nearest above `node` in the plan tree, `node` itself if it

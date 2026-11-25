@@ -70,7 +70,7 @@ class StateHistoryItem:
         """
         return node.index < len(self.life_cycle_state.data)
 
-    def life_cycle_of(self, *, node: StatechartNode) -> LifeCycleValue:
+    def life_cycle_state_of(self, *, node: StatechartNode) -> LifeCycleValue:
         """
         :param node: A node of the statechart.
         :return: The life cycle state of `node` in this snapshot, NOT_STARTED if it had
@@ -80,7 +80,7 @@ class StateHistoryItem:
             return LifeCycleValue.NOT_STARTED
         return self.life_cycle_state[node]
 
-    def observation_of(self, *, node: StatechartNode) -> ObservationStateValue:
+    def observation_state_of(self, *, node: StatechartNode) -> ObservationStateValue:
         """
         :param node: A node of the statechart.
         :return: What `node` observed in this snapshot, UNKNOWN if it had not joined the
@@ -149,7 +149,7 @@ class NodeRun(RunTicks):
     The node that ran.
     """
 
-    number: int
+    sequence_number: int
     """
     Which run of :attr:`node` this is, counted from one.
     """
@@ -188,14 +188,6 @@ class NodeRun(RunTicks):
         """
         return self.start_tick <= other.start_tick and other.last_tick <= self.last_tick
 
-    @property
-    def variable_name(self) -> str:
-        """
-        :return: The name of the outcome variable standing for this run in a causal
-            graph, unique within its statechart.
-        """
-        return f"{self.node.name}[{self.node.index}]#{self.number}.outcome"
-
     def __str__(self) -> str:
         """
         :return: The type and name of the node, which run this is, its ticks and its
@@ -203,7 +195,7 @@ class NodeRun(RunTicks):
         """
         return (
             f"{type(self.node).__name__} '{self.node.name}' "
-            f"(run {self.number}, ticks {self.start_tick}-{self.end_tick}, "
+            f"(run {self.sequence_number}, ticks {self.start_tick}-{self.end_tick}, "
             f"{self.final_state.name})"
         )
 
@@ -372,14 +364,14 @@ class StateHistory:
             for history_item in self.items_recording(node=node)
         ]
 
-    def item_at(self, *, tick: int) -> StateHistoryItem:
+    def snapshot_at_tick(self, *, tick: int) -> StateHistoryItem:
         """
         :param tick: A tick the history covers.
         :return: The state at `tick`: the last snapshot taken at or before it.
         """
         return [item for item in self.items if item.tick_count <= tick][-1]
 
-    def last_observation_of(
+    def last_known_observation_of(
         self, *, node: StatechartNode, tick: int
     ) -> ObservationStateValue:
         """
@@ -392,7 +384,7 @@ class StateHistory:
             observation
             for item in self.items
             if item.tick_count <= tick
-            and (observation := item.observation_of(node=node))
+            and (observation := item.observation_state_of(node=node))
             is not ObservationStateValue.UNKNOWN
         ]
         return observed[-1] if observed else ObservationStateValue.UNKNOWN
@@ -438,7 +430,7 @@ class StateHistory:
                 runs.append(
                     NodeRun(
                         node=node,
-                        number=len(runs) + 1,
+                        sequence_number=len(runs) + 1,
                         start_tick=start_tick,
                         end_tick=item.tick_count,
                         final_state=previous_state,
@@ -455,7 +447,7 @@ class StateHistory:
                 runs.append(
                     NodeRun(
                         node=node,
-                        number=len(runs) + 1,
+                        sequence_number=len(runs) + 1,
                         start_tick=start_tick,
                         end_tick=item.tick_count,
                         final_state=state,
@@ -467,7 +459,7 @@ class StateHistory:
             runs.append(
                 NodeRun(
                     node=node,
-                    number=len(runs) + 1,
+                    sequence_number=len(runs) + 1,
                     start_tick=start_tick,
                     end_tick=None,
                     final_state=previous_state,

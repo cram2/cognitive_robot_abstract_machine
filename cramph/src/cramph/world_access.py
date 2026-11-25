@@ -25,22 +25,22 @@ class WorldAccess:
     The degrees of freedom and frames a node changes, holds and reads.
     """
 
-    moved: frozenset[DegreeOfFreedom] = frozenset()
+    moved_degrees_of_freedom: frozenset[DegreeOfFreedom] = frozenset()
     """
     The degrees of freedom the node moves somewhere.
     """
 
-    held: frozenset[DegreeOfFreedom] = frozenset()
+    held_degrees_of_freedom: frozenset[DegreeOfFreedom] = frozenset()
     """
     The degrees of freedom the node keeps where they were when it started.
     """
 
-    read: frozenset[DegreeOfFreedom] = frozenset()
+    read_degrees_of_freedom: frozenset[DegreeOfFreedom] = frozenset()
     """
     The degrees of freedom whose state decides what the node observes or aims for.
     """
 
-    reattached: frozenset[KinematicStructureEntity] = frozenset()
+    reparented_frames: frozenset[KinematicStructureEntity] = frozenset()
     """
     The frames the node attaches to a new parent.
     """
@@ -51,14 +51,14 @@ class WorldAccess:
     """
 
     @property
-    def driven(self) -> frozenset[DegreeOfFreedom]:
+    def moved_or_held_degrees_of_freedom(self) -> frozenset[DegreeOfFreedom]:
         """
         :return: The degrees of freedom the node moves or holds.
         """
-        return self.moved | self.held
+        return self.moved_degrees_of_freedom | self.held_degrees_of_freedom
 
     @staticmethod
-    def degrees_of_freedom_of(
+    def degrees_of_freedom_in_expression(
         *, expression: Scalar | None
     ) -> frozenset[DegreeOfFreedom]:
         """
@@ -73,26 +73,30 @@ class WorldAccess:
             if isinstance(variable, DegreeOfFreedomVariable)
         )
 
-    def merged_with(self, *, other: WorldAccess) -> WorldAccess:
+    def union_with(self, *, other: WorldAccess) -> WorldAccess:
         """
         :param other: More of what the same node does to the world.
         :return: An access holding what both hold.
         """
         return WorldAccess(
-            moved=self.moved | other.moved,
-            held=self.held | other.held,
-            read=self.read | other.read,
-            reattached=self.reattached | other.reattached,
+            moved_degrees_of_freedom=self.moved_degrees_of_freedom
+            | other.moved_degrees_of_freedom,
+            held_degrees_of_freedom=self.held_degrees_of_freedom
+            | other.held_degrees_of_freedom,
+            read_degrees_of_freedom=self.read_degrees_of_freedom
+            | other.read_degrees_of_freedom,
+            reparented_frames=self.reparented_frames | other.reparented_frames,
             read_frames=self.read_frames | other.read_frames,
         )
 
-    def count_moved_as_held(self) -> WorldAccess:
+    def treat_moved_as_held(self) -> WorldAccess:
         """
         :return: This access, with what it moves counted as held instead.
         """
         return WorldAccess(
-            held=self.held | self.moved,
-            read=self.read,
-            reattached=self.reattached,
+            held_degrees_of_freedom=self.held_degrees_of_freedom
+            | self.moved_degrees_of_freedom,
+            read_degrees_of_freedom=self.read_degrees_of_freedom,
+            reparented_frames=self.reparented_frames,
             read_frames=self.read_frames,
         )

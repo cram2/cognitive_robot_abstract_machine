@@ -13,13 +13,13 @@ from typing_extensions import Iterable
 
 from coraplex.robot_plans.actions.base import Action
 from cramph.causal_edges import (
-    CausalEdgeSource,
-    ChangesOfTheWorld,
+    CausalEdgeFinder,
+    WorldChanges,
     ContainmentEdges,
-    ControlEdges,
-    RunEdge,
-    WorldAccessIndex,
-    WorldEdges,
+    ConditionEdges,
+    CausalEdge,
+    WorldAccessOfNodes,
+    WorldStateEdges,
 )
 from cramph.node import StatechartNode
 from cramph.node_runs import StatechartRuns
@@ -37,19 +37,19 @@ class PlanConflictEdges(ConflictEdges):
     a goal ends below the action that holds it.
     """
 
-    def is_part_of_a_goal(self, *, node: StatechartNode) -> bool:
+    def belongs_to_a_goal(self, *, node: StatechartNode) -> bool:
         """
-        Differs from :meth:`ConflictEdges.is_part_of_a_goal` in that an action is never
+        Differs from :meth:`ConflictEdges.belongs_to_a_goal` in that an action is never
         part of a goal, even one that takes a goal pose.
         """
-        return not isinstance(node, Action) and super().is_part_of_a_goal(node=node)
+        return not isinstance(node, Action) and super().belongs_to_a_goal(node=node)
 
 
 # %% the causal graph of a plan
 
 
 @dataclass(kw_only=True)
-class NodeCausalGraph:
+class RunCausalGraph:
     """
     The causal graph whose vertices are the runs of a statechart's nodes, with the edges
     that say how the outcome of one run can decide that of another.
@@ -60,14 +60,14 @@ class NodeCausalGraph:
     The runs the vertices stand for.
     """
 
-    access: WorldAccessIndex
+    world_access_of_nodes: WorldAccessOfNodes
     """
     What each node that ran does to the world.
     """
 
-    edges: list[RunEdge]
+    edges: list[CausalEdge]
     """
-    Every edge found, those kept beside :attr:`graph` included.
+    Every edge found.
     """
 
     @classmethod
@@ -75,20 +75,20 @@ class NodeCausalGraph:
         cls,
         *,
         statechart: Statechart,
-        sources: Iterable[CausalEdgeSource] | None = None,
-    ) -> NodeCausalGraph:
+        sources: Iterable[CausalEdgeFinder] | None = None,
+    ) -> RunCausalGraph:
         """
         :param statechart: A statechart that ran, at least in part.
         :param sources: The sources of edges, every kind of edge if None.
         :return: Its causal graph.
         """
         runs = StatechartRuns(statechart=statechart)
-        access = WorldAccessIndex(runs=runs)
+        access = WorldAccessOfNodes(runs=runs)
         sources = (
             [
                 ContainmentEdges(),
-                ControlEdges(),
-                WorldEdges(),
+                ConditionEdges(),
+                WorldStateEdges(),
                 PlanConflictEdges(),
             ]
             if sources is None
@@ -97,18 +97,18 @@ class NodeCausalGraph:
         edges = [
             edge
             for source in sources
-            for edge in source.edges(runs=runs, access=access)
+            for edge in source.find_edges(runs=runs, access=access)
         ]
-        return cls(runs=runs, access=access, edges=edges)
+        return cls(runs=runs, world_access_of_nodes=access, edges=edges)
 
     @cached_property
-    def changes_of_the_world(self) -> ChangesOfTheWorld:
+    def world_changes(self) -> WorldChanges:
         """
         :return: The changes the ended runs made to the world.
         """
-        return ChangesOfTheWorld.from_runs(runs=self.runs, access=self.access)
+        return WorldChanges.from_runs(runs=self.runs, access=self.world_access_of_nodes)
 
-    def edges_into(self, *, run: NodeRun) -> list[RunEdge]:
+    def edges_into_run(self, *, run: NodeRun) -> list[CausalEdge]:
         """
         :param run: A run.
         :return: The edges whose effect is `run`.
@@ -126,12 +126,12 @@ class RootCause:
     started.
     """
 
-    run: NodeRun
+    causing_run: NodeRun
     """
     The run that caused the failure.
     """
 
-    chain: tuple[RunEdge, ...]
+    edges_to_origin: tuple[CausalEdge, ...]
     """
-    The edges from :attr:`run` to the run where the failure started, in order.
+    The edges from :attr:`causing_run` to the run where the failure started, in order.
     """

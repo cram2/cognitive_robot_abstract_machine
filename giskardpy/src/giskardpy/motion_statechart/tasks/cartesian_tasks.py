@@ -780,13 +780,13 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
     The pose of the link bound when this task starts.
     """
 
-    def world_access(self) -> WorldAccess:
+    def compute_world_access(self) -> WorldAccess:
         """
-        :return: What :meth:`~giskardpy.motion_statechart.graph_node.MotionStatechartNode.world_access`
-            returns, with what its constraints move counted as held, since they keep it
-            where it was.
+        :return: What :meth:`~giskardpy.motion_statechart.graph_node.MotionStatechartNode.compute_world_access`
+            returns, with what its constraints move counted as held, since they keep
+            it where it was.
         """
-        return super().world_access().count_moved_as_held()
+        return super().compute_world_access().treat_moved_as_held()
 
     def set_up(self) -> None:
         """

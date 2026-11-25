@@ -336,7 +336,7 @@ class PlanExecutor(Executor, ABC):
             )
         except CollisionViolatedError as violation:
             return PlanOutcome.failed_by(
-                failure=MotionViolatedCollisionAvoidance.in_world(
+                failure=MotionViolatedCollisionAvoidance.from_violation_in_world(
                     violation=violation, world=self.context.world
                 ),
                 cause=violation,

@@ -113,14 +113,16 @@ class MotionViolatedCollisionAvoidance(PlanFailure):
     The violation the motion reported, which names the body pairs that came too close.
     """
 
-    degrees_of_freedom_moving_the_bodies: frozenset[DegreeOfFreedom] = frozenset()
+    degrees_of_freedom_moving_colliding_bodies: frozenset[DegreeOfFreedom] = frozenset()
     """
     The degrees of freedom that moved one of the bodies that came too close relative to
     the root of the world, when the violation was reported; empty if not known.
     """
 
     @classmethod
-    def in_world(cls, *, violation: CollisionViolatedError, world: World) -> Self:
+    def from_violation_in_world(
+        cls, *, violation: CollisionViolatedError, world: World
+    ) -> Self:
         """
         :param violation: The violation a motion in `world` reported.
         :param world: The world the motion ran in.
@@ -137,7 +139,7 @@ class MotionViolatedCollisionAvoidance(PlanFailure):
         }
         return cls(
             violation=violation,
-            degrees_of_freedom_moving_the_bodies=frozenset(
+            degrees_of_freedom_moving_colliding_bodies=frozenset(
                 degree_of_freedom
                 for body in bodies
                 for connection in world.compute_chain_of_connections(world.root, body)

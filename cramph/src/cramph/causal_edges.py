@@ -27,7 +27,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 
 @dataclass(kw_only=True)
-class WorldAccessIndex:
+class WorldAccessOfNodes:
     """
     What each node that ran does to the world, as it declares it.
     """
@@ -38,13 +38,13 @@ class WorldAccessIndex:
     """
 
     @cached_property
-    def access_of_node(self) -> dict[StatechartNode, WorldAccess]:
+    def world_access_of_each_node(self) -> dict[StatechartNode, WorldAccess]:
         """
         :return: What each node that ran does to the world.
         """
         return {
-            node: node.world_access()
-            for node, runs in self.runs.runs_of_node.items()
+            node: node.compute_world_access()
+            for node, runs in self.runs.runs_by_node.items()
             if runs
         }
 
@@ -53,14 +53,14 @@ class WorldAccessIndex:
         :param node: A node of the statechart.
         :return: What it does to the world, nothing for a node that never ran.
         """
-        return self.access_of_node.get(node, WorldAccess())
+        return self.world_access_of_each_node.get(node, WorldAccess())
 
 
 # %% causal edges between runs
 
 
 @dataclass(frozen=True, kw_only=True)
-class RunEdge(ABC):
+class CausalEdge(ABC):
     """
     Says that the outcome of :attr:`effect` depends on the outcome of :attr:`cause`.
     """
@@ -76,13 +76,13 @@ class RunEdge(ABC):
     """
 
     @abstractmethod
-    def describe(self) -> str:
+    def describe_relation(self) -> str:
         """
         :return: How the cause acts on the effect, as the verb phrase between them.
         """
 
     @staticmethod
-    def names_of(
+    def join_sorted_names(
         *, entities: Iterable[DegreeOfFreedom | KinematicStructureEntity]
     ) -> str:
         """
@@ -92,18 +92,18 @@ class RunEdge(ABC):
 
 
 @dataclass(frozen=True, kw_only=True)
-class ContainmentEdge(RunEdge):
+class ContainmentEdge(CausalEdge):
     """
     The effect is a composite node whose outcome is made from that of its child, the
     cause.
     """
 
-    def describe(self) -> str:
+    def describe_relation(self) -> str:
         return "is part of"
 
 
 @dataclass(frozen=True, kw_only=True)
-class ControlEdge(RunEdge):
+class ConditionEdge(CausalEdge):
     """
     A transition condition of the effect reads the cause.
     """
@@ -113,12 +113,12 @@ class ControlEdge(RunEdge):
     The kind of the condition of the effect that reads the cause.
     """
 
-    def describe(self) -> str:
+    def describe_relation(self) -> str:
         return f"is read by the {self.transition_kind.name.lower()} condition of"
 
 
 @dataclass(frozen=True, kw_only=True)
-class WorldEdge(RunEdge):
+class WorldStateEdge(CausalEdge):
     """
     The cause was the last run to change degrees of freedom or frames the effect reads,
     before the effect started.
@@ -134,18 +134,22 @@ class WorldEdge(RunEdge):
     The frames the cause attached where the effect read them.
     """
 
-    def describe(self) -> str:
-        changed = self.names_of(entities=[*self.degrees_of_freedom, *self.frames])
+    def describe_relation(self) -> str:
+        changed = self.join_sorted_names(
+            entities=[*self.degrees_of_freedom, *self.frames]
+        )
         return f"left ({changed}) where they were read by"
 
 
-class CausalEdgeSource(ABC):
+class CausalEdgeFinder(ABC):
     """
     Finds one kind of causal edge between the runs of a statechart.
     """
 
     @abstractmethod
-    def edges(self, *, runs: StatechartRuns, access: WorldAccessIndex) -> list[RunEdge]:
+    def find_edges(
+        self, *, runs: StatechartRuns, access: WorldAccessOfNodes
+    ) -> list[CausalEdge]:
         """
         :param runs: The runs of the statechart.
         :param access: What each node that ran does to the world.
@@ -154,25 +158,29 @@ class CausalEdgeSource(ABC):
 
 
 @dataclass(kw_only=True)
-class ContainmentEdges(CausalEdgeSource):
+class ContainmentEdges(CausalEdgeFinder):
     """
     Each run of a child acts on the run of its parent that held it.
     """
 
-    def edges(self, *, runs: StatechartRuns, access: WorldAccessIndex) -> list[RunEdge]:
+    def find_edges(
+        self, *, runs: StatechartRuns, access: WorldAccessOfNodes
+    ) -> list[CausalEdge]:
         edges = []
         for run in runs.all_runs:
             parent = run.node.parent_node
             if parent is None:
                 continue
-            parent_run = runs.latest_run_started_by(node=parent, tick=run.start_tick)
+            parent_run = runs.latest_run_started_at_or_before(
+                node=parent, tick=run.start_tick
+            )
             if parent_run is not None:
                 edges.append(ContainmentEdge(cause=run, effect=parent_run))
         return edges
 
 
 @dataclass(kw_only=True)
-class ControlEdges(CausalEdgeSource):
+class ConditionEdges(CausalEdgeFinder):
     """
     Each run of a node is acted on by the runs of the other nodes its written conditions
     read, except the nodes it holds or is held by: for its start condition the runs that
@@ -180,15 +188,17 @@ class ControlEdges(CausalEdgeSource):
     ended.
     """
 
-    def edges(self, *, runs: StatechartRuns, access: WorldAccessIndex) -> list[RunEdge]:
+    def find_edges(
+        self, *, runs: StatechartRuns, access: WorldAccessOfNodes
+    ) -> list[CausalEdge]:
         edges = []
-        for node, node_runs in runs.runs_of_node.items():
+        for node, node_runs in runs.runs_by_node.items():
             for condition in node.conditions:
                 for read_node in set(condition.node_dependencies):
-                    if node.holds_or_is_held_by(other=read_node):
+                    if node.is_ancestor_or_descendant_of(other=read_node):
                         continue
                     for run in node_runs:
-                        read_run = runs.latest_run_started_by(
+                        read_run = runs.latest_run_started_at_or_before(
                             node=read_node,
                             tick=(
                                 run.start_tick
@@ -198,7 +208,7 @@ class ControlEdges(CausalEdgeSource):
                         )
                         if read_run is not None:
                             edges.append(
-                                ControlEdge(
+                                ConditionEdge(
                                     cause=read_run,
                                     effect=run,
                                     transition_kind=condition.kind,
@@ -208,30 +218,32 @@ class ControlEdges(CausalEdgeSource):
 
 
 @dataclass(kw_only=True)
-class WorldEdges(CausalEdgeSource):
+class WorldStateEdges(CausalEdgeFinder):
     """
     Each run reading a degree of freedom or frame is acted on by the last run that
     changed it and ended before the reading run started.
     """
 
-    def edges(self, *, runs: StatechartRuns, access: WorldAccessIndex) -> list[RunEdge]:
-        movers = ChangesOfTheWorld.from_runs(runs=runs, access=access)
+    def find_edges(
+        self, *, runs: StatechartRuns, access: WorldAccessOfNodes
+    ) -> list[CausalEdge]:
+        movers = WorldChanges.from_runs(runs=runs, access=access)
         edges = []
         for reader in runs.all_runs:
             reader_access = access[reader.node]
             left_by: dict[NodeRun, tuple[set, set]] = {}
-            for degree_of_freedom in reader_access.read:
-                last = movers.last_mover(
+            for degree_of_freedom in reader_access.read_degrees_of_freedom:
+                last = movers.last_run_that_moved(
                     degree_of_freedom_id=degree_of_freedom.id, reader=reader
                 )
                 if last is not None:
                     left_by.setdefault(last, (set(), set()))[0].add(degree_of_freedom)
             for frame in reader_access.read_frames:
-                last = movers.last_reattacher(frame=frame, reader=reader)
+                last = movers.last_run_that_reparented(frame=frame, reader=reader)
                 if last is not None:
                     left_by.setdefault(last, (set(), set()))[1].add(frame)
             edges.extend(
-                WorldEdge(
+                WorldStateEdge(
                     cause=mover,
                     effect=reader,
                     degrees_of_freedom=frozenset(degrees_of_freedom),
@@ -265,7 +277,7 @@ class WorldChange:
 
 
 @dataclass(kw_only=True)
-class ChangesOfTheWorld:
+class WorldChanges:
     """
     The changes the ended runs of a statechart made to the world.
     """
@@ -277,16 +289,16 @@ class ChangesOfTheWorld:
 
     @classmethod
     def from_runs(
-        cls, *, runs: StatechartRuns, access: WorldAccessIndex
-    ) -> ChangesOfTheWorld:
+        cls, *, runs: StatechartRuns, access: WorldAccessOfNodes
+    ) -> WorldChanges:
         """
         :return: The changes the ended runs of `runs` made.
         """
         changes = [
             WorldChange(
                 run=run,
-                degrees_of_freedom=list(access[run.node].moved),
-                frames=list(access[run.node].reattached),
+                degrees_of_freedom=list(access[run.node].moved_degrees_of_freedom),
+                frames=list(access[run.node].reparented_frames),
             )
             for run in runs.all_runs
             if run.end_tick is not None
@@ -299,14 +311,14 @@ class ChangesOfTheWorld:
             ]
         )
 
-    def last_mover(
+    def last_run_that_moved(
         self, *, degree_of_freedom_id: UUID, reader: NodeRun
     ) -> NodeRun | None:
         """
         :return: The last run unrelated to `reader` that moved the degree of freedom
             with `degree_of_freedom_id` and ended before `reader` started.
         """
-        return self.last_before(
+        return self.latest_unrelated_run_ended_before(
             changers=[
                 change.run
                 for change in self.changes
@@ -318,20 +330,22 @@ class ChangesOfTheWorld:
             reader=reader,
         )
 
-    def last_reattacher(
+    def last_run_that_reparented(
         self, *, frame: KinematicStructureEntity, reader: NodeRun
     ) -> NodeRun | None:
         """
         :return: The last run unrelated to `reader` that attached `frame` to a new
             parent and ended before `reader` started.
         """
-        return self.last_before(
+        return self.latest_unrelated_run_ended_before(
             changers=[change.run for change in self.changes if frame in change.frames],
             reader=reader,
         )
 
     @staticmethod
-    def last_before(*, changers: list[NodeRun], reader: NodeRun) -> NodeRun | None:
+    def latest_unrelated_run_ended_before(
+        *, changers: list[NodeRun], reader: NodeRun
+    ) -> NodeRun | None:
         """
         :return: The latest of `changers` unrelated to `reader` that ended before it
             started, None if there is none.
@@ -340,7 +354,7 @@ class ChangesOfTheWorld:
             changer
             for changer in changers
             if changer.end_tick <= reader.start_tick
-            and not changer.node.holds_or_is_held_by(other=reader.node)
+            and not changer.node.is_ancestor_or_descendant_of(other=reader.node)
         ]
         if not earlier:
             return None

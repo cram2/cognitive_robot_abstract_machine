@@ -8,10 +8,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import singledispatchmethod
 
-from coraplex.plans.failure_diagnosis.causal_graph import NodeCausalGraph, RootCause
+from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph, RootCause
 from coraplex.plans.failure_diagnosis.counterfactual import (
     StallCounterfactual,
-    try_stalled_task_freed,
+    retry_task_with_chain_from_world_root,
 )
 from coraplex.plans.failure_diagnosis.exceptions import (
     FailureDiagnosis,
@@ -31,7 +31,7 @@ from coraplex.plans.underspecified import (
     FailedTrial,
     UnderspecifiedChildChooser,
 )
-from cramph.causal_edges import ControlEdge, RunEdge, WorldEdge
+from cramph.causal_edges import ConditionEdge, CausalEdge, WorldStateEdge
 from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.data_types import TransitionKind
 from cramph.node import StatechartNode
@@ -51,12 +51,12 @@ class FailureDiagnoser:
     Diagnoses failures of a statechart from its causal graph.
     """
 
-    causal_graph: NodeCausalGraph
+    causal_graph: RunCausalGraph
     """
     The causal graph of the statechart.
     """
 
-    trial: ActionTrial | None = None
+    action_trial: ActionTrial | None = None
     """
     The trial the plan tries its candidates in, which also tries the counterfactuals of
     a diagnosis; None if the plan has none.
@@ -111,8 +111,8 @@ class FailureDiagnoser:
             None,
         )
         return cls(
-            causal_graph=NodeCausalGraph.from_statechart(statechart=statechart),
-            trial=trial,
+            causal_graph=RunCausalGraph.from_statechart(statechart=statechart),
+            action_trial=trial,
         )
 
     @property
@@ -135,11 +135,11 @@ class FailureDiagnoser:
         self.stalled_nodes = []
         self.colliding_nodes = []
         self.colliding_degrees_of_freedom = frozenset()
-        return self.diagnoses_reported_by(failure)
+        return self.diagnose_reported_runs(failure)
 
     @singledispatchmethod
     @called_positionally
-    def diagnoses_reported_by(
+    def diagnose_reported_runs(
         self, failure: Exception | None
     ) -> list[FailureDiagnosis]:
         """
@@ -147,9 +147,11 @@ class FailureDiagnoser:
             exception.
         :return: One diagnosis per run the failure is reported for.
         """
-        return [self.diagnose_run(symptom=run) for run in self.failed_leaves()]
+        return [
+            self.diagnose_run(reported_run=run) for run in self.innermost_failed_runs()
+        ]
 
-    @diagnoses_reported_by.register
+    @diagnose_reported_runs.register
     @called_positionally
     def _(self, failure: MotionMadeNoProgress) -> list[FailureDiagnosis]:
         """
@@ -160,45 +162,51 @@ class FailureDiagnoser:
             failure.no_progress.progress_monitor.monitored_node
         ]
         return [
-            self.diagnose_run(symptom=self.runs.latest_run(node=node))
+            self.diagnose_run(reported_run=self.runs.latest_run_of_node(node=node))
             for node in self.stalled_nodes
         ]
 
-    @diagnoses_reported_by.register
+    @diagnose_reported_runs.register
     @called_positionally
     def _(self, failure: MotionViolatedCollisionAvoidance) -> list[FailureDiagnosis]:
         """
         :return: One diagnosis per run moving a body the failure reports as too close
             to another.
         """
-        self.colliding_degrees_of_freedom = failure.degrees_of_freedom_moving_the_bodies
+        self.colliding_degrees_of_freedom = (
+            failure.degrees_of_freedom_moving_colliding_bodies
+        )
         self.colliding_nodes = [
             run.node
-            for run in self.runs_moving(
+            for run in self.active_runs_moving(
                 degrees_of_freedom=self.colliding_degrees_of_freedom
             )
         ]
         return [
-            self.diagnose_run(symptom=self.runs.latest_run(node=node))
+            self.diagnose_run(reported_run=self.runs.latest_run_of_node(node=node))
             for node in self.colliding_nodes
         ]
 
-    @diagnoses_reported_by.register
+    @diagnose_reported_runs.register
     @called_positionally
     def _(self, failure: EmptyUnderspecified) -> list[FailureDiagnosis]:
         """
         :return: The diagnosis of the statement that ran out of candidates.
         """
-        return [self.diagnose_run(symptom=self.runs.latest_run(node=failure.node))]
+        return [
+            self.diagnose_run(
+                reported_run=self.runs.latest_run_of_node(node=failure.node)
+            )
+        ]
 
     def diagnose_node(self, *, node: StatechartNode) -> FailureDiagnosis:
         """
         :param node: A node whose latest run failed.
         :return: Why it failed.
         """
-        return self.diagnose_run(symptom=self.runs.latest_run(node=node))
+        return self.diagnose_run(reported_run=self.runs.latest_run_of_node(node=node))
 
-    def failed_leaves(self) -> list[NodeRun]:
+    def innermost_failed_runs(self) -> list[NodeRun]:
         """
         :return: The failed runs no failed run of a node they hold explains and no later
             run of their node replaced, the earliest first.
@@ -206,14 +214,14 @@ class FailureDiagnoser:
         failed = [
             run
             for run in self.runs.all_runs
-            if run.failed and run == self.runs.latest_run(node=run.node)
+            if run.failed and run == self.runs.latest_run_of_node(node=run.node)
         ]
         return sorted(
-            (run for run in failed if not self.failed_runs_inside(run=run)),
+            (run for run in failed if not self.failed_runs_below(run=run)),
             key=lambda run: run.last_tick,
         )
 
-    def failed_runs_inside(self, *, run: NodeRun) -> list[NodeRun]:
+    def failed_runs_below(self, *, run: NodeRun) -> list[NodeRun]:
         """
         :param run: A run.
         :return: The failed runs of nodes below `run`'s node within it, the earliest
@@ -231,7 +239,7 @@ class FailureDiagnoser:
             key=lambda other: other.last_tick,
         )
 
-    def runs_moving(
+    def active_runs_moving(
         self, *, degrees_of_freedom: frozenset[DegreeOfFreedom]
     ) -> list[NodeRun]:
         """
@@ -243,19 +251,24 @@ class FailureDiagnoser:
         active = [
             run
             for run in self.runs.all_runs
-            if run.last_tick >= self.runs.last_tick
-            and self.causal_graph.access[run.node].moved
+            if run.last_tick >= self.runs.newest_tick
+            and self.causal_graph.world_access_of_nodes[
+                run.node
+            ].moved_degrees_of_freedom
         ]
         moving = [
             run
             for run in active
-            if self.causal_graph.access[run.node].moved & degrees_of_freedom
+            if self.causal_graph.world_access_of_nodes[
+                run.node
+            ].moved_degrees_of_freedom
+            & degrees_of_freedom
         ]
         return moving or active
 
     # %% from the report to the cause
 
-    def origin_of(self, *, run: NodeRun) -> NodeRun:
+    def failure_origin_of(self, *, run: NodeRun) -> NodeRun:
         """
         :param run: A run the failure is reported for.
         :return: The run where the failure started: the earliest failed run below it
@@ -263,27 +276,29 @@ class FailureDiagnoser:
         """
         if isinstance(run.node, StatementNode):
             return run
-        inside = self.failed_runs_inside(run=run)
+        inside = self.failed_runs_below(run=run)
         if not inside:
             return run
-        return self.origin_of(run=inside[0])
+        return self.failure_origin_of(run=inside[0])
 
-    def diagnose_run(self, *, symptom: NodeRun) -> FailureDiagnosis:
+    def diagnose_run(self, *, reported_run: NodeRun) -> FailureDiagnosis:
         """
-        :param symptom: A run the failure is reported for.
+        :param reported_run: A run the failure is reported for.
         :return: Why it failed, by the first of :attr:`diagnosis_kinds` its origin
             failed in.
         """
-        origin = self.origin_of(run=symptom)
+        origin_run = self.failure_origin_of(run=reported_run)
         for kind in self.diagnosis_kinds:
-            diagnosis = kind.found_at(symptom=symptom, origin=origin, diagnoser=self)
+            diagnosis = kind.diagnose_if_failed_this_way(
+                reported_run=reported_run, origin_run=origin_run, diagnoser=self
+            )
             if diagnosis is not None:
                 return diagnosis
-        return NodeFailedOnItsOwn.found_at(
-            symptom=symptom, origin=origin, diagnoser=self
+        return NodeFailedOnItsOwn.diagnose_if_failed_this_way(
+            reported_run=reported_run, origin_run=origin_run, diagnoser=self
         )
 
-    def failing_conditions_into(self, *, run: NodeRun) -> list[ControlEdge]:
+    def edges_from_conditions_that_ended(self, *, run: NodeRun) -> list[ConditionEdge]:
         """
         :param run: A run.
         :return: The control edges into `run` from its fail and interrupt conditions
@@ -295,19 +310,19 @@ class FailureDiagnoser:
             condition.kind
             for condition in run.node.conditions
             if condition.kind in (TransitionKind.FAIL, TransitionKind.INTERRUPT)
-            and condition.held_at(
+            and condition.was_true_at_tick(
                 history=self.runs.statechart.state_history, tick=run.end_tick
             )
         }
         return [
             edge
-            for edge in self.causal_graph.edges_into(run=run)
-            if isinstance(edge, ControlEdge) and edge.transition_kind in fired
+            for edge in self.causal_graph.edges_into_run(run=run)
+            if isinstance(edge, ConditionEdge) and edge.transition_kind in fired
         ]
 
     # %% the causes of each kind of failure
 
-    def causes_of_stall(
+    def find_causes_of_stall(
         self, *, stalled: NodeRun
     ) -> tuple[list[RootCause], StallCounterfactual | None]:
         """
@@ -320,71 +335,89 @@ class FailureDiagnoser:
         :return: The runs that made it stall, the most likely first, and what trying it
             free of what an earlier run left showed, None if that was not asked.
         """
-        edges = self.causal_graph.edges_into(run=stalled)
-        access = self.causal_graph.access[stalled.node]
+        edges = self.causal_graph.edges_into_run(run=stalled)
+        access = self.causal_graph.world_access_of_nodes[stalled.node]
         conflicts = [
             edge
             for edge in edges
-            if isinstance(edge, ConflictEdge) and edge.degrees_of_freedom & access.moved
+            if isinstance(edge, ConflictEdge)
+            and edge.degrees_of_freedom & access.moved_degrees_of_freedom
         ]
         if conflicts:
             return [
-                RootCause(run=edge.cause, chain=(edge,)) for edge in conflicts
+                RootCause(causing_run=edge.cause, edges_to_origin=(edge,))
+                for edge in conflicts
             ], None
-        unmovable = access.read - access.driven
+        unmovable = (
+            access.read_degrees_of_freedom - access.moved_or_held_degrees_of_freedom
+        )
         left_by_earlier = [
-            RootCause(run=edge.cause, chain=(edge,))
-            for edge in self.latest_first(edges=edges)
-            if isinstance(edge, WorldEdge) and edge.degrees_of_freedom & unmovable
+            RootCause(causing_run=edge.cause, edges_to_origin=(edge,))
+            for edge in self.sorted_by_latest_cause(edges=edges)
+            if isinstance(edge, WorldStateEdge) and edge.degrees_of_freedom & unmovable
         ]
         if not left_by_earlier:
             return [], None
-        counterfactual = try_stalled_task_freed(task=stalled.node, trial=self.trial)
+        counterfactual = retry_task_with_chain_from_world_root(
+            task=stalled.node, trial=self.action_trial
+        )
         if counterfactual == StallCounterfactual.STILL_STALLED:
             return [], counterfactual
         return left_by_earlier, counterfactual
 
-    def causes_of_collision(self, *, colliding: NodeRun) -> list[RootCause]:
+    def find_causes_of_collision(self, *, colliding: NodeRun) -> list[RootCause]:
         """
         :param colliding: A run moving a body that came too close to another.
         :return: The last runs before it that moved a degree of freedom moving one of
             the bodies that came too close, among those it does not drive itself.
         """
-        return self.plan_runs_leaving(
+        return self.last_plan_runs_moving(
             degrees_of_freedom=self.colliding_degrees_of_freedom
-            - self.causal_graph.access[colliding.node].driven,
+            - self.causal_graph.world_access_of_nodes[
+                colliding.node
+            ].moved_or_held_degrees_of_freedom,
             statement=colliding,
         )
 
-    def causes_of_observation(self, *, run: NodeRun) -> list[RootCause]:
+    def find_causes_of_observation(self, *, run: NodeRun) -> list[RootCause]:
         """
         :param run: A run that failed on what it observed or aimed for.
         :return: The runs that left what it read where it was, the latest first.
         """
         return [
-            RootCause(run=edge.cause, chain=(edge,))
-            for edge in self.latest_first(edges=self.causal_graph.edges_into(run=run))
-            if isinstance(edge, WorldEdge)
+            RootCause(causing_run=edge.cause, edges_to_origin=(edge,))
+            for edge in self.sorted_by_latest_cause(
+                edges=self.causal_graph.edges_into_run(run=run)
+            )
+            if isinstance(edge, WorldStateEdge)
         ]
 
-    def causes_of_failing_condition(self, *, run: NodeRun) -> list[RootCause]:
+    def find_causes_of_failing_condition(self, *, run: NodeRun) -> list[RootCause]:
         """
         :param run: A run a fail or interrupt condition ended.
         :return: The runs that caused what the condition read, through the nodes it
             read; a read node that nothing else explains is the cause itself.
         """
         root_causes = []
-        for edge in self.failing_conditions_into(run=run):
-            upstream = self.causes_of_observation(run=edge.cause)
+        for edge in self.edges_from_conditions_that_ended(run=run):
+            upstream = self.find_causes_of_observation(run=edge.cause)
             if not upstream:
-                root_causes.append(RootCause(run=edge.cause, chain=(edge,)))
+                root_causes.append(
+                    RootCause(causing_run=edge.cause, edges_to_origin=(edge,))
+                )
                 continue
             root_causes.extend(
-                RootCause(run=root.run, chain=(*root.chain, edge)) for root in upstream
+                RootCause(
+                    causing_run=root.causing_run,
+                    edges_to_origin=(*root.edges_to_origin, edge),
+                )
+                for root in upstream
             )
         return root_causes
 
-    def causes_shared_by_candidates(self, *, statement: NodeRun) -> list[RootCause]:
+    def find_causes_shared_by_candidates(
+        self, *, statement: NodeRun
+    ) -> list[RootCause]:
         """
         :param statement: A run of a statement that ran out of candidates.
         :return: The causes every failed candidate shares, whether it failed in the
@@ -392,43 +425,49 @@ class FailureDiagnoser:
         """
         per_candidate = [
             *(
-                self.diagnose_run(symptom=child).root_causes
+                self.diagnose_run(reported_run=child).root_causes
                 for child in self.runs.all_runs
                 if child.failed
                 and child.node.parent_node is statement.node
                 and statement.contains(other=child)
             ),
             *(
-                self.causes_of_trial(failed_trial=failed_trial, statement=statement)
-                for failed_trial in self.trials_of(statement=statement)
+                self.find_causes_of_trial(
+                    failed_trial=failed_trial, statement=statement
+                )
+                for failed_trial in self.failed_trials_during(statement=statement)
             ),
         ]
         nodes_per_candidate = [
-            {root.run.node for root in roots} for roots in per_candidate
+            {root.causing_run.node for root in roots} for roots in per_candidate
         ]
         shared = (
             set.intersection(*nodes_per_candidate) if nodes_per_candidate else set()
         )
         roots = [root for roots in per_candidate for root in roots]
-        kept = [root for root in roots if root.run.node in shared] if shared else roots
-        return list({root.run: root for root in kept}.values())
+        kept = (
+            [root for root in roots if root.causing_run.node in shared]
+            if shared
+            else roots
+        )
+        return list({root.causing_run: root for root in kept}.values())
 
-    def trials_of(self, *, statement: NodeRun) -> list[FailedTrial]:
+    def failed_trials_during(self, *, statement: NodeRun) -> list[FailedTrial]:
         """
         :param statement: A run of a statement.
         :return: The failed trials that tried candidates of the statement during this
             run.
         """
-        if self.trial is None:
+        if self.action_trial is None:
             return []
         return [
             failed_trial
-            for failed_trial in self.trial.failed_trials
-            if statement.node in failed_trial.tried
-            and statement.start_tick <= failed_trial.plan_tick <= statement.last_tick
+            for failed_trial in self.action_trial.failed_trials
+            if statement.node in failed_trial.tried_statements
+            and statement.start_tick <= failed_trial.tick_in_plan <= statement.last_tick
         ]
 
-    def causes_of_trial(
+    def find_causes_of_trial(
         self, *, failed_trial: FailedTrial, statement: NodeRun
     ) -> list[RootCause]:
         """
@@ -442,7 +481,7 @@ class FailureDiagnoser:
             of the trial no node of its own explains.
         """
         trial_diagnoser = FailureDiagnoser(
-            causal_graph=NodeCausalGraph.from_statechart(
+            causal_graph=RunCausalGraph.from_statechart(
                 statechart=failed_trial.statechart
             )
         )
@@ -450,16 +489,20 @@ class FailureDiagnoser:
         for diagnosis in trial_diagnoser.diagnose_failure(failure=failed_trial.failure):
             if diagnosis.root_causes:
                 continue
-            access = trial_diagnoser.causal_graph.access[diagnosis.origin.node]
+            access = trial_diagnoser.causal_graph.world_access_of_nodes[
+                diagnosis.origin_run.node
+            ]
             root_causes.extend(
-                self.plan_runs_leaving(
-                    degrees_of_freedom=diagnosis.inputs_from_before(access=access),
+                self.last_plan_runs_moving(
+                    degrees_of_freedom=diagnosis.degrees_of_freedom_left_by_earlier_nodes(
+                        access=access
+                    ),
                     statement=statement,
                 )
             )
         return root_causes
 
-    def plan_runs_leaving(
+    def last_plan_runs_moving(
         self, *, degrees_of_freedom: frozenset[DegreeOfFreedom], statement: NodeRun
     ) -> list[RootCause]:
         """
@@ -468,19 +511,19 @@ class FailureDiagnoser:
         :return: The last runs of the plan before `statement` that moved them, matched
             by their ids.
         """
-        changes = self.causal_graph.changes_of_the_world
+        changes = self.causal_graph.world_changes
         left_by: dict[NodeRun, set[DegreeOfFreedom]] = {}
         for degree_of_freedom in degrees_of_freedom:
-            mover = changes.last_mover(
+            mover = changes.last_run_that_moved(
                 degree_of_freedom_id=degree_of_freedom.id, reader=statement
             )
             if mover is not None:
                 left_by.setdefault(mover, set()).add(degree_of_freedom)
         return [
             RootCause(
-                run=mover,
-                chain=(
-                    WorldEdge(
+                causing_run=mover,
+                edges_to_origin=(
+                    WorldStateEdge(
                         cause=mover,
                         effect=statement,
                         degrees_of_freedom=frozenset(moved),
@@ -491,7 +534,7 @@ class FailureDiagnoser:
         ]
 
     @staticmethod
-    def latest_first(*, edges: list[RunEdge]) -> list[RunEdge]:
+    def sorted_by_latest_cause(*, edges: list[CausalEdge]) -> list[CausalEdge]:
         """
         :return: `edges`, those from the latest cause first.
         """

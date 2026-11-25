@@ -277,7 +277,7 @@ class TransitionCondition(SubclassJSONSerializer):
             if isinstance(variable, ConditionVariable)
         ]
 
-    def held_at(self, *, history: StateHistory, tick: int) -> bool:
+    def was_true_at_tick(self, *, history: StateHistory, tick: int) -> bool:
         """
         :param history: The history of the statechart the condition's nodes run in.
         :param tick: A tick the history covers.
@@ -289,7 +289,7 @@ class TransitionCondition(SubclassJSONSerializer):
         value = self.expression.substitute(
             old_variables=variables,
             new_variables=[
-                Scalar(float(variable.truth_value_at(history=history, tick=tick)))
+                Scalar(float(variable.truth_value_at_tick(history=history, tick=tick)))
                 for variable in variables
             ],
         )
@@ -608,7 +608,7 @@ class DerivedConditionVariable(ConditionVariable, ABC):
         """
 
     @abstractmethod
-    def truth_value_at(
+    def truth_value_at_tick(
         self, *, history: StateHistory, tick: int
     ) -> ObservationStateValue:
         """
@@ -706,11 +706,11 @@ class LifeCyclePredicateVariable(DerivedConditionVariable):
     def for_node(self, *, node: StatechartNode) -> Self:
         return node._life_cycle_predicate(predicate=self.predicate)
 
-    def truth_value_at(
+    def truth_value_at_tick(
         self, *, history: StateHistory, tick: int
     ) -> ObservationStateValue:
         return self.predicate.truth_value(
-            life_cycle_value=history.item_at(tick=tick).life_cycle_of(
+            life_cycle_value=history.snapshot_at_tick(tick=tick).life_cycle_state_of(
                 node=self.statechart_node
             )
         )
@@ -767,16 +767,16 @@ class ObservationPredicateVariable(DerivedConditionVariable):
     def for_node(self, *, node: StatechartNode) -> Self:
         return node._observation_predicate(predicate=self.predicate)
 
-    def truth_value_at(
+    def truth_value_at_tick(
         self, *, history: StateHistory, tick: int
     ) -> ObservationStateValue:
         match self.predicate.reading:
             case ObservationReading.CURRENT:
-                observation = history.item_at(tick=tick).observation_of(
+                observation = history.snapshot_at_tick(tick=tick).observation_state_of(
                     node=self.statechart_node
                 )
             case ObservationReading.LAST:
-                observation = history.last_observation_of(
+                observation = history.last_known_observation_of(
                     node=self.statechart_node, tick=tick
                 )
         return self.predicate.truth_value(observation=observation)
@@ -1146,7 +1146,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             ancestor = ancestor.parent_node
         return ancestors
 
-    def holds_or_is_held_by(self, *, other: StatechartNode) -> bool:
+    def is_ancestor_or_descendant_of(self, *, other: StatechartNode) -> bool:
         """
         :param other: Another node.
         :return: Whether this node is `other`, holds it or is held by it.
@@ -1661,13 +1661,13 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return NodeArtifacts()
 
-    def world_access(self) -> WorldAccess:
+    def compute_world_access(self) -> WorldAccess:
         """
         :return: What this built node changes and reads in the world: here, the degrees
             of freedom its observation reads.
         """
         return WorldAccess(
-            read=WorldAccess.degrees_of_freedom_of(
+            read_degrees_of_freedom=WorldAccess.degrees_of_freedom_in_expression(
                 expression=self.artifacts.observation
             )
         )

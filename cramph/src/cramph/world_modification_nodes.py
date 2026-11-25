@@ -43,13 +43,15 @@ class MoveBranch(SucceedsOnObservingTrue, StatechartNode):
     def on_start(self) -> None:
         self.context.world.move_branch(self.branch_root, self.new_parent)
 
-    def world_access(self) -> WorldAccess:
+    def compute_world_access(self) -> WorldAccess:
         """
-        :return: What :meth:`~cramph.node.StatechartNode.world_access` returns, with
-            :attr:`branch_root` re-attached.
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with :attr:`branch_root` attached to a new parent.
         """
         return (
             super()
-            .world_access()
-            .merged_with(other=WorldAccess(reattached=frozenset({self.branch_root})))
+            .compute_world_access()
+            .union_with(
+                other=WorldAccess(reparented_frames=frozenset({self.branch_root}))
+            )
         )

@@ -16,7 +16,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
     HoldPose,
 )
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import run_plan
 
@@ -75,7 +75,7 @@ def test_setting_the_odometry_moves_the_degrees_of_freedom_of_the_drive(
     robot, plan, milk = ran_pick_up
     set_odometry = first_of(plan, SetOdometry)
 
-    assert set_odometry.world_access().moved == frozenset(
+    assert set_odometry.compute_world_access().moved_degrees_of_freedom == frozenset(
         set_odometry.odom_connection.dofs
     )
 
@@ -87,10 +87,10 @@ def test_holding_the_base_holds_and_does_not_move_its_degrees_of_freedom(
     Holding the base holds its degrees of freedom and moves none of them.
     """
     robot, plan, milk = ran_pick_up
-    access = first_of(plan, HoldPose).world_access()
+    access = first_of(plan, HoldPose).compute_world_access()
 
-    assert access.moved == frozenset()
-    assert access.held >= planar_pose_of_the_base(robot)
+    assert access.moved_degrees_of_freedom == frozenset()
+    assert access.held_degrees_of_freedom >= planar_pose_of_the_base(robot)
 
 
 def test_a_goal_bound_relative_to_the_robot_reads_where_the_base_stands(
@@ -100,10 +100,12 @@ def test_a_goal_bound_relative_to_the_robot_reads_where_the_base_stands(
     A goal bound relative to the robot reads the degrees of freedom that place the base.
     """
     robot, plan, milk = ran_pick_up
-    access = first_of(first_of(plan, ReachAction), CartesianPosition).world_access()
+    access = first_of(
+        first_of(plan, ReachAction), CartesianPosition
+    ).compute_world_access()
 
-    assert access.read >= planar_pose_of_the_base(robot)
-    assert not access.moved & planar_pose_of_the_base(robot)
+    assert access.read_degrees_of_freedom >= planar_pose_of_the_base(robot)
+    assert not access.moved_degrees_of_freedom & planar_pose_of_the_base(robot)
 
 
 def test_moving_a_branch_reattaches_its_root(ran_pick_up) -> None:
@@ -113,4 +115,6 @@ def test_moving_a_branch_reattaches_its_root(ran_pick_up) -> None:
     robot, plan, milk = ran_pick_up
     move_branch = first_of(plan, MoveBranch)
 
-    assert move_branch.world_access().reattached == frozenset({move_branch.branch_root})
+    assert move_branch.compute_world_access().reparented_frames == frozenset(
+        {move_branch.branch_root}
+    )

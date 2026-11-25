@@ -31,7 +31,7 @@ class StallCounterfactual(StrEnum):
 
 
 @dataclass(kw_only=True)
-class TaskFreedOfItsInputs(SubtreeRebuild):
+class TaskWithChainFromWorldRoot(SubtreeRebuild):
     """
     Rebuilds a stalled task alone onto a copy of the world, with its kinematic chain
     reaching down to the root of that world, so it may move every degree of freedom
@@ -57,7 +57,7 @@ class TaskFreedOfItsInputs(SubtreeRebuild):
         return f"{self.root.name} free to move its whole chain from the world root"
 
 
-def try_stalled_task_freed(
+def retry_task_with_chain_from_world_root(
     *, task: StatechartNode, trial: ActionTrial | None
 ) -> StallCounterfactual:
     """
@@ -67,6 +67,6 @@ def try_stalled_task_freed(
     """
     if trial is None or not isinstance(task, HasKinematicChainParameter):
         return StallCounterfactual.NOT_TRIED
-    if trial.succeeds(rebuild=TaskFreedOfItsInputs(root=task, candidates={})):
+    if trial.succeeds(rebuild=TaskWithChainFromWorldRoot(root=task, candidates={})):
         return StallCounterfactual.REACHED
     return StallCounterfactual.STILL_STALLED

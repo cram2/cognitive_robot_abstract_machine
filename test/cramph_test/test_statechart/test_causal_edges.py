@@ -8,9 +8,9 @@ from __future__ import annotations
 from cramph.causal_edges import (
     ContainmentEdge,
     ContainmentEdges,
-    ControlEdge,
-    ControlEdges,
-    WorldAccessIndex,
+    ConditionEdge,
+    ConditionEdges,
+    WorldAccessOfNodes,
 )
 from cramph.composites import Sequence
 from cramph.data_types import LifeCycleValue, TransitionKind
@@ -53,8 +53,8 @@ def test_a_node_that_ran_once_has_one_run_ending_in_its_final_state(
 
     runs = ran_to_its_end(executor=statechart_executor, statechart=statechart)
 
-    [run] = runs.runs_of_node[step]
-    assert run.number == 1
+    [run] = runs.runs_by_node[step]
+    assert run.sequence_number == 1
     assert run.final_state == LifeCycleValue.SUCCEEDED
     assert run.end_tick is not None
     assert run.start_tick < run.end_tick
@@ -76,11 +76,13 @@ def test_the_run_of_a_child_is_part_of_the_run_of_its_parent(
     statechart.add_node(node=EndStatechart.when_true(node=sequence))
 
     runs = ran_to_its_end(executor=statechart_executor, statechart=statechart)
-    edges = ContainmentEdges().edges(runs=runs, access=WorldAccessIndex(runs=runs))
+    edges = ContainmentEdges().find_edges(
+        runs=runs, access=WorldAccessOfNodes(runs=runs)
+    )
 
-    [sequence_run] = runs.runs_of_node[sequence]
+    [sequence_run] = runs.runs_by_node[sequence]
     assert {
-        ContainmentEdge(cause=runs.latest_run(node=child), effect=sequence_run)
+        ContainmentEdge(cause=runs.latest_run_of_node(node=child), effect=sequence_run)
         for child in (first, second)
     } <= set(edges)
 
@@ -99,12 +101,12 @@ def test_a_start_condition_reading_another_node_is_a_control_edge(
     statechart.add_node(node=EndStatechart.when_true(node=started))
 
     runs = ran_to_its_end(executor=statechart_executor, statechart=statechart)
-    edges = ControlEdges().edges(runs=runs, access=WorldAccessIndex(runs=runs))
+    edges = ConditionEdges().find_edges(runs=runs, access=WorldAccessOfNodes(runs=runs))
 
     assert (
-        ControlEdge(
-            cause=runs.latest_run(node=trigger),
-            effect=runs.latest_run(node=started),
+        ConditionEdge(
+            cause=runs.latest_run_of_node(node=trigger),
+            effect=runs.latest_run_of_node(node=started),
             transition_kind=TransitionKind.START,
         )
         in edges
@@ -139,12 +141,12 @@ def test_an_interrupt_condition_reads_the_run_that_had_started_when_its_node_end
     A node interrupted by a node that started after it is acted on by that node's run.
     """
     runs, waiting, later = interrupted_by_a_later_node(executor=statechart_executor)
-    edges = ControlEdges().edges(runs=runs, access=WorldAccessIndex(runs=runs))
+    edges = ConditionEdges().find_edges(runs=runs, access=WorldAccessOfNodes(runs=runs))
 
     assert (
-        ControlEdge(
-            cause=runs.latest_run(node=later),
-            effect=runs.latest_run(node=waiting),
+        ConditionEdge(
+            cause=runs.latest_run_of_node(node=later),
+            effect=runs.latest_run_of_node(node=waiting),
             transition_kind=TransitionKind.INTERRUPT,
         )
         in edges
@@ -164,11 +166,11 @@ def test_a_condition_held_only_at_the_ticks_its_nodes_made_it_true(
         for condition in waiting.conditions
         if condition.kind is TransitionKind.INTERRUPT
     ]
-    run = runs.latest_run(node=waiting)
+    run = runs.latest_run_of_node(node=waiting)
     history = runs.statechart.state_history
 
     assert [
-        condition.held_at(history=history, tick=tick)
+        condition.was_true_at_tick(history=history, tick=tick)
         for tick in (run.start_tick, run.end_tick)
     ] == [False, True]
 
@@ -181,7 +183,7 @@ def test_runs_that_only_touch_at_one_tick_do_not_overlap() -> None:
     earlier, later = (
         NodeRun(
             node=node,
-            number=number,
+            sequence_number=number,
             start_tick=start_tick,
             end_tick=end_tick,
             final_state=LifeCycleValue.SUCCEEDED,
@@ -207,7 +209,7 @@ def test_a_node_holds_its_children_and_is_held_by_its_parent(
     statechart = Statechart(context=statechart_executor.context)
     statechart.add_node(node=sequence)
 
-    assert first.holds_or_is_held_by(other=first)
-    assert sequence.holds_or_is_held_by(other=first)
-    assert first.holds_or_is_held_by(other=sequence)
-    assert not first.holds_or_is_held_by(other=second)
+    assert first.is_ancestor_or_descendant_of(other=first)
+    assert sequence.is_ancestor_or_descendant_of(other=first)
+    assert first.is_ancestor_or_descendant_of(other=sequence)
+    assert not first.is_ancestor_or_descendant_of(other=second)

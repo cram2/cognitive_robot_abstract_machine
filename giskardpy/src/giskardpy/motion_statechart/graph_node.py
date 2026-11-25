@@ -175,12 +175,12 @@ class MotionStatechartNode(StatechartNode):
         """
         return MotionNodeArtifacts()
 
-    def world_access(self) -> WorldAccess:
+    def compute_world_access(self) -> WorldAccess:
         """
-        :return: What :meth:`~cramph.node.StatechartNode.world_access` returns, with the
-            degrees of freedom of a connection with an active one that its constraints
-            move, and the degrees of freedom its error reads or its constraints depend
-            on but cannot move.
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with the degrees of freedom of a connection with an active one that
+            its constraints move, and the degrees of freedom its error reads or its
+            constraints depend on but cannot move.
         """
         artifacts = self.artifacts
         in_constraints = frozenset(
@@ -189,7 +189,7 @@ class MotionStatechartNode(StatechartNode):
                 *artifacts.constraints.equality_constraints,
                 *artifacts.constraints.inequality_constraints,
             ]
-            for degree_of_freedom in WorldAccess.degrees_of_freedom_of(
+            for degree_of_freedom in WorldAccess.degrees_of_freedom_in_expression(
                 expression=constraint.expression
             )
         )
@@ -201,11 +201,13 @@ class MotionStatechartNode(StatechartNode):
         )
         return (
             super()
-            .world_access()
-            .merged_with(
+            .compute_world_access()
+            .union_with(
                 other=WorldAccess(
-                    moved=moved,
-                    read=WorldAccess.degrees_of_freedom_of(expression=artifacts.error)
+                    moved_degrees_of_freedom=moved,
+                    read_degrees_of_freedom=WorldAccess.degrees_of_freedom_in_expression(
+                        expression=artifacts.error
+                    )
                     | (in_constraints - moved),
                 )
             )
@@ -422,7 +424,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
     :attr:`goal_reference_frame`.
     """
 
-    _goal_binding_access: WorldAccess = field(
+    _goal_binding_world_access: WorldAccess = field(
         default_factory=WorldAccess, init=False, repr=False
     )
     """
@@ -498,8 +500,8 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
             self.goal_binding_root, self.goal_reference_frame
         )
         chain = [*root_chain, *tip_chain]
-        self._goal_binding_access = WorldAccess(
-            read=frozenset(
+        self._goal_binding_world_access = WorldAccess(
+            read_degrees_of_freedom=frozenset(
                 degree_of_freedom
                 for connection in chain
                 for degree_of_freedom in connection.dofs
@@ -511,13 +513,17 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
             ),
         )
 
-    def world_access(self) -> WorldAccess:
+    def compute_world_access(self) -> WorldAccess:
         """
-        :return: What :meth:`~cramph.node.StatechartNode.world_access` returns, with the
-            degrees of freedom and frames the latest binding of the goal reference frame
-            read.
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with the degrees of freedom and frames the latest binding of the
+            goal reference frame read.
         """
-        return super().world_access().merged_with(other=self._goal_binding_access)
+        return (
+            super()
+            .compute_world_access()
+            .union_with(other=self._goal_binding_world_access)
+        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

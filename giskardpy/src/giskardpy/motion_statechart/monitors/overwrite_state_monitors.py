@@ -91,15 +91,19 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
         self.odom_connection = self._current_odom_connection()
         return NodeArtifacts(observation=sm.Scalar.const_true())
 
-    def world_access(self) -> WorldAccess:
+    def compute_world_access(self) -> WorldAccess:
         """
-        :return: What :meth:`~cramph.node.StatechartNode.world_access` returns, with the
-            degrees of freedom of the drive it sets moved.
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with the degrees of freedom of the drive it sets moved.
         """
         return (
             super()
-            .world_access()
-            .merged_with(other=WorldAccess(moved=frozenset(self.odom_connection.dofs)))
+            .compute_world_access()
+            .union_with(
+                other=WorldAccess(
+                    moved_degrees_of_freedom=frozenset(self.odom_connection.dofs)
+                )
+            )
         )
 
     def _current_odom_connection(self) -> OmniDrive:

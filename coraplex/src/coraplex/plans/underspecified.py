@@ -130,7 +130,7 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
 # %% what a trial tries
 
 
-class TrialBuild(ABC):
+class TrialBuilder(ABC):
     """
     Builds what an :class:`ActionTrial` tries in its copy of the world.
     """
@@ -156,7 +156,7 @@ class FailedTrial:
     A trial that failed, kept so the failure can be explained afterwards.
     """
 
-    build: TrialBuild
+    builder: TrialBuilder
     """
     What built the nodes that were tried.
     """
@@ -171,12 +171,12 @@ class FailedTrial:
     What the trial failed with.
     """
 
-    tried: frozenset[StatementNode]
+    tried_statements: frozenset[StatementNode]
     """
     The statements whose candidates the trial tried.
     """
 
-    plan_tick: int
+    tick_in_plan: int
     """
     The tick of the plan's statechart the trial ran at.
     """
@@ -186,7 +186,7 @@ class FailedTrial:
 
 
 @dataclass(kw_only=True)
-class SubtreeRebuild(NodeRebuild, TrialBuild):
+class SubtreeRebuild(NodeRebuild, TrialBuilder):
     """
     Rebuilds a node of a plan and everything below it onto a world to be tried, putting
     candidates in for its statements.
@@ -485,11 +485,14 @@ class ActionTrial:
         return self.executor.context.world
 
     def succeeds(
-        self, *, rebuild: TrialBuild, tried: frozenset[StatementNode] = frozenset()
+        self,
+        *,
+        rebuild: TrialBuilder,
+        tried_statements: frozenset[StatementNode] = frozenset(),
     ) -> bool:
         """
         Run what `rebuild` builds for a trial against the copy, see
-        :meth:`TrialBuild.build_for_trial`, and restore the copy afterwards. A trial
+        :meth:`TrialBuilder.build_for_trial`, and restore the copy afterwards. A trial
         that tries candidates of statements and fails is kept in :attr:`failed_trials`.
 
         It is rebuilt onto the copy because an action that modifies the model (attaching
@@ -499,7 +502,7 @@ class ActionTrial:
         each attempt undoes only its own modifications.
 
         :param rebuild: Builds what is tried.
-        :param tried: The statements whose candidates `rebuild` tries.
+        :param tried_statements: The statements whose candidates `rebuild` tries.
         :return: True if what `rebuild` builds runs to completion without raising an
             :class:`~cramph.exceptions.ExecutionFailure`.
         """
@@ -520,14 +523,14 @@ class ActionTrial:
                 return True
             except ExecutionFailure as failure:
                 logger.info(f"{rebuild} failed its trial: {failure}")
-                if tried:
+                if tried_statements:
                     self.failed_trials.append(
                         FailedTrial(
-                            build=rebuild,
+                            builder=rebuild,
                             statechart=statechart,
                             failure=failure,
-                            tried=tried,
-                            plan_tick=self.executor.context.tick_count,
+                            tried_statements=tried_statements,
+                            tick_in_plan=self.executor.context.tick_count,
                         )
                     )
                 return False
@@ -700,7 +703,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         while candidate is not None:
             if self.trial.succeeds(
                 rebuild=SubtreeRebuild.unfinished_nodes(root, {node: candidate}),
-                tried=frozenset({node}),
+                tried_statements=frozenset({node}),
             ):
                 return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
             candidate = node.next_candidate(
@@ -735,7 +738,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         for combination in combinations:
             if not self.trial.succeeds(
                 rebuild=SubtreeRebuild.unfinished_nodes(root, combination),
-                tried=frozenset(combination),
+                tried_statements=frozenset(combination),
             ):
                 continue
             combinations.take(combination=combination)
