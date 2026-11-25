@@ -168,9 +168,6 @@ class SizeBBAnnotator(BaseAnnotator):
             size_annotation.y_length = y
             size_annotation.z_length = z
 
-            # logger.info(
-            #     f"x length: {x}, y_length {y}, z_length {z}"
-            #     f" of type object: {oh.classification.classname}")
             oh.annotations.append(size_annotation)
             vis_geometries.extend([cluster_obb, pcd])
 
