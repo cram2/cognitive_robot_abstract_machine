@@ -18,9 +18,9 @@ from geometry_msgs.msg import TransformStamped
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from py_trees.common import Status
 from rclpy.time import Time as ROSClockTime
-from robokudo.datastructures.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.static_camera_transform import StaticCameraTransformAnnotator
 from robokudo.cas import CAS
+from robokudo.datastructures.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 from robokudo.exceptions import CameraPoseMissing, InvalidCameraObservation
 from robokudo.io.camera_interface import (
@@ -907,7 +907,7 @@ def transform_camera() -> ROSCameraInterface:
     camera.lookup_viewpoint = True
     camera.tf_from = "camera_optical_frame"
     camera.tf_to = "map"
-    camera.tf_buffer = Mock()
+    camera.tf_wrapper = Mock()
     camera._world_T_camera = None
     return camera
 
@@ -918,9 +918,9 @@ def test_unavailable_transform_returns_false(
     """
     An unavailable sample is reported without attempting its lookup.
     """
-    transform_camera.tf_buffer.can_transform.return_value = False
+    transform_camera.tf_wrapper.wait_for_transform.return_value = False
     assert transform_camera.lookup_transform() is False
-    transform_camera.tf_buffer.lookup_transform.assert_not_called()
+    transform_camera.tf_wrapper.lookup_transform.assert_not_called()
 
 
 def test_available_transform_updates_pose(transform_camera: ROSCameraInterface) -> None:
@@ -932,10 +932,10 @@ def test_available_transform_updates_pose(transform_camera: ROSCameraInterface) 
     sample.transform.translation.y = 2.0
     sample.transform.translation.z = 3.0
     sample.transform.rotation.w = 1.0
-    transform_camera.tf_buffer.can_transform.return_value = True
-    transform_camera.tf_buffer.lookup_transform.return_value = sample
+    transform_camera.tf_wrapper.wait_for_transform.return_value = True
+    transform_camera.tf_wrapper.lookup_transform.return_value = sample
     timestamp = ROSClockTime(nanoseconds=123)
-    assert transform_camera.lookup_transform(timestamp) is True
+    assert transform_camera.lookup_transform(timestamp=timestamp) is True
     expected_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=sample.transform.translation.x,
         pos_y=sample.transform.translation.y,
@@ -948,7 +948,7 @@ def test_available_transform_updates_pose(transform_camera: ROSCameraInterface) 
     np.testing.assert_array_equal(
         transform_camera._world_T_camera.to_np(), expected_pose.to_np()
     )
-    transform_camera.tf_buffer.lookup_transform.assert_called_once_with(
+    transform_camera.tf_wrapper.lookup_transform.assert_called_once_with(
         target_frame=transform_camera.tf_to,
         source_frame=transform_camera.tf_from,
         time=timestamp,
@@ -963,8 +963,8 @@ def test_disabled_lookup_does_not_access_buffer(
     """
     transform_camera.lookup_viewpoint = False
     assert transform_camera.lookup_transform() is True
-    transform_camera.tf_buffer.can_transform.assert_not_called()
-    transform_camera.tf_buffer.lookup_transform.assert_not_called()
+    transform_camera.tf_wrapper.wait_for_transform.assert_not_called()
+    transform_camera.tf_wrapper.lookup_transform.assert_not_called()
 
 
 def test_transform_lookup_errors_propagate(
@@ -973,8 +973,8 @@ def test_transform_lookup_errors_propagate(
     """
     A buffer failure after its availability check reaches the caller.
     """
-    transform_camera.tf_buffer.can_transform.return_value = True
-    transform_camera.tf_buffer.lookup_transform.side_effect = LookupException
+    transform_camera.tf_wrapper.wait_for_transform.return_value = True
+    transform_camera.tf_wrapper.lookup_transform.side_effect = LookupException
     with pytest.raises(LookupException):
         transform_camera.lookup_transform()
 

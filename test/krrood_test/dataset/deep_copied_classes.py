@@ -1,10 +1,14 @@
+"""
+Dataclasses deep-copied through their constructors by the deep-copy mixin.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from typing_extensions import Any, Self
 
-from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
+from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin, DeepCopyOfField
 
 # %% immutable values a deep copy shares
 
@@ -98,4 +102,41 @@ class SensorReading(DataclassDeepcopyMixin):
     value: float
     """
     The value read.
+    """
+
+
+# %% fields a deep copy keeps
+
+
+@dataclass(kw_only=True, eq=False)
+class Logbook:
+    """
+    A record of readings, which refers back to each of them.
+    """
+
+    readings: list[LoggedReading] = field(default_factory=list)
+    """
+    The readings recorded in the logbook.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class LoggedReading(DataclassDeepcopyMixin):
+    """
+    A reading whose copies stay recorded in the same logbook.
+    """
+
+    value: float
+    """
+    The value read.
+    """
+
+    notes: list[str] = field(default_factory=list)
+    """
+    The notes about the reading.
+    """
+
+    logbook: Logbook = field(metadata={DeepCopyOfField: DeepCopyOfField.SHARED})
+    """
+    The logbook the reading is recorded in.
     """

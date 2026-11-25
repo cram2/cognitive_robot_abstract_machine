@@ -6,10 +6,10 @@ or when you develop the perception system in isolation.
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 
+# %% Imports
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from py_trees.common import Status
 

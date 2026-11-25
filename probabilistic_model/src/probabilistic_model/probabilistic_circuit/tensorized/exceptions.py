@@ -117,3 +117,50 @@ class CopiesNotAlignedError(ProbabilisticModelException, ValueError):
             "Only stack copies that a structural pass made from the same layer graph "
             "without pruning it."
         )
+
+
+@dataclass
+class UnsupportedArrayBackendError(ProbabilisticModelException, TypeError):
+    """
+    Exception raised when a numeric query needs the normal distribution functions of an
+    array backend for which none are available.
+    """
+
+    namespace_name: str
+    """
+    The name of the Array API namespace of the backend.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"No normal distribution functions are available for arrays of "
+            f"{self.namespace_name}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Use numpy or jax arrays."
+
+
+@dataclass
+class HostOnlyQueryError(ProbabilisticModelException, TypeError):
+    """
+    Exception raised when a structural query or sampling is asked of a circuit whose
+    parameters are not numpy arrays.
+    """
+
+    backend: str
+    """
+    The name of the Array API namespace of the parameters.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Structural queries and sampling run on numpy only, but the parameters of "
+            f"the circuit are arrays of {self.backend}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Convert the circuit to numpy first, with "
+            "LayeredProbabilisticCircuit.to_namespace(numpy)."
+        )

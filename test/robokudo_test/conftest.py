@@ -1,3 +1,7 @@
+"""
+Provide isolated RoboKudo state, recorded frames, and storage preservation checks.
+"""
+
 from __future__ import annotations
 
 # %% Imports

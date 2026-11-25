@@ -2,6 +2,8 @@
 Demonstrate iterative scheduling of perception subtrees with shared annotators.
 """
 
+from __future__ import annotations
+
 # %% Imports
 from py_trees.composites import Sequence
 

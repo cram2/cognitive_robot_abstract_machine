@@ -77,6 +77,9 @@ def _color_descriptor() -> ZeroShotClassificationDescriptor:
 
 
 def _object_hypothesis_descriptor() -> ZeroShotClassificationDescriptor:
+    """
+    Configure zero-shot classification over existing object hypotheses.
+    """
     descriptor = _color_descriptor()
     descriptor.parameters.analysis_scope = ObjectHypothesis
     return descriptor
@@ -155,6 +158,9 @@ def test_object_hypothesis_scope_classifies_each_hypothesis_by_its_region():
 
 
 def test_object_hypothesis_scope_skips_hypotheses_rejected_by_filter():
+    """
+    Rejected hypotheses are excluded from classification and remain unchanged.
+    """
     descriptor = _object_hypothesis_descriptor()
     rejected_object = object_hypothesis(x=0, y=0, width=10, height=10)
     descriptor.parameters.filter_function = lambda hypothesis: (

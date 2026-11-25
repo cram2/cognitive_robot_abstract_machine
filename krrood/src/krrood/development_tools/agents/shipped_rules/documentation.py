@@ -10,6 +10,7 @@ from krrood.development_tools.agents.docstring_presence import (
 )
 from krrood.development_tools.agents.prose_length import ProseLengthChecker
 from krrood.development_tools.agents.rule import Section
+from krrood.development_tools.agents.ruff_rules import RuffRule, RuffRuleChecker
 
 
 class DocumentationRules(Section):
@@ -68,6 +69,12 @@ class DocumentationRules(Section):
 
     MEANINGFUL_COMMENTS = (
         "Comments are meaningful and DRY; remove comments that restate the code"
+    )
+
+    NO_COMMENTED_OUT_CODE = (
+        "Never leave code commented out; delete it",
+        (),
+        RuffRuleChecker(lint_rules=(RuffRule.COMMENTED_OUT_CODE,)),
     )
 
     SPHINX_ROLES = (

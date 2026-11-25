@@ -2,6 +2,8 @@
 Analysis engine that records Kinect camera data to storage.
 """
 
+from __future__ import annotations
+
 # %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator

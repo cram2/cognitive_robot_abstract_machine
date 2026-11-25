@@ -25,6 +25,7 @@ license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
     "random-events>=26.10.0",
+    "krrood_compute_resources>=26.10.0",
     "networkx",
     "plotly",
     "scipy>=1.10",
@@ -38,11 +39,7 @@ dependencies = [
     "rustworkx>=0.16.0",
     "scikit-learn>=1.7",
     "stepmix>=3.0.0",
-    "jax>=0.6.0",
-    "jaxtyping>=0.3.2",
-    "equinox>=0.12.1",
     "mlflow>=2.22.0",
-    "optax>=0.2.4",
     "pyjpt; sys_platform == 'linux'",
     "mlflow-skinny>=2.22.0",
     "dnutils",
@@ -53,6 +50,8 @@ dependencies = [
     "superqt",
     "krrood>=26.10.0",
     "causal-learn",
+    "array-api-compat>=1.15",
+    "array-api-extra>=0.11",
 ]
 
 [project.urls]
@@ -68,6 +67,14 @@ include = ["probabilistic_model*"]
 version = {attr = "probabilistic_model._version.__version__"}
 
 [project.optional-dependencies]
+jax = [
+    "jax>=0.6.0",
+    "optax>=0.2.4",
+    "krrood_compute_resources[jax]>=26.10.0",
+]
+torch = [
+    "torch>=2.4",
+]
 dev = [
     "pytest",
     "pandas>=2.2.3",
@@ -79,7 +86,70 @@ dev = [
     "pytest-xvfb",
 ]
 
+[tool.krrood.core-boundary]
+# The modules a plain `pip install probabilistic_model` must be able to load; training
+# with jax and with torch needs the extras of the same name.
+core = [
+    "probabilistic_model._version",
+    "probabilistic_model.adapters",
+    "probabilistic_model.bayesian_network",
+    "probabilistic_model.causal_structure",
+    "probabilistic_model.constants",
+    "probabilistic_model.distributions",
+    "probabilistic_model.exceptions",
+    "probabilistic_model.graph",
+    "probabilistic_model.gui",
+    "probabilistic_model.interfaces",
+    "probabilistic_model.learning.exceptions",
+    "probabilistic_model.learning.expectation_maximization",
+    "probabilistic_model.learning.gaussian_mixture",
+    "probabilistic_model.learning.gradient_descent",
+    "probabilistic_model.learning.jpt",
+    "probabilistic_model.learning.learning_method",
+    "probabilistic_model.learning.nyga_induction",
+    "probabilistic_model.learning.progressive",
+    "probabilistic_model.learning.region_graph",
+    "probabilistic_model.learning.step_memory",
+    "probabilistic_model.learning.training_schedule",
+    "probabilistic_model.monte_carlo_estimator",
+    "probabilistic_model.probabilistic_circuit",
+    "probabilistic_model.probabilistic_model",
+    "probabilistic_model.query_results",
+    "probabilistic_model.utils",
+]
+dependencies = [
+    "random-events",
+    "krrood-compute-resources",
+    "networkx",
+    "plotly",
+    "scipy",
+    "typing-extensions",
+    "numpy",
+    "sortedcontainers",
+    "tqdm",
+    "tabulate",
+    "n2g",
+    "python-igraph",
+    "rustworkx",
+    "scikit-learn",
+    "stepmix",
+    "mlflow",
+    "pyjpt",
+    "mlflow-skinny",
+    "dnutils",
+    "arff",
+    "deprecated",
+    "pyside6",
+    "qt-material",
+    "superqt",
+    "krrood",
+    "causal-learn",
+    "array-api-compat",
+    "array-api-extra",
+]
+
 [dependency-groups]
 workspace = [
     "krrood",
+    "krrood_compute_resources",
 ]

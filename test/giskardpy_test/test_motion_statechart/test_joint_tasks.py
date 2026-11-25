@@ -1,7 +1,11 @@
+"""
+Tests of the tasks that move joints to goal positions or limit their velocity.
+"""
+
 import numpy as np
 import pytest
 
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import (
     EndMotion,
@@ -63,17 +67,17 @@ def test_set_seed_configuration(pr2_world_state_reset):
         seed_configuration=JointState.from_mapping({connection: goal})
     )
     end = EndMotion()
-    statechart.add_node(node1)
-    statechart.add_node(end)
+    statechart.add_node(node=node1)
+    statechart.add_node(node=end)
     node1.success_condition = node1.observes_true
     end.start_condition = node1.observes_true
 
     executor.compile(statechart=statechart)
 
     executor.tick_until_end()
-    assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert end.observation_state == ObservationStateValues.TRUE
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert end.observation_state == ObservationStateValue.TRUE
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     assert np.isclose(connection.position, goal)
 
@@ -102,17 +106,17 @@ def test_set_seed_odometry(pr2_world_state_reset):
         base_pose=goal,
     )
     end = EndMotion()
-    statechart.add_node(node1)
-    statechart.add_node(end)
+    statechart.add_node(node=node1)
+    statechart.add_node(node=end)
     node1.success_condition = node1.observes_true
     end.start_condition = node1.observes_true
 
     executor.compile(statechart=statechart)
 
     executor.tick_until_end()
-    assert node1.life_cycle_state == LifeCycleValues.SUCCEEDED
-    assert end.observation_state == ObservationStateValues.TRUE
-    assert end.life_cycle_state == LifeCycleValues.RUNNING
+    assert node1.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert end.observation_state == ObservationStateValue.TRUE
+    assert end.life_cycle_state == LifeCycleValue.RUNNING
 
     assert np.allclose(
         expected.to_np(),
@@ -123,6 +127,10 @@ def test_set_seed_odometry(pr2_world_state_reset):
 
 
 def test_joint_goal(tmp_path):
+    """
+    A joint position task moves a revolute joint to its goal, after which the motion
+    ends.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -164,41 +172,41 @@ def test_joint_goal(tmp_path):
 
     task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 1}))
     always_true = ConstTrueNode()
-    statechart.add_node(always_true)
-    statechart.add_node(task1)
+    statechart.add_node(node=always_true)
+    statechart.add_node(node=task1)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
 
     task1.start_condition = always_true.observes_true
     end.start_condition = logic_and(task1.observes_true, always_true.observes_true)
 
     executor.compile(statechart=statechart)
 
-    assert task1.observation_state == ObservationStateValues.UNKNOWN
-    assert end.observation_state == ObservationStateValues.UNKNOWN
-    assert task1.life_cycle_state == LifeCycleValues.NOT_STARTED
-    assert end.life_cycle_state == LifeCycleValues.NOT_STARTED
-    statechart.draw(str(tmp_path / "muh.pdf"))
+    assert task1.observation_state == ObservationStateValue.UNKNOWN
+    assert end.observation_state == ObservationStateValue.UNKNOWN
+    assert task1.life_cycle_state == LifeCycleValue.NOT_STARTED
+    assert end.life_cycle_state == LifeCycleValue.NOT_STARTED
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     executor.tick_until_end()
-    statechart.draw(str(tmp_path / "muh.pdf"))
+    statechart.draw(file_name=tmp_path / "muh.pdf")
     # +1 compared to the tick count without a moving dof: EndMotion now waits for the
     # dof's velocity to settle below its convergence threshold before observing True.
     assert len(statechart.state_history) == 7
     assert (
-        statechart.state_history.get_observation_history_of_node(task1)[-1]
-        == ObservationStateValues.TRUE
+        statechart.state_history.get_observation_history_of_node(node=task1)[-1]
+        == ObservationStateValue.TRUE
     )
     assert (
-        statechart.state_history.get_observation_history_of_node(end)[-1]
-        == ObservationStateValues.TRUE
+        statechart.state_history.get_observation_history_of_node(node=end)[-1]
+        == ObservationStateValue.TRUE
     )
     assert (
-        statechart.state_history.get_life_cycle_history_of_node(task1)[-1]
-        == LifeCycleValues.RUNNING
+        statechart.state_history.get_life_cycle_history_of_node(node=task1)[-1]
+        == LifeCycleValue.RUNNING
     )
     assert (
-        statechart.state_history.get_life_cycle_history_of_node(end)[-1]
-        == LifeCycleValues.RUNNING
+        statechart.state_history.get_life_cycle_history_of_node(node=end)[-1]
+        == LifeCycleValue.RUNNING
     )
 
 
@@ -222,9 +230,9 @@ def test_continuous_joint(pr2_world_state_reset):
             },
         ),
     )
-    statechart.add_node(joint_goal)
+    statechart.add_node(node=joint_goal)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = joint_goal.observes_true
 
     executor.compile(statechart=statechart)
@@ -257,9 +265,9 @@ def test_revolute_joint(pr2_world_state_reset):
             },
         ),
     )
-    statechart.add_node(joint_goal)
+    statechart.add_node(node=joint_goal)
     end = EndMotion()
-    statechart.add_node(end)
+    statechart.add_node(node=end)
     end.start_condition = joint_goal.observes_true
 
     executor.compile(statechart=statechart)
@@ -284,7 +292,7 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
             ),
@@ -301,7 +309,7 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
             f"head_pan_joint's velocity {observed_velocity} exceeded the "
             f"{max_velocity} rad/s cap on tick {i}"
         )
-        if statechart.observation_state[joint_goal] == ObservationStateValues.TRUE:
+        if statechart.observation_state[joint_goal] == ObservationStateValue.TRUE:
             break
     else:
         raise TimeoutError(
@@ -318,22 +326,24 @@ def test_joint_sequence(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        sequence := Sequence(
-            nodes=[
-                JointPositionList(
-                    goal_state=JointState.from_str_dict(
-                        {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
-                    )
-                ),
-                JointPositionList(
-                    goal_state=JointState.from_str_dict(
-                        {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
-                    )
-                ),
-            ]
+        node=(
+            sequence := Sequence(
+                nodes=[
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
+                        )
+                    ),
+                    JointPositionList(
+                        goal_state=JointState.from_str_dict(
+                            {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
+                        )
+                    ),
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(sequence))
+    statechart.add_node(node=EndMotion.when_true(node=sequence))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()
@@ -356,8 +366,8 @@ def test_daisy_arm_reaches_its_park_state(
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(joint_goal := JointPositionList(goal_state=park_state))
-    statechart.add_node(EndMotion.when_true(joint_goal))
+    statechart.add_node(node=(joint_goal := JointPositionList(goal_state=park_state)))
+    statechart.add_node(node=EndMotion.when_true(node=joint_goal))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()
@@ -378,7 +388,7 @@ def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_th
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(limit)
+    statechart.add_node(node=limit)
     executor.compile(statechart=statechart)
 
     assert [
@@ -398,7 +408,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5})
             ),
@@ -455,8 +465,10 @@ def test_a_joint_goal_measures_each_joint_in_the_lower_of_its_velocity_limit_and
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        goal := JointPositionList(
-            goal_state=JointState.from_mapping({joint: 1.0 for joint in joints})
+        node=(
+            goal := JointPositionList(
+                goal_state=JointState.from_mapping({joint: 1.0 for joint in joints})
+            )
         )
     )
     executor.compile(statechart=statechart)

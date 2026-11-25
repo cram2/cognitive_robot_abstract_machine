@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from functools import wraps
 
+import numpy as np
+import numpy.typing as npt
 from typing_extensions import Any, Self, TYPE_CHECKING
 
 from krrood.class_diagrams.collection_kind import CollectionKind
@@ -13,6 +16,7 @@ from krrood.adapters.json_serializer import (
     to_json,
     from_json,
 )
+from semantic_digital_twin.mixin import SimulatorAdditionalProperty
 from semantic_digital_twin.exceptions import (
     MissingWorldModificationContextError,
     MismatchingIDsInWorldModification,
@@ -296,17 +300,36 @@ class AddDegreeOfFreedomModification(WorldModificationWithWorldEntityReference):
 
 @dataclass
 class RemoveDegreeOfFreedomModification(WorldModification):
+    """
+    Removal of a degree of freedom from the world.
+    """
+
     degree_of_freedom_id: UUID
+    """
+    The UUID of the degree of freedom that was removed.
+    """
 
     degree_of_freedom: DegreeOfFreedom | None = field(default=None, repr=False)
     """
     The degree of freedom that was removed, kept so this modification can be reverted.
     """
 
+    state_before_removal: npt.NDArray[np.float64] | None = field(
+        default=None, repr=False
+    )
+    """
+    The position and derivatives the degree of freedom had when it was removed, given
+    back to it when this modification is reverted.
+    """
+
     @classmethod
     def from_kwargs(cls, kwargs: dict[str, Any]):
         dof = kwargs["dof"]
-        return cls(degree_of_freedom_id=dof.id, degree_of_freedom=dof)
+        return cls(
+            degree_of_freedom_id=dof.id,
+            degree_of_freedom=dof,
+            state_before_removal=dof._world.state[dof.id].data.copy(),
+        )
 
     def apply(self, world: World):
         world.remove_degree_of_freedom(
@@ -315,6 +338,8 @@ class RemoveDegreeOfFreedomModification(WorldModification):
 
     def revert(self, world: World):
         world.add_degree_of_freedom(self.degree_of_freedom)
+        if self.state_before_removal is not None:
+            world.state[self.degree_of_freedom_id] = self.state_before_removal
 
 
 @dataclass
@@ -414,6 +439,50 @@ class RemoveSemanticAnnotationModification(WorldModification, SubclassJSONSerial
             semantic_annotation_id=from_json(data["semantic_annotation_id"], **kwargs),
             semantic_annotation_json=data["semantic_annotation_json"],
         )
+
+
+@dataclass
+class AddWorldSimulatorPropertyModification(WorldModification):
+    """
+    Addition of a simulator property to the world itself, such as a MuJoCo tendon.
+    """
+
+    simulator_property: SimulatorAdditionalProperty
+    """
+    The property that was added.
+    """
+
+    @classmethod
+    def from_kwargs(cls, kwargs: dict[str, Any]) -> Self:
+        return cls(simulator_property=kwargs["simulator_property"])
+
+    def apply(self, world: World):
+        world.add_simulator_property(deepcopy(self.simulator_property))
+
+    def revert(self, world: World):
+        world.remove_simulator_property(self.simulator_property)
+
+
+@dataclass
+class RemoveWorldSimulatorPropertyModification(WorldModification):
+    """
+    Removal of a simulator property from the world itself.
+    """
+
+    simulator_property: SimulatorAdditionalProperty
+    """
+    The property that was removed.
+    """
+
+    @classmethod
+    def from_kwargs(cls, kwargs: dict[str, Any]) -> Self:
+        return cls(simulator_property=kwargs["simulator_property"])
+
+    def apply(self, world: World):
+        world.remove_simulator_property(self.simulator_property)
+
+    def revert(self, world: World):
+        world.add_simulator_property(deepcopy(self.simulator_property))
 
 
 @dataclass
@@ -553,10 +622,13 @@ class SetDofHasHardwareInterface(WorldModification):
     """
 
     def apply(self, world: World):
-        for dof_id in self.degree_of_freedom_ids:
-            world.get_degree_of_freedom_by_id(
-                dof_id
-            ).has_hardware_interface = self.value
+        world.set_dofs_has_hardware_interface(
+            [
+                world.get_degree_of_freedom_by_id(dof_id)
+                for dof_id in self.degree_of_freedom_ids
+            ],
+            self.value,
+        )
 
     def revert(self, world: World):
         dofs_by_previous_value: dict[bool, list[DegreeOfFreedom]] = {}
@@ -727,7 +799,7 @@ def synchronized_attribute_modification(func):
 
     @wraps(func)
     def wrapper(self: WorldEntityWithID, *args: Any, **kwargs: Any) -> Any:
-        if not self._world._model_manager._active_world_model_update_context_manager_ids:
+        if not self._world._model_manager.has_open_modification:
             raise MissingWorldModificationContextError(func)
 
         object_before_change = to_json(self)
@@ -747,7 +819,7 @@ def synchronized_attribute_modification(func):
         current_model_modification_block.append(
             AttributeUpdateModification.from_kwargs(
                 {
-                    "entity_id": object_after_change["id"],
+                    "entity_id": to_json(self.id),
                     "updated_kwargs": to_json(diff),
                     **tracker_kwargs,
                 }

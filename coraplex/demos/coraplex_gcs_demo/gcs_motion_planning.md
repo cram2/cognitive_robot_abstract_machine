@@ -67,11 +67,11 @@ giskard_wrapper.execute()
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 
 executor = RealRobotPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)])
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(ParkArmsAction(arms=robot.all_arms))
-executor.compile(statechart)
+statechart.add_node(node=ParkArmsAction(arms=robot.all_arms))
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 
@@ -80,7 +80,7 @@ Now, we define a search space for the GCS algorithm around the open drawer and t
 ```python
 search_space = BoundingBox(min_x=-0.0, max_x=1.5, min_y=0.1, max_y=2, min_z=0, max_z=1.45)
 print('Calculating graph of convex sets...')
-cg = VolumetricGraphOfBoundingBoxes.free_space_from_world(world, search_space=search_space)
+cg = VolumetricGraphOfBoundingBoxes.free_space_from_world(world=world, search_space=search_space)
 ```
 
 Given the connectivity graph a start pose and a goal pose for the path search is needed.
@@ -118,7 +118,7 @@ def follow_path(waypoints):
     return Sequence(
         nodes=[
             CartesianPose(
-                root_link=RobotAccess(robot).controlled_root,
+                root_link=RobotAccess(robot=robot).controlled_root,
                 tip_link=tool_frame,
                 goal_pose=pose,
             )
@@ -128,11 +128,11 @@ def follow_path(waypoints):
 
 
 executor = RealRobotPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)])
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(follow_path(path[1:]))
-executor.compile(statechart)
+statechart.add_node(node=follow_path(path[1:]))
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 
@@ -165,10 +165,10 @@ print(len(new_path))
 ```python
 print("move along path to goal pose...")
 executor = RealRobotPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)])
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(follow_path(filter_path(path)))
-executor.compile(statechart)
+statechart.add_node(node=follow_path(filter_path(path)))
+executor.compile(statechart=statechart)
 executor.execute()
 ```

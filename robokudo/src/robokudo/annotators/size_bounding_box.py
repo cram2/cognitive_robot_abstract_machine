@@ -57,18 +57,10 @@ class SizeBoundingBoxAnnotator(BaseAnnotator):
 
     def update(self) -> Status:
         """
-        Process object hypotheses to compute and annotate their 3D bounding box sizes.
+        Annotate object cluster dimensions and display their oriented bounding boxes.
 
-        For each object hypothesis with sufficient points:
-
-        * Transforms point cloud to world coordinates
-        * Projects points to 2D and finds minimum area rectangle
-        * Computes 3D oriented bounding box
-        * Annotates size information
-        * Updates visualization
-
-        :return: SUCCESS if processing completed, FAILURE if camera viewpoint not found
-        :raises Exception: If camera viewpoint transform cannot be found in CAS
+        :return: Success after processing, or failure when a camera transform is
+            unavailable.
         """
         start_timer = default_timer()
         vis_geometries = [self.get_cas().get_copy(CASViews.CLOUD)]
@@ -161,8 +153,6 @@ class SizeBoundingBoxAnnotator(BaseAnnotator):
             size_annotation.z_length = z
 
             # self.rk_logger.info(
-            #     f"x length: {x}, y_length {y}, z_length {z}"
-            #     f" of type object: {oh.classification.classname}")
             oh.annotations.append(size_annotation)
             vis_geometries.extend([cluster_obb, pcd])
 

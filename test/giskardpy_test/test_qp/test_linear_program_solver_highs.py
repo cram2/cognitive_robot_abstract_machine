@@ -55,7 +55,7 @@ def test_solution_lies_on_the_binding_bounds():
         inequality_upper_bounds=np.array([np.inf]),
     )
 
-    solution = LinearProgramSolverHighs().solver_call(linear_program)
+    solution = LinearProgramSolverHighs().solver_call(qp_data=linear_program)
 
     assert solution[0] == VARIABLE_UPPER_BOUND
     assert solution[0] - solution[1] == VARIABLE_DIFFERENCE
@@ -70,7 +70,7 @@ def test_two_sided_inequality_rows_bound_the_solution():
         inequality_upper_bounds=np.array([inequality_upper_bound]),
     )
 
-    solution = LinearProgramSolverHighs().solver_call(linear_program)
+    solution = LinearProgramSolverHighs().solver_call(qp_data=linear_program)
 
     assert solution[0] == inequality_upper_bound
 
@@ -84,7 +84,7 @@ def test_infeasible_program_raises():
     )
 
     with pytest.raises(InfeasibleException):
-        LinearProgramSolverHighs().solver_call(linear_program)
+        LinearProgramSolverHighs().solver_call(qp_data=linear_program)
 
 
 def test_quadratic_objective_is_rejected():
@@ -96,4 +96,4 @@ def test_quadratic_objective_is_rejected():
     )
 
     with pytest.raises(QuadraticObjectiveUnsupportedError):
-        LinearProgramSolverHighs().solver_call(linear_program)
+        LinearProgramSolverHighs().solver_call(qp_data=linear_program)

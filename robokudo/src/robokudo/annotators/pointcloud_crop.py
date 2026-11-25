@@ -14,12 +14,13 @@ This module provides an annotator for:
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
 import open3d
+
+# %% Imports
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 

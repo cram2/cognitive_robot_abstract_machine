@@ -21,7 +21,7 @@ import cv2
 import numba
 import numpy as np
 import numpy.ma
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING

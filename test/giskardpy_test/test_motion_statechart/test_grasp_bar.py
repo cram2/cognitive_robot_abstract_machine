@@ -1,6 +1,6 @@
 import numpy as np
 
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.grasp_bar import GraspBar
@@ -38,13 +38,13 @@ def test_grasp_bar(pr2_world_state_reset: World, rclpy_node):
         bar_axis=bar_axis,
         bar_length=0.4,
     )
-    statechart.add_node(grasp)
-    statechart.add_node(EndMotion.when_true(grasp))
+    statechart.add_node(node=grasp)
+    statechart.add_node(node=EndMotion.when_true(node=grasp))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end()
 
-    assert grasp.observation_state == ObservationStateValues.TRUE
+    assert grasp.observation_state == ObservationStateValue.TRUE
 
     # Tip must end up within the bar segment and aligned with the bar axis.
     root_P_tip = pr2_world_state_reset.transform(

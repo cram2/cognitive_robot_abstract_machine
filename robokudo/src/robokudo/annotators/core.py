@@ -26,7 +26,7 @@ from collections import defaultdict
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard

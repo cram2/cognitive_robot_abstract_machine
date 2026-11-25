@@ -18,7 +18,7 @@ import subprocess
 import threading
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import timedelta
 from typing_extensions import Iterator
 
@@ -28,12 +28,22 @@ from rclpy.node import Node
 
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.executors import RealRobotPlanExecutor
+from coraplex.plans.plan_transformation import PlanTransformation
+from coraplex.robot_plans.plan_transformations import (
+    CloseFingersToObjectWidth,
+    DetectWithRoboKudo,
+)
+from coraplex.robotiq_grippers import DriveRobotiqGrippersThroughTheirActionServers
 from cramph.context import StatechartContext
 from demo import DemoRunner, ShapeSortingPlan
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from giskardpy.middleware.ros2.scripts.iai_robots.tracy.launch_files import (
+    TracyGiskardLaunchFile,
+)
+from semantic_digital_twin.adapters.ros.world_fetcher import join_shared_world
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.world import World
+
+# %% running the demo
 
 
 @dataclass
@@ -60,16 +70,9 @@ class RealRunner(DemoRunner):
     Carries the sorting plan out on the real robot, bringing its controllers up first.
     """
 
-    controller_launch_command: list[str] = field(
-        default_factory=lambda: [
-            "ros2",
-            "launch",
-            "giskardpy_ros",
-            "giskardpy_tracy_standalone.launch.py",
-        ]
-    )
+    giskard_launch_file: TracyGiskardLaunchFile = TracyGiskardLaunchFile.STANDALONE
     """
-    The command that brings the robot's controllers up.
+    The launch file that brings up the giskard controlling the robot.
     """
 
     controller_start_up_time: timedelta = timedelta(seconds=8)
@@ -93,13 +96,29 @@ class RealRunner(DemoRunner):
             self.scene.populate(robot.world)
             [tracy] = robot.world.get_semantic_annotations_by_type(Tracy)
             executor = RealRobotPlanExecutor(
-                StatechartContext.with_extensions(robot.world, [RobotAccess(tracy)]),
+                context=StatechartContext.with_extensions(
+                    world=robot.world, extensions=[RobotAccess(robot=tracy)]
+                ),
                 ros_node=robot.node,
                 collision_avoidance=False,
+                plan_adaptations=self.plan_adaptations(),
             )
-            executor.compile(ShapeSortingPlan(scene=self.scene).build(executor.context))
+            executor.compile(
+                statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+            )
             executor.execute()
             executor.close()
+
+    def plan_adaptations(self) -> list[PlanTransformation]:
+        """
+        :return: The plan transformations of a :class:`RealRobotPlanExecutor`, without
+            :class:`DriveRobotiqGrippersThroughTheirActionServers` when
+            :attr:`giskard_launch_file` is :attr:`TracyGiskardLaunchFile.STANDALONE`.
+        """
+        adaptations = [CloseFingersToObjectWidth(), DetectWithRoboKudo()]
+        if self.giskard_launch_file is TracyGiskardLaunchFile.STANDALONE:
+            return adaptations
+        return [DriveRobotiqGrippersThroughTheirActionServers(), *adaptations]
 
     @contextmanager
     def running_robot(self) -> Iterator[RunningRobot]:
@@ -110,7 +129,8 @@ class RealRunner(DemoRunner):
         :return: The running robot, for as long as the context lasts.
         """
         controllers = subprocess.Popen(
-            self.controller_launch_command, start_new_session=True
+            ["ros2", "launch", "giskardpy_ros", self.giskard_launch_file],
+            start_new_session=True,
         )
         time.sleep(self.controller_start_up_time.total_seconds())
         try:
@@ -122,14 +142,16 @@ class RealRunner(DemoRunner):
                 target=executor.spin, daemon=True, name="rclpy-executor"
             ).start()
 
-            world = fetch_world_from_service(
+            world = join_shared_world(
                 node=node, timeout_seconds=self.world_fetch_timeout.total_seconds()
             )
-            WorldSynchronizer(_world=world, node=node)
             yield RunningRobot(world=world, node=node)
         finally:
             os.killpg(os.getpgid(controllers.pid), signal.SIGTERM)
             controllers.wait()
+
+
+# %% entry point
 
 
 if __name__ == "__main__":

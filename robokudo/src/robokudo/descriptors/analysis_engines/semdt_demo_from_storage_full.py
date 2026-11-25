@@ -2,7 +2,8 @@
 Classify stored tabletop objects and synchronize them with the semantic world.
 """
 
-# %% Imports
+from __future__ import annotations
+
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
@@ -26,6 +27,8 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+
+# %% Imports
 from robokudo.world import world_instance
 
 

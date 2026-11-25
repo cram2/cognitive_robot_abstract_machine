@@ -135,6 +135,9 @@ class TestFullAEExecution(object):
         belief_uuids_after_each_successful_cas = []
 
         def assert_current_cas_updates_single_belief(cas):
+            """
+            Check that each successful frame updates the same single object belief.
+            """
             object_hypotheses = cas.filter_annotations_by_type(
                 robokudo.types.scene.ObjectHypothesis
             )

@@ -19,7 +19,6 @@ The module uses:
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 import math
 from dataclasses import dataclass, field
@@ -27,6 +26,8 @@ from timeit import default_timer
 
 import cv2
 import numpy as np
+
+# %% Imports
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING

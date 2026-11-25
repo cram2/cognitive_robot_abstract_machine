@@ -2,6 +2,8 @@
 Segment tabletop objects from stored camera observations.
 """
 
+from __future__ import annotations
+
 # %% Imports
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
@@ -70,7 +72,6 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 OutlierRemovalOnObjectHypothesisAnnotator(),
                 ClusterPoseBoundingBoxAnnotator(),
-                # SlowAnnotator("SlowAnnotator",sleep_duration_seconds=0),
             ]
         )
         return seq

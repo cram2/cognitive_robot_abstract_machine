@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cramph.data_types import FloatEnum
+from krrood.patterns.float_enumeration import FloatEnum
 
 # %% weights
 

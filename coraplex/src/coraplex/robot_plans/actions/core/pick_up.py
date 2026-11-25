@@ -1,3 +1,8 @@
+"""
+Actions that take hold of an object: reaching for it, grasping it, picking it up and
+holding it in place.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -106,22 +111,24 @@ class ReachAction(
         pre_pose = poses.retreat if self.reverse_reach_order else poses.pre_grasp
         children = [
             self.tool_center_point_goal(
-                pre_pose,
-                self.arm,
-                max_linear_velocity=self.pre_approach_linear_velocity,
+                target=pre_pose,
+                arm=self.arm,
+                cruise_linear_velocity=self.pre_approach_linear_velocity,
             ),
         ]
         if self.open_gripper_at_pre_pose:
             children.append(
-                self.gripper_goal_type.moving_gripper_to(
-                    self.arm.end_effector.default_configuration(GripperState.OPEN)
+                self.gripper_goal_type.create_gripper_goal(
+                    configuration=self.arm.end_effector.default_configuration(
+                        GripperState.OPEN
+                    )
                 )
             )
         children.append(
             self.tool_center_point_goal(
-                poses.grasp,
-                self.arm,
-                max_linear_velocity=self.final_approach_linear_velocity,
+                target=poses.grasp,
+                arm=self.arm,
+                cruise_linear_velocity=self.final_approach_linear_velocity,
             )
         )
         return children
@@ -212,9 +219,9 @@ class PickUpAction(
         return [
             *self._grasp_steps(),
             self.tool_center_point_goal(
-                lift_to_pose,
-                self.arm,
-                max_linear_velocity=self.lift_linear_velocity,
+                target=lift_to_pose,
+                arm=self.arm,
+                cruise_linear_velocity=self.lift_linear_velocity,
             ),
         ]
 
@@ -264,8 +271,8 @@ class GraspingAction(
                 grasp_detection_threshold=self.grasp_detection_threshold,
             ),
             self.closing_step(
-                self.gripper_goal_type.moving_gripper_to(
-                    self.arm.end_effector.default_configuration(
+                self.gripper_goal_type.create_gripper_goal(
+                    configuration=self.arm.end_effector.default_configuration(
                         GripperState.CLOSE, finger_velocity=self.grasp_closing_velocity
                     ),
                     stall_minimum_time=self.grasp_stall_minimum_time,
@@ -284,10 +291,10 @@ class GraspingAction(
             nodes=[
                 closing_goal,
                 self.tool_center_point_goal(
-                    self.grasp_pose_sequence(
+                    target=self.grasp_pose_sequence(
                         self.grasp.grasp_pose, self.arm.end_effector, self.grasp
                     ).grasp,
-                    self.arm,
+                    arm=self.arm,
                 ),
             ]
         )

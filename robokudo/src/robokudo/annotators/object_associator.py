@@ -58,6 +58,11 @@ class ObjectAssociator(BaseAnnotator):
         )
 
     def update(self) -> Status:
+        """
+        Associate current hypotheses with tracked objects.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
         new_ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
             ObjectHypothesis
         )

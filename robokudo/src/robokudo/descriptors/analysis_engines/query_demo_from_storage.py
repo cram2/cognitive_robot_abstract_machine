@@ -19,6 +19,8 @@ The pipeline implements the following functionality:
     without requiring live camera input.
 """
 
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator

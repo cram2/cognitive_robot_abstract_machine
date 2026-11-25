@@ -15,7 +15,6 @@ The module uses DBSCAN clustering and oriented bounding boxes (OBB) for object d
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 import logging
 from dataclasses import dataclass, field
@@ -24,6 +23,8 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import open3d
+
+# %% Imports
 from matplotlib import pyplot as plt
 from py_trees.common import Status
 from scipy.spatial.transform import Rotation as R

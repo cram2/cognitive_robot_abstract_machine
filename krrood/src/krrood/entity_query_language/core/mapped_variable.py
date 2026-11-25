@@ -7,9 +7,9 @@ expressions.
 
 from __future__ import annotations
 
-import collections.abc
 import operator
 import uuid
+from enum import Enum
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -25,17 +25,10 @@ from typing_extensions import (
     get_origin,
 )
 
-
-from random_events.variable import (
-    Continuous,
-    Integer,
-    compatible_types,
-    variable_from_name_and_type,
-)
-
-from krrood.class_diagrams.utils import common_base_class, get_type_hints_of_object
+from krrood.class_diagrams.utils import get_type_hints_of_object
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.call_signature import CallSignature
+from krrood.class_diagrams.collection_kind import DeclaredValueKind
 from krrood.entity_query_language.core.base_expressions import (
     UnaryExpression,
     Bindings,
@@ -64,9 +57,10 @@ from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.math_operations import MathOperator
 from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
-from krrood.symbol_graph.helpers import (
+from krrood.entity_query_language.class_diagram_lookup import (
     get_field_type_endpoint,
     get_method_return_type,
+    get_wrapped_field,
 )
 
 if TYPE_CHECKING:
@@ -355,6 +349,22 @@ class CanBehaveLikeAVariable(Selectable[T], HasSymbolicOperations[T], ABC):
         """
         return self
 
+    @property
+    def _expression_read_from_(self) -> CanBehaveLikeAVariable | None:
+        """
+        The expression whose value this one's values are read from along an access path,
+        which is none for an expression at the root of one.
+        """
+        return None
+
+    @property
+    def _declared_value_kind_(self) -> DeclaredValueKind:
+        """
+        What this expression is declared to evaluate to, which is undeclared unless the
+        expression reads a value whose annotation says it.
+        """
+        return DeclaredValueKind.UNDECLARED
+
     def _get_mapped_variable_(
         self, *, type_: type[MappedVariable], **kwargs
     ) -> MappedVariable:
@@ -486,14 +496,22 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
         return self._rerooted_chains_[root._id_]
 
     @property
+    def _expression_read_from_(self) -> CanBehaveLikeAVariable:
+        """
+        Overrides :attr:`CanBehaveLikeAVariable._expression_read_from_`: the child this
+        mapping is applied to.
+        """
+        return self._child_
+
+    @property
     def _access_path_(self) -> list[Self]:
         """
         :return: The access path of the variable as a list of operations.
         """
         current = self
         result = [current]
-        while isinstance(current, MappedVariable):
-            current = current._child_
+        while current._expression_read_from_ is not None:
+            current = current._expression_read_from_
             result.append(current)
         return result[:-1][::-1]
 
@@ -549,11 +567,10 @@ class MappedVariable(UnaryExpression, CanBehaveLikeAVariable[T], ABC):
 
         Two mappings name where their value is kept and so override this: an
         :class:`Attribute` names a field, and an :class:`IndexByValue` names the key an
-        element is stored under. The other three do not, and a value cannot be written
-        through any of them: a :class:`Call` computes its value, an
+        element is stored under. The other two do not, and a value cannot be written
+        through either: a :class:`Call` computes its value, and an
         :class:`IndexByExpression` names which elements to reach rather than where one
-        of them lives, and a :class:`FlatVariable` reaches every element without naming
-        any.
+        of them lives.
 
         Naming such a place is a separate question from how many values a mapping
         reaches. A call reaches exactly one value and still cannot be written through,
@@ -684,6 +701,19 @@ class Attribute(SingleValueMapping[T, AttributeTerm]):
         """
         self._type_ = get_field_type_endpoint(self._owner_class_, self._attribute_name_)
 
+    @cached_property
+    def _declared_value_kind_(self) -> DeclaredValueKind:
+        """
+        Overrides :attr:`CanBehaveLikeAVariable._declared_value_kind_`: the kind the
+        annotation of the attribute's field declares.
+        """
+        if not isinstance(self._owner_class_, type):
+            return DeclaredValueKind.UNDECLARED
+        wrapped_field = get_wrapped_field(self._owner_class_, self._attribute_name_)
+        if wrapped_field is None:
+            return DeclaredValueKind.UNDECLARED
+        return wrapped_field.declared_value_kind
+
     def _ground_term_(self, *, operand_values: tuple[Any, ...]) -> AttributeTerm:
         (instance,) = operand_values
         return AttributeTerm(instance=instance, attribute_name=self._attribute_name_)
@@ -711,7 +741,8 @@ class Attribute(SingleValueMapping[T, AttributeTerm]):
 
     def number_like_field(self) -> Self:
         """
-        Assert this attribute resolves to a number-like (integer or continuous) type.
+        Assert this attribute resolves to an integer or floating-point type that is
+        neither a boolean nor an enumeration.
 
         :return: This attribute.
         :raises AmbiguousQueryAttribute: If this attribute is chain-rooted at a query
@@ -722,12 +753,9 @@ class Attribute(SingleValueMapping[T, AttributeTerm]):
         """
         resolved_type = self._variable_rooted_._type_
         is_number_like = (
-            resolved_type is not None
-            and issubclass(resolved_type, compatible_types)
-            and isinstance(
-                variable_from_name_and_type(self._attribute_name_, resolved_type),
-                (Integer, Continuous),
-            )
+            isclass(resolved_type)
+            and issubclass(resolved_type, (int, float))
+            and not issubclass(resolved_type, (bool, Enum))
         )
         if not is_number_like:
             raise NotNumberLikeFieldError(attribute=self, resolved_type=resolved_type)
@@ -869,68 +897,6 @@ class Call(SingleValueMapping[T, CallTerm]):
             self._type_ = get_method_return_type(
                 self._child_._owner_class_, self._child_._attribute_name_
             )
-
-
-@dataclass(kw_only=True, eq=False, repr=False)
-class FlatVariable(MappedVariable[T]):
-    """
-    A variable that is created from its child through a flattening operation that
-     transforms the values of the child from an iterable-of-iterables into a single iterable of items.
-     Note: It only unwraps one level of nesting.
-
-    Given a child expression that evaluates to an iterable (e.g., Views.bodies), this mapping yields
-    one solution per inner element while preserving the original bindings (e.g., the View instance),
-    similar to UNNEST in SQL.
-
-    Unlike a :class:`SingleValueMapping`, it takes no argument naming which element it means, so
-    the iteration belongs to the node itself: each flattening written is a variable of
-    its own, and two of them range over the elements independently.
-    """
-
-    def _update_type_(self) -> None:
-        """
-        Update the `_type_` attribute with the type of the elements that iterating the
-        child's value yields, when the child's type is a parameterized iterable, else
-        with the child's type.
-
-        A dictionary yields its key type, and a tuple whose positions have different
-        types yields their lowest common base class.
-        """
-        super()._update_type_()
-        collection_type = get_origin(self._type_)
-        element_types = get_args(self._type_)
-        if not (
-            isclass(collection_type)
-            and issubclass(collection_type, collections.abc.Iterable)
-            and element_types
-        ):
-            return
-        if issubclass(collection_type, collections.abc.Mapping):
-            self._type_ = element_types[0]
-            return
-        distinct_element_types = [
-            element_type
-            for element_type in dict.fromkeys(element_types)
-            if element_type is not Ellipsis
-        ]
-        if len(distinct_element_types) == 1:
-            self._type_ = distinct_element_types[0]
-            return
-        self._type_ = common_base_class(distinct_element_types)
-
-    def _apply_mapping_(
-        self, *, value: Iterable[T], sources: OperationResult | None = None
-    ) -> Iterable[T]:
-        yield from value
-
-    def _rebuild_on_(self, *, child: CanBehaveLikeAVariable) -> MappedVariable:
-        # Not routed through the mapped-variable cache: a flattening is an iteration
-        # variable, so each one written ranges over the elements on its own.
-        return FlatVariable(_child_=child)
-
-    @cached_property
-    def _name_(self) -> str:
-        return f"Flatten({self._child_._name_})"
 
 
 @dataclass(kw_only=True, frozen=True)

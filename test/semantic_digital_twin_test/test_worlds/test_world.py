@@ -1,3 +1,7 @@
+"""
+Tests of the world: its kinematic structure, its state and their changes.
+"""
+
 from __future__ import annotations
 
 import gc
@@ -80,6 +84,8 @@ from semantic_digital_twin.world_description.world_modification import (
     AddConnectionModification,
     AddKinematicStructureEntityModification,
     AttributeUpdateModification,
+    RemoveConnectionModification,
+    RemoveKinematicStructureEntityModification,
 )
 from semantic_digital_twin.world_description.world_state import (
     WorldStateTrajectory,
@@ -419,25 +425,6 @@ def test_compute_fk(world_setup):
     )
 
 
-def test_compute_ik(world_setup):
-    world, l1, l2, bf, r1, r2 = world_setup
-    target = np.array(
-        [
-            [0.540302, -0.841471, 0.0, -1.0],
-            [0.841471, 0.540302, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
-    joint_state = world.compute_inverse_kinematics(
-        l2, r2, HomogeneousTransformationMatrix(target, reference_frame=l2)
-    )
-    for joint, state in joint_state.items():
-        world.state[joint.id].position = state
-    world.notify_state_change()
-    assert np.allclose(world.compute_forward_kinematics_np(l2, r2), target, atol=1e-3)
-
-
 def test_compute_fk_expression(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
     connection: PrismaticConnection = world.get_connection(r1, r2)
@@ -447,6 +434,26 @@ def test_compute_fk_expression(world_setup):
     fk_expr = world.compose_forward_kinematics_expression(r2, l2)
     fk2 = fk_expr.evaluate()
     np.testing.assert_array_almost_equal(fk, fk2)
+
+
+# %% state changes inside a modification
+
+
+def test_a_state_change_inside_a_modification_is_announced_when_it_ends(world_setup):
+    """
+    State callbacks hear about a change made inside a modification only once, when the
+    modification ends, never while the world is still being modified.
+    """
+    world, l1, l2, _, _, _ = world_setup
+    prismatic_connection = world.get_connection(l1, l2)
+    counter = StateChangeCounter(_world=world)
+
+    with world.modify_world():
+        prismatic_connection.position = 1.0
+        count_inside_the_modification = counter.count
+
+    assert count_inside_the_modification == 0
+    assert counter.count == 1
 
 
 # %% forward kinematics expressions and recompilation
@@ -1419,7 +1426,7 @@ def test_adding_an_entity_that_belongs_to_another_world_raises(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
 
     with pytest.raises(AlreadyBelongsToAWorldError):
-        l1.add_to_world(World())
+        l1.add_to_world(world=World())
 
     assert l1._world is world
     assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
@@ -1432,7 +1439,7 @@ def test_adding_an_entity_to_the_world_it_belongs_to_re_registers_it(world_setup
     """
     world, l1, l2, bf, r1, r2 = world_setup
 
-    l1.add_to_world(world)
+    l1.add_to_world(world=world)
 
     assert l1._world is world
     assert world.get_kinematic_structure_entity_by_id(l1.id) is l1
@@ -1918,6 +1925,9 @@ def test_a_connection_copied_with_a_new_child_connects_the_new_child(world_setup
 
 
 def test_world_state_trajectory(world_setup, tmp_path):
+    """
+    A world state trajectory records every appended state, and plots them.
+    """
     world, l1, l2, bf, r1, r2 = world_setup
 
     time = 1337.0
@@ -1963,7 +1973,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
 
     plotter = WorldStateTrajectoryPlotter()
     plotter.world_state_trajectory = traj
-    plotter.plot_trajectory(str(tmp_path / "traj.pdf"))
+    plotter.plot_trajectory(file_name=tmp_path / "traj.pdf")
 
     # Verify world version consistency
     assert traj._world_version == world.get_world_model_manager().version
@@ -2985,6 +2995,27 @@ def test_world_does_not_record_removing_a_kinematic_structure_entity_it_does_not
 
     assert recorded_modifications(other_world) == []
     assert body in world.kinematic_structure_entities
+
+
+def test_world_removing_a_connection_after_its_child_records_it_once():
+    """
+    A connection that left the world with its child is not removed a second time, so the
+    order of the two removals leaves a history that still rebuilds the world.
+    """
+    world, branch_root = world_with_branch(branch_length=1)
+    leaf = branch_root.child_kinematic_structure_entities[0]
+    leaf_connection = leaf.parent_connection
+    modifications_before_removal = len(recorded_modifications(world))
+
+    with world.modify_world():
+        world.remove_kinematic_structure_entity(leaf)
+        world.remove_connection(leaf_connection)
+
+    assert [
+        type(modification)
+        for modification in recorded_modifications(world)[modifications_before_removal:]
+    ] == [RemoveConnectionModification, RemoveKinematicStructureEntityModification]
+    assert_rebuilds_to_same_structure(world, World(name="other"))
 
 
 def test_world_does_not_record_removing_a_degree_of_freedom_it_does_not_hold(

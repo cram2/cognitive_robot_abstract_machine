@@ -93,13 +93,7 @@ def any_of_type_present(annotation_type: type, cas: CAS) -> bool:
 @dataclass(kw_only=True, eq=False)
 class CASCheckAnnotationTypeExists(CASCheckFunction):
     """
-    Check for existence of specific annotation types.
-
-    Specialized CASCheckFunction that:
-
-    * Checks for presence of specific annotation types
-    * Returns SUCCESS if at least one annotation exists
-    * Returns FAILURE if no annotations exist
+    Succeed when the CAS contains at least one annotation of the configured type.
     """
 
     annotation_type: type | None = None

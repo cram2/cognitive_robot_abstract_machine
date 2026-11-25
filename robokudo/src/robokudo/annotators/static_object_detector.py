@@ -11,7 +11,6 @@ The detector can create object hypotheses with poses, masks, and class labels.
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 from dataclasses import dataclass, field
 from enum import Enum
@@ -19,6 +18,8 @@ from timeit import default_timer
 
 import cv2
 import numpy as np
+
+# %% Imports
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Body

@@ -1,7 +1,12 @@
+"""
+Tests of the model scoring how familiar an object's features are.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
-import semantic_digital_twin.orm.ormatic_interface  # type: ignore  # noqa: F401
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Cup, Pot
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.inertial_properties import Inertial

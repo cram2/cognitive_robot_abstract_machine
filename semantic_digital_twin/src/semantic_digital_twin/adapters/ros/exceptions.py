@@ -1,16 +1,16 @@
+"""
+Exceptions of the ROS 2 adapters of semantic digital twin.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from typing_extensions import TYPE_CHECKING
-
 from krrood.exceptions import DataclassException
+from krrood_synchronization.messages import Sender
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import UsageError
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.adapters.ros.messages import MetaData
 
 
 @dataclass
@@ -83,16 +83,16 @@ class LaserScanBeamCountMismatch(ROS2ConversionError):
 # %% world updates that cannot be applied
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUpdateReferencesUnknownEntityError(UsageError):
     """
     Raised when an update refers to an entity this world never received, which leaves
     everything the missing update carried out of reach.
     """
 
-    publisher: MetaData
+    sender: Sender
     """
-    The synchronizer whose update could not be applied.
+    The node whose update could not be applied.
     """
 
     entity_id: UUID
@@ -114,7 +114,7 @@ class WorldUpdateReferencesUnknownEntityError(UsageError):
             else f"'{self.entity_id}'"
         )
         return (
-            f"The update of '{self.publisher.node_name}' refers to the entity "
+            f"The update of '{self.sender.node_name}' refers to the entity "
             f"{named_entity}, which this world never received."
         )
 

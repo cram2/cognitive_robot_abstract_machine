@@ -2,6 +2,8 @@
 Validate CAS ownership and annotator traversal across nested behaviour trees.
 """
 
+from __future__ import annotations
+
 # %% Imports
 import py_trees
 from robokudo.annotators.core import BaseAnnotator

@@ -21,7 +21,6 @@ The module uses:
 
 from __future__ import annotations
 
-# %% Imports
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +28,8 @@ from timeit import default_timer
 
 import cv2
 from krrood.adapters.json_serializer import to_json
+
+# %% Imports
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator

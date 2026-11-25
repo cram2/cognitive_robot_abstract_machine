@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from cramph.composites import StatementNode, StatementsGroundedTogether
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
@@ -17,7 +17,7 @@ def _statement_of_names(names: list[str]) -> Match[NodeSucceedingOnObservingTrue
     :return: A statement with one candidate per name in `names`, ranked in that order.
     """
     return a(NodeSucceedingOnObservingTrue)(
-        name=variable(str, domain=names), observation=ObservationStateValues.TRUE
+        name=variable(str, domain=names), observation=ObservationStateValue.TRUE
     )
 
 
@@ -83,13 +83,17 @@ def test_a_statement_goes_on_with_the_candidates_read_before_its_own() -> None:
     [statement, _] = grounding.statements
     backend = grounding.query_backend
 
-    grounding.take(combination)
+    grounding.take(combination=combination)
 
     assert _names_of(combination) == ["a2", "b1"]
     assert [
-        statement.next_candidate(backend, 10).name,
-        statement.next_candidate(backend, 10).name,
-        statement.next_candidate(backend, 10),
+        statement.next_candidate(
+            query_backend=backend, default_candidate_limit=10
+        ).name,
+        statement.next_candidate(
+            query_backend=backend, default_candidate_limit=10
+        ).name,
+        statement.next_candidate(query_backend=backend, default_candidate_limit=10),
     ] == ["a1", "a3", None]
 
 
@@ -107,7 +111,12 @@ def test_a_statement_going_on_counts_only_its_own_candidate_towards_its_limit() 
     combination = next(combinations)
     [statement, _] = grounding.statements
 
-    grounding.take(combination)
+    grounding.take(combination=combination)
 
-    assert statement.next_candidate(grounding.query_backend, 2).name == "a1"
+    assert (
+        statement.next_candidate(
+            query_backend=grounding.query_backend, default_candidate_limit=2
+        ).name
+        == "a1"
+    )
     assert statement.reached_candidate_limit

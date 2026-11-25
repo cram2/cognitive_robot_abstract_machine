@@ -2,14 +2,18 @@
 Validate image crops, masks, regions, and color conversions.
 """
 
-# %% Imports
+from __future__ import annotations
+
 import copy
 
 import numpy as np
 import open3d as o3d
 import pytest
 import robokudo.cas
+
+# %% Imports
 from cv2 import boundingRect
+from krrood_spatial_math.spatial_types import Point2
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.pipeline import Pipeline
@@ -25,8 +29,11 @@ from robokudo.utils.cv_helper import (
     get_hsv_for_bgr_color,
     get_hsv_for_rgb_color,
     get_scaled_color_image_for_depth_image,
+    project_to_color_pixels,
     sanity_checks_bounding_rects,
 )
+from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
 
 # %% Image operations
@@ -549,3 +556,41 @@ class TestUtilsCVHelper(object):
         )
         assert np.array_equal(new_mask, mask[expected_slice])
         assert np.all(new_mask.shape[:2] == np.array(mask.shape[:2]) - 20)
+
+
+# %% projection to color pixels
+
+
+@pytest.fixture
+def half_resolution() -> ColorToDepthRatio:
+    """
+    A depth image with half the width and a quarter of the height of the color image.
+    """
+    return ColorToDepthRatio(horizontal=0.5, vertical=0.25)
+
+
+@pytest.fixture
+def depth_camera_model() -> PinholeCameraModel:
+    """
+    Calibration of a camera at depth image resolution.
+    """
+    return PinholeCameraModel(
+        image_resolution=CameraResolution(width=320, height=240),
+        focal_length_x=200.0,
+        focal_length_y=100.0,
+        principal_point=Point2(x=160.0, y=120.0),
+    )
+
+
+def test_points_are_projected_to_color_pixels(
+    half_resolution: ColorToDepthRatio, depth_camera_model: PinholeCameraModel
+) -> None:
+    """
+    Project depth-camera coordinates into the full-resolution color image.
+    """
+    points = np.array([[0.5, -0.4, 2.0], [0.0, 0.0, 1.0]])
+
+    np.testing.assert_array_equal(
+        project_to_color_pixels(points, depth_camera_model, half_resolution),
+        [[420, 400], [320, 480]],
+    )

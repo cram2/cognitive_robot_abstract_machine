@@ -8,7 +8,7 @@ from coraplex.plans.executors import RealRobotPlanExecutor
 from coraplex.robot_plans.actions.composite.carrying import CarryAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.statechart import Statechart
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
@@ -48,7 +48,9 @@ def test_a_carry_runs_against_a_controller_in_another_process(
             )
         )
     executor = RealRobotPlanExecutor(
-        StatechartContext.with_extensions(world, [RobotAccess(stretch)]),
+        context=StatechartContext.with_extensions(
+            world=world, extensions=[RobotAccess(robot=stretch)]
+        ),
         ros_node=session.node,
     )
     carry = CarryAction(
@@ -58,10 +60,10 @@ def test_a_carry_runs_against_a_controller_in_another_process(
         holding_arms=[arm],
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(carry)
+    statechart.add_node(node=carry)
 
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     executor.execute()
     executor.close()
 
-    assert carry.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert carry.life_cycle_state == LifeCycleValue.SUCCEEDED

@@ -17,6 +17,8 @@ The pipeline implements the following functionality:
     processing flows using nested pipelines and conditional execution.
 """
 
+from __future__ import annotations
+
 from py_trees.behaviours import SuccessEveryN, TickCounter
 from py_trees.common import Status
 from py_trees.composites import Sequence

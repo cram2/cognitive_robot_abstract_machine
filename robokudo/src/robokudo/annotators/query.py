@@ -20,7 +20,6 @@ The module is used for:
 
 from __future__ import annotations
 
-# %% Imports
 import logging
 import queue
 import time
@@ -29,6 +28,8 @@ from threading import Event
 
 import rclpy
 from geometry_msgs.msg import PoseStamped
+
+# %% Imports
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from rclpy.action import CancelResponse, GoalResponse
@@ -39,6 +40,7 @@ from robokudo_msgs.msg import ObjectDesignator
 from typing_extensions import TYPE_CHECKING, Any
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.annotators.exceptions import QueryServerMissing
 from robokudo.cas import CASViews
 from robokudo.datastructures.annotator_descriptor import AnnotatorDescriptor
 from robokudo.datastructures.annotator_parameters import AnnotatorParameters
@@ -146,9 +148,8 @@ class QueryAnnotator(BaseAnnotator):
         """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
 
-        assert self.action_server is not None, (
-            "Action server should be initialized by now."
-        )
+        if self.action_server is None:
+            raise QueryServerMissing()
         query = self.action_server.new_query
         self.rk_logger.debug(f"self.action_server.new_query: {query}")
 
@@ -174,6 +175,11 @@ class QueryFeedback(BaseAnnotator):
     """Feedback text sent to the active query client."""
 
     def update(self) -> Status:
+        """
+        Send fixed query feedback and return success.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(self.feedback_text)
 
@@ -198,6 +204,11 @@ class QueryFeedbackAndCount(BaseAnnotator):
     """The current count."""
 
     def update(self) -> Status:
+        """
+        Send counter feedback and return success once the configured count is exceeded.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
         self.rk_logger.debug(f"{self.__class__.__name__}.update()")
         QueryHandler.send_feedback_str(f"Count: {self.current_count}")
         self.current_count = self.current_count + 1

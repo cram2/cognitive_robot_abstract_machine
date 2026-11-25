@@ -1,4 +1,6 @@
-"""Zero shot classification annotator configuration and annotation behavior."""
+"""
+The base of annotators that classify perceived objects with a zero-shot model.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +11,7 @@ from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
 from PIL import Image
 from py_trees.common import Status

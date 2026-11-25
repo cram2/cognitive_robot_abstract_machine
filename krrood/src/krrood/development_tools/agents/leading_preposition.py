@@ -12,7 +12,7 @@ from typing_extensions import Iterator, override
 
 from krrood.development_tools.agents.checker import CodeRuleChecker, CodeRuleViolation
 from krrood.entity_query_language.verbalization.vocabulary.english import Prepositions
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% the check
 

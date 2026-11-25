@@ -1,12 +1,15 @@
-from __future__ import annotations
+"""
+Navigation chains read out as possessives, genitives and relative clauses.
+"""
 
-from dataclasses import replace
+from __future__ import annotations
 
 from typing_extensions import TYPE_CHECKING
 
-from krrood.entity_query_language.verbalization import morphology
 from krrood.entity_query_language.verbalization.navigation_path import PathStep
 from krrood.entity_query_language.verbalization.fragments.base import (
+    CollectionElementNoun,
+    IndexOrdinal,
     NounPhrase,
     oxford_comma,
     PhraseFragment,
@@ -64,19 +67,32 @@ def indexed_noun(
     step: PathStep, number: GrammaticalNumber = GrammaticalNumber.SINGULAR
 ) -> list[VerbalizationFragment]:
     """:return: the ordinal followed by the singularized collection noun for an indexed hop — the
-    *"first task"* body of *"the first task of a Worker"*, without its article or owner.
+    *"first task"* body of *"the first task of a Worker"*, without its article or owner. A hop that
+    indexes no attribute (a call result) is the ordinal alone (*"the first of …"*).
 
     The collection noun singularizes (*"tasks"* → *"task"*) because a single element is named, and
     the ordinal precedes it as a modifier.
 
-    >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, PhraseFragment
-    >>> step = PathStep(name="tasks", ordinal="first")
-    >>> flatten_fragment_to_plain_text(PhraseFragment(parts=indexed_noun(step)))
+    >>> from krrood.entity_query_language.verbalization.fragments.base import PhraseFragment
+    >>> from krrood.entity_query_language.verbalization.fragments.source_reference import SourceReference
+    >>> from krrood.entity_query_language.verbalization.rendering.realization import realize_subtree
+    >>> step = PathStep(name="tasks", index=0, source_reference=SourceReference.for_attribute(owner=Worker, attribute_name="tasks"))
+    >>> realize_subtree(PhraseFragment(parts=indexed_noun(step)))
     'first task'
     """
+    ordinal = IndexOrdinal(index=step.index)
+    if not step.is_plain_attribute:
+        return [ordinal]
     noun = attribute_fragment(step, number)
-    singular_noun = replace(noun, text=morphology.singular(noun.text))
-    return [WordFragment(text=step.ordinal), singular_noun]
+    return [
+        ordinal,
+        CollectionElementNoun(
+            text=noun.text,
+            role=noun.role,
+            source_reference=noun.source_reference,
+            number=noun.number,
+        ),
+    ]
 
 
 def _ordinal_genitive_step(
@@ -86,8 +102,10 @@ def _ordinal_genitive_step(
     (*"the first task of a Worker"*).
 
     >>> from krrood.entity_query_language.verbalization.fragments.base import flatten_fragment_to_plain_text, WordFragment
-    >>> step = PathStep(name="tasks", ordinal="first")
-    >>> flatten_fragment_to_plain_text(_ordinal_genitive_step(step, WordFragment(text="Worker")))
+    >>> from krrood.entity_query_language.verbalization.fragments.source_reference import SourceReference
+    >>> from krrood.entity_query_language.verbalization.rendering.realization import realize_subtree
+    >>> step = PathStep(name="tasks", index=0, source_reference=SourceReference.for_attribute(owner=Worker, attribute_name="tasks"))
+    >>> realize_subtree(_ordinal_genitive_step(step, WordFragment(text="Worker")))
     'the first task of Worker'
     """
     return PhraseFragment(
@@ -263,7 +281,7 @@ def _extend_hop(
     """
     if step.is_relation:
         return _relative_clause(step, owner_fragment)
-    if step.ordinal is not None:
+    if step.index is not None:
         return _ordinal_genitive_step(step, owner_fragment)
     return _genitive_step(step, owner_fragment)
 
@@ -324,7 +342,7 @@ def _pronominal_first_hop(
     indexed collection, else the plain possessive *"its <attribute>"*."""
     if first.is_relation:
         return _relative_clause(first, nominative_pronoun, subject_number)
-    if first.ordinal is not None:
+    if first.index is not None:
         return PhraseFragment(parts=[possessive_pronoun, *indexed_noun(first)])
     return PhraseFragment(
         parts=[possessive_pronoun, attribute_fragment(first, attribute_number)]

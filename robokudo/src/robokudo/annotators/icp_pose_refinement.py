@@ -21,7 +21,6 @@ The module uses:
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 import math
 from dataclasses import dataclass, field
@@ -30,6 +29,8 @@ from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
+
+# %% Imports
 from py_trees.common import Status
 
 from robokudo.annotators.core import ThreadedAnnotator

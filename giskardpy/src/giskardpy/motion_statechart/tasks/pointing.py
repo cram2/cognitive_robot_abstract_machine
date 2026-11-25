@@ -1,3 +1,7 @@
+"""
+Tasks that point an axis of a link at a goal point.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -76,7 +80,7 @@ class Pointing(CartesianTask):
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(
-            artifacts, goal=root_V_goal_axis, current=root_V_pointing_axis
+            artifacts=artifacts, goal=root_V_goal_axis, current=root_V_pointing_axis
         )
 
         artifacts.error = root_V_pointing_axis.angle_between(root_V_goal_axis)
@@ -156,7 +160,9 @@ class PointingCone(CartesianTask):
             quadratic_weight=self.weight,
         )
         self.add_goal_and_current_debug_expressions(
-            artifacts, goal=root_V_goal_axis_proj, current=root_V_pointing_axis
+            artifacts=artifacts,
+            goal=root_V_goal_axis_proj,
+            current=root_V_pointing_axis,
         )
 
         artifacts.error = root_V_pointing_axis.angle_between(root_V_goal_axis_proj)

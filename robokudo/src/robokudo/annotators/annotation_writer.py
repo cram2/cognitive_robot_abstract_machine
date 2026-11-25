@@ -5,13 +5,13 @@ This module provides annotators for writing and publishing annotations.
 
 from __future__ import annotations
 
-# %% Imports
 import json
 import os
 import shutil
 from dataclasses import dataclass, field
 from timeit import default_timer
 
+# %% Imports
 from py_trees.common import Status
 from rclpy.publisher import Publisher
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry

@@ -24,7 +24,7 @@ import cv2
 import numpy as np
 import open3d
 import torch
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING, Any
 from ultralytics import SAM, YOLO
@@ -150,7 +150,7 @@ class YoloParameters(AnnotatorParameters):
     minimum_hypothesis_overlap: float = 0.65
     """Intersection over union a detection must exceed with an existing object hypothesis to classify it."""
 
-    def model_location(self, annotator_name: str) -> str:
+    def model_location(self, *, annotator_name: str) -> str:
         """
         :param annotator_name: Name of the annotator loading the model, for the
             error.
@@ -162,9 +162,9 @@ class YoloParameters(AnnotatorParameters):
             return str(self.models_directory / self.pretrained_model)
         if self.ros_package_name is None or self.weights_path is None:
             raise DetectionModelNotConfigured(annotator_name=annotator_name)
-        return str(self.file_in_ros_package(self.weights_path))
+        return str(self.file_in_ros_package(relative_path=self.weights_path))
 
-    def file_in_ros_package(self, relative_path: str) -> Path:
+    def file_in_ros_package(self, *, relative_path: str) -> Path:
         """
         :param relative_path: Path of a file, relative to the configured ROS
             package.
@@ -226,7 +226,9 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
         super().__post_init__()
 
-        self.model_location: str = self.descriptor.parameters.model_location(self.name)
+        self.model_location: str = self.descriptor.parameters.model_location(
+            annotator_name=self.name
+        )
         self.image_region_comparator = RoiComparator(weight=1.0)
 
     def setup(self, **kwargs: Any) -> bool:
@@ -250,7 +252,9 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         parameters = self.descriptor.parameters
         if parameters.pretrained_model is not None:
             return dict(self.model.names)
-        class_names_file = parameters.file_in_ros_package(parameters.class_names_path)
+        class_names_file = parameters.file_in_ros_package(
+            relative_path=parameters.class_names_path
+        )
         with open(class_names_file, "r", encoding="utf-8") as file:
             return {int(class_id): name for class_id, name in json.load(file).items()}
 

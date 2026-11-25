@@ -20,7 +20,6 @@ The module is used for:
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 import datetime
 import time
@@ -28,6 +27,8 @@ from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
+
+# %% Imports
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence

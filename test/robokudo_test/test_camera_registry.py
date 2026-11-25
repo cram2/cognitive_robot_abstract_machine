@@ -1,3 +1,9 @@
+"""
+Verify registered camera configurations can be discovered and constructed.
+"""
+
+from __future__ import annotations
+
 from robokudo.descriptors.camera_configs.config_kinect_robot import KinectCameraConfig
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
@@ -8,6 +14,10 @@ from robokudo.descriptors.camera_configs.registry import CameraConfigRegistry
 
 
 class TestCameraConfigRegistry(object):
+    """
+    Check registered camera names resolve to their declared configuration types.
+    """
+
     def test_camera_registry_valid_camera_name(self) -> None:
         """
         Test the creation of a valid camera config.

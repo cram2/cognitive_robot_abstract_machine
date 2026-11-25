@@ -20,10 +20,10 @@ The module is used for:
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 
+# %% Imports
 from py_trees.common import Status
 from semantic_digital_twin.world_description.world_entity import Region
 from typing_extensions import TYPE_CHECKING

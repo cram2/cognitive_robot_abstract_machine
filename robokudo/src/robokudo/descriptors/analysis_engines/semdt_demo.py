@@ -2,6 +2,8 @@
 Synchronize tabletop objects observed by a Kinect with the semantic world.
 """
 
+from __future__ import annotations
+
 # %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator

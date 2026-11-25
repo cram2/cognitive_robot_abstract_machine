@@ -27,7 +27,7 @@ argued the two are different questions whenever two fields share a hidden common
 through
 {py:class}`~probabilistic_model.probabilistic_circuit.causal.causal_circuit.CausalCircuit`'s
 backdoor-adjustment machinery instead of plain conditioning, when evaluated with
-{py:class}`~krrood.entity_query_language.backends.ProbabilisticBackend`.
+{py:class}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend`.
 
 ### Seeing the difference
 
@@ -148,7 +148,7 @@ The conditioning half runs through EQL exactly as any other query -- register th
 from dataclasses import dataclass
 
 from krrood.entity_query_language.factories import a
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.parametrization.model_registries import DictRegistry
 
 
@@ -238,7 +238,7 @@ intervened on, and the structure is learned from the same circuit and rooms:
 
 ```python
 from krrood.class_diagrams.class_diagram import ClassDiagram
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, cause
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from probabilistic_model.causal_structure.domain_causal_knowledge import (
@@ -346,7 +346,7 @@ raises otherwise -- there is no multi-effect form of the underlying intervention
 computation to route several through. Multiple `cause` fields are fine: each candidate
 is searched independently and the one that best explains the effect becomes the primary
 cause -- see
-{py:meth}`~krrood.entity_query_language.backends.ProbabilisticBackend.rank_causes`
+{py:meth}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend.rank_causes`
 below to see every candidate's score, not just the primary one. Mark a known
 confounder with `confounder` to have it summed out of every candidate's score --
 see [Adjusting for a confounder](#adjusting-for-a-confounder) above.
@@ -374,7 +374,7 @@ for the queried class -- {py:class}`~krrood.parametrization.model_registries.Cau
 maps classes directly to pre-built causal circuits:
 
 ```python
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.parametrization.model_registries import CausalCircuitRegistry
 
 backend = ProbabilisticBackend(
@@ -433,7 +433,7 @@ grounding.
 than one field is plausibly responsible -- a pick failure that could trace back to
 either `arm` or `grip` -- and how the candidates compare matters, not just which one
 wins,
-{py:meth}`~krrood.entity_query_language.backends.ProbabilisticBackend.rank_causes`
+{py:meth}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend.rank_causes`
 returns every candidate's score instead:
 
 ```python
@@ -482,7 +482,7 @@ backend.
 - {py:class}`~krrood.parametrization.exceptions.DoRequiresCausalCircuitModel`
 - {py:class}`~krrood.parametrization.exceptions.MultipleEffectVariablesNotSupported`
 - {py:class}`~krrood.entity_query_language.exceptions.NoCausesEffectConditionForCause`
-- {py:meth}`~krrood.entity_query_language.backends.ProbabilisticBackend.rank_causes`
+- {py:meth}`~krrood.parametrization.probabilistic_backend.ProbabilisticBackend.rank_causes`
 - {py:class}`~krrood.entity_query_language.exceptions.NoCauseVariablesForRanking`
 - {py:data}`~krrood.entity_query_language.factories.confounder`
 - {py:data}`~krrood.entity_query_language.operators.causal.confounder`

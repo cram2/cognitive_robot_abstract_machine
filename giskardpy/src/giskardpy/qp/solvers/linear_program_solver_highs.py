@@ -58,7 +58,7 @@ class LinearProgramStatus(IntEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LinearProgramSolverHighs(QPSolver[QPDataExplicit]):
     """
     Solves problems without a quadratic objective exactly with the HiGHS simplex method.
@@ -67,10 +67,10 @@ class LinearProgramSolverHighs(QPSolver[QPDataExplicit]):
     floating point precision instead of up to a convergence tolerance.
     """
 
-    def solver_call_explicit_interface(self, qp_data: QPDataExplicit) -> np.ndarray:
+    def solver_call_explicit_interface(self, *, qp_data: QPDataExplicit) -> np.ndarray:
         if np.any(qp_data.quadratic_weights):
             raise QuadraticObjectiveUnsupportedError(solver_name=type(self).__name__)
-        upper_rows, upper_bounds = self._one_sided_inequalities(qp_data)
+        upper_rows, upper_bounds = self._one_sided_inequalities(qp_data=qp_data)
         result = scipy.optimize.linprog(
             c=qp_data.linear_weights,
             A_ub=upper_rows,
@@ -93,6 +93,7 @@ class LinearProgramSolverHighs(QPSolver[QPDataExplicit]):
 
     @staticmethod
     def _one_sided_inequalities(
+        *,
         qp_data: QPDataExplicit,
     ) -> tuple[sp.csc_matrix | None, np.ndarray | None]:
         """

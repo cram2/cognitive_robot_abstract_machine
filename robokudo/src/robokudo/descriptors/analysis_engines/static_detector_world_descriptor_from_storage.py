@@ -2,6 +2,8 @@
 Detect predefined objects in stored camera observations using a world descriptor.
 """
 
+from __future__ import annotations
+
 # %% Imports
 import robokudo.analysis_engine
 import robokudo.behaviours.clear_errors

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-# %% Imports
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -11,6 +10,8 @@ from timeit import default_timer
 import cv2
 import numpy as np
 import open3d
+
+# %% Imports
 from krrood.patterns.field_metadata import JSONMetadata
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Color

@@ -20,12 +20,12 @@ The module is used for:
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 import json
 from dataclasses import dataclass, field
 from timeit import default_timer
 
+# %% Imports
 from py_trees.common import Status
 from semantic_digital_twin.adapters.ros.messages import WorldModelSnapshot
 from typing_extensions import Any

@@ -2,6 +2,8 @@
 Validate query gating and perception results through the ROS action interface.
 """
 
+from __future__ import annotations
+
 # %% Imports
 import logging
 import multiprocessing

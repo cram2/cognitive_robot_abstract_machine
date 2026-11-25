@@ -65,10 +65,18 @@ class RuffArgument(StrEnum):
     """
 
     FORMAT = "format"
+    """
+    Run ruff's formatter.
+    """
+
     QUIET = "--quiet"
+    """
+    Print nothing but errors.
+    """
+
     ISOLATED = "--isolated"
     """
-    Ignore every configuration file, so each repository formats alike.
+    Ignore every configuration file, so each repository formats and checks alike.
     """
 
 

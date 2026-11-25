@@ -1,3 +1,7 @@
+"""
+Verify RoboKudo errors preserve structured context and corrective guidance.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -33,6 +37,10 @@ from robokudo.utils.cv_helper import (
 
 
 class TestRoboKudoExceptions:
+    """
+    Check structured exception messages and corrective guidance.
+    """
+
     def test_color_to_depth_ratio_missing_message(self) -> None:
         exception = ColorToDepthRatioMissing(operation="scale coordinates")
 

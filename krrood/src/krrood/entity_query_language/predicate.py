@@ -51,10 +51,10 @@ from krrood.entity_query_language.core.base_expressions import Selectable
 from krrood.entity_query_language.core.bound_value import HasBoundValue
 from krrood.entity_query_language.utils import camel_case_to_words
 from krrood.entity_query_language.exceptions import ResultTypeCannotBeDetermined
-from krrood.patterns.code_parsing_utils import (
+from krrood.source_analysis.property_return_statement import (
     get_accessed_attribute_name_in_return_statement_of_property,
 )
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -448,26 +448,25 @@ class Triple(Predicate, Generic[SubjectType, ObjectType], SubClassSafeGeneric):
     ) -> VerbalizationFragment:
         """
         Verbalization of a Triple is a subject - verb-phrase - object, where the verb phrase is read
-        off the class name (``ConnectsTo`` → *"connects to"*). The leading word is a :class:`Verb`
-        (its lemma), so a wrapping ``Not`` negates with do-support (*"does not connect to"*).
+        off the class name (``ConnectsTo`` → *"connects to"*). The leading word is a :class:`VerbForm`,
+        so a wrapping ``Not`` negates with do-support (*"does not connect to"*).
         """
         # Imported locally: the verbalization layer depends on the core predicate types, so a
         # module-level import here would close an import cycle.
-        from krrood.entity_query_language.verbalization import morphology
         from krrood.entity_query_language.verbalization.fragments.base import (
             WordFragment,
         )
         from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
             clause,
             Noun,
-            Verb,
+            VerbForm,
         )
 
         words = camel_case_to_words(cls.__name__).split()
         particles = [WordFragment(text=word) for word in words[1:]]
         return clause(
             Noun(content=fields[cls.subject_field_name()]),
-            Verb(lemma=morphology.verb_lemma(words[0])),
+            VerbForm(form=words[0]),
             *particles,
             Noun(content=fields[cls.object_field_name()]),
         )

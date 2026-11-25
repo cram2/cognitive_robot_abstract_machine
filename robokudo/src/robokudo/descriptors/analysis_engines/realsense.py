@@ -2,6 +2,8 @@
 Segment tabletop objects from a RealSense camera stream.
 """
 
+from __future__ import annotations
+
 # %% Imports
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator

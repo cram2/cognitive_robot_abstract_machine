@@ -641,7 +641,7 @@ def _boolean_constraint(right: SymbolicExpression) -> set[bool] | None:
     if isinstance(right, Literal) and isinstance(right._value_, bool):
         return {right._value_}
     if isinstance(right, Variable) and right._type_ is bool:
-        values = list(islice(right._re_enterable_domain_generator_, 3))
+        values = list(islice(right._values_domain_.listed_values, 3))
         if values and len(values) <= 2 and all(isinstance(v, bool) for v in values):
             return set(values)
     return None

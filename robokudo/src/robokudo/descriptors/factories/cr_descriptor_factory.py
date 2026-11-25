@@ -7,7 +7,7 @@ from __future__ import annotations
 # %% Imports
 from dataclasses import dataclass
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from typing_extensions import Any
 
 from robokudo.annotators.collection_reader import (
@@ -48,7 +48,7 @@ from robokudo.io.storage_reader_interface import StorageReaderInterface
 
 
 # %% Camera descriptor construction
-@dataclass
+@dataclass(kw_only=True)
 class CollectionReaderDescriptorFactory:
     """
     Factory class for creating CollectionReader descriptors.

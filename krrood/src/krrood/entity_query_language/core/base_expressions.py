@@ -87,7 +87,7 @@ class HasExpression(ABC):
     Anything verbalization/build steps can resolve to a single underlying
     :class:`SymbolicExpression` to scan or build, regardless of what kind of object
     routes to it (a plain expression, a :class:`~krrood.entity_query_language.query.match.Match`,
-    a :class:`~krrood.entity_query_language.operators.probabilistic_queries.ProbabilisticQuery`,
+    a :class:`~krrood.parametrization.probabilistic_queries.ProbabilisticQuery`,
     ...). Callers use :meth:`_get_expression_` polymorphically instead of an
     ``isinstance`` chain over every such wrapper type.
     """
@@ -111,6 +111,16 @@ class Operand(ABC):
         """
         :return: The expression this contributes where an operand is expected.
         """
+
+    def _quantifier_operands_(
+        self, *, condition: Any
+    ) -> tuple[SymbolicExpression, Any]:
+        """
+        :param condition: The condition a quantifier over this states.
+        :return: The variable the quantifier ranges over and the condition it states of
+            each value, which are this operand's expression and *condition*.
+        """
+        return self._symbolic_expression_, condition
 
 
 class MatchAssignedValue(ABC):

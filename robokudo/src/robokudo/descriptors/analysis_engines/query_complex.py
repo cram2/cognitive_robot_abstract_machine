@@ -2,6 +2,8 @@
 Serve tabletop perception queries with preemption checks and progress feedback.
 """
 
+from __future__ import annotations
+
 # %% Imports
 from py_trees.common import Status
 from py_trees.composites import Selector, Sequence

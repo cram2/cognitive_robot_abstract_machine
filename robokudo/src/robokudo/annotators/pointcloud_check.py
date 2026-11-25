@@ -20,11 +20,12 @@ The annotator supports:
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 
 import open3d as o3d
+
+# %% Imports
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator

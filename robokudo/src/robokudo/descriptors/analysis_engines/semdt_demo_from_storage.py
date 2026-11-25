@@ -2,12 +2,15 @@
 Synchronize objects segmented from stored observations with the semantic world.
 """
 
-# %% Imports
+from __future__ import annotations
+
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color_histogram import ClusterColorHistogramAnnotator
+
+# %% Imports
 from robokudo.annotators.cluster_pose_bounding_box import (
     ClusterPoseBoundingBoxAnnotator,
 )

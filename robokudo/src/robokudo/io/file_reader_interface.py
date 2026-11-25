@@ -207,6 +207,9 @@ class FileReaderInterface(CameraInterface):
         self.initialized = True
 
     def has_new_data(self) -> bool:
+        """
+        Report whether a recorded frame is available, honoring playback looping.
+        """
         if not self.initialized:
             return False
         if self.camera_configuration.loop and self.next_frame_index == len(

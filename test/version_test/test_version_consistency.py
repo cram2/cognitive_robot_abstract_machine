@@ -1,3 +1,9 @@
+"""
+Tests that every package of the workspace has the version of the repository.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 PACKAGES = [
@@ -7,7 +13,9 @@ PACKAGES = [
     "experiments",
     "giskardpy",
     "krrood",
+    "krrood_compute_resources",
     "krrood_spatial_math",
+    "krrood_synchronization",
     "physics_simulators",
     "probabilistic_model",
     "random_events",

@@ -1,6 +1,11 @@
+"""
+The camera configuration that renders images by ray tracing a world, and the sources that
+world can come from.
+"""
+
 from __future__ import annotations
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from dataclasses import dataclass, field
 
 from typing_extensions import TYPE_CHECKING

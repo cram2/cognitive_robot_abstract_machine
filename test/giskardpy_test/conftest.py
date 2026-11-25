@@ -1,11 +1,19 @@
+"""
+Fixtures shared by the giskardpy tests: robot poses, worlds and Giskard instances.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
 # conftest of a run before calling any hook, so a hook would fire too late. The build runs
 # once per process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.GISKARDPY)
 
 
 import pytest
@@ -207,14 +215,14 @@ def giskard_factory(init_background_node, robot: GiskardTester):
             name="initial configuration",
             seed_configuration=JointState.from_mapping(parse_seed_joint_state),
         )
-        statechart.add_node(initial_config)
+        statechart.add_node(node=initial_config)
 
         if robot.has_odometry_joint():
             base_goal = HomogeneousTransformationMatrix(
                 reference_frame=robot.api.world.root
             )
             base_pose_reached = SetOdometry(name="initial pose", base_pose=base_goal)
-            statechart.add_node(base_pose_reached)
+            statechart.add_node(node=base_pose_reached)
             done = logic_and(
                 initial_config.observes_true,
                 base_pose_reached.observes_true,
@@ -222,9 +230,9 @@ def giskard_factory(init_background_node, robot: GiskardTester):
         else:
             done = initial_config.observes_true
         end = EndMotion(name="end")
-        statechart.add_node(end)
+        statechart.add_node(node=end)
         end.start_condition = done
-        robot.api.compile(statechart)
+        robot.api.compile(statechart=statechart)
         robot.api.execute()
         return robot
 
@@ -338,6 +346,17 @@ def prismatic_world_with_acceleration_limit(request):
     )
 
 
+@pytest.fixture()
+def prismatic_bot_with_acceleration_limit():
+    """
+    A prismatic joint like :func:`prismatic_bot` with an acceleration limit of its own,
+    which brakes with a jerk limit far below the one of the default braking time.
+    """
+    return _make_prismatic_world(
+        [_symmetric_prismatic_limits(1, 1, acceleration=ACCELERATION_LIMIT)]
+    )
+
+
 @pytest.fixture(
     params=[1, None], ids=["with_position_limits", "without_position_limits"]
 )
@@ -396,3 +415,15 @@ def daisy_world_specification() -> WorldSpecification:
     DAiSy alone, as Giskard sets it up.
     """
     return WorldSpecification(robots=[RobotSpecification.specify_real_robot(DAiSy)])
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load giskardpy's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import giskardpy.orm.ormatic_interface  # noqa: F401

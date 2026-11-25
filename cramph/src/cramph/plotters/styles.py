@@ -5,7 +5,7 @@ from enum import Enum, StrEnum
 
 
 from semantic_digital_twin.world_description.geometry import Color
-from cramph.data_types import ObservationStateValues, TransitionKind
+from cramph.data_types import ObservationStateValue, TransitionKind
 
 # %% fonts
 
@@ -70,7 +70,7 @@ class BorderStyle(StrEnum):
 # %% sizes
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class DrawingMetrics:
     """
     The measurements the drawing is laid out with.
@@ -124,7 +124,7 @@ class DrawingMetrics:
     at least, so the node read is drawn a row above the node reading it.
     """
 
-    def minimum_rank_distance(self, transition_kind: TransitionKind) -> int:
+    def minimum_rank_distance(self, *, transition_kind: TransitionKind) -> int:
         """
         :param transition_kind: The kind of the condition a dependency feeds.
         :return: How many rows apart that dependency draws its endpoints at least.
@@ -144,7 +144,7 @@ class ObservationDrawingStyle(Enum):
     Only true and false are colors; a value with no answer yet is plain black and drawn
     thin, so it recedes instead of presenting itself as a third value color.
 
-    ..note:: These are the badge colors of :class:`ObservationStateValues` darkened for
+    ..note:: These are the badge colors of :class:`ObservationStateValue` darkened for
         drawing on the page. A badge color fills a cell behind black text and has to stay
         light, which makes it far too pale for a stroke.
     """
@@ -175,7 +175,7 @@ class ObservationDrawingStyle(Enum):
 
     @classmethod
     def of_observation(
-        cls, observation: ObservationStateValues
+        cls, *, observation: ObservationStateValue
     ) -> ObservationDrawingStyle:
         """
         :param observation: The trinary value to draw.
@@ -183,7 +183,7 @@ class ObservationDrawingStyle(Enum):
         """
         return cls[observation.name]
 
-    def line_width(self, metrics: DrawingMetrics) -> float:
+    def line_width(self, *, metrics: DrawingMetrics) -> float:
         """
         :param metrics: The measurements the drawing is laid out with.
         :return: The width of a line carrying this value.

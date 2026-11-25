@@ -2,6 +2,8 @@
 Validate that database resets are deferred until storage writer setup.
 """
 
+from __future__ import annotations
+
 # %% Imports
 from dataclasses import dataclass
 

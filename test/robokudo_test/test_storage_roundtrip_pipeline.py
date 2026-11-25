@@ -79,6 +79,9 @@ def _build_writer_pipeline(database_name: str, recording_directory: Path) -> Pip
 
 
 def _build_reader_pipeline(database_name: str) -> Pipeline:
+    """
+    Replay camera observations from the selected database.
+    """
     mongo_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
         "mongo", loop=False, database_name=database_name
     )
@@ -93,6 +96,10 @@ def _build_reader_pipeline(database_name: str) -> Pipeline:
 
 
 class TestStorageRoundtripPipeline:
+    """
+    Exercise recording and replay through complete camera pipelines.
+    """
+
     def test_store_and_replay_sensor_data_roundtrip(
         self, cup_on_counter_directory: Path
     ) -> None:

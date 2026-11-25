@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 
 import faiss
 import numpy as np
 import torch
+
+# %% Imports
 from PIL import Image
 from transformers import CLIPModel, CLIPProcessor
 from typing_extensions import TYPE_CHECKING

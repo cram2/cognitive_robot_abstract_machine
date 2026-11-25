@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 from dataclasses import dataclass, field
 from enum import Enum
@@ -10,6 +9,8 @@ from enum import Enum
 import cv2
 import numpy as np
 import open3d
+
+# %% Imports
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING, Any
 

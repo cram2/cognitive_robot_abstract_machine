@@ -13,12 +13,13 @@ blur exceeds a threshold.
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 from dataclasses import dataclass, field
 from timeit import default_timer
 
 import cv2
+
+# %% Imports
 from py_trees.common import Status
 from typing_extensions import TYPE_CHECKING
 

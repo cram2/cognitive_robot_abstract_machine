@@ -62,11 +62,11 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: ${{ runner.os }}-demo-cache-${{ inputs.script }}-${{ github.ref_name }}-${{ github.run_id }}
+          # Only the cache this script saved itself; a cache another job saved lacks its files.
           restore-keys: |
-            ${{ runner.os }}-cache-${{ inputs.repo_lowercase }}-${{ github.ref_name }}
-            ${{ runner.os }}-cache-${{ inputs.repo_lowercase }}
-            ${{ runner.os }}-cache-
+            ${{ runner.os }}-demo-cache-${{ inputs.script }}-${{ github.ref_name }}-
+            ${{ runner.os }}-demo-cache-${{ inputs.script }}-
 
       - name: Build ORM
         # ormatic_interface.py files are not tracked (see AGENTS.md), so the full
@@ -94,3 +94,10 @@ jobs:
         # Runs after a failure too, so a job that ran out of disk shows what filled it.
         if: always()
         run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
+
+      - name: Save cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-demo-cache-${{ inputs.script }}-${{ github.ref_name }}-${{ github.run_id }}

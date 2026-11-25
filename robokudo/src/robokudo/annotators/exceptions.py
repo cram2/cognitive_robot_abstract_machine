@@ -6,7 +6,24 @@ from __future__ import annotations
 
 # %% Imports
 from dataclasses import dataclass
+
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+
 from robokudo.exceptions import RoboKudoError
+
+
+# %% Query lifecycle
+@dataclass(kw_only=True)
+class QueryServerMissing(RoboKudoError, RuntimeError):
+    """
+    Query processing was requested before the action server was initialized.
+    """
+
+    def error_message(self) -> str:
+        return "The query action server has not been initialized."
+
+    def suggest_correction(self) -> str:
+        return "Initialize the query annotator before processing requests."
 
 
 # %% Collection reader placement
@@ -40,6 +57,7 @@ class InvalidAnalysisData(RoboKudoError):
     """
     Type required by the analysis operation.
     """
+
     actual_type: type
     """
     Type of the supplied data.
@@ -94,3 +112,50 @@ class NotAPoseModelException(RoboKudoError, ValueError):
 
     def suggest_correction(self) -> str:
         return "set 'pretrained_model' to a YOLO pose model, e.g. 'yolov8n-pose.pt'."
+
+
+# %% object pose estimation
+
+
+@dataclass
+class DuplicateObjectClassMesh(RoboKudoError, ValueError):
+    """
+    Raised when more than one mesh is configured for an object class.
+    """
+
+    class_name: str
+    """
+    The object class with more than one mesh.
+    """
+
+    def error_message(self) -> str:
+        return f"More than one mesh is configured for the class '{self.class_name}'."
+
+    def suggest_correction(self) -> str:
+        return "Configure exactly one mesh per class name."
+
+
+@dataclass
+class ImageResolutionMismatch(RoboKudoError, ValueError):
+    """
+    Raised when the color and the depth image of a frame differ in resolution.
+    """
+
+    color_image_resolution: CameraResolution
+    """
+    Resolution of the color image.
+    """
+
+    depth_image_resolution: CameraResolution
+    """
+    Resolution of the depth image.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The color image has the resolution {self.color_image_resolution}, the "
+            f"depth image {self.depth_image_resolution}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Scale the color image to the resolution of the depth image."

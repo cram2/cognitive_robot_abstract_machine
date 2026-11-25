@@ -1,3 +1,7 @@
+"""
+Verify rendered camera observations preserve calibration and spatial placement.
+"""
+
 from __future__ import annotations
 
 # %% Imports

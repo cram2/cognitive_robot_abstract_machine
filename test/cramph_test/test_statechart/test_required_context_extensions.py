@@ -1,3 +1,7 @@
+"""
+Tests of the context extensions statechart nodes declare they require.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,25 +10,25 @@ import pytest
 
 from cramph.node import SucceedsOnObservingTrue
 from cramph.context import ContextExtension, StatechartContext
-from cramph.data_types import ObservationStateValues
+from cramph.data_types import ObservationStateValue
 from cramph.exceptions import NodesMissingContextExtensionsError
 from cramph.executor import StatechartExecutor
 from cramph.node import CompositeNode
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionANodeRequires(ContextExtension):
     """
     A context extension a node declares it requires.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionASpecializedNodeRequires(ContextExtension):
     """
     A context extension only a specialized node declares it requires.
@@ -75,7 +79,7 @@ class CompositeRequiringAnExtension(SucceedsOnObservingTrue, CompositeNode):
         self.expanded = True
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionACompositeReadsWhileExpanding(ContextExtension):
     """
     A context extension a composite node reads only to create its children.
@@ -105,8 +109,8 @@ class CompositeReadingAnExtensionWhileExpanding(SucceedsOnObservingTrue, Composi
     def expand(self) -> None:
         self.expanded = True
         self._add_child_to_statechart(
-            NodeSucceedingOnObservingTrue(
-                name="child", observation=ObservationStateValues.TRUE
+            node=NodeSucceedingOnObservingTrue(
+                name="child", observation=ObservationStateValue.TRUE
             )
         )
 
@@ -139,8 +143,10 @@ def test_compiling_raises_for_a_node_missing_a_required_extension(
 ) -> None:
     statechart = Statechart(context=statechart_context)
     statechart.add_node(
-        node := NodeRequiringAnExtension(
-            name="requiring", observation=ObservationStateValues.TRUE
+        node=(
+            node := NodeRequiringAnExtension(
+                name="requiring", observation=ObservationStateValue.TRUE
+            )
         )
     )
 
@@ -155,13 +161,17 @@ def test_compiling_reports_every_missing_extension_at_once(
 ) -> None:
     statechart = Statechart(context=statechart_context)
     statechart.add_node(
-        first := NodeRequiringAnExtension(
-            name="first", observation=ObservationStateValues.TRUE
+        node=(
+            first := NodeRequiringAnExtension(
+                name="first", observation=ObservationStateValue.TRUE
+            )
         )
     )
     statechart.add_node(
-        second := SpecializedNodeRequiringAnotherExtension(
-            name="second", observation=ObservationStateValues.TRUE
+        node=(
+            second := SpecializedNodeRequiringAnotherExtension(
+                name="second", observation=ObservationStateValue.TRUE
+            )
         )
     )
 
@@ -177,11 +187,11 @@ def test_compiling_reports_every_missing_extension_at_once(
 def test_compiling_succeeds_once_the_required_extension_is_registered(
     statechart_context: StatechartContext,
 ) -> None:
-    statechart_context.add_extension(ExtensionANodeRequires())
+    statechart_context.add_extension(extension=ExtensionANodeRequires())
     statechart = Statechart(context=statechart_context)
     statechart.add_node(
-        NodeRequiringAnExtension(
-            name="requiring", observation=ObservationStateValues.TRUE
+        node=NodeRequiringAnExtension(
+            name="requiring", observation=ObservationStateValue.TRUE
         )
     )
 
@@ -195,16 +205,18 @@ def test_a_node_joining_a_compiled_statechart_is_checked(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     statechart.add_node(
-        NodeSucceedingOnObservingTrue(
-            name="first", observation=ObservationStateValues.TRUE
+        node=NodeSucceedingOnObservingTrue(
+            name="first", observation=ObservationStateValue.TRUE
         )
     )
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
 
     with pytest.raises(NodesMissingContextExtensionsError) as raised:
         statechart.add_node(
-            node := NodeRequiringAnExtension(
-                name="joining", observation=ObservationStateValues.TRUE
+            node=(
+                node := NodeRequiringAnExtension(
+                    name="joining", observation=ObservationStateValue.TRUE
+                )
             )
         )
 
@@ -224,7 +236,7 @@ def test_a_composite_node_expands_without_what_it_requires_once_compiled(
     statechart = Statechart(context=statechart_context)
     composite = CompositeRequiringAnExtension(name="composite")
 
-    statechart.add_node(composite)
+    statechart.add_node(node=composite)
 
     assert composite.expanded
 
@@ -233,7 +245,9 @@ def test_compiling_raises_for_an_expanded_composite_node_missing_a_required_exte
     statechart_context: StatechartContext,
 ) -> None:
     statechart = Statechart(context=statechart_context)
-    statechart.add_node(composite := CompositeRequiringAnExtension(name="composite"))
+    statechart.add_node(
+        node=(composite := CompositeRequiringAnExtension(name="composite"))
+    )
 
     with pytest.raises(NodesMissingContextExtensionsError) as raised:
         statechart.compiler.compile()
@@ -250,7 +264,7 @@ def test_a_composite_node_is_checked_for_what_it_reads_while_expanding(
     composite = CompositeReadingAnExtensionWhileExpanding(name="composite")
 
     with pytest.raises(NodesMissingContextExtensionsError) as raised:
-        statechart.add_node(composite)
+        statechart.add_node(node=composite)
 
     assert raised.value.nodes_by_missing_extension == {
         ExtensionACompositeReadsWhileExpanding: [composite]
@@ -262,10 +276,12 @@ def test_a_composite_node_expanded_elsewhere_compiles_without_what_it_read_to_ex
     statechart_context: StatechartContext,
 ) -> None:
     context_it_expands_in = StatechartContext(world=statechart_context.world)
-    context_it_expands_in.add_extension(ExtensionACompositeReadsWhileExpanding())
+    context_it_expands_in.add_extension(
+        extension=ExtensionACompositeReadsWhileExpanding()
+    )
     expanded_elsewhere = Statechart(context=context_it_expands_in)
     expanded_elsewhere.add_node(
-        CompositeReadingAnExtensionWhileExpanding(name="composite")
+        node=CompositeReadingAnExtensionWhileExpanding(name="composite")
     )
 
     received = Statechart.from_json(

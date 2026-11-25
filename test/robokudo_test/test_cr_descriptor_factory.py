@@ -1,3 +1,9 @@
+"""
+Verify camera reader descriptors select registered interfaces and configurations.
+"""
+
+from __future__ import annotations
+
 # %% Imports
 import pytest
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
@@ -10,6 +16,10 @@ from robokudo.io.storage_reader_interface import StorageReaderInterface
 
 
 class TestCrDescriptorFactory(object):
+    """
+    Check camera selection and configuration validation during reader construction.
+    """
+
     def test_cr_descriptor_factory_valid_interface_name(self) -> None:
         """
         Test the creation of a valid cr descriptor config.

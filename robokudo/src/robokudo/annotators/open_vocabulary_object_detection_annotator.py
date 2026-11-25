@@ -4,7 +4,6 @@ Open-vocabulary object detection with optional Segment Anything masks.
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from timeit import default_timer
@@ -13,6 +12,8 @@ import cv2
 import numpy
 import py_trees
 import torch
+
+# %% Imports
 from semantic_digital_twin.world_description.geometry import Color
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 from typing_extensions import TYPE_CHECKING

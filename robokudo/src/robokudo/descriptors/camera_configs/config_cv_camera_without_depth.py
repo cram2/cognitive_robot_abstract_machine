@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import cv2
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from sensor_msgs.msg import CameraInfo
 from typing_extensions import TYPE_CHECKING
 

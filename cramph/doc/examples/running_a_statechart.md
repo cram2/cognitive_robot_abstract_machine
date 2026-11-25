@@ -65,14 +65,14 @@ plan = Sequence(
         CountTicks(name="retreat", ticks=5),
     ]
 )
-statechart.add_node(plan)
-statechart.add_node(EndStatechart.when_true(plan))
+statechart.add_node(node=plan)
+statechart.add_node(node=EndStatechart.when_true(node=plan))
 ```
 
 ## Ticking it
 
 ```{code-cell} ipython3
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.tick_until_end(timeout=100)
 
 print(f"Ticks executed: {executor.tick_count}")
@@ -95,6 +95,6 @@ from pathlib import Path
 from tempfile import mkdtemp
 
 output_directory = Path(mkdtemp())
-statechart.draw(str(output_directory / "statechart.pdf"))
-statechart.plot_gantt_chart(str(output_directory / "statechart_gantt_chart.pdf"))
+statechart.draw(file_name=str(output_directory / "statechart.pdf"))
+statechart.plot_gantt_chart(path=str(output_directory / "statechart_gantt_chart.pdf"))
 ```

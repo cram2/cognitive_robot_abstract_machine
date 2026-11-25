@@ -5,10 +5,10 @@ structures.
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 
+# %% Imports
 from py_trees.common import Status
 from py_trees.composites import Sequence
 from py_trees.display import unicode_tree

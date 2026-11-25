@@ -6,7 +6,6 @@ This module provides an annotator for visualizing object hypotheses in both
 
 from __future__ import annotations
 
-# %% Imports
 import copy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,6 +14,8 @@ from timeit import default_timer
 import cv2
 import open3d as o3d
 import trimesh
+
+# %% Imports
 from py_trees.common import Status
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.world_description.world_entity import Body

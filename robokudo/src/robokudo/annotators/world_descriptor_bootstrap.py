@@ -4,11 +4,11 @@ Bootstrap static world descriptor content into the shared world.
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 from uuid import UUID
 
+# %% Imports
 from py_trees.common import Status
 from typing_extensions import Any
 

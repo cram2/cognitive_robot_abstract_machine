@@ -6,31 +6,28 @@ from __future__ import annotations
 
 # %% Imports
 import json
-from collections.abc import Iterator
 
 import numpy as np
 import pytest
-from py_trees.common import Status
-
 from krrood.adapters.json_serializer import from_json
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
+from py_trees.common import Status
 from robokudo.annotators.file_writer import FileWriter
-from robokudo.types.cv import ColorToDepthRatio
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_filereader_playback import (
     FileReaderCameraConfig,
 )
 from robokudo.io.file_reader_interface import RGBDFileReaderInterface
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types import Point2
+from robokudo.types.cv import ColorToDepthRatio
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 
-from .test_camera_interface_observation import runtime_world
+from .test_camera_interface_observation import runtime_world as runtime_world
 
 # %% Camera observation recording
 

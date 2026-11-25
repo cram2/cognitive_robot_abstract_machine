@@ -6,13 +6,14 @@ This annotator visualizes predefined objects and regions from a world descriptor
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
 import open3d
 import py_trees
+
+# %% Imports
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 import robokudo.annotators.core

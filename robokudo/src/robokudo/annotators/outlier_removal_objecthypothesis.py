@@ -19,12 +19,13 @@ Authors:
 
 from __future__ import annotations
 
-# %% Imports
 from dataclasses import dataclass, field
 from timeit import default_timer
 
 import numpy as np
 import open3d as o3d
+
+# %% Imports
 from py_trees.common import Status
 from rcl_interfaces.msg import SetParametersResult
 from rclpy.parameter import Parameter

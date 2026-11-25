@@ -1,9 +1,20 @@
+"""
+Tests of specificity-ranked selection among the alternatives of a family.
+"""
+
 from abc import ABC
+
+from typing_extensions import Callable
 
 import pytest
 
 from krrood.patterns.exceptions import AmbiguousRuleError
-from krrood.patterns.specificity_ranking import SpecificityRule
+from krrood.patterns.classproperty import classproperty
+from krrood.patterns.specificity_ranking import (
+    SpecificityRankedAlternative,
+    SpecificityRule,
+    mro_depth,
+)
 
 # %% a family of rules that classify numbers
 
@@ -92,6 +103,71 @@ class SecondOverlappingRule(OverlappingRule):
         return True
 
 
+# %% a family ranked by the type it handles, with a guard of its own name
+
+
+class TypeHandlingAlternative(SpecificityRankedAlternative, ABC):
+    """
+    A family whose alternatives each handle one type and are ranked by that type's
+    depth.
+    """
+
+    @classproperty
+    def handled_type(cls) -> type:
+        """
+        The type of the subjects this alternative handles.
+        """
+        return object
+
+    @classproperty
+    def guard(cls) -> Callable[..., bool]:
+        """
+        :meth:`handles`.
+        """
+        return cls.handles
+
+    @classproperty
+    def specificity(cls) -> int:
+        """
+        The depth of :attr:`handled_type`, not of the alternative itself.
+        """
+        return mro_depth(cls.handled_type)
+
+    @classmethod
+    def handles(cls, *, subject: object) -> bool:
+        """
+        :param subject: The subject to decide on.
+        :return: Whether ``subject`` is of :attr:`handled_type`.
+        """
+        return isinstance(subject, cls.handled_type)
+
+
+class IntegerHandlingAlternative(TypeHandlingAlternative):
+    """
+    Handles integers, booleans included.
+    """
+
+    @classproperty
+    def handled_type(cls) -> type:
+        """
+        :class:`int`.
+        """
+        return int
+
+
+class BooleanHandlingAlternative(TypeHandlingAlternative):
+    """
+    Handles booleans; a sibling of :class:`IntegerHandlingAlternative`, not a subclass.
+    """
+
+    @classproperty
+    def handled_type(cls) -> type:
+        """
+        :class:`bool`.
+        """
+        return bool
+
+
 # %% tests
 
 
@@ -123,3 +199,15 @@ def test_equally_specific_applying_rules_are_rejected():
         FirstOverlappingRule,
         SecondOverlappingRule,
     }
+
+
+@pytest.mark.parametrize(
+    "subject, alternative",
+    [(3, IntegerHandlingAlternative), (True, BooleanHandlingAlternative)],
+)
+def test_a_family_chooses_with_its_own_guard_and_specificity(subject, alternative):
+    """
+    A boolean goes to the alternative for :class:`bool`, whose type is deeper than
+    :class:`int`, although neither alternative subclasses the other.
+    """
+    assert TypeHandlingAlternative.most_applicable(subject=subject) is alternative

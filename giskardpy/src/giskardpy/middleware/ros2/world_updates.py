@@ -1,3 +1,8 @@
+"""
+The world updates Giskard and its clients exchange around a goal, and what each side has
+to catch up with before it may read the world.
+"""
+
 from __future__ import annotations
 
 import time
@@ -7,10 +12,11 @@ from time import sleep
 from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json
-from semantic_digital_twin.adapters.ros.messages import StreamPosition
+from krrood_synchronization.exceptions import DivergedFromPublisherError
+from krrood_synchronization.messages import MessageOrigin, StreamPosition
+from krrood_synchronization.stream_participants import PublicationProgress
 from semantic_digital_twin.adapters.ros.world_synchronizer import (
     ModelReloadSynchronizer,
-    PublicationProgress,
     WorldSynchronizer,
 )
 
@@ -20,7 +26,7 @@ from giskardpy.middleware.ros2.feedback_publisher import MotionStatechartPayload
 # %% the world of Giskard
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IncomingWorldUpdates:
     """
     The world updates other processes sent to Giskard.
@@ -75,15 +81,25 @@ class IncomingWorldUpdates:
             return
         self.model_reload_synchronizer.apply_pending_reload()
 
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
         """
         Whether everything the publisher of ``position`` sent up to it was applied to
         the world.
         """
-        return self.world_synchronizer.has_applied(position)
+        return self.world_synchronizer.has_applied(position=position)
+
+    def divergence_from(
+        self, *, publisher: MessageOrigin
+    ) -> DivergedFromPublisherError | None:
+        """
+        :param publisher: Another process.
+        :return: The first failure to apply an update of ``publisher`` to the world, or
+            ``None`` if every update of it was applied.
+        """
+        return self.world_synchronizer.divergence_from(publisher=publisher)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OutgoingWorldUpdates:
     """
     The changes of Giskard's world that the running goal published to other processes.
@@ -126,7 +142,7 @@ class OutgoingWorldUpdates:
 # %% the world of a client
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientWorldUpdates:
     """
     Keeps the world of a client in step with Giskard around a goal.
@@ -164,7 +180,7 @@ class ClientWorldUpdates:
             return None
         return self.world_synchronizer.latest_published_position
 
-    def wait_for_the_changes_of_a_goal(self, result: dict[str, Any]) -> None:
+    def wait_for_the_changes_of_a_goal(self, *, result: dict[str, Any]) -> None:
         """
         Wait until the changes Giskard made while executing a goal reached this world.
 
@@ -173,11 +189,11 @@ class ClientWorldUpdates:
             ``timeout``.
         """
         catching_up = CatchingUpWithGiskard(world_updates=self)
-        while not catching_up.has_applied_the_changes_reported_in(result):
+        while not catching_up.has_applied_the_changes_reported_in(report=result):
             sleep(self.poll_interval.total_seconds())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CatchingUpWithGiskard:
     """
     The world of a client catching up with the changes Giskard reports to have published
@@ -205,7 +221,7 @@ class CatchingUpWithGiskard:
     was reported.
     """
 
-    def has_applied_the_changes_reported_in(self, report: dict[str, Any]) -> bool:
+    def has_applied_the_changes_reported_in(self, *, report: dict[str, Any]) -> bool:
         """
         :param report: A feedback or the result of a goal.
         :return: Whether the changes Giskard reports to have published while executing
@@ -216,12 +232,12 @@ class CatchingUpWithGiskard:
         published_position = report.get(MotionStatechartPayloadKey.PUBLISHED_POSITION)
         synchronizer = self.world_updates.world_synchronizer
         if published_position is None or synchronizer.has_applied(
-            position := from_json(published_position)
+            position=(position := from_json(published_position))
         ):
             self._awaited_position = None
             return True
         if self._awaited_position is None or synchronizer.has_applied(
-            self._awaited_position
+            position=self._awaited_position
         ):
             self._awaited_position = position
             self._waiting_since = self.world_updates.clock()
