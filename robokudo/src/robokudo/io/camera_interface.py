@@ -340,7 +340,7 @@ class CameraInterface(object):
             timestamp_nanoseconds=timestamp_nanoseconds,
         )
         if world_T_camera is not None and world_T_camera.child_frame is not camera.root:
-            observation = observation.with_world_T_camera(
+            observation = observation.copy_with_world_T_camera(
                 world_T_camera=HomogeneousTransformationMatrix(
                     data=world_T_camera,
                     reference_frame=world_T_camera.reference_frame,

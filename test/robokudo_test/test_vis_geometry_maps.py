@@ -133,7 +133,7 @@ class TestVisGeometryMaps(object):
         """
         iterations = 3
 
-        write_manager = SharedMemoryManager.with_shm(
+        write_manager = SharedMemoryManager.create_shared_memory(
             size=(1000 * np.dtype(np.float64).itemsize * (3 + 3 + 3 + 9)) * iterations
         )
 
@@ -182,7 +182,9 @@ class TestVisGeometryMaps(object):
         iterations = 3
 
         mesh_size = (np.dtype(np.float64).itemsize * (3 + 3 + 3)) * 1000
-        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=mesh_size * iterations
+        )
 
         input_meshes = []
         for _ in range(iterations):
@@ -218,7 +220,9 @@ class TestVisGeometryMaps(object):
             + (np.dtype(np.int32).itemsize * (3 + 1))
             + (np.dtype(np.int64).itemsize * (3 + 2 + 3))
         ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
-        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=mesh_size * iterations
+        )
 
         input_meshes = []
         for _ in range(iterations):
@@ -253,7 +257,9 @@ class TestVisGeometryMaps(object):
             (np.dtype(np.float64).itemsize * (3 + 3 + 3))
             + (np.dtype(np.int64).itemsize * 4)
         ) * 1000
-        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=mesh_size * iterations
+        )
 
         input_meshes = []
         for _ in range(iterations):
@@ -289,7 +295,9 @@ class TestVisGeometryMaps(object):
             + (np.dtype(np.int32).itemsize * (3 + 1))
             + (np.dtype(np.int64).itemsize * (3 + 2 + 3))
         ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
-        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=mesh_size * iterations
+        )
 
         input_meshes = []
         for _ in range(iterations):
@@ -333,7 +341,9 @@ class TestVisGeometryMaps(object):
         iterations = 3
 
         bbox_size = (3 + 3 + 3 + 9) * np.dtype(np.float64).itemsize
-        write_manager = SharedMemoryManager.with_shm(size=bbox_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=bbox_size * iterations
+        )
 
         input_obbs = []
         for _ in range(iterations):
@@ -370,7 +380,9 @@ class TestVisGeometryMaps(object):
         iterations = 3
 
         bbox_size = (3 + 3 + 3) * np.dtype(np.float64).itemsize
-        write_manager = SharedMemoryManager.with_shm(size=bbox_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=bbox_size * iterations
+        )
 
         input_obbs = []
         for _ in range(iterations):
@@ -411,7 +423,9 @@ class TestVisGeometryMaps(object):
             ((3 + 3) * np.dtype(np.float64).itemsize)
             + (2 * np.dtype(np.int32).itemsize)
         ) * 1000
-        write_manager = SharedMemoryManager.with_shm(size=lineset_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=lineset_size * iterations
+        )
 
         input_linesets = []
         for _ in range(iterations):
@@ -461,7 +475,9 @@ class TestVisGeometryMaps(object):
             + (np.dtype(np.int32).itemsize * (3 + 1))
             + (np.dtype(np.int64).itemsize * (3 + 2 + 3))
         ) * 1000 + ((np.dtype(np.uint8).itemsize * (512 * 512)) * 2)
-        write_manager = SharedMemoryManager.with_shm(size=mesh_size * iterations)
+        write_manager = SharedMemoryManager.create_shared_memory(
+            size=mesh_size * iterations
+        )
 
         input_dicts: list[dict] = []
         for _ in range(iterations):

@@ -1147,7 +1147,7 @@ class SharedMemoryManager(object):
     """The current end byte index of the shared memory (sum of all memory map sizes)."""
 
     @classmethod
-    def with_shm(cls, *, size: int) -> Self:
+    def create_shared_memory(cls, *, size: int) -> Self:
         """Create a SharedMemoryManager with a newly created shared memory of the given size.
 
         :param size: The size of the shared memory to create.
@@ -1156,7 +1156,7 @@ class SharedMemoryManager(object):
         return cls(_shm=shared_memory.SharedMemory(create=True, size=size))
 
     @classmethod
-    def for_shm(cls, *, name: str) -> Self:
+    def attach_to_shared_memory(cls, *, name: str) -> Self:
         """Create a SharedMemoryManager for an existing shared memory with the given name.
 
         :param name: The name of the shared memory to use.
@@ -1284,8 +1284,8 @@ class MultiprocessedViewer3DClient(object):
         :return: The shared memory manager for the given shared memory name.
         """
         if shm_name not in self.name_to_shm_manager:
-            self.name_to_shm_manager[shm_name] = SharedMemoryManager.for_shm(
-                name=shm_name
+            self.name_to_shm_manager[shm_name] = (
+                SharedMemoryManager.attach_to_shared_memory(name=shm_name)
             )
         return self.name_to_shm_manager[shm_name]
 
@@ -1400,7 +1400,7 @@ class MultiprocessedViewer3D(object):
         """Event indicating that the o3d visualizer shut down."""
 
         self.memory_manager = [
-            SharedMemoryManager.with_shm(size=shm_size)
+            SharedMemoryManager.create_shared_memory(size=shm_size)
             for _ in range(self.buffer_count)
         ]
         """Manager instances for shared memory handling."""

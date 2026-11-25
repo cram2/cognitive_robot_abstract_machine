@@ -33,7 +33,7 @@ class CameraObservation:
     The camera root is the optical frame; its sampled pose is also its replay pose. A
     supplied pose must have a reference frame and identify this camera's optical root.
     Frame metadata and the camera root must remain unchanged after construction; use
-    :meth:`with_world_T_camera` to replace the sampled pose.
+    :meth:`copy_with_world_T_camera` to replace the sampled pose.
     """
 
     camera: Camera
@@ -136,7 +136,7 @@ class CameraObservation:
         """
         return self.world_T_camera_or_raise().inverse()
 
-    def with_world_T_camera(
+    def copy_with_world_T_camera(
         self, *, world_T_camera: HomogeneousTransformationMatrix
     ) -> CameraObservation:
         """
