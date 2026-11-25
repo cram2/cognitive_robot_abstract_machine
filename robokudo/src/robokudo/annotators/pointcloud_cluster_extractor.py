@@ -50,6 +50,8 @@ if TYPE_CHECKING:
 
     from robokudo.types.cv import ColorToDepthRatio
 
+logger = logging.getLogger(__name__)
+
 DILATION_KERNEL = np.ones((3, 3), np.uint8)
 
 
@@ -109,7 +111,6 @@ def cluster_points(
     input_cloud: open3d.geometry.PointCloud,
     eps: float,
     min_points: int,
-    rk_logger: logging.Logger,
 ) -> list[int]:
     """
     Cluster points using DBSCAN algorithm.
@@ -117,14 +118,13 @@ def cluster_points(
     :param input_cloud: Point cloud to cluster
     :param eps: DBSCAN epsilon parameter (density threshold)
     :param min_points: Minimum points for a cluster
-    :param rk_logger: Logger instance for progress reporting
     :return: List of point indices for each cluster
 
     .. note::
        Points labeled as noise (label=-1) are ignored in the output.
     """
     # Only print progress of DBSCAN when in logging level DEBUG
-    if rk_logger.getEffectiveLevel() < logging.getLevelNamesMapping()["DEBUG"]:
+    if logger.getEffectiveLevel() < logging.getLevelNamesMapping()["DEBUG"]:
         print_progress = True
     else:
         print_progress = False
@@ -135,7 +135,7 @@ def cluster_points(
     )
 
     max_label = labels.max()
-    rk_logger.debug(f"point cloud has {max_label + 1} clusters")
+    logger.debug(f"point cloud has {max_label + 1} clusters")
     all_cluster_indices = []
     # DBScan returns label==-1 for all points that appear to be noise
     # This will be ignored
@@ -329,7 +329,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
         """
         start_timer = default_timer()
-        self.rk_logger.info("PCE Start")
+        logger.info("Point cloud cluster extraction start")
         cloud = self.get_cas().get(CASViews.CLOUD)
         color_to_depth_ratio = self.get_cas().color_to_depth_ratio
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
@@ -358,7 +358,6 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             input_cloud=on_plane_cloud,
             eps=self.descriptor.parameters.eps,
             min_points=self.descriptor.parameters.dbscan_min_cluster_count,
-            rk_logger=self.rk_logger,
         )
 
         cmap = plt.get_cmap("tab20")
@@ -368,7 +367,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         cluster_idx = 0
         for cluster_indices in all_cluster_indices:
             if len(cluster_indices) < self.descriptor.parameters.min_cluster_count:
-                self.rk_logger.debug(
+                logger.debug(
                     f"Skipping cluster {cluster_idx} with {len(cluster_indices)} points"
                 )
                 continue
@@ -393,7 +392,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             )  # limit to 0-19 range due to map size
             all_vis_clouds.append(clusters[cluster_idx]["vis_cloud"])
 
-            self.rk_logger.debug(
+            logger.debug(
                 f"Extracted cluster {cluster_idx} with {len(cluster_cloud.points)} points"
             )
 
@@ -421,7 +420,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             cluster_idx += 1
 
         if len(object_hypotheses) == 0:
-            self.rk_logger.warning("No Clusters have been found.")
+            logger.warning("No Clusters have been found.")
             end_timer = default_timer()
             self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
             return Status.FAILURE
@@ -462,7 +461,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
-        self.rk_logger.info("PCE Done")
+        logger.info("Point cloud cluster extraction done")
         return Status.SUCCESS
 
 
@@ -555,7 +554,6 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             input_cloud=cloud,
             eps=self.descriptor.parameters.eps,
             min_points=self.descriptor.parameters.dbscan_min_cluster_count,
-            rk_logger=self.rk_logger,
         )
 
         cmap = plt.get_cmap("tab20")
@@ -565,7 +563,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         cluster_idx = 0
         for cluster_indices in all_cluster_indices:
             if len(cluster_indices) < self.descriptor.parameters.min_cluster_count:
-                self.rk_logger.debug(
+                logger.debug(
                     f"Skipping cluster {cluster_idx} with {len(cluster_indices)} points"
                 )
                 continue
@@ -582,7 +580,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             )  # limit to 0-19 range due to map size
             all_vis_clouds.append(clusters[cluster_idx]["vis_cloud"])
 
-            self.rk_logger.debug(
+            logger.debug(
                 f"Extracted cluster {cluster_idx} with {len(cluster_cloud.points)} points"
             )
 
@@ -610,7 +608,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             cluster_idx += 1
 
         if len(object_hypotheses) == 0:
-            self.rk_logger.warning("No Clusters have been found.")
+            logger.warning("No Clusters have been found.")
             end_timer = default_timer()
             self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
             return Status.FAILURE
@@ -643,5 +641,5 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
-        self.rk_logger.info("PCE Stop")
+        logger.info("Point cloud cluster extraction stop")
         return Status.SUCCESS

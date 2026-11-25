@@ -15,6 +15,7 @@ This module provides an annotator for:
 from __future__ import annotations
 
 # %% Imports
+import logging
 from enum import StrEnum
 from timeit import default_timer
 
@@ -32,6 +33,8 @@ from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ImagePreprocessorAnnotator(BaseAnnotator):
@@ -88,7 +91,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.color: npt.NDArray | None = None
         """

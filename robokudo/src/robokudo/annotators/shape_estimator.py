@@ -6,6 +6,7 @@ shape models to segmented object point clouds.
 
 from __future__ import annotations
 
+import logging
 import copy
 from dataclasses import dataclass
 
@@ -37,6 +38,8 @@ from robokudo.utils.shape_fitting import (
     refit_cylinder_with_fixed_axis,
     select_best_shape,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -617,10 +620,10 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         axis_deviation_degrees = self._axis_angle_degrees(
             original_fit.axis_direction, selected_candidate.axis_direction
         )
-        self.rk_logger.info(
+        logger.info(
             f"{self.name} stabilized cylinder axis: "
             f"source={selected_candidate.source}, "
-            f"deviation={axis_deviation_degrees:.2f}deg, "
+            f"deviation={axis_deviation_degrees:.2f} degrees, "
             f"score_before={original_fit.score:.3f}, "
             f"score_after={selected_candidate.fit.score:.3f}"
         )
@@ -997,7 +1000,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         if not self.descriptor.parameters.log_rejection_reasons:
             return
         object_name = object_hypothesis.id if object_hypothesis.id != "" else "object"
-        self.rk_logger.info(f"{self.name} rejected {shape_name} for {object_name}")
+        logger.info(f"{self.name} rejected {shape_name} for {object_name}")
 
     def _log_candidate_metrics(
         self, object_hypothesis: ObjectHypothesis, fit_result: FittedShape
@@ -1006,7 +1009,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         if not self.descriptor.parameters.log_candidate_metrics:
             return
         object_name = object_hypothesis.id if object_hypothesis.id != "" else "object"
-        self.rk_logger.info(
+        logger.info(
             f"{self.name} candidate {object_name}: "
             f"{adapter_for_fit(fit_result).summary(fit_result)}"
         )
@@ -1018,7 +1021,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         if not self.descriptor.parameters.log_candidate_metrics:
             return
         object_name = object_hypothesis.id if object_hypothesis.id != "" else "object"
-        self.rk_logger.info(
+        logger.info(
             f"{self.name} selected {object_name}: "
             f"{adapter_for_fit(fit_result).summary(fit_result)}"
         )

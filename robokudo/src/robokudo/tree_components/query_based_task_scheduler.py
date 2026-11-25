@@ -8,6 +8,7 @@ of perception pipelines based on the current query state.
 Original implementation by Malte Huerkamp.
 """
 
+import logging
 from py_trees.composites import Composite, Sequence
 from robokudo_msgs.action import Query
 from typing_extensions import Any, Callable
@@ -16,6 +17,8 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.tree_components.task_scheduler import TaskSchedulerBase
 from robokudo.utils.tree import add_child_to_parent, setup_with_descendants_on_behavior
+
+logger = logging.getLogger(__name__)
 
 
 class QueryBasedScheduler(
@@ -86,10 +89,10 @@ class QueryBasedScheduler(
         query = self.get_cas().get(CASViews.QUERY)
 
         task_key = self.filter_fn(query)
-        self.rk_logger.info(f"Running perception task: {task_key}")
+        logger.info(f"Running perception task: {task_key}")
 
         if task_key not in self.tasks.keys():
-            self.rk_logger.debug(f"Can't find task pipeline for '{task_key}'")
+            logger.debug(f"Can't find task pipeline for '{task_key}'")
             return None
 
         job_elements = self.tasks[task_key]
