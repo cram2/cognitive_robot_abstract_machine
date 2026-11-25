@@ -89,7 +89,10 @@ from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.rustworkx_utils.rxnode import RWXNode
-from krrood.entity_query_language.class_diagram_lookup import get_field_type_endpoint, get_wrapped_field
+from krrood.entity_query_language.class_diagram_lookup import (
+    get_field_type_endpoint,
+    get_wrapped_field,
+)
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.backends import QueryBackend
@@ -515,13 +518,13 @@ class Match(
         self._update_fields_(variable=variable, parent=parent)
         self._conditions_.extend(self._type_union_conditions_)
         if variable is not None and self._domain_ is not None:
-            self._conditions_.append(
-                Comparator(
-                    left=_resolve_domain(type_=self._type_, domain=self._domain_),
-                    right=self._variable_,
-                    operation=operator.contains,
-                )
+            # A variable over the domain reads a one-shot source once, and an expression
+            # domain per binding, where a membership test would re-read the raw domain.
+            domain_member = Variable(
+                _type_=self._type_,
+                _domain_=_resolve_domain(type_=self._type_, domain=self._domain_),
             )
+            self._conditions_.append(self._variable_ == domain_member)
         for attr_name, attr_assigned_value in self._kwargs_.items():
             if isinstance(attr_assigned_value, (list, tuple)) and any(
                 isinstance(element, AbstractMatchExpression)
@@ -583,7 +586,14 @@ class Match(
                 assigned_value=element,
                 index_access=index,
             )
-        self._conditions_.append(length(iterable=getattr(self._variable_, key)) == len(value))
+        collection = getattr(self._variable_, key)
+        # An absent optional collection holds no elements and has no length to compare.
+        self._conditions_.append(
+            AND(
+                left=collection != None,
+                right=length(iterable=collection) == len(value),
+            )
+        )
 
     def _update_fields_(
         self,
@@ -1068,7 +1078,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
         element_quantifier = self.assigned_value._element_quantifier_
         if self.assigned_value._resolved_:
             self._conditions_.append(
-                self._condition_on_resolved_pattern_(element_quantifier=element_quantifier)
+                self._condition_on_resolved_pattern_(
+                    element_quantifier=element_quantifier
+                )
             )
             return
 
@@ -1109,18 +1121,18 @@ class AttributeMatch(AbstractMatchExpression[T]):
             *self.assigned_value._conditions_,
             *self.assigned_value._where_conditions_,
         )
-        if (
-            element_quantifier is ElementQuantifier.EVERY
-            and self._states_an_element_of_the_attribute_
-        ):
-            element = Variable(_domain_=self.attribute)
-            return ForAll(
-                left=element,
-                right=Exists(
-                    left=pattern_value,
-                    right=AND(left=pattern_value == element, right=pattern_holds),
-                ),
-            )
+        if element_quantifier is ElementQuantifier.EVERY:
+            if self._states_an_element_of_the_attribute_:
+                element = Variable(_domain_=self.attribute)
+                return ForAll(
+                    left=element,
+                    right=Exists(
+                        left=pattern_value,
+                        right=AND(left=pattern_value == element, right=pattern_holds),
+                    ),
+                )
+            # The one value of a single-valued attribute is every element there is.
+            element_quantifier = ElementQuantifier.SOME
         return element_quantifier.condition_on_elements(
             element=pattern_value,
             condition=AND(
@@ -1143,7 +1155,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
             self.assigned_value._element_quantifier_ is not ElementQuantifier.SOME
         )
         if self.is_type_filter_needed or quantifier_states_the_type:
-            conditions.append(HasType(variable=variable, types_=self.assigned_value._type_))
+            conditions.append(
+                HasType(variable=variable, types_=self.assigned_value._type_)
+            )
         conditions.extend(self.assigned_value._conditions_)
         return conditions
 
@@ -1155,7 +1169,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
         if not self._states_an_element_of_the_attribute_:
             return self.attribute == self.assigned_variable
         membership = Comparator(
-            left=self.attribute, right=self.assigned_variable, operation=operator.contains
+            left=self.attribute,
+            right=self.assigned_variable,
+            operation=operator.contains,
         )
         if self._collection_field_.is_optional:
             # An absent optional collection has no elements, so it contains nothing.
@@ -1177,9 +1193,11 @@ class AttributeMatch(AbstractMatchExpression[T]):
         value = self.assigned_value
         if isinstance(value, AbstractMatchExpression):
             return True
-        element_type = get_origin(self._collection_element_type_) or (
-            self._collection_element_type_
-        )
+        element_type = self._collection_element_type_
+        if is_union_annotation(element_type):
+            # Elements of a union are instances of its members' nearest common base.
+            element_type = common_base_class(list(get_args(element_type)))
+        element_type = get_origin(element_type) or element_type
         # An element type that is no class, or ``Any``, cannot be checked against.
         element_type_is_known = isclass(element_type) and element_type is not Any
         if isinstance(value, SymbolicExpression):
@@ -1200,7 +1218,9 @@ class AttributeMatch(AbstractMatchExpression[T]):
             return True
         if is_a_collection:
             return False
-        raise ValueFitsNeitherElementNorCollection(attribute_match=self, element_type=element_type)
+        raise ValueFitsNeitherElementNorCollection(
+            attribute_match=self, element_type=element_type
+        )
 
     @property
     def _attribute_holds_a_collection_(self) -> bool:
@@ -1223,15 +1243,18 @@ class AttributeMatch(AbstractMatchExpression[T]):
             # Nested in an attribute, the class is the one the pattern assigned to that
             # attribute names, as EndEffector in end_effector=an(EndEffector)(...).
             pattern = pattern.assigned_value
-        pattern_class = getattr(pattern, "_type_", None)
+        pattern_class = pattern._type_
         wrapped_field = self._field_declared_below_(
-            pattern_class
-        ) or self._field_declared_below_(self.attribute._owner_class_)
-        if wrapped_field is None or self._declared_collection_(wrapped_field) is None:
+            owner_class=pattern_class
+        ) or self._field_declared_below_(owner_class=self.attribute._owner_class_)
+        if (
+            wrapped_field is None
+            or self._declared_collection_(wrapped_field=wrapped_field) is None
+        ):
             return None
         return wrapped_field
 
-    def _field_declared_below_(self, owner_class: Any) -> WrappedField | None:
+    def _field_declared_below_(self, *, owner_class: Any) -> WrappedField | None:
         """
         :param owner_class: The class the pattern is written for, or the class the
             attribute is read from.
@@ -1264,11 +1287,13 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         :return: The type of the elements of the collection-valued attribute.
         """
-        element_types = get_args(self._declared_collection_(self._collection_field_))
+        element_types = get_args(
+            self._declared_collection_(wrapped_field=self._collection_field_)
+        )
         return element_types[0] if element_types else None
 
     @staticmethod
-    def _declared_collection_(wrapped_field: WrappedField) -> Any | None:
+    def _declared_collection_(*, wrapped_field: WrappedField) -> Any | None:
         """
         :param wrapped_field: The field of an attribute.
         :return: The collection type the field is declared as, unwrapped from optional,

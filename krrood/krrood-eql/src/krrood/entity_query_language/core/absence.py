@@ -23,3 +23,10 @@ class Absence(Enum):
     """
     The element of a collection that holds no elements, or of one that is itself absent.
     """
+
+    def __bool__(self) -> bool:
+        """
+        An absent element is false, so a condition that reads it as its truth does not
+        hold.
+        """
+        return False

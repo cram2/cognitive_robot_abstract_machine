@@ -96,7 +96,8 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         )
         if left_value is Absence.NO_ELEMENT or right_value is Absence.NO_ELEMENT:
             return self._operation_result_with_value_(
-                self.operation in self.negations, child_result
+                comparison_result=self.operation in self.negations,
+                child_result=child_result,
             )
         if (
             self.operation in [operator.eq, operator.ne]
@@ -110,11 +111,12 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             else:
                 left_value, right_value = make_set(left_value), make_set(right_value)
         return self._operation_result_with_value_(
-            self.operation(left_value, right_value), child_result
+            comparison_result=self.operation(left_value, right_value),
+            child_result=child_result,
         )
 
     def _operation_result_with_value_(
-        self, comparison_result: bool, child_result: OperationResult
+        self, *, comparison_result: bool, child_result: OperationResult
     ) -> OperationResult:
         """
         :param comparison_result: Whether the comparison holds.
