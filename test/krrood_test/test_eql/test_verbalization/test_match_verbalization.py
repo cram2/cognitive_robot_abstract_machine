@@ -79,7 +79,7 @@ def test_match_opens_with_generate():
 
 def test_domain_carrying_match_also_opens_with_generate():
     """
-    A domain-carrying ``an(...).from_(...)`` still opens with *"Generate"* by
+    A domain-carrying ``an(...).from_(domain=...)`` still opens with *"Generate"* by
     default: the domain does not by itself make it a search — that is the
     backend's call.
     """

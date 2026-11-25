@@ -19,8 +19,9 @@ from types import ModuleType
 
 import pytest
 
-from typing_extensions import Optional
+from typing_extensions import Iterable, List, Optional
 
+from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.class_diagram_lookup import get_field_type_endpoint
 from krrood.symbol_graph.symbol_graph import Symbol
 
@@ -83,6 +84,30 @@ def shadowing_module() -> ModuleType:
     return importlib.import_module(
         f"{__package__}.annotation_resolution_shadowing_module"
     )
+
+
+def names_of(courses: Iterable[ResolutionCourse]) -> List[str]:
+    """
+    :param courses: The matched courses.
+    :return: Their sorted names.
+    """
+    return sorted(course.name for course in courses)
+
+
+def build_courses():
+    """
+    :return: Courses Logic (taught by a dean), AI (taught by a lecturer), Databases
+        (taught by both) and Orphan (taught by nobody).
+    """
+    faculty = ResolutionOrganization(name="Faculty")
+    dean = Person(name="Dean", is_dean_of={faculty})
+    lecturer = Person(name="Lecturer")
+    return [
+        ResolutionCourse(name="Logic", is_taught_by={dean}),
+        ResolutionCourse(name="AI", is_taught_by={lecturer}),
+        ResolutionCourse(name="Databases", is_taught_by={lecturer, dean}),
+        ResolutionCourse(name="Orphan"),
+    ]
 
 
 # %% A same-named class in another loaded module does not shadow
@@ -156,3 +181,33 @@ def test_type_checking_only_name_resolves_through_the_class_diagram():
     under ``TYPE_CHECKING``, so it is found through the class diagram.
     """
     assert get_field_type_endpoint(FallbackHolder, "targets") is FallbackTarget
+
+
+# %% Matching through two collection levels with a same-named class loaded
+
+
+def test_two_level_match_over_test_local_classes_returns_the_right_rows():
+    """
+    With the university dataset's ``Person`` loaded, matching courses taught by a person
+    who is dean of some organization finds exactly the courses with a dean among their
+    teachers: Logic and Databases.
+    """
+    pattern = a(ResolutionCourse)(
+        is_taught_by=a(Person)(is_dean_of=a(ResolutionOrganization)())
+    )
+    assert names_of(pattern.from_(domain=build_courses()).evaluate()) == [
+        "Databases",
+        "Logic",
+    ]
+
+
+def test_one_level_match_over_test_local_classes_returns_the_right_rows():
+    """
+    Matching courses taught by some person finds every taught course and not the orphan.
+    """
+    pattern = a(ResolutionCourse)(is_taught_by=a(Person)())
+    assert names_of(pattern.from_(domain=build_courses()).evaluate()) == [
+        "AI",
+        "Databases",
+        "Logic",
+    ]

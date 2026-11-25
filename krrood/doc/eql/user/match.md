@@ -112,6 +112,90 @@ to create a {py:func}`~krrood.entity_query_language.factories.variable`,
  selects it using {py:func}`~krrood.entity_query_language.factories.entity` and automatically adds the corresponding {py:meth}`~krrood.entity_query_language.query.query.Query.where` clauses.
 ```
 
+## Matching Collection-Valued Attributes
+
+When an attribute holds a collection (it is declared as a `list`, `set`, `tuple` or `Sequence` of some type), a single
+value or a nested pattern given for it describes **one element** of the collection:
+
+- `attr=value` matches when `value` is in the collection. The same holds for a variable whose type is the element type,
+  such as `takes_course=variable(Course, ...)`.
+- `attr=a(Type)(...)` matches when **some** element of the collection matches the nested pattern. Each object appears
+  in the results once, however many of its elements match, and an object whose collection is empty does not match.
+
+```python
+# Students taking the 'Logic' course
+a(Student)(takes_course=logic).from_(students)
+
+# Students taking some course named 'Databases'
+a(Student)(takes_course=a(Course)(name="Databases")).from_(students)
+
+# Students taking some course taught by someone who is the dean of some organization
+a(Student)(takes_course=a(Course)(is_taught_by=a(Person)(is_dean_of=an(Organization)())))
+```
+
+Nested patterns through several collection-valued attributes, as in the last query, mean "some element, whose
+attribute has some element, ...".
+
+Which reading applies is decided by the declared types: a value of the element type describes one element, and a
+collection describes the whole collection. A plain value that is neither raises
+{py:class}`~krrood.entity_query_language.exceptions.ValueFitsNeitherElementNorCollection`.
+
+- A set is compared as a set: `takes_course={logic, ai}` matches only a student taking exactly these two courses.
+- A list or tuple is compared by order, length and duplicates: on a `list[Course]` attribute, `courses=[logic, ai]`
+  does not match `[ai, logic]`, `[logic, ai, databases]` or `[logic, logic, ai]`.
+- A list of patterns matches the elements position by position, and the attribute must hold as many elements.
+- A variable whose values are whole collections is compared to the whole collection.
+- To ask about one position, index the attribute: `playlist.courses[0] == logic`.
+
+A nested pattern ranging over a domain is satisfied only by an object in that domain, on any attribute:
+`takes_course=a(Course)().from_(core_courses)` matches the students taking some course in `core_courses`, and
+`advisor=a(Person)().from_(deans)` the students whose advisor is one of `deans`. A variable with a domain is different:
+it stays free, so `takes_course=variable(Course, domain=core_courses)` gives one result for each student and each of
+their courses in `core_courses`, which `.distinct()` reduces to one per student.
+
+An attribute declared as an optional collection, such as `Optional[set[Course]]`, is matched the same way, and an absent
+collection (`None`) counts as empty: it contains no value and no element matches a pattern. `attr=None` still compares
+the attribute to `None`.
+
+### Every element and no element with `every_is(Type)` and `none_is(Type)`
+
+`every_is` and `none_is` take the place of `a` in a nested pattern to say how many elements match it:
+
+- `attr=every_is(Type)(...)` matches when **every** element of the collection is a `Type` that matches the pattern.
+- `attr=none_is(Type)(...)` matches when **no** element of the collection is a `Type` that matches the pattern.
+
+An empty or absent collection satisfies both, since it has no element that fails them. The type is stated of each
+element rather than used to pick some: `courses=every_is(SeminarCourse)` matches the students all of whose courses are
+seminars. Conditions given with `.where(...)` belong to the pattern, so they too hold of every element, or of none:
+
+```python
+# Students all of whose courses are taught by a dean
+a(Student)(takes_course=every_is(Course)(is_taught_by=a(Person)(is_dean_of=an(Organization)())))
+
+# Students taking no course worth more than 6 credits
+heavy = none_is(Course)
+heavy.where(heavy.credits > 6)
+a(Student)(takes_course=heavy).from_(students)
+```
+
+On an attribute holding one value, `every_is(Type)` is the same as `a(Type)`, and `none_is(Type)(...)` matches when the value
+does not match the pattern. A pattern made with `every_is` or `none_is` describes elements of an attribute, so evaluating one
+on its own raises {py:class}`~krrood.entity_query_language.exceptions.ElementQuantifierWithoutAttribute`.
+
+### A union of classes with `a(TypeA | TypeB)`
+
+A pattern names a union of classes as Python writes it, `TypeA | TypeB`, and matches an object of any one of them, as
+`isinstance` does. This works with `a`, `every_is` and `none_is`:
+
+```python
+# Students taking no course that is a seminar or a lab
+a(Student)(takes_course=none_is(SeminarCourse | LabCourse)).from_(students)
+```
+
+The pattern describes the nearest common base class of the union, here `Course`: its keyword arguments and
+`.where(...)` conditions are read on that class, and a generative backend constructs that class, so it yields only the
+objects that happen to be of a class of the union.
+
 ## Full Example: Finding Connected Parts
 
 This example demonstrates how to find a complex structural relationship using nested matches.
@@ -157,4 +241,6 @@ print(f"Found connection: {result.parent.name} <-> {result.child.name}")
 ## API Reference
 - {py:func}`~krrood.entity_query_language.factories.an`
 - {py:func}`~krrood.entity_query_language.factories.the`
+- {py:func}`~krrood.entity_query_language.factories.every_is`
+- {py:func}`~krrood.entity_query_language.factories.none_is`
 - {py:class}`~krrood.entity_query_language.query.match.Match`

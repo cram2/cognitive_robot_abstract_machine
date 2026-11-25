@@ -166,7 +166,7 @@ def test_domain_carrying_an_is_a_select():
         battery: int
 
     robots = [Robot(name="R2D2", battery=100), Robot(name="C3PO", battery=0)]
-    # an(...)(kwargs).from_(domain) stays one Match carrying the domain; the backend decides
+    # an(...)(kwargs).from_(domain=domain) stays one Match carrying the domain; the backend decides
     # whether to select over it or generate from it, so from_ does not collapse it to an Entity.
     query = a(Robot)(name="R2D2", battery=100).from_(domain=robots)
     assert isinstance(query, Match)
@@ -278,7 +278,7 @@ def test_from_after_where_still_restricts_the_search():
 
 def test_from_without_kwargs_selects_all(handles_and_containers_world):
     world = handles_and_containers_world
-    # a(Type).from_(X) with no kwargs is a valid "any Type in X" select.
+    # a(Type).from_(domain=X) with no kwargs is a valid "any Type in X" select.
     selected = a(FixedConnection).from_(domain=world.connections).tolist()
     assert selected
     assert all(isinstance(connection, FixedConnection) for connection in selected)

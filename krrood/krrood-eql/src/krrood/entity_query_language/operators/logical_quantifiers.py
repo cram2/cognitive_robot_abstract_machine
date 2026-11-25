@@ -355,11 +355,17 @@ class ForAll(QuantifiedConditional):
         return values_that_satisfy_condition
 
     def evaluate_condition(self, *, sources: OperationResult) -> bool:
-        for condition_result in self._evaluate_child_as_condition_(
-            child=self.condition, sources=sources
-        ):
-            return condition_result.is_true
-        return False
+        """
+        :param sources: A value of the quantified variable, with a candidate solution.
+        :return: Whether any evaluation of the condition under *sources* is true, as
+            :meth:`get_all_candidate_solutions` keeps a solution of any true evaluation.
+        """
+        return any(
+            condition_result.is_true
+            for condition_result in self._evaluate_child_as_condition_(
+                child=self.condition, sources=sources
+            )
+        )
 
     def _invert_(self):
         return Exists(left=self.variable, right=self.condition._invert_())

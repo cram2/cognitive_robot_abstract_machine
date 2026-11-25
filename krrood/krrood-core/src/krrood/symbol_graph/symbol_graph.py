@@ -542,3 +542,19 @@ class SymbolGraph(metaclass=SingletonMeta):
         else:
             graph = self._instance_graph
         ClassDiagram.graph_to_dot(filepath=filepath, graph=graph, format_=format_)
+
+
+@dataclass(kw_only=True)
+class RegisteredInstances(Generic[TSymbol]):
+    """
+    The instances of a symbol type that the :class:`SymbolGraph` holds at the moment of
+    each iteration, so iterating again sees instances registered since.
+    """
+
+    type_: type[TSymbol]
+    """
+    The symbol type whose instances, those of its subclasses included, are iterated.
+    """
+
+    def __iter__(self) -> Iterator[TSymbol]:
+        return iter(SymbolGraph().get_instances_of_type(type_=self.type_))

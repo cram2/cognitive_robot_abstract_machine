@@ -65,6 +65,35 @@ iterated. A value of undeclared type, such as a method's result, gives its eleme
 `flat_variable(...)` is deprecated; it is the same as `variable_from(...)`.
 ```
 
+## Reading Attributes Through a Collection
+
+When a field is declared to hold a collection, such as `parts: list[ExamplePart]`, an attribute that the collection
+class does not have is read on its elements: `robot.parts.name` is the name of a part of the robot. No
+variable over the parts is needed, and the path behaves as follows:
+
+- **One path, one element.** Every writing of `robot.parts` followed by an element attribute means the same part, so
+  `where(robot.parts.name == "Arm", robot.parts.weight > 2)` asks for one part that is both. Name another part with
+  `variable_from(robot.parts)`.
+- **A filter, reported once.** `an(entity(robot).where(robot.parts.name == "Arm"))` gives each robot that has an arm
+  once, however many of its parts match. `not_(robot.parts.name == "Arm")`, like `robot.parts.name != "Arm"`, keeps a
+  robot that has a part which is not an arm.
+- **An empty collection has an absent element.** A condition on it is false and its negation true, so a robot without
+  parts passes `or_(robot.parts.name == "Arm", robot.name == "R2D2")` through its name. Selecting
+  `set_of(robot, robot.parts.name)` reports `None` for its part, and `count(robot.parts.name)` counts `0`.
+- **The collection itself is unchanged.** Indexing (`robot.parts[0]`), comparing the whole collection and the
+  collection's own attributes, such as `robot.parts.copy`, act on the collection. A name that the collection class and
+  the element type both have raises
+  {py:class}`~krrood.entity_query_language.exceptions.AmbiguousCollectionAttribute`.
+
+To say *no* part or *every* part, use the patterns `none_is(ExamplePart)(...)` and `every_is(ExamplePart)(...)` of
+[matching](match.md), or quantify over a named element:
+
+```python
+part = variable_from(robot.parts)
+no_arm = an(entity(robot).where(not_(exists(part, part.name == "Arm"))))
+only_arms = an(entity(robot).where(for_all(part, part.name == "Arm")))
+```
+
 ## Symbolic Method Calls
 
 You can also call methods on symbolic variables. These calls are deferred and executed when the query is evaluated.
@@ -122,3 +151,4 @@ for part in query.evaluate():
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.Index`
 - {py:class}`~krrood.entity_query_language.core.mapped_variable.Call`
 - {py:class}`~krrood.entity_query_language.core.variable.ExpressionDomain`
+- {py:class}`~krrood.entity_query_language.core.mapped_variable.CollectionElement`

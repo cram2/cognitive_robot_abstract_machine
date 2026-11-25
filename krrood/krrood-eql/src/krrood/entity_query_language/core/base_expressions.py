@@ -366,12 +366,20 @@ class SymbolicExpression(
             term_reader=state, results=self._processed_results_()
         )
 
+    def _restart_domain_from_source_(self) -> None:
+        """
+        Make the next evaluation read this expression's domain as it is then; an
+        expression without a domain of its own has nothing to read.
+        """
+
     def _processed_results_(self) -> Iterator[T | dict[T | SymbolicExpression, T]]:
         """
         :return: The results of a new evaluation, mapped to the output data structure
             and limited to :attr:`_limit_`.
         """
         SymbolGraph().remove_dead_instances()
+        for expression in self._all_expressions_:
+            expression._restart_domain_from_source_()
         results = (self._process_result_(result=res) for res in self._true_results_())
         yield from itertools.islice(results, self._limit_)
 

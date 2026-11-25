@@ -26,8 +26,10 @@ from typing_extensions import (
     TypeVar,
 )
 
+from krrood.entity_query_language.core.absence import Absence
 from krrood.entity_query_language.core.mapped_variable import (
     CanBehaveLikeAVariable,
+    CollectionElement,
     Index,
     MappedVariable,
 )
@@ -70,6 +72,7 @@ from krrood.entity_query_language.evaluation_context import get_evaluation_conte
 from krrood.entity_query_language.core.variable import (
     InstantiatedVariable,
     ExternallySetVariable,
+    Variable,
 )
 from krrood.entity_query_language.enums import DomainSource
 from krrood.entity_query_language.exceptions import (
@@ -89,6 +92,7 @@ from krrood.entity_query_language._monitoring import (
 from krrood.entity_query_language.utils import (
     T,
 )
+from krrood.utils import ensure_hashable
 
 if TYPE_CHECKING:
     from krrood.entity_query_language.evaluation_context import EvaluationContext
@@ -292,11 +296,12 @@ class Query(
         next :meth:`build` recomputes them. Called by every modifier method.
         """
         self._dirty_ = True
-        # ``_group_`` and ``_distinct_on_ids_`` are cached_property values stored in ``__dict__``;
-        # popping the keys invalidates them so they recompute from the new modifier state on next
-        # access. Assigning ``None`` would instead cache ``None`` and keep returning it.
+        # These cached_property values are stored in ``__dict__``; popping the keys invalidates
+        # them so they recompute from the new modifier state on next access. Assigning ``None``
+        # would instead cache ``None`` and keep returning it.
         self.__dict__.pop("_group_", None)
         self.__dict__.pop("_distinct_on_ids_", None)
+        self.__dict__.pop("_ids_identifying_a_result_", None)
 
     def evaluate(
         self, *, backend: QueryBackend | None = None, state: TermReader | None = None
@@ -766,7 +771,11 @@ class Query(
         results = (
             self._get_operation_result_(child_result=result)
             for result in self._apply_results_mapping_(
-                results=self._evaluate_product_(sources=sources),
+                results=self._results_once_per_reported_values_(
+                    results=self._results_reporting_a_value_(
+                        results=self._evaluate_product_(sources=sources)
+                    )
+                ),
             )
         )
         for transformer in self._result_transformers_:
@@ -775,6 +784,72 @@ class Query(
 
         if self._seen_results is not None:
             self._seen_results.clear()
+
+    def _results_reporting_a_value_(
+        self, *, results: Iterator[OperationResult]
+    ) -> Iterator[OperationResult]:
+        """
+        :param results: The rows of this query's product.
+        :return: The rows, without those whose every selected value is an absent element
+            (see :class:`~krrood.entity_query_language.core.absence.Absence`).
+        """
+        for result in results:
+            if self._selected_variables_ and all(
+                result[selected._id_] is Absence.NO_ELEMENT
+                for selected in self._selected_variables_
+            ):
+                continue
+            yield result
+
+    def _results_once_per_reported_values_(
+        self, *, results: Iterator[OperationResult]
+    ) -> Iterator[OperationResult]:
+        """
+        :param results: The rows of this query's product.
+        :return: The rows, each given once however many elements of a collection that a
+            condition reads through (see
+            :class:`~krrood.entity_query_language.core.mapped_variable.CollectionElement`)
+            and the selection does not report satisfied the conditions.
+        """
+        if self._ids_identifying_a_result_ is None:
+            yield from results
+            return
+        seen_results = set()
+        for result in results:
+            identity = tuple(
+                ensure_hashable(result.bindings.get(id_))
+                for id_ in self._ids_identifying_a_result_
+            )
+            if identity in seen_results:
+                continue
+            seen_results.add(identity)
+            yield result
+
+    @cached_property
+    def _ids_identifying_a_result_(self) -> tuple[uuid.UUID, ...] | None:
+        """
+        The identifiers of what tells one result of this query from another: its
+        variables, its selection and the collection elements the selection reports,
+        or ``None`` when every collection element in it is reported.
+        """
+        descendants = list(self._descendants_)
+        reported = {
+            expression._id_
+            for selected in self._selected_variables_
+            for expression in (selected, *selected._descendants_)
+        }
+        if not any(
+            isinstance(expression, CollectionElement)
+            and expression._id_ not in reported
+            for expression in descendants
+        ):
+            return None
+        variables = (
+            expression._id_
+            for expression in descendants
+            if isinstance(expression, Variable)
+        )
+        return tuple(dict.fromkeys((*variables, *reported)))
 
     @cached_property
     def _result_transformers_(self) -> list[ResultTransformer]:
@@ -833,7 +908,14 @@ class Query(
         :return: The operation result.
         """
         return OperationResult(
-            bindings={v._id_: child_result[v._id_] for v in self._selected_variables_},
+            bindings={
+                v._id_: (
+                    None
+                    if child_result[v._id_] is Absence.NO_ELEMENT
+                    else child_result[v._id_]
+                )
+                for v in self._selected_variables_
+            },
             operand=self,
             previous_operation_result=child_result,
         )

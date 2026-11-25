@@ -24,6 +24,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.call_arguments import CallArguments
 from krrood.class_diagrams.collection_kind import CollectionKind, DeclaredValueKind
+from krrood.entity_query_language.core.absence import Absence
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     OperationResult,
@@ -59,7 +60,7 @@ from krrood.entity_query_language._monitoring import (
     monitored,
 )
 from krrood.patterns.classproperty import classproperty
-from krrood.symbol_graph.symbol_graph import SymbolGraph
+from krrood.symbol_graph.symbol_graph import RegisteredInstances
 
 DomainType = Iterable[T] | HasSymbolicOperations
 """
@@ -99,6 +100,12 @@ class VariableDomain(ABC, Generic[T]):
         """
         :param sources: The bindings the variable is evaluated under.
         :return: Every value the variable takes under ``sources``.
+        """
+
+    def restart_from_source(self) -> None:
+        """
+        Make the next evaluation read the domain's values as they are then, which a
+        domain that reads them anew at every evaluation does already.
         """
 
     @property
@@ -155,9 +162,7 @@ class InstancesOfType(ExistingValues[T]):
     """
 
     def __post_init__(self):
-        self.set_iterable(
-            iterable=SymbolGraph().get_instances_of_type(type_=self.type_)
-        )
+        self.set_iterable(iterable=RegisteredInstances(type_=self.type_))
 
     def __iter__(self) -> Iterator[T]:
         existing_ids = set()
@@ -180,7 +185,8 @@ class ExpressionDomain(VariableDomain[T]):
     evaluates to, that are instances of a type.
 
     A value declared as one value, or of undeclared kind and not a collection, is its
-    only element. A value that is ``None`` has no elements.
+    only element. A value that is ``None``, or the absent element of an empty collection
+    a path reads through, has no elements.
     """
 
     expression: CanBehaveLikeAVariable
@@ -213,7 +219,7 @@ class ExpressionDomain(VariableDomain[T]):
             declared to hold a collection, or is of undeclared kind and the value is a
             collection, else the value alone.
         """
-        if value is None:
+        if value is None or value is Absence.NO_ELEMENT:
             return ()
         declared_value_kind = self.expression._declared_value_kind_
         if declared_value_kind is DeclaredValueKind.COLLECTION:
@@ -319,6 +325,9 @@ class Variable(CanHaveDomainSource[T]):
             self._values_domain_.set_iterable(
                 iterable=domain if is_iterable(domain) else [domain]
             )
+
+    def _restart_domain_from_source_(self) -> None:
+        self._values_domain_.restart_from_source()
 
     def _evaluate__(
         self,

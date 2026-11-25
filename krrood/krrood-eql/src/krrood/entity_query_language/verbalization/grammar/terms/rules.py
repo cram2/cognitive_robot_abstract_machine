@@ -11,6 +11,7 @@ from dataclasses import fields, is_dataclass
 
 from typing_extensions import Any
 
+from krrood.entity_query_language.core.mapped_variable import CollectionElement
 from krrood.entity_query_language.core.variable import (
     ExpressionDomain,
     ExternallySetVariable,
@@ -296,3 +297,21 @@ class ExternalVariableRule(PhraseRule):
         """:return: The indefinite type-name noun phrase for the externally-set variable."""
         type_name = FallbackNouns.VARIABLE.name_of(node=node)
         return NounPhrase(head=RoleFragment.for_type(type_=node._type_, text=type_name))
+
+
+class CollectionElementRule(PhraseRule):
+    """
+    The element a path reads through → render the collection it is read from (forwarding
+    the requested number).
+
+    >>> verbalize_expression(variable(Worker, []).tasks.name)
+    'the name of the tasks of a Worker'
+    """
+
+    construct = CollectionElement
+
+    def build(
+        self, node: CollectionElement, context: RuleContext
+    ) -> VerbalizationFragment:
+        """:return: The rendering of the collection the element is read from."""
+        return context.child(node=node._child_, number=context.number)

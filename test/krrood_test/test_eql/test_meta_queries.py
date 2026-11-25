@@ -8,7 +8,7 @@ Drawer rule (DoorsAndDrawersWorld):
     handle         = variable(Handle, world.bodies)
     prismatic_conn = variable(PrismaticConnection, world.connections)
     fixed_conn     = a(FixedConnection)(
-                         parent=prismatic_conn.child, child=handle).from_(world.connections)
+                         parent=prismatic_conn.child, child=handle).from_(domain=world.connections)
     rule           = inference(Drawer)(container=fixed_conn.parent, handle=fixed_conn.child)
   Conditions: fixed_conn.parent == prismatic_conn.child  AND  fixed_conn.child == handle
 
@@ -98,7 +98,7 @@ def cabinet_explanation(inferred_cabinets_world) -> InferenceExplanation:
 
 def test_drawer_satisfied_conditions_returns_comparators(drawer_explanation):
     # The method returns ALL satisfied condition expressions, including LogicalOperator
-    # wrappers (AND nodes) produced by an(...).from_(...) and the inference root.
+    # wrappers (AND nodes) produced by an(...).from_(domain=...) and the inference root.
     # The Drawer rule has 2 comparators plus 2 AND nodes from the condition tree.
     conditions = drawer_explanation.get_satisfied_condition_expressions_for_the_instance().tolist()
     assert len(conditions) >= 2

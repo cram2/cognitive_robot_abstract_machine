@@ -319,6 +319,67 @@ class NotNumberLikeFieldError(UsageError):
 
 
 @dataclass(kw_only=True)
+class ElementQuantifierWithoutAttribute(UsageError):
+    """
+    Raised when a pattern made with :func:`~krrood.entity_query_language.factories.every_is`
+    or :func:`~krrood.entity_query_language.factories.none_is` is not the value of an
+    attribute of another pattern, so there are no elements whose number it states.
+    """
+
+    pattern: Match
+    """
+    The pattern that is quantified over the elements of no attribute.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.pattern._element_quantifier_.name.lower()}"
+            f"({self.pattern._type_.__name__}) "
+            f"states how many elements of an attribute match, but it is not the value "
+            f"of an attribute of another pattern."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"give it as the value of a collection attribute, as in "
+            f"a(Shelf)(products=every_is(Product)(...)), or write "
+            f"a({self.pattern._type_.__name__}) "
+            f"for a pattern of its own."
+        )
+
+
+@dataclass(kw_only=True)
+class AmbiguousCollectionAttribute(UsageError):
+    """
+    Raised when an attribute is read on an expression that holds a collection, and both
+    the collection class and the element type have an attribute of that name, so it is
+    unclear whether the collection or each element is meant.
+    """
+
+    collection: Attribute
+    """
+    The attribute that holds the collection.
+    """
+
+    attribute_name: str
+    """
+    The name both the collection class and the element type have.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.attribute_name}' of {self.collection._name_} is ambiguous: both its "
+            f"collection and its elements have it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"name the element with variable_from({self.collection._name_})."
+            f"{self.attribute_name} to read it on each element."
+        )
+
+
+@dataclass(kw_only=True)
 class MultipleValuesAlongAccessPath(UsageError):
     """
     Raised when a chain is followed from a value outside query evaluation and a step maps
@@ -1235,6 +1296,39 @@ class UnboundPatternVariable(UsageError):
         return (
             "Bind every variable of the pattern, keyed by the identifier of the "
             "variable assigned to its attribute."
+        )
+
+
+@dataclass(kw_only=True)
+class ValueFitsNeitherElementNorCollection(UsageError):
+    """
+    Raised when a pattern gives a collection-valued attribute a plain value that is
+    neither of the collection's element type nor a collection, so it describes neither
+    one element nor the whole collection.
+    """
+
+    attribute_match: AttributeMatch
+    """
+    The attribute match assigning the value.
+    """
+
+    element_type: type
+    """
+    The declared type of the collection's elements.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"'{self.attribute_match}' holds elements of type "
+            f"{self.element_type.__name__}, but was given "
+            f"{self.attribute_match.assigned_value!r}, which is neither such an "
+            f"element nor a collection."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Give one {self.element_type.__name__} to require it as an element, or a "
+            f"collection to compare the whole collection."
         )
 
 

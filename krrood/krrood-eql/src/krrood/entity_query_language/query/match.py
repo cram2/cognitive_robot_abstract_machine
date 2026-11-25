@@ -13,12 +13,17 @@ fields are reachable directly as symbolic attributes.
 
 from __future__ import annotations
 
+import numbers
+import operator
 import uuid
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from functools import cached_property, lru_cache
 from inspect import isclass
+from typing import TypeVar
+from types import UnionType
 from typing_extensions import (
     Callable,
     Generic,
@@ -27,11 +32,18 @@ from typing_extensions import (
     Iterator,
     Iterable,
     Any,
+    get_args,
+    get_origin,
 )
 
 import rustworkx as rx
 
-from krrood.class_diagrams.utils import get_type_hints_of_object
+from krrood.class_diagrams.utils import (
+    common_base_class,
+    get_type_hints_of_object,
+    is_union_annotation,
+)
+from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
     HasExpression,
@@ -56,16 +68,20 @@ from krrood.entity_query_language.evaluable import Evaluable
 from krrood.entity_query_language.exceptions import (
     CalledMatchAfterResolution,
     CalledMatchMultipleTimes,
+    ElementQuantifierWithoutAttribute,
     MatchTypeCannotBeDetermined,
     PositionalArgumentsInMatchPattern,
     NoAttributeWithAccessPathName,
     UnboundPatternVariable,
+    ValueFitsNeitherElementNorCollection,
 )
+from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
     AND,
     chained_logic,
 )
-from krrood.entity_query_language.predicate import HasType
+from krrood.entity_query_language.operators.logical_quantifiers import Exists, ForAll
+from krrood.entity_query_language.predicate import HasType, length
 from krrood.entity_query_language.query.quantifiers import An, ResultQuantifier
 from krrood.entity_query_language.query.query import MatchedEntity
 from krrood.entity_query_language.query.query_modifiers import HasQueryModifiers
@@ -73,11 +89,69 @@ from krrood.entity_query_language.utils import T
 from krrood.patterns.factory_and_kwargs import HasFactoryAndKwargs
 from krrood.class_diagrams.call_signature import CallSignature
 from krrood.rustworkx_utils.rxnode import RWXNode
-from krrood.entity_query_language.class_diagram_lookup import get_field_type_endpoint
+from krrood.entity_query_language.class_diagram_lookup import get_field_type_endpoint, get_wrapped_field
 
 if TYPE_CHECKING:
+    from krrood.entity_query_language.backends import QueryBackend
     from krrood.entity_query_language.factories import ConditionType
+    from krrood.entity_query_language.ground_term import TermReader
     from krrood.entity_query_language.query.query import Entity, Query
+
+
+# %% element quantifiers
+
+
+class ElementQuantifier(Enum):
+    """
+    How many elements of a collection attribute a pattern given as its value describes.
+    """
+
+    SOME = auto()
+    """
+    At least one element matches the pattern.
+    """
+
+    EVERY = auto()
+    """
+    Every element matches the pattern, which an empty collection satisfies.
+    """
+
+    NO = auto()
+    """
+    No element matches the pattern, which an empty collection satisfies.
+    """
+
+    def condition_on_elements(
+        self, *, element: CanBehaveLikeAVariable, condition: ConditionType
+    ) -> SymbolicExpression:
+        """
+        :param element: A variable over the elements of a collection.
+        :param condition: The condition of the pattern on *element*.
+        :return: The condition that this many elements satisfy *condition*.
+        """
+        match self:
+            case ElementQuantifier.SOME:
+                return Exists(left=element, right=condition)
+            case ElementQuantifier.EVERY:
+                return ForAll(left=element, right=condition)
+            case ElementQuantifier.NO:
+                return Exists(left=element, right=condition)._invert_()
+
+    def conditions_on_value(
+        self, *, conditions: list[ConditionType]
+    ) -> list[ConditionType]:
+        """
+        :param conditions: The conditions of the pattern on an attribute holding one
+            value.
+        :return: The conditions that the value satisfies as this many elements of a
+            collection of it alone would.
+        """
+        if self is ElementQuantifier.NO:
+            return [chained_logic(AND, *conditions)._invert_()]
+        return conditions
+
+
+# %% match expressions
 
 
 @dataclass(kw_only=True)
@@ -281,6 +355,20 @@ class Match(
     ``the(...)``.
     """
 
+    _element_quantifier_: ElementQuantifier = field(
+        init=False, default=ElementQuantifier.SOME
+    )
+    """
+    How many elements of the collection attribute this pattern is the value of it
+    describes.
+    """
+
+    _type_union_: UnionType | None = field(init=False, default=None)
+    """
+    The union of classes the matched object is an instance of one of, when the pattern
+    names a union; the matched type is then their nearest common base class.
+    """
+
     _domain_: DomainType | None = field(default=None, init=False)
     """
     The instances the match ranges over.
@@ -293,9 +381,15 @@ class Match(
         """
         Take the matched type from :attr:`_factory_` when none was declared.
 
+        A union of classes given as :attr:`_factory_` becomes :attr:`_type_union_`, and
+        its nearest common base class the factory.
+
         :raises MatchTypeCannotBeDetermined: If :attr:`_factory_` names no type it
             builds.
         """
+        if is_union_annotation(self._factory_):
+            self._type_union_ = self._factory_
+            self._factory_ = common_base_class(list(get_args(self._factory_))) or object
         if self._declared_type_ is not None:
             return
         self._declared_type_ = self._type_built_by_(factory=self._factory_)
@@ -410,12 +504,24 @@ class Match(
         """
         Resolve the match by creating the variable and conditions expressions in-place.
 
+        A nested match given a domain requires the object it describes to be in that
+        domain.
+
         :param variable: An optional pre-existing variable to use for the match; if not
             provided, a new variable will be created.
         :param parent: The parent match if this is a nested match.
         """
         parent = parent or self
         self._update_fields_(variable=variable, parent=parent)
+        self._conditions_.extend(self._type_union_conditions_)
+        if variable is not None and self._domain_ is not None:
+            self._conditions_.append(
+                Comparator(
+                    left=_resolve_domain(type_=self._type_, domain=self._domain_),
+                    right=self._variable_,
+                    operation=operator.contains,
+                )
+            )
         for attr_name, attr_assigned_value in self._kwargs_.items():
             if isinstance(attr_assigned_value, (list, tuple)) and any(
                 isinstance(element, AbstractMatchExpression)
@@ -462,7 +568,8 @@ class Match(
     def _resolve_list_like_value(self, *, key: str, value: list | tuple, parent: Match):
         """
         Resolves list-like values by iterating over their elements and creating
-        attribute matches for the parent match variable.
+        attribute matches for the parent match variable; the attribute must hold as many
+        elements as the value.
 
         :param key: The attribute name being processed.
         :param value: The list or tuple containing elements to be resolved.
@@ -476,6 +583,7 @@ class Match(
                 assigned_value=element,
                 index_access=index,
             )
+        self._conditions_.append(length(iterable=getattr(self._variable_, key)) == len(value))
 
     def _update_fields_(
         self,
@@ -517,6 +625,22 @@ class Match(
             domain=_resolve_domain(self._type_, self._domain_)
         )
 
+    def evaluate(
+        self, backend: QueryBackend | None = None, state: TermReader | None = None
+    ) -> Iterator:
+        """
+        Overrides :meth:`~krrood.entity_query_language.evaluable.Evaluable.evaluate`: a
+        pattern that states how many elements of an attribute match is not evaluated on
+        its own.
+
+        :raises ElementQuantifierWithoutAttribute: If this pattern was made with
+            :func:`~krrood.entity_query_language.factories.every_is` or
+            :func:`~krrood.entity_query_language.factories.none_is`.
+        """
+        if self._element_quantifier_ is not ElementQuantifier.SOME:
+            raise ElementQuantifierWithoutAttribute(pattern=self)
+        return super().evaluate(backend=backend, state=state)
+
     def _evaluate_natively_(self) -> Iterator:
         """
         Select the elements of the match's domain (its variable's domain, or the
@@ -549,7 +673,11 @@ class Match(
 
         self._variable_._update_domain_(domain=instances)
         selection = entity(self._variable_)
-        conditions = [*self._conditions_on_stated_values_, *self._where_conditions_]
+        conditions = [
+            *self._type_union_conditions_,
+            *self._conditions_on_stated_values_,
+            *self._where_conditions_,
+        ]
         if conditions:
             selection = selection.where(*conditions)
         return selection
@@ -615,6 +743,16 @@ class Match(
             attribute_match.construct_value_from_bindings(bindings=bindings)
             for attribute_match in attribute_matches
         )
+
+    @property
+    def _type_union_conditions_(self) -> list[ConditionType]:
+        """
+        :return: The condition that the matched object is an instance of a class of
+            :attr:`_type_union_`, or none when the pattern names a single class.
+        """
+        if self._type_union_ is None:
+            return []
+        return [HasType(variable=self._variable_, types_=self._type_union_)]
 
     @property
     def _conditions_on_stated_values_(self) -> Iterator[ConditionType]:
@@ -894,7 +1032,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
     The value to assign to the attribute, which can be a Match instance or a Literal.
     """
 
-    _variable_: Attribute = field(default=None, kw_only=True)
+    _variable_: Attribute | Variable = field(default=None, kw_only=True)
     """
     The symbolic variable representing the attribute.
     """
@@ -915,28 +1053,239 @@ class AttributeMatch(AbstractMatchExpression[T]):
 
     def _resolve(self):
         """
-        Resolve the attribute assignment by creating the conditions and applying the
-        necessary mappings to the attribute.
+        Resolve the attribute assignment into conditions on the attribute: on a
+        collection, a value must be in it, and as many elements as the pattern's
+        :class:`ElementQuantifier` states must match a pattern.
 
-        A pattern evaluated before it was nested still restricts the attribute.
+        A pattern evaluated before it was nested keeps its :meth:`Match.where`
+        conditions.
         """
+        attribute = self.attribute
         if not isinstance(self.assigned_value, AbstractMatchExpression):
-            self._conditions_.append(self.attribute == self.assigned_variable)
+            self._conditions_.append(self._build_condition_on_assigned_value_())
             return
 
+        element_quantifier = self.assigned_value._element_quantifier_
         if self.assigned_value._resolved_:
-            self._conditions_.append(self.attribute == self.assigned_variable)
-            self._conditions_.extend(self.assigned_value._conditions_)
+            self._conditions_.append(
+                self._condition_on_resolved_pattern_(element_quantifier=element_quantifier)
+            )
             return
 
-        self.assigned_value.resolve(variable=self.attribute, parent=self)
-
-        if self.is_type_filter_needed:
-            self._conditions_.append(
-                HasType(variable=self.attribute, types_=self.assigned_value._type_)
+        if not self._states_an_element_of_the_attribute_:
+            self._conditions_.extend(
+                element_quantifier.conditions_on_value(
+                    conditions=self._resolve_pattern_against_(variable=attribute)
+                )
             )
+            return
 
-        self._conditions_.extend(self.assigned_value._conditions_)
+        element = Variable(_domain_=attribute)
+        # The pattern's own attributes are read off this match's variable, which now
+        # stands for one element of the collection rather than the whole collection.
+        self._variable_ = element
+        self._conditions_.append(
+            element_quantifier.condition_on_elements(
+                element=element,
+                condition=chained_logic(
+                    AND, *self._resolve_pattern_against_(variable=element)
+                ),
+            )
+        )
+
+    def _condition_on_resolved_pattern_(
+        self, *, element_quantifier: ElementQuantifier
+    ) -> SymbolicExpression:
+        """
+        :param element_quantifier: How many elements of the attribute the pattern
+            describes.
+        :return: The condition that that many elements of the attribute are values of
+            the assigned pattern, which was resolved before it was nested, satisfying its
+            conditions and its :meth:`Match.where` conditions.
+        """
+        pattern_value = self.assigned_variable
+        pattern_holds = chained_logic(
+            AND,
+            *self.assigned_value._conditions_,
+            *self.assigned_value._where_conditions_,
+        )
+        if (
+            element_quantifier is ElementQuantifier.EVERY
+            and self._states_an_element_of_the_attribute_
+        ):
+            element = Variable(_domain_=self.attribute)
+            return ForAll(
+                left=element,
+                right=Exists(
+                    left=pattern_value,
+                    right=AND(left=pattern_value == element, right=pattern_holds),
+                ),
+            )
+        return element_quantifier.condition_on_elements(
+            element=pattern_value,
+            condition=AND(
+                left=self._build_condition_on_assigned_value_(), right=pattern_holds
+            ),
+        )
+
+    def _resolve_pattern_against_(
+        self, *, variable: CanBehaveLikeAVariable
+    ) -> list[ConditionType]:
+        """
+        Resolve the assigned pattern with *variable* as the object it describes.
+
+        :param variable: The variable the pattern describes.
+        :return: The conditions of the pattern on *variable*.
+        """
+        self.assigned_value.resolve(variable=variable, parent=self)
+        conditions = []
+        quantifier_states_the_type = (
+            self.assigned_value._element_quantifier_ is not ElementQuantifier.SOME
+        )
+        if self.is_type_filter_needed or quantifier_states_the_type:
+            conditions.append(HasType(variable=variable, types_=self.assigned_value._type_))
+        conditions.extend(self.assigned_value._conditions_)
+        return conditions
+
+    def _build_condition_on_assigned_value_(self) -> SymbolicExpression:
+        """
+        :return: Membership of the assigned value in the attribute when it states one
+            element of a collection-valued attribute, else equality.
+        """
+        if not self._states_an_element_of_the_attribute_:
+            return self.attribute == self.assigned_variable
+        membership = Comparator(
+            left=self.attribute, right=self.assigned_variable, operation=operator.contains
+        )
+        if self._collection_field_.is_optional:
+            # An absent optional collection has no elements, so it contains nothing.
+            return AND(left=self.attribute != None, right=membership)
+        return membership
+
+    @cached_property
+    def _states_an_element_of_the_attribute_(self) -> bool:
+        """
+        :return: Whether the attribute holds a collection and the assigned value stands
+            for one of its elements: a pattern, or a plain or symbolic value of the
+            element type, any number standing for a number. An indexed attribute names
+            one element already.
+        :raises ValueFitsNeitherElementNorCollection: If a plain value is neither of the
+            element type nor a collection.
+        """
+        if self.index_access is not None or not self._attribute_holds_a_collection_:
+            return False
+        value = self.assigned_value
+        if isinstance(value, AbstractMatchExpression):
+            return True
+        element_type = get_origin(self._collection_element_type_) or (
+            self._collection_element_type_
+        )
+        # An element type that is no class, or ``Any``, cannot be checked against.
+        element_type_is_known = isclass(element_type) and element_type is not Any
+        if isinstance(value, SymbolicExpression):
+            return (
+                isclass(value._type_)
+                and element_type_is_known
+                and issubclass(value._type_, element_type)
+            )
+        if value is None or value is Ellipsis:
+            return False
+        is_a_collection = isinstance(value, (list, tuple, set, frozenset))
+        if not element_type_is_known:
+            return not is_a_collection
+        if isinstance(value, element_type) or (
+            issubclass(element_type, numbers.Number)
+            and isinstance(value, numbers.Number)
+        ):
+            return True
+        if is_a_collection:
+            return False
+        raise ValueFitsNeitherElementNorCollection(attribute_match=self, element_type=element_type)
+
+    @property
+    def _attribute_holds_a_collection_(self) -> bool:
+        """
+        :return: Whether the attribute is declared as a collection, such as a list, set,
+            tuple or sequence of elements, or as an optional one.
+        """
+        return self._collection_field_ is not None
+
+    @cached_property
+    def _collection_field_(self) -> WrappedField | None:
+        """
+        :return: The attribute's field when it is declared as a collection or an
+            optional collection, else None.
+        """
+        pattern = self._parent_
+        if isinstance(pattern, AttributeMatch) and isinstance(
+            pattern.assigned_value, AbstractMatchExpression
+        ):
+            # Nested in an attribute, the class is the one the pattern assigned to that
+            # attribute names, as EndEffector in end_effector=an(EndEffector)(...).
+            pattern = pattern.assigned_value
+        pattern_class = getattr(pattern, "_type_", None)
+        wrapped_field = self._field_declared_below_(
+            pattern_class
+        ) or self._field_declared_below_(self.attribute._owner_class_)
+        if wrapped_field is None or self._declared_collection_(wrapped_field) is None:
+            return None
+        return wrapped_field
+
+    def _field_declared_below_(self, owner_class: Any) -> WrappedField | None:
+        """
+        :param owner_class: The class the pattern is written for, or the class the
+            attribute is read from.
+        :return: The attribute's field as the class declares it or, for a class that
+            leaves it to its subclasses, such as an abstract end effector whose concrete
+            grippers declare their fingers, as the nearest subclass declares it.
+        """
+        if isinstance(owner_class, TypeVar):
+            # A field declared with a type variable holds values of its bound.
+            owner_class = owner_class.__bound__
+        if not isclass(owner_class):
+            return None
+        classes_to_search = [owner_class]
+        searched = set()
+        while classes_to_search:
+            candidate = classes_to_search.pop(0)
+            if candidate in searched:
+                continue
+            searched.add(candidate)
+            wrapped_field = get_wrapped_field(
+                owner_class=candidate, field_name=self.attribute_name
+            )
+            if wrapped_field is not None:
+                return wrapped_field
+            classes_to_search.extend(candidate.__subclasses__())
+        return None
+
+    @cached_property
+    def _collection_element_type_(self) -> type | None:
+        """
+        :return: The type of the elements of the collection-valued attribute.
+        """
+        element_types = get_args(self._declared_collection_(self._collection_field_))
+        return element_types[0] if element_types else None
+
+    @staticmethod
+    def _declared_collection_(wrapped_field: WrappedField) -> Any | None:
+        """
+        :param wrapped_field: The field of an attribute.
+        :return: The collection type the field is declared as, unwrapped from optional,
+            such as ``set[Course]``, or None when it is not a collection.
+        """
+        declared_type = (
+            wrapped_field.contained_type
+            if wrapped_field.is_optional
+            else wrapped_field.resolved_type
+        )
+        container_type = get_origin(declared_type)
+        if (
+            container_type in wrapped_field.container_types
+            and container_type is not type
+        ):
+            return declared_type
+        return None
 
     @cached_property
     def assigned_variable(self) -> SymbolicExpression:
@@ -982,10 +1331,15 @@ class AttributeMatch(AbstractMatchExpression[T]):
         :return: True if a type filter condition is needed for the attribute assignment, else False.
         """
         attr_type = self._type_
-        return (not attr_type) or (
-            (self.assigned_value._type_ and self.assigned_value._type_ is not attr_type)
-            and issubclass(self.assigned_value._type_, attr_type)
-        )
+        if not attr_type:
+            return True
+        if not isinstance(attr_type, type):
+            # A type variable or a generic alias cannot be compared with issubclass, so
+            # the value's type is checked when the query runs.
+            return True
+        return (
+            self.assigned_value._type_ and self.assigned_value._type_ is not attr_type
+        ) and issubclass(self.assigned_value._type_, attr_type)
 
     @property
     def _name_(self) -> str:

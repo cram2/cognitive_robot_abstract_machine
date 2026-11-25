@@ -1,3 +1,7 @@
+"""
+A graph of the expressions of a query, for drawing it.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

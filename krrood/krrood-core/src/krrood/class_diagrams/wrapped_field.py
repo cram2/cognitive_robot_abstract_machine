@@ -215,6 +215,21 @@ class WrappedField:
         )
 
     @cached_property
+    def element_sequence_class(self) -> type | None:
+        """
+        The class of the unkeyed collection the field holds, such as :class:`list` for
+        ``list[X]`` or ``Optional[list[X]]``, or ``None`` when it holds none.
+        """
+        return next(
+            (
+                get_origin(annotation)
+                for annotation in self._union_members_
+                if get_origin(annotation) in CollectionKind.ELEMENT_SEQUENCE.value
+            ),
+            None,
+        )
+
+    @cached_property
     def declared_value_kind(self) -> DeclaredValueKind:
         """
         Whether the field's annotation declares a collection, one value, or neither.

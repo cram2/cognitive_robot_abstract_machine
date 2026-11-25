@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 from typing_extensions import Any, Iterable
 
+from krrood.entity_query_language.core.absence import Absence
 from krrood.entity_query_language.core.base_expressions import (
     BinaryExpression,
     OperationResult,
@@ -87,7 +88,11 @@ class ArithmeticOperation(
             self.left._process_result_(result=child_result),
             self.right._process_result_(result=child_result),
         )
-        value = self.math_operator.function(*operands)
+        value = (
+            Absence.NO_ELEMENT
+            if any(operand is Absence.NO_ELEMENT for operand in operands)
+            else self.math_operator.function(*operands)
+        )
         return self._build_operation_result_(
             bindings=child_result.bindings | {self._id_: value},
             child_result=child_result,
@@ -137,4 +142,6 @@ class UnaryArithmeticOperation(UnaryExpression, CanBehaveLikeAVariable[T]):
         :return: The operator applied to the child's value.
         """
         value = self._child_._process_result_(result=child_result)
+        if value is Absence.NO_ELEMENT:
+            return Absence.NO_ELEMENT
         return self.math_operator.function(value)

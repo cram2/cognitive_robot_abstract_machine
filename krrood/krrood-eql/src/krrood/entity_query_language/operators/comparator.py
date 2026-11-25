@@ -8,11 +8,13 @@ symbolic expressions, including equality, ordering, and membership-style checks.
 from __future__ import annotations
 
 import operator
+from collections.abc import Sequence
 from copy import copy
 from dataclasses import dataclass
 
 from typing_extensions import Callable, Any, ClassVar, Iterable
 
+from krrood.entity_query_language.core.absence import Absence
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
     SymbolicExpression,
@@ -23,6 +25,7 @@ from krrood.entity_query_language.operators.set_operations import (
     PerformsCartesianProduct,
 )
 from krrood.entity_query_language.utils import is_iterable, make_set
+from krrood.patterns.classproperty import classproperty
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
@@ -30,6 +33,9 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
     """
     A symbolic equality check that can be used to compare symbolic variables using a
     provided comparison operation.
+
+    Under ``==`` and ``!=``, two lists or tuples are equal when they hold the same
+    elements in the same order; any other two collections are equal as sets.
     """
 
     left: Selectable
@@ -43,6 +49,15 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
         operator.gt: ">",
         operator.ge: ">=",
     }
+
+    @classproperty
+    def negations(cls) -> frozenset[Callable[[Any, Any], bool]]:
+        """
+        The operations that negate another, and so hold where it does not: on an absent
+        element (:class:`~krrood.entity_query_language.core.absence.Absence`), these
+        hold and every other comparison is false.
+        """
+        return frozenset({operator.ne, not_contains})
 
     @property
     def _product_operands_(self) -> tuple[SymbolicExpression, ...]:
@@ -79,14 +94,33 @@ class Comparator(BinaryExpression, PerformsCartesianProduct):
             self.left._process_result_(result=child_result),
             self.right._process_result_(result=child_result),
         )
+        if left_value is Absence.NO_ELEMENT or right_value is Absence.NO_ELEMENT:
+            return self._operation_result_with_value_(
+                self.operation in self.negations, child_result
+            )
         if (
             self.operation in [operator.eq, operator.ne]
             and is_iterable(left_value)
             and is_iterable(right_value)
         ):
-            left_value = make_set(left_value)
-            right_value = make_set(right_value)
-        comparison_result = self.operation(left_value, right_value)
+            # Two sequences compare by order, length and duplicates; any other pair of
+            # collections compares as sets.
+            if isinstance(left_value, Sequence) and isinstance(right_value, Sequence):
+                left_value, right_value = tuple(left_value), tuple(right_value)
+            else:
+                left_value, right_value = make_set(left_value), make_set(right_value)
+        return self._operation_result_with_value_(
+            self.operation(left_value, right_value), child_result
+        )
+
+    def _operation_result_with_value_(
+        self, comparison_result: bool, child_result: OperationResult
+    ) -> OperationResult:
+        """
+        :param comparison_result: Whether the comparison holds.
+        :param child_result: The result that has the values of both operands.
+        :return: The result with the comparison bound under this comparator.
+        """
         bindings = copy(child_result.bindings)
         bindings[self._id_] = comparison_result
         return OperationResult(

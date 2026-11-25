@@ -228,6 +228,18 @@ class ReEnterableLazyIterable(Generic[T]):
             self._active_iteration_count -= 1
             self._release_source_if_idle()
 
+    def restart_from_source(self) -> None:
+        """
+        Make the next iteration read the source anew, so it yields the source's elements
+        as they are then. A one-shot source, which cannot be read again, and one that is
+        being iterated keep their materialized values.
+        """
+        if not self._source_is_re_iterable or self._active_iteration_count > 0:
+            return
+        self._release_source()
+        self.materialized_values = []
+        self._source_exhausted = False
+
     def _release_source_if_idle(self) -> None:
         """
         Release the live source once nothing is iterating it, but only when it can be
