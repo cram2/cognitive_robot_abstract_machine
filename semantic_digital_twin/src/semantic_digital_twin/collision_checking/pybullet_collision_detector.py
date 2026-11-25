@@ -1,3 +1,10 @@
+"""
+Collision detection with Bullet, including the conversion of shapes into Bullet
+collision objects.
+"""
+
+from __future__ import annotations
+
 import hashlib
 import logging
 import os

@@ -1,3 +1,9 @@
+"""
+Parsing of MuJoCo MJCF files into a world.
+"""
+
+from __future__ import annotations
+
 import logging
 import os
 import tempfile

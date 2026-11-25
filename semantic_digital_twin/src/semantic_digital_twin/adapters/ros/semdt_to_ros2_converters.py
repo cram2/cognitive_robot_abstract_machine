@@ -1,3 +1,7 @@
+"""
+Converters from spatial types and shapes of the world to ROS 2 messages.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -200,6 +204,10 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
 
 @dataclass
 class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
+    """
+    Converts a mesh to a marker that draws its file, placed at the mesh's file origin.
+    """
+
     @classmethod
     def mesh_resource_of(cls, mesh: Mesh) -> str:
         """

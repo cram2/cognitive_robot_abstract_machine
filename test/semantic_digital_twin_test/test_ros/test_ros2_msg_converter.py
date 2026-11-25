@@ -1,3 +1,9 @@
+"""
+Tests of converting between the world's types and ROS 2 messages.
+"""
+
+from __future__ import annotations
+
 import os
 import shutil
 import subprocess
@@ -460,6 +466,9 @@ def test_a_package_uri_mesh_is_found_in_the_local_install(
 def test_a_mesh_turned_within_its_file_is_drawn_from_its_file_origin(
     cylinder_bot_world, tmp_path
 ):
+    """
+    The marker of a mesh turned within its file is posed at the mesh's file origin.
+    """
     mesh_file = tmp_path / "jeroen_cup.stl"
     shutil.copy(
         Path(files("semantic_digital_twin")).parent.parent

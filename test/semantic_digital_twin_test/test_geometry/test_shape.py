@@ -1,3 +1,9 @@
+"""
+Tests of shapes, their meshes and their serialization.
+"""
+
+from __future__ import annotations
+
 import gc
 import math
 import os
@@ -805,6 +811,9 @@ def bounds_in_the_body(vertices: np.ndarray, body_T_vertices: np.ndarray) -> np.
 
 
 def test_a_mesh_turned_within_its_file_keeps_its_vertices_through_serialization():
+    """
+    A JSON round trip keeps the vertices of a mesh turned within its file.
+    """
     mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
 
     deserialized = from_json(to_json(mesh))
@@ -815,6 +824,9 @@ def test_a_mesh_turned_within_its_file_keeps_its_vertices_through_serialization(
 
 
 def test_the_scaled_file_placed_at_its_file_origin_lies_where_the_mesh_does():
+    """
+    The file's scaled vertices, placed at the file origin, cover the mesh's bounds.
+    """
     mesh = turned_cylinder(scale=Scale(0.5, 0.5, 0.5))
 
     placed_file = bounds_in_the_body(
@@ -827,6 +839,9 @@ def test_the_scaled_file_placed_at_its_file_origin_lies_where_the_mesh_does():
 
 
 def test_an_unevenly_scaled_mesh_turned_within_its_file_has_no_file_origin():
+    """
+    No pose places the file of a mesh that is turned within it and scaled unevenly.
+    """
     mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
 
     with pytest.raises(MeshFileNotPlaceableByAPose):

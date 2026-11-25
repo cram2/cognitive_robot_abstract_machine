@@ -1,3 +1,9 @@
+"""
+Tests of parsing MJCF files into a world.
+"""
+
+from __future__ import annotations
+
 import os.path
 import shutil
 
@@ -569,6 +575,9 @@ def turned_mesh_of(world) -> Mesh:
 
 
 def test_a_mesh_lies_where_its_reference_frame_places_it():
+    """
+    The parsed mesh's vertices lie where MuJoCo's compile places them.
+    """
     expected = compiled_mesh_vertex_bounds(
         compile_from_a_clean_mesh_cache(TURNED_MESH_SCENE)
     )

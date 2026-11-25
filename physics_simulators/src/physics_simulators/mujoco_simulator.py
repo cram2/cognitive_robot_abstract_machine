@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+A simulator that runs a MuJoCo model and serves its bodies, joints, actuators and cameras.
+"""
+
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, InitVar
