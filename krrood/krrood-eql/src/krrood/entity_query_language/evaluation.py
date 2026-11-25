@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from ordered_set import OrderedSet
-from typing_extensions import Any, Self
+from typing_extensions import TYPE_CHECKING, Any, Self
 
 from krrood.entity_query_language._monitoring import monitored
 from krrood.entity_query_language.core.base_expressions import (
@@ -19,7 +19,7 @@ from krrood.entity_query_language.core.base_expressions import (
     SymbolicExpression,
     TruthValueOperator,
 )
-from krrood.entity_query_language.core.variable import InstantiatedVariable, Literal
+from krrood.entity_query_language.core.variable import InstantiatedVariable
 from krrood.entity_query_language.evaluation_context import (
     EvaluationContext,
     EvaluationObserver,
@@ -38,6 +38,9 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 )
 from krrood.entity_query_language.predicate import Predicate
 from krrood.entity_query_language.query.query import Query
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.factories import ConditionType
 
 
 def is_condition_participant(
@@ -236,7 +239,7 @@ class ConditionEvaluation:
 
     @classmethod
     def from_condition(
-        cls, *, condition: SymbolicExpression | bool, state: TermReader | None = None
+        cls, *, condition: ConditionType, state: TermReader | None = None
     ) -> Self:
         """
         :param condition: The condition to evaluate; a plain boolean is evaluated as
@@ -245,11 +248,7 @@ class ConditionEvaluation:
             evaluation does when omitted.
         :return: The evaluation of *condition*.
         """
-        symbolic_condition = (
-            Literal(_value_=condition, _type_=bool)
-            if type(condition) is bool
-            else condition
-        )
+        symbolic_condition = SymbolicExpression._as_operand_(value=condition)
         evaluation_context = create_default_evaluation_context()
         if state is not None:
             evaluation_context.term_reader = state
