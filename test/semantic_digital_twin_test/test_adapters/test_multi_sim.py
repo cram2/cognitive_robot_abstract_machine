@@ -1,3 +1,9 @@
+"""
+Tests of the MuJoCo multi-sim adapter: building MuJoCo worlds and simulating them.
+"""
+
+from __future__ import annotations
+
 import logging
 import os
 from datetime import timedelta
@@ -839,6 +845,9 @@ def test_mujoco_with_tracy_dae_files():
 
 
 def test_mujocosim_world_with_added_objects(test_urdf_1_world):
+    """
+    A world with a mesh body merged into it can be simulated in MuJoCo.
+    """
     milk_path = "package://iai_objects/objects/milk.stl"
     stl_parser = STLParser(milk_path)
     mesh_world = stl_parser.create_world()

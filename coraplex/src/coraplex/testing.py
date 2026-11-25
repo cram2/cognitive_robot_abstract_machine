@@ -1,3 +1,7 @@
+"""
+Worlds, visualizations and processes shared by the coraplex tests and demos.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -89,6 +93,10 @@ def attach_tool(world: World, arm: Arm, tool_world: World, mount: dict) -> Body:
 
 
 def setup_world() -> World:
+    """
+    The apartment with a PR2 on an omnidirectional drive and a milk carton and a cereal box
+    on a counter.
+    """
     logger.setLevel(logging.DEBUG)
 
     pr2_sem_world = URDFParser.from_file(

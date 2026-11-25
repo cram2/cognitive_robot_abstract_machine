@@ -1,3 +1,9 @@
+"""
+Tests of the decomposers that split a mesh into convex parts.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 import trimesh
@@ -18,6 +24,9 @@ from semantic_digital_twin.world_description.geometry import Box, Mesh
 
 @pytest.fixture(scope="function")
 def jeroen_cup_world_fixture():
+    """
+    :return: A world of the jeroen cup whose root is named ``root``.
+    """
     world = STLParser("package://iai_objects/objects/jeroen_cup.stl").create_world()
     world.root.name = PrefixedName("root")
     return world

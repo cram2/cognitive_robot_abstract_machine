@@ -1,3 +1,9 @@
+"""
+Tests of the conversion of meshes for bullet collision checking and its cache.
+"""
+
+from __future__ import annotations
+
 import copy
 import os
 from dataclasses import dataclass, field
@@ -49,6 +55,9 @@ def clean_cache(cache_dir):
 
 @pytest.fixture
 def non_convex_mesh():
+    """
+    :return: The collision mesh of the jeroen cup.
+    """
     stl_path = "package://iai_objects/objects/jeroen_cup.stl"
     world_with_stl = STLParser(stl_path).create_world()
     body: Body = world_with_stl.root

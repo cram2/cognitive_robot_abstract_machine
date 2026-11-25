@@ -1,3 +1,9 @@
+"""
+Tests of the reasoning queries over worlds and of the world reasoner.
+"""
+
+from __future__ import annotations
+
 import os
 
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -48,6 +54,9 @@ def test_load_environment_names_are_stringifiable():
 
 
 def test_world_reasoner_reason_returns_dicts():
+    """
+    Reasoning over the kitchen returns a dictionary.
+    """
     world = URDFParser.from_file(
         file_path="package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     ).create_world()
@@ -252,11 +261,9 @@ def test_sort_annotations_by_volume(kitchen_environment_fixture):
 def test_world_reasoner_leaves_urdf_doors_and_drawers_on_their_own_joints():
     """
     Doors and drawers loaded from a URDF hang straight from their cabinet on an active
-    connection, e.g. ``iai_fridge_main`` -> (revolute) -> ``iai_fridge_door`` in
-    ``iai_kitchen``'s ``kitchen-small.urdf``.
-
-    Recognising them must not change the
-    kinematic structure: each one's joint is that connection.
+    connection, e.g. ``iai_fridge_main`` -> ``iai_fridge_door`` in ``kitchen-small.urdf``.
+    Recognising them must not change the kinematic structure: each one's joint is that
+    connection.
     """
     world = URDFParser.from_file(
         file_path="package://iai_kitchen/urdf_obj/kitchen-small.urdf"

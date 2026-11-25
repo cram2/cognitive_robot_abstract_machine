@@ -299,6 +299,9 @@ def test_create_world_is_repeatable():
 
 
 def test_world_specification_from_urdf_environment():
+    """
+    A world specification from a URDF creates a non-empty world.
+    """
     world = WorldSpecification.from_urdf(
         "package://iai_objects/urdf/table.urdf"
     ).create_world()
@@ -307,6 +310,9 @@ def test_world_specification_from_urdf_environment():
 
 
 def test_materialized_environments_share_no_entity_ids():
+    """
+    Two worlds created from one specification share no entity IDs.
+    """
     specification = WorldSpecification.from_urdf(
         "package://iai_objects/urdf/table.urdf"
     )
@@ -413,6 +419,9 @@ def test_world_specification_from_gazebo_environment():
     ],
 )
 def test_shape_constructors_spawn(empty_world, make_spec):
+    """
+    Each shape constructor spawns a body with collision on a fixed connection.
+    """
     body = make_spec().spawn(empty_world)
     assert isinstance(body, Body)
     assert len(body.collision.shapes) >= 1
@@ -451,6 +460,9 @@ def test_from_event_constructor_spawns(empty_world):
     ],
 )
 def test_shape_constructors_apply_parent_T_self(empty_world, make_spec):
+    """
+    Each shape constructor places its entity at the pose it is given.
+    """
     pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
     entity = make_spec(pose).spawn(empty_world)
     root_T_entity = empty_world.compute_forward_kinematics(empty_world.root, entity)
@@ -712,6 +724,9 @@ def test_a_robot_is_spawned_from_the_description_it_reads_itself(empty_world):
 
 
 def test_world_specification_from_urdf_with_robot():
+    """
+    A robot specification places the PR2 on an omnidirectional drive below the world root.
+    """
     try:
         world = WorldSpecification.from_urdf(
             "package://iai_objects/urdf/table.urdf",

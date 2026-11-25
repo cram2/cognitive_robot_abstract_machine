@@ -816,7 +816,11 @@ class Mesh(Shape):
         return {**super().to_json(**kwargs), "mesh": to_json(geometry, **kwargs)}
 
     @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Mesh:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Mesh:
+        """
+        Overrides :meth:`Shape._from_json` to read a mesh either from its package URI or
+        from its serialized geometry.
+        """
         if "package_uri" in data:
             mesh = super()._from_json(data=data, **kwargs)
             mesh.filename = data["package_uri"]

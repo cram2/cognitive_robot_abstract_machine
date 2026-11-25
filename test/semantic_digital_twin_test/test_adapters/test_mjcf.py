@@ -1,3 +1,9 @@
+"""
+Tests of :class:`semantic_digital_twin.adapters.mjcf.MJCFParser`.
+"""
+
+from __future__ import annotations
+
 import os.path
 import shutil
 

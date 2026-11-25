@@ -1,3 +1,9 @@
+"""
+World descriptor of a tabletop scene for camera simulation with the SemDT ray tracer.
+"""
+
+from __future__ import annotations
+
 # %% Imports
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
@@ -31,6 +37,9 @@ class WorldDescriptor(BaseWorldDescriptor):
     """
 
     def __init__(self) -> None:
+        """
+        Adds the table, the objects on it and the camera to the world.
+        """
         super().__init__()
         root = self.world.root
 

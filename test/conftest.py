@@ -641,6 +641,9 @@ def _tiago_world_setup():
 
 @pytest.fixture(scope="session")
 def _apartment_world_setup():
+    """
+    :return: The apartment with a floor, a milk carton, a cereal box and a spoon in a drawer.
+    """
     apartment_world = URDFParser.from_file(
         "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
@@ -779,6 +782,9 @@ def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_set
 
 @pytest.fixture(scope="session")
 def _simple_apartment_setup():
+    """
+    :return: A world of two boxes surrounded by four walls.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -878,6 +884,9 @@ def _simple_apartment_setup():
 
 @pytest.fixture(scope="session")
 def kitchen_world():
+    """
+    :return: The small IAI kitchen.
+    """
     path = "package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     parser = URDFParser.from_file(file_path=path)
     world = parser.create_world()

@@ -1,3 +1,7 @@
+"""
+Where mesh files are read from and where generated mesh files are written to.
+"""
+
 from __future__ import annotations
 
 import atexit
@@ -23,14 +27,11 @@ from semantic_digital_twin.adapters.package_resolver import (
 @dataclass
 class MeshFileSources(metaclass=SingletonMeta):
     """
-    The sources this process reads mesh files from.
+    The sources this process reads mesh files from. Each source claims the mesh
+    references it recognises and answers with a readable local path, so a reference to
+    a file held elsewhere becomes a path every consumer of a mesh can open.
 
-    A mesh records where it came from, which is not always a file the machine reading it
-    has. Each source claims the references it recognises and answers with a readable
-    local path, so a reference to a file held elsewhere becomes a path every consumer of
-    a mesh -- the mesh loader, the collision detectors, the visualizer -- can open.
-
-    ..note:: A reference no source claims is answered with itself, which is what makes
+    .. note:: A reference no source claims is answered with itself, which is what makes
         a process that reads only local files behave as though this did not exist.
     """
 

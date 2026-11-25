@@ -1,3 +1,9 @@
+"""
+Tests of the URDF parser: geometry, materials, joints and whole robots and environments.
+"""
+
+from __future__ import annotations
+
 import os.path
 from dataclasses import dataclass
 from math import pi

@@ -1,3 +1,9 @@
+"""
+Tests of :class:`semantic_digital_twin.adapters.mesh.STLParser`.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 import pytest
@@ -29,6 +35,9 @@ def cup_uri() -> str:
 
 
 def test_stl_parsing_construct(milk_uri):
+    """
+    The parser keeps the file path it is given.
+    """
     stl_parser = STLParser(milk_uri)
     assert stl_parser.file_path == milk_uri
 

@@ -1,3 +1,9 @@
+"""
+Parser that creates a world from an MJCF (MuJoCo XML) file.
+"""
+
+from __future__ import annotations
+
 import logging
 import os
 import tempfile
@@ -110,6 +116,9 @@ class MJCFParser(WorldModelParser):
     """
 
     def __post_init__(self) -> None:
+        """
+        Resolves the package URIs of the file and its meshes and loads the MuJoCo spec.
+        """
         package_uri_resolver = PackageUriResolver()
         if package_uri_resolver.supports(self.file_path):
             self.file_path = package_uri_resolver.resolve(self.file_path)

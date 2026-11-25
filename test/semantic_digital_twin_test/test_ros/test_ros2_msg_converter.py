@@ -1,3 +1,9 @@
+"""
+Tests of the conversion between semantic digital twin objects and ROS 2 messages.
+"""
+
+from __future__ import annotations
+
 import os
 import shutil
 import subprocess
@@ -319,6 +325,9 @@ def test_convert_sphere_shape(cylinder_bot_world):
 
 
 def test_convert_mesh_shape(cylinder_bot_world):
+    """
+    A mesh survives the round-trip through a ROS 2 marker.
+    """
     stl_file = PackageUriResolver().resolve(
         "package://iai_objects/objects/jeroen_cup.stl"
     )
@@ -403,6 +412,9 @@ def test_a_mesh_in_a_package_is_published_by_package_uri(
 def test_a_mesh_outside_any_package_is_published_by_file_uri(
     cylinder_bot_world, tmp_path
 ):
+    """
+    A mesh whose file lies in no package is published with a ``file://`` URI.
+    """
     mesh_file = tmp_path / "jeroen_cup.stl"
     shutil.copy(
         PackageUriResolver().resolve("package://iai_objects/objects/jeroen_cup.stl"),

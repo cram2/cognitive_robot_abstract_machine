@@ -1,3 +1,9 @@
+"""
+Tests of the shapes, in particular meshes, their files and their serialization.
+"""
+
+from __future__ import annotations
+
 import gc
 import math
 import os
@@ -653,6 +659,9 @@ def test_serializing_a_mesh_holds_less_than_twice_the_memory_of_its_arrays(tmp_p
 
 
 def test_a_mesh_in_a_package_is_serialized_without_its_geometry(installed_mesh_file):
+    """
+    A mesh whose file lies in an installed package is serialized by reference only.
+    """
     payload = Mesh(filename=str(installed_mesh_file)).to_json()
 
     assert "mesh" not in payload

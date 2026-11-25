@@ -985,6 +985,9 @@ def test_copy_world(world_setup):
 
 
 def test_copy_big_world():
+    """
+    A deep copy of the apartment with a PR2 holds the same world entities.
+    """
     pr2_world = URDFParser.from_file(
         file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     ).create_world()

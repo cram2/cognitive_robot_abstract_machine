@@ -1,3 +1,9 @@
+"""
+World descriptor of the IAI kitchen with a cereal box and a milk carton near the kitchen island.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec, RegionSpec
@@ -7,7 +13,14 @@ from semantic_digital_twin.world_description.geometry import Scale
 
 
 class WorldDescriptor(BaseWorldDescriptor):
+    """
+    The IAI kitchen with a cereal box and a milk carton and the kitchen island as region.
+    """
+
     def __init__(self) -> None:
+        """
+        Adds the objects and the region to the world.
+        """
         super().__init__()
         root = self.world.root
 

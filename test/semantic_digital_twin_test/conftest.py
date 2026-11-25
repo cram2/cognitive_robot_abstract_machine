@@ -17,14 +17,14 @@ from ..orm_interface_build import regenerate_orm_interfaces
 regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
 
-import shutil
-from pathlib import Path
+import shutil  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 import numpy as np
 import pytest
 import sqlalchemy
 import trimesh
-from typing_extensions import Callable
+from typing_extensions import Callable  # noqa: E402
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.symbol_graph.symbol_graph import SymbolGraph, Symbol
@@ -33,7 +33,9 @@ from krrood.ontomatic.property_descriptor.attribute_introspector import (
 )
 from krrood.ormatic.utils import create_engine, drop_database
 from krrood.utils import recursive_subclasses
-from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
+from semantic_digital_twin.adapters.package_resolver import (  # noqa: E402
+    PackageUriResolver,
+)
 from semantic_digital_twin.adapters.urdf import URDFParser
 
 from semantic_digital_twin.world import World
@@ -72,6 +74,9 @@ def in_memory_session_maker():
 
 @pytest.fixture
 def table_world():
+    """
+    :return: A world holding the table of the iai_objects package.
+    """
     return URDFParser.from_file(
         file_path="package://iai_objects/urdf/table.urdf"
     ).create_world()
@@ -127,6 +132,11 @@ def mesh_package_installer(monkeypatch) -> Callable[[Path], Path]:
     )
 
     def install(prefix: Path) -> Path:
+        """
+        Installs ``mesh_package`` into ``prefix``.
+
+        :return: The installed mesh file.
+        """
         share = prefix / "share"
         package_index = share / "ament_index" / "resource_index" / "packages"
         package_index.mkdir(parents=True)

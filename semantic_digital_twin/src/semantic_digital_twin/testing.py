@@ -1,3 +1,9 @@
+"""
+Callbacks and pytest fixtures of small worlds shared by the semantic digital twin tests.
+"""
+
+from __future__ import annotations
+
 import os
 
 import pytest
@@ -107,6 +113,10 @@ def world_setup() -> tuple[
 
 @pytest.fixture
 def world_setup_simple():
+    """
+    :return: A world with a box, a cylinder, a sphere, a mesh and a compound body, each
+        on a 6 DoF connection to the root, followed by these five bodies.
+    """
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     body1 = Body(
@@ -266,6 +276,9 @@ def ray_test_world():
 
 @pytest.fixture
 def two_arm_robot_world():
+    """
+    :return: A world with the simple two arm robot on an omnidirectional drive.
+    """
     robot = "package://iai_objects/urdf/simple_two_arm_robot.urdf"
     world = World()
     with world.modify_world():

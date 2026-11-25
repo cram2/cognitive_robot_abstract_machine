@@ -1,3 +1,7 @@
+"""
+Converters from semantic digital twin objects to ROS 2 messages.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -200,6 +204,10 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
 
 @dataclass
 class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
+    """
+    Converts a mesh to a marker that references the mesh file.
+    """
+
     @classmethod
     def mesh_resource_of(cls, mesh: Mesh) -> str:
         """

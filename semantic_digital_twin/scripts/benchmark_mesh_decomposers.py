@@ -1,3 +1,10 @@
+"""
+Compares the mesh decomposers by run time, output size and number of convex hulls on a
+non-convex cup mesh.
+"""
+
+from __future__ import annotations
+
 import os
 import tempfile
 import time
@@ -19,6 +26,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def load_non_convex_mesh():
+    """
+    :return: The collision mesh of the jeroen cup.
+    """
     stl_path = "package://iai_objects/objects/jeroen_cup.stl"
     body: Body = STLParser(stl_path).create_world().root
     return body.collision[0]
