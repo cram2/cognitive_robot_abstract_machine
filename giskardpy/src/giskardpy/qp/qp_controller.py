@@ -19,6 +19,7 @@ from giskardpy.qp.qp_data import QPData, QPDataExplicit
 from giskardpy.qp.qp_data_symbolic import QPDataSymbolic
 from giskardpy.qp.qp_debugger import QuadraticProgramDebugger
 from giskardpy.qp.solvers.qp_solver import QPSolver
+from giskardpy.qp.submatrix_cache import SubmatrixCache
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,11 @@ class QPController:
     qp_solver: QPSolver = field(default=None, init=False)
     debugger: QuadraticProgramDebugger = field(default=None, init=False)
     dof_filter: np.ndarray = field(default=None, init=False)
+    submatrix_cache: SubmatrixCache = field(default_factory=SubmatrixCache, init=False)
+    """
+    Remembers the constraint matrices filtered in earlier control cycles, whose sparsity
+    pattern the compiled QP keeps from one cycle to the next.
+    """
 
     def __post_init__(self, degrees_of_freedom: list[DegreeOfFreedom]) -> None:
         """
@@ -137,7 +143,9 @@ class QPController:
             life_cycle_state=life_cycle_state,
             float_variables=float_variables,
         )
-        qp_data_filtered = qp_data_raw.apply_filters()
+        qp_data_filtered = qp_data_raw.apply_filters(
+            submatrix_cache=self.submatrix_cache
+        )
         stopped = self._unconstrained_degrees_of_freedom_able_to_stop(
             qp_data=qp_data_filtered
         )
@@ -174,7 +182,10 @@ class QPController:
         )
         if not removed_variables.all():
             solution[~removed_variables] = self._solve(
-                qp_data=qp_data.without_variables(removed_variables=removed_variables)
+                qp_data=qp_data.without_variables(
+                    removed_variables=removed_variables,
+                    submatrix_cache=self.submatrix_cache,
+                )
             )
         return solution
 
