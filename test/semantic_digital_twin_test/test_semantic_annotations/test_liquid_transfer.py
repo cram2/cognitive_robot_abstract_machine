@@ -9,14 +9,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-import krrood.symbolic_math.symbolic_math as sm
 import numpy as np
 import pytest
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.patterns.classproperty import classproperty
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
-    Point3,
     Vector3,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
@@ -53,31 +51,6 @@ from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.liquid_connection import LiquidConnection
 from semantic_digital_twin.world_description.world_entity import Body
 
-# %% helpers
-
-
-def _value(expression: sm.Scalar) -> float:
-    """
-    The numeric value of a symbolic expression at the world's current state.
-    """
-    return float(expression.evaluate()[0])
-
-
-def _evaluated_xyz(spatial: Point3 | Vector3) -> np.ndarray:
-    """
-    The numeric ``x, y, z`` of a symbolic point or vector at the world's current state.
-    """
-    return np.array([_value(spatial.x), _value(spatial.y), _value(spatial.z)])
-
-
-def _container_volume(container: HasFillLevel) -> float:
-    """
-    The liquid volume of a container at full fill, read off its collision geometry.
-    """
-    extents = container.root.collision.scale
-    return extents.x * extents.y * extents.z
-
-
 # %% test containers
 
 
@@ -108,26 +81,6 @@ class _SoftGateContainer(_Container):
         A gentle overlap gate.
         """
         return 1.0
-
-
-@dataclass(eq=False, kw_only=True)
-class _SteadilyFillingContainer(_Container):
-    """
-    A container whose fill rises at a constant rate whatever its pose.
-    """
-
-    @classproperty
-    def steady_fill_velocity(cls) -> float:
-        """
-        The constant rate of the normalized fill level, per second.
-        """
-        return 0.1
-
-    def fill_velocity(self) -> sm.Scalar:
-        """
-        :return: The constant fill rate.
-        """
-        return sm.Scalar(self.steady_fill_velocity)
 
 
 # %% world builders
@@ -236,15 +189,15 @@ def _partly_open_transfer() -> tuple[World, HasFillLevel, HasFillLevel]:
     inside their transitions.
     """
     world, source, receiver = _build_world(receiver_class=_SoftGateContainer)
-    _tilt_source(world, source, 0.5)
+    _tilt(world, source, 0.5)
     return world, source, receiver
 
 
-def _tilt_source(world: World, source: HasFillLevel, tilt: float) -> None:
+def _tilt(world: World, container: HasFillLevel, tilt: float) -> None:
     """
-    Tilts the source to ``tilt`` about its tilt axis.
+    Tilts the container to ``tilt`` about its tilt axis.
     """
-    JointState.from_mapping({source.root.parent_connection: tilt}).apply_to(world)
+    JointState.from_mapping({container.root.parent_connection: tilt}).apply_to(world)
 
 
 def _step_passive_state(world: World, dt: float) -> None:
@@ -305,11 +258,13 @@ class TestFillVelocity:
         The volume the source loses is the volume the receiver gains.
         """
         _, source, receiver = _partly_open_transfer()
-        gate = _value(receiver.transfer_gate(source=source))
+        gate = receiver.transfer_gate(source=source).evaluate()[0]
         assert 0.01 < gate < 0.99, "the setup must hold the gate partly open"
 
-        assert _value(receiver.fill_velocity()) * receiver.capacity == pytest.approx(
-            -_value(source.fill_velocity()) * source.capacity
+        assert receiver.fill_velocity().evaluate()[
+            0
+        ] * receiver.capacity == pytest.approx(
+            -source.fill_velocity().evaluate()[0] * source.capacity
         )
 
     def test_a_receiver_of_measured_capacity_converts_volume_by_it(self) -> None:
@@ -318,12 +273,14 @@ class TestFillVelocity:
         the box its collision geometry bounds would hold.
         """
         world, source, receiver = _build_world()
-        receiver.measured_capacity = 3.0 * _container_volume(receiver)
-        _tilt_source(world, source, 0.6)
+        receiver.measured_capacity = 3.0 * receiver.capacity
+        _tilt(world, source, 0.6)
 
-        assert _value(receiver.fill_velocity()) / -_value(
-            source.fill_velocity()
-        ) == pytest.approx(_container_volume(source) / receiver.measured_capacity)
+        assert receiver.fill_velocity().evaluate()[
+            0
+        ] / -source.fill_velocity().evaluate()[0] == pytest.approx(
+            source.capacity / receiver.measured_capacity
+        )
 
 
 # %% geometric transfer gate
@@ -341,9 +298,9 @@ class TestTransferGate:
         """
         _, source, receiver = _partly_open_transfer()
 
-        assert _value(receiver.transfer_gate(source=source)) == pytest.approx(
-            _value(receiver.height_gate(source=source))
-            * _value(receiver.overlap_gate(source=source))
+        assert receiver.transfer_gate(source=source).evaluate()[0] == pytest.approx(
+            receiver.height_gate(source=source).evaluate()[0]
+            * receiver.overlap_gate(source=source).evaluate()[0]
         )
 
     def test_the_height_factor_reads_the_clearance_in_receiver_heights(self) -> None:
@@ -352,12 +309,13 @@ class TestTransferGate:
         measured in receiver heights.
         """
         _, source, receiver = _partly_open_transfer()
-        clearance = _value(source.liquid_exit_point().z) - _value(
-            receiver.opening_point().z
+        clearance = (
+            source.liquid_exit_point().z.evaluate()[0]
+            - receiver.opening_point().z.evaluate()[0]
         )
         sharpness = receiver.height_gate_sharpness
 
-        assert _value(receiver.height_gate(source=source)) == pytest.approx(
+        assert receiver.height_gate(source=source).evaluate()[0] == pytest.approx(
             1 / (1 + math.exp(-sharpness * clearance / receiver.root.collision.scale.z))
         )
 
@@ -369,17 +327,17 @@ class TestTransferGate:
         opening, measured in opening radii.
         """
         _, source, receiver = _partly_open_transfer()
-        landing = _evaluated_xyz(
+        landing = (
             receiver.projectile_landing_point(
                 source=source, exit_speed=source.exit_speed()
             )
-        )
-        opening = _evaluated_xyz(receiver.opening_point())
+        ).evaluate()[:3]
+        opening = receiver.opening_point().evaluate()[:3]
         landing_distance = np.linalg.norm(landing[:2] - opening[:2])
         margin = (receiver.opening_radius - landing_distance) / receiver.opening_radius
         sharpness = receiver.overlap_gate_sharpness
 
-        assert _value(receiver.overlap_gate(source=source)) == pytest.approx(
+        assert receiver.overlap_gate(source=source).evaluate()[0] == pytest.approx(
             1 / (1 + math.exp(-sharpness * margin))
         )
 
@@ -398,9 +356,9 @@ class TestTilt:
         Turning a container about a horizontal axis by an angle tilts it by that angle.
         """
         world, cup = _lone_tilting_cup()
-        JointState.from_mapping({cup.root.parent_connection: angle}).apply_to(world)
+        _tilt(world, cup, angle)
 
-        assert _value(cup.tilt) == pytest.approx(abs(angle), abs=1e-6)
+        assert cup.tilt.evaluate()[0] == pytest.approx(abs(angle), abs=1e-6)
 
 
 # %% liquid exit point
@@ -411,32 +369,23 @@ class TestLiquidExitPoint:
     Liquid leaves from the rim edge on the pour side, not the rim centre.
     """
 
-    def _rim_center_world(self, *, world: World, source: HasFillLevel) -> Point3:
-        """
-        The centre of the source's rim in the world frame.
-        """
-        return (
-            world.compose_forward_kinematics_expression(world.root, source.root)
-            @ source.rim_point()
-        )
-
     def test_exit_point_at_rim_edge_along_pour_direction_when_tilted(self) -> None:
         """
         A tilted cup pours over the rim edge on the pour side, a full rim radius from
         centre.
         """
         world, source, _ = _build_world()
-        _tilt_source(world, source, 1.2)
+        _tilt(world, source, 1.2)
 
-        offset = _evaluated_xyz(source.liquid_exit_point()) - _evaluated_xyz(
-            self._rim_center_world(world=world, source=source)
+        offset = (
+            source.liquid_exit_point().evaluate()[:3]
+            - source.opening_point().evaluate()[:3]
         )
-        collision = source.root.collision
 
         assert np.linalg.norm(offset) == pytest.approx(
-            (collision.max_point.x - collision.min_point.x) / 2, abs=1e-3
+            source.root.collision.scale.x / 2, abs=1e-3
         )
-        pour_direction = _evaluated_xyz(source.opening_direction())
+        pour_direction = source.opening_direction().evaluate()[:3]
         assert offset[:2] @ pour_direction[:2] > 0
 
 
@@ -456,15 +405,15 @@ class TestProjectileLandingPoint:
         leans from vertical.
         """
         world, source, _ = _build_world()
-        _tilt_source(world, source, 0.6)
+        _tilt(world, source, 0.6)
         exit_speed = 0.2
 
-        exit_velocity = _evaluated_xyz(
-            source.liquid_exit_velocity(exit_speed=exit_speed)
-        )
+        exit_velocity = source.liquid_exit_velocity(exit_speed=exit_speed).evaluate()[
+            :3
+        ]
 
         assert exit_velocity[:2] == pytest.approx(
-            exit_speed * _evaluated_xyz(source.opening_direction())[:2]
+            exit_speed * source.opening_direction().evaluate()[:2]
         )
 
     def test_throw_distance_follows_the_fall_to_the_opening(self) -> None:
@@ -474,23 +423,23 @@ class TestProjectileLandingPoint:
         """
         exit_speed = 0.2
         world, source, receiver = _build_world()
-        _tilt_source(world, source, 0.6)
+        _tilt(world, source, 0.6)
 
         landing = receiver.projectile_landing_point(
             source=source, exit_speed=exit_speed
         )
 
-        exit_point = _evaluated_xyz(source.liquid_exit_point())
-        exit_velocity = _evaluated_xyz(
-            source.liquid_exit_velocity(exit_speed=exit_speed)
-        )
-        opening_height = _value(receiver.opening_point().z)
+        exit_point = source.liquid_exit_point().evaluate()[:3]
+        exit_velocity = source.liquid_exit_velocity(exit_speed=exit_speed).evaluate()[
+            :3
+        ]
+        opening_height = receiver.opening_point().z.evaluate()[0]
         fall_height = exit_point[2] - opening_height
         flight_time = math.sqrt(2 * fall_height / PouringEquation.standard_gravity)
-        assert _value(landing.x) == pytest.approx(
+        assert landing.x.evaluate()[0] == pytest.approx(
             exit_point[0] + exit_velocity[0] * flight_time, abs=1e-9
         )
-        assert _value(landing.z) == pytest.approx(opening_height, abs=1e-9)
+        assert landing.z.evaluate()[0] == pytest.approx(opening_height, abs=1e-9)
 
 
 # %% coupling guards
@@ -658,7 +607,7 @@ class TestSynchronizedTransfer:
         assert copied_source.fill_equation == faster_drain
         compiled = copied_source.fill_connection.current_compiled_fill_velocity()
         assert compiled.evaluate() == pytest.approx(
-            _value(copied_source.fill_velocity())
+            copied_source.fill_velocity().evaluate()[0]
         )
 
 
@@ -671,31 +620,32 @@ class TestFillLevelIntegration:
     belongs to, inside its limits.
     """
 
-    def test_a_filling_container_saturates_at_full(self) -> None:
-        """
-        A container with a steady inflow stops at fill 1, not past the brim.
-        """
-        world, cup = _lone_tilting_cup(container_class=_SteadilyFillingContainer)
-        cup.initialize_fill_level(initial_fill=0.9)
-
-        for _ in range(50):
-            _step_passive_state(world, 0.05)
-
-        assert cup.fill_level == pytest.approx(1.0)
-
     def test_a_step_advances_the_fill_by_its_velocity(self) -> None:
         """
         One step moves the fill level by its velocity times the step length.
         """
-        world, cup = _lone_tilting_cup(container_class=_SteadilyFillingContainer)
-        cup.initialize_fill_level(initial_fill=0.2)
+        world, cup = _lone_tilting_cup()
+        cup.initialize_fill_level(initial_fill=0.8)
+        _tilt(world, cup, 1.0)
+        fill_velocity = cup.fill_velocity().evaluate()[0]
         dt = 0.05
 
         _step_passive_state(world, dt)
 
-        assert cup.fill_level == pytest.approx(
-            0.2 + _SteadilyFillingContainer.steady_fill_velocity * dt
-        )
+        assert cup.fill_level == pytest.approx(0.8 + fill_velocity * dt)
+
+    def test_a_draining_container_stops_at_empty(self) -> None:
+        """
+        A tilted container drains to fill 0, not below.
+        """
+        world, cup = _lone_tilting_cup()
+        cup.initialize_fill_level(initial_fill=0.1)
+        _tilt(world, cup, 1.5)
+
+        for _ in range(50):
+            _step_passive_state(world, 0.05)
+
+        assert cup.fill_level == 0.0
 
 
 # %% the liquid connection on its own
