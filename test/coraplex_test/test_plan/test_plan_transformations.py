@@ -1,3 +1,10 @@
+"""
+Tests of the transformations that rewrite a plan before it runs, and of the plan
+adaptations of the executors that apply them.
+"""
+
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 
@@ -82,7 +89,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Spoon,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -169,7 +176,9 @@ def gripper_goal(end_effector: EndEffector, state: GripperState) -> MoveFingers:
     """
     :return: A new goal moving the gripper of `end_effector` to `state`.
     """
-    return MoveFingers.moving_gripper_to(end_effector.default_configuration(state))
+    return MoveFingers.create_gripper_goal(
+        configuration=end_effector.default_configuration(state)
+    )
 
 
 def joint_goal_of(torso_move: MoveTorsoAction) -> JointPositionList:
@@ -267,7 +276,10 @@ def reach_action(milk: Milk, view) -> ReachAction:
     :param view: The robot reaching for it.
     :return: A reach at the object's own frame.
     """
-    return ReachAction(grasp=GraspCandidate.from_body_origin(milk), arm=view.right_arm)
+    return ReachAction(
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+        arm=view.right_arm,
+    )
 
 
 def detect_actions_of(plan: StatechartNode) -> list[DetectAction]:
@@ -540,7 +552,7 @@ def test_a_transformation_inserts_its_nodes_before_the_anchor(pr2_apartment_cont
         MoveGripper,
         JointPositionList,
     ]
-    assert [step.gripper for step in steps[:2]] == [
+    assert [step.two_finger_gripper for step in steps[:2]] == [
         view.left_arm.end_effector,
         view.right_arm.end_effector,
     ]
@@ -564,7 +576,7 @@ def test_a_transformation_inserts_its_nodes_after_the_anchor(pr2_apartment_conte
         MoveGripper,
         MoveGripper,
     ]
-    assert [step.gripper for step in steps[1:]] == [
+    assert [step.two_finger_gripper for step in steps[1:]] == [
         view.left_arm.end_effector,
         view.right_arm.end_effector,
     ]
@@ -671,7 +683,10 @@ def test_the_perception_precedes_the_final_approach_of_a_straight_reach(
     plan_transformations = [DetectBeforeGrasp()]
 
     plan = rewritten(
-        ReachAction(grasp=GraspCandidate.from_body_origin(milk), arm=view.all_arms[0]),
+        ReachAction(
+            grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+            arm=view.all_arms[0],
+        ),
         extensions,
         plan_transformations,
     )
@@ -721,7 +736,7 @@ def test_a_transformation_on_reaches_also_fires_inside_a_pick_up(pr2_apartment_c
     plan_transformations = [DetectBeforeGrasp()]
 
     plan = rewritten(
-        PickUpAction(grasp=milk.grasp_candidates()[0], arm=view.right_arm),
+        PickUpAction(grasp_candidate=milk.grasp_candidates()[0], arm=view.right_arm),
         extensions,
         plan_transformations,
     )
@@ -758,7 +773,7 @@ def pick_up_action(annotation, arm: Arm) -> PickUpAction:
     :param arm: The arm to pick it up with.
     :return: A pick-up of the object by the first grasp it offers.
     """
-    return PickUpAction(grasp=annotation.grasp_candidates()[0], arm=arm)
+    return PickUpAction(grasp_candidate=annotation.grasp_candidates()[0], arm=arm)
 
 
 def handle_opened_by(opening: Match) -> Handle:
@@ -769,7 +784,7 @@ def handle_opened_by(opening: Match) -> Handle:
     first_candidate = next(
         iter(EntityQueryLanguageGenerativeBackend().evaluate(expression=opening))
     )
-    return first_candidate.open_container.grasp.graspable
+    return first_candidate.open_container.grasp_candidate.graspable
 
 
 def arm_opening_with(opening: Match) -> Arm:
@@ -877,7 +892,7 @@ def test_opening_a_drawer_stands_where_it_is_opened_from(pr2_apartment_context):
         drawer, view.right_arm, simulated_executor(extensions).context
     )
     standing_positions = (
-        opening.statement._kwargs_["navigate"]._kwargs_["target_location"]._domain_
+        opening.statement._kwargs_["navigate"]._kwargs_["planar_goal_pose"]._domain_
     )
     location = standing_positions.domain
 
@@ -902,8 +917,8 @@ def test_opening_a_drawer_faces_the_handle_where_it_is_when_it_opens_it(
 
     facing = opening.statement._kwargs_["face_and_look_at"]._kwargs_
     for target in [
-        facing["face_at"]._kwargs_["target"],
-        facing["look_at"]._kwargs_["target"],
+        facing["face_at"]._kwargs_["look_target"],
+        facing["look_at"]._kwargs_["look_target"],
     ]:
         np.testing.assert_allclose(
             world.transform(target, world.root).position.to_np(),
@@ -924,7 +939,7 @@ def test_the_drawer_is_opened_before_a_move_and_pick_up_rather_than_inside_it(
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=spoon.grasp_candidates()[0],
         arm=view.right_arm,
     )
@@ -1016,7 +1031,7 @@ def test_an_object_that_lies_in_no_drawer_is_picked_up_unchanged(pr2_apartment_c
     assert steps_of(plan) == [pick_up]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChoosesTheGivenChild(PlanChildChooser[StatementNode]):
     """
     Answers a node choosing its child with the child it was given, once, and prepares it
@@ -1028,7 +1043,7 @@ class ChoosesTheGivenChild(PlanChildChooser[StatementNode]):
     The child handed over, None once it was.
     """
 
-    def choose_child(self, node: StatementNode) -> StatechartNode | None:
+    def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
         child, self.child = self.child, None
         return child
 
@@ -1051,14 +1066,16 @@ def test_the_opening_joins_the_sequence_a_grounded_pick_up_is_a_child_of(
 
     described = pick_up_action(spoon, view.right_arm)
     underspecified = StatementNode(
-        statement=a(PickUpAction)(grasp=described.grasp, arm=described.arm)
+        statement=a(PickUpAction)(
+            grasp_candidate=described.grasp_candidate, arm=described.arm
+        )
     )
     plan = rewritten(Sequence(nodes=[underspecified]), extensions, plan_transformations)
     candidate = pick_up_action(spoon, view.right_arm)
     candidate_steps = Sequence(nodes=[candidate])
 
     underspecified.choose_child_with(
-        ChoosesTheGivenChild(child=candidate_steps),
+        chooser=ChoosesTheGivenChild(child=candidate_steps),
     )
 
     [parking, opening, parking_again, drive_to_the_spoon, chosen] = steps_of(
@@ -1098,7 +1115,7 @@ def test_parking_ends_before_a_first_action_running_in_parallel_starts(
     started_together = [
         MoveTorsoAction(torso_state=TorsoState.HIGH),
         SetGripperAction(
-            configuration=view.right_arm.end_effector.default_configuration(
+            gripper_configuration=view.right_arm.end_effector.default_configuration(
                 GripperState.OPEN
             )
         ),
@@ -1116,12 +1133,16 @@ def test_parking_ends_before_a_first_action_running_in_parallel_starts(
 
 
 def test_parking_ends_before_a_plan_that_starts_in_parallel(pr2_apartment_context):
+    """
+    Parking the arms before the first action ends before a parallel at the start of the
+    plan begins.
+    """
     world, view, extensions = pr2_apartment_context
     in_parallel = Parallel(
         nodes=[
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             SetGripperAction(
-                configuration=view.right_arm.end_effector.default_configuration(
+                gripper_configuration=view.right_arm.end_effector.default_configuration(
                     GripperState.OPEN
                 )
             ),
@@ -1230,13 +1251,13 @@ def test_a_move_and_pick_up_whose_grasps_are_on_several_objects_is_opened_per_ca
 
     standing_pose = Pose(reference_frame=world.root)
     move_and_pick_up = a(MoveAndPickUpAction)(
-        navigate=NavigateAction(target_location=standing_pose),
+        navigate=NavigateAction(planar_goal_pose=Pose2D.from_pose(standing_pose)),
         face_and_look_at=FaceAndLookAtAction(
-            face_at=FaceAtAction(target=standing_pose),
-            look_at=LookAtAction(target=standing_pose),
+            face_at=FaceAtAction(look_target=standing_pose),
+            look_at=LookAtAction(look_target=standing_pose),
         ),
         pick_up=a(PickUpAction)(
-            grasp=variable(
+            grasp_candidate=variable(
                 GraspCandidate,
                 domain=spoon.grasp_candidates() + milk.grasp_candidates(),
             ),
@@ -1256,11 +1277,15 @@ def test_a_move_and_pick_up_whose_grasps_are_on_several_objects_is_opened_per_ca
 def test_a_move_and_pick_up_of_an_object_in_no_drawer_is_left_alone(
     pr2_apartment_context,
 ):
+    """
+    A move-and-pick-up of an object that stands in no drawer is not rewritten to open
+    one first.
+    """
     world, view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     move_and_pick_up = MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose(reference_frame=world.root),
+        standing_position=Pose2D(reference_frame=world.root),
         grasp=milk.grasp_candidates()[0],
         arm=view.right_arm,
     )
@@ -1547,7 +1572,7 @@ def test_the_transformations_that_collide_are_still_applied(pr2_apartment_contex
         plan_transformations,
     )
 
-    assert [step.gripper for step in steps_of(plan)[:2]] == [
+    assert [step.two_finger_gripper for step in steps_of(plan)[:2]] == [
         view.left_arm.end_effector,
         view.right_arm.end_effector,
     ]
@@ -1596,7 +1621,7 @@ def shutting_goals_of(plan: StatechartNode) -> list[MoveGripper]:
         node
         for node in plan.descendants
         if isinstance(node, MoveGripper)
-        and node.width == node.gripper.separation_in(GripperState.CLOSE)
+        and node.width == node.two_finger_gripper.separation_in(GripperState.CLOSE)
     ]
 
 
@@ -1605,7 +1630,7 @@ def grasp_of(milk: Milk) -> GraspCandidate:
     :param milk: The object to grasp.
     :return: A grasp at that object's own origin.
     """
-    return GraspCandidate.from_body_origin(milk)
+    return GraspCandidate.from_body_origin(graspable=milk)
 
 
 @pytest.mark.parametrize(
@@ -1614,11 +1639,15 @@ def grasp_of(milk: Milk) -> GraspCandidate:
 def test_a_grasp_closes_to_the_objects_width_where_objects_push_back(
     pr2_apartment_context, executor_for
 ):
+    """
+    Where objects push back, a grasp closes the fingers to the object's width instead of
+    shutting them.
+    """
     world, view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = rewritten(
-        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
         extensions,
         executor_for=executor_for,
     )
@@ -1640,7 +1669,8 @@ def test_a_grasp_still_shuts_the_gripper_where_nothing_pushes_back(
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = rewritten(
-        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)), extensions
+        GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
+        extensions,
     )
 
     assert width_actions_of(plan) == []
@@ -1658,7 +1688,7 @@ def test_a_gripper_whose_fingers_are_not_modelled_like_the_real_ones_still_shuts
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = rewritten(
-        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
         extensions,
         executor_for=robot_executor,
     )
@@ -1668,12 +1698,15 @@ def test_a_gripper_whose_fingers_are_not_modelled_like_the_real_ones_still_shuts
 
 
 def test_the_squeeze_is_handed_on_to_the_fingers(pr2_apartment_context):
+    """
+    The squeeze the adaptation was given is handed on to the fingers.
+    """
     world, view, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     squeeze = 0.002
 
     plan = rewritten(
-        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
         extensions,
         executor_for=lambda extensions: physically_simulated_executor(
             extensions,
@@ -1685,11 +1718,14 @@ def test_the_squeeze_is_handed_on_to_the_fingers(pr2_apartment_context):
 
 
 def test_the_hsr_hand_is_sent_shut_in_a_physical_simulation(hsr_apartment_context):
+    """
+    In a physical simulation the HSR's hand is closed with the squeeze of its gripper.
+    """
     world, view, extensions = hsr_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     plan = rewritten(
-        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
         extensions,
         executor_for=physically_simulated_executor,
     )
@@ -1700,6 +1736,9 @@ def test_the_hsr_hand_is_sent_shut_in_a_physical_simulation(hsr_apartment_contex
 
 
 def test_the_real_hsr_hand_is_squeezed_as_its_executor_says(hsr_apartment_context):
+    """
+    The real HSR's hand is closed with the squeeze its executor's adaptation gives.
+    """
     world, view, extensions = hsr_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     executors = []
@@ -1709,7 +1748,7 @@ def test_the_real_hsr_hand_is_squeezed_as_its_executor_says(hsr_apartment_contex
         return executors[-1]
 
     plan = rewritten(
-        GraspingAction(grasp=grasp_of(milk), arm=left_or_only_arm(view)),
+        GraspingAction(grasp_candidate=grasp_of(milk), arm=left_or_only_arm(view)),
         extensions,
         executor_for=kept_robot_executor,
     )
@@ -1739,7 +1778,7 @@ def test_an_object_without_collision_is_still_held_by_shutting_the_gripper(
         world.add_semantic_annotation(shapeless)
 
     plan = rewritten(
-        GraspingAction(grasp=grasp_of(shapeless), arm=left_or_only_arm(view)),
+        GraspingAction(grasp_candidate=grasp_of(shapeless), arm=left_or_only_arm(view)),
         extensions,
         executor_for=physically_simulated_executor,
     )

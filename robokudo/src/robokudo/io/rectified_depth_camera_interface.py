@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from rclpy.node import Node
     from std_msgs.msg import Header
+    from semantic_digital_twin.world import World
 
     from robokudo.cas import CAS
     from robokudo.descriptors.camera_configs.config_stereo import (
@@ -354,8 +355,14 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
             self.last_timestamp = timestamp
             self._has_new_data = True
 
-    @called_positionally
-    def set_data(self, cas: CAS) -> bool:
+    def has_new_data(self) -> bool:
+        """
+        Unlike :meth:`ROSCameraInterface.has_new_data`, defer TF checks to consumption.
+        """
+        with self.lock:
+            return self._has_new_data
+
+    def set_data(self, *, cas: CAS, world: World) -> bool:
         """
         Return ``False`` from :meth:`ROSCameraInterface.set_data` when a frame is dropped.
         """
@@ -369,14 +376,16 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         frame.validate(optical_frame=self.camera_config.tf_from)
         if (
             not self.camera_config.static_camera_transform_enabled
-            and not self.lookup_transform(timestamp)
+            and not self.lookup_transform(timestamp=timestamp)
         ):
             self.statistics.missing_transforms += 1
             return False
-        self.store_frame(cas=cas, frame=frame)
+        self._store_rectified_frame(cas=cas, world=world, frame=frame)
         return True
 
-    def store_frame(self, *, cas: CAS, frame: RectifiedDepthFrame) -> None:
+    def _store_rectified_frame(
+        self, *, cas: CAS, world: World, frame: RectifiedDepthFrame
+    ) -> None:
         """
         Populate RK image views and the acquisition-time camera pose.
         """
@@ -392,11 +401,16 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
         camera_frame = frame.images.color.header.frame_id
         self.validate_camera_frame_for_tf(camera_frame)
-        world_T_camera = self.static_world_T_camera_if_configured(camera_frame)
+        world_T_camera = self.static_world_T_camera_if_configured(
+            world=world, camera_frame=camera_frame
+        )
         if world_T_camera is None:
-            world_T_camera = self.world_T_camera_from_tf(frame.images.header.stamp)
+            world_T_camera = self.world_T_camera_from_tf(
+                world=world, timestamp=frame.images.header.stamp
+            )
         self.store_camera_observation(
             cas=cas,
+            world=world,
             camera_model=RosCameraModelAdapter.from_camera_info(calibration),
             camera_frame=camera_frame,
             timestamp_nanoseconds=Time.from_msg(frame.images.header.stamp).nanoseconds,

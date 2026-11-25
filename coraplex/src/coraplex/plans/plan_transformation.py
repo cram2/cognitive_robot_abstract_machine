@@ -10,6 +10,7 @@ from coraplex.datastructures.enums import InsertionPosition
 from coraplex.exceptions import CannotMatchOnType
 from cramph.composites import ControlStructureNode, Parallel, Sequence
 from cramph.context import ContextExtension
+from cramph.failure_handling import LimitedRecovery
 from cramph.node import StatechartNode
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 
@@ -149,15 +150,15 @@ class SequentialInsertion(
         """
 
     def _insert(self, anchor: StatechartNode, node: StatechartNode) -> StatechartNode:
-        step = ControlStructureNode.step_holding(anchor)
+        step = ControlStructureNode.step_holding(node=anchor)
         if not isinstance(step.parent_node, Sequence):
-            step.statechart.replace(step, Sequence(nodes=[step]))
+            step.statechart.replace(node=step, replacement=Sequence(nodes=[step]))
         match self.position:
             case InsertionPosition.BEFORE:
-                step.parent_node.insert_before(step, node)
+                step.parent_node.insert_before(reference=step, node=node)
                 return anchor
             case InsertionPosition.AFTER:
-                step.parent_node.insert_after(step, node)
+                step.parent_node.insert_after(reference=step, node=node)
                 return node
 
 
@@ -172,17 +173,17 @@ class ParallelInsertion(
     """
 
     def _insert(self, anchor: StatechartNode, node: StatechartNode) -> StatechartNode:
-        step = ControlStructureNode.step_holding(anchor)
+        step = ControlStructureNode.step_holding(node=anchor)
         if not isinstance(step.parent_node, Parallel):
-            step.statechart.replace(step, Parallel(nodes=[step]))
-        step.parent_node.add_node(node)
+            step.statechart.replace(node=step, replacement=Parallel(nodes=[step]))
+        step.parent_node.add_node(node=node)
         return anchor
 
 
 # %% rewriting a plan
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanRewriting(ContextExtension):
     """
     Offers the nodes of a plan to the transformations that may rewrite it.
@@ -301,3 +302,44 @@ class PlanRewriting(ContextExtension):
             )
         for transformation in transformations:
             transformation.apply(node)
+
+
+# %% recovering from a failure
+
+
+@dataclass(kw_only=True)
+class RecoveryByInsertion(LimitedRecovery):
+    """
+    Recovers by rewriting the plan with :attr:`transformation`, and then running the
+    step holding the failed node again, which waits for inserted nodes that run before
+    it.
+
+    It gives up on a node :attr:`transformation` does not match or apply to. The inserted
+    nodes are offered to the :class:`PlanRewriting` of the context of the failed node, if
+    any, like every other part of the plan.
+
+    .. warning:: The step has to be held by a control structure node of the kind
+        :attr:`transformation` inserts into, since a compiled node cannot be put below a
+        new one: :meth:`InsertionTransformation.apply` raises
+        :class:`~cramph.exceptions.StatechartAlreadyCompiledError` otherwise.
+
+    .. warning:: It only works in a locally ticked statechart, since a remote executor
+        does not send the nodes it inserts back.
+    """
+
+    transformation: InsertionTransformation
+    """
+    The transformation inserting the nodes that recover the plan.
+    """
+
+    def recover(self, *, failed_node: StatechartNode) -> None:
+        if not self.transformation.matches_node(
+            failed_node
+        ) or not self.transformation.is_applicable(failed_node):
+            return
+        step = ControlStructureNode.step_holding(node=failed_node)
+        self.transformation.apply(failed_node)
+        rewriting = failed_node.context.get_extension(extension_type=PlanRewriting)
+        if rewriting is not None:
+            rewriting.rewrite(step.parent_node)
+        failed_node.statechart.request_reset(node=step)

@@ -8,7 +8,6 @@ the tests themselves only check that every pose goal is reached.
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -34,11 +33,12 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% scenarios
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PoseOffset:
     """
     How far a pose goal lies from the tip, expressed in the tip's own frame.
@@ -59,7 +59,7 @@ class PoseOffset:
     Angle to the goal orientation in radians, about :data:`ROTATION_AXIS`.
     """
 
-    def goal_pose(self, tip: KinematicStructureEntity) -> Pose:
+    def goal_pose(self, *, tip: KinematicStructureEntity) -> Pose:
         """
         :return: The goal pose, relative to the tip.
         """
@@ -86,13 +86,33 @@ Axis of every rotation offset in the tip frame, not aligned with any of its axes
 """
 
 POSE_OFFSETS = [
-    PoseOffset("little translation, much rotation", 0.02, np.radians(120)),
-    PoseOffset("much translation, little rotation", 0.3, np.radians(5)),
-    PoseOffset("much translation, much rotation", 0.25, np.radians(100)),
-    PoseOffset("some translation, some rotation", 0.1, np.radians(45)),
-    PoseOffset("little translation, little rotation", 0.02, np.radians(5)),
-    PoseOffset("translation only", 0.2, 0.0),
-    PoseOffset("rotation only", 0.0, np.radians(90)),
+    PoseOffset(
+        label="little translation, much rotation",
+        translation=0.02,
+        rotation=np.radians(120),
+    ),
+    PoseOffset(
+        label="much translation, little rotation",
+        translation=0.3,
+        rotation=np.radians(5),
+    ),
+    PoseOffset(
+        label="much translation, much rotation",
+        translation=0.25,
+        rotation=np.radians(100),
+    ),
+    PoseOffset(
+        label="some translation, some rotation",
+        translation=0.1,
+        rotation=np.radians(45),
+    ),
+    PoseOffset(
+        label="little translation, little rotation",
+        translation=0.02,
+        rotation=np.radians(5),
+    ),
+    PoseOffset(label="translation only", translation=0.2, rotation=0.0),
+    PoseOffset(label="rotation only", translation=0.0, rotation=np.radians(90)),
 ]
 """
 Pose offsets from mostly translation to mostly rotation, with both errors small or
@@ -112,7 +132,7 @@ class BalancePlotFile(Enum):
 # %% recording
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ErrorTrace:
     """
     The translation and rotation error of a pose goal at every control cycle.
@@ -133,7 +153,7 @@ class ErrorTrace:
     Angle between the tip and the goal orientation in radians.
     """
 
-    def record(self, time: float, root_T_tip: np.ndarray, root_T_goal: np.ndarray):
+    def record(self, *, time: float, root_T_tip: np.ndarray, root_T_goal: np.ndarray):
         """
         Appends the errors of the tip pose against the goal pose.
         """
@@ -146,7 +166,7 @@ class ErrorTrace:
         self.rotation_errors.append(float(np.arccos(cosine)))
 
     @staticmethod
-    def settling_time(times: list[float], errors: list[float], threshold: float):
+    def settling_time(*, times: list[float], errors: list[float], threshold: float):
         """
         :return: The first time after which the error stays below `threshold`.
         """
@@ -156,7 +176,7 @@ class ErrorTrace:
         return times[min(settled_from, len(times) - 1)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BalanceRun:
     """
     One pose goal, run on one robot, with the trace of its errors.
@@ -184,18 +204,21 @@ class BalanceRun:
 
     @property
     def translation_settling_time(self) -> float:
+        """
+        How long the position error took to settle below the goal's position threshold.
+        """
         return ErrorTrace.settling_time(
-            self.trace.times,
-            self.trace.translation_errors,
-            self.goal.translation_threshold,
+            times=self.trace.times,
+            errors=self.trace.translation_errors,
+            threshold=self.goal.position_threshold,
         )
 
     @property
     def rotation_settling_time(self) -> float:
         return ErrorTrace.settling_time(
-            self.trace.times,
-            self.trace.rotation_errors,
-            self.goal.orientation_threshold,
+            times=self.trace.times,
+            errors=self.trace.rotation_errors,
+            threshold=self.goal.orientation_threshold,
         )
 
 
@@ -210,26 +233,33 @@ def run_pose_goal(
     Moves the tip to a pose goal at `offset` and records its errors on every cycle, for
     at most `maximum_cycles`.
     """
-    goal = CartesianPose(root_link=root, tip_link=tip, goal_pose=offset.goal_pose(tip))
+    goal = CartesianPose(
+        kinematic_chain=KinematicChain(root=root, tip=tip),
+        goal_pose=offset.goal_pose(tip=tip),
+    )
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     motion_statechart = Statechart(context=executor.context)
-    motion_statechart.add_node(goal)
-    motion_statechart.add_node(EndMotion.when_true(goal))
+    motion_statechart.add_node(node=goal)
+    motion_statechart.add_node(node=EndMotion.when_true(node=goal))
     executor.compile(statechart=motion_statechart)
 
     root_T_goal = world.compute_forward_kinematics_np(root, tip) @ (
-        offset.goal_pose(tip).to_np()
+        offset.goal_pose(tip=tip).to_np()
     )
     trace = ErrorTrace()
-    trace.record(0.0, world.compute_forward_kinematics_np(root, tip), root_T_goal)
+    trace.record(
+        time=0.0,
+        root_T_tip=world.compute_forward_kinematics_np(root, tip),
+        root_T_goal=root_T_goal,
+    )
     for _ in range(maximum_cycles):
         executor.tick()
         trace.record(
-            executor.time,
-            world.compute_forward_kinematics_np(root, tip),
-            root_T_goal,
+            time=executor.time,
+            root_T_tip=world.compute_forward_kinematics_np(root, tip),
+            root_T_goal=root_T_goal,
         )
         if executor.statechart.is_ended():
             return BalanceRun(offset=offset, goal=goal, trace=trace, reached=True)
@@ -325,28 +355,11 @@ def assert_every_goal_reached(runs: list[BalanceRun]):
     """
     assert [run.offset.label for run in runs if not run.reached] == []
     for run in runs:
-        assert run.trace.translation_errors[-1] <= run.goal.translation_threshold
+        assert run.trace.translation_errors[-1] <= run.goal.position_threshold
         assert run.trace.rotation_errors[-1] <= run.goal.orientation_threshold
 
 
 # %% robots
-
-TRACY_ARM_POSE = {
-    TracyJoint.RIGHT_SHOULDER_PAN: 0.0,
-    TracyJoint.RIGHT_SHOULDER_LIFT: -np.pi / 2,
-    TracyJoint.RIGHT_ELBOW: np.pi / 2,
-    TracyJoint.RIGHT_WRIST_1: -np.pi / 2,
-    TracyJoint.RIGHT_WRIST_2: -np.pi / 2,
-    TracyJoint.RIGHT_WRIST_3: 0.0,
-}
-"""
-An elbow-up pose of Tracy's right arm, away from its singularities.
-"""
-
-
-@pytest.fixture()
-def tracy_world_copy(tracy_world: World) -> World:
-    return deepcopy(tracy_world)
 
 
 def test_pr2_translation_rotation_balance(
@@ -363,9 +376,14 @@ def test_pr2_translation_rotation_balance(
     assert_every_goal_reached(runs)
 
 
-def test_tracy_translation_rotation_balance(tracy_world_copy: World):
+def test_tracy_translation_rotation_balance(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    Tracy's right arm, starting elbow-up, reaches every offset pose goal.
+    """
     world = tracy_world_copy
-    JointState.from_str_dict(TRACY_ARM_POSE, world=world).apply_to(world)
+    JointState.from_str_dict(tracy_arm_pose, world=world).apply_to(world)
     tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
 
     runs = run_every_pose_offset(world, world.root, tip)

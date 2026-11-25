@@ -1,9 +1,13 @@
+"""
+The random events variables of space: the coordinates x, y and z and their combinations.
+"""
+
 from __future__ import annotations
 
 from enum import Enum
 from functools import cached_property
 
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from random_events.variable import Continuous
 from sortedcontainers import SortedSet
 

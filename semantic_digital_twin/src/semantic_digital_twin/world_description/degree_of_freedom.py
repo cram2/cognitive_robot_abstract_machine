@@ -1,8 +1,10 @@
+"""Degrees of freedom of a world, their state variables and their limits."""
+
 from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 
 from typing_extensions import Any, ClassVar, Generic, Self, TypeVar
 
@@ -114,6 +116,23 @@ class JerkVariable(DegreeOfFreedomVariable):
 T = TypeVar("T")
 
 
+class PositionLimitSide(IntEnum):
+    """
+    Which of the two position limits of a degree of freedom is meant, valued by the
+    direction of motion that crosses it.
+    """
+
+    LOWER = -1
+    """
+    The lower position limit, crossed by moving in the negative direction.
+    """
+
+    UPPER = 1
+    """
+    The upper position limit, crossed by moving in the positive direction.
+    """
+
+
 @dataclass
 class DegreeOfFreedomLimits(Generic[T]):
     """
@@ -161,6 +180,29 @@ class DegreeOfFreedomLimits(Generic[T]):
             upper=DerivativeMap(position=upper_position, velocity=maximum_speed),
         )
 
+    def reached_position_limits(
+        self, *, position: float, range_fraction: float
+    ) -> list[PositionLimitSide]:
+        """
+        :param position: A position of the degree of freedom these limits bound.
+        :param range_fraction: How close to a position limit ``position`` counts as at
+            that limit, as a fraction of the range between the two position limits.
+        :return: Every position limit ``position`` lies at, none if one is missing.
+        """
+        lower = self.lower.position
+        upper = self.upper.position
+        if lower is None or upper is None:
+            return []
+        tolerance = range_fraction * (upper - lower)
+        return [
+            side
+            for side, reached in (
+                (PositionLimitSide.LOWER, position <= lower + tolerance),
+                (PositionLimitSide.UPPER, position >= upper - tolerance),
+            )
+            if reached
+        ]
+
     def __deepcopy__(self, memo):
         return DegreeOfFreedomLimits(
             lower=deepcopy(self.lower), upper=deepcopy(self.upper)
@@ -198,9 +240,12 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     E.g. the caster wheels of a PR2 have dofs, but they are not directly controlled.
     Instead a the omni drive connection is directly controlled and a low level
-    controller translates these commands to commands for the caster wheels.
+    controller translates these commands to commands for the caster wheels. A door
+    hinge also has a dof that cannot be controlled.
 
-    A door hinge also has a dof that cannot be controlled.
+    .. warning:: In a world, change it only through
+        :meth:`World.set_dofs_has_hardware_interface`: a direct assignment is not
+        recorded, published or rolled back, and a block holding only it changes nothing.
     """
 
     def __post_init__(self):

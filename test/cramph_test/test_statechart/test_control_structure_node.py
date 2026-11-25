@@ -1,3 +1,7 @@
+"""
+Tests the control structure nodes and replacing the nodes they hold.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -10,7 +14,7 @@ from cramph.composites import (
     TryAll,
     TryInOrder,
 )
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.exceptions import (
     NodeAlreadyAChildError,
     NodeAlreadyBelongsToDifferentNodeError,
@@ -18,6 +22,7 @@ from cramph.exceptions import (
     NotHeldByControlStructureNodeError,
     NoControlStructureNodeAboveError,
     StatechartAlreadyCompiledError,
+    StatechartBrokenByFailedModificationError,
 )
 from cramph.executor import StatechartExecutor
 from cramph.node import EndStatechart, StatechartNode
@@ -39,7 +44,7 @@ def _succeeding(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds as soon as it observes, which it does right away.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -48,7 +53,7 @@ def _failing(name: str) -> NodeFailingOnObservingFalse:
     :return: A node that fails as soon as it observes, which it does right away.
     """
     return NodeFailingOnObservingFalse(
-        name=name, observation=ObservationStateValues.FALSE
+        name=name, observation=ObservationStateValue.FALSE
     )
 
 
@@ -58,8 +63,8 @@ def _run(
     """
     Compiles `statechart` with an end once `goal` ended, and ticks it until then.
     """
-    statechart.add_node(EndStatechart.when_true(goal))
-    executor.compile(statechart)
+    statechart.add_node(node=EndStatechart.when_true(node=goal))
+    executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=100)
 
 
@@ -71,11 +76,11 @@ def _start_order(
     """
     first_running_tick = {}
     for node in nodes:
-        history = statechart.state_history.get_life_cycle_history_of_node(node)
+        history = statechart.state_history.get_life_cycle_history_of_node(node=node)
         started = [
             tick
             for tick, state in enumerate(history)
-            if state != LifeCycleValues.NOT_STARTED
+            if state != LifeCycleValue.NOT_STARTED
         ]
         if started:
             first_running_tick[node] = started[0]
@@ -91,13 +96,13 @@ def test_a_step_inserted_before_another_runs_right_before_it(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first, second, third = _succeeding("1"), _succeeding("2"), _succeeding("3")
-    statechart.add_node(sequence := Sequence(nodes=[first, third]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, third])))
 
-    sequence.insert_before(third, second)
+    sequence.insert_before(reference=third, node=second)
     _run(statechart_executor, statechart, sequence)
 
     assert _start_order(statechart, [third, second, first]) == [first, second, third]
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_step_inserted_before_the_first_one_runs_first(
@@ -105,9 +110,9 @@ def test_a_step_inserted_before_the_first_one_runs_first(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first, second = _succeeding("1"), _succeeding("2")
-    statechart.add_node(sequence := Sequence(nodes=[second]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[second])))
 
-    sequence.insert_before(second, first)
+    sequence.insert_before(reference=second, node=first)
     _run(statechart_executor, statechart, sequence)
 
     assert _start_order(statechart, [second, first]) == [first, second]
@@ -118,9 +123,9 @@ def test_a_step_inserted_after_the_last_one_runs_last(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first, second, third = _succeeding("1"), _succeeding("2"), _succeeding("3")
-    statechart.add_node(sequence := Sequence(nodes=[first, second]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
 
-    sequence.insert_after(second, third)
+    sequence.insert_after(reference=second, node=third)
     _run(statechart_executor, statechart, sequence)
 
     assert _start_order(statechart, [third, second, first]) == [first, second, third]
@@ -131,9 +136,9 @@ def test_a_step_inserted_after_another_runs_right_after_it(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first, second, third = _succeeding("1"), _succeeding("2"), _succeeding("3")
-    statechart.add_node(sequence := Sequence(nodes=[first, third]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, third])))
 
-    sequence.insert_after(first, second)
+    sequence.insert_after(reference=first, node=second)
     _run(statechart_executor, statechart, sequence)
 
     assert _start_order(statechart, [third, second, first]) == [first, second, third]
@@ -145,9 +150,9 @@ def test_a_replaced_step_leaves_the_statechart_and_its_replacement_runs_in_its_p
     statechart = Statechart(context=statechart_executor.context)
     first, replaced, third = _succeeding("1"), _succeeding("x"), _succeeding("3")
     second = _succeeding("2")
-    statechart.add_node(sequence := Sequence(nodes=[first, replaced, third]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, replaced, third])))
 
-    statechart.replace(replaced, second)
+    statechart.replace(node=replaced, replacement=second)
     _run(statechart_executor, statechart, sequence)
 
     assert replaced not in statechart.nodes
@@ -164,13 +169,13 @@ def test_a_replaced_node_of_a_step_no_longer_decides_when_the_step_succeeds(
     statechart = Statechart(context=statechart_executor.context)
     replaced, kept, replacement = _succeeding("x"), _succeeding("1"), _succeeding("2")
     parallel = Parallel(nodes=[replaced, kept])
-    statechart.add_node(sequence := Sequence(nodes=[parallel]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[parallel])))
 
-    statechart.replace(replaced, replacement)
+    statechart.replace(node=replaced, replacement=replacement)
     _run(statechart_executor, statechart, sequence)
 
     assert replaced not in statechart.nodes
-    assert parallel.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert parallel.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_sequence_that_did_not_join_yet_only_changes_its_list(
@@ -179,7 +184,7 @@ def test_a_sequence_that_did_not_join_yet_only_changes_its_list(
     first, second, third = _succeeding("1"), _succeeding("2"), _succeeding("3")
     sequence = Sequence(nodes=[first, third])
 
-    sequence.insert_before(third, second)
+    sequence.insert_before(reference=third, node=second)
 
     assert sequence.nodes == [first, second, third]
     assert not second.belongs_to_statechart()
@@ -193,13 +198,13 @@ def test_an_inserted_alternative_starts_once_the_one_before_it_failed(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first, second, third = _failing("1"), _failing("2"), _succeeding("3")
-    statechart.add_node(alternatives := TryInOrder(nodes=[first, third]))
+    statechart.add_node(node=(alternatives := TryInOrder(nodes=[first, third])))
 
-    alternatives.insert_after(first, second)
+    alternatives.insert_after(reference=first, node=second)
     _run(statechart_executor, statechart, alternatives)
 
     assert _start_order(statechart, [third, second, first]) == [first, second, third]
-    assert alternatives.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert alternatives.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% children running side by side
@@ -210,28 +215,29 @@ def test_an_alternative_inserted_into_try_all_can_decide_it(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     failing = _failing("fails")
-    statechart.add_node(alternatives := TryAll(nodes=[failing]))
+    statechart.add_node(node=(alternatives := TryAll(nodes=[failing])))
 
-    alternatives.insert_after(failing, _succeeding("works"))
+    alternatives.insert_after(reference=failing, node=_succeeding("works"))
     _run(statechart_executor, statechart, alternatives)
 
-    assert alternatives.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert alternatives.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_inserted_into_a_parallel_counts_towards_its_observation(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    at_goal = NodeObservingAFixedValue(observation=ObservationStateValues.TRUE)
-    statechart.add_node(parallel := Parallel(nodes=[at_goal]))
+    at_goal = NodeObservingAFixedValue(observation=ObservationStateValue.TRUE)
+    statechart.add_node(node=(parallel := Parallel(nodes=[at_goal])))
 
     parallel.insert_after(
-        at_goal, NodeObservingAFixedValue(observation=ObservationStateValues.FALSE)
+        reference=at_goal,
+        node=NodeObservingAFixedValue(observation=ObservationStateValue.FALSE),
     )
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
 
-    assert parallel.observation_state == ObservationStateValues.FALSE
+    assert parallel.observation_state == ObservationStateValue.FALSE
 
 
 def test_a_parallel_can_still_arrive_through_a_node_inserted_after_it_joined(
@@ -239,18 +245,19 @@ def test_a_parallel_can_still_arrive_through_a_node_inserted_after_it_joined(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     failing = _failing("fails")
-    statechart.add_node(parallel := Parallel(nodes=[failing], minimum_success=1))
+    statechart.add_node(node=(parallel := Parallel(nodes=[failing], minimum_success=1)))
 
     parallel.insert_after(
-        failing, NodeObservingAFixedValue(observation=ObservationStateValues.TRUE)
+        reference=failing,
+        node=NodeObservingAFixedValue(observation=ObservationStateValue.TRUE),
     )
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
     statechart_executor.tick()
 
-    assert failing.life_cycle_state == LifeCycleValues.FAILED
-    assert parallel.life_cycle_state == LifeCycleValues.RUNNING
-    assert parallel.observation_state == ObservationStateValues.TRUE
+    assert failing.life_cycle_state == LifeCycleValue.FAILED
+    assert parallel.life_cycle_state == LifeCycleValue.RUNNING
+    assert parallel.observation_state == ObservationStateValue.TRUE
 
 
 # %% replacing a node by one holding it
@@ -260,7 +267,7 @@ def _at_goal(name: str) -> NodeObservingAFixedValue:
     """
     :return: A node that observes being at its goal and leaves ending it to its parent.
     """
-    return NodeObservingAFixedValue(name=name, observation=ObservationStateValues.TRUE)
+    return NodeObservingAFixedValue(name=name, observation=ObservationStateValue.TRUE)
 
 
 def test_a_step_replaced_by_a_node_holding_it_stays_in_the_statechart_below_that_node(
@@ -269,9 +276,11 @@ def test_a_step_replaced_by_a_node_holding_it_stays_in_the_statechart_below_that
     statechart = Statechart(context=statechart_executor.context)
     first, held, third = _succeeding("1"), _at_goal("held"), _succeeding("3")
     beside = _at_goal("beside")
-    statechart.add_node(sequence := Sequence(nodes=[first, held, third]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, held, third])))
 
-    statechart.replace(held, replacement := Parallel(nodes=[beside, held]))
+    statechart.replace(
+        node=held, replacement=(replacement := Parallel(nodes=[beside, held]))
+    )
     _run(statechart_executor, statechart, sequence)
 
     assert sequence.nodes == [first, replacement, third]
@@ -283,7 +292,7 @@ def test_a_step_replaced_by_a_node_holding_it_stays_in_the_statechart_below_that
         replacement,
         third,
     ]
-    assert sequence.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_held_step_keeps_its_position_among_the_children_of_its_new_parent(
@@ -295,9 +304,11 @@ def test_a_held_step_keeps_its_position_among_the_children_of_its_new_parent(
         _succeeding("before"),
         _succeeding("after"),
     )
-    statechart.add_node(sequence := Sequence(nodes=[held]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[held])))
 
-    statechart.replace(held, replacement := Sequence(nodes=[before, held, after]))
+    statechart.replace(
+        node=held, replacement=(replacement := Sequence(nodes=[before, held, after]))
+    )
     _run(statechart_executor, statechart, sequence)
 
     assert replacement.nodes == [before, held, after]
@@ -313,22 +324,22 @@ def test_a_held_step_is_no_longer_ended_by_its_former_parent(
     """
     statechart = Statechart(context=statechart_executor.context)
     held = _at_goal("held")
-    statechart.add_node(Sequence(nodes=[held]))
+    statechart.add_node(node=Sequence(nodes=[held]))
     statechart.replace(
-        held,
-        Parallel(
+        node=held,
+        replacement=Parallel(
             nodes=[
-                NodeObservingAFixedValue(observation=ObservationStateValues.FALSE),
+                NodeObservingAFixedValue(observation=ObservationStateValue.FALSE),
                 held,
             ]
         ),
     )
 
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     statechart_executor.tick()
     statechart_executor.tick()
 
-    assert held.life_cycle_state == LifeCycleValues.RUNNING
+    assert held.life_cycle_state == LifeCycleValue.RUNNING
 
 
 def test_replacing_a_step_of_a_compiled_statechart_is_rejected_and_changes_nothing(
@@ -336,13 +347,13 @@ def test_replacing_a_step_of_a_compiled_statechart_is_rejected_and_changes_nothi
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     held = _at_goal("held")
-    statechart.add_node(sequence := Sequence(nodes=[held]))
-    statechart.add_node(EndStatechart.when_true(sequence))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=(sequence := Sequence(nodes=[held])))
+    statechart.add_node(node=EndStatechart.when_true(node=sequence))
+    statechart_executor.compile(statechart=statechart)
     replacement = Parallel(nodes=[_at_goal("beside"), held])
 
     with pytest.raises(StatechartAlreadyCompiledError):
-        statechart.replace(held, replacement)
+        statechart.replace(node=held, replacement=replacement)
 
     assert sequence.nodes == [held]
     assert replacement.nodes[1] is held
@@ -356,25 +367,29 @@ def test_a_top_level_node_replaced_by_a_node_holding_it_stays_below_that_node(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(held := _succeeding("held"))
+    statechart.add_node(node=(held := _succeeding("held")))
     beside = _at_goal("beside")
 
-    statechart.replace(held, replacement := Sequence(nodes=[held, beside]))
+    statechart.replace(
+        node=held, replacement=(replacement := Sequence(nodes=[held, beside]))
+    )
     _run(statechart_executor, statechart, replacement)
 
     assert statechart.top_level_nodes[0] is replacement
     assert replacement.nodes == [held, beside]
     assert held.parent_node is replacement
-    assert replacement.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert replacement.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_replaced_top_level_node_leaves_the_statechart(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(replaced := Sequence(nodes=[_succeeding("below")]))
+    statechart.add_node(node=(replaced := Sequence(nodes=[_succeeding("below")])))
 
-    statechart.replace(replaced, replacement := _succeeding("instead"))
+    statechart.replace(
+        node=replaced, replacement=(replacement := _succeeding("instead"))
+    )
 
     assert statechart.nodes == [replacement]
     assert not replaced.belongs_to_statechart()
@@ -384,12 +399,12 @@ def test_replacing_a_top_level_node_of_a_compiled_statechart_is_rejected(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(held := _at_goal("held"))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=(held := _at_goal("held")))
+    statechart_executor.compile(statechart=statechart)
     replacement = Parallel(nodes=[_at_goal("beside"), held])
 
     with pytest.raises(StatechartAlreadyCompiledError):
-        statechart.replace(held, replacement)
+        statechart.replace(node=held, replacement=replacement)
 
     assert held.parent_node is None
     assert statechart.top_level_nodes == [held]
@@ -406,9 +421,9 @@ def test_the_closest_language_node_above_a_nested_node_is_the_first_one_on_its_p
     paused = PausedWhileTrue(
         name="paused", monitor=ConstFalseNode(), monitored_node=nested
     )
-    statechart.add_node(sequence := Sequence(nodes=[paused]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[paused])))
 
-    assert ControlStructureNode.closest_above(nested) is sequence
+    assert ControlStructureNode.closest_above(node=nested) is sequence
 
 
 def test_a_step_inserted_before_a_nested_node_runs_before_what_holds_it(
@@ -419,9 +434,11 @@ def test_a_step_inserted_before_a_nested_node_runs_before_what_holds_it(
     paused = PausedWhileTrue(
         name="paused", monitor=ConstFalseNode(), monitored_node=nested
     )
-    statechart.add_node(sequence := Sequence(nodes=[paused]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[paused])))
 
-    ControlStructureNode.closest_above(nested).insert_before(nested, first)
+    ControlStructureNode.closest_above(node=nested).insert_before(
+        reference=nested, node=first
+    )
     _run(statechart_executor, statechart, sequence)
 
     assert _start_order(statechart, [paused, first]) == [first, paused]
@@ -431,10 +448,10 @@ def test_a_node_without_a_language_node_above_it_has_none_closest_above_it(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(top_level := _succeeding("top level"))
+    statechart.add_node(node=(top_level := _succeeding("top level")))
 
     with pytest.raises(NoControlStructureNodeAboveError):
-        ControlStructureNode.closest_above(top_level)
+        ControlStructureNode.closest_above(node=top_level)
 
 
 # %% the step holding a node
@@ -448,17 +465,17 @@ def test_the_step_holding_a_nested_node_is_the_child_of_the_closest_language_nod
     paused = PausedWhileTrue(
         name="paused", monitor=ConstFalseNode(), monitored_node=nested
     )
-    statechart.add_node(Sequence(nodes=[paused]))
+    statechart.add_node(node=Sequence(nodes=[paused]))
 
-    assert ControlStructureNode.step_holding(nested) is paused
+    assert ControlStructureNode.step_holding(node=nested) is paused
 
 
 def test_a_step_holds_itself(statechart_executor: StatechartExecutor) -> None:
     statechart = Statechart(context=statechart_executor.context)
     step = _succeeding("step")
-    statechart.add_node(Sequence(nodes=[step]))
+    statechart.add_node(node=Sequence(nodes=[step]))
 
-    assert ControlStructureNode.step_holding(step) is step
+    assert ControlStructureNode.step_holding(node=step) is step
 
 
 def test_without_a_language_node_above_the_top_level_node_holds_a_node(
@@ -469,9 +486,9 @@ def test_without_a_language_node_above_the_top_level_node_holds_a_node(
     paused = PausedWhileTrue(
         name="paused", monitor=ConstFalseNode(), monitored_node=nested
     )
-    statechart.add_node(paused)
+    statechart.add_node(node=paused)
 
-    assert ControlStructureNode.step_holding(nested) is paused
+    assert ControlStructureNode.step_holding(node=nested) is paused
 
 
 # %% a failed replacement
@@ -482,11 +499,11 @@ def test_a_failed_replacement_by_a_node_holding_the_step_leaves_it_where_it_was(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first, second = _succeeding("1"), _succeeding("2")
-    statechart.add_node(sequence := Sequence(nodes=[first, second]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
     replacement = Sequence(nodes=[first, second])
 
     with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
-        statechart.replace(second, replacement)
+        statechart.replace(node=second, replacement=replacement)
     _run(statechart_executor, statechart, sequence)
 
     assert not replacement.belongs_to_statechart()
@@ -500,11 +517,11 @@ def test_a_failed_replacement_by_another_node_leaves_the_step_where_it_was(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first, second = _succeeding("1"), _succeeding("2")
-    statechart.add_node(sequence := Sequence(nodes=[first, second]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first, second])))
     replacement = Sequence(nodes=[first])
 
     with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
-        statechart.replace(second, replacement)
+        statechart.replace(node=second, replacement=replacement)
     _run(statechart_executor, statechart, sequence)
 
     assert not replacement.belongs_to_statechart()
@@ -513,16 +530,56 @@ def test_a_failed_replacement_by_another_node_leaves_the_step_where_it_was(
     assert _start_order(statechart, [second, first]) == [first, second]
 
 
+def test_a_node_rejected_before_a_modification_changed_anything_leaves_the_statechart_usable(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The handed child is rejected before the sequence holding it joins.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    first = _succeeding("1")
+    statechart.add_node(node=(sequence := Sequence(nodes=[first])))
+
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError):
+        with statechart.modify():
+            statechart.add_node(node=Sequence(nodes=[first]))
+    _run(statechart_executor, statechart, sequence)
+
+    assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
+
+
+def test_a_node_rejected_after_its_modification_changed_the_statechart_breaks_it(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The node added before the rejected one stays, so the statechart is half changed.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    first = _succeeding("1")
+    statechart.add_node(node=Sequence(nodes=[first]))
+
+    with pytest.raises(NodeAlreadyBelongsToDifferentNodeError) as raised:
+        with statechart.modify():
+            statechart.add_node(node=_succeeding("2"))
+            statechart.add_node(node=Sequence(nodes=[first]))
+
+    with pytest.raises(StatechartBrokenByFailedModificationError) as broken:
+        statechart.check_not_broken()
+    assert broken.value.modification_error is raised.value
+
+
 def test_only_a_node_a_language_node_or_the_top_level_holds_can_be_replaced(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     holder = CompositeNodeWithChainedChildren(name="holder")
-    statechart.add_node(holder)
+    statechart.add_node(node=holder)
     nested = holder.sub_node1
 
     with pytest.raises(NotHeldByControlStructureNodeError) as raised:
-        statechart.replace(nested, Sequence(nodes=[_succeeding("1"), nested]))
+        statechart.replace(
+            node=nested, replacement=Sequence(nodes=[_succeeding("1"), nested])
+        )
 
     assert raised.value.node is nested
 
@@ -534,10 +591,10 @@ def test_inserting_next_to_a_node_that_is_not_below_the_goal_is_rejected(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(sequence := Sequence(nodes=[_succeeding("1")]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[_succeeding("1")])))
 
     with pytest.raises(NodeIsNotAChildError):
-        sequence.insert_before(_succeeding("stranger"), _succeeding("2"))
+        sequence.insert_before(reference=_succeeding("stranger"), node=_succeeding("2"))
 
 
 def test_inserting_a_node_that_is_a_child_of_the_goal_already_is_rejected(
@@ -545,7 +602,7 @@ def test_inserting_a_node_that_is_a_child_of_the_goal_already_is_rejected(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first = _succeeding("1")
-    statechart.add_node(sequence := Sequence(nodes=[first]))
+    statechart.add_node(node=(sequence := Sequence(nodes=[first])))
 
     with pytest.raises(NodeAlreadyAChildError):
-        sequence.insert_after(first, first)
+        sequence.insert_after(reference=first, node=first)

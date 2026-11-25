@@ -31,10 +31,6 @@ from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech impor
 )
 from krrood.inheritance_path_length import inheritance_path_length
 from krrood.symbolic_math.symbolic_math import Scalar
-from semantic_digital_twin.spatial_computations.ik_solver import (
-    MaxIterationsException,
-    UnreachableException,
-)
 from krrood_spatial_math.spatial_types import Vector3, Point3
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
@@ -116,62 +112,6 @@ class InContactWith(Triple[TBody, TBody]):
             Noun.bare(head="contact"),
             Prepositions.WITH,
             Noun(content=fields["body2"]),
-        )
-
-
-@dataclass(eq=False)
-class Reachable(Predicate):
-    """
-    Whether a kinematic chain can put its tip at a pose, answered by inverse kinematics.
-    """
-
-    pose: HomogeneousTransformationMatrix
-    """
-    The pose to reach.
-    """
-
-    root: Body
-    """
-    The root of the kinematic chain.
-    """
-
-    tip: Body
-    """
-    The end of the kinematic chain that has to arrive at the pose.
-    """
-
-    maximum_iterations: int = 1000
-    """
-    How long the solver may search before the pose counts as out of reach.
-    """
-
-    def __call__(self) -> bool:
-        try:
-            self.root._world.compute_inverse_kinematics(
-                root=self.root,
-                tip=self.tip,
-                target=self.pose,
-                max_iterations=self.maximum_iterations,
-            )
-        except (MaxIterationsException, UnreachableException):
-            return False
-        return True
-
-    @classmethod
-    def _verbalization_fragment_(
-        cls, *, fields: RenderedFields
-    ) -> VerbalizationFragment:
-        """
-        Reads as *"the pose is reachable by the tip"*.
-
-        :param fields: The rendered fragment for each field, keyed by field name.
-        """
-        return clause(
-            Noun(content=fields["pose"]),
-            Copula(),
-            Adjective(word="reachable"),
-            Prepositions.BY,
-            Noun(content=fields["tip"]),
         )
 
 

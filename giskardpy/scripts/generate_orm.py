@@ -1,3 +1,9 @@
+"""
+Generate the ORM interface of giskardpy.
+"""
+
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
@@ -9,12 +15,10 @@ import cramph.orm.ormatic_interface
 from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.custom_types import NumpyType
 from krrood.ormatic.ormatic import ORMatic
-from krrood.ormatic.utils import classes_of_package
+from krrood.class_diagrams.utils import classes_of_package
 
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the giskardpy package.
-# ..warning:: Do not import coraplex here. Alternative mappings are collected through a global
-# subclass scan, so importing a downstream package leaks its mappings into this interface.
 # ----------------------------------------------------------------------------------------------------------------------
 
 

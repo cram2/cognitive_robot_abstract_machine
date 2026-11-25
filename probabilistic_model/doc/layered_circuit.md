@@ -18,8 +18,8 @@ kernelspec:
 While understanding the concepts of a probabilistic circuit is subject to math, implementing it is a whole different
 story.
 This section discusses different approaches to represent circuits.
-This package has three implementations: one that stores the circuit as a graph in rustworkx, and two that store it in
-layers, one in NumPy and one in JAX.
+This package has two implementations: one that stores the circuit as a graph in rustworkx, and one that stores it in
+layers, whose arrays belong to any array library.
 
 ## The DAG (rustworkx) Way
 
@@ -117,7 +117,7 @@ The drawbacks are:
 - Harder to maintain
 - Harder to extend with new kinds of nodes or to change in structure
 
-The two layered implementations of this package, NumPy and JAX, are built for different things.
+The layered implementation answers its numeric queries on NumPy, JAX or PyTorch arrays.
 
 ## NumPy Implementation
 
@@ -138,55 +138,56 @@ print(truncation.probability)
 
 ```
 
-## JAX Implementation
+## Array Backends and Training
 
-The JAX implementation, the `DifferentiableLayeredCircuit` in `probabilistic_model.probabilistic_circuit.jax`, calculates the log-likelihood and learns the
-parameters of a circuit by gradient descent.
-It answers no other query; a trained JAX circuit is converted into a NumPy circuit for those.
-A JAX circuit is created from a NumPy circuit, so the example from above looks as follows:
+The numeric queries of a layered circuit (log-likelihood, cumulative distribution,
+probability of a simple event and moments) run on any array library that implements the
+Python Array API standard: NumPy and, with the optional `jax` and `torch` extras, JAX and PyTorch, on
+the CPU or a GPU. `to_namespace` copies a circuit to another library, device and floating
+point type; the queries then compute in that library and type.
 
 ```{code-cell} ipython3
-from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from probabilistic_model.probabilistic_circuit.jax.probabilistic_circuit import DifferentiableLayeredCircuit
+import jax.numpy as jnp
 
-jax_model = CircuitRepresentations().convert(numpy_model, DifferentiableLayeredCircuit)
-print(jax_model.root)
+jax_model = numpy_model.to_namespace(jnp)
+print(jax_model.log_likelihood(events=jnp.asarray([[0.5], [1.5]])))
 ```
 
-The JAX implementation uses equinox to aid with an OOP approach to the circuit.
-It uses sparse matrices to represent edges between the layers and hence does not suffer from extreme memory consumption
-like EinsumNetworks.
+Under `jax.jit` the log-likelihood compiles into a single function. Structural queries
+(support, mode, truncation, conditioning, marginals, simplification) and sampling run on
+NumPy only and raise `HostOnlyQueryError` for other parameters; `to_namespace(numpy)`
+converts back.
 
-JAX circuits are approximately **5** times faster than the rustworkx implementation in calculating the
-log-likelihood of a joint probability tree on a CPU, and hence are a great tool for doing deep learning with circuits.
-For the speed-up to kick in, the JAX computational graph that describes the circuit has to be compiled.
-This is expensive, so don't do it more than needed.
-However, for a fixed circuit, the speed-up is immense.
+The edges of sum and product layers are stored in an `EdgeMatrix`: `SparseEdgeMatrix`
+stores one value per edge, `DenseEdgeMatrix` the whole matrix of a layer. Dense matrices
+are faster for layers whose nodes are connected to most of their children, such as the
+sum layers of a RAT-SPN, and much slower for sparsely connected ones;
+`store_edges_as` converts every inner layer of a circuit.
 
-`probabilistic_model/scripts/jpt_speed_comparison.py` reproduces this measurement.
-
-Be aware that the JAX implementation is still in development and might not be as stable as the rustworkx implementation.
-I would be happy to get support here if someone is interested in it.
+A circuit with JAX parameters is trained by gradient descent with `fit`, or with
+`JaxGradientDescent` from `probabilistic_model.learning.jax_gradient_descent` and a `Loss`
+from `probabilistic_model.learning.gradient_descent`; a
+circuit with PyTorch parameters with `TorchGradientDescent` from
+`probabilistic_model.learning.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
+builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with NumPy
+parameters, which `to_namespace` moves to JAX or PyTorch for training: fully factorized input distributions in every leaf region, the cross products
+of the regions of every partition and fully connected sum layers in every other region. A
+RAT-SPN that predicts a symbolic variable, built with
+`to_probabilistic_circuit(predicted_variable=...)`, is trained generatively on the joint
+likelihood with `fit`, or discriminatively with
+`fit(..., loss=CrossEntropy.from_predicted_variable(...))`.
 
 ## Which One to Use
 
 | implementation | built for |
 | --- | --- |
 | rustworkx | trying out new circuit structures, and understanding and developing new algorithms |
-| NumPy | speed: answering queries, including truncation, conditioning and marginals |
-| JAX | learning the parameters of a circuit by gradient descent |
+| layered | speed: answering queries, including truncation, conditioning and marginals, and learning parameters by gradient descent on any array backend |
 
-All three can be converted into each other, and every conversion goes through NumPy.
 `RustworkxCircuitToLayeredCircuitConverter` and `LayeredCircuitToRustworkxCircuitConverter` in
-`probabilistic_model.adapters.rustworkx_tensorized` convert between rustworkx and NumPy,
-`LayeredCircuitToDifferentiableLayeredCircuitConverter` and `DifferentiableLayeredCircuitToLayeredCircuitConverter` in
-`probabilistic_model.adapters.jax_tensorized` between NumPy and JAX.
-`CircuitRepresentations` in `probabilistic_model.adapters.circuit_representations` chains these converters,
-so that it converts a circuit into any representation, for instance rustworkx into JAX.
-Both layered circuits group their nodes the same way, so the conversion between them copies arrays layer by layer.
-To learn the parameters of a NumPy circuit, convert it to JAX, train it there and
-convert it back.
-Classification circuits and coupling circuits only exist in JAX and are not converted.
+`probabilistic_model.adapters.rustworkx_tensorized` convert between the two, and
+`CircuitRepresentations` in `probabilistic_model.adapters.circuit_representations` chains
+the converters of whole circuits.
 
 The NumPy circuit is faster than rustworkx for the probability of an event, for
 truncation and for conditioning, by between about 2 and 60 times on a joint probability

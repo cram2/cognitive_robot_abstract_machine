@@ -15,7 +15,6 @@ from ..dataset.example_classes import (
     KRROODOrientation,
     KRROODPositions,
 )
-from ..dataset.ormatic_interface import *  # type: ignore
 
 
 def test_query_writing_with_match_and_copy():

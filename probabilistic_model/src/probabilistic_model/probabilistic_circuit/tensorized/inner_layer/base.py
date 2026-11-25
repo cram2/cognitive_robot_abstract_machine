@@ -1,21 +1,31 @@
+"""
+The layers of a layered probabilistic circuit and their shared behaviour.
+"""
+
 from __future__ import annotations
 
 import dataclasses
+import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
-from krrood.adapters import json_serializer
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
 
+from probabilistic_model.exceptions import ShapeMismatchError
 from probabilistic_model.probabilistic_model import PartialPointType
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    BackendArray,
     NodeMask,
     NodeValues,
+    NodeVariableMask,
     NodeVariableValues,
     SampleArray,
     SampleNodeValues,
@@ -25,6 +35,9 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.forward_sample_assignment import (
     ForwardSampleAssignment,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
+    EdgeMatrix,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.inner_layer_edge import (
     InnerLayerEdge,
@@ -53,7 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
+class Layer(DataclassDeepcopyMixin, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
@@ -99,6 +112,15 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         :return: The number of parameters stored in this layer alone.
         """
         raise NotImplementedError
+
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :return: Whether a training step through this layer copies nothing from the
+            host to the device of its parameters, as recording the step as a CUDA graph
+            requires.
+        """
+        return False
 
     def validate(self):
         """
@@ -158,6 +180,104 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
             result.extend(child_layer.all_layers_with_depth(depth + 1))
         return result
 
+    # %% parameters
+
+    @property
+    def parameters(self) -> list[BackendArray]:
+        """
+        :return: The parameter arrays stored in this layer alone, none for a layer
+            without parameters.
+        """
+        return []
+
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`parameters`.
+        :return: This layer, since a layer without parameters has nothing to replace.
+        """
+        return self
+
+    def projected_parameters(
+        self, *, parameters: list[BackendArray]
+    ) -> list[BackendArray]:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`parameters`, for instance after a step of gradient descent.
+        :return: The closest arrays that are valid parameters of this layer, the
+            arrays themselves for a layer whose parameters are not constrained.
+        """
+        return parameters
+
+    @abstractmethod
+    def copy_with_child_layers(self, child_layers: list[Layer]) -> Self:
+        """
+        :param child_layers: Layers in the place of :attr:`child_layers`, with the same
+            nodes.
+        :return: A copy of this layer that points to these child layers.
+        """
+        raise NotImplementedError
+
+    @property
+    def circuit_parameters(self) -> list[BackendArray]:
+        """
+        :return: The parameter arrays of every layer of the circuit rooted here, the
+            layers in the order of :meth:`all_layers`.
+        """
+        return [
+            parameter for layer in self.all_layers() for parameter in layer.parameters
+        ]
+
+    def projected_circuit_parameters(
+        self, parameters: list[BackendArray]
+    ) -> list[BackendArray]:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`circuit_parameters`.
+        :return: The arrays with those of every layer replaced by its
+            :meth:`projected_parameters`.
+        """
+        result = []
+        position = 0
+        for layer in self.all_layers():
+            number_of_arrays = len(layer.parameters)
+            result.extend(
+                layer.projected_parameters(
+                    parameters=parameters[position : position + number_of_arrays]
+                )
+            )
+            position += number_of_arrays
+        return result
+
+    def copy_with_circuit_parameters(self, parameters: list[BackendArray]) -> Layer:
+        """
+        Copy the circuit rooted here with other parameter arrays, keeping every layer
+        that several parents share shared. It runs under :func:`jax.jit`.
+
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`circuit_parameters`.
+        :return: The root of the copy.
+        """
+        order = self.all_layers()
+        parameters_of_layer: dict[int, list[BackendArray]] = {}
+        position = 0
+        for layer in order:
+            number_of_arrays = len(layer.parameters)
+            parameters_of_layer[id(layer)] = parameters[
+                position : position + number_of_arrays
+            ]
+            position += number_of_arrays
+
+        copies: dict[int, Layer] = {}
+        for layer in reversed(order):
+            copy_of_layer = layer.copy_with_child_layers(
+                [copies[id(child_layer)] for child_layer in layer.child_layers]
+            )
+            copies[id(layer)] = copy_of_layer.copy_with_parameters(
+                parameters=parameters_of_layer[id(layer)]
+            )
+        return copies[id(self)]
+
     # %% queries
 
     @property
@@ -191,7 +311,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     @abstractmethod
     def log_likelihood_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         """
         Calculate the log-likelihood of every node of this layer.
@@ -204,7 +324,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     @abstractmethod
     def cumulative_distribution_of_nodes(
-        self, events: SampleArray, cache: QueryCache | None = None
+        self, *, events: SampleArray, cache: QueryCache | None = None
     ) -> SampleNodeValues:
         """
         Calculate the cumulative distribution function of every node of this layer.
@@ -218,6 +338,7 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
     @abstractmethod
     def probability_of_simple_event_of_nodes(
         self,
+        *,
         event: SimpleEvent,
         variables: SortedSet,
         cache: QueryCache | None = None,
@@ -483,16 +604,41 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         return rebuilt[id(self)]
 
     @abstractmethod
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        """
+        :param width: The number of variables of the circuit.
+        :param cache: The shared cache of the current pass.
+        :return: Whether every node of this layer has every variable in its scope.
+        """
+        raise NotImplementedError
+
+    def nodes_over(
+        self, *, kept: VariableMask, cache: QueryCache | None = None
+    ) -> NodeMask:
+        """
+        :param kept: The variables of the circuit to keep.
+        :param cache: The shared cache of the current pass.
+        :return: Whether the scope of every node of this layer meets the kept variables,
+            which are the nodes :meth:`marginal` keeps.
+        """
+        return self.node_scopes(width=len(kept), cache=cache)[:, kept].any(axis=1)
+
+    @abstractmethod
     def marginal(
         self, kept: VariableMask, cache: QueryCache | None = None
     ) -> Layer | None:
         """
         Restrict this layer to a subset of the variables.
 
+        A node over none of the kept variables marginalizes to one: it is removed, and
+        the edges of the parents to it are dropped.
+
         :param kept: The variables of the circuit to keep.
         :param cache: The shared cache of the current pass.
-        :return: The marginalized layer, or ``None`` if this layer models none of the
-            kept variables.
+        :return: The marginal of the nodes of :meth:`nodes_over`, in their order, or
+            ``None`` if no node is over a kept variable.
         """
         raise NotImplementedError
 
@@ -531,30 +677,30 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         Normalize the parameters stored in this layer alone in-place.
         """
 
-    def apply_translation(self, translation: VariableValues):
+    def apply_translation(self, *, translation: VariableValues) -> None:
         """
         Translate the circuit rooted here in-place.
 
         :param translation: The translation per variable of the circuit.
         """
         for layer in self.all_layers():
-            layer.apply_translation_own(translation)
+            layer.apply_translation_own(translation=translation)
 
-    def apply_translation_own(self, translation: VariableValues):
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
         """
         Translate the parameters of this layer alone in-place.
         """
 
-    def apply_scaling(self, scaling: VariableValues):
+    def apply_scaling(self, *, scaling: VariableValues) -> None:
         """
         Scale the circuit rooted here in-place.
 
         :param scaling: The scaling per variable of the circuit.
         """
         for layer in self.all_layers():
-            layer.apply_scaling_own(scaling)
+            layer.apply_scaling_own(scaling=scaling)
 
-    def apply_scaling_own(self, scaling: VariableValues):
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
         """
         Scale the parameters of this layer alone in-place.
         """
@@ -609,46 +755,6 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.number_of_nodes})"
 
-    # %% serialization
-
-    @classmethod
-    def serialized_fields(cls) -> list[dataclasses.Field]:
-        """
-        :return: The dataclass fields that describe a layer, which are the ones its
-            constructor takes. The caches a layer fills in on its own are declared with
-            ``init=False`` and are left out.
-        """
-        return [field_ for field_ in dataclasses.fields(cls) if field_.init]
-
-    def to_json(self, **kwargs) -> dict[str, Any]:
-        """
-        Serialize this layer through the fields it declares.
-
-        The parameter arrays, the child layers and the sparse edge and weight blocks are
-        all types that :mod:`krrood.adapters.json_serializer` serializes generically, so
-        a layer type is serializable by declaring its fields and none of them has to
-        write a method per field.
-
-        :param kwargs: Keyword arguments to hand on to the nested ``to_json`` calls.
-        :return: The JSON dict.
-        """
-        result = super().to_json(**kwargs)
-        for field_ in self.serialized_fields():
-            result[field_.name] = json_serializer.to_json(
-                getattr(self, field_.name), **kwargs
-            )
-        return result
-
-    @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        return cls(
-            **{
-                field_.name: json_serializer.from_json(data[field_.name], **kwargs)
-                for field_ in cls.serialized_fields()
-                if field_.name in data
-            }
-        )
-
 
 @dataclass(eq=False, repr=False)
 class InnerLayer(Layer, ABC):
@@ -663,6 +769,14 @@ class InnerLayer(Layer, ABC):
     The list is not copied.
     """
 
+    edges: EdgeMatrix
+    """
+    The edges from the nodes of this layer to the nodes of its child layers.
+
+    The columns are the nodes of the child layers in order: the node ``j`` of the
+    ``i``-th child layer is the column ``column_offsets[i] + j``.
+    """
+
     _variables_cache: VariableIndices | None = field(
         default=None, init=False, repr=False
     )
@@ -670,14 +784,77 @@ class InnerLayer(Layer, ABC):
     Cached indices of the variables in the scope of this layer.
     """
 
+    @property
+    def number_of_nodes(self) -> int:
+        return self.edges.shape.number_of_rows
+
+    def validate_own(self):
+        expected_shape = MatrixShape2D(
+            number_of_rows=self.number_of_nodes,
+            number_of_columns=self.column_offsets[-1],
+        )
+        if self.edges.shape != expected_shape:
+            raise ShapeMismatchError(expected_shape, self.edges.shape)
+
     def reset_variables(self):
         self._variables_cache = None
+
+    def copy_with_child_layers(self, child_layers: list[Layer]) -> Self:
+        return dataclasses.replace(self, child_layers=child_layers)
+
+    @property
+    def column_offsets(self) -> npt.NDArray[np.int64]:
+        """
+        :return: The first column of every child layer, followed by the number of
+            columns, where the columns are the nodes of all child layers in order.
+        """
+        return np.concatenate(
+            [
+                [0],
+                np.cumsum(
+                    [child_layer.number_of_nodes for child_layer in self.child_layers]
+                ),
+            ]
+        ).astype(np.int64)
 
     @memoized
     def remap_variables(self, remap: VariableIndices, cache: QueryCache | None = None):
         for child_layer in self.child_layers:
             child_layer.remap_variables(remap, cache=cache)
         self.reset_variables()
+
+    def scopes_of_edges(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        """
+        :param width: The number of variables of the circuit.
+        :param cache: The shared cache of the current pass.
+        :return: The scope of the child node of every edge, shape (#edges, width), the
+            edges in the order of :attr:`inner_layer_edges`.
+        """
+        edges = self.inner_layer_edges
+        child_scopes = np.concatenate(
+            [
+                child_layer.node_scopes(width=width, cache=cache)
+                for child_layer in self.child_layers
+            ],
+            axis=0,
+        )
+        return child_scopes[
+            self.column_offsets[edges.child_layer_indices] + edges.child_nodes
+        ]
+
+    @memoized
+    def node_scopes(
+        self, *, width: int, cache: QueryCache | None = None
+    ) -> NodeVariableMask:
+        result = np.zeros((self.number_of_nodes, width), dtype=bool)
+        np.logical_or.at(
+            result,
+            self.inner_layer_edges.nodes,
+            self.scopes_of_edges(width=width, cache=cache),
+        )
+        return result
 
     @classmethod
     def stacked(
@@ -697,6 +874,19 @@ class InnerLayer(Layer, ABC):
             and np.array_equal(own.child_nodes, others.child_nodes)
         )
 
+    def store_edges_as(self, edge_matrix_type: type[EdgeMatrix]):
+        """
+        Store the edges of this layer in a matrix of the given type, in place.
+
+        :param edge_matrix_type: The type of edge matrix, for instance
+            :class:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix.DenseEdgeMatrix`
+            for a layer whose nodes are connected to most child nodes.
+        """
+        self.edges = edge_matrix_type.from_edge_positions(
+            rows=self.edges.rows, columns=self.edges.columns, shape=self.edges.shape
+        )
+        self.__dict__.pop(InnerLayer.inner_layer_edges.attrname, None)
+
     @abstractmethod
     def with_edges(
         self, child_layers: list[Layer], edges: InnerLayerEdges, copies: list[Self]
@@ -711,14 +901,18 @@ class InnerLayer(Layer, ABC):
         """
         raise NotImplementedError
 
-    @property
-    @abstractmethod
+    @functools.cached_property
     def inner_layer_edges(self) -> InnerLayerEdges:
         """
         :return: Every edge from a node of this layer to a node of one of its child
-            layers.
+            layers, in the order of :attr:`edges`.
         """
-        raise NotImplementedError
+        offsets = self.column_offsets
+        columns = self.edges.columns
+        child_layer_indices = np.searchsorted(offsets, columns, side="right") - 1
+        return InnerLayerEdges(
+            self.edges.rows, child_layer_indices, columns - offsets[child_layer_indices]
+        )
 
     def iterate_edges(self) -> Iterator[InnerLayerEdge]:
         """
@@ -753,18 +947,21 @@ class LeafLayer(Layer, ABC):
         """
         return []
 
+    def copy_with_child_layers(self, child_layers: list[Layer]) -> Self:
+        return self
+
     @classmethod
     def stacked(
         cls, copies: list[Self], stacked_child_layers: list[StackedLayer]
     ) -> StackedLayer:
-        return StackedLayer.of_leaf_layer_copies(copies)
+        return StackedLayer.from_leaf_layer_copies(copies=copies)
 
     def nodes_with_child_in(self, nodes_of_layers: dict[int, NodeMask]) -> NodeMask:
         return np.zeros(self.number_of_nodes, dtype=bool)
 
     @classmethod
     @abstractmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         """
         Join layers of this type over the same variables into one layer, the nodes of
         ``layers[k]`` as one contiguous block.
@@ -778,7 +975,7 @@ class LeafLayer(Layer, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         """
         :param other: A layer that :meth:`concatenate` may join with this one.
         :return: Whether every node of both layers has the same parameters.

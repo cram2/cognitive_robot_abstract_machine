@@ -65,7 +65,9 @@ class MinimalRobot(AbstractRobot):
     def _setup_hardware_interfaces(self):
         for connection in self.connections:
             if isinstance(connection, ActiveConnection):
-                connection.has_hardware_interface = True
+                self._world.set_dofs_has_hardware_interface(
+                    connection.active_dofs, True
+                )
 
     def _setup_joint_states(self):
         pass

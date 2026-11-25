@@ -26,6 +26,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, P
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 pytestmark = pytest.mark.skipif(
     not runs_in_continuous_integration(), reason="MuJoCo tests only run in CI"
@@ -59,12 +60,12 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odome
         reference_frame=world.root,
     )
     drive_to_goal = CartesianPose(
-        root_link=world.root, tip_link=pr2.root, goal_pose=goal
+        kinematic_chain=KinematicChain(root=world.root, tip=pr2.root), goal_pose=goal
     )
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        pacer = SteppedSimulationPacer(simulation)
+        pacer = SteppedSimulationPacer(simulation=simulation)
         executor = StatechartExecutor(
             context=StatechartContext(world=world),
             pacer=pacer,
@@ -77,10 +78,12 @@ def test_the_simulated_base_reaches_the_pose_giskard_commands_live(world_T_odome
             ],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes([drive_to_goal, EndMotion.when_true(drive_to_goal)])
+        motion_statechart.add_nodes(
+            nodes=[drive_to_goal, EndMotion.when_true(node=drive_to_goal)]
+        )
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end(timeout=tick_limit)
-        MotionControl.set_velocity_acceleration_jerk_to_zero(world)
+        MotionControl.set_velocity_acceleration_jerk_to_zero(world=world)
         world.notify_state_change()
         pacer.wait_for_standstill()
         x, y, _ = simulation.simulator.get_body_position(

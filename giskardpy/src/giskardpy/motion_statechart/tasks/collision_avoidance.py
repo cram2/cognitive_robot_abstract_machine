@@ -1,18 +1,22 @@
+"""
+Motion statechart tasks that keep a robot clear of collisions with itself and its
+environment, and the nodes that update the collision rules they follow.
+"""
+
 from __future__ import annotations
 
 from dataclasses import field, dataclass
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from itertools import combinations
 
 import krrood.symbolic_math.symbolic_math as sm
 from giskardpy.motion_statechart.context import MotionControlContext
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
-from cramph.data_types import ObservationStateValues
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
+from cramph.data_types import ObservationStateValue
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import (
     UnexpectedWorldEntityCountError,
@@ -24,6 +28,7 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from cramph.node import CompositeNode, NodeArtifacts, CancelStatechart
 from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.mixins import HasCruiseVelocityParameter
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.collision_checking.collision_groups import (
@@ -53,7 +58,7 @@ from krrood_spatial_math.spatial_types import Vector3
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class _CollisionAvoidanceTask(ABC, Task):
+class _CollisionAvoidanceTask(Task, HasCruiseVelocityParameter, ABC):
     """
     Avoids collisions of :attr:`robot` with one inequality constraint per collision it
     avoids.
@@ -65,12 +70,6 @@ class _CollisionAvoidanceTask(ABC, Task):
     robot: AbstractRobot
     """
     The robot whose collisions are avoided.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast a violated collision distance is restored, in m/s; not strictly
-    enforced.
     """
 
     collision_variable_manager: BaseCollisionVariableManager | None = field(
@@ -93,7 +92,7 @@ class _CollisionAvoidanceTask(ABC, Task):
         return super().required_context_extensions + (MotionControlContext,)
 
     @staticmethod
-    def _weight_while_close(contact_normal: Vector3) -> Scalar:
+    def _weight_while_close(*, contact_normal: Vector3) -> Scalar:
         """
         :param contact_normal: The contact normal of one avoided collision, zero while no
             collision data was computed for it.
@@ -162,7 +161,7 @@ class _CancelBecauseCollisionViolated(CancelStatechart):
             violated_collisions=[
                 violation
                 for task in self.tasks
-                if task.observation_state == ObservationStateValues.FALSE
+                if task.observation_state == ObservationStateValue.FALSE
                 for violation in task.collision_variable_manager.violated_collisions(
                     task.avoided_contacts
                 )
@@ -185,6 +184,74 @@ def _single_robot_of_world(node: CompositeNode) -> AbstractRobot:
             entity_type=AbstractRobot,
         )
     return robots[0]
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class CollisionAvoidance(EndedByOwner, CompositeNode, HasCruiseVelocityParameter, ABC):
+    """
+    Avoids collisions of the robot with one task, and cancels the motion once one of
+    them is violated.
+
+    .. note:: Its children are left out of drawings. Set
+        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
+        :attr:`plot_specifications` to False to draw them.
+    """
+
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_collapsed_composite_node_style
+    )
+    """
+    How this node is drawn: collapsed, so its children are left out.
+    """
+
+    robot: AbstractRobot | None = None
+    """
+    The robot for which the collision avoidance goal is defined; ``None`` for the only
+    robot of the world it runs in.
+    """
+
+    cancel_if_collision_violated: bool = True
+    """
+    If True, the motion will be canceled if a collision is violated.
+    """
+
+    @classproperty
+    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        """
+        :return: The extensions of the base, and the motion control context the avoidance
+            constraints are built in.
+        """
+        return super().required_context_extensions + (MotionControlContext,)
+
+    @abstractmethod
+    def _create_task(self) -> _CollisionAvoidanceTask:
+        """
+        :return: A new task avoiding the collisions of :attr:`robot`.
+        """
+
+    @abstractmethod
+    def _create_cancel_node(
+        self, *, task: _CollisionAvoidanceTask
+    ) -> _CancelBecauseCollisionViolated:
+        """
+        :param task: The task whose violated collisions cancel the motion.
+        :return: A new node cancelling the motion once `task` is violated.
+        """
+
+    def expand(self) -> None:
+        """
+        Add the task avoiding the collisions of :attr:`robot`, and the node cancelling
+        the motion once one is violated.
+
+        The task decides which collisions it avoids when it is built, in the context
+        that runs it.
+        """
+        if self.robot is None:
+            self.robot = _single_robot_of_world(self)
+        task = self._create_task()
+        self._add_child_to_statechart(node=task)
+        if self.cancel_if_collision_violated:
+            self._add_child_to_statechart(node=self._create_cancel_node(task=task))
 
 
 # %% external collision avoidance
@@ -216,8 +283,8 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         reads from then on.
         """
         self.collision_variable_manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_external_collision_manager(self.context)
+            extension_type=MotionControlContext
+        ).get_or_create_external_collision_manager(context=self.context)
         self.avoided_contacts = []
         for group in self._groups_avoiding_external_collisions():
             self.collision_variable_manager.register_group_of_body(group.root)
@@ -259,7 +326,9 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
-                quadratic_weight=self._weight_while_close(root_V_contact_normal),
+                quadratic_weight=self._weight_while_close(
+                    contact_normal=root_V_contact_normal
+                ),
                 # the position distance is not accurate, but the derivative is still correct
                 task_expression=root_V_contact_normal @ root_V_point_on_group,
             )
@@ -280,64 +349,24 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ExternalCollisionAvoidance(EndedByOwner, CompositeNode):
+class ExternalCollisionAvoidance(CollisionAvoidance):
     """
-    Avoids external collisions of every collision group of the robot with one task, and
-    cancels the motion once one of them is violated.
-
-    .. note:: Its children are left out of drawings. Set
-        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
-        :attr:`plot_specifications` to False to draw them.
+    Avoids external collisions of every collision group of the robot.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_composite_node_style
-    )
-
-    robot: AbstractRobot | None = None
-    """
-    The robot for which the collision avoidance goal is defined; ``None`` for the only
-    robot of the world it runs in.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast a violated collision distance is restored, in m/s; not strictly
-    enforced.
-    """
-
-    cancel_if_collision_violated: bool = True
-    """
-    If True, the motion will be canceled if a collision is violated.
-    """
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def expand(self) -> None:
-        """
-        Add the task avoiding every external collision of :attr:`robot`, and the node
-        cancelling the motion once one is violated.
-
-        The task decides which collisions it avoids when it is built, in the context
-        that runs it.
-        """
-        if self.robot is None:
-            self.robot = _single_robot_of_world(self)
-        task = _ExternalCollisionAvoidanceTask(
+    def _create_task(self) -> _ExternalCollisionAvoidanceTask:
+        return _ExternalCollisionAvoidanceTask(
             name=f"{self.name}/task",
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
         )
-        self._add_child_to_statechart(task)
-        if self.cancel_if_collision_violated:
-            self._add_child_to_statechart(
-                _CancelBecauseExternalCollisionViolated(
-                    tasks=[task],
-                    name="External Collision Violated",
-                )
-            )
+
+    def _create_cancel_node(
+        self, *, task: _ExternalCollisionAvoidanceTask
+    ) -> _CancelBecauseExternalCollisionViolated:
+        return _CancelBecauseExternalCollisionViolated(
+            tasks=[task], name="External Collision Violated"
+        )
 
 
 # %% temporary collision rules
@@ -357,7 +386,7 @@ class UpdateTemporaryCollisionRules(EndedByOwner, MotionStatechartNode):
 
     @classmethod
     def for_end_effector(
-        cls, end_effector: EndEffector
+        cls, *, end_effector: EndEffector
     ) -> UpdateTemporaryCollisionRules:
         """
         :param end_effector: The end effector that may touch its surroundings.
@@ -484,8 +513,8 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
         :attr:`context`, which this node reads from then on.
         """
         self.collision_variable_manager = self.context.require_extension(
-            MotionControlContext
-        ).get_or_create_self_collision_manager(self.context)
+            extension_type=MotionControlContext
+        ).get_or_create_self_collision_manager(context=self.context)
         collision_matrix = self.create_self_collision_matrix()
         kinematic_structure_entities = self.robot.kinematic_structure_entities
         self.checked_combinations = []
@@ -547,7 +576,9 @@ class _SelfCollisionAvoidanceTask(_CollisionAvoidanceTask):
                 lower_error=manager.get_buffer_distance_symbol(contact)
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
-                quadratic_weight=self._weight_while_close(group_b_V_contact_normal),
+                quadratic_weight=self._weight_while_close(
+                    contact_normal=group_b_V_contact_normal
+                ),
                 task_expression=group_b_V_contact_normal
                 @ group_b_V_point_on_b_to_point_on_a,
             )
@@ -568,60 +599,22 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SelfCollisionAvoidance(EndedByOwner, CompositeNode):
+class SelfCollisionAvoidance(CollisionAvoidance):
     """
     Avoids self collisions between every checked combination of collision groups of the
-    robot with one task, and cancels the motion once one of them is violated.
-
-    .. note:: Its children are left out of drawings. Set
-        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
-        :attr:`plot_specifications` to False to draw them.
+    robot.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_composite_node_style
-    )
-
-    robot: AbstractRobot | None = None
-    """
-    The robot for which the collision avoidance goal is defined; ``None`` for the only
-    robot of the world it runs in.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast a violated collision distance is restored, in m/s; not strictly
-    enforced.
-    """
-
-    cancel_if_collision_violated: bool = True
-    """
-    If True, the motion will be canceled if a collision is violated.
-    """
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def expand(self) -> None:
-        """
-        Add the task avoiding every self collision of :attr:`robot`, and the node
-        cancelling the motion once one is violated.
-
-        The task decides which combinations of collision groups it avoids when it is
-        built, in the context that runs it.
-        """
-        if self.robot is None:
-            self.robot = _single_robot_of_world(self)
-        task = _SelfCollisionAvoidanceTask(
+    def _create_task(self) -> _SelfCollisionAvoidanceTask:
+        return _SelfCollisionAvoidanceTask(
             name=f"{self.name}/task",
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
         )
-        self._add_child_to_statechart(task)
-        if self.cancel_if_collision_violated:
-            self._add_child_to_statechart(
-                _CancelBecauseSelfCollisionViolated(
-                    name="self collision violated", tasks=[task]
-                )
-            )
+
+    def _create_cancel_node(
+        self, *, task: _SelfCollisionAvoidanceTask
+    ) -> _CancelBecauseSelfCollisionViolated:
+        return _CancelBecauseSelfCollisionViolated(
+            name="self collision violated", tasks=[task]
+        )

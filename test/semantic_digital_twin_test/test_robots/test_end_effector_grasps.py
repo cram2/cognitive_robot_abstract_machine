@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,6 +23,7 @@ from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from krrood_spatial_math.spatial_types import Point3, Vector3
+from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,
@@ -44,6 +46,31 @@ HELD_BODY_OFFSET = HomogeneousTransformationMatrix.from_xyz_rpy(0.01, 0.02, 0.03
 """
 Where the body a gripper holds sits relative to the tool frame.
 """
+
+
+@pytest.fixture(scope="module")
+def _worlds_of_supported_robots_setup(supported_abstract_robots) -> list[World]:
+    """
+    One world per supported robot, parsed from its description and annotated once for
+    the module and only ever copied.
+    """
+    worlds = []
+    for abstract_robot in supported_abstract_robots:
+        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
+        abstract_robot.from_world(world)
+        worlds.append(world)
+    return worlds
+
+
+@pytest.fixture
+def worlds_of_supported_robots(
+    _worlds_of_supported_robots_setup: list[World],
+) -> list[World]:
+    """
+    Copies of the worlds of the supported robots whose annotations are in the symbol
+    graph of the test that uses them.
+    """
+    return [deepcopy(world) for world in _worlds_of_supported_robots_setup]
 
 
 @pytest.fixture
@@ -175,16 +202,13 @@ def test_a_gripper_whose_axes_are_not_perpendicular_is_refused(pr2_gripper) -> N
 
 
 def test_every_robot_states_its_axes_in_the_frame_they_belong_to(
-    supported_abstract_robots,
+    worlds_of_supported_robots: list[World],
 ) -> None:
     """
     A gripper's axes are read in its tool frame and a camera's in its root, for every
     robot there is.
     """
-    for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
-        abstract_robot.from_world(world)
-
+    for world in worlds_of_supported_robots:
         for end_effector in world.get_semantic_annotations_by_type(EndEffector):
             assert end_effector.approach_axis.reference_frame is end_effector.tool_frame
             assert end_effector.closing_axis.reference_frame is end_effector.tool_frame
@@ -300,6 +324,39 @@ def test_the_held_grasp_can_be_read_at_any_point_of_the_gripper(pr2_gripper):
     )
 
 
+def test_the_grasp_on_a_body_not_below_the_tool_frame_is_read_the_same(pr2_gripper):
+    """
+    Where contact carries a body, it never hangs off the tool frame, yet the gripper
+    holds it all the same.
+    """
+    world = pr2_gripper._world
+    carried = Body(name=PrefixedName("carried_body"))
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=world.root,
+                child=carried,
+                parent_T_connection_expression=world.transform(
+                    pr2_gripper.tool_frame.global_transform @ HELD_BODY_OFFSET,
+                    world.root,
+                ),
+            )
+        )
+    held = hold_body(pr2_gripper)
+    tool_P_grasp = pr2_gripper.tool_P_grasp_when_closed
+
+    np.testing.assert_allclose(
+        pr2_gripper.body_T_grasp(body=carried, tool_P_grasp=tool_P_grasp).to_np(),
+        pr2_gripper.body_T_grasp(body=held, tool_P_grasp=tool_P_grasp).to_np(),
+        atol=1e-9,
+    )
+    np.testing.assert_allclose(
+        pr2_gripper.body_T_grasp(body=held, tool_P_grasp=tool_P_grasp).to_np(),
+        pr2_gripper.held_body_T_grasp.to_np(),
+        atol=1e-9,
+    )
+
+
 # %% where a two-finger gripper's fingers meet
 
 
@@ -328,16 +385,13 @@ def test_the_grasp_point_is_read_in_the_frame_it_belongs_to(pr2_gripper):
 
 
 def test_every_two_finger_gripper_can_measure_where_its_fingers_meet(
-    supported_abstract_robots,
+    worlds_of_supported_robots: list[World],
 ):
     """
     The measurements are read off the robot's own description, so every two-finger
     gripper there is answers them rather than only the one they were written against.
     """
-    for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
-        abstract_robot.from_world(world)
-
+    for world in worlds_of_supported_robots:
         for gripper in world.get_semantic_annotations_by_type(EndEffector):
             if not isinstance(gripper, HasTwoFingers):
                 continue
@@ -534,16 +588,13 @@ def test_the_finger_connections_are_those_the_grippers_states_drive(
 
 
 def test_every_two_finger_gripper_drives_every_joint_up_to_its_fingertips(
-    supported_abstract_robots,
+    worlds_of_supported_robots: list[World],
 ) -> None:
     """
     A gripper's states decide alone where its fingertips stand, for every robot there
     is, so a goal on the fingertips moves only joints the gripper's states drive.
     """
-    for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
-        abstract_robot.from_world(world)
-
+    for world in worlds_of_supported_robots:
         for gripper in world.get_semantic_annotations_by_type(EndEffector):
             if not isinstance(gripper, HasTwoFingers):
                 continue
@@ -580,16 +631,13 @@ def test_an_hsr_opens_with_its_motor_and_springs_at_their_upper_limits(
 
 
 def test_every_two_finger_gripper_stands_narrower_closed_than_open(
-    supported_abstract_robots,
+    worlds_of_supported_robots: list[World],
 ) -> None:
     """
     A gripper's closed state brings its fingertips closer together than its open state,
     for every robot there is.
     """
-    for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
-        abstract_robot.from_world(world)
-
+    for world in worlds_of_supported_robots:
         for gripper in world.get_semantic_annotations_by_type(EndEffector):
             if not isinstance(gripper, HasTwoFingers):
                 continue

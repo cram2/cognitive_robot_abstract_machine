@@ -135,14 +135,18 @@ class DAiSyGripperDemonstration(RobotDemonstration):
         """
         Give the plan the DAiSy in ``world``.
         """
-        return [RobotAccess(world.get_semantic_annotations_by_type(self.used_robot)[0])]
+        return [
+            RobotAccess(
+                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+            )
+        ]
 
     def build_statechart(self, context: StatechartContext) -> Statechart:
         """
         Open and close both grippers: each one alone, then both together, with the
         preset states first and the flex states afterwards.
         """
-        daisy = context.require_extension(RobotAccess).robot
+        daisy = context.require_extension(extension_type=RobotAccess).robot
         left_gripper = daisy.left_arm.end_effector
         right_gripper = daisy.right_arm.end_effector
         steps = [ParkArmsAction(arms=daisy.all_arms)]
@@ -163,7 +167,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
                     )
                 )
         statechart = Statechart(context=context)
-        statechart.add_node(Sequence(nodes=steps))
+        statechart.add_node(node=Sequence(nodes=steps))
         return statechart
 
     def create_steps_moving(
@@ -177,7 +181,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
             configuration of `state`, and waiting :attr:`pause_after_motion` after it.
         """
         moves = [
-            SetGripperAction(configuration=gripper.default_configuration(state))
+            SetGripperAction(gripper_configuration=gripper.default_configuration(state))
             for gripper in grippers
         ]
         return [

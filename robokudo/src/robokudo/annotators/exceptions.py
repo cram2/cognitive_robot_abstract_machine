@@ -6,6 +6,9 @@ from __future__ import annotations
 
 # %% Imports
 from dataclasses import dataclass
+
+from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
+
 from robokudo.exceptions import RoboKudoError
 
 
@@ -94,3 +97,104 @@ class NotAPoseModelException(RoboKudoError, ValueError):
 
     def suggest_correction(self) -> str:
         return "set 'pretrained_model' to a YOLO pose model, e.g. 'yolov8n-pose.pt'."
+
+
+# %% object pose estimation
+
+
+@dataclass
+class DuplicateObjectClassMesh(RoboKudoError, ValueError):
+    """
+    Raised when more than one mesh is configured for an object class.
+    """
+
+    class_name: str
+    """
+    The object class with more than one mesh.
+    """
+
+    def error_message(self) -> str:
+        return f"More than one mesh is configured for the class '{self.class_name}'."
+
+    def suggest_correction(self) -> str:
+        return "Configure exactly one mesh per class name."
+
+
+@dataclass
+class ImageResolutionMismatch(RoboKudoError, ValueError):
+    """
+    Raised when the color and the depth image of a frame differ in resolution.
+    """
+
+    color_image_resolution: CameraResolution
+    """
+    Resolution of the color image.
+    """
+
+    depth_image_resolution: CameraResolution
+    """
+    Resolution of the depth image.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The color image has the resolution {self.color_image_resolution}, the "
+            f"depth image {self.depth_image_resolution}."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Scale the color image to the resolution of the depth image."
+
+
+# %% World updating
+
+
+@dataclass(kw_only=True)
+class CameraPoseOutsideWorldError(RoboKudoError, LookupError):
+    """
+    Raised when the camera pose of a pass is measured against a body that is not part of
+    the world RoboKudo perceives into.
+    """
+
+    reference_frame_name: str
+    """
+    The name of the body the camera pose is measured against.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The camera pose of the pass is measured against '{self.reference_frame_name}', "
+            f"which is not a body of the world RoboKudo perceives into, so the objects "
+            f"of the pass cannot be placed in it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "let the pipeline perceive into the world of its RoboKudo, which "
+            "RoboKudo.start gives every pipeline of the analysis engine."
+        )
+
+
+@dataclass(kw_only=True)
+class QueryServerNotStarted(RoboKudoError, RuntimeError):
+    """
+    Raised when a query annotator is updated before its initialisation connected it to
+    the query action server.
+    """
+
+    annotator_name: str
+    """
+    The name of the annotator that was updated too early.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.annotator_name} was updated before it was connected to the query "
+            f"action server."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "set the annotator up or initialise it before ticking it, as a behaviour "
+            "tree does when it runs the annotator."
+        )

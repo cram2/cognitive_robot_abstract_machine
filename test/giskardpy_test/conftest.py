@@ -1,13 +1,25 @@
+"""
+Fixtures shared by the giskardpy tests: robot poses, worlds and Giskard instances.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
 # conftest of a run before calling any hook, so a hook would fire too late. The build runs
 # once per process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.GISKARDPY)
 
 
+# Below the ORM build at the top of this module, which has to run first.
+from copy import deepcopy  # noqa: E402
+
+import numpy as np  # noqa: E402
 import pytest
 
 from giskardpy.middleware.ros2.giskard_tester import GiskardTester
@@ -41,7 +53,7 @@ from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.tracy import Tracy, TracyJoint  # noqa: E402
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
@@ -166,6 +178,29 @@ def default_daisy_pose() -> dict[str, float]:
 
 
 @pytest.fixture()
+def tracy_arm_pose() -> dict[TracyJoint, float]:
+    """
+    :return: An elbow-up pose of Tracy's right arm, away from its singularities.
+    """
+    return {
+        TracyJoint.RIGHT_SHOULDER_PAN: 0.0,
+        TracyJoint.RIGHT_SHOULDER_LIFT: -np.pi / 2,
+        TracyJoint.RIGHT_ELBOW: np.pi / 2,
+        TracyJoint.RIGHT_WRIST_1: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_2: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_3: 0.0,
+    }
+
+
+@pytest.fixture()
+def tracy_world_copy(tracy_world: World) -> World:
+    """
+    :return: A copy of Tracy's world that a test may move the robot in.
+    """
+    return deepcopy(tracy_world)
+
+
+@pytest.fixture()
 def orientation_speed_ratio_tolerance() -> float:
     """
     :return: How much faster a far away orientation goal may turn than a close one.
@@ -207,14 +242,14 @@ def giskard_factory(init_background_node, robot: GiskardTester):
             name="initial configuration",
             seed_configuration=JointState.from_mapping(parse_seed_joint_state),
         )
-        statechart.add_node(initial_config)
+        statechart.add_node(node=initial_config)
 
         if robot.has_odometry_joint():
             base_goal = HomogeneousTransformationMatrix(
                 reference_frame=robot.api.world.root
             )
             base_pose_reached = SetOdometry(name="initial pose", base_pose=base_goal)
-            statechart.add_node(base_pose_reached)
+            statechart.add_node(node=base_pose_reached)
             done = logic_and(
                 initial_config.observes_true,
                 base_pose_reached.observes_true,
@@ -222,9 +257,9 @@ def giskard_factory(init_background_node, robot: GiskardTester):
         else:
             done = initial_config.observes_true
         end = EndMotion(name="end")
-        statechart.add_node(end)
+        statechart.add_node(node=end)
         end.start_condition = done
-        robot.api.compile(statechart)
+        robot.api.compile(statechart=statechart)
         robot.api.execute()
         return robot
 
@@ -338,6 +373,17 @@ def prismatic_world_with_acceleration_limit(request):
     )
 
 
+@pytest.fixture()
+def prismatic_bot_with_acceleration_limit():
+    """
+    A prismatic joint like :func:`prismatic_bot` with an acceleration limit of its own,
+    which brakes with a jerk limit far below the one of the default braking time.
+    """
+    return _make_prismatic_world(
+        [_symmetric_prismatic_limits(1, 1, acceleration=ACCELERATION_LIMIT)]
+    )
+
+
 @pytest.fixture(
     params=[1, None], ids=["with_position_limits", "without_position_limits"]
 )
@@ -396,3 +442,15 @@ def daisy_world_specification() -> WorldSpecification:
     DAiSy alone, as Giskard sets it up.
     """
     return WorldSpecification(robots=[RobotSpecification.specify_real_robot(DAiSy)])
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load giskardpy's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import giskardpy.orm.ormatic_interface  # noqa: F401

@@ -1,3 +1,7 @@
+"""
+Compiling a statechart, and the callbacks told whenever it compiles again.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -18,7 +22,7 @@ if TYPE_CHECKING:
 # %% being told that a statechart compiles again
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecompileCallback(ABC):
     """
     Something told whenever a statechart that already compiled compiles again, because
@@ -47,7 +51,7 @@ class RecompileCallback(ABC):
 # %% compiling a statechart
 
 
-@dataclass(eq=False)
+@dataclass(kw_only=True, eq=False)
 class StatechartCompiler:
     """
     Compiles a statechart: completes and builds its nodes, derives the edges of its
@@ -110,7 +114,7 @@ class StatechartCompiler:
         """
         return self.compiled_tick is not None
 
-    def add_recompile_callback(self, callback: RecompileCallback) -> None:
+    def add_recompile_callback(self, *, callback: RecompileCallback) -> None:
         """
         :param callback: Told whenever :attr:`statechart` compiles again after it had
             compiled. A callback already registered is not added twice.
@@ -119,7 +123,7 @@ class StatechartCompiler:
             return
         self._recompile_callbacks.append(callback)
 
-    def latest_compile_covers(self, node: StatechartNode) -> bool:
+    def latest_compile_covers(self, *, node: StatechartNode) -> bool:
         """
         :param node: A node of :attr:`statechart`.
         :return: Whether the latest compile covered `node`, which fixed its wiring.
@@ -128,23 +132,23 @@ class StatechartCompiler:
 
     def compile(self) -> None:
         """
-        Compiles all components of :attr:`statechart` in its context.
+        Compiles :attr:`statechart` in its context, before it ticks.
 
-        This method must be called before the statechart ticks.
-
-        Compiling again, once nodes joined, keeps the state and the history of the
-        nodes already there: only the joined nodes are completed and built, and the
-        tick is compiled over every node. Every :class:`RecompileCallback` is told.
-        Compiling again waits until every :class:`RecompileCallback` is at rest; until
-        then the statechart goes on ticking as it compiled last, see
+        Compiling again keeps the state and history of the nodes already there and tells
+        every :class:`RecompileCallback`, once all are at rest; until then the
+        statechart ticks as it compiled last, see
         :meth:`~cramph.statechart.Statechart.tick`.
+
+        :raises StatechartBrokenByFailedModificationError: If a
+            :meth:`~cramph.statechart.Statechart.modify` block of the statechart raised.
         """
+        self.statechart.check_not_broken()
         is_recompile = self.is_compiled
         if is_recompile and not self._hold_still():
             return
         statechart = self.statechart
         statechart.sanity_check()
-        self._compile_nodes(statechart.nodes[self._compiled_node_count :])
+        self._compile_nodes(nodes=statechart.nodes[self._compiled_node_count :])
         if is_recompile:
             for callback in list(self._recompile_callbacks):
                 callback.after_recompile()
@@ -170,9 +174,9 @@ class StatechartCompiler:
         from where it was.
         """
         if self.changed_since_compile or self._world_structure_changed():
-            self.when_held_still(self.compile)
+            self.when_held_still(step=self.compile)
 
-    def when_held_still(self, step: Callable[[], None]) -> None:
+    def when_held_still(self, *, step: Callable[[], None]) -> None:
         """
         Run `step`, which blocks the tick, once every :class:`RecompileCallback` is at
         rest; until then the statechart goes on ticking and asks again next tick.
@@ -204,12 +208,12 @@ class StatechartCompiler:
             for condition in node.effective_conditions
         ]
         for owner, condition in conditions_by_owner:
-            self._validate_condition_scope(owner, condition)
+            self._validate_condition_scope(owner=owner, condition=condition)
         self.statechart.rx_graph.clear_edges()
         for owner, condition in conditions_by_owner:
-            self._create_edge_for_condition(owner, condition)
+            self._create_edge_for_condition(owner=owner, condition=condition)
 
-    def _compile_nodes(self, nodes: list[StatechartNode]) -> None:
+    def _compile_nodes(self, *, nodes: list[StatechartNode]) -> None:
         """
         Completes `nodes`, builds them, or every node if the kinematic structure of the
         world changed since the nodes were built, then compiles the tick over every
@@ -221,7 +225,10 @@ class StatechartCompiler:
         for goal in goals:
             goal.check_children()
         self.statechart.check_context_holds(
-            nodes, lambda compiled_node: compiled_node.required_context_extensions
+            nodes=nodes,
+            required_extensions_of=lambda compiled_node: (
+                compiled_node.required_context_extensions
+            ),
         )
         if self._world_structure_changed():
             nodes_to_build = self.statechart.nodes
@@ -274,7 +281,7 @@ class StatechartCompiler:
         return all(answers)
 
     def _validate_condition_scope(
-        self, owner: StatechartNode, condition: TransitionCondition
+        self, *, owner: StatechartNode, condition: TransitionCondition
     ) -> None:
         """
         Checks that `condition` only depends on `owner` itself, siblings of `owner` or
@@ -300,7 +307,7 @@ class StatechartCompiler:
             )
 
     def _create_edge_for_condition(
-        self, owner: StatechartNode, condition: TransitionCondition
+        self, *, owner: StatechartNode, condition: TransitionCondition
     ) -> None:
         """
         Adds an edge from `owner` to every node `condition` depends on.
@@ -311,7 +318,7 @@ class StatechartCompiler:
         for parent_node in condition.node_dependencies:
             self.statechart.rx_graph.add_edge(owner.index, parent_node.index, condition)
 
-    def _build_nodes(self, nodes: list[StatechartNode]) -> None:
+    def _build_nodes(self, *, nodes: list[StatechartNode]) -> None:
         """
         Builds `nodes` and applies their resulting artifacts, leaving every other node
         of :attr:`statechart` as it was built already.
@@ -322,10 +329,13 @@ class StatechartCompiler:
             node.index for node in nodes
         }
         for node in nodes:
-            self._build_and_apply_artifacts(node, built_node_indices, [])
+            self._build_and_apply_artifacts(
+                node=node, built_node_indices=built_node_indices, dependency_chain=[]
+            )
 
     def _build_and_apply_artifacts(
         self,
+        *,
         node: StatechartNode,
         built_node_indices: set[int],
         dependency_chain: list[StatechartNode],
@@ -343,18 +353,27 @@ class StatechartCompiler:
         """
         if node.index in built_node_indices:
             return
-        self._check_no_dependency_cycle(node, dependency_chain)
+        self._check_no_dependency_cycle(node=node, dependency_chain=dependency_chain)
         chain = dependency_chain + [node]
         for dependency in node.prerequisite_nodes:
-            self._build_and_apply_artifacts(dependency, built_node_indices, chain)
+            self._build_and_apply_artifacts(
+                node=dependency,
+                built_node_indices=built_node_indices,
+                dependency_chain=chain,
+            )
         if isinstance(node, CompositeNode):
             for child_node in node.nodes:
-                self._build_and_apply_artifacts(child_node, built_node_indices, chain)
+                self._build_and_apply_artifacts(
+                    node=child_node,
+                    built_node_indices=built_node_indices,
+                    dependency_chain=chain,
+                )
         built_node_indices.add(node.index)
-        node.apply_artifacts(node.build())
+        node.apply_artifacts(artifacts=node.build())
 
     @staticmethod
     def _check_no_dependency_cycle(
+        *,
         node: StatechartNode,
         dependency_chain: list[StatechartNode],
     ) -> None:

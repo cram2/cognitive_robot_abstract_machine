@@ -21,6 +21,7 @@ The module is used for:
 from __future__ import annotations
 
 # %% Imports
+import logging
 import time
 
 from typing_extensions import TYPE_CHECKING, Any
@@ -35,8 +36,12 @@ from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 import cv2
 
 if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
+
     from robokudo.cas import CAS
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 TYPE_VIDEO: int = 0
@@ -111,7 +116,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         """
         Backup of image for single-image file mode.
         """
-        self.rk_logger.info("OpenCVCameraWithoutDepthInterface initialized")
+        logger.info("OpenCVCameraWithoutDepthInterface initialized")
 
     def has_new_data(self) -> bool:
         """
@@ -130,17 +135,15 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
 
         return self._has_new_data
 
-    def set_data(self, cas: CAS) -> None:
+    def set_data(self, *, cas: CAS, world: World) -> None:
         """
-        Update the Common Analysis Structure with latest frame data.
-
-        This method:
-        * Retrieves the next frame from video/camera or backup
-        * Handles looping behavior for videos and images
-        * Applies optional contrast/brightness normalization
-        * Updates the CAS with frame and camera data
+        Put the next frame of the video, camera or images and its camera data into the
+        CAS, looping over videos and images and normalizing contrast and brightness if
+        configured.
 
         :param cas: Common Analysis Structure to update
+        :param world: The world perception perceives into; the camera is registered
+            there without a pose, since its pose is unknown
         """
         if not self.has_new_data():
             # no new frame available
@@ -156,7 +159,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
             retval = True
         timestamp_nanoseconds = time.time_ns()
 
-        self.rk_logger.debug(
+        logger.debug(
             "loaded frame {} of {}".format(
                 self.video_capture.get(cv2.CAP_PROP_POS_FRAMES),
                 self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT),
@@ -230,6 +233,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         )
         self.store_camera_observation(
             cas=cas,
+            world=world,
             camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
             camera_frame=camera_frame,
             timestamp_nanoseconds=timestamp_nanoseconds,

@@ -110,14 +110,16 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
     """
 
     def is_applicable(self, plan_node: MoveGripper) -> bool:
-        return isinstance(plan_node.gripper, (GarmiLeftGripper, GarmiRightGripper))
+        return isinstance(
+            plan_node.two_finger_gripper, (GarmiLeftGripper, GarmiRightGripper)
+        )
 
     def apply(self, plan_node: MoveGripper) -> None:
         """
         Puts the task in place of the step that drives the fingers: `plan_node`, or the
         action whose goal it is.
         """
-        gripper = plan_node.gripper
+        gripper = plan_node.two_finger_gripper
         if plan_node.width <= gripper.separation_in(GripperState.CLOSE):
             task = self.grasp(gripper)
         else:
@@ -126,7 +128,9 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
                 width=plan_node.width,
                 speed=self.finger_speed,
             )
-        plan_node.statechart.replace(ControlStructureNode.step_holding(plan_node), task)
+        plan_node.statechart.replace(
+            node=ControlStructureNode.step_holding(node=plan_node), replacement=task
+        )
 
 
 @dataclass
@@ -139,16 +143,20 @@ class CloseGarmiFingersToWidthWithTheirFrankaDriver(
     """
 
     def is_applicable(self, plan_node: MoveFingersToWidthAction) -> bool:
-        return isinstance(plan_node.gripper, (GarmiLeftGripper, GarmiRightGripper))
+        return isinstance(
+            plan_node.two_finger_gripper, (GarmiLeftGripper, GarmiRightGripper)
+        )
 
     def apply(self, plan_node: MoveFingersToWidthAction) -> None:
-        plan_node.statechart.replace(plan_node, self.grasp(plan_node.gripper))
+        plan_node.statechart.replace(
+            node=plan_node, replacement=self.grasp(plan_node.two_finger_gripper)
+        )
 
 
 # %% running plans on the real GARMI
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealGarmiPlanExecutor(RealRobotPlanExecutor):
     """
     Runs plans on the real GARMI, whose grippers move through their Franka gripper

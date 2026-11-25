@@ -1,3 +1,7 @@
+"""
+The exceptions raised across the semantic digital twin.
+"""
+
 from __future__ import annotations, absolute_import
 
 # %% Imports
@@ -12,7 +16,7 @@ from typing_extensions import TYPE_CHECKING, Callable, Any
 
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -22,7 +26,7 @@ if TYPE_CHECKING:
         HasRootBody,
         HasSupportingSurface,
     )
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
     from semantic_digital_twin.grasping.object_relative_grasp import (
         ObjectRelativeGrasp,
     )
@@ -542,6 +546,52 @@ class InvalidRollbackVersionError(WorldValidationError):
 
     def suggest_correction(self) -> str:
         return "pass a version between 0 and the world's current version."
+
+
+@dataclass(kw_only=True)
+class RollbackBeforeClearError(WorldValidationError):
+    """
+    Raised when attempting to roll back to a version from before the world's history was
+    last cleared, which the history no longer holds the modifications to restore.
+    """
+
+    target_version: int
+    """
+    The version that was requested.
+    """
+
+    version_at_last_clear: int
+    """
+    The version the world was at when its history was last cleared.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Cannot roll back to version {self.target_version}: the world's history "
+            f"was cleared at version {self.version_at_last_clear}, so no version up to "
+            f"it can be restored."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"pass a version after {self.version_at_last_clear}."
+
+
+@dataclass(kw_only=True)
+class WorldMergedWithItselfError(UsageError):
+    """
+    Raised when a world is asked to merge itself into itself.
+    """
+
+    world: World
+    """
+    The world that was to be merged with itself.
+    """
+
+    def error_message(self) -> str:
+        return f"Cannot merge the world {self.world} with itself."
+
+    def suggest_correction(self) -> str:
+        return "merge another world, or a copy of this one."
 
 
 @dataclass
@@ -1384,6 +1434,28 @@ class StateUpdateContainsUnknownDegreesOfFreedomError(UsageError):
 
     def suggest_correction(self) -> str:
         return ""
+
+
+@dataclass
+class StateUpdateContainsNonNumericValuesError(UsageError):
+    """
+    Raised when a received WorldStateUpdate gives a degree of freedom a value that is
+    not a number.
+    """
+
+    non_numeric_states: list[Any]
+    """
+    The values that are not numbers.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Received a WorldStateUpdate whose states {self.non_numeric_states} are "
+            f"not numbers."
+        )
+
+    def suggest_correction(self) -> str:
+        return "publish the positions of degrees of freedom as numbers."
 
 
 @dataclass
@@ -2377,7 +2449,7 @@ class NoGraspGeometry(UsageError):
     shape to derive them from.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The annotation whose grasps were asked for.
     """
@@ -2406,7 +2478,7 @@ class GraspNotOnObjectError(UsageError):
     The grasp that missed.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object it was meant for.
     """

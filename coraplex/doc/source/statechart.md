@@ -22,7 +22,7 @@ statechart:
 ```python
 from cramph.composites import Sequence
 
-plan = Sequence(nodes=[ParkArmsAction(arms=robot.all_arms), NavigateAction(target_location=target_pose)])
+plan = Sequence(nodes=[ParkArmsAction(arms=robot.all_arms), NavigateAction(planar_goal_pose=target_pose)])
 ```
 
 ## How the statechart is shaped
@@ -69,11 +69,11 @@ from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from cramph.statechart import Statechart
 
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)])
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(plan)
-executor.compile(statechart)
+statechart.add_node(node=plan)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 

@@ -30,7 +30,7 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
 from coraplex.plans.context_extensions import RobotAccess
@@ -131,17 +131,17 @@ def straighten_torso(robot: AbstractRobot) -> JointPositionList:
     )
 
 
-def standing_pose_in_front_of(pose: Pose, world: World) -> Pose:
+def standing_pose_in_front_of(pose: Pose, world: World) -> Pose2D:
     """
     :param pose: The pose the robot should approach from its FRONT-facing side.
     :param world: The world the pose is expressed in.
-    :return: The pose the robot stands in to reach that pose with a FRONT grasp.
+    :return: The spot on the floor the robot stands at to reach that pose with a FRONT
+        grasp.
     """
     yaw = float(pose.yaw)
-    return Pose.from_xyz_rpy(
+    return Pose2D.from_xy_yaw(
         pose.x - STANDING_DISTANCE * np.cos(yaw),
         pose.y - STANDING_DISTANCE * np.sin(yaw),
-        PELVIS_HEIGHT_ABOVE_FLOOR,
         yaw=yaw,
         reference_frame=world.root,
     )
@@ -160,33 +160,34 @@ def build_statechart(
     :return: The statechart carrying the parcel from one pallet stack to the other.
     """
     world = context.world
-    robot = context.require_extension(RobotAccess).robot
+    robot = context.require_extension(extension_type=RobotAccess).robot
     parcel = world.get_semantic_annotations_by_type(Parcel)[0]
     statechart = Statechart(context=context)
     statechart.add_node(
-        Sequence(
+        node=Sequence(
             nodes=[
                 ParkArmsAction(arms=robot.all_arms),
                 NavigateAction(
-                    target_location=standing_pose_in_front_of(source, world)
+                    planar_goal_pose=standing_pose_in_front_of(source, world)
                 ),
                 PickUpAction(
-                    grasp=GraspCandidate.from_body_origin(parcel),
+                    grasp_candidate=GraspCandidate.from_body_origin(graspable=parcel),
                     arm=robot.torso.left_arm,
                 ),
                 ParkArmsAction(arms=robot.all_arms),
                 straighten_torso(robot),
                 NavigateAction(
-                    target_location=Pose.from_xyz_rpy(
+                    planar_goal_pose=Pose2D.from_xy_yaw(
                         yaw=turn, reference_frame=robot.root
                     )
                 ),
                 NavigateAction(
-                    target_location=standing_pose_in_front_of(destination, world)
+                    planar_goal_pose=standing_pose_in_front_of(destination, world)
                 ),
                 PlaceAction(
-                    object_designator=parcel,
-                    target_location=Pose(
+                    arm=robot.torso.left_arm,
+                    graspable=parcel,
+                    goal_pose=Pose(
                         destination.position,
                         destination.quaternion,
                         reference_frame=world.root,
@@ -232,11 +233,15 @@ def run(
     see :func:`build_statechart`, showing it with `visualizations`.
     """
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, [RobotAccess(robot)]),
+        context=StatechartContext.with_extensions(
+            world=world, extensions=[RobotAccess(robot=robot)]
+        ),
         ros_node=ros_node,
         extensions=visualizations,
     )
-    executor.compile(build_statechart(executor.context, source, destination, turn))
+    executor.compile(
+        statechart=build_statechart(executor.context, source, destination, turn)
+    )
     executor.execute()
 
 

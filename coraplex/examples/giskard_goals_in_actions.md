@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from coraplex.robot_plans.actions.base import GoalAction
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from coraplex.testing import setup_world
 from cramph.context import StatechartContext
 from cramph.node import StatechartNode
@@ -66,8 +67,7 @@ class MoveToolCenterPointAction(GoalAction):
 
     def create_goal(self) -> StatechartNode:
         return CartesianPose(
-            root_link=self.controlled_root,
-            tip_link=self.arm.end_effector.tool_frame,
+            kinematic_chain=KinematicChain(root=self.controlled_root, tip=self.arm.end_effector.tool_frame),
             goal_pose=self.target,
         )
 
@@ -75,16 +75,16 @@ class MoveToolCenterPointAction(GoalAction):
 world = setup_world()
 pr2 = PR2.from_world(world)
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )
 statechart = Statechart(context=executor.context)
 statechart.add_node(
-    MoveToolCenterPointAction(
+    node=MoveToolCenterPointAction(
         arm=pr2.left_arm,
         target=Pose.from_xyz_rpy(0.6, 0.3, 0.9, reference_frame=pr2.root),
     )
 )
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 

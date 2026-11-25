@@ -43,9 +43,9 @@ from cramph.context import StatechartContext
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from cramph.statechart import Statechart
 
-extensions = [RobotAccess(pr2_view), StatementGrounding()]
+extensions = [RobotAccess(robot=pr2_view), StatementGrounding()]
 context = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, extensions)
+    context=StatechartContext.with_extensions(world=world, extensions=extensions)
 ).context
 
 
@@ -54,11 +54,11 @@ def run(plan):
     Run `plan` simulated in `world`, with the robot and settings in `extensions`.
     """
     executor = KinematicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world, extensions)
+        context=StatechartContext.with_extensions(world=world, extensions=extensions)
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(plan)
-    executor.compile(statechart)
+    statechart.add_node(node=plan)
+    executor.compile(statechart=statechart)
     executor.execute()
     return executor
 
@@ -87,7 +87,7 @@ run(Sequence(nodes=[ParkArmsAction(arms=pr2_view.all_arms),
 ```python
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.locations.locations import ReachabilityLocation
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 
 location = ReachabilityLocation(
     Pose(reference_frame=world.get_body_by_name("milk.stl")),
@@ -95,7 +95,7 @@ location = ReachabilityLocation(
     context=context,
 )
 
-run(NavigateAction(target_location=location.ground()))
+run(NavigateAction(planar_goal_pose=location.ground()))
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
@@ -148,7 +148,7 @@ location = VisibilityLocation(
     Pose(reference_frame=world.get_body_by_name("milk.stl")), context=context
 )
 
-run(NavigateAction(target_location=location.ground()))
+run(NavigateAction(planar_goal_pose=location.ground()))
 
 pr2_view.root.parent_connection.origin = origin_pose.homogeneous_matrix
 ```
@@ -183,8 +183,8 @@ from cramph.composites import StatementNode
 from krrood.entity_query_language.factories import a, variable
 
 navigate = a(NavigateAction)(
-    target_location=variable(
-        Pose,
+    planar_goal_pose=variable(
+        Pose2D,
         domain=ReachabilityLocation(
             Pose(reference_frame=world.get_body_by_name("milk.stl")),
             pr2_view.left_arm,

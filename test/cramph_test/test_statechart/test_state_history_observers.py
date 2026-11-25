@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.node import CancelStatechart, StatechartNode
 from cramph.nodes_for_testing import (
@@ -28,7 +28,7 @@ from krrood.symbolic_math.symbolic_math import Scalar
 # %% observers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HistoryRecorder(StateHistoryObserver):
     """
     Remember snapshots available when a history change is delivered.
@@ -39,7 +39,7 @@ class HistoryRecorder(StateHistoryObserver):
     The appended snapshots in notification order.
     """
 
-    def on_state_change(self, history: StateHistory) -> None:
+    def on_state_change(self, *, history: StateHistory) -> None:
         """
         Retain the snapshot already appended to the observed history.
 
@@ -48,7 +48,7 @@ class HistoryRecorder(StateHistoryObserver):
         self.snapshots.append(history.latest_item)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObserverReplacement(StateHistoryObserver):
     """
     Replace one subscription while a notification is being delivered.
@@ -64,14 +64,14 @@ class ObserverReplacement(StateHistoryObserver):
     The subscription to add.
     """
 
-    def on_state_change(self, history: StateHistory) -> None:
+    def on_state_change(self, *, history: StateHistory) -> None:
         """
         Replace subscriptions for subsequent history changes.
 
         :param history: The history whose subscriptions change.
         """
-        history.remove_observer(self.removed)
-        history.add_observer(self.added)
+        history.remove_observer(observer=self.removed)
+        history.add_observer(observer=self.added)
 
 
 # %% history changes
@@ -83,8 +83,8 @@ def history_chart(statechart_context: StatechartContext) -> Statechart:
     A compiled chart whose node state can be changed independently of execution.
     """
     chart = Statechart(context=statechart_context)
-    chart.add_node(ConstTrueNode())
-    StatechartExecutor(statechart_context).compile(statechart=chart)
+    chart.add_node(node=ConstTrueNode())
+    StatechartExecutor(context=statechart_context).compile(statechart=chart)
     return chart
 
 
@@ -100,7 +100,7 @@ def append_snapshot(chart: Statechart) -> StateHistoryItem:
         life_cycle_state=chart.life_cycle_state,
         observation_state=chart.observation_state,
     )
-    chart.state_history.append(snapshot)
+    chart.state_history.append(next_item=snapshot)
     return snapshot
 
 
@@ -109,11 +109,11 @@ def test_history_notifies_only_when_a_snapshot_changes(history_chart) -> None:
     Repeated ticks do not produce duplicate history notifications.
     """
     recorder = HistoryRecorder()
-    history_chart.state_history.add_observer(recorder)
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.PAUSED
+    history_chart.state_history.add_observer(observer=recorder)
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.PAUSED
     paused = append_snapshot(history_chart)
     append_snapshot(history_chart)
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.RUNNING
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.RUNNING
     running = append_snapshot(history_chart)
 
     assert recorder.snapshots == [paused, running]
@@ -130,9 +130,9 @@ def test_an_empty_history_has_no_latest_item() -> None:
 def test_item_before_latest_is_the_snapshot_recorded_before_the_latest(
     history_chart,
 ) -> None:
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.PAUSED
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.PAUSED
     paused = append_snapshot(history_chart)
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.RUNNING
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.RUNNING
     running = append_snapshot(history_chart)
 
     assert history_chart.state_history.item_before_latest is paused
@@ -145,10 +145,10 @@ def test_history_registration_is_idempotent_by_identity(history_chart) -> None:
     """
     first = HistoryRecorder()
     second = HistoryRecorder()
-    history_chart.state_history.add_observer(first)
-    history_chart.state_history.add_observer(first)
-    history_chart.state_history.add_observer(second)
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.PAUSED
+    history_chart.state_history.add_observer(observer=first)
+    history_chart.state_history.add_observer(observer=first)
+    history_chart.state_history.add_observer(observer=second)
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.PAUSED
     snapshot = append_snapshot(history_chart)
 
     assert len(history_chart.state_history.observers) == 2
@@ -164,11 +164,11 @@ def test_history_removes_only_the_owned_observer(history_chart) -> None:
     """
     first = HistoryRecorder()
     second = HistoryRecorder()
-    history_chart.state_history.add_observer(first)
-    history_chart.state_history.add_observer(second)
-    history_chart.state_history.remove_observer(first)
-    history_chart.state_history.remove_observer(first)
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.PAUSED
+    history_chart.state_history.add_observer(observer=first)
+    history_chart.state_history.add_observer(observer=second)
+    history_chart.state_history.remove_observer(observer=first)
+    history_chart.state_history.remove_observer(observer=first)
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.PAUSED
     snapshot = append_snapshot(history_chart)
 
     assert first.snapshots == []
@@ -181,12 +181,12 @@ def test_subscription_changes_apply_after_current_notification(history_chart) ->
     """
     removed = HistoryRecorder()
     added = HistoryRecorder()
-    replacement = ObserverReplacement(removed, added)
-    history_chart.state_history.add_observer(replacement)
-    history_chart.state_history.add_observer(removed)
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.PAUSED
+    replacement = ObserverReplacement(removed=removed, added=added)
+    history_chart.state_history.add_observer(observer=replacement)
+    history_chart.state_history.add_observer(observer=removed)
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.PAUSED
     paused = append_snapshot(history_chart)
-    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.RUNNING
+    history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.RUNNING
     running = append_snapshot(history_chart)
 
     assert removed.snapshots == [paused]
@@ -204,10 +204,10 @@ def test_cancelled_tick_publishes_its_final_snapshot(
     """
     cancel = CancelStatechart(exception=NodeAssertionError(reason="cancelled"))
     chart = Statechart(context=statechart_context)
-    chart.add_node(cancel)
+    chart.add_node(node=cancel)
     recorder = HistoryRecorder()
-    chart.state_history.add_observer(recorder)
-    executor = StatechartExecutor(statechart_context)
+    chart.state_history.add_observer(observer=recorder)
+    executor = StatechartExecutor(context=statechart_context)
 
     with pytest.raises(NodeAssertionError) as caught:
         executor.compile(statechart=chart)
@@ -215,7 +215,7 @@ def test_cancelled_tick_publishes_its_final_snapshot(
 
     assert caught.value is cancel.exception
     final = recorder.snapshots[-1]
-    assert final.life_cycle_state[cancel] is LifeCycleValues.RUNNING
+    assert final.life_cycle_state[cancel] is LifeCycleValue.RUNNING
     assert final.observation_state == chart.observation_state
     assert final.life_cycle_state == chart.life_cycle_state
 
@@ -227,26 +227,28 @@ def test_cancelled_tick_preserves_error_when_observer_fails(
     A subscriber failure cannot replace the chart's cancellation reason.
     """
     trigger = ConstTrueNode()
-    cancel = CancelStatechart.when_true(trigger, NodeAssertionError(reason="cancelled"))
+    cancel = CancelStatechart.when_true(
+        node=trigger, exception=NodeAssertionError(reason="cancelled")
+    )
     chart = Statechart(context=statechart_context)
-    chart.add_nodes([trigger, cancel])
-    executor = StatechartExecutor(statechart_context)
+    chart.add_nodes(nodes=[trigger, cancel])
+    executor = StatechartExecutor(context=statechart_context)
     executor.compile(statechart=chart)
     recorder = HistoryRecorder()
     observer = Mock(spec=StateHistoryObserver)
     observer.on_state_change.side_effect = ValueError("observer failed")
-    chart.state_history.add_observer(recorder)
-    chart.state_history.add_observer(observer)
+    chart.state_history.add_observer(observer=recorder)
+    chart.state_history.add_observer(observer=observer)
 
     with pytest.raises(NodeAssertionError) as caught:
         while True:
             executor.tick()
 
     assert caught.value is cancel.exception
-    assert recorder.snapshots[-1].life_cycle_state[cancel] is LifeCycleValues.RUNNING
+    assert recorder.snapshots[-1].life_cycle_state[cancel] is LifeCycleValue.RUNNING
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChartCancelledWithNodesInEveryState:
     """
     A chart cancelled in its first tick, with one node in each state a node can be in
@@ -299,15 +301,15 @@ def chart_cancelled_with_nodes_in_every_state(
     running = NodeRecordingItsCallbacks()
     paused = ConstFalseNode()
     paused.pause_condition = Scalar.const_true()
-    succeeded = NodeSucceedingOnObservingTrue(observation=ObservationStateValues.TRUE)
+    succeeded = NodeSucceedingOnObservingTrue(observation=ObservationStateValue.TRUE)
     not_started = ConstFalseNode()
     not_started.start_condition = Scalar.const_false()
     cancel = CancelStatechart.when_true(
-        succeeded, NodeAssertionError(reason="cancelled")
+        node=succeeded, exception=NodeAssertionError(reason="cancelled")
     )
     chart = Statechart(context=statechart_context)
-    chart.add_nodes([running, paused, succeeded, not_started, cancel])
-    executor = StatechartExecutor(statechart_context)
+    chart.add_nodes(nodes=[running, paused, succeeded, not_started, cancel])
+    executor = StatechartExecutor(context=statechart_context)
     executor.compile(statechart=chart)
     with pytest.raises(NodeAssertionError) as raised:
         executor.tick()
@@ -341,11 +343,11 @@ def test_cancellation_interrupts_unfinished_nodes(
             cancelled.cancel,
         ]
     } == {
-        cancelled.running: LifeCycleValues.INTERRUPTED,
-        cancelled.paused: LifeCycleValues.INTERRUPTED,
-        cancelled.succeeded: LifeCycleValues.SUCCEEDED,
-        cancelled.not_started: LifeCycleValues.NOT_STARTED,
-        cancelled.cancel: LifeCycleValues.RUNNING,
+        cancelled.running: LifeCycleValue.INTERRUPTED,
+        cancelled.paused: LifeCycleValue.INTERRUPTED,
+        cancelled.succeeded: LifeCycleValue.SUCCEEDED,
+        cancelled.not_started: LifeCycleValue.NOT_STARTED,
+        cancelled.cancel: LifeCycleValue.RUNNING,
     }
 
 
@@ -359,7 +361,7 @@ def test_cancellation_is_the_last_record_of_the_history(
 
     final = cancelled.chart.state_history.latest_item
     assert final.life_cycle_state == cancelled.chart.life_cycle_state
-    assert final.life_cycle_state[cancelled.running] is LifeCycleValues.INTERRUPTED
+    assert final.life_cycle_state[cancelled.running] is LifeCycleValue.INTERRUPTED
 
 
 def test_cancellation_record_names_the_cancelling_node(
@@ -411,7 +413,7 @@ def test_failed_settle_does_not_publish_partial_snapshot(
     A tick that fails while settling records nothing.
     """
     recorder = HistoryRecorder()
-    history_chart.state_history.add_observer(recorder)
+    history_chart.state_history.add_observer(observer=recorder)
     snapshots = list(history_chart.state_history.items)
     failure = NodeAssertionError(reason="settling failed")
 
@@ -419,7 +421,7 @@ def test_failed_settle_does_not_publish_partial_snapshot(
         """
         Change one state before settling fails to complete.
         """
-        history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValues.PAUSED
+        history_chart.life_cycle_state[history_chart.nodes[0]] = LifeCycleValue.PAUSED
         raise failure
 
     monkeypatch.setattr(history_chart.compiler.compiled_tick, "settle", fail_settle)
@@ -443,8 +445,8 @@ def _compiled_with(
     """
     executor = StatechartExecutor(context=statechart_context)
     statechart = Statechart(context=executor.context)
-    statechart.add_node(node)
-    executor.compile(statechart)
+    statechart.add_node(node=node)
+    executor.compile(statechart=statechart)
     return executor
 
 
@@ -465,7 +467,7 @@ def test_a_node_that_just_ended_is_among_those_ended_in_the_newest_snapshot(
     statechart_context: StatechartContext,
 ) -> None:
     succeeding = NodeSucceedingOnObservingTrue(
-        name="succeeding", observation=ObservationStateValues.TRUE
+        name="succeeding", observation=ObservationStateValue.TRUE
     )
 
     executor = _compiled_with(statechart_context, succeeding)
@@ -498,8 +500,8 @@ def test_a_state_snapshot_keeps_its_values_when_the_state_changes(
     Changing the live state after taking a snapshot leaves the snapshot as it was.
     """
     node = history_chart.nodes[0]
-    history_chart.life_cycle_state[node] = LifeCycleValues.PAUSED
+    history_chart.life_cycle_state[node] = LifeCycleValue.PAUSED
     snapshot = history_chart.life_cycle_state.snapshot()
-    history_chart.life_cycle_state[node] = LifeCycleValues.RUNNING
+    history_chart.life_cycle_state[node] = LifeCycleValue.RUNNING
 
-    assert snapshot[node] == LifeCycleValues.PAUSED
+    assert snapshot[node] == LifeCycleValue.PAUSED

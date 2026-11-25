@@ -1,0 +1,13 @@
+[project]
+name = "family-extra"
+dynamic = ["version"]
+dependencies = [
+    "family-core>=1.0",
+    "loner",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "family.extra._version.__version__"}

@@ -1,3 +1,7 @@
+"""
+Tests of the product units of rustworkx circuits.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -6,13 +10,20 @@ import numpy as np
 import pytest
 from random_events.interval import closed
 from random_events.product_algebra import Event, SimpleEvent
+from random_events.set import Set
+from random_events.variable import Symbolic
+from scipy.stats import norm
 from sortedcontainers import SortedSet
 
 from krrood.adapters.json_serializer import from_json, to_json
+from probabilistic_model.distributions.distributions import SymbolicDistribution
+from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,
+    leaf,
 )
+from probabilistic_model.utils import MissingDict
 
 from ..circuit_building import uniform_leaf
 
@@ -117,6 +128,34 @@ def test_marginal_keeps_the_factor_of_the_variable(product, x):
 
 def test_marginal_without_variables_is_none(product):
     assert product.marginal([]) is None
+
+
+def test_a_product_over_symbolic_and_continuous_variables_reads_domain_elements(x):
+    """
+    Rows that hold a domain element for the symbolic variable and a number for the
+    continuous one have the likelihood of both factors.
+    """
+    animal = Symbolic(name="animal", domain=Set.from_iterable(["cat", "dog"]))
+    circuit = ProbabilisticCircuit()
+    product_unit = ProductUnit(probabilistic_circuit=circuit)
+    gaussian = GaussianDistribution(variable=x, location=0.0, scale=1.0)
+    product_unit.add_subcircuit(leaf(gaussian, circuit))
+    product_unit.add_subcircuit(
+        leaf(
+            SymbolicDistribution(
+                variable=animal,
+                probabilities=MissingDict(
+                    float, {hash("cat"): 0.25, hash("dog"): 0.75}
+                ),
+            ),
+            circuit,
+        )
+    )
+    rows = np.array([["dog", 0.5], ["cat", -1.0]], dtype=object)
+
+    assert circuit.log_likelihood(events=rows) == pytest.approx(
+        np.log([0.75, 0.25]) + norm.logpdf([0.5, -1.0])
+    )
 
 
 # %% copies

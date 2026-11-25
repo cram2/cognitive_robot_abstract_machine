@@ -1,3 +1,8 @@
+"""
+Tests for adding nodes to a statechart after it compiled, and for a
+:meth:`~cramph.statechart.Statechart.modify` block that raises.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,8 +11,11 @@ import pytest
 
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
-from cramph.exceptions import StatechartAlreadyCompiledError
+from cramph.data_types import LifeCycleValue, ObservationStateValue
+from cramph.exceptions import (
+    StatechartAlreadyCompiledError,
+    StatechartBrokenByFailedModificationError,
+)
 from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
 from cramph.statechart import Statechart
@@ -21,7 +29,7 @@ class ModificationDeliberatelyFailed(Exception):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionCountingCompiles(TickingExecutorExtension):
     """
     An executor extension that counts how often it was told the statechart compiled.
@@ -32,11 +40,11 @@ class ExtensionCountingCompiles(TickingExecutorExtension):
     How often :meth:`after_compile` ran.
     """
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.compile_count += 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ExtensionTellingRecompilesApart(TickingExecutorExtension):
     """
     An executor extension that counts separately how often it was told the statechart
@@ -53,10 +61,10 @@ class ExtensionTellingRecompilesApart(TickingExecutorExtension):
     How often :meth:`after_recompile` ran.
     """
 
-    def after_compile(self, executor: StatechartExecutor) -> None:
+    def after_compile(self, *, executor: StatechartExecutor) -> None:
         self.compile_count += 1
 
-    def after_recompile(self, executor: StatechartExecutor) -> None:
+    def after_recompile(self, *, executor: StatechartExecutor) -> None:
         self.recompile_count += 1
 
 
@@ -68,7 +76,7 @@ def _node_arriving_at_once(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
@@ -81,10 +89,10 @@ def _compile_and_run_one_node(
     :return: The node, succeeded.
     """
     statechart = Statechart(context=executor.context)
-    statechart.add_node(first := _node_arriving_at_once("first"))
-    executor.compile(statechart)
+    statechart.add_node(node=(first := _node_arriving_at_once("first")))
+    executor.compile(statechart=statechart)
     executor.tick()
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
     return first
 
 
@@ -97,7 +105,7 @@ def _tick_until_succeeded(
     """
     executor.tick()
     executor.tick()
-    assert node.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert node.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% growing
@@ -112,12 +120,12 @@ def test_a_node_added_in_a_modification_runs_after_the_node_it_waits_for(
     second.start_condition = first.is_succeeded
 
     with statechart.modify():
-        statechart.add_node(second)
+        statechart.add_node(node=second)
     statechart_executor.tick()
-    assert second.life_cycle_state == LifeCycleValues.RUNNING
+    assert second.life_cycle_state == LifeCycleValue.RUNNING
     statechart_executor.tick()
 
-    assert second.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert second.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_a_node_added_outside_a_modification_is_compiled_right_away(
@@ -126,7 +134,7 @@ def test_a_node_added_outside_a_modification_is_compiled_right_away(
     _compile_and_run_one_node(statechart_executor)
     second = _node_arriving_at_once("second")
 
-    statechart_executor.statechart.add_node(second)
+    statechart_executor.statechart.add_node(node=second)
 
     _tick_until_succeeded(statechart_executor, second)
 
@@ -136,10 +144,10 @@ def test_growing_keeps_the_outcome_of_the_nodes_already_there(
 ) -> None:
     first = _compile_and_run_one_node(statechart_executor)
 
-    statechart_executor.statechart.add_node(_node_arriving_at_once("second"))
+    statechart_executor.statechart.add_node(node=_node_arriving_at_once("second"))
     statechart_executor.tick()
 
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 def test_growing_does_not_restart_the_tick_count(
@@ -148,7 +156,7 @@ def test_growing_does_not_restart_the_tick_count(
     _compile_and_run_one_node(statechart_executor)
     ticks_before = statechart_executor.tick_count
 
-    statechart_executor.statechart.add_node(_node_arriving_at_once("second"))
+    statechart_executor.statechart.add_node(node=_node_arriving_at_once("second"))
 
     assert statechart_executor.tick_count == ticks_before
 
@@ -161,11 +169,14 @@ def test_the_history_of_an_added_node_starts_when_it_joined(
     recorded_before_joining = len(history)
     second = _node_arriving_at_once("second")
 
-    statechart_executor.statechart.add_node(second)
+    statechart_executor.statechart.add_node(node=second)
     statechart_executor.tick()
 
     recorded_since_joining = len(history) - recorded_before_joining
-    assert len(history.get_life_cycle_history_of_node(second)) == recorded_since_joining
+    assert (
+        len(history.get_life_cycle_history_of_node(node=second))
+        == recorded_since_joining
+    )
     assert second.start_time is not None
 
 
@@ -176,7 +187,7 @@ def test_a_history_item_reads_the_same_once_a_node_joined(
     recorded_before_joining = statechart_executor.statechart.state_history.latest_item
     representation_before_joining = repr(recorded_before_joining)
 
-    statechart_executor.statechart.add_node(_node_arriving_at_once("second"))
+    statechart_executor.statechart.add_node(node=_node_arriving_at_once("second"))
 
     assert repr(recorded_before_joining) == representation_before_joining
 
@@ -187,7 +198,7 @@ def test_an_added_composite_node_runs_its_children(
     _compile_and_run_one_node(statechart_executor)
     steps = [_node_arriving_at_once("step one"), _node_arriving_at_once("step two")]
 
-    statechart_executor.statechart.add_node(Sequence(nodes=steps))
+    statechart_executor.statechart.add_node(node=Sequence(nodes=steps))
 
     for step in steps:
         _tick_until_succeeded(statechart_executor, step)
@@ -203,7 +214,7 @@ def test_an_extension_is_told_apart_that_the_statechart_compiled_again(
     statechart_executor.extensions.append(telling_apart)
     _compile_and_run_one_node(statechart_executor)
 
-    statechart_executor.statechart.add_node(_node_arriving_at_once("second"))
+    statechart_executor.statechart.add_node(node=_node_arriving_at_once("second"))
 
     assert telling_apart.compile_count == 1
     assert telling_apart.recompile_count == 1
@@ -216,7 +227,7 @@ def test_an_extension_not_telling_them_apart_takes_a_recompile_as_a_compile(
     statechart_executor.extensions.append(counting)
     _compile_and_run_one_node(statechart_executor)
 
-    statechart_executor.statechart.add_node(_node_arriving_at_once("second"))
+    statechart_executor.statechart.add_node(node=_node_arriving_at_once("second"))
 
     assert counting.compile_count == 2
 
@@ -235,9 +246,9 @@ def test_nested_modifications_compile_once_when_the_outermost_one_ends(
 
     with statechart.modify():
         with statechart.modify():
-            statechart.add_node(_node_arriving_at_once("second"))
+            statechart.add_node(node=_node_arriving_at_once("second"))
         statechart.add_nodes(
-            [_node_arriving_at_once("third"), _node_arriving_at_once("fourth")]
+            nodes=[_node_arriving_at_once("third"), _node_arriving_at_once("fourth")]
         )
         assert counting.compile_count == compiles_before
 
@@ -250,68 +261,170 @@ def test_a_modification_on_a_statechart_not_compiled_yet_only_adds(
     statechart = Statechart(context=statechart_executor.context)
 
     with statechart.modify():
-        statechart.add_node(first := _node_arriving_at_once("first"))
+        statechart.add_node(node=(first := _node_arriving_at_once("first")))
 
     assert not statechart.compiler.is_compiled
-    statechart_executor.compile(statechart)
+    statechart_executor.compile(statechart=statechart)
     _tick_until_succeeded(statechart_executor, first)
 
 
-def test_an_abandoned_modification_leaves_the_statechart_as_it_was(
+# %% a modification that raises
+
+
+def test_an_abandoned_modification_keeps_what_it_changed(
     statechart_executor: StatechartExecutor,
 ) -> None:
-    first = _compile_and_run_one_node(statechart_executor)
+    """
+    Nothing the block changed is undone, so the node it added stays.
+    """
+    _compile_and_run_one_node(statechart_executor)
     statechart = statechart_executor.statechart
-    nodes_before = list(statechart.nodes)
+    second = _node_arriving_at_once("second")
 
     with pytest.raises(ModificationDeliberatelyFailed):
         with statechart.modify():
-            statechart.add_node(_node_arriving_at_once("second"))
+            statechart.add_node(node=second)
             raise ModificationDeliberatelyFailed()
 
-    assert statechart.nodes == nodes_before
-    statechart_executor.tick()
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert statechart.nodes[-1] is second
 
 
-def test_an_abandoned_inner_modification_keeps_the_outer_one_working(
+def test_an_abandoned_modification_compiles_nothing(
+    statechart_context: StatechartContext,
+) -> None:
+    """
+    A block that raised leaves the statechart compiled as it was before the block.
+    """
+    counting = ExtensionCountingCompiles()
+    executor = StatechartExecutor(context=statechart_context, extensions=[counting])
+    _compile_and_run_one_node(executor)
+    statechart = executor.statechart
+    compiles_before = counting.compile_count
+
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
+            raise ModificationDeliberatelyFailed()
+
+    assert counting.compile_count == compiles_before
+
+
+def test_a_modification_raising_before_it_changed_anything_leaves_the_statechart_usable(
     statechart_executor: StatechartExecutor,
 ) -> None:
+    """
+    Nothing is half changed, so the statechart grows and runs as before.
+    """
+    _compile_and_run_one_node(statechart_executor)
+    statechart = statechart_executor.statechart
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            raise ModificationDeliberatelyFailed()
+
+    statechart.add_node(node=(second := _node_arriving_at_once("second")))
+
+    _tick_until_succeeded(statechart_executor, second)
+
+
+def test_a_statechart_whose_modification_raised_refuses_to_tick(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The error names the one the block raised.
+    """
+    _compile_and_run_one_node(statechart_executor)
+    statechart = statechart_executor.statechart
+    with pytest.raises(ModificationDeliberatelyFailed) as raised:
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
+            raise ModificationDeliberatelyFailed()
+
+    with pytest.raises(StatechartBrokenByFailedModificationError) as broken:
+        statechart_executor.tick()
+
+    assert broken.value.modification_error is raised.value
+    assert broken.value.__cause__ is raised.value
+
+
+def test_a_statechart_whose_modification_raised_refuses_to_compile(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    A statechart that a block broke before its first compile never compiles.
+    """
+    statechart = Statechart(context=statechart_executor.context)
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
+            raise ModificationDeliberatelyFailed()
+
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        statechart_executor.compile(statechart=statechart)
+
+
+def test_a_statechart_whose_modification_raised_refuses_further_modifications(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    Adding a node opens a block, which a broken statechart refuses.
+    """
+    _compile_and_run_one_node(statechart_executor)
+    statechart = statechart_executor.statechart
+    with pytest.raises(ModificationDeliberatelyFailed):
+        with statechart.modify():
+            statechart.add_node(node=_node_arriving_at_once("kept"))
+            raise ModificationDeliberatelyFailed()
+
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        statechart.add_node(node=_node_arriving_at_once("rejected"))
+
+
+def test_an_outer_modification_raises_after_the_error_of_an_inner_one_was_caught(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    Catching the error of the inner block does not let the outer one end quietly.
+    """
     _compile_and_run_one_node(statechart_executor)
     statechart = statechart_executor.statechart
 
-    with statechart.modify():
-        with pytest.raises(ModificationDeliberatelyFailed):
-            with statechart.modify():
-                statechart.add_node(_node_arriving_at_once("dropped"))
-                raise ModificationDeliberatelyFailed()
-        statechart.add_node(kept := _node_arriving_at_once("kept"))
+    with pytest.raises(StatechartBrokenByFailedModificationError):
+        with statechart.modify():
+            with pytest.raises(ModificationDeliberatelyFailed):
+                with statechart.modify():
+                    statechart.add_node(node=_node_arriving_at_once("kept"))
+                    raise ModificationDeliberatelyFailed()
 
-    _tick_until_succeeded(statechart_executor, kept)
+
+# %% compiled composite nodes
 
 
 def test_a_compiled_composite_node_still_rejects_new_children(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(sequence := Sequence(nodes=[_node_arriving_at_once("first")]))
-    statechart_executor.compile(statechart)
+    statechart.add_node(
+        node=(sequence := Sequence(nodes=[_node_arriving_at_once("first")]))
+    )
+    statechart_executor.compile(statechart=statechart)
 
     with pytest.raises(StatechartAlreadyCompiledError):
-        sequence.add_node(_node_arriving_at_once("second"))
+        sequence.add_node(node=_node_arriving_at_once("second"))
 
 
 def test_a_child_a_compiled_composite_node_rejects_does_not_join_the_statechart(
     statechart_executor: StatechartExecutor,
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
-    statechart.add_node(sequence := Sequence(nodes=[_node_arriving_at_once("first")]))
-    statechart_executor.compile(statechart)
+    statechart.add_node(
+        node=(sequence := Sequence(nodes=[_node_arriving_at_once("first")]))
+    )
+    statechart_executor.compile(statechart=statechart)
     nodes_before = list(statechart.nodes)
     rejected = _node_arriving_at_once("rejected")
 
     with pytest.raises(StatechartAlreadyCompiledError):
-        sequence.add_node(rejected)
+        sequence.add_node(node=rejected)
 
     assert statechart.nodes == nodes_before
     assert not rejected.belongs_to_statechart()
@@ -322,10 +435,10 @@ def test_a_child_a_compiled_composite_node_rejects_does_not_become_its_child(
 ) -> None:
     statechart = Statechart(context=statechart_executor.context)
     first = _node_arriving_at_once("first")
-    statechart.add_node(sequence := Sequence(nodes=[first]))
-    statechart_executor.compile(statechart)
+    statechart.add_node(node=(sequence := Sequence(nodes=[first])))
+    statechart_executor.compile(statechart=statechart)
 
     with pytest.raises(StatechartAlreadyCompiledError):
-        sequence.add_node(_node_arriving_at_once("rejected"))
+        sequence.add_node(node=_node_arriving_at_once("rejected"))
 
     assert sequence.nodes == [first]

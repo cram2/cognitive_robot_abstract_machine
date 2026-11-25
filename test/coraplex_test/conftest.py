@@ -1,11 +1,19 @@
+"""
+Fixtures shared by the coraplex tests: robot contexts, arms, regions and a database.
+"""
+
+from __future__ import annotations
+
 # %% ORM interfaces
 
 # Built before the imports below, which read a mapped datastructure: pytest imports every
 # conftest of a run before calling any hook, so a hook would fire too late. The build runs
 # once per process and never on an xdist worker.
+from cognitive_robot_abstract_machine.orm_interfaces import OrmPackage
+
 from ..orm_interface_build import regenerate_orm_interfaces
 
-regenerate_orm_interfaces()
+regenerate_orm_interfaces(OrmPackage.CORAPLEX)
 
 
 from dataclasses import dataclass, field
@@ -35,10 +43,6 @@ from sqlalchemy.orm import sessionmaker
 from krrood.ormatic.utils import create_engine, drop_database
 
 try:
-    from coraplex.orm.ormatic_interface import Base
-except ImportError:
-    pass
-try:
     from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
         VizMarkerPublisher,
     )
@@ -54,6 +58,11 @@ from .world_snapshot import WorldSnapshot
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 
 from ..plan_running import expand, robot_extensions, statechart_of, world_of
+
+# Below the ORM build at the top of this module, which has to run first.
+from semantic_digital_twin.world_description.kinematic_chain import (  # noqa: E402
+    KinematicChain,
+)
 
 # %% the arm a test runs with on any robot
 
@@ -156,6 +165,12 @@ def hsr_apartment_context(hsr_apartment_world):
 
 @pytest.fixture(scope="function")
 def coraplex_testing_session():
+    """
+    :return: A session on an empty in-memory database holding coraplex's tables, which are
+        dropped again after the test.
+    """
+    from coraplex.orm.ormatic_interface import Base
+
     engine = create_engine("sqlite:///:memory:")
     session_maker = sessionmaker(engine)
     session = session_maker()
@@ -229,10 +244,12 @@ def tool_center_point_goal(
     :return: The goal moving that tool center point there.
     """
     return CartesianPose(
-        root_link=RobotAccess(robot).controlled_root,
-        tip_link=(
-            left_or_only_arm(robot) if arm is None else arm
-        ).end_effector.tool_frame,
+        kinematic_chain=KinematicChain(
+            root=RobotAccess(robot=robot).controlled_root,
+            tip=(
+                left_or_only_arm(robot) if arm is None else arm
+            ).end_effector.tool_frame,
+        ),
         goal_pose=(
             Pose(reference_frame=robot._world.root) if target is None else target
         ),
@@ -301,7 +318,9 @@ def physically_simulated_executor(
         counts its steps while the controller moves the world.
     """
     return PhysicallySimulatedPlanExecutor(
-        StatechartContext.with_extensions(world_of(extensions), extensions),
+        context=StatechartContext.with_extensions(
+            world=world_of(extensions), extensions=extensions
+        ),
         simulation=SimulationThatCountsItsSteps(),
         **options,
     )
@@ -317,3 +336,15 @@ def motion_nodes_in_physics_of(
     """
     statechart_of(physically_simulated_executor(extensions), plan)
     return [plan, *plan.descendants]
+
+
+# %% the ORM mappers the tests use
+
+
+@pytest.fixture(scope="session", autouse=True)
+def register_orm_mappers() -> None:
+    """
+    Load coraplex's ORM interface, whose import registers the mappers of it and the
+    interfaces it builds on for every test.
+    """
+    import coraplex.orm.ormatic_interface  # noqa: F401

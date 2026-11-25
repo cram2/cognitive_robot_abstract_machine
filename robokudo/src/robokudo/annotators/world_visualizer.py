@@ -6,6 +6,7 @@ This annotator visualizes predefined objects and regions from a world descriptor
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import numpy as np
@@ -17,10 +18,11 @@ import robokudo.annotators.core
 import robokudo.utils.annotator_helper
 import robokudo.utils.error_handling
 import robokudo.utils.o3d_helper
-import robokudo.world as rk_world
 from robokudo.cas import CASViews
 from robokudo.utils.region import region_obb_in_camera_coordinates
 from robokudo.world_descriptor import PredefinedObject
+
+logger = logging.getLogger(__name__)
 
 
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
@@ -57,9 +59,14 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
     def compute(self) -> py_trees.common.Status:
+        """
+        Visualize the bounding boxes of the world's bodies together with the point
+        cloud.
+
+        Overrides :meth:`ThreadedAnnotator.compute`.
+        """
         start_timer = default_timer()
         cloud = self.get_cas().get(CASViews.CLOUD)
-        runtime_world = rk_world.world_instance()
 
         try:
             world_to_camera_transform = (
@@ -68,13 +75,15 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 )
             )
         except KeyError as err:
-            self.rk_logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(
+                f"Couldn't find viewpoint in the common analysis structure: {err}"
+            )
             return py_trees.common.Status.FAILURE
 
         visualized_geometries = []
 
         if self.descriptor.parameters.visualize_objects:
-            predefined_objects = runtime_world.get_semantic_annotations_by_type(
+            predefined_objects = self.world.get_semantic_annotations_by_type(
                 PredefinedObject
             )
             for predefined_object in predefined_objects:
@@ -92,10 +101,10 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 visualized_geometries.append({"name": str(body.name), "geometry": obb})
 
         if self.descriptor.parameters.visualize_regions:
-            regions = runtime_world.get_kinematic_structure_entity_by_type(Region)
+            regions = self.world.get_kinematic_structure_entity_by_type(Region)
             for region in regions:
                 obb = region_obb_in_camera_coordinates(
-                    runtime_world, region, world_to_camera_transform
+                    self.world, region, world_to_camera_transform
                 )
                 visualized_geometries.append(
                     {"name": str(region.name), "geometry": obb}

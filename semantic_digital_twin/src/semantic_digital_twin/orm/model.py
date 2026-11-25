@@ -1,3 +1,10 @@
+"""
+The alternative mappings and column types semantic_digital_twin stores its
+non-dataclass types, such as the world and the spatial types, with.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from io import BytesIO
 from uuid import UUID
@@ -6,6 +13,7 @@ import numpy as np
 import trimesh
 import trimesh.exchange.stl
 from sqlalchemy import TypeDecorator, types
+from typing_extensions import Self
 
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from semantic_digital_twin.mixin import HasSimulatorProperties
@@ -22,6 +30,8 @@ from krrood_spatial_math.spatial_types import (
     Pose2D,
     AxisAngle,
     SpatialType,
+    Displacement,
+    ScrewAxis,
     Twist,
 )
 from semantic_digital_twin.world import World
@@ -40,6 +50,11 @@ from semantic_digital_twin.world_description.world_state import WorldState
 
 @dataclass(eq=False)
 class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
+    """
+    A world as ORMatic stores it: the modifications that build it again, its state and
+    its entities.
+    """
+
     kinematic_structure_entities: list[KinematicStructureEntity]
     connections: list[Connection]
     semantic_annotations: list[SemanticAnnotation]
@@ -66,7 +81,7 @@ class WorldMapping(HasSimulatorProperties, AlternativeMapping[World]):
 
         with result.modify_world():
             for modification_block in self.modification_history:
-                modification_block.apply(result)
+                modification_block.apply(world=result)
 
             result.state = self.state
             result.state._world = result
@@ -101,6 +116,11 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
 
 @dataclass(eq=False)
 class Vector3Mapping(AlternativeMapping[Vector3]):
+    """
+    The coordinates of a :class:`Vector3`, as they evaluate in the world's state when
+    it is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -109,7 +129,7 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Vector3):
-        x, y, z, _ = obj.to_np().tolist()
+        x, y, z, _ = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
@@ -121,6 +141,11 @@ class Vector3Mapping(AlternativeMapping[Vector3]):
 
 @dataclass(eq=False)
 class Point3Mapping(AlternativeMapping[Point3]):
+    """
+    The coordinates of a :class:`Point3`, as they evaluate in the world's state when it
+    is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -129,7 +154,7 @@ class Point3Mapping(AlternativeMapping[Point3]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Point3):
-        x, y, z, _ = float(obj.x), float(obj.y), float(obj.z), obj.reference_frame
+        x, y, z, _ = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
@@ -141,6 +166,11 @@ class Point3Mapping(AlternativeMapping[Point3]):
 
 @dataclass(eq=False)
 class QuaternionMapping(AlternativeMapping[Quaternion]):
+    """
+    The components of a :class:`Quaternion`, as they evaluate in the world's state when
+    it is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -150,7 +180,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Quaternion):
-        x, y, z, w = float(obj.x), float(obj.y), float(obj.z), float(obj.w)
+        x, y, z, w = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, w=w, reference_frame=obj.reference_frame)
         return result
 
@@ -166,6 +196,11 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
 @dataclass(eq=False)
 class AxisAngleMapping(AlternativeMapping[AxisAngle]):
+    """
+    The axis of an :class:`AxisAngle` and its angle, as the angle evaluates in the
+    world's state when it is stored, and the frame it is expressed in.
+    """
+
     axis: Vector3
     angle: float
     reference_frame: KinematicStructureEntity | None
@@ -173,7 +208,9 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
     @classmethod
     def from_domain_object(cls, *, obj: AxisAngle):
         return cls(
-            axis=obj.axis, angle=float(obj.angle), reference_frame=obj.reference_frame
+            axis=obj.axis,
+            angle=float(obj.angle.evaluate()[0]),
+            reference_frame=obj.reference_frame,
         )
 
     def to_domain_object(self) -> AxisAngle:
@@ -187,21 +224,21 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
 
 
 @dataclass(eq=False)
-class TwistMapping(AlternativeMapping[Twist]):
+class DisplacementMapping(AlternativeMapping[Displacement]):
     translation: Vector3
     rotation_vector: Vector3
     reference_frame: KinematicStructureEntity | None
 
     @classmethod
-    def from_domain_object(cls, *, obj: Twist):
+    def from_domain_object(cls, *, obj: Displacement):
         return cls(
             translation=obj.translation,
             rotation_vector=obj.rotation_vector,
             reference_frame=obj.reference_frame,
         )
 
-    def to_domain_object(self) -> Twist:
-        return Twist(
+    def to_domain_object(self) -> Displacement:
+        return Displacement(
             translation=self.translation,
             rotation_vector=self.rotation_vector,
             reference_frame=self.reference_frame,
@@ -209,6 +246,98 @@ class TwistMapping(AlternativeMapping[Twist]):
 
     @classmethod
     def required_pre_build_classes(cls) -> list[type]:
+        return [Vector3]
+
+
+@dataclass(eq=False, kw_only=True)
+class TwistMapping(AlternativeMapping[Twist]):
+    """
+    A :class:`Twist` stored as its two velocities and its reference frame.
+    """
+
+    angular_velocity: Vector3
+    """
+    The axis the body turns around, scaled by how fast it turns.
+    """
+
+    linear_velocity: Vector3
+    """
+    How fast the point of the body at the origin of the reference frame moves.
+    """
+
+    reference_frame: KinematicStructureEntity | None
+    """
+    The frame along whose axes both velocities are given.
+    """
+
+    @classmethod
+    def from_domain_object(cls, *, obj: Twist) -> Self:
+        return cls(
+            angular_velocity=obj.angular_velocity,
+            linear_velocity=obj.linear_velocity,
+            reference_frame=obj.reference_frame,
+        )
+
+    def to_domain_object(self) -> Twist:
+        return Twist(
+            angular_velocity=self.angular_velocity,
+            linear_velocity=self.linear_velocity,
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        """
+        Extends :meth:`AlternativeMapping.required_pre_build_classes` by the
+        :class:`Vector3` both vectors are stored as.
+        """
+        return [Vector3]
+
+
+@dataclass(eq=False, kw_only=True)
+class ScrewAxisMapping(AlternativeMapping[ScrewAxis]):
+    """
+    A :class:`ScrewAxis` stored as its rotation and translation per unit of position and
+    its reference frame.
+    """
+
+    rotation_per_unit_position: Vector3
+    """
+    The axis the body turns around, scaled by the angle it turns by per unit of position.
+    """
+
+    translation_per_unit_position: Vector3
+    """
+    How far the point of the body at the origin of the reference frame moves per unit of
+    position.
+    """
+
+    reference_frame: KinematicStructureEntity | None
+    """
+    The frame along whose axes both parts are given.
+    """
+
+    @classmethod
+    def from_domain_object(cls, *, obj: ScrewAxis) -> Self:
+        return cls(
+            rotation_per_unit_position=obj.rotation_per_unit_position,
+            translation_per_unit_position=obj.translation_per_unit_position,
+            reference_frame=obj.reference_frame,
+        )
+
+    def to_domain_object(self) -> ScrewAxis:
+        return ScrewAxis(
+            rotation_per_unit_position=self.rotation_per_unit_position,
+            translation_per_unit_position=self.translation_per_unit_position,
+            reference_frame=self.reference_frame,
+        )
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        """
+        Extends :meth:`AlternativeMapping.required_pre_build_classes` by the
+        :class:`Vector3` both vectors are stored as.
+        """
         return [Vector3]
 
 
@@ -318,6 +447,11 @@ class PoseMapping(AlternativeMapping[Pose]):
 
 @dataclass(eq=False)
 class Point2Mapping(AlternativeMapping[Point2]):
+    """
+    The coordinates of a :class:`Point2`, as they evaluate in the world's state when it
+    is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
 
@@ -325,9 +459,8 @@ class Point2Mapping(AlternativeMapping[Point2]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Point2):
-        result = cls(
-            x=float(obj.x), y=float(obj.y), reference_frame=obj.reference_frame
-        )
+        x, y = obj.evaluate().tolist()[:2]
+        result = cls(x=x, y=y, reference_frame=obj.reference_frame)
         return result
 
     def to_domain_object(self) -> Point2:
@@ -336,13 +469,18 @@ class Point2Mapping(AlternativeMapping[Point2]):
 
 @dataclass(eq=False)
 class Pose2DMapping(AlternativeMapping[Pose2D]):
+    """
+    The position of a :class:`Pose2D` and its yaw, as the yaw evaluates in the world's
+    state when it is stored, and the frame it is expressed in.
+    """
+
     position: Point2
     yaw: float
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
     @classmethod
     def from_domain_object(cls, *, obj: Pose2D):
-        result = cls(position=obj.position, yaw=float(obj.yaw))
+        result = cls(position=obj.position, yaw=float(obj.yaw.evaluate()[0]))
         result.reference_frame = obj.reference_frame
         return result
 

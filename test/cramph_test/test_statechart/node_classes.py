@@ -12,7 +12,7 @@ from cramph.node import StatechartNode
 # %% the node classes of some modules
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeClassesOfModules:
     """
     The dataclass statechart node classes some modules define.
@@ -32,7 +32,7 @@ class NodeClassesOfModules:
         module_names = tuple(module.__name__ for module in self.modules)
         return [
             node_class
-            for node_class in dict.fromkeys(self._subclasses(StatechartNode))
+            for node_class in dict.fromkeys(self._subclasses(node_class=StatechartNode))
             if node_class.__module__.startswith(module_names)
             and is_dataclass(node_class)
         ]
@@ -51,11 +51,11 @@ class NodeClassesOfModules:
             ):
                 importlib.import_module(module_info.name)
 
-    def _subclasses(self, node_class: type[StatechartNode]) -> Iterator[type]:
+    def _subclasses(self, *, node_class: type[StatechartNode]) -> Iterator[type]:
         """
         :return: Every direct and indirect subclass of `node_class`, once per path it
             inherits from `node_class` along.
         """
         for subclass in node_class.__subclasses__():
             yield subclass
-            yield from self._subclasses(subclass)
+            yield from self._subclasses(node_class=subclass)

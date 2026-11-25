@@ -1,6 +1,11 @@
+"""
+Tracking of detected objects across pipeline ticks with ByteTrack.
+"""
+
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 
 import numpy as np
@@ -17,6 +22,8 @@ from robokudo.types.scene import ObjectHypothesis
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ByteTrackAnnotator(BaseAnnotator):
@@ -64,7 +71,7 @@ class ByteTrackAnnotator(BaseAnnotator):
         data_ts = observation.timestamp_nanoseconds
         if data_ts < self.last_ts:
             # This is expected when looping data
-            self.rk_logger.debug("Time moved backward, resetting tracker.")
+            logger.debug("Time moved backward, resetting tracker.")
             self.tracker.reset()
         self.last_ts = data_ts
 
@@ -72,7 +79,7 @@ class ByteTrackAnnotator(BaseAnnotator):
             ObjectHypothesis
         )
         if len(object_hypotheses) == 0:
-            self.rk_logger.debug(
+            logger.debug(
                 f"{len(object_hypotheses)} object hypothesis found, nothing to do."
             )
             return Status.SUCCESS
@@ -84,8 +91,8 @@ class ByteTrackAnnotator(BaseAnnotator):
             ]
         )
         if len(rois_xyxy) == 0:
-            self.rk_logger.debug(
-                f"No ROI found in {len(object_hypotheses)} object hypothesis."
+            logger.debug(
+                f"No region of interest found in {len(object_hypotheses)} object hypothesis."
             )
             return Status.FAILURE
 
@@ -111,9 +118,7 @@ class ByteTrackAnnotator(BaseAnnotator):
                 restored_masks.append(restored_mask)
             detections["mask"] = np.array(restored_masks).astype(bool)
 
-            self.rk_logger.debug(
-                f"Using {len(restored_masks)} masks for object tracking."
-            )
+            logger.debug(f"Using {len(restored_masks)} masks for object tracking.")
 
         classifications: list[Classification] = []
         for object_hypothesis in object_hypotheses:
@@ -137,8 +142,8 @@ class ByteTrackAnnotator(BaseAnnotator):
                 detections["confidence"][i] = cls.confidence
                 detections["data"][CLASS_NAME_DATA_FIELD] = cls.classname
 
-            self.rk_logger.debug(
-                f"Using {len(object_hypotheses)} class ids for object tracking."
+            logger.debug(
+                f"Using {len(object_hypotheses)} class identifiers for object tracking."
             )
 
         detections = sv.Detections(**detections)

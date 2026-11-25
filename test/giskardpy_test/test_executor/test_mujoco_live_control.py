@@ -30,6 +30,7 @@ from semantic_digital_twin.robots.tracy import Tracy
 from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 pytestmark = [
     pytest.mark.skipif(
@@ -68,7 +69,9 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
     start = world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
     goal_point = Point3(start[0], start[1], start[2] + 0.15, reference_frame=world.root)
     reach = CartesianPosition(
-        name="reach", root_link=world.root, tip_link=tool_frame, goal_point=goal_point
+        name="reach",
+        kinematic_chain=KinematicChain(root=world.root, tip=tool_frame),
+        goal_point=goal_point,
     )
     controller_config = QPControllerConfig(target_frequency=control_frequency)
 
@@ -77,11 +80,11 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
     try:
         executor = StatechartExecutor(
             context=StatechartContext(world=world),
-            pacer=SteppedSimulationPacer(simulation),
+            pacer=SteppedSimulationPacer(simulation=simulation),
             extensions=[MotionControl(qp_controller_config=controller_config)],
         )
         motion_statechart = Statechart(context=executor.context)
-        motion_statechart.add_nodes([reach, EndMotion.when_true(reach)])
+        motion_statechart.add_nodes(nodes=[reach, EndMotion.when_true(node=reach)])
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end(timeout=tick_limit)
         simulation.step_simulation(timedelta(seconds=1))

@@ -19,11 +19,10 @@ from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
-from krrood.entity_query_language.backends import ProbabilisticBackend
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, and_, or_
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import GraspNotOnObjectError
-from semantic_digital_twin.orm.ormatic_interface import SurfaceGraspDAO  # noqa: F401
 from semantic_digital_twin.grasping.object_relative_grasp import (
     GraspResult,
     draw_grasps,
@@ -34,7 +33,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
-    Twist,
+    Displacement,
     Vector3,
 )
 from semantic_digital_twin.world import World
@@ -77,7 +76,7 @@ def grasp_frame(carton: Milk, surface_grasp: SurfaceGrasp) -> np.ndarray:
     """
     :return: The grasp frame of ``surface_grasp`` in the carton's own frame.
     """
-    return surface_grasp.grasp_candidate(carton).grasp_pose.to_np()
+    return surface_grasp.grasp_candidate(graspable=carton).grasp_pose.to_np()
 
 
 # %% grasps on the surface
@@ -138,11 +137,15 @@ def test_a_rolled_grasp_closes_along_a_turned_direction(carton):
 
 
 def test_a_point_above_the_object_is_not_on_its_surface(carton):
+    """
+    A grasp above the object lies off its surface, so no grasp candidate can be made from
+    it.
+    """
     above = SurfaceGrasp(yaw=0.0, height=1.5, depth=0.0, pitch=0.0, roll=0.0)
 
-    assert not above.reaches_surface_of(carton)
+    assert not above.reaches_surface_of(graspable=carton)
     with pytest.raises(GraspNotOnObjectError):
-        above.grasp_candidate(carton)
+        above.grasp_candidate(graspable=carton)
 
 
 # %% statements of where to grasp
@@ -249,19 +252,15 @@ fraction of the carton's height.
 """
 
 
-def small_twist(rng: np.random.Generator, rise: float) -> Twist:
+def small_displacement(rng: np.random.Generator, rise: float) -> Displacement:
     """
-    :param rise: How far the twist moves upwards, in meters.
-    :return: A twist that moves ``rise`` upwards while turning by a few degrees about a
+    :param rise: How far the displacement moves upwards, in meters.
+    :return: A displacement that moves ``rise`` upwards while turning by a few degrees about a
         random axis.
     """
-    rotation_vector = rng.normal(0.0, 0.05, 3)
-    return Twist.from_transformation(
-        HomogeneousTransformationMatrix.from_xyz_axis_angle(
-            z=rise,
-            axis=Vector3(*rotation_vector),
-            angle=float(np.linalg.norm(rotation_vector)),
-        )
+    return Displacement(
+        translation=Vector3(0.0, 0.0, rise),
+        rotation_vector=Vector3(*rng.normal(0.0, 0.05, 3)),
     )
 
 
@@ -278,8 +277,8 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
         grasp.result = GraspResult(
             object_raised=raised,
             motion_completed=True,
-            object_displacement=small_twist(rng, 0.2 if raised else 0.0),
-            slip=small_twist(rng, 0.0 if raised else -0.2),
+            object_displacement=small_displacement(rng, 0.2 if raised else 0.0),
+            slip=small_displacement(rng, 0.0 if raised else -0.2),
         )
     return RelationalCircuitRegistry(
         relational_probabilistic_circuit=RelationalProbabilisticCircuit(

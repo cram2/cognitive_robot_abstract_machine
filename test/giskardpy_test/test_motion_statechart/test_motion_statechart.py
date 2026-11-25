@@ -1,14 +1,20 @@
+"""
+Tests of motion statecharts: giskardpy's nodes run by a statechart executor with motion
+control.
+"""
+
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from giskardpy.data_types.exceptions import DuplicateNameException
+from giskardpy.exceptions import DuplicateNameException
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from cramph.data_types import (
-    LifeCycleValues,
-    ObservationStateValues,
+    LifeCycleValue,
+    ObservationStateValue,
 )
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.exceptions import (
@@ -63,6 +69,7 @@ from cramph.context import StatechartContext
 from cramph.exceptions import TickLimitReachedError
 from cramph.executor import StatechartExecutor
 from ..motion_control_context import add_to_statechart_with_motion_control
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% motion nodes in a statechart
 
@@ -90,8 +97,8 @@ def test_converging_task_without_error_signal_is_rejected():
     executor = _create_executor()
     statechart = Statechart(context=executor.context)
     task = _ConvergingTaskWithoutErrorSignal()
-    statechart.add_node(task)
-    statechart.add_node(EndMotion.when_true(task))
+    statechart.add_node(node=task)
+    statechart.add_node(node=EndMotion.when_true(node=task))
 
     with pytest.raises(MissingErrorSignalError):
         executor.compile(statechart=statechart)
@@ -108,12 +115,12 @@ def test_two_goals(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             JointPositionList(goal_state=JointState.from_mapping({torso_joint: 0.1})),
             local_min := LocalMinimumReached(),
         ]
     )
-    statechart.add_node(EndMotion.when_true(local_min))
+    statechart.add_node(node=EndMotion.when_true(node=local_min))
 
     executor.compile(statechart=statechart)
 
@@ -126,11 +133,13 @@ def test_two_goals(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_mapping({r_wrist_roll_joint: 1})
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_mapping({r_wrist_roll_joint: 1})
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(joint_goal))
+    statechart.add_node(node=EndMotion.when_true(node=joint_goal))
 
     executor.compile(statechart=statechart)
 
@@ -166,21 +175,23 @@ def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: W
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        combined := Parallel(
-            nodes=[
-                joint_goal := JointPositionList(
-                    goal_state=JointState.from_mapping({torso_joint: 1.0}),
-                ),
-                LocalMinimumReached(
-                    degrees_of_freedom=[torso_joint.raw_dof],
-                    minimum_time=0.2,
-                    measure_from_own_start=True,
-                ),
-            ],
-            minimum_success=1,
+        node=(
+            combined := Parallel(
+                nodes=[
+                    joint_goal := JointPositionList(
+                        goal_state=JointState.from_mapping({torso_joint: 1.0}),
+                    ),
+                    LocalMinimumReached(
+                        degrees_of_freedom=[torso_joint.raw_dof],
+                        minimum_time=0.2,
+                        measure_from_own_start=True,
+                    ),
+                ],
+                minimum_success=1,
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(combined))
+    statechart.add_node(node=EndMotion.when_true(node=combined))
 
     executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=1000)
@@ -190,7 +201,7 @@ def test_parallel_local_minimum_reached_tolerates_stall(pr2_world_state_reset: W
         "was capped far too low to traverse the distance within the timeout, "
         "this test is only meaningful if it stayed far away"
     )
-    assert statechart.observation_state[joint_goal] == ObservationStateValues.FALSE, (
+    assert statechart.observation_state[joint_goal] == ObservationStateValue.FALSE, (
         "the goal task's own observation must still mean 'goal reached' -- it must "
         "not be the thing that turned true here, only the surrounding Parallel"
     )
@@ -215,11 +226,13 @@ def test_joint_position_list_alone_times_out_on_stall(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        joint_goal := JointPositionList(
-            goal_state=JointState.from_mapping({torso_joint: 1.0}),
+        node=(
+            joint_goal := JointPositionList(
+                goal_state=JointState.from_mapping({torso_joint: 1.0}),
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(joint_goal))
+    statechart.add_node(node=EndMotion.when_true(node=joint_goal))
 
     executor.compile(statechart=statechart)
 
@@ -247,14 +260,14 @@ def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
     )
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             JointPositionList(goal_state=JointState.from_mapping({moving_joint: 2.0})),
             local_min := LocalMinimumReached(
                 degrees_of_freedom=[torso_joint.raw_dof], minimum_time=0.1
             ),
         ]
     )
-    statechart.add_node(EndMotion.when_true(local_min))
+    statechart.add_node(node=EndMotion.when_true(node=local_min))
 
     executor.compile(statechart=statechart)
 
@@ -265,7 +278,7 @@ def test_local_minimum_reached_only_depends_on_given_degrees_of_freedom(
     # "when did this specific monitor become true".
     for _ in range(10):
         executor.tick()
-    assert statechart.observation_state[local_min] == ObservationStateValues.TRUE, (
+    assert statechart.observation_state[local_min] == ObservationStateValue.TRUE, (
         "the scoped monitor should have settled almost immediately -- torso_joint "
         "never moves"
     )
@@ -302,17 +315,23 @@ def test_local_minimum_reached_raises_on_explicitly_empty_degrees_of_freedom(
 
 
 def test_long_goal(pr2_world_state_reset: World):
+    """
+    A PR2 base goal fifty meters away runs to its end beside a joint goal, printing the
+    time each tick took.
+    """
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
         extensions=[MotionControl()],
     )
     statechart = Statechart(context=executor.context)
     statechart.add_nodes(
-        [
+        nodes=[
             cart_goal := CartesianPose(
-                root_link=pr2_world_state_reset.root,
-                tip_link=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-                    "base_footprint"
+                kinematic_chain=KinematicChain(
+                    root=pr2_world_state_reset.root,
+                    tip=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+                        "base_footprint"
+                    ),
                 ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=50, reference_frame=pr2_world_state_reset.root
@@ -344,18 +363,22 @@ def test_long_goal(pr2_world_state_reset: World):
             ),
         ]
     )
-    statechart.add_node(EndMotion.when_true(cart_goal))
+    statechart.add_node(node=EndMotion.when_true(node=cart_goal))
 
     executor.compile(statechart=statechart)
     t = time.perf_counter()
-    executor.tick_until_end(1_000_000)
+    executor.tick_until_end(timeout=1_000_000)
     after = time.perf_counter()
     diff = after - t
     print(diff / executor.tick_count)
 
 
 class TestTemplates:
-    def test_hsr_cutting(self, hsr_world_state_reset: World, rclpy_node):
+    """
+    Motions built from reusable statechart templates.
+    """
+
+    def test_hsr_cutting(self, *, hsr_world_state_reset: World, rclpy_node):
         """
         The HSR cuts a loaf with a knife: down, up, then a sideways shift, repeated
         until five seconds have passed and paused while a human is close.
@@ -425,16 +448,14 @@ class TestTemplates:
         statechart = Statechart(context=executor.context)
         position_knife = CartesianPose(
             name="Position Knife",
-            root_link=map_link,
-            tip_link=knife,
+            kinematic_chain=KinematicChain(root=map_link, tip=knife),
             goal_pose=pre_cut_pose,
         )
         cut = Sequence(
             nodes=[
                 CartesianPose(
                     name="Down",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose(
                         position=Point3(x=-depth, reference_frame=knife),
                         reference_frame=knife,
@@ -442,8 +463,7 @@ class TestTemplates:
                 ),
                 CartesianPose(
                     name="Up",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose(
                         position=Point3(x=depth, reference_frame=knife),
                         reference_frame=knife,
@@ -451,8 +471,7 @@ class TestTemplates:
                 ),
                 CartesianPose(
                     name="Move Right",
-                    root_link=map_link,
-                    tip_link=knife,
+                    kinematic_chain=KinematicChain(root=map_link, tip=knife),
                     goal_pose=Pose(
                         position=Point3(y=right_shift, reference_frame=knife),
                         reference_frame=knife,
@@ -465,7 +484,9 @@ class TestTemplates:
         wait_for_human = CountTicks(name="Human Approaching", ticks=30)
         human_close = Pulse(name="Human Close?", length=50)
         done = CheckTickCount(name="Done?", threshold=200)
-        statechart.add_nodes([position_knife, cut, wait_for_human, human_close, done])
+        statechart.add_nodes(
+            nodes=[position_knife, cut, wait_for_human, human_close, done]
+        )
 
         position_knife.success_condition = position_knife.observes_true
         cut.start_condition = position_knife.is_succeeded
@@ -478,25 +499,31 @@ class TestTemplates:
         cut.pause_condition = human_close.observes_true
         # Each finished pass restarts the cut, until the five seconds are up.
         cut.reset_condition = done.observes_false
-        statechart.add_node(EndMotion.when_true(done))
+        statechart.add_node(node=EndMotion.when_true(node=done))
 
         executor.compile(statechart=statechart)
 
         executor.tick_until_end()
-        statechart.draw("/tmp/muh.pdf")
+        statechart.draw(file_name=Path("/tmp/muh.pdf"))
 
-        assert done.observation_state == ObservationStateValues.TRUE
-        cut_life_cycle = statechart.state_history.get_life_cycle_history_of_node(cut)
-        assert LifeCycleValues.PAUSED in cut_life_cycle
+        assert done.observation_state == ObservationStateValue.TRUE
+        cut_life_cycle = statechart.state_history.get_life_cycle_history_of_node(
+            node=cut
+        )
+        assert LifeCycleValue.PAUSED in cut_life_cycle
         restarts = sum(
             1
             for previous, current in zip(cut_life_cycle, cut_life_cycle[1:])
-            if current == LifeCycleValues.NOT_STARTED
-            and previous != LifeCycleValues.NOT_STARTED
+            if current == LifeCycleValue.NOT_STARTED
+            and previous != LifeCycleValue.NOT_STARTED
         )
         assert restarts >= 1
 
-    def test_parallel_with_tasks(self, pr2_world_state_reset: World):
+    def test_parallel_with_tasks(self, *, pr2_world_state_reset: World):
+        """
+        Two plane alignments of the PR2's right gripper run in one parallel until both
+        are reached.
+        """
         map = pr2_world_state_reset.root
         r_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
             "r_gripper_tool_frame"
@@ -507,24 +534,24 @@ class TestTemplates:
         )
         statechart = Statechart(context=executor.context)
         statechart.add_node(
-            parallel := Parallel(
-                nodes=[
-                    AlignPlanes(
-                        root_link=map,
-                        tip_link=r_tip,
-                        tip_normal=Vector3.X(reference_frame=r_tip),
-                        goal_normal=Vector3.X(reference_frame=map),
-                    ),
-                    AlignPlanes(
-                        root_link=map,
-                        tip_link=r_tip,
-                        tip_normal=Vector3.Y(reference_frame=r_tip),
-                        goal_normal=Vector3.Z(reference_frame=map),
-                    ),
-                ]
+            node=(
+                parallel := Parallel(
+                    nodes=[
+                        AlignPlanes(
+                            kinematic_chain=KinematicChain(root=map, tip=r_tip),
+                            tip_normal=Vector3.X(reference_frame=r_tip),
+                            reference_normal=Vector3.X(reference_frame=map),
+                        ),
+                        AlignPlanes(
+                            kinematic_chain=KinematicChain(root=map, tip=r_tip),
+                            tip_normal=Vector3.Y(reference_frame=r_tip),
+                            reference_normal=Vector3.Z(reference_frame=map),
+                        ),
+                    ]
+                )
             )
         )
-        statechart.add_node(EndMotion.when_true(parallel))
+        statechart.add_node(node=EndMotion.when_true(node=parallel))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -547,7 +574,7 @@ def test_constraint_collection(pr2_world_state_reset: World):
 
     expr = Vector3.X(tip).angle_between(Vector3.Y(root))
 
-    GeometricConstraintBuilder(col).add_point_goal_constraints(
+    GeometricConstraintBuilder(collection=col).add_point_goal_constraints(
         frame_P_current=Point3(0, 0, 0, reference_frame=tip),
         frame_P_goal=Point3(0, 0, 0, reference_frame=tip),
         cruise_velocity=0.1,
@@ -594,11 +621,11 @@ def test_constraint_collection(pr2_world_state_reset: World):
         task_expression=expr,
     )
 
-    col.merge("prefix", col2)
+    col.merge(name_prefix="prefix", other=col2)
     assert any(c.name.startswith("prefix/") for c in col._constraints)
 
     with pytest.raises(DuplicateNameException):
-        col.merge("", col2)
+        col.merge(name_prefix="", other=col2)
 
     col3 = ConstraintCollection()
     col3.add_equality_constraint(
@@ -627,11 +654,19 @@ def test_constraint_collection(pr2_world_state_reset: World):
         col3._are_names_unique()
 
     with pytest.raises(DuplicateNameException):
-        col2.merge("", col3)
+        col2.merge(name_prefix="", other=col3)
 
 
 class TestMaxManipulability:
-    def test_MaxManipulability(self, pr2_world_state_reset: World) -> None:
+    """
+    Maximizing manipulability beside another goal.
+    """
+
+    def test_MaxManipulability(self, *, pr2_world_state_reset: World) -> None:
+        """
+        Maximizing manipulability until a pose goal of the PR2's right gripper is
+        reached still brings the gripper to that pose.
+        """
         root = pr2_world_state_reset.get_body_by_name("base_footprint")
         tip = pr2_world_state_reset.get_body_by_name("r_gripper_tool_frame")
 
@@ -644,18 +679,19 @@ class TestMaxManipulability:
         )
         statechart = Statechart(context=executor.context)
         cart_goal = CartesianPose(
-            root_link=pr2_world_state_reset.root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=pr2_world_state_reset.root, tip=tip),
             goal_pose=goal_pose,
         )
         statechart.add_nodes(
-            [
+            nodes=[
                 cart_goal,
-                manipulability := MaxManipulability(root_link=root, tip_link=tip),
+                manipulability := MaxManipulability(
+                    kinematic_chain=KinematicChain(root=root, tip=tip)
+                ),
             ]
         )
         manipulability.interrupt_condition = cart_goal.observes_true
-        statechart.add_node(EndMotion.when_true(cart_goal))
+        statechart.add_node(node=EndMotion.when_true(node=cart_goal))
 
         executor.compile(statechart=statechart)
         executor.tick_until_end()
@@ -663,4 +699,4 @@ class TestMaxManipulability:
         fk = pr2_world_state_reset.compute_forward_kinematics_np(
             pr2_world_state_reset.root, tip
         )
-        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.translation_threshold)
+        assert np.allclose(fk, goal_pose.to_np(), atol=cart_goal.position_threshold)

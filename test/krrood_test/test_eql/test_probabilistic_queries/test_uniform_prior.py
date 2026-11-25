@@ -6,8 +6,13 @@ import pytest
 from random_events.interval import closed
 from random_events.product_algebra import SimpleEvent
 
-from krrood.entity_query_language.backends import ProbabilisticBackend
-from krrood.entity_query_language.factories import a, and_, distribution_of, or_
+from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
+from krrood.entity_query_language.factories import (
+    a,
+    and_,
+    or_,
+)
+from krrood.entity_query_language.factories import distribution_of
 from krrood.parametrization.exceptions import UnboundedParameterError
 from krrood.parametrization.model_registries import UniformPriorRegistry
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (

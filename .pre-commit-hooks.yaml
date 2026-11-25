@@ -1,4 +1,4 @@
-# Hooks for krrood's development tools (krrood/src/krrood/development_tools). They run the
+# Hooks for krrood's development tools (krrood/krrood-development-tools/src/krrood/development_tools). They run the
 # installed `krrood` command, so the repository using them installs
 # `krrood[development-tools]` in its development environment; see
 # krrood/doc/development_tools.md.
@@ -26,6 +26,16 @@
   description: >
     Generates the SKILL.md of every skill the repository declares in agent_skills.py.
   entry: krrood skills
+  language: system
+  pass_filenames: false
+  always_run: true
+
+- id: krrood-issue-forms
+  name: Update the generated issue forms
+  description: >
+    Generates the .github/ISSUE_TEMPLATE file of every issue form krrood ships and
+    the repository declares in issue_forms.py.
+  entry: krrood issue-forms
   language: system
   pass_filenames: false
   always_run: true

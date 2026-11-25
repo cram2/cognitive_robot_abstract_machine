@@ -5,7 +5,7 @@ copy of it, see :mod:`giskardpy.middleware.ros2.child_choices`, without a ROS gr
 
 from __future__ import annotations
 
-from cramph.data_types import StatechartPayloadKey
+from cramph.reported_statechart import ReportedStatechart, StatechartPayloadKey
 import json
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -21,12 +21,11 @@ from cramph.composites import (
     Sequence,
 )
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues, ObservationStateValues
+from cramph.data_types import LifeCycleValue, ObservationStateValue
 from cramph.executor import StatechartExecutor
 from cramph.monitors import CountTicks
 from cramph.node import StatechartNode
 from cramph.nodes_for_testing import NodeSucceedingOnObservingTrue
-from cramph.reported_statechart import ReportedStatechart
 from cramph.statechart import Statechart
 from giskardpy.middleware.ros2.child_choices import (
     ChildChoiceClient,
@@ -45,7 +44,7 @@ from giskardpy.middleware.ros2.world_updates import (
     ClientWorldUpdates,
     OutgoingWorldUpdates,
 )
-from semantic_digital_twin.adapters.ros.messages import MetaData, StreamPosition
+from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.world import World
 
 from .test_client_presence import SteppingClock
@@ -55,7 +54,7 @@ from .test_world_updates import PublishingSynchronizerMimic
 # %% mimics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionServerRunningOneGoal:
     """
     Stands in for the action server while one goal runs.
@@ -71,11 +70,11 @@ class ActionServerRunningOneGoal:
     Every feedback message that was sent.
     """
 
-    def send_feedback(self, message: Any) -> None:
+    def send_feedback(self, *, message: Any) -> None:
         self.sent_feedback.append(message)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUpdatesCaughtUpOnDemand:
     """
     Stands in for the incoming world updates, catching up with a client when told to.
@@ -86,11 +85,11 @@ class WorldUpdatesCaughtUpOnDemand:
     Whether every position asked about counts as applied.
     """
 
-    def has_applied(self, position: StreamPosition) -> bool:
+    def has_applied(self, *, position: StreamPosition) -> bool:
         return self.caught_up
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserGivingAFreshChild(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Gives every node that asks a new child that succeeds on the tick after it starts.
@@ -102,13 +101,13 @@ class ChooserGivingAFreshChild(ChildChooser[CompositeNodeChoosingItsChild]):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         self.given_children += 1
         return _node_succeeding_at_once(f"child {self.given_children}")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserGivingUpOnItsFirstChild(ChooserGivingAFreshChild):
     """
     Gives a child that never ends on its own first, with a failure monitor giving up on
@@ -116,17 +115,18 @@ class ChooserGivingUpOnItsFirstChild(ChooserGivingAFreshChild):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         if self.given_children > 0:
-            return super().choose_child(node)
+            return super().choose_child(node=node)
         self.given_children += 1
         return NodeSucceedingOnObservingTrue(
-            name="undecided", observation=ObservationStateValues.UNKNOWN
+            name="undecided", observation=ObservationStateValue.UNKNOWN
         )
 
     def failure_monitors_for(
         self,
+        *,
         node: CompositeNodeChoosingItsChild,
         child: StatechartNode,
     ) -> list[StatechartNode]:
@@ -135,7 +135,7 @@ class ChooserGivingUpOnItsFirstChild(ChooserGivingAFreshChild):
         return [CountTicks(name="timeout", ticks=2)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserHandingOverOneChild(ChildChooser[CompositeNodeChoosingItsChild]):
     """
     Gives the one child it was prepared with, with the failure monitors prepared for it.
@@ -152,19 +152,20 @@ class ChooserHandingOverOneChild(ChildChooser[CompositeNodeChoosingItsChild]):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         return self.child
 
     def failure_monitors_for(
         self,
+        *,
         node: CompositeNodeChoosingItsChild,
         child: StatechartNode,
     ) -> list[StatechartNode]:
         return self.failure_monitors
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserGivingAParallelOfBranchesThatChose(ChooserGivingAFreshChild):
     """
     Gives the node starting first a parallel of choosing nodes, each of which chose its
@@ -190,10 +191,10 @@ class ChooserGivingAParallelOfBranchesThatChose(ChooserGivingAFreshChild):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         if node.name != "starting first":
-            return super().choose_child(node)
+            return super().choose_child(node=node)
         branches = [
             CompositeNodeChoosingItsChild(name=f"branch {position}")
             for position in range(len(self.first_children))
@@ -202,6 +203,7 @@ class ChooserGivingAParallelOfBranchesThatChose(ChooserGivingAFreshChild):
 
     def prepare_chosen_child(
         self,
+        *,
         node: CompositeNodeChoosingItsChild,
         child: StatechartNode,
     ) -> None:
@@ -214,7 +216,7 @@ class ChooserGivingAParallelOfBranchesThatChose(ChooserGivingAFreshChild):
             self.failure_monitors_of_first_children,
         ):
             branch.choose_child_with(
-                ChooserHandingOverOneChild(
+                chooser=ChooserHandingOverOneChild(
                     child=first_child, failure_monitors=failure_monitors
                 )
             )
@@ -228,11 +230,11 @@ def _node_succeeding_at_once(name: str) -> NodeSucceedingOnObservingTrue:
     :return: A node that succeeds on the tick after it starts.
     """
     return NodeSucceedingOnObservingTrue(
-        name=name, observation=ObservationStateValues.TRUE
+        name=name, observation=ObservationStateValue.TRUE
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TwoChoosingNodes:
     """
     A statechart in which the choosing node with the higher index starts first.
@@ -259,7 +261,7 @@ class TwoChoosingNodes:
     """
 
     @classmethod
-    def in_context(cls, context: StatechartContext) -> TwoChoosingNodes:
+    def in_context(cls, *, context: StatechartContext) -> TwoChoosingNodes:
         """
         :param context: The context the statechart is built in.
         """
@@ -267,7 +269,7 @@ class TwoChoosingNodes:
         starting_late = CompositeNodeChoosingItsChild(name="starting late")
         starting_first = CompositeNodeChoosingItsChild(name="starting first")
         delay = _node_succeeding_at_once("delay")
-        statechart.add_nodes([starting_late, starting_first, delay])
+        statechart.add_nodes(nodes=[starting_late, starting_first, delay])
         starting_late.start_condition = delay.is_succeeded
         return cls(
             statechart=statechart,
@@ -277,7 +279,7 @@ class TwoChoosingNodes:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClientAndRunningStatechart:
     """
     A client holding a copy of a statechart that runs elsewhere, and the two ends of the
@@ -355,14 +357,18 @@ class ClientAndRunningStatechart:
     """
 
     def __post_init__(self) -> None:
+        """
+        Wire the chooser that takes the client's choices into the running statechart,
+        and connect the feedback to the action server mimic.
+        """
         self.receiving_chooser = ChildSentByClient(
             world_updates=self.world_updates, action_server=self.action_server
         )
         self.executor = StatechartExecutor(context=StatechartContext(world=World()))
         self.executor.context.add_extension(
-            ChildChooserAccess(choosers=[self.receiving_chooser])
+            extension=ChildChooserAccess(choosers=[self.receiving_chooser])
         )
-        self.running = TwoChoosingNodes.in_context(self.executor.context)
+        self.running = TwoChoosingNodes.in_context(context=self.executor.context)
         self.outgoing_world_updates = OutgoingWorldUpdates(
             world_synchronizer=self.running_side_publications
         )
@@ -373,14 +379,17 @@ class ClientAndRunningStatechart:
         )
 
         client_context = StatechartContext(world=World())
-        client_context.add_extension(ChildChooserAccess(choosers=[self.client_chooser]))
-        self.copy = TwoChoosingNodes.in_context(client_context)
+        client_context.add_extension(
+            extension=ChildChooserAccess(choosers=[self.client_chooser])
+        )
+        self.copy = TwoChoosingNodes.in_context(context=client_context)
         self.client = ChildChoiceClient(
             statechart=self.copy.statechart,
             child_chooser_access=ChildChooserAccess(choosers=[self.client_chooser]),
             world_updates=self.client_world_updates,
             required_position=StreamPosition(
-                origin=MetaData(node_name="client", process_id=0), sequence_number=1
+                origin=MessageOrigin(sender=Sender(node_name="client", process_id=0)),
+                sequence_number=1,
             ),
         )
 
@@ -389,7 +398,7 @@ class ClientAndRunningStatechart:
         Accept the running statechart as a goal and compile it, which starts it.
         """
         self.outgoing_world_updates.start_goal()
-        self.executor.compile(self.running.statechart)
+        self.executor.compile(statechart=self.running.statechart)
 
     def let_the_client_catch_up(self) -> None:
         """
@@ -410,10 +419,10 @@ class ClientAndRunningStatechart:
         feedback[StatechartPayloadKey.GOAL_ID] = self.action_server.goal_id
         sent_choices = [
             ChildChoiceMessage.from_json(data=json.loads(json.dumps(choice.to_json())))
-            for choice in self.client.answer(json.loads(json.dumps(feedback)))
+            for choice in self.client.answer(feedback=json.loads(json.dumps(feedback)))
         ]
         for choice in sent_choices:
-            self.receiving_chooser.receive(choice)
+            self.receiving_chooser.receive(message=choice)
         return sent_choices
 
     def let_both_nodes_be_answered_before_any_choice_is_taken(self) -> None:
@@ -480,7 +489,9 @@ def test_a_choice_made_later_waits_for_the_one_made_before_it(
 ) -> None:
     exchange.let_both_nodes_be_answered_before_any_choice_is_taken()
 
-    assert not exchange.receiving_chooser.has_choice_for(exchange.running.starting_late)
+    assert not exchange.receiving_chooser.has_choice_for(
+        node=exchange.running.starting_late
+    )
 
 
 # %% a choice out of step is still rejected
@@ -491,7 +502,7 @@ def test_a_choice_skipping_nodes_the_statechart_never_got_is_rejected(
 ) -> None:
     waiting_node = exchange.running.starting_first
     exchange.receiving_chooser.receive(
-        ChildChoiceMessage(
+        message=ChildChoiceMessage(
             goal_id=exchange.action_server.goal_id,
             node_index=waiting_node.index,
             first_node_index=len(exchange.running.statechart.nodes) + 1,
@@ -511,7 +522,7 @@ def test_a_choice_made_after_one_whose_node_ended_untaken_is_rejected(
     ended_node.interrupt_condition = exchange.running.delay.is_succeeded
     exchange.start()
     exchange.let_both_nodes_be_answered_before_any_choice_is_taken()
-    assert ended_node.life_cycle_state == LifeCycleValues.INTERRUPTED
+    assert ended_node.life_cycle_state == LifeCycleValue.INTERRUPTED
 
     with pytest.raises(StatechartOutOfStepError):
         exchange.executor.tick()
@@ -534,9 +545,9 @@ def test_the_running_side_gives_up_on_a_child_the_client_handed_failure_monitors
 
     choosing_node = exchange.running.starting_first
     undecided, succeeding = choosing_node.chosen_children
-    assert undecided.life_cycle_state == LifeCycleValues.FAILED
+    assert undecided.life_cycle_state == LifeCycleValue.FAILED
     assert [monitor.name for monitor in choosing_node.failure_reasons] == ["timeout"]
-    assert succeeding.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert succeeding.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% the client chooses on the changes the running side published
@@ -602,7 +613,7 @@ def test_a_client_catching_up_just_behind_the_running_side_keeps_waiting(
         exchange.running_side_publications.publish_one_update()
         assert exchange.let_the_client_answer() == []
         exchange.let_the_client_catch_up()
-        clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+        clock.advance(seconds=exchange.client_world_updates.timeout.total_seconds() / 2)
 
     [answer] = exchange.let_the_client_answer()
 
@@ -617,10 +628,10 @@ def test_a_change_that_never_reaches_the_client_is_reported_while_later_ones_fol
     exchange.running_side_publications.publish_one_update()
     lost_change = exchange.running_side_publications.published_sequence_number
     exchange.let_the_client_answer()
-    clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+    clock.advance(seconds=exchange.client_world_updates.timeout.total_seconds() / 2)
     exchange.running_side_publications.publish_one_update()
     exchange.let_the_client_answer()
-    clock.advance(exchange.client_world_updates.timeout.total_seconds() / 2)
+    clock.advance(seconds=exchange.client_world_updates.timeout.total_seconds() / 2)
     exchange.running_side_publications.publish_one_update()
 
     with pytest.raises(GiskardWorldUpdateNotReceivedError) as raised:
@@ -675,9 +686,14 @@ def test_the_running_side_asks_again_only_once_the_repeat_period_passed(
 # %% the statechart rebuilt from the feedback
 
 
-def test_the_statechart_rebuilt_from_the_feedback_holds_the_children_that_joined(
-    exchange: ClientAndRunningStatechart,
-) -> None:
+def statechart_rebuilt_from_the_feedback(
+    *, exchange: ClientAndRunningStatechart
+) -> Statechart:
+    """
+    Reports the structure, lets both nodes take their child and reports again.
+
+    :return: The statechart rebuilt from every feedback sent.
+    """
     exchange.feedback_publisher.publish_structure()
     exchange.let_both_nodes_be_answered_before_any_choice_is_taken()
     exchange.executor.tick()
@@ -686,10 +702,38 @@ def test_the_statechart_rebuilt_from_the_feedback_holds_the_children_that_joined
 
     reported_statechart = ReportedStatechart()
     for message in exchange.action_server.sent_feedback:
-        reported_statechart.take_over(json.loads(message.feedback))
+        reported_statechart.take_over(payload=json.loads(message.feedback))
+    return reported_statechart.statechart
 
-    assert [node.name for node in reported_statechart.statechart.nodes] == [
+
+def test_the_statechart_rebuilt_from_the_feedback_holds_the_children_that_joined(
+    exchange: ClientAndRunningStatechart,
+) -> None:
+    """
+    The children both nodes took join the rebuilt statechart in the same order.
+    """
+    rebuilt_statechart = statechart_rebuilt_from_the_feedback(exchange=exchange)
+
+    assert [node.name for node in rebuilt_statechart.nodes] == [
         node.name for node in exchange.running.statechart.nodes
+    ]
+
+
+def test_the_statechart_rebuilt_from_the_feedback_reads_the_conditions_of_the_running_one(
+    exchange: ClientAndRunningStatechart,
+) -> None:
+    """
+    Taking a child also changes the conditions of nodes that joined before it, such as
+    the node that took it.
+    """
+    rebuilt_statechart = statechart_rebuilt_from_the_feedback(exchange=exchange)
+
+    assert [
+        [str(condition) for condition in node.conditions]
+        for node in rebuilt_statechart.nodes
+    ] == [
+        [str(condition) for condition in node.conditions]
+        for node in exchange.running.statechart.nodes
     ]
 
 
@@ -698,11 +742,11 @@ def test_the_running_side_repeats_nothing_while_no_node_waits_for_a_child() -> N
     executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
     statechart.add_node(
-        NodeSucceedingOnObservingTrue(
-            name="undecided", observation=ObservationStateValues.UNKNOWN
+        node=NodeSucceedingOnObservingTrue(
+            name="undecided", observation=ObservationStateValue.UNKNOWN
         )
     )
-    executor.compile(statechart)
+    executor.compile(statechart=statechart)
     feedback_publisher = ActionFeedbackPublisher(
         executor=executor,
         action_server=action_server,
@@ -734,7 +778,7 @@ def _run_reporting_the_waiting_nodes(
     for _ in range(ticks):
         feedback = exchange.feedback_publisher.create_states()
         reported |= {
-            exchange.running.statechart.get_node_by_index(int(index)).name
+            exchange.running.statechart.get_node_by_index(index=int(index)).name
             for index in feedback[MotionStatechartPayloadKey.WAITING_FOR_CHILD]
         }
         exchange.let_the_client_answer()
@@ -770,7 +814,7 @@ def test_branches_that_chose_before_they_were_sent_start_together_unasked() -> N
     assert reported.isdisjoint(branch.name for branch in branches)
     history = exchange.running.statechart.state_history
     start_ticks = {
-        history.get_current_run_ticks_of_node(branch.latest_child).start_tick
+        history.get_current_run_ticks_of_node(node=branch.latest_child).start_tick
         for branch in branches
     }
     assert len(start_ticks) == 1
@@ -780,7 +824,7 @@ def test_only_the_branch_whose_child_failed_waits_for_a_new_one() -> None:
     chooser = ChooserGivingAParallelOfBranchesThatChose(
         first_children=[
             NodeSucceedingOnObservingTrue(
-                name="undecided", observation=ObservationStateValues.UNKNOWN
+                name="undecided", observation=ObservationStateValue.UNKNOWN
             ),
             _node_succeeding_at_once("first child of branch 1"),
         ],
@@ -798,14 +842,14 @@ def test_only_the_branch_whose_child_failed_waits_for_a_new_one() -> None:
     undecided, chosen_again = failed_branch.chosen_children
     assert "branch 0" in reported
     assert "branch 1" not in reported
-    assert undecided.life_cycle_state == LifeCycleValues.FAILED
-    assert chosen_again.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert undecided.life_cycle_state == LifeCycleValue.FAILED
+    assert chosen_again.life_cycle_state == LifeCycleValue.SUCCEEDED
 
 
 # %% one choice handing the branches beside it their children
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChooserGroundingTheBranchesTogether(ChooserGivingAFreshChild):
     """
     Gives the node starting first a parallel of choosing branches that have chosen
@@ -833,7 +877,7 @@ class ChooserGroundingTheBranchesTogether(ChooserGivingAFreshChild):
     """
 
     def choose_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         self.asked_nodes.append(node.name)
         if node.name == "starting first":
@@ -843,7 +887,7 @@ class ChooserGroundingTheBranchesTogether(ChooserGivingAFreshChild):
             ]
             return Sequence(nodes=[Parallel(nodes=branches)])
         if node.name != "branch 0":
-            return super().choose_child(node)
+            return super().choose_child(node=node)
         _, *other_branches = node.parent_node.nodes
         for branch, child, failure_monitors in zip(
             other_branches,
@@ -852,7 +896,7 @@ class ChooserGroundingTheBranchesTogether(ChooserGivingAFreshChild):
         ):
             if branch.latest_child is None:
                 branch.choose_child_with(
-                    ChooserHandingOverOneChild(
+                    chooser=ChooserHandingOverOneChild(
                         child=child, failure_monitors=failure_monitors
                     )
                 )
@@ -870,7 +914,7 @@ def test_a_branch_handed_its_child_by_another_choice_runs_it_unasked() -> None:
     assert [child.name for child in handed.chosen_children] == [
         child.name for child in chooser.children_of_the_other_branches
     ]
-    assert handed.latest_child.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert handed.latest_child.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert "branch 1" not in chooser.asked_nodes
 
 
@@ -887,7 +931,7 @@ def test_a_branch_handed_its_child_starts_it_with_the_child_of_the_branch_that_a
     history = exchange.running.statechart.state_history
     start_ticks = {
         history.get_current_run_ticks_of_node(
-            _running_node_named(exchange, f"branch {position}").latest_child
+            node=_running_node_named(exchange, f"branch {position}").latest_child
         ).start_tick
         for position in range(2)
     }
@@ -898,7 +942,7 @@ def test_only_the_handed_branch_whose_child_failed_waits_for_a_new_one() -> None
     chooser = ChooserGroundingTheBranchesTogether(
         children_of_the_other_branches=[
             NodeSucceedingOnObservingTrue(
-                name="undecided", observation=ObservationStateValues.UNKNOWN
+                name="undecided", observation=ObservationStateValue.UNKNOWN
             )
         ],
         failure_monitors_of_the_other_branches=[[CountTicks(name="timeout", ticks=2)]],
@@ -912,5 +956,5 @@ def test_only_the_handed_branch_whose_child_failed_waits_for_a_new_one() -> None
     undecided, chosen_again = handed.chosen_children
     assert chooser.asked_nodes.count("branch 1") == 1
     assert chooser.asked_nodes.count("branch 0") == 1
-    assert undecided.life_cycle_state == LifeCycleValues.FAILED
-    assert chosen_again.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert undecided.life_cycle_state == LifeCycleValue.FAILED
+    assert chosen_again.life_cycle_state == LifeCycleValue.SUCCEEDED

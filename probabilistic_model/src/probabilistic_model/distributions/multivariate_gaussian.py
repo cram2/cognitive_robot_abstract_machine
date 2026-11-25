@@ -1,3 +1,7 @@
+"""
+The multivariate Gaussian distribution over several continuous variables.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -232,7 +236,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
 
     # %% density and probability
 
-    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
+    def log_likelihood(self, *, events: npt.NDArray) -> npt.NDArray:
         return np.atleast_1d(self.scipy_distribution.logpdf(events))
 
     def cumulative_distribution_function(self, events: npt.NDArray) -> npt.NDArray:
@@ -283,7 +287,9 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
                 for variable, value in zip(self.variables, self.mean)
             }
         ).as_composite_set()
-        return LogMode(mode, float(self.log_likelihood(self.mean.reshape(1, -1))[0]))
+        return LogMode(
+            mode, float(self.log_likelihood(events=self.mean.reshape(1, -1))[0])
+        )
 
     # %% reading fewer variables
 
@@ -342,7 +348,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
         fixed_at = np.array([float(point[variable]) for variable in point])
         log_density = float(
             self._marginal_over_variable_indices(fixed_indices).log_likelihood(
-                fixed_at.reshape(1, -1)
+                events=fixed_at.reshape(1, -1)
             )[0]
         )
 
@@ -464,7 +470,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
 
     # %% translation and scaling
 
-    def apply_translation(self, translation: dict[Variable, float]):
+    def apply_translation(self, *, translation: dict[Variable, float]) -> None:
         """
         Move the mean, leaving the covariance as it is.
 
@@ -474,7 +480,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
         for index, variable in enumerate(self.variables):
             self.mean[index] += translation.get(variable, 0.0)
 
-    def apply_scaling(self, scaling: dict[Variable, float]):
+    def apply_scaling(self, *, scaling: dict[Variable, float]) -> None:
         """
         Scale the variables, which scales the mean once and the covariance once per
         variable it relates.

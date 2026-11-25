@@ -14,6 +14,7 @@ import pytest
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo
+from semantic_digital_twin.world import World
 
 from robokudo.cas import CAS, CASViews
 from robokudo.descriptors.camera_configs.config_stereo import StereoCameraConfig
@@ -72,7 +73,7 @@ def test_rectified_depth_uses_projection_and_millimeters(
     original = deepcopy(stereo_frame.calibration)
     interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
     cas = CAS()
-    assert interface.set_data(cas) is True
+    assert interface.set_data(cas=cas, world=World()) is True
     np.testing.assert_array_equal(
         cas.get(CASViews.DEPTH_IMAGE), [[1500, 0, 0], [0, 0, 0]]
     )
@@ -123,7 +124,7 @@ def test_rectified_depth_records_configured_static_pose(
     interface = RectifiedDepthCameraInterface(camera_config=configuration, node=node)
     interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
     cas = CAS()
-    assert interface.set_data(cas) is True
+    assert interface.set_data(cas=cas, world=World()) is True
     observation = cas.camera_observation
     np.testing.assert_array_equal(
         observation.world_T_camera, configuration.static_world_T_camera
@@ -176,7 +177,7 @@ def test_rectified_depth_accepts_old_acquisition(
     interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
     assert interface.has_new_data() is True
     cas = CAS()
-    assert interface.set_data(cas) is True
+    assert interface.set_data(cas=cas, world=World()) is True
     assert cas.camera_observation.timestamp_nanoseconds == Time().nanoseconds
 
 
@@ -197,7 +198,7 @@ def test_rectified_depth_accepts_delayed_consumption(
     )
     monkeypatch.setattr(node, "get_clock", lambda: clock)
     cas = CAS()
-    assert interface.set_data(cas) is True
+    assert interface.set_data(cas=cas, world=World()) is True
     assert cas.camera_observation.timestamp_nanoseconds == interface.last_timestamp
     assert interface.pending_frame is None
 
@@ -214,8 +215,10 @@ def test_rectified_depth_waits_for_acquisition_transform(
     lookup = Mock(return_value=False)
     monkeypatch.setattr(interface, "lookup_transform", lookup)
     interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
-    assert interface.set_data(CAS()) is False
-    lookup.assert_called_once_with(Time.from_msg(stereo_frame.images.header.stamp))
+    assert interface.set_data(cas=CAS(), world=World()) is False
+    lookup.assert_called_once_with(
+        timestamp=Time.from_msg(stereo_frame.images.header.stamp)
+    )
     assert interface.statistics.missing_transforms == 1
 
 

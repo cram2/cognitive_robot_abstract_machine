@@ -1,0 +1,197 @@
+"""
+Alternative mappings, which store a class through another class.
+"""
+
+from __future__ import annotations
+
+import abc
+import importlib
+from collections.abc import Callable
+from dataclasses import dataclass
+from types import FunctionType
+
+
+from typing_extensions import Optional, Self, List, Type, TypeVar, TYPE_CHECKING
+
+from krrood.patterns.has_generic import HasGeneric
+from krrood.ormatic.exceptions import UncallableFunction
+
+if TYPE_CHECKING:
+    from krrood.ormatic.data_access_objects.to_dao import ToDataAccessObjectState
+
+T = TypeVar("T")
+
+
+@dataclass(kw_only=True)
+class AlternativeMapping(HasGeneric[T], abc.ABC):
+    """
+    Base class for alternative mapping implementations.
+
+    .. important::
+        The hash function has to be the object's identity.
+        Make sure to decorate subclasses with @dataclass(eq=False).
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # The import is local since helper imports this module at load time.
+        from krrood.ormatic.data_access_objects.helper import clear_dao_lookup_caches
+
+        clear_dao_lookup_caches()
+
+    @classmethod
+    def to_dao(
+        cls, *, source_object: T, state: ToDataAccessObjectState | None = None
+    ) -> T:
+        """
+        Resolve a source object to a DAO.
+
+        :param source_object: The object to convert.
+        :param state: The conversion state.
+        :return: The converted DAO instance.
+        """
+        if state is not None and state.has(source=source_object):
+            return state.get(source=source_object)
+        elif isinstance(source_object, cls):
+            return source_object
+        else:
+            result = cls.from_domain_object(obj=source_object)
+            return result
+
+    @classmethod
+    @abc.abstractmethod
+    def from_domain_object(cls, *, obj: T) -> Self:
+        """
+        Create this from a domain object.
+
+        Do not create any DAOs here but the target DAO of `T`. The rest of the `to_dao`
+        algorithm will process the fields of the created instance.
+
+        :param obj: The source object.
+        :return: A new instance of this mapping class.
+        """
+
+    @abc.abstractmethod
+    def to_domain_object(self) -> T:
+        """
+        Create a domain object from this instance.
+
+        :return: The constructed domain object.
+        """
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        """
+        A list of other classes that have to be built before this one in the `from_dao`
+        algorithm.
+
+        The types inside the list are the domain types, not the data access objects nor
+        the alternative mappings.
+        """
+        return []
+
+    def __hash__(self):
+        return id(self)
+
+
+def raise_uncallable_function(function_mapping: FunctionMapping):
+    raise UncallableFunction(function_mapping=function_mapping)
+
+
+@dataclass(kw_only=True, eq=False)
+class FunctionMapping(AlternativeMapping[FunctionType]):
+    """
+    Alternative mapping for functions.
+    """
+
+    module_name: str
+    """
+    The module name where the function is defined.
+    """
+
+    function_name: str
+    """
+    The name of the function.
+    """
+
+    class_name: str | None = None
+    """
+    The name of the class if the function is defined by a class.
+    """
+
+    @classmethod
+    def from_domain_object(cls, *, obj: Callable) -> Self:
+
+        if "." in obj.__qualname__:
+            class_name = obj.__qualname__.split(".")[0]
+        else:
+            class_name = None
+        dao = cls(
+            module_name=obj.__module__,
+            function_name=obj.__name__,
+            class_name=class_name,
+        )
+        return dao
+
+    def to_domain_object(self) -> T:
+
+        if self.function_name == "<lambda>":
+            return lambda *args, **kwargs: raise_uncallable_function(self)
+
+        module = importlib.import_module(self.module_name)
+
+        if self.class_name is not None:
+            return getattr(getattr(module, self.class_name), self.function_name)
+        else:
+            return getattr(module, self.function_name)
+
+
+@dataclass(kw_only=True, eq=False)
+class ExceptionMapping(AlternativeMapping[Exception]):
+    """
+    Alternative mapping for exceptions, which keeps the exceptions they are chained to
+    as rows of their own.
+    """
+
+    exception_type: type[Exception]
+    """
+    The class of the exception.
+    """
+
+    message: str
+    """
+    What the exception says: its only argument as text, or its text form if it has any
+    other number of arguments.
+
+    A plain exception is rebuilt with it.
+    """
+
+    raised_from: Exception | None = None
+    """
+    The exception this one was raised from with ``raise ...
+
+    from``, if any.
+    """
+
+    raised_while_handling: Exception | None = None
+    """
+    The exception that was being handled when this one was raised, if any.
+    """
+
+    @classmethod
+    def from_domain_object(cls, *, obj: Exception) -> Self:
+        return cls(
+            exception_type=type(obj),
+            message=str(obj.args[0]) if len(obj.args) == 1 else str(obj),
+            raised_from=obj.__cause__,
+            raised_while_handling=obj.__context__,
+        )
+
+    def to_domain_object(self) -> Exception:
+        # allocated without __init__, so a subclass with a constructor of its own, such
+        # as a dataclass exception, is not called with the message
+        exception = self.exception_type.__new__(self.exception_type, self.message)
+        exception.__context__ = self.raised_while_handling
+        if self.raised_from is not None:
+            exception.__cause__ = self.raised_from
+        return exception

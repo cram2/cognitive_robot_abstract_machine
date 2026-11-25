@@ -373,7 +373,7 @@ def _spawn_robot_and_prepare_pick_up(
             ParkArmsAction(arms=pr2.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             PickUpAction(
-                grasp=apple_annotation.grasp_candidates()[0],
+                grasp_candidate=apple_annotation.grasp_candidates()[0],
                 arm=pr2.right_arm,
             ),
         ]
@@ -386,11 +386,13 @@ def _spawn_robot_and_prepare_pick_up(
         logger.info("Spawned PR2; parking arms, raising torso, picking up an apple ...")
         try:
             executor = KinematicallySimulatedPlanExecutor(
-                StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+                context=StatechartContext.with_extensions(
+                    world=world, extensions=[RobotAccess(robot=pr2)]
+                )
             )
             statechart = Statechart(context=executor.context)
-            statechart.add_node(plan)
-            executor.compile(statechart)
+            statechart.add_node(node=plan)
+            executor.compile(statechart=statechart)
             executor.execute()
         except PlanFailure as failure:
             logger.warning("Robot could not complete the pick-up: %s", failure)

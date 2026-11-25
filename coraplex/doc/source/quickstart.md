@@ -108,7 +108,7 @@ The plan will consist of the following steps:
 ```python
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
@@ -122,7 +122,7 @@ from cramph.statechart import Statechart
 
 pr2 = PR2.from_world(world)
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )
 milk_body = world.get_body_by_name("milk.stl")
 
@@ -136,25 +136,26 @@ plan = Sequence(
         ParkArmsAction(arms=pr2.all_arms),
         MoveTorsoAction(torso_state=TorsoState.HIGH),
         NavigateAction(
-            target_location=Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)
+            planar_goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=world.root)
         ),
         PickUpAction(
-            grasp=milk.grasp_candidates()[0],
+            grasp_candidate=milk.grasp_candidates()[0],
             arm=pr2.right_arm,
         ),
         NavigateAction(
-            target_location=Pose.from_xyz_rpy(4.0, 4.0, 0.0, reference_frame=world.root)
+            planar_goal_pose=Pose2D.from_xy_yaw(x=4.0, y=4.0, reference_frame=world.root)
         ),
         PlaceAction(
-            object_designator=milk,
-            target_location=Pose.from_xyz_rpy(
+            arm=pr2.right_arm,
+            graspable=milk,
+            goal_pose=Pose.from_xyz_rpy(
                 4.2, 4.0, 1.0, reference_frame=world.root
             ),
         ),
     ]
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(plan)
+statechart.add_node(node=plan)
 ```
 
 What did we just do here?
@@ -167,7 +168,7 @@ another in the order they are defined, and put it into a statechart of the execu
 To execute the plan, the executor compiles the statechart and executes it.
 
 ```python
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 

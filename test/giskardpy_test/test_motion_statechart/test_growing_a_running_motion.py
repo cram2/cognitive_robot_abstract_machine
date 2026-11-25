@@ -2,7 +2,7 @@ import pytest
 
 from cramph.composites import Sequence
 from cramph.context import StatechartContext
-from cramph.data_types import LifeCycleValues
+from cramph.data_types import LifeCycleValue
 from cramph.executor import StatechartExecutor
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
@@ -41,21 +41,21 @@ def test_a_motion_added_while_running_moves_the_robot(pr2_world_state_reset) -> 
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
     statechart = Statechart(context=executor.context)
-    statechart.add_node(first := _torso_goal(world, 0.1))
-    executor.compile(statechart)
+    statechart.add_node(node=(first := _torso_goal(world, 0.1)))
+    executor.compile(statechart=statechart)
     maximum_ticks = 1_000
     for _ in range(maximum_ticks):
-        if first.life_cycle_state == LifeCycleValues.SUCCEEDED:
+        if first.life_cycle_state == LifeCycleValue.SUCCEEDED:
             break
         executor.tick()
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
 
     second = _torso_goal(world, 0.2)
     second.start_condition = first.is_succeeded
     with statechart.modify():
-        statechart.add_node(second)
-        statechart.add_node(EndMotion.when_true(second))
+        statechart.add_node(node=second)
+        statechart.add_node(node=EndMotion.when_true(node=second))
     executor.tick_until_end(timeout=maximum_ticks)
 
-    assert first.life_cycle_state == LifeCycleValues.SUCCEEDED
+    assert first.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert _torso_position(world) == pytest.approx(0.2, abs=0.01)

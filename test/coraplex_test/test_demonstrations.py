@@ -18,6 +18,7 @@ import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from typing_extensions import Iterator
 
+import coraplex.demonstrations
 from coraplex.demonstrations import RobotDemonstration, RobotDemonstrationRosSession
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
@@ -142,7 +143,9 @@ class RecordingDemonstration(RobotDemonstration):
 
     def build_statechart(self, context: StatechartContext) -> Statechart:
         statechart = Statechart(context=context)
-        statechart.add_node(FunctionCall(function=lambda: self.run_plan_body(context)))
+        statechart.add_node(
+            node=FunctionCall(function=lambda: self.run_plan_body(context))
+        )
         return statechart
 
     @contextmanager
@@ -212,12 +215,12 @@ def test_simulated_run_puts_the_robot_into_the_scene_it_builds():
 
 def serve_from_the_controller(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
     """
-    Make every fetch of a real run return `world`, as if a controller served it.
+    Make every join of a real run return `world`, as if a controller served it.
     """
     monkeypatch.setattr(
-        RobotDemonstrationRosSession,
-        "fetch_world",
-        lambda session, timeout_seconds=None: world,
+        coraplex.demonstrations,
+        "join_shared_world",
+        lambda node, timeout_seconds=None: world,
     )
 
 

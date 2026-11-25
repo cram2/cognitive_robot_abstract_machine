@@ -1,6 +1,11 @@
+"""
+Per-object TSDF volume integration.
+"""
+
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 from dataclasses import dataclass
 from enum import Enum
@@ -25,6 +30,8 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from robokudo.types.cv import ColorToDepthRatio
+
+logger = logging.getLogger(__name__)
 
 
 # %% Volume integration inputs
@@ -168,7 +175,7 @@ class TSDFAnnotator(ThreadedAnnotator):
         for object_hypothesis in object_hypotheses:
             poses = cas.filter_by_type(PoseAnnotation, object_hypothesis.annotations)
             if len(poses) == 0:
-                self.rk_logger.debug(
+                logger.debug(
                     f"No pose found for object {object_hypothesis.id}, skipping..."
                 )
                 continue
@@ -210,7 +217,7 @@ class TSDFAnnotator(ThreadedAnnotator):
             )
             mask: npt.NDArray[np.uint8] = object_hypothesis.roi.mask
             if mask is None:
-                self.rk_logger.debug(
+                logger.debug(
                     f"No mask found for object {object_hypothesis.id}, skipping..."
                 )
                 continue
@@ -296,9 +303,7 @@ class TSDFAnnotator(ThreadedAnnotator):
 
         vis_mode = self.descriptor.parameters.geometry_visualization_mode
         if vis_mode != TSDFAnnotatorVisualizationModes.NONE:
-            self.rk_logger.debug(
-                f"Visualizing geometry for {len(geometries) // 3} objects"
-            )
+            logger.debug(f"Visualizing geometry for {len(geometries) // 3} objects")
             self.get_annotator_output_struct().set_geometries(geometries)
 
         return Status.SUCCESS
@@ -317,9 +322,7 @@ class TSDFAnnotator(ThreadedAnnotator):
         :param masks: The masks to visualize.
         :return: The image with the visualizations.
         """
-        self.rk_logger.debug(
-            f"Visualizing image for {len(volume_integration_inputs)} objects"
-        )
+        logger.debug(f"Visualizing image for {len(volume_integration_inputs)} objects")
 
         overlay = np.zeros_like(image, dtype=np.uint8)
         combined_mask = np.zeros(image.shape[:2], dtype=np.uint8)  # 0-1
@@ -362,5 +365,5 @@ class TSDFAnnotator(ThreadedAnnotator):
         elif vis_mode == TSDFAnnotatorVisualizationModes.MESH:
             return [volume.get_mesh(), volume.get_coordinate_frame()]
         else:
-            self.rk_logger.warning(f"Visualization mode '{vis_mode}' not supported!")
+            logger.warning(f"Visualization mode '{vis_mode}' not supported!")
             return []

@@ -1,3 +1,10 @@
+"""
+The nodes of a motion statechart and the tasks built on them.
+
+A node hands its constraints for the QP controller and its debug expressions over in its
+artifacts.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -5,21 +12,30 @@ from dataclasses import field, dataclass
 from functools import cached_property
 
 import numpy as np
-from typing_extensions import TYPE_CHECKING, Self
+from typing_extensions import Self
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
+from giskardpy.motion_statechart.forward_kinematics_binding import (
+    ForwardKinematicsBinding,
+)
 from giskardpy.motion_statechart.constraint_builders import GeometricConstraintBuilder
 from giskardpy.motion_statechart.context import MotionControlContext
 from cramph.node import EndedByOwner
 from cramph.context import StatechartContext
-from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.exceptions import MissingErrorSignalError
+from giskardpy.motion_statechart.mixins import (
+    HasGoalBindingPolicyParameter,
+    HasThresholdParameter,
+    HasWeightParameter,
+)
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     Scalar,
 )
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     Point3,
     Vector3,
@@ -30,14 +46,15 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Color
+from semantic_digital_twin.world_description.world_entity import (
+    KinematicStructureEntity,
+)
 
 from cramph.node import NodeArtifacts, StatechartNode, EndStatechart
-
-if TYPE_CHECKING:
-    from cramph.statechart import Statechart
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebugExpression:
     """
     Symbolic expressions used for debugging only.
@@ -80,21 +97,8 @@ class DebugExpression:
         """
         return self.expression.evaluate()
 
-    @classmethod
-    def collect_from(cls, statechart: Statechart) -> list[DebugExpression]:
-        """
-        :param statechart: The statechart whose nodes registered debug expressions.
-        :return: The debug expressions of every motion node of `statechart`, in node
-            order.
-        """
-        return [
-            debug_expression
-            for node in statechart.get_nodes_by_type(MotionStatechartNode)
-            for debug_expression in node.debug_expressions
-        ]
 
-
-@dataclass
+@dataclass(kw_only=True)
 class MotionNodeArtifacts(NodeArtifacts):
     """
     The artifacts of a node that takes part in motion control.
@@ -121,7 +125,7 @@ class MotionNodeArtifacts(NodeArtifacts):
     """
 
     @classmethod
-    def from_node_artifacts(cls, artifacts: NodeArtifacts) -> Self:
+    def from_node_artifacts(cls, *, artifacts: NodeArtifacts) -> Self:
         """
         :param artifacts: The artifacts a node built.
         :return: `artifacts` itself if it already describes motion, otherwise motion
@@ -139,7 +143,7 @@ class MotionNodeArtifacts(NodeArtifacts):
 
         :return: The builder for this collection of artifacts.
         """
-        return GeometricConstraintBuilder(self.constraints)
+        return GeometricConstraintBuilder(collection=self.constraints)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
@@ -156,10 +160,10 @@ class MotionStatechartNode(StatechartNode):
     def artifacts(self) -> MotionNodeArtifacts:
         return super().artifacts
 
-    def apply_artifacts(self, artifacts: NodeArtifacts) -> None:
-        motion_artifacts = MotionNodeArtifacts.from_node_artifacts(artifacts)
-        motion_artifacts.constraints.link_to_motion_statechart_node(self)
-        super().apply_artifacts(motion_artifacts)
+    def apply_artifacts(self, *, artifacts: NodeArtifacts) -> None:
+        motion_artifacts = MotionNodeArtifacts.from_node_artifacts(artifacts=artifacts)
+        motion_artifacts.constraints.link_to_motion_statechart_node(node=self)
+        super().apply_artifacts(artifacts=motion_artifacts)
 
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
@@ -246,7 +250,7 @@ def velocity_convergence_expression(
         symbols.append(dof.variables.velocity)
 
     time_step = context.require_extension(
-        MotionControlContext
+        extension_type=MotionControlContext
     ).qp_controller_config.control_time_step.total_seconds()
     elapsed_cycles = context.tick_variable
     if reference_cycle_variable is not None:
@@ -267,17 +271,12 @@ class StructureCopyMotionStatechartNode(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class Task(EndedByOwner, MotionStatechartNode):
+class Task(EndedByOwner, MotionStatechartNode, HasWeightParameter):
     """
     Tasks are MotionStatechartNodes that add motion constraints.
 
     A task stops holding what it reached the moment it is released, so its owner decides
     when it succeeded.
-    """
-
-    weight: float = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE.value
-    """
-    Task priority relative to other tasks.
     """
 
     plot_specifications: NodePlotSpec = plot_specification_field(
@@ -289,7 +288,7 @@ class Task(EndedByOwner, MotionStatechartNode):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ConvergingTask(ABC, Task):
+class ConvergingTask(Task, HasThresholdParameter, ABC):
     """
     A task that drives a single scalar error towards zero and counts as having reached
     its goal once that error is within :attr:`threshold`.
@@ -305,11 +304,6 @@ class ConvergingTask(ABC, Task):
     observation.
     """
 
-    threshold: float = 0.01
-    """
-    Error at or below which the goal counts as reached, in the task's own units.
-    """
-
     def build(self) -> MotionNodeArtifacts:
         """
         Build the task and derive its observation from its error.
@@ -320,10 +314,10 @@ class ConvergingTask(ABC, Task):
         artifacts = super().build()
         if not isinstance(artifacts, MotionNodeArtifacts) or artifacts.error is None:
             raise MissingErrorSignalError(node=self)
-        artifacts.observation = self.goal_reached_at(artifacts.error)
+        artifacts.observation = self.goal_reached_at(error=artifacts.error)
         return artifacts
 
-    def goal_reached_at(self, error: Scalar) -> Scalar:
+    def goal_reached_at(self, *, error: Scalar) -> Scalar:
         """
         :param error: An error of this task, in its own units.
         :return: Whether this task observes its goal as reached at that error.
@@ -361,6 +355,92 @@ class ConvergingTask(ABC, Task):
         :return: The threshold relative error of this task.
         """
         return self.error_signal / self.threshold
+
+
+# %% nodes reading where their goal lies
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC):
+    """
+    A node whose goal is given in a frame that may move, and which reads where that
+    frame lies as :attr:`goal_binding_policy` says.
+    """
+
+    root_T_goal_reference_frame: HomogeneousTransformationMatrix | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
+    """
+    The pose of :attr:`goal_reference_frame` relative to :attr:`goal_binding_root`, as
+    :attr:`goal_binding_policy` fixes it; None until this node is set up.
+    """
+
+    _goal_reference_frame_binding: ForwardKinematicsBinding = field(
+        init=False, repr=False
+    )
+    """
+    Fixes :attr:`root_T_goal_reference_frame` to the current pose of
+    :attr:`goal_reference_frame`.
+    """
+
+    @property
+    @abstractmethod
+    def goal_reference_frame(self) -> KinematicStructureEntity:
+        """
+        :return: The frame the goal of this node is given in.
+        """
+
+    @property
+    @abstractmethod
+    def goal_binding_root(self) -> KinematicStructureEntity:
+        """
+        :return: The frame the pose of :attr:`goal_reference_frame` is read relative to.
+        """
+
+    @property
+    def _goal_reference_frame_name(self) -> PrefixedName:
+        """
+        :return: The name the variables of :attr:`root_T_goal_reference_frame` are
+            created under.
+        """
+        return PrefixedName("root_T_goal_ref", str(self.name))
+
+    def _root_T_goal_reference_frame_to_bind(
+        self,
+    ) -> HomogeneousTransformationMatrix | None:
+        """
+        :return: The matrix :meth:`set_up` binds, or None to bind one over new
+            variables.
+        """
+        return None
+
+    def set_up(self) -> None:
+        """
+        Bind :attr:`root_T_goal_reference_frame`.
+        """
+        super().set_up()
+        self._goal_reference_frame_binding = ForwardKinematicsBinding(
+            name=self._goal_reference_frame_name,
+            kinematic_chain=KinematicChain(
+                root=self.goal_binding_root, tip=self.goal_reference_frame
+            ),
+            float_variable_data=self.context.float_variable_data,
+            root_T_tip=self._root_T_goal_reference_frame_to_bind(),
+        )
+        self.root_T_goal_reference_frame = self._goal_reference_frame_binding.root_T_tip
+        self._goal_reference_frame_binding.bind(world=self.context.world)
+
+    def on_start(self) -> None:
+        """
+        Differs from the inherited ``on_start`` in also binding the goal reference frame
+        again under :attr:`GoalBindingPolicy.Bind_on_start`, so the goal is read from
+        where that frame is each time the node starts.
+        """
+        super().on_start()
+        if self.goal_binding_policy == GoalBindingPolicy.Bind_on_start:
+            self._goal_reference_frame_binding.bind(world=self.context.world)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

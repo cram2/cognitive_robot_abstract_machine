@@ -6,14 +6,27 @@ defaults:
 on:
   workflow_call:
     inputs:
-      lib:
-        description: "Library folder name (relative to repo root)"
+      name:
+        description: "Name of the job's test group, which its cache is saved under"
+        required: true
+        type: string
+      libraries:
+        description: "JSON list of the library folder names (relative to repo root) whose tests the job runs"
         required: true
         type: string
       repo_lowercase:
         description: "Lowercase repository name with tag"
         required: true
         type: string
+      test_paths:
+        description: "JSON object of the test files and directories to run for each library, relative to the repository root"
+        required: true
+        type: string
+      check_rules:
+        description: "Whether the job checks the code a pull request changes against the rules that have a checker, before anything else"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   test:
@@ -48,24 +61,22 @@ jobs:
         run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
 
       - name: Install dependencies
-        env:
-          # Keep uv's cache on the same filesystem as the target venv (/opt/ros/cram-env) so uv can
-          # hardlink packages into site-packages instead of full-copying them. The default cache
-          # (~/.cache/uv under the mounted /github/home volume) is a different filesystem, which
-          # forces a full copy of every wheel and stores each package twice -- exhausting the runner
-          # disk ("No space left on device") during install.
-          UV_CACHE_DIR: /opt/ros/.uv_cache
+        uses: ./cognitive_robot_abstract_machine/.github/actions/install-workspace
+
+      - name: Check the changed code against the rules that have a checker
+        # The check pre-commit runs, over the lines the pull request changes, so it holds
+        # even for commits made without the hooks. A pull request is checked out as its
+        # merge commit, whose first parent is the base.
+        if: ${{ inputs.check_rules && github.event_name == 'pull_request' }}
         run: |
-          cd cognitive_robot_abstract_machine
           source /opt/ros/cram-env/bin/activate
-          sudo apt-get update
-          sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
-          uv sync --extra dev --active
-          uv tree --depth 1
-          python -c "import sys; print(sys.executable)"
+          cd cognitive_robot_abstract_machine
+          git config --global --add safe.directory "$PWD"
+          git fetch --quiet --deepen=1 origin "$GITHUB_REF"
+          krrood check --since HEAD^1
 
       - name: Install drake
-        if: ${{ inputs.lib == 'semantic_digital_twin' }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'semantic_digital_twin') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
@@ -73,8 +84,18 @@ jobs:
           source /opt/ros/cram-env/bin/activate
           uv pip install drake
 
+      - name: Install usd-core
+        if: ${{ contains(fromJSON(inputs.libraries), 'semantic_digital_twin') }}
+        env:
+          UV_CACHE_DIR: /opt/ros/.uv_cache
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          # Optional for semantic_digital_twin, so its USD tests only run where it is installed
+          uv pip install usd-core
+
       - name: Install robokudo optional requirements
-        if: ${{ inputs.lib == 'robokudo' }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'robokudo') }}
         env:
           UV_CACHE_DIR: /opt/ros/.uv_cache
         run: |
@@ -87,16 +108,17 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: ${{ runner.os }}-cache-${{ inputs.name }}-${{ github.ref_name }}-${{ github.run_id }}
+          # Only this library's own cache: a prefix shared with another library, such as
+          # krrood's with krrood_spatial_math's, restores a cache without this library's files.
           restore-keys: |
-            ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}
-            ${{ runner.os }}-cache-${{ inputs.lib }}
-            ${{ runner.os }}-cache-
+            ${{ runner.os }}-cache-${{ inputs.name }}-${{ github.ref_name }}-
+            ${{ runner.os }}-cache-${{ inputs.name }}-
 
       - name: Run CPP tests
-        if: ${{inputs.lib == 'random_events'}}
+        if: ${{ contains(fromJSON(inputs.libraries), 'random_events') }}
         run: |
-          cd cognitive_robot_abstract_machine/${{ inputs.lib }}/src/random_events_lib
+          cd cognitive_robot_abstract_machine/random_events/src/random_events_lib
           sudo apt-get install -y g++ unzip zip
           BAZEL_VERSION=7.0.0
           curl -L -o bazel.sh \
@@ -111,7 +133,7 @@ jobs:
       - name: Check the generated rules in AGENTS.md
         # AGENTS.md is generated from the rules krrood ships and agent_rules.py; a hand
         # edit or a forgotten regeneration fails here.
-        if: ${{ inputs.lib == 'krrood' }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'krrood') }}
         run: |
           source /opt/ros/cram-env/bin/activate
           cd cognitive_robot_abstract_machine
@@ -120,28 +142,21 @@ jobs:
       - name: Check the generated skills
         # Every SKILL.md of a skill declared in agent_skills.py is generated; a hand edit
         # or a forgotten regeneration fails here.
-        if: ${{ inputs.lib == 'krrood' }}
+        if: ${{ contains(fromJSON(inputs.libraries), 'krrood') }}
         run: |
           source /opt/ros/cram-env/bin/activate
           cd cognitive_robot_abstract_machine
           krrood skills --check
 
       - name: Run tests
+        env:
+          TEST_PATHS: ${{ inputs.test_paths }}
         run: |
           source /opt/ros/cram-env/bin/activate
           source /opt/ros/overlay_ws/install/setup.bash
           echo "PYTHONPATH: $PYTHONPATH"
-          if [[ "${{ inputs.lib }}" == "probabilistic_model" ]]; then
-            export QT_QPA_PLATFORM=offscreen
-          fi
-          # The MuJoCo video-recorder tests render offscreen; xvfb provides a display, so MuJoCo
-          # would otherwise pick its windowed GLFW backend and fail to create a context on the
-          # runner. EGL renders headlessly. Must be set before Python imports mujoco, which locks
-          # the GL backend at import, so it cannot be done from inside the test process.
-          if [[ "${{ inputs.lib }}" == "semantic_digital_twin" ]]; then
-            export MUJOCO_GL=egl
-          fi
-          python -m pytest -n auto cognitive_robot_abstract_machine/test/${{ inputs.lib }}_test
+          # Every library runs in a pytest process of its own, even after another one failed.
+          python cognitive_robot_abstract_machine/scripts/run_library_tests.py --test-paths "$TEST_PATHS"
 
       - name: Show runner resources after the job
         # Runs after a failure too, so a job that ran out of disk shows what filled it.
@@ -153,4 +168,4 @@ jobs:
         if: always()
         with:
           path: /github/home/.cache/semantic_digital_twin
-          key: ${{ runner.os }}-cache-${{ inputs.lib }}-${{ github.ref_name }}-${{ github.run_id }}
+          key: ${{ runner.os }}-cache-${{ inputs.name }}-${{ github.ref_name }}-${{ github.run_id }}

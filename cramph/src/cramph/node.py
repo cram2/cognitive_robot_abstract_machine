@@ -10,7 +10,9 @@ import logging
 import threading
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
+from copy import deepcopy
 from dataclasses import MISSING, field, dataclass, fields
+from enum import StrEnum
 
 from typing_extensions import (
     Any,
@@ -23,14 +25,12 @@ from typing_extensions import (
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.context import ContextExtension, StatechartContext
 from cramph.data_types import (
-    LifeCycleValues,
+    LifeCycleValue,
     LifeCyclePredicate,
     ObservationPredicate,
     ObservationReading,
-    ObservationStateValues,
+    ObservationStateValue,
     TransitionKind,
-    TransitionConditionJSONKey,
-    NodeJSONKey,
 )
 from cramph.exceptions import (
     CancelledByNodeFailing,
@@ -59,12 +59,16 @@ from krrood.adapters.json_serializer import (
     SubclassJSONSerializer,
 )
 from krrood.exceptions import DataclassException
-from krrood.ormatic.utils import classproperty
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.symbolic_math.symbolic_math import (
     FloatVariable,
     GenericSymbolicType,
     Scalar,
+)
+from cramph.structure_change_recorder import (
+    StructureChangeRecorder,
+    StructureChangeRecorderOutsideStatechart,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
@@ -74,8 +78,46 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# %% serialization keys
 
-@dataclass(eq=False, repr=False)
+
+class NodeJSONKey(StrEnum):
+    """
+    Keys a serialized node carries on top of its dataclass fields.
+    """
+
+    NODE_ID = "node_id"
+    """
+    Tells apart the nodes of one JSON document, so every place referring to the same node
+    deserializes to the same instance.
+    """
+
+
+class TransitionConditionJSONKey(StrEnum):
+    """
+    Keys a serialized transition condition carries.
+    """
+
+    KIND = "kind"
+    """
+    The kind of transition the condition controls.
+    """
+
+    EXPRESSION = "expression"
+    """
+    The rendered condition, naming every variable by the id of its node.
+    """
+
+    OWNER = "owner"
+    """
+    The id of the node the condition belongs to.
+    """
+
+
+# %% transition conditions
+
+
+@dataclass(kw_only=True, eq=False, repr=False)
 class TransitionCondition(SubclassJSONSerializer):
     """
     The condition deciding when one transition of a node's life cycle happens.
@@ -107,7 +149,7 @@ class TransitionCondition(SubclassJSONSerializer):
 
     @classmethod
     def create_true(
-        cls, kind: TransitionKind, owner: StatechartNode | None = None
+        cls, *, kind: TransitionKind, owner: StatechartNode | None = None
     ) -> Self:
         """
         Creates a condition that always evaluates to true.
@@ -120,7 +162,7 @@ class TransitionCondition(SubclassJSONSerializer):
 
     @classmethod
     def create_false(
-        cls, kind: TransitionKind, owner: StatechartNode | None = None
+        cls, *, kind: TransitionKind, owner: StatechartNode | None = None
     ) -> Self:
         """
         Creates a condition that always evaluates to false.
@@ -131,31 +173,37 @@ class TransitionCondition(SubclassJSONSerializer):
         """
         return cls(expression=Scalar.const_false(), kind=kind, owner=owner)
 
-    def update_expression(self, new_expression: Scalar, child: StatechartNode) -> None:
+    def update_expression(
+        self, *, new_expression: Scalar, child: StatechartNode
+    ) -> None:
         """
         Replaces the expression of this condition, rejecting invalid expressions.
 
         :param new_expression: The expression to evaluate for this transition.
         :param child: The node the new expression is set on.
         """
-        self._sanity_check(new_expression)
+        self._sanity_check(new_expression=new_expression)
         self.expression = new_expression
         self._child = child
+        if self.owner is not None:
+            self.owner._structure_change_recorder._record_changed_condition(
+                node=self.owner, transition_kind=self.kind
+            )
 
-    def _sanity_check(self, new_expression: Scalar) -> None:
+    def _sanity_check(self, *, new_expression: Scalar) -> None:
         """
         Rejects expressions that may not be used as a transition condition.
 
         :param new_expression: The expression to validate.
         """
-        self._check_condition_is_variable_or_expression(new_expression)
-        self._check_only_condition_variables(new_expression)
-        self._check_is_two_valued_logic(new_expression)
-        self._check_owner_not_in_start_condition(new_expression)
-        self._check_no_terminal_node(new_expression)
+        self._check_condition_is_variable_or_expression(new_expression=new_expression)
+        self._check_only_condition_variables(new_expression=new_expression)
+        self._check_is_two_valued_logic(new_expression=new_expression)
+        self._check_owner_not_in_start_condition(new_expression=new_expression)
+        self._check_no_terminal_node(new_expression=new_expression)
 
     def _check_condition_is_variable_or_expression(
-        self, new_expression: Scalar
+        self, *, new_expression: Scalar
     ) -> None:
         """
         Rejects values that are not symbolic expressions.
@@ -165,7 +213,7 @@ class TransitionCondition(SubclassJSONSerializer):
         if not isinstance(new_expression, Scalar):
             raise InputNotExpressionError(condition=self, new_expression=new_expression)
 
-    def _check_only_condition_variables(self, new_expression: Scalar) -> None:
+    def _check_only_condition_variables(self, *, new_expression: Scalar) -> None:
         """
         Rejects expressions that reference state a transition may not read.
 
@@ -180,7 +228,7 @@ class TransitionCondition(SubclassJSONSerializer):
                 )
 
     @staticmethod
-    def _check_is_two_valued_logic(new_expression: Scalar) -> None:
+    def _check_is_two_valued_logic(*, new_expression: Scalar) -> None:
         """
         Rejects expressions built from anything but the two-valued logic operators, which
         could not be rendered and parsed back.
@@ -190,7 +238,7 @@ class TransitionCondition(SubclassJSONSerializer):
         """
         sm.boolean_expression_to_str(new_expression)
 
-    def _check_no_terminal_node(self, new_expression: Scalar) -> None:
+    def _check_no_terminal_node(self, *, new_expression: Scalar) -> None:
         """
         Rejects references to nodes that end the statechart.
 
@@ -207,7 +255,7 @@ class TransitionCondition(SubclassJSONSerializer):
                     terminal_node=variable.statechart_node,
                 )
 
-    def _check_owner_not_in_start_condition(self, new_expression: Scalar) -> None:
+    def _check_owner_not_in_start_condition(self, *, new_expression: Scalar) -> None:
         """
         Rejects start conditions that reference the state of their own node.
 
@@ -250,12 +298,14 @@ class TransitionCondition(SubclassJSONSerializer):
 
         :return: The rendered condition.
         """
-        return self._render(lambda variable: variable.display_name)
+        return self._render(name_variable=lambda variable: variable.display_name)
 
     def __repr__(self) -> str:
         return str(self)
 
-    def _render(self, name_variable: Callable[[DerivedConditionVariable], str]) -> str:
+    def _render(
+        self, *, name_variable: Callable[[DerivedConditionVariable], str]
+    ) -> str:
         """
         Renders the condition with ``and``, ``or``, ``not``, ``True`` and ``False``.
 
@@ -280,14 +330,14 @@ class TransitionCondition(SubclassJSONSerializer):
         json_data = super().to_json(**kwargs)
         json_data[TransitionConditionJSONKey.KIND] = self.kind.name
         json_data[TransitionConditionJSONKey.EXPRESSION] = self._render(
-            lambda variable: str(variable.reference)
+            name_variable=lambda variable: str(variable.reference)
         )
         json_data[TransitionConditionJSONKey.OWNER] = self.owner._node_id
         return json_data
 
     @staticmethod
     def _parse_ast_expression(
-        node: ast.expr, resolve_variable: Callable[[str], DerivedConditionVariable]
+        *, node: ast.expr, resolve_variable: Callable[[str], DerivedConditionVariable]
     ) -> Scalar:
         """
         Translates a parsed condition into a symbolic expression.
@@ -300,11 +350,17 @@ class TransitionCondition(SubclassJSONSerializer):
         """
         match node:
             case ast.BoolOp(op=ast.And()):
-                return TransitionCondition._parse_ast_and(node, resolve_variable)
+                return TransitionCondition._parse_ast_and(
+                    node=node, resolve_variable=resolve_variable
+                )
             case ast.BoolOp(op=ast.Or()):
-                return TransitionCondition._parse_ast_or(node, resolve_variable)
+                return TransitionCondition._parse_ast_or(
+                    node=node, resolve_variable=resolve_variable
+                )
             case ast.UnaryOp(op=ast.Not()):
-                return TransitionCondition._parse_ast_not(node, resolve_variable)
+                return TransitionCondition._parse_ast_not(
+                    node=node, resolve_variable=resolve_variable
+                )
             case ast.Constant(value=str(variable_name)):
                 return resolve_variable(variable_name)
             case ast.Constant(value=True):
@@ -318,7 +374,7 @@ class TransitionCondition(SubclassJSONSerializer):
 
     @staticmethod
     def _parse_ast_and(
-        node: ast.BoolOp, resolve_variable: Callable[[str], DerivedConditionVariable]
+        *, node: ast.BoolOp, resolve_variable: Callable[[str], DerivedConditionVariable]
     ) -> Scalar:
         """
         Translates a parsed conjunction into a symbolic expression.
@@ -329,14 +385,16 @@ class TransitionCondition(SubclassJSONSerializer):
         """
         return sm.logic_and(
             *[
-                TransitionCondition._parse_ast_expression(x, resolve_variable)
+                TransitionCondition._parse_ast_expression(
+                    node=x, resolve_variable=resolve_variable
+                )
                 for x in node.values
             ]
         )
 
     @staticmethod
     def _parse_ast_or(
-        node: ast.BoolOp, resolve_variable: Callable[[str], DerivedConditionVariable]
+        *, node: ast.BoolOp, resolve_variable: Callable[[str], DerivedConditionVariable]
     ) -> Scalar:
         """
         Translates a parsed disjunction into a symbolic expression.
@@ -347,14 +405,18 @@ class TransitionCondition(SubclassJSONSerializer):
         """
         return sm.logic_or(
             *[
-                TransitionCondition._parse_ast_expression(x, resolve_variable)
+                TransitionCondition._parse_ast_expression(
+                    node=x, resolve_variable=resolve_variable
+                )
                 for x in node.values
             ]
         )
 
     @staticmethod
     def _parse_ast_not(
-        node: ast.UnaryOp, resolve_variable: Callable[[str], DerivedConditionVariable]
+        *,
+        node: ast.UnaryOp,
+        resolve_variable: Callable[[str], DerivedConditionVariable],
     ) -> Scalar:
         """
         Translates a parsed negation into a symbolic expression.
@@ -364,7 +426,9 @@ class TransitionCondition(SubclassJSONSerializer):
         :return: The symbolic expression.
         """
         return sm.logic_not(
-            TransitionCondition._parse_ast_expression(node.operand, resolve_variable)
+            TransitionCondition._parse_ast_expression(
+                node=node.operand, resolve_variable=resolve_variable
+            )
         )
 
     @classmethod
@@ -383,16 +447,16 @@ class TransitionCondition(SubclassJSONSerializer):
         return cls(
             kind=TransitionKind[data[TransitionConditionJSONKey.KIND]],
             expression=cls._parse_ast_expression(
-                tree.body,
-                lambda variable_name: ConditionVariableReference.parse(
-                    variable_name
-                ).resolve(nodes),
+                node=tree.body,
+                resolve_variable=lambda variable_name: ConditionVariableReference.parse(
+                    written_reference=variable_name
+                ).resolve(nodes=nodes),
             ),
             owner=nodes.get(key=data[TransitionConditionJSONKey.OWNER]),
         )
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class NodeStateVariable(FloatVariable, ABC):
     """
     A symbol standing for part of the state of one node.
@@ -429,7 +493,7 @@ class NodeStateVariable(FloatVariable, ABC):
         """
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class ConditionVariable(NodeStateVariable, ABC):
     """
     A node state variable a transition condition may read.
@@ -439,7 +503,7 @@ class ConditionVariable(NodeStateVariable, ABC):
     """
 
     @abstractmethod
-    def resolve(self) -> ObservationStateValues:
+    def resolve(self) -> ObservationStateValue:
         """
         Narrows :meth:`NodeStateVariable.resolve` to a two-valued answer.
 
@@ -447,7 +511,7 @@ class ConditionVariable(NodeStateVariable, ABC):
         """
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class ObservationVariable(NodeStateVariable):
     """
     A symbol representing the observation state of a node.
@@ -456,11 +520,11 @@ class ObservationVariable(NodeStateVariable):
         because it may be unknown. Use an :class:`ObservationPredicateVariable` there.
     """
 
-    def resolve(self) -> ObservationStateValues:
+    def resolve(self) -> ObservationStateValue:
         return self.statechart_node.observation_state
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class LifeCycleVariable(NodeStateVariable):
     """
     A symbol representing the life cycle state of a node.
@@ -469,11 +533,11 @@ class LifeCycleVariable(NodeStateVariable):
         Use a :class:`LifeCyclePredicateVariable` there, so the condition stays renderable.
     """
 
-    def resolve(self) -> LifeCycleValues:
+    def resolve(self) -> LifeCycleValue:
         return self.statechart_node.life_cycle_state
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class LastObservationVariable(NodeStateVariable):
     """
     A symbol representing the observation a node took most recently, which it keeps once
@@ -495,11 +559,11 @@ class LastObservationVariable(NodeStateVariable):
     def display_name(self) -> str:
         return f"{self.statechart_node.unique_name}.{self.attribute_name}"
 
-    def resolve(self) -> ObservationStateValues:
+    def resolve(self) -> ObservationStateValue:
         return self.statechart_node.last_observation_state
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class DerivedConditionVariable(ConditionVariable, ABC):
     """
     A condition variable standing for an expression over its node's state variables,
@@ -533,14 +597,14 @@ class DerivedConditionVariable(ConditionVariable, ABC):
         """
 
     @abstractmethod
-    def for_node(self, node: StatechartNode) -> Self:
+    def for_node(self, *, node: StatechartNode) -> Self:
         """
         :param node: The node to apply this variable's test to.
         :return: The variable holding the same test on `node`.
         """
 
     @classmethod
-    def substitute_in(cls, expression: GenericSymbolicType) -> GenericSymbolicType:
+    def substitute_in(cls, *, expression: GenericSymbolicType) -> GenericSymbolicType:
         """
         Replaces every variable of this kind in `expression` by the expression it stands
         for, which is what the compiled statechart evaluates.
@@ -566,6 +630,7 @@ class DerivedConditionVariable(ConditionVariable, ABC):
     @classmethod
     def reading_counterparts(
         cls,
+        *,
         condition: Scalar,
         counterpart_of: Callable[[StatechartNode], StatechartNode | None],
     ) -> Scalar:
@@ -585,14 +650,14 @@ class DerivedConditionVariable(ConditionVariable, ABC):
             replacements.append(
                 Scalar(float(variable.resolve()))
                 if counterpart is None
-                else variable.for_node(counterpart)
+                else variable.for_node(node=counterpart)
             )
         return Scalar(condition).substitute(
             old_variables=variables, new_variables=replacements
         )
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class LifeCyclePredicateVariable(DerivedConditionVariable):
     """
     A symbol representing a binary test on the life cycle state of a node.
@@ -612,20 +677,24 @@ class LifeCyclePredicateVariable(DerivedConditionVariable):
         super().__init__(name, statechart_node)
         self.predicate = predicate
 
-    def resolve(self) -> ObservationStateValues:
-        return self.predicate.truth_value(self.statechart_node.life_cycle_state)
+    def resolve(self) -> ObservationStateValue:
+        return self.predicate.truth_value(
+            life_cycle_value=self.statechart_node.life_cycle_state
+        )
 
-    def for_node(self, node: StatechartNode) -> Self:
-        return node._life_cycle_predicate(self.predicate)
+    def for_node(self, *, node: StatechartNode) -> Self:
+        return node._life_cycle_predicate(predicate=self.predicate)
 
     def expression(self) -> Scalar:
         """
         :return: The truth table of this predicate over the life cycle state of its node.
         """
-        return self.statechart_node.life_cycle_predicate_expression(self.predicate)
+        return self.statechart_node.life_cycle_predicate_expression(
+            predicate=self.predicate
+        )
 
 
-@dataclass(repr=False, eq=False, init=False)
+@dataclass(kw_only=True, repr=False, eq=False, init=False)
 class ObservationPredicateVariable(DerivedConditionVariable):
     """
     A symbol representing a binary test whether one of a node's observations is a
@@ -660,22 +729,22 @@ class ObservationPredicateVariable(DerivedConditionVariable):
             case ObservationReading.LAST:
                 return self.statechart_node.last_observation
 
-    def resolve(self) -> ObservationStateValues:
+    def resolve(self) -> ObservationStateValue:
         return self.predicate.truth_value(
-            ObservationStateValues(self.observation.resolve())
+            observation=ObservationStateValue(self.observation.resolve())
         )
 
-    def for_node(self, node: StatechartNode) -> Self:
-        return node._observation_predicate(self.predicate)
+    def for_node(self, *, node: StatechartNode) -> Self:
+        return node._observation_predicate(predicate=self.predicate)
 
     def expression(self) -> Scalar:
         """
         :return: The test of this predicate on the observation it reads.
         """
-        return self.predicate.expression(self.observation)
+        return self.predicate.expression(observation=self.observation)
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class ConditionVariableReference:
     """
     How a serialized condition names a variable: by the id of its node in the JSON
@@ -702,7 +771,7 @@ class ConditionVariableReference:
         return "."
 
     @classmethod
-    def parse(cls, written_reference: str) -> Self:
+    def parse(cls, *, written_reference: str) -> Self:
         """
         :param written_reference: A reference as :meth:`__str__` writes it.
         :return: The reference.
@@ -713,7 +782,7 @@ class ConditionVariableReference:
         node_id, attribute_name = written_reference.split(cls.separator, maxsplit=1)
         return cls(node_id=node_id, attribute_name=attribute_name)
 
-    def resolve(self, nodes: DeserializedNodeTracker) -> DerivedConditionVariable:
+    def resolve(self, *, nodes: DeserializedNodeTracker) -> DerivedConditionVariable:
         """
         :param nodes: The nodes of the JSON document.
         :return: The variable this reference names.
@@ -729,7 +798,7 @@ class ConditionVariableReference:
         return f"{self.node_id}{self.separator}{self.attribute_name}"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeArtifacts:
     """
     Represents the artifacts produced by the `build_artifacts` method of a node.
@@ -746,7 +815,7 @@ class NodeArtifacts:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LifeCycleTransitions:
     """
     The next life cycle state of one node, as an expression per state it can be in.
@@ -770,17 +839,17 @@ class LifeCycleTransitions:
     outcome is only left by a reset.
     """
 
-    def as_cases(self) -> list[tuple[LifeCycleValues, sm.Scalar]]:
+    def as_cases(self) -> list[tuple[LifeCycleValue, sm.Scalar]]:
         """
         :return: (current state, next state) pairs covering every life cycle state.
         """
         return [
-            (LifeCycleValues.NOT_STARTED, self.not_started),
-            (LifeCycleValues.RUNNING, self.running),
-            (LifeCycleValues.PAUSED, self.paused),
+            (LifeCycleValue.NOT_STARTED, self.not_started),
+            (LifeCycleValue.RUNNING, self.running),
+            (LifeCycleValue.PAUSED, self.paused),
             *(
                 (state, self.terminal)
-                for state in sorted(LifeCycleValues.terminal_states())
+                for state in sorted(LifeCycleValue.terminal_states())
             ),
         ]
 
@@ -957,7 +1026,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         if self.parent_node_index is None:
             return None
-        return self._statechart.get_node_by_index(self.parent_node_index)
+        return self._statechart.get_node_by_index(index=self.parent_node_index)
 
     @property
     def artifacts(self) -> NodeArtifacts:
@@ -969,7 +1038,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             raise NodeNotBuiltError(node=self)
         return self._artifacts
 
-    def apply_artifacts(self, artifacts: NodeArtifacts) -> None:
+    def apply_artifacts(self, *, artifacts: NodeArtifacts) -> None:
         """
         Keeps what :meth:`build` returned, reading the observation from it.
 
@@ -1034,7 +1103,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         return ancestors
 
     def find_upwards(
-        self, predicate: Callable[[StatechartNode], bool]
+        self, *, predicate: Callable[[StatechartNode], bool]
     ) -> StatechartNode | None:
         """
         :param predicate: Whether a node is the one looked for.
@@ -1134,11 +1203,11 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         if tracker.has(key=node_id):
             return tracker.get(key=node_id)
         node = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
-        node._take_over_node_id(node_id)
+        node._take_over_node_id(node_id=node_id)
         tracker.add(key=node_id, tracked_object=node)
         return node
 
-    def _take_over_node_id(self, node_id: str) -> None:
+    def _take_over_node_id(self, *, node_id: str) -> None:
         """
         Gives this node the id of the node it was deserialized from, so that a later
         document referring to that node finds this one.
@@ -1148,7 +1217,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         self._node_id = node_id
         self._create_state_variables()
 
-    def _set_transition(self, transition: TransitionCondition) -> None:
+    def _set_transition(self, *, transition: TransitionCondition) -> None:
         """
         Sets the transition condition for this node, depending on its kind.
         Used in json parsing.
@@ -1170,9 +1239,12 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
                 self._interrupt_condition = transition
             case _:
                 raise UnknownTransitionKindError(transition_kind=transition.kind)
+        self._structure_change_recorder._record_changed_condition(
+            node=self, transition_kind=transition.kind
+        )
 
     def create_lifecycle_transitions(
-        self, own_transitions_allowed: sm.Scalar
+        self, *, own_transitions_allowed: sm.Scalar
     ) -> LifeCycleTransitions:
         """
         Builds the state machine of this node for one pass through the statechart.
@@ -1196,66 +1268,79 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         reset = sm.logic_or(
             self._own_trigger(
-                self.get_condition(TransitionKind.RESET), own_transitions_allowed
+                trigger=self.get_condition(transition_kind=TransitionKind.RESET),
+                own_transitions_allowed=own_transitions_allowed,
             ),
-            self._parent_is(LifeCyclePredicate.IS_NOT_STARTED),
+            self._parent_is(predicate=LifeCyclePredicate.IS_NOT_STARTED),
         )
         start = sm.logic_and(
             self._own_trigger(
-                self.get_condition(TransitionKind.START), own_transitions_allowed
+                trigger=self.get_condition(transition_kind=TransitionKind.START),
+                own_transitions_allowed=own_transitions_allowed,
             ),
             self._is_top_level_or_parent_running(),
         )
-        end_cases = self._create_end_cases(own_transitions_allowed)
+        end_cases = self._create_end_cases(
+            own_transitions_allowed=own_transitions_allowed
+        )
         return LifeCycleTransitions(
             not_started=sm.if_cases(
                 cases=[
-                    (reset, sm.Scalar(LifeCycleValues.NOT_STARTED)),
+                    (reset, sm.Scalar(LifeCycleValue.NOT_STARTED)),
                     (
-                        sm.logic_and(start, self.get_condition(TransitionKind.PAUSE)),
-                        sm.Scalar(LifeCycleValues.PAUSED),
+                        sm.logic_and(
+                            start,
+                            self.get_condition(transition_kind=TransitionKind.PAUSE),
+                        ),
+                        sm.Scalar(LifeCycleValue.PAUSED),
                     ),
-                    (start, sm.Scalar(LifeCycleValues.RUNNING)),
+                    (start, sm.Scalar(LifeCycleValue.RUNNING)),
                 ],
-                else_result=sm.Scalar(LifeCycleValues.NOT_STARTED),
+                else_result=sm.Scalar(LifeCycleValue.NOT_STARTED),
             ),
             running=sm.if_cases(
                 cases=[
-                    (reset, sm.Scalar(LifeCycleValues.NOT_STARTED)),
+                    (reset, sm.Scalar(LifeCycleValue.NOT_STARTED)),
                     *end_cases,
                     (
                         sm.logic_or(
                             self._own_trigger(
-                                self.get_condition(TransitionKind.PAUSE),
-                                own_transitions_allowed,
+                                trigger=self.get_condition(
+                                    transition_kind=TransitionKind.PAUSE
+                                ),
+                                own_transitions_allowed=own_transitions_allowed,
                             ),
-                            self._parent_is(LifeCyclePredicate.IS_PAUSED),
+                            self._parent_is(predicate=LifeCyclePredicate.IS_PAUSED),
                         ),
-                        sm.Scalar(LifeCycleValues.PAUSED),
+                        sm.Scalar(LifeCycleValue.PAUSED),
                     ),
                 ],
-                else_result=sm.Scalar(LifeCycleValues.RUNNING),
+                else_result=sm.Scalar(LifeCycleValue.RUNNING),
             ),
             paused=sm.if_cases(
                 cases=[
-                    (reset, sm.Scalar(LifeCycleValues.NOT_STARTED)),
+                    (reset, sm.Scalar(LifeCycleValue.NOT_STARTED)),
                     *end_cases,
                     (
                         sm.logic_and(
                             self._own_trigger(
-                                sm.logic_not(self.get_condition(TransitionKind.PAUSE)),
-                                own_transitions_allowed,
+                                trigger=sm.logic_not(
+                                    self.get_condition(
+                                        transition_kind=TransitionKind.PAUSE
+                                    )
+                                ),
+                                own_transitions_allowed=own_transitions_allowed,
                             ),
                             self._is_top_level_or_parent_running(),
                         ),
-                        sm.Scalar(LifeCycleValues.RUNNING),
+                        sm.Scalar(LifeCycleValue.RUNNING),
                     ),
                 ],
-                else_result=sm.Scalar(LifeCycleValues.PAUSED),
+                else_result=sm.Scalar(LifeCycleValue.PAUSED),
             ),
             terminal=sm.if_else(
                 condition=reset,
-                if_result=sm.Scalar(LifeCycleValues.NOT_STARTED),
+                if_result=sm.Scalar(LifeCycleValue.NOT_STARTED),
                 else_result=self.life_cycle_variable,
             ),
         )
@@ -1271,38 +1356,38 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         return sm.if_cases(
             cases=[
                 (
-                    self._parent_is(LifeCyclePredicate.IS_NOT_STARTED),
-                    sm.Scalar(LifeCycleValues.NOT_STARTED),
+                    self._parent_is(predicate=LifeCyclePredicate.IS_NOT_STARTED),
+                    sm.Scalar(LifeCycleValue.NOT_STARTED),
                 ),
                 (
                     sm.logic_and(
-                        self._parent_is(LifeCyclePredicate.IS_TERMINATED),
+                        self._parent_is(predicate=LifeCyclePredicate.IS_TERMINATED),
                         sm.logic_or(
                             self.life_cycle_predicate_expression(
-                                LifeCyclePredicate.IS_RUNNING
+                                predicate=LifeCyclePredicate.IS_RUNNING
                             ),
                             self.life_cycle_predicate_expression(
-                                LifeCyclePredicate.IS_PAUSED
+                                predicate=LifeCyclePredicate.IS_PAUSED
                             ),
                         ),
                     ),
-                    sm.Scalar(LifeCycleValues.INTERRUPTED),
+                    sm.Scalar(LifeCycleValue.INTERRUPTED),
                 ),
                 (
                     sm.logic_and(
-                        self._parent_is(LifeCyclePredicate.IS_PAUSED),
+                        self._parent_is(predicate=LifeCyclePredicate.IS_PAUSED),
                         self.life_cycle_predicate_expression(
-                            LifeCyclePredicate.IS_RUNNING
+                            predicate=LifeCyclePredicate.IS_RUNNING
                         ),
                     ),
-                    sm.Scalar(LifeCycleValues.PAUSED),
+                    sm.Scalar(LifeCycleValue.PAUSED),
                 ),
             ],
             else_result=self.life_cycle_variable,
         )
 
     def _create_end_cases(
-        self, own_transitions_allowed: sm.Scalar
+        self, *, own_transitions_allowed: sm.Scalar
     ) -> list[tuple[sm.Scalar, sm.Scalar]]:
         """
         Every way this node leaves RUNNING or PAUSED, and the outcome each yields.
@@ -1319,22 +1404,24 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             *[
                 (
                     self._own_trigger(
-                        self.effective_condition(transition_kind),
-                        own_transitions_allowed,
+                        trigger=self.effective_condition(
+                            transition_kind=transition_kind
+                        ),
+                        own_transitions_allowed=own_transitions_allowed,
                     ),
                     sm.Scalar(transition_kind.outcome),
                 )
                 for transition_kind in TransitionKind.ending_kinds()
             ],
             (
-                self._parent_is(LifeCyclePredicate.IS_TERMINATED),
-                sm.Scalar(LifeCycleValues.INTERRUPTED),
+                self._parent_is(predicate=LifeCyclePredicate.IS_TERMINATED),
+                sm.Scalar(LifeCycleValue.INTERRUPTED),
             ),
         ]
 
     @staticmethod
     def _own_trigger(
-        trigger: sm.Scalar, own_transitions_allowed: sm.Scalar
+        *, trigger: sm.Scalar, own_transitions_allowed: sm.Scalar
     ) -> sm.Scalar:
         """
         :param trigger: When one of this node's own transitions would happen.
@@ -1344,7 +1431,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return sm.logic_and(trigger, own_transitions_allowed)
 
-    def _parent_is(self, predicate: LifeCyclePredicate) -> sm.Scalar:
+    def _parent_is(self, *, predicate: LifeCyclePredicate) -> sm.Scalar:
         """
         :param predicate: The test on the parent's life cycle state.
         :return: The test on the life cycle state of this node's parent, false for a
@@ -1352,7 +1439,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         if self.parent_node is None:
             return sm.Scalar.const_false()
-        return self.parent_node.life_cycle_predicate_expression(predicate)
+        return self.parent_node.life_cycle_predicate_expression(predicate=predicate)
 
     def _is_top_level_or_parent_running(self) -> sm.Scalar:
         """
@@ -1361,19 +1448,19 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         if self.parent_node is None:
             return sm.Scalar.const_true()
         return self.parent_node.life_cycle_predicate_expression(
-            LifeCyclePredicate.IS_RUNNING
+            predicate=LifeCyclePredicate.IS_RUNNING
         )
 
-    def get_condition(self, transition_kind: TransitionKind) -> Scalar:
+    def get_condition(self, *, transition_kind: TransitionKind) -> Scalar:
         """
         Get the condition for the given transition kind.
         :param transition_kind: The kind of transition whose condition to get.
         :return: The condition for the given transition kind.
         """
-        return self._get_transition(transition_kind).expression
+        return self._get_transition(transition_kind=transition_kind).expression
 
     def set_condition(
-        self, transition_kind: TransitionKind, expression: Scalar
+        self, *, transition_kind: TransitionKind, expression: Scalar
     ) -> None:
         """
         Set the condition for the given transition kind.
@@ -1381,10 +1468,10 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param transition_kind: The kind of transition whose condition to set.
         :param expression: The expression deciding when that transition happens.
         """
-        transition = self._get_transition(transition_kind)
+        transition = self._get_transition(transition_kind=transition_kind)
         if transition is None:
-            raise NotInStatechartError(self.name)
-        transition.update_expression(expression, self)
+            raise NotInStatechartError(name=self.name)
+        transition.update_expression(new_expression=expression, child=self)
 
     def _clear_owner_wiring(self) -> None:
         """
@@ -1392,9 +1479,14 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         created with, so that another owner can wire it.
         """
         for transition_kind in TransitionKind.owner_wired_kinds():
-            self.set_condition(transition_kind, transition_kind.unwired_condition)
+            self.set_condition(
+                transition_kind=transition_kind,
+                expression=transition_kind.default_condition,
+            )
 
-    def _get_transition(self, transition_kind: TransitionKind) -> TransitionCondition:
+    def _get_transition(
+        self, *, transition_kind: TransitionKind
+    ) -> TransitionCondition:
         """
         :param transition_kind: The kind of transition to look up.
         :return: This node's transition of that kind.
@@ -1441,7 +1533,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :return: The statechart this node belongs to.
         """
         if self._statechart is None:
-            raise NotInStatechartError(self.name)
+            raise NotInStatechartError(name=self.name)
         return self._statechart
 
     @statechart.setter
@@ -1450,6 +1542,26 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param statechart: The statechart this node now belongs to.
         """
         self._statechart = statechart
+
+    @property
+    def _structure_change_recorder(self) -> StructureChangeRecorder:
+        """
+        :return: The recorder of the statechart this node belongs to, or a recorder
+            that records nothing if it belongs to none.
+        """
+        if self._statechart is None:
+            return StructureChangeRecorderOutsideStatechart()
+        return self._statechart.structure_change_recorder
+
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Records with `recorder` every part of the structure of this node that a copy of
+        its statechart has to repeat: the condition of every transition.
+        """
+        for transition_kind in TransitionKind:
+            recorder._record_changed_condition(
+                node=self, transition_kind=transition_kind
+            )
 
     @property
     def context(self) -> StatechartContext:
@@ -1482,6 +1594,17 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             :meth:`~cramph.statechart.Statechart.create_structure_copy`.
         """
         return StructureCopyNode(name=self.name)
+
+    def create_structure_counterpart(self) -> StatechartNode:
+        """
+        :return: The structure copy of this node, see :meth:`create_structure_copy`,
+            with the id and the plot specifications of this node, so that a document
+            naming this node by its id names the copy too.
+        """
+        counterpart = self.create_structure_copy()
+        counterpart._take_over_node_id(node_id=self._node_id)
+        counterpart.plot_specifications = deepcopy(self.plot_specifications)
+        return counterpart
 
     def set_up(self) -> None:
         """
@@ -1521,7 +1644,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return NodeArtifacts()
 
-    def on_tick(self) -> ObservationStateValues | None:
+    def on_tick(self) -> ObservationStateValue | None:
         """
         Triggered when the node is ticked.
         .. warning:: This method is called inside a control loop, make sure it is fast.
@@ -1584,11 +1707,11 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         return self is other
 
     @property
-    def life_cycle_state(self) -> LifeCycleValues:
+    def life_cycle_state(self) -> LifeCycleValue:
         """
         :return: The current life cycle state of this node.
         """
-        return LifeCycleValues(self.statechart.life_cycle_state[self])
+        return LifeCycleValue(self.statechart.life_cycle_state[self])
 
     @property
     def observation_state(self) -> float:
@@ -1609,7 +1732,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         return self._last_observation_variable
 
     @property
-    def last_observation_state(self) -> ObservationStateValues:
+    def last_observation_state(self) -> ObservationStateValue:
         """
         :return: The observation this node took most recently.
         """
@@ -1622,7 +1745,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             recently started running, None if it has not started since its last
             reset.
         """
-        run = self.statechart.state_history.get_current_run_ticks_of_node(self)
+        run = self.statechart.state_history.get_current_run_ticks_of_node(node=self)
         if run is None:
             return None
         return run.start_tick * self.statechart.context.require_tick_duration()
@@ -1634,7 +1757,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             recently ended, None if it has not started since its last reset or has
             not ended yet.
         """
-        run = self.statechart.state_history.get_current_run_ticks_of_node(self)
+        run = self.statechart.state_history.get_current_run_ticks_of_node(node=self)
         if run is None or run.end_tick is None:
             return None
         return run.end_tick * self.statechart.context.require_tick_duration()
@@ -1652,8 +1775,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param expression: The expression deciding when this node transitions from NOT_STARTED to RUNNING.
         """
         if self._start_condition is None:
-            raise NotInStatechartError(self.name)
-        self._start_condition.update_expression(expression, self)
+            raise NotInStatechartError(name=self.name)
+        self._start_condition.update_expression(new_expression=expression, child=self)
 
     @property
     def pause_condition(self) -> Scalar:
@@ -1668,8 +1791,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param expression: The expression deciding when this node transitions from RUNNING to PAUSED or back.
         """
         if self._pause_condition is None:
-            raise NotInStatechartError(self.name)
-        self._pause_condition.update_expression(expression, self)
+            raise NotInStatechartError(name=self.name)
+        self._pause_condition.update_expression(new_expression=expression, child=self)
 
     @property
     def success_condition(self) -> Scalar:
@@ -1684,8 +1807,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param expression: The expression deciding when this node ends as SUCCEEDED.
         """
         if self._success_condition is None:
-            raise NotInStatechartError(self.name)
-        self._success_condition.update_expression(expression, self)
+            raise NotInStatechartError(name=self.name)
+        self._success_condition.update_expression(new_expression=expression, child=self)
 
     @property
     def interrupt_condition(self) -> Scalar:
@@ -1700,8 +1823,10 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param expression: The expression deciding when this node ends as INTERRUPTED.
         """
         if self._interrupt_condition is None:
-            raise NotInStatechartError(self.name)
-        self._interrupt_condition.update_expression(expression, self)
+            raise NotInStatechartError(name=self.name)
+        self._interrupt_condition.update_expression(
+            new_expression=expression, child=self
+        )
 
     @property
     def reset_condition(self) -> Scalar:
@@ -1716,8 +1841,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :param expression: The expression deciding when this node transitions to NOT_STARTED.
         """
         if self._reset_condition is None:
-            raise NotInStatechartError(self.name)
-        self._reset_condition.update_expression(expression, self)
+            raise NotInStatechartError(name=self.name)
+        self._reset_condition.update_expression(new_expression=expression, child=self)
 
     @property
     def fail_condition(self) -> Scalar:
@@ -1733,8 +1858,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             continue.
         """
         if self._fail_condition is None:
-            raise NotInStatechartError(self.name)
-        self._fail_condition.update_expression(expression, self)
+            raise NotInStatechartError(name=self.name)
+        self._fail_condition.update_expression(new_expression=expression, child=self)
 
     @property
     def can_fail_on_its_own(self) -> bool:
@@ -1745,7 +1870,9 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         .. note:: Complete only once every goal of the statechart has expanded,
             because a template may write a fail condition while expanding.
         """
-        return not self.effective_condition(TransitionKind.FAIL).is_constant_false()
+        return not self.effective_condition(
+            transition_kind=TransitionKind.FAIL
+        ).is_constant_false()
 
     @property
     @abstractmethod
@@ -1771,14 +1898,14 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return Scalar.const_false()
 
-    def effective_condition(self, transition_kind: TransitionKind) -> Scalar:
+    def effective_condition(self, *, transition_kind: TransitionKind) -> Scalar:
         """
         :param transition_kind: The kind of transition whose condition to get.
         :return: The expression deciding when that transition happens: the written
             condition, see :meth:`get_condition`, or for succeeding and failing either
             that or the inherent one.
         """
-        written_condition = self.get_condition(transition_kind)
+        written_condition = self.get_condition(transition_kind=transition_kind)
         match transition_kind:
             case TransitionKind.SUCCEED:
                 inherent_condition = self.inherent_success_condition
@@ -1790,19 +1917,21 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             return written_condition
         return sm.logic_or(written_condition, inherent_condition)
 
-    def life_cycle_predicate_expression(self, predicate: LifeCyclePredicate) -> Scalar:
+    def life_cycle_predicate_expression(
+        self, *, predicate: LifeCyclePredicate
+    ) -> Scalar:
         """
         :param predicate: The test to read.
         :return: The truth table of `predicate` over :attr:`life_cycle_variable`.
         """
         if predicate not in self._life_cycle_predicate_expression_cache:
             self._life_cycle_predicate_expression_cache[predicate] = (
-                predicate.expression(self.life_cycle_variable)
+                predicate.expression(life_cycle=self.life_cycle_variable)
             )
         return self._life_cycle_predicate_expression_cache[predicate]
 
     def _life_cycle_predicate(
-        self, predicate: LifeCyclePredicate
+        self, *, predicate: LifeCyclePredicate
     ) -> LifeCyclePredicateVariable:
         """
         Hands out the variable for one test on this node's life cycle state, creating it
@@ -1835,11 +1964,11 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return [
             *(
-                self._life_cycle_predicate(predicate)
+                self._life_cycle_predicate(predicate=predicate)
                 for predicate in LifeCyclePredicate
             ),
             *(
-                self._observation_predicate(predicate)
+                self._observation_predicate(predicate=predicate)
                 for predicate in ObservationPredicate
             ),
         ]
@@ -1867,12 +1996,17 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         conditions = []
         for transition_kind in [written.kind for written in self.conditions]:
             condition = TransitionCondition(kind=transition_kind, owner=self)
-            condition.update_expression(self.effective_condition(transition_kind), self)
+            condition.update_expression(
+                new_expression=self.effective_condition(
+                    transition_kind=transition_kind
+                ),
+                child=self,
+            )
             conditions.append(condition)
         return conditions
 
     def _observation_predicate(
-        self, predicate: ObservationPredicate
+        self, *, predicate: ObservationPredicate
     ) -> ObservationPredicateVariable:
         """
         Hands out the variable for one test on this node's observations, creating it on
@@ -1901,7 +2035,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :return: True while this node observes True, false while it observes anything
             else or is not running.
         """
-        return self._observation_predicate(ObservationPredicate.OBSERVES_TRUE)
+        return self._observation_predicate(predicate=ObservationPredicate.OBSERVES_TRUE)
 
     @property
     def observes_false(self) -> ObservationPredicateVariable:
@@ -1909,7 +2043,9 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :return: True while this node observes False, false while it observes anything
             else or is not running.
         """
-        return self._observation_predicate(ObservationPredicate.OBSERVES_FALSE)
+        return self._observation_predicate(
+            predicate=ObservationPredicate.OBSERVES_FALSE
+        )
 
     @property
     def last_observed_true(self) -> ObservationPredicateVariable:
@@ -1920,49 +2056,51 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :return: True if the observation this node took most recently is True, false
             otherwise.
         """
-        return self._observation_predicate(ObservationPredicate.LAST_OBSERVED_TRUE)
+        return self._observation_predicate(
+            predicate=ObservationPredicate.LAST_OBSERVED_TRUE
+        )
 
     @property
     def is_not_started(self) -> LifeCyclePredicateVariable:
         """
         :return: True while this node has not started, false otherwise.
         """
-        return self._life_cycle_predicate(LifeCyclePredicate.IS_NOT_STARTED)
+        return self._life_cycle_predicate(predicate=LifeCyclePredicate.IS_NOT_STARTED)
 
     @property
     def is_running(self) -> LifeCyclePredicateVariable:
         """
         :return: True while this node is running, false otherwise.
         """
-        return self._life_cycle_predicate(LifeCyclePredicate.IS_RUNNING)
+        return self._life_cycle_predicate(predicate=LifeCyclePredicate.IS_RUNNING)
 
     @property
     def is_paused(self) -> LifeCyclePredicateVariable:
         """
         :return: True while this node is paused, false otherwise.
         """
-        return self._life_cycle_predicate(LifeCyclePredicate.IS_PAUSED)
+        return self._life_cycle_predicate(predicate=LifeCyclePredicate.IS_PAUSED)
 
     @property
     def is_terminated(self) -> LifeCyclePredicateVariable:
         """
         :return: True once this node has ended, whatever its outcome, false before that.
         """
-        return self._life_cycle_predicate(LifeCyclePredicate.IS_TERMINATED)
+        return self._life_cycle_predicate(predicate=LifeCyclePredicate.IS_TERMINATED)
 
     @property
     def is_succeeded(self) -> LifeCyclePredicateVariable:
         """
         :return: True once this node ended by succeeding, false otherwise.
         """
-        return self._life_cycle_predicate(LifeCyclePredicate.IS_SUCCEEDED)
+        return self._life_cycle_predicate(predicate=LifeCyclePredicate.IS_SUCCEEDED)
 
     @property
     def is_failed(self) -> LifeCyclePredicateVariable:
         """
         :return: True once this node ended by failing, false otherwise.
         """
-        return self._life_cycle_predicate(LifeCyclePredicate.IS_FAILED)
+        return self._life_cycle_predicate(predicate=LifeCyclePredicate.IS_FAILED)
 
     @property
     def is_interrupted(self) -> LifeCyclePredicateVariable:
@@ -1970,7 +2108,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :return: True once this node ended because its interrupt condition held or an
             ancestor ended, false otherwise.
         """
-        return self._life_cycle_predicate(LifeCyclePredicate.IS_INTERRUPTED)
+        return self._life_cycle_predicate(predicate=LifeCyclePredicate.IS_INTERRUPTED)
 
     @property
     def is_failed_or_interrupted(self) -> sm.Scalar:
@@ -1994,7 +2132,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return sm.logic_or(self.is_failed, self.is_interrupted)
 
-    def formatted_name(self, quoted: bool = False) -> str:
+    def formatted_name(self, *, quoted: bool = False) -> str:
         """
         Renders the name of this node together with all of its transition conditions.
 
@@ -2024,7 +2162,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         return result
 
     @staticmethod
-    def _wrap_text(text: str, max_lines: int, max_line_length: int) -> str:
+    def _wrap_text(*, text: str, max_lines: int, max_line_length: int) -> str:
         """
         :param text: The text to wrap.
         :param max_lines: The most lines the result may have.
@@ -2054,7 +2192,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return f"{self.name}#{self.index}"
 
-    def rebuilt_by(self, rebuild: NodeRebuild) -> Self | None:
+    def rebuilt_by(self, *, rebuild: NodeRebuild) -> Self | None:
         """
         :param rebuild: Builds the nodes this node holds anew and rebinds what it refers
             to.
@@ -2069,12 +2207,12 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             if constructor_field.init
         }
         held_nodes = {
-            name: rebuild.rebuilt(value)
+            name: rebuild.rebuilt(node=value)
             for name, value in arguments.items()
             if isinstance(value, StatechartNode)
         }
         held_node_lists = {
-            name: rebuild.rebuilt_children(self, value)
+            name: rebuild.rebuilt_children(owner=self, children=value)
             for name, value in arguments.items()
             if isinstance(value, list)
             and value
@@ -2090,7 +2228,7 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             if name not in held_nodes and name not in held_node_lists
         }
         return type(self)(
-            **rebuild.rebound(other_arguments), **held_nodes, **held_node_lists
+            **rebuild.rebound(value=other_arguments), **held_nodes, **held_node_lists
         )
 
     def __repr__(self) -> str:
@@ -2103,7 +2241,7 @@ GenericStatechartNode = TypeVar("GenericStatechartNode", bound=StatechartNode)
 # %% building nodes anew
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeRebuild(ABC):
     """
     Builds nodes of a statechart anew, as nodes of no statechart, from the arguments
@@ -2111,7 +2249,7 @@ class NodeRebuild(ABC):
     """
 
     @abstractmethod
-    def rebuilt(self, node: StatechartNode) -> StatechartNode | None:
+    def rebuilt(self, *, node: StatechartNode) -> StatechartNode | None:
         """
         :param node: A node a node being built anew holds or refers to.
         :return: `node` built anew, the same node each time `node` is asked for, or
@@ -2120,7 +2258,7 @@ class NodeRebuild(ABC):
 
     @abstractmethod
     def rebuilt_children(
-        self, owner: StatechartNode, children: list[StatechartNode]
+        self, *, owner: StatechartNode, children: list[StatechartNode]
     ) -> list[StatechartNode]:
         """
         :param owner: The node holding `children`.
@@ -2129,7 +2267,7 @@ class NodeRebuild(ABC):
         """
 
     @abstractmethod
-    def rebound(self, value: Any) -> Any:
+    def rebound(self, *, value: Any) -> Any:
         """
         :param value: A node of no statechart, or anything it was constructed with.
         :return: `value` referring to what the nodes built anew refer to.
@@ -2186,7 +2324,7 @@ class StructureCopyNode(EndedByOwner, StatechartNode):
 # %% deserialization
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
     """
     The nodes deserialized from one JSON document, by the node id they were serialized
@@ -2205,7 +2343,7 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
     """
 
     @classmethod
-    def from_statechart(cls, statechart: Statechart) -> Self:
+    def from_statechart(cls, *, statechart: Statechart) -> Self:
         """
         :param statechart: The statechart whose nodes are found by the id
             they carry.
@@ -2216,15 +2354,15 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
         return tracker
 
     def _has_untracked(self, *, key: str) -> bool:
-        return self._find_node_of_statechart(key) is not None
+        return self._find_node_of_statechart(node_id=key) is not None
 
     def _get_untracked(self, *, key: str, name: Any = None) -> StatechartNode:
-        node = self._find_node_of_statechart(key)
+        node = self._find_node_of_statechart(node_id=key)
         if node is None:
             raise UntrackedObjectError(key=key, name=name)
         return node
 
-    def _find_node_of_statechart(self, node_id: str) -> StatechartNode | None:
+    def _find_node_of_statechart(self, *, node_id: str) -> StatechartNode | None:
         """
         :param node_id: The id of the node to find.
         :return: The node of :attr:`_statechart` with that id, or None if there is
@@ -2282,6 +2420,52 @@ class CompositeNode(StatechartNode):
         """
         return list(self.nodes)
 
+    def set_children(self, *, children: list[StatechartNode]) -> None:
+        """
+        Holds `children` as the children of this node from now on, in that order, and
+        records the change in the statechart this node belongs to.
+
+        .. warning:: Changing :attr:`nodes` in place goes unrecorded once the
+            :meth:`~cramph.statechart.Statechart.modify` block this node joined in has
+            ended, so a copy of the statechart repeating its changes misses it.
+
+        :param children: The nodes to hold as children.
+        """
+        self.nodes = list(children)
+        self._structure_change_recorder._record_changed_children(node=self)
+
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Also records the children, see :meth:`StatechartNode._record_structure`.
+        """
+        super()._record_structure(recorder=recorder)
+        recorder._record_changed_children(node=self)
+
+    def insert_child(self, *, position: int, node: StatechartNode) -> None:
+        """
+        Lists `node` among the children at `position`, without adding it to the
+        statechart, and records the change like :meth:`set_children`. See
+        :meth:`_add_listed_child_to_statechart` for adding it.
+
+        :param position: The index among the children `node` takes.
+        :param node: The node to list as a child.
+        """
+        self.set_children(
+            children=[*self.nodes[:position], node, *self.nodes[position:]]
+        )
+
+    def remove_child(self, *, child: StatechartNode) -> None:
+        """
+        Stops listing `child` itself among the children, whatever other child it
+        compares equal to, without removing it from the statechart, and records the
+        change like :meth:`set_children`.
+
+        :param child: One of :attr:`nodes`.
+        """
+        self.set_children(
+            children=[listed for listed in self.nodes if listed is not child]
+        )
+
     @classproperty
     def context_extensions_required_to_expand(
         cls,
@@ -2305,6 +2489,18 @@ class CompositeNode(StatechartNode):
         """
         return None
 
+    def check_handed_children(
+        self, *, taken_over: StatechartNode | None = None
+    ) -> None:
+        """
+        Rejects the children this node was handed that it cannot adopt, see
+        :meth:`adopt_handed_children`. Rejects none unless overridden.
+
+        :param taken_over: A handed child this node takes over before it adopts its
+            children, see :meth:`take_over`, which it can adopt then.
+        """
+        return None
+
     def expand(self) -> None:
         """
         Instantiate child nodes, add them to this node, and wire their life cycle transition conditions.
@@ -2323,7 +2519,7 @@ class CompositeNode(StatechartNode):
         """
         return None
 
-    def _add_child_to_statechart(self, node: StatechartNode) -> None:
+    def _add_child_to_statechart(self, *, node: StatechartNode) -> None:
         """
         Adds a node to this node and to the statechart this node belongs to.
 
@@ -2331,49 +2527,53 @@ class CompositeNode(StatechartNode):
         :raises StatechartAlreadyCompiledError: If this node accepts no children any
             more, see :meth:`_check_accepts_children`.
         """
-        self._add_node_sanity_check(node)
+        self._add_node_sanity_check(node=node)
         self._check_accepts_children()
         if node not in self.nodes:
-            self.nodes.append(node)
-        self._place_child_in_statechart(node)
+            self.insert_child(position=len(self.nodes), node=node)
+        self._add_listed_child_to_statechart(node=node)
 
-    def _place_child_in_statechart(self, node: StatechartNode) -> None:
+    def _add_listed_child_to_statechart(self, *, node: StatechartNode) -> None:
         """
-        Makes `node` a child of this node in the statechart this node belongs to,
-        without touching :attr:`nodes`.
+        Adds `node`, which :attr:`nodes` lists already, to the statechart this node
+        belongs to, as a child of this node, without touching :attr:`nodes`.
 
         .. note:: It does not check :meth:`_check_accepts_children`; check that before
             changing :attr:`nodes`, so a rejected node leaves this node as it was.
 
         :param node: The node that becomes a child of this node.
         """
-        self._add_node_sanity_check(node)
+        self._add_node_sanity_check(node=node)
         if node._statechart is self.statechart:
             return
         node.parent_node = self
-        self.statechart.add_node(node)
+        self.statechart.add_node(node=node)
 
     def _check_accepts_children(self) -> None:
         """
         :raises StatechartAlreadyCompiledError: If the latest compile covered this
-            node, which fixed its wiring over its children, and it accepts no children
-            after that.
+            node, which fixed its wiring over its children, it accepts no children
+            after that, and no block of :meth:`~cramph.statechart.Statechart.modify`
+            rewriting compiled nodes is open.
         """
-        if self.accepts_children_after_compile:
+        if (
+            self.accepts_children_after_compile
+            or self.statechart.may_rewrite_compiled_nodes
+        ):
             return
-        if self.statechart.compiler.latest_compile_covers(self):
+        if self.statechart.compiler.latest_compile_covers(node=self):
             raise StatechartAlreadyCompiledError()
 
-    def _add_node_sanity_check(self, node: StatechartNode) -> None:
+    def _add_node_sanity_check(self, *, node: StatechartNode) -> None:
         """
         Rejects nodes that may not become a child of this node.
 
         :param node: The node to validate.
         """
-        self._check_node_does_not_end_statechart(node)
-        self._check_node_doesnt_belong_to_different_parent(node)
+        self._check_node_does_not_end_statechart(node=node)
+        self._check_node_doesnt_belong_to_different_parent(node=node)
 
-    def _check_caller_wired_no_transitions(self, node: StatechartNode) -> None:
+    def _check_caller_wired_no_transitions(self, *, node: StatechartNode) -> None:
         """
         Rejects a child whose life cycle the caller already decided, which is this
         node's to decide.
@@ -2386,14 +2586,14 @@ class CompositeNode(StatechartNode):
             no longer the one it was constructed with.
         """
         for transition_kind in TransitionKind.owner_wired_kinds():
-            condition = node.get_condition(transition_kind)
-            if str(condition) != str(transition_kind.unwired_condition):
+            condition = node.get_condition(transition_kind=transition_kind)
+            if str(condition) != str(transition_kind.default_condition):
                 raise ChildTransitionAlreadyWiredError(
                     node=self, child=node, transition_kind=transition_kind
                 )
 
     def list_in_place_of(
-        self, child: StatechartNode, substitute: StatechartNode
+        self, *, child: StatechartNode, substitute: StatechartNode
     ) -> None:
         """
         Lists `substitute` among :attr:`nodes` where `child` itself is listed, leaving
@@ -2402,12 +2602,13 @@ class CompositeNode(StatechartNode):
         :param child: One of :attr:`nodes`.
         :param substitute: The node to list in its place.
         """
-        position = next(
-            index for index, listed in enumerate(self.nodes) if listed is child
+        self.set_children(
+            children=[
+                substitute if listed is child else listed for listed in self.nodes
+            ]
         )
-        self.nodes[position] = substitute
 
-    def take_over(self, node: StatechartNode) -> None:
+    def take_over(self, *, node: StatechartNode) -> None:
         """
         Becomes the parent of `node`, which forgets the transitions its former parent
         decided for it, so that this node decides them anew.
@@ -2417,7 +2618,7 @@ class CompositeNode(StatechartNode):
         node._clear_owner_wiring()
         node.parent_node = self
 
-    def _succeed_at_its_goal(self, child: StatechartNode) -> None:
+    def _succeed_at_its_goal(self, *, child: StatechartNode) -> None:
         """
         Ends a child whose owner decides its success once it observes True, which is
         this node deciding it as its owner. A child that fails on the same tick fails,
@@ -2429,7 +2630,9 @@ class CompositeNode(StatechartNode):
             return
         child.success_condition = sm.logic_and(
             child.observes_true,
-            sm.logic_not(child.effective_condition(TransitionKind.FAIL)),
+            sm.logic_not(
+                child.effective_condition(transition_kind=TransitionKind.FAIL)
+            ),
         )
 
     def _check_has_children(self) -> None:
@@ -2444,7 +2647,7 @@ class CompositeNode(StatechartNode):
         if not self.nodes:
             raise CompositeNodeWithoutChildrenError(node=self)
 
-    def _check_node_does_not_end_statechart(self, node: StatechartNode) -> None:
+    def _check_node_does_not_end_statechart(self, *, node: StatechartNode) -> None:
         """
         Rejects nodes that end the whole statechart.
 
@@ -2454,7 +2657,7 @@ class CompositeNode(StatechartNode):
             raise EndInCompositeNodeError(node=self)
 
     def _check_node_doesnt_belong_to_different_parent(
-        self, node: StatechartNode
+        self, *, node: StatechartNode
     ) -> None:
         """
         Rejects a node that is already a child of another node of this statechart.
@@ -2470,7 +2673,7 @@ class CompositeNode(StatechartNode):
         if node.belongs_to_statechart() and node.parent_node != self:
             raise NodeAlreadyBelongsToDifferentNodeError(node=self, new_node=node)
 
-    def _add_children_to_statechart(self, nodes: list[StatechartNode]) -> None:
+    def _add_children_to_statechart(self, *, nodes: list[StatechartNode]) -> None:
         """
         Adds multiple nodes to this node and to the statechart this node belongs
         to, see :meth:`_add_child_to_statechart`.
@@ -2478,7 +2681,7 @@ class CompositeNode(StatechartNode):
         :param nodes: The nodes to add as children of this node.
         """
         for node in nodes:
-            self._add_child_to_statechart(node)
+            self._add_child_to_statechart(node=node)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -2524,7 +2727,7 @@ class ThreadPayloadMonitor(EndedByOwner, StatechartNode, ABC):
     """
 
     _last_result: float = field(
-        default=ObservationStateValues.UNKNOWN, init=False, repr=False
+        default=ObservationStateValue.UNKNOWN, init=False, repr=False
     )
     """
     The observation the latest finished computation returned.
@@ -2590,7 +2793,7 @@ class TerminalNode(EndedByOwner, StatechartNode, ABC):
     """
 
     @staticmethod
-    def _observing_true_or_succeeded(node: StatechartNode) -> Scalar:
+    def _observing_true_or_succeeded(*, node: StatechartNode) -> Scalar:
         """
         :param node: The node to read.
         :return: A condition that is True while `node` observes True and once it
@@ -2619,7 +2822,7 @@ class EndStatechart(TerminalNode):
         return NodeArtifacts(observation=Scalar.const_true())
 
     @classmethod
-    def when_true(cls, node: StatechartNode) -> Self:
+    def when_true(cls, *, node: StatechartNode) -> Self:
         """
         Factory method for creating an EndStatechart node that activates once the given node
         observes True or succeeded.
@@ -2628,11 +2831,11 @@ class EndStatechart(TerminalNode):
         :return: The new EndStatechart node.
         """
         end = cls()
-        end.start_condition = cls._observing_true_or_succeeded(node)
+        end.start_condition = cls._observing_true_or_succeeded(node=node)
         return end
 
     @classmethod
-    def when_failed(cls, node: StatechartNode) -> Self:
+    def when_failed(cls, *, node: StatechartNode) -> Self:
         """
         Factory method for creating an EndStatechart node that activates once the given node
         ended by failing.
@@ -2645,7 +2848,7 @@ class EndStatechart(TerminalNode):
         return end
 
     @classmethod
-    def when_false(cls, node: StatechartNode) -> Self:
+    def when_false(cls, *, node: StatechartNode) -> Self:
         """
         Factory method for creating an EndStatechart node that activates while the given node
         has a false observation state.
@@ -2663,7 +2866,7 @@ class EndStatechart(TerminalNode):
         return end
 
     @classmethod
-    def when_all_true(cls, nodes: list[StatechartNode]) -> Self:
+    def when_all_true(cls, *, nodes: list[StatechartNode]) -> Self:
         """
         Factory method for creating an EndStatechart node that activates once *all* of the
         given nodes observe True or succeeded.
@@ -2673,12 +2876,12 @@ class EndStatechart(TerminalNode):
         """
         end = cls()
         end.start_condition = sm.logic_and(
-            *[cls._observing_true_or_succeeded(node) for node in nodes]
+            *[cls._observing_true_or_succeeded(node=node) for node in nodes]
         )
         return end
 
     @classmethod
-    def when_any_true(cls, nodes: list[StatechartNode]) -> Self:
+    def when_any_true(cls, *, nodes: list[StatechartNode]) -> Self:
         """
         Factory method for creating an EndStatechart node that activates once *any* of the
         given nodes observes True or succeeded.
@@ -2688,7 +2891,7 @@ class EndStatechart(TerminalNode):
         """
         end = cls()
         end.start_condition = sm.logic_or(
-            *[cls._observing_true_or_succeeded(node) for node in nodes]
+            *[cls._observing_true_or_succeeded(node=node) for node in nodes]
         )
         return end
 
@@ -2765,7 +2968,7 @@ class CancelStatechart(TerminalNode):
 
     @classmethod
     def when_true(
-        cls, node: StatechartNode, exception: Exception | None = None
+        cls, *, node: StatechartNode, exception: Exception | None = None
     ) -> Self:
         """
         Factory method for creating a CancelStatechart node that activates once the given
@@ -2778,12 +2981,12 @@ class CancelStatechart(TerminalNode):
         if exception is None:
             exception = CancelledByNodeReachingItsGoal(node=node)
         end = cls(exception=exception)
-        end.start_condition = cls._observing_true_or_succeeded(node)
+        end.start_condition = cls._observing_true_or_succeeded(node=node)
         return end
 
     @classmethod
     def when_failed(
-        cls, node: StatechartNode, exception: Exception | None = None
+        cls, *, node: StatechartNode, exception: Exception | None = None
     ) -> Self:
         """
         Factory method for creating a CancelStatechart node that activates once the given
@@ -2800,7 +3003,9 @@ class CancelStatechart(TerminalNode):
         return end
 
     @classmethod
-    def when_all_true(cls, nodes: list[StatechartNode], exception: Exception) -> Self:
+    def when_all_true(
+        cls, *, nodes: list[StatechartNode], exception: Exception
+    ) -> Self:
         """
         Factory method for creating a CancelStatechart node that activates once *all* of the
         given nodes observe True or succeeded.
@@ -2811,12 +3016,14 @@ class CancelStatechart(TerminalNode):
         """
         end = cls(exception=exception)
         end.start_condition = sm.logic_and(
-            *[cls._observing_true_or_succeeded(node) for node in nodes]
+            *[cls._observing_true_or_succeeded(node=node) for node in nodes]
         )
         return end
 
     @classmethod
-    def when_any_true(cls, nodes: list[StatechartNode], exception: Exception) -> Self:
+    def when_any_true(
+        cls, *, nodes: list[StatechartNode], exception: Exception
+    ) -> Self:
         """
         Factory method for creating a CancelStatechart node that activates once *any* of the
         given nodes observes True or succeeded.
@@ -2827,6 +3034,6 @@ class CancelStatechart(TerminalNode):
         """
         end = cls(exception=exception)
         end.start_condition = sm.logic_or(
-            *[cls._observing_true_or_succeeded(node) for node in nodes]
+            *[cls._observing_true_or_succeeded(node=node) for node in nodes]
         )
         return end

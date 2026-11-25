@@ -16,10 +16,13 @@ kernelspec:
 This example demonstrates how to use `CartesianPose` goals to move a robot to a specific pose. We will use the PR2 robot for this demonstration.
 
 ```{code-cell} ipython3
+:tags: [skip-execution]
+
 import os
 from cramph.context import StatechartContext
 from cramph.executor import SimulationPacer, StatechartExecutor
 from giskardpy.motion_control import MotionControl
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
@@ -51,7 +54,7 @@ with world.modify_world():
     localization_body = Body(name=PrefixedName("odom_combined"))
 
     map_C_localization = Connection6DoF.create_with_dofs(
-        world, map_body, localization_body
+        world=world, parent=map_body, child=localization_body
     )
     world.add_connection(map_C_localization)
 
@@ -87,16 +90,15 @@ goal_pose = Pose(
 )
 goal = CartesianPose(
     name="move_to_goal", 
-    root_link=root_link, 
-    tip_link=tip_link, 
+    kinematic_chain=KinematicChain(root=root_link, tip=tip_link),
     goal_pose=goal_pose
 )
 
-statechart.add_node(goal)
-statechart.add_node(EndMotion.when_true(goal))
+statechart.add_node(node=goal)
+statechart.add_node(node=EndMotion.when_true(node=goal))
 
 # 4. Compile and run the statechart
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.tick_until_end(timeout=100)
 print(f"Motion finished after {executor.tick_count} cycles.")
 ```

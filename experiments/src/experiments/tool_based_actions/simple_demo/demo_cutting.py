@@ -18,8 +18,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bread,
     CuttingKnife,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
 
 from coraplex.datastructures.enums import CuttingTechnique
 from coraplex.robot_plans.actions.composite.tool_based import CuttingAction
@@ -69,15 +68,15 @@ def main() -> None:
     plan = Sequence(
         nodes=[
             SetGripperAction(
-                configuration=pr2.right_arm.end_effector.default_configuration(
+                gripper_configuration=pr2.right_arm.end_effector.default_configuration(
                     GripperState.CLOSE
                 )
             ),
             ParkArmsAction(arms=pr2.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
-                    *BASE_POSITION_XYZ, reference_frame=world.root
+                planar_goal_pose=Pose2D.from_xy_yaw(
+                    *BASE_POSITION_XYZ[:2], reference_frame=world.root
                 )
             ),
             CuttingAction(
@@ -93,13 +92,15 @@ def main() -> None:
 
     with RobotDemonstrationRosSession.start("cutting_demo") as ros_session:
         executor = KinematicallySimulatedPlanExecutor(
-            StatechartContext.with_extensions(world, [RobotAccess(pr2)]),
+            context=StatechartContext.with_extensions(
+                world=world, extensions=[RobotAccess(robot=pr2)]
+            ),
             ros_node=ros_session.node,
             extensions=selected_visualizations(ros_session.node),
         )
         statechart = Statechart(context=executor.context)
-        statechart.add_node(plan)
-        executor.compile(statechart)
+        statechart.add_node(node=plan)
+        executor.compile(statechart=statechart)
         executor.execute()
 
 

@@ -1,3 +1,7 @@
+"""
+Tests of the distributions Nyga induction learns over one variable.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -267,8 +271,12 @@ def test_fitted_distribution_is_deterministic(fitted_induction):
 
 
 def test_fitted_distribution_supports_its_data(fitted_induction, standard_normal_data):
+    """
+    The distribution Nyga induction fits gives every row of its data a positive
+    likelihood.
+    """
     log_likelihood = fitted_induction.probabilistic_circuit.log_likelihood(
-        standard_normal_data.reshape(-1, 1)
+        events=standard_normal_data.reshape(-1, 1)
     )
     assert log_likelihood.shape == (1000,)
     assert log_likelihood.min() > -np.inf

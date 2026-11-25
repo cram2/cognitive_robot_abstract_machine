@@ -1,3 +1,7 @@
+"""
+Tasks that insert a cylinder held by the robot into a hole.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,34 +14,34 @@ from cramph.node import (
     NodeArtifacts,
     expanded_child_field,
 )
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionNodeArtifacts
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasHoleNormalParameter,
+    HasHolePointParameter,
+    HasTipLinkParameter,
+    HasWeightParameter,
+    HasKinematicChainParameter,
+)
 from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.feature_functions import AngleGoal, ReachPoint
 from krrood.symbolic_math.symbolic_math import logic_and
 from krrood_spatial_math.spatial_types import Point3, Vector3
-from semantic_digital_twin.world_description.world_entity import (
-    KinematicStructureEntity,
-)
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% staying on a line
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class StayOnLineTask(ConvergingTask):
+class StayOnLineTask(
+    ConvergingTask,
+    HasKinematicChainParameter,
+    HasCruiseVelocityParameter,
+):
     """
-    Keeps a point on the tip on the line segment between two points.
-    """
-
-    root_link: KinematicStructureEntity
-    """
-    Root link of the kinematic chain.
-    """
-
-    tip_link: KinematicStructureEntity
-    """
-    Tip link of the kinematic chain, which the controlled point is attached to.
+    Keeps a point on the tip on the line segment between two points, with an error in
+    meters.
     """
 
     tip_P_tool: Point3
@@ -55,11 +59,6 @@ class StayOnLineTask(ConvergingTask):
     End of the line segment.
     """
 
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast the goal is approached, in m/s; not strictly enforced.
-    """
-
     def build_artifacts(self) -> MotionNodeArtifacts:
         """
         Build motion constraints that pull the controlled point onto the line segment.
@@ -68,17 +67,17 @@ class StayOnLineTask(ConvergingTask):
             controlled point and the line segment.
         """
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.root_link, self.tip_link
+            self.kinematic_chain.root, self.kinematic_chain.tip
         )
         root_P_tool = root_T_tip @ self.context.world.transform(
-            target_frame=self.tip_link, spatial_object=self.tip_P_tool
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_P_tool
         )
         distance_to_line, root_P_on_line = root_P_tool.distance_to_line_segment(
             self.context.world.transform(
-                target_frame=self.root_link, spatial_object=self.root_P_start
+                target_frame=self.kinematic_chain.root, spatial_object=self.root_P_start
             ),
             self.context.world.transform(
-                target_frame=self.root_link, spatial_object=self.root_P_end
+                target_frame=self.kinematic_chain.root, spatial_object=self.root_P_end
             ),
         )
 
@@ -97,7 +96,14 @@ class StayOnLineTask(ConvergingTask):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class InsertCylinder(EndedByOwner, CompositeNode):
+class InsertCylinder(
+    EndedByOwner,
+    CompositeNode,
+    HasTipLinkParameter,
+    HasHolePointParameter,
+    HasHoleNormalParameter,
+    HasWeightParameter,
+):
     """
     Inserts a grasped cylinder into a hole.
 
@@ -108,19 +114,9 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     Observes True once the cylinder is straightened.
     """
 
-    tip_link: KinematicStructureEntity
-    """
-    Controlled tip of the kinematic chain; the grasped body to insert.
-    """
-
     tip_P_tool: Point3
     """
     The point of the cylinder that leads the insertion.
-    """
-
-    hole_point: Point3
-    """
-    Position of the hole to insert into.
     """
 
     tip_V_axis: Vector3
@@ -128,14 +124,10 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     Insertion axis of the cylinder.
     """
 
-    up_axis: Vector3
-    """
-    Axis pointing out of the hole.
-    """
-
     pre_grasp_height: float = 0.2
     """
-    Distance above the hole along :attr:`up_axis` at which the insertion starts, in m.
+    Distance above the hole along :attr:`hole_normal` at which the insertion starts, in
+    m.
     """
 
     tilt: float = np.pi / 10
@@ -165,7 +157,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
 
     weight: float = DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE
     """
-    Task priority relative to other tasks.
+    Above collision avoidance by default.
     """
 
     reach_top: ReachPoint = expanded_child_field()
@@ -194,9 +186,14 @@ class InsertCylinder(EndedByOwner, CompositeNode):
     """
 
     def expand(self) -> None:
+        """
+        Create the tasks that reach a point above :attr:`hole_point` with the cylinder
+        tilted, lower it along :attr:`hole_normal` into the hole, and straighten it once
+        it reaches the bottom.
+        """
         root = self.context.world.root
         root_V_up = self.context.world.transform(
-            target_frame=root, spatial_object=self.up_axis
+            target_frame=root, spatial_object=self.hole_normal
         )
         root_P_hole = self.context.world.transform(
             target_frame=root, spatial_object=self.hole_point
@@ -205,8 +202,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
 
         self.reach_top = ReachPoint(
             name=f"{self.name}/reach top",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_point=self.tip_P_tool,
             reference_point=root_P_top,
             cruise_velocity=self.approach_cruise_velocity,
@@ -214,8 +210,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
         )
         self.tilt_task = AngleGoal(
             name=f"{self.name}/slightly tilted",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_vector=self.tip_V_axis,
             reference_vector=root_V_up,
             lower_angle=self.tilt,
@@ -225,8 +220,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
         )
         self.stay_on_line = StayOnLineTask(
             name=f"{self.name}/stay on straight line",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_P_tool=self.tip_P_tool,
             root_P_start=root_P_hole,
             root_P_end=root_P_top,
@@ -234,8 +228,7 @@ class InsertCylinder(EndedByOwner, CompositeNode):
         )
         self.insert_task = ReachPoint(
             name=f"{self.name}/insert",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_point=self.tip_P_tool,
             reference_point=root_P_hole,
             cruise_velocity=self.insertion_cruise_velocity,
@@ -243,15 +236,14 @@ class InsertCylinder(EndedByOwner, CompositeNode):
         )
         self.tilt_straight_task = AlignPlanes(
             name=f"{self.name}/tilt straight",
-            root_link=root,
-            tip_link=self.tip_link,
+            kinematic_chain=KinematicChain(root=root, tip=self.tip_link),
             tip_normal=self.tip_V_axis,
-            goal_normal=root_V_up,
-            cruise_velocity=self.straightening_cruise_velocity,
+            reference_normal=root_V_up,
+            cruise_angular_velocity=self.straightening_cruise_velocity,
             weight=self.weight,
         )
         self._add_children_to_statechart(
-            [
+            nodes=[
                 self.reach_top,
                 self.tilt_task,
                 self.stay_on_line,

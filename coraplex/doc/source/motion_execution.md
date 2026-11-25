@@ -43,16 +43,16 @@ from coraplex.plans.executors import (
 from cramph.statechart import Statechart
 
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)])
 )
 statechart = Statechart(context=executor.context)
-statechart.add_node(plan)
-executor.compile(statechart)
+statechart.add_node(node=plan)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 
 A plan for the real robot is built and run the same way in a
-`RealRobotPlanExecutor(StatechartContext.with_extensions(world, [RobotAccess(robot)]), ros_node=node)`.
+`RealRobotPlanExecutor(context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)]), ros_node=node)`.
 Code that is told how to execute at run time takes the executor type, as
 {attr}`~coraplex.demonstrations.RobotDemonstration.executor_type` does. A plan does not ask what executes it: each
 executor adapts it with its own {attr}`~coraplex.plans.executors.PlanExecutor.plan_adaptations`, see below.
@@ -64,7 +64,7 @@ A plan can also be performed against a physically simulated world, which has to 
 from coraplex.plans.executors import PhysicallySimulatedPlanExecutor
 
 executor = PhysicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)]),
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)]),
     simulation=simulation,
 )
 ```
@@ -82,8 +82,8 @@ from giskardpy.motion_control import MotionControl
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)]),
-    extensions=[MotionControl(QPControllerConfig(target_frequency=50))],
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)]),
+    extensions=[MotionControl(qp_controller_config=QPControllerConfig(target_frequency=50))],
 )
 ```
 
@@ -91,7 +91,7 @@ Collision avoidance is a setting of the executor:
 
 ```python
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(robot)]),
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=robot)]),
     collision_avoidance=True,
 )
 ```
@@ -140,7 +140,7 @@ action is expanded, and that applies only to its robot type. Every executor appl
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.DriveWithTheDifferentialDrive` drives the base of
   every robot on a differential drive with a
   {class}`~giskardpy.motion_statechart.tasks.drive_tasks.DifferentialDriveBaseGoal`, which arrives within the
-  {attr}`~coraplex.robot_plans.actions.core.navigation.DrivesBase.base_pose_threshold` of the action.
+  {attr}`~coraplex.robot_plans.actions.core.navigation.DrivesBase.threshold` of the action.
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.MoveStretchToolCenterPointInAStraightLine` moves
   the tool center point of a Stretch to each of its targets along a straight line.
 - {class}`~coraplex.robot_plans.robot_specific_plan_transformations.KeepStretchFromTurningWhileMovingItsTool` holds the

@@ -1,3 +1,9 @@
+"""
+Tests of reaching a goal with robots whose links are very short or very long.
+"""
+
+from __future__ import annotations
+
 from copy import deepcopy
 
 from cramph.composites import Sequence
@@ -29,6 +35,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
@@ -161,6 +168,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
 
 def execute(link_length: float, vel_limit: float):
+    """
+    Move the tip of a robot built with links of link_length to a goal and run the motion
+    to its end.
+
+    :param link_length: How long each link of the robot is, in meters.
+    :param vel_limit: The velocity limit of each joint.
+    """
     fucking_huge_robot = robot_factory(
         fucking_huge_link_length=link_length, vel_limit=vel_limit
     )
@@ -180,35 +194,38 @@ def execute(link_length: float, vel_limit: float):
     eef = fucking_huge_robot.get_kinematic_structure_entity_by_name("eef")
 
     statechart.add_node(
-        node1 := Sequence(
-            nodes=[
-                SetSeedConfiguration(
-                    seed_configuration=JointState.from_str_dict(
-                        {
-                            "map_T_link1": goal,
-                            "link1_T_link2": goal,
-                            "link2_T_link3": goal,
-                            "link3_T_link4": goal,
-                            "link4_T_link5": goal,
-                            "link5_T_eef": goal,
-                        },
-                        world=fucking_huge_robot,
-                    )
-                ),
-                CartesianPosition(
-                    root_link=fucking_huge_robot.root,
-                    tip_link=eef,
-                    goal_point=Point3(y=-link_length, reference_frame=eef),
-                    cruise_velocity=0.2 * link_length,
-                ),
-            ]
+        node=(
+            node1 := Sequence(
+                nodes=[
+                    SetSeedConfiguration(
+                        seed_configuration=JointState.from_str_dict(
+                            {
+                                "map_T_link1": goal,
+                                "link1_T_link2": goal,
+                                "link2_T_link3": goal,
+                                "link3_T_link4": goal,
+                                "link4_T_link5": goal,
+                                "link5_T_eef": goal,
+                            },
+                            world=fucking_huge_robot,
+                        )
+                    ),
+                    CartesianPosition(
+                        kinematic_chain=KinematicChain(
+                            root=fucking_huge_robot.root, tip=eef
+                        ),
+                        goal_point=Point3(y=-link_length, reference_frame=eef),
+                        cruise_velocity=0.2 * link_length,
+                    ),
+                ]
+            )
         )
     )
-    statechart.add_node(EndMotion.when_true(node1))
+    statechart.add_node(node=EndMotion.when_true(node=node1))
 
     executor.compile(statechart=statechart)
 
-    executor.tick_until_end(10_000)
+    executor.tick_until_end(timeout=10_000)
 
 
 def test_cart_goal01():

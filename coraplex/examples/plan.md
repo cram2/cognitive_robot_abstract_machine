@@ -40,7 +40,7 @@ ticks the plan in the world itself, a `RealRobotPlanExecutor` sends it to Giskar
 
 ```python
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)])
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )
 ```
 
@@ -53,14 +53,14 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from cramph.composites import Sequence
 from cramph.statechart import Statechart
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose2D
 
-navigate = NavigateAction(target_location=Pose.from_xyz_quaternion(1, 1, 0, reference_frame=world.root))
+navigate = NavigateAction(planar_goal_pose=Pose2D.from_xy_yaw(1, 1, reference_frame=world.root))
 park = ParkArmsAction(arms=pr2.all_arms)
 
 plan = Sequence(nodes=[navigate, park])
 statechart = Statechart(context=executor.context)
-statechart.add_node(plan)
+statechart.add_node(node=plan)
 ```
 
 This creates a plan with a `Sequence` at the top level of the statechart and the two actions as its children.
@@ -76,7 +76,7 @@ statechart.visualize()
 top-level node of the plan succeeded. Underspecified actions are grounded while the plan runs.
 
 ```python
-executor.compile(statechart)
+executor.compile(statechart=statechart)
 executor.execute()
 ```
 
@@ -88,7 +88,7 @@ statechart, keeping the robot from colliding with the rest of the world while th
 
 ```python
 executor = KinematicallySimulatedPlanExecutor(
-    StatechartContext.with_extensions(world, [RobotAccess(pr2)]),
+    context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)]),
     collision_avoidance=True,
 )
 ```
