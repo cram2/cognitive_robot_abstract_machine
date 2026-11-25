@@ -31,7 +31,6 @@ from giskardpy.motion_statechart.graph_node import Task
 from giskardpy.motion_statechart.mixins import (
     HasCruiseVelocityParameter,
     HasGoalPointParameter,
-    HasTipLinkParameter,
 )
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from krrood.symbolic_math.symbolic_math import Scalar
@@ -57,7 +56,7 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from semantic_digital_twin.world import World
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Point3, Vector3
 
 # %% shared by self and external collision avoidance
 
@@ -263,11 +262,11 @@ class CollisionAvoidance(EndedByOwner, CompositeNode, HasCruiseVelocityParameter
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class BufferZoneScaling(HasTipLinkParameter, HasGoalPointParameter, ABC):
+class BufferZoneScaling(HasGoalPointParameter, ABC):
     """
-    Scales the configured buffer zone distance of every external contact by a factor
-    that depends on the translational distance between :attr:`tip_link` and
-    :attr:`goal_point`, bounded by :attr:`minimum_scale_factor` and
+    Scales the configured buffer zone distance of each external contact by a factor that
+    depends on the translational distance between the contact's closest point on the
+    robot and :attr:`goal_point`, bounded by :attr:`minimum_scale_factor` and
     :attr:`maximum_scale_factor`.
     """
 
@@ -284,15 +283,18 @@ class BufferZoneScaling(HasTipLinkParameter, HasGoalPointParameter, ABC):
     @abstractmethod
     def unbounded_scale_factor(self, *, goal_distance: Scalar) -> Scalar:
         """
-        :param goal_distance: The translational distance between :attr:`tip_link` and
+        :param goal_distance: The translational distance between a contact point and
             :attr:`goal_point`, in meters.
         :return: The scale factor before it is bounded.
         """
 
-    def scale_factor(self, *, world: World) -> Scalar:
+    def scale_factor(self, *, world: World, root_P_contact_point: Point3) -> Scalar:
         """
-        :param world: The world :attr:`tip_link` and :attr:`goal_point` are in.
-        :return: The factor the configured buffer zone distances are scaled by.
+        :param world: The world :attr:`goal_point` is in.
+        :param root_P_contact_point: The closest point of one contact on the robot,
+            relative to the root of `world`.
+        :return: The factor the configured buffer zone distance of that contact is
+            scaled by.
         """
         root_P_goal = (
             world.compose_forward_kinematics_expression(
@@ -300,10 +302,7 @@ class BufferZoneScaling(HasTipLinkParameter, HasGoalPointParameter, ABC):
             )
             @ self.goal_point
         )
-        root_P_tip = world.compose_forward_kinematics_expression(
-            world.root, self.tip_link
-        ).position
-        goal_distance = root_P_goal.euclidean_distance(other=root_P_tip)
+        goal_distance = root_P_goal.euclidean_distance(other=root_P_contact_point)
         return sm.limit(
             self.unbounded_scale_factor(goal_distance=goal_distance),
             self.minimum_scale_factor,
@@ -352,8 +351,9 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
 
     buffer_zone_scaling: BufferZoneScaling | None = None
     """
-    How the buffer zone distance of every avoided contact is scaled, never below its
-    violated distance; ``None`` keeps the configured buffer zone distances.
+    How the buffer zone distance of each external contact is scaled by the distance of
+    its closest point on the robot to a goal, never below its violated distance;
+    ``None`` keeps the configured buffer zone distances.
     """
 
     def build(self) -> NodeArtifacts:
@@ -395,29 +395,35 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             root_T_group = self.context.world.compose_forward_kinematics_expression(
                 self.context.world.root, contact.group.root
             )
-            root_V_point_on_group = (
+            root_P_point_on_group = (
                 root_T_group @ manager.get_group_a_P_point_on_a_symbol(contact)
-            ).vector3
+            )
             root_V_contact_normal = manager.get_root_V_contact_normal_symbol(contact)
             artifacts.constraints.add_inequality_constraint(
                 name=f"{contact.group.root.name}/{contact.rank}",
                 cruise_velocity=self.cruise_velocity,
                 velocity_scale=VelocityScale.TRANSLATION,
-                lower_error=self._buffer_distance(contact=contact)
+                lower_error=self._buffer_distance(
+                    contact=contact, root_P_point_on_group=root_P_point_on_group
+                )
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
                 quadratic_weight=self._weight_while_close(
                     contact_normal=root_V_contact_normal
                 ),
                 # the position distance is not accurate, but the derivative is still correct
-                task_expression=root_V_contact_normal @ root_V_point_on_group,
+                task_expression=root_V_contact_normal @ root_P_point_on_group.vector3,
             )
         artifacts.observation = self._none_violated()
         return artifacts
 
-    def _buffer_distance(self, *, contact: AvoidedExternalContact) -> Scalar:
+    def _buffer_distance(
+        self, *, contact: AvoidedExternalContact, root_P_point_on_group: Point3
+    ) -> Scalar:
         """
         :param contact: One avoided contact of this task.
+        :param root_P_point_on_group: The closest point of `contact` on the robot,
+            relative to the root of the world.
         :return: The buffer zone distance `contact` is kept outside of, scaled by
             :attr:`buffer_zone_scaling`.
         """
@@ -427,7 +433,9 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
             return buffer_distance
         return sm.max(
             buffer_distance
-            * self.buffer_zone_scaling.scale_factor(world=self.context.world),
+            * self.buffer_zone_scaling.scale_factor(
+                world=self.context.world, root_P_contact_point=root_P_point_on_group
+            ),
             manager.get_violated_distance_symbol(contact),
         )
 
@@ -452,8 +460,9 @@ class ExternalCollisionAvoidance(CollisionAvoidance):
 
     buffer_zone_scaling: BufferZoneScaling | None = None
     """
-    How the buffer zone distance of every external contact is scaled, never below its
-    violated distance; ``None`` keeps the configured buffer zone distances.
+    How the buffer zone distance of each external contact is scaled by the distance of
+    its closest point on the robot to a goal, never below its violated distance;
+    ``None`` keeps the configured buffer zone distances.
     """
 
     def _create_task(self) -> _ExternalCollisionAvoidanceTask:
