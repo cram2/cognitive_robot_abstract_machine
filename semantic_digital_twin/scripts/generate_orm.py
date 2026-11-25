@@ -31,9 +31,6 @@ from krrood.ormatic.ormatic import ORMatic
 from krrood.utils import recursive_subclasses
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.reasoning.world_rdr.rules
-from semantic_digital_twin.physics.equations.pouring_equations import (
-    RectangularContainerGeometry,
-)
 from semantic_digital_twin.world_description.liquid_connection import (
     CompiledFillVelocity,
 )
@@ -70,9 +67,6 @@ ignore_classes = {
     USDComponent,
     USDJointedLinks,
     USDSceneContent,
-    # A mixin of the fill equations, not an equation itself: the equations inheriting it
-    # map its fields within their own single-rooted equation hierarchy.
-    RectangularContainerGeometry,
     # A liquid connection's compiled fill velocity is a process-local cache.
     CompiledFillVelocity,
     # A symbolic operation is a step of a query, not something a world stores, so none of

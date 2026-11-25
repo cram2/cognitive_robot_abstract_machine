@@ -10,17 +10,11 @@ from dataclasses import dataclass
 import krrood.symbolic_math.symbolic_math as sm
 import pytest
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 
 from semantic_digital_twin.physics.equations.pouring_equations import (
-    ArticulatedPouringEquation,
-    FillContext,
-    FillEquation,
-    InflowEquation,
-    SymbolicFillContext,
+    PouringEquation,
 )
 from semantic_digital_twin.physics.exceptions import (
-    NonPositiveContainerCapacityError,
     NonPositiveContainerGeometryError,
 )
 
@@ -58,11 +52,11 @@ class PouringCup:
     Fill level at which the head is evaluated.
     """
 
-    def equation(self, *, repose_angle: float = 0.0) -> ArticulatedPouringEquation:
+    def equation(self, *, repose_angle: float = 0.0) -> PouringEquation:
         """
         :return: The drain of this cup.
         """
-        return ArticulatedPouringEquation(
+        return PouringEquation(
             container_height=self.container_height,
             container_width=self.container_width,
             repose_angle=repose_angle,
@@ -88,21 +82,21 @@ def cup() -> PouringCup:
     return PouringCup()
 
 
-def _head(*, equation: ArticulatedPouringEquation, tilt: float, fill: float) -> float:
+def _head(*, equation: PouringEquation, tilt: float, fill: float) -> float:
     """
     :return: The equation's numeric head at the given tilt and fill.
     """
     return equation.head_above_lip(
-        context=SymbolicFillContext(tilt=sm.Scalar(tilt), fill=sm.Scalar(fill))
+        tilt=sm.Scalar(tilt), fill=sm.Scalar(fill)
     ).evaluate()[0]
 
 
-def _drain(*, equation: ArticulatedPouringEquation, tilt: float, fill: float) -> float:
+def _drain(*, equation: PouringEquation, tilt: float, fill: float) -> float:
     """
     :return: The equation's numeric fill rate at the given tilt and fill.
     """
-    return equation.symbolic_velocity(
-        context=SymbolicFillContext(tilt=sm.Scalar(tilt), fill=sm.Scalar(fill))
+    return equation.fill_velocity(
+        tilt=sm.Scalar(tilt), fill=sm.Scalar(fill)
     ).evaluate()[0]
 
 
@@ -125,35 +119,9 @@ class TestContainerGeometryGuard:
         A drain of no or negative extent is refused.
         """
         with pytest.raises(NonPositiveContainerGeometryError):
-            ArticulatedPouringEquation(
+            PouringEquation(
                 container_height=container_height, container_width=container_width
             )
-
-    @pytest.mark.parametrize(
-        "container_height, container_width",
-        [(0.0, 0.08), (0.1, 0.0)],
-    )
-    def test_inflow_equation_rejects_non_positive_geometry(
-        self, *, container_height: float, container_width: float
-    ) -> None:
-        """
-        An inflow of no or negative extent is refused.
-        """
-        with pytest.raises(NonPositiveContainerGeometryError):
-            InflowEquation(
-                container_height=container_height, container_width=container_width
-            )
-
-    @pytest.mark.parametrize("capacity", [0.0, -1e-3])
-    def test_a_non_positive_capacity_is_rejected(self, *, capacity: float) -> None:
-        """
-        A container that holds no volume cannot convert a fill rate to a volume rate.
-        """
-        with pytest.raises(NonPositiveContainerCapacityError) as error_info:
-            InflowEquation(
-                container_height=0.1, container_width=0.08, capacity=capacity
-            )
-        assert error_info.value.capacity == capacity
 
     def test_positive_geometry_is_accepted(self, *, cup: PouringCup) -> None:
         """
@@ -247,15 +215,12 @@ class TestReposeAngle:
             )
         )
 
-    def test_the_angle_survives_gating_and_a_round_trip(
-        self, *, cup: PouringCup
-    ) -> None:
+    def test_the_angle_survives_a_round_trip(self, *, cup: PouringCup) -> None:
         """
-        A property of the contents is kept when the drain is gated or written out.
+        A property of the contents is kept when the drain is written out.
         """
         equation = cup.equation(repose_angle=cup.repose_angle)
 
-        assert equation.gate_drain(gate=sm.Scalar(1.0)).repose_angle == cup.repose_angle
         assert from_json(to_json(equation)).repose_angle == cup.repose_angle
 
 
@@ -316,7 +281,7 @@ class TestOnsetTilt:
         )
 
     @staticmethod
-    def _onset(*, equation: ArticulatedPouringEquation, fill: float) -> float:
+    def _onset(*, equation: PouringEquation, fill: float) -> float:
         """
         :return: The equation's numeric onset tilt at the given fill.
         """
@@ -334,7 +299,8 @@ class TestDrainRate:
 
     def test_the_drain_follows_the_closed_form(self, *, cup: PouringCup) -> None:
         """
-        ``ḣ = −k · d / A`` at a pouring operating point.
+        ``fill_velocity = −outflow_rate_constant · head_above_lip / container_height``
+        at a pouring operating point.
         """
         equation = cup.equation()
         head = cup.expected_head(
@@ -366,13 +332,11 @@ class TestExitSpeed:
             lip_offset=equation.lip_offset, tilt=tilt, fill=cup.fill
         )
 
-        exit_speed = equation.exit_speed(
-            context=SymbolicFillContext(tilt=sm.Scalar(tilt), fill=sm.Scalar(cup.fill))
-        )
+        exit_speed = equation.exit_speed(tilt=sm.Scalar(tilt), fill=sm.Scalar(cup.fill))
 
         assert exit_speed.evaluate()[0] == pytest.approx(
             equation.discharge_coefficient
-            * math.sqrt(2 * FillEquation.standard_gravity * head)
+            * math.sqrt(2 * PouringEquation.standard_gravity * head)
         )
 
     def test_the_exit_speed_of_no_head_is_that_of_the_minimum_head(
@@ -383,37 +347,9 @@ class TestExitSpeed:
         """
         equation = cup.equation()
 
-        exit_speed = equation.exit_speed(
-            context=SymbolicFillContext(tilt=sm.Scalar(0.0), fill=sm.Scalar(cup.fill))
-        )
+        exit_speed = equation.exit_speed(tilt=sm.Scalar(0.0), fill=sm.Scalar(cup.fill))
 
         assert exit_speed.evaluate()[0] == pytest.approx(
             equation.discharge_coefficient
-            * math.sqrt(2 * FillEquation.standard_gravity * equation.minimum_head)
+            * math.sqrt(2 * PouringEquation.standard_gravity * equation.minimum_head)
         )
-
-
-# %% tilt from the vertical
-
-
-class TestTiltFromVertical:
-    """
-    The tilt is the angle between a container's up axis and the vertical.
-    """
-
-    @pytest.mark.parametrize(
-        "roll, pitch, tilt", [(0.0, 0.7, 0.7), (-0.4, 0.0, 0.4), (0.0, 0.0, 0.0)]
-    )
-    def test_the_tilt_is_the_angle_from_the_vertical(
-        self, *, roll: float, pitch: float, tilt: float
-    ) -> None:
-        """
-        Rolling or pitching a container by an angle tilts it by that angle.
-        """
-        root_T_container = HomogeneousTransformationMatrix.from_xyz_rpy(
-            roll=roll, pitch=pitch
-        )
-
-        assert FillContext.tilt_from_vertical(
-            root_T_container=root_T_container
-        ).evaluate()[0] == pytest.approx(tilt, abs=1e-6)

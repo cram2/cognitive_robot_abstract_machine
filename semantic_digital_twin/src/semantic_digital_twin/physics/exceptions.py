@@ -38,24 +38,3 @@ class NonPositiveContainerGeometryError(UsageError):
         return (
             "describe the container with its positive inner height and width in metres."
         )
-
-
-@dataclass(kw_only=True)
-class NonPositiveContainerCapacityError(UsageError):
-    """
-    Raised when a pouring-domain container is described with a non-positive capacity.
-    """
-
-    capacity: float
-    """
-    The capacity that was given, in cubic metres.
-    """
-
-    def error_message(self) -> str:
-        return f"Container capacity must be strictly positive, got {self.capacity}."
-
-    def suggest_correction(self) -> str:
-        return (
-            "give the volume the container holds at full fill, in cubic metres, or "
-            "leave it out to have it taken from the container's extents."
-        )
