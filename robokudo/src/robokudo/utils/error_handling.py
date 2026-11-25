@@ -17,8 +17,6 @@ from typing_extensions import Any, Callable
 
 from robokudo.identifier import BBIdentifier
 
-# rk_logger = logging.getLogger(robokudo.defs.PACKAGE_NAME)
-
 
 def raise_to_blackboard(exception: Exception | None) -> None:
     """

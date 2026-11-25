@@ -21,6 +21,7 @@ The module uses:
 
 from __future__ import annotations
 
+import logging
 import copy
 import math
 from pathlib import Path
@@ -41,6 +42,8 @@ from robokudo.utils.transform import (
     get_transform_matrix_from_q,
     get_translation_from_transform_matrix,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ICPPoseRefinementAnnotator(ThreadedAnnotator):
@@ -89,7 +92,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         # Data structure for available classes -> PLY files
         self.class_name_to_ply_model = dict()
@@ -97,7 +100,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
         # Load PLY PointClouds (not Meshes!) for all objects
         ply_path = self.get_model_path("JeroenCup")
         if ply_path is None or not ply_path.exists():
-            self.rk_logger.error("Couldn't lookup model path. Deactivating Annotator.")
+            logger.error("Couldn't lookup model path. Deactivating Annotator.")
             self.annotator_deactivated = True
         else:
             self.annotator_deactivated = False
@@ -128,22 +131,22 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
             data_folder_path = Path(self.descriptor.parameters.data_path)
 
             if not data_folder_path.exists():
-                self.rk_logger.error(f"'{data_folder_path}' is not existing.")
+                logger.error(f"'{data_folder_path}' is not existing.")
                 return None
 
             if not data_folder_path.is_dir():
-                self.rk_logger.error(f"No directory found at '{data_folder_path}.'")
+                logger.error(f"No directory found at '{data_folder_path}.'")
                 return None
 
         else:
-            self.rk_logger.error(
+            logger.error(
                 f"Can't look up necessary input data. Please check Parameters of this Annotator.'"
             )
             return None
 
         ply_path = data_folder_path.joinpath(f"{class_name}.ply")
         if not ply_path.exists():
-            self.rk_logger.error(f"No ply model found at '{ply_path}'")
+            logger.error(f"No ply model found at '{ply_path}'")
         return ply_path
 
     def compute(self) -> Status:
@@ -167,7 +170,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
             error_message = (
                 f"{type(self).__name__} couldn't find model files and is deactivated."
             )
-            self.rk_logger.warn(error_message)
+            logger.warning(error_message)
             self.feedback_message = error_message
             return Status.SUCCESS  # Don't fail the whole pipeline
 
@@ -230,10 +233,6 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
                     {"name": "Initial Pose Estimate", "geometry": ply_model}
                 )
 
-                # evaluation = o3d.pipelines.registration.evaluate_registration(
-                #     ply_model, cluster_cloud, thresh, icp_transform_init)
-                # self.rk_logger.info(evaluation)
-
                 # We'll now go through our pose variants, register them after each other and then check which has the
                 # highest fitness
                 pose_variant_registration_results = []
@@ -256,7 +255,6 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
                     pose_variant_registration_results.append(
                         (reg_p2p, pose_variant, description)
                     )
-                    # self.rk_logger.info(reg_p2p)
 
                 best_registration_result = None
                 best_registration_result_idx = 0
@@ -280,7 +278,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
                 if best_registration_result is None:
                     continue  # Abort here if we didn't find a good fit
 
-                self.rk_logger.info(
+                logger.info(
                     f"Selected pose {best_registration_result_idx} as the best one"
                 )
                 # Visualize ICP Result

@@ -949,6 +949,21 @@ def test_keep_held_body_upright_holding_nothing_keeps_the_tool_frame_as_it_is(
     )
 
 
+def test_keep_held_body_upright_holds_the_axis_it_keeps_upright_as_a_number(
+    pr2_world_state_reset: World,
+):
+    """
+    The axis the task keeps upright is a numeric vector, which can be stored, rather
+    than an expression over the pose the task binds while it runs.
+    """
+    keep_upright = _run_keep_held_body_upright(pr2_world_state_reset)
+
+    np.testing.assert_array_equal(
+        keep_upright.tip_normal.to_np(),
+        Vector3.Z(reference_frame=keep_upright.kinematic_chain.tip).to_np(),
+    )
+
+
 def test_align_perpendicular(pr2_world_state_reset: World):
     """
     Aligning perpendicular leaves the gripper's normal at a right angle to the reference

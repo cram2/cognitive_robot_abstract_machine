@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum, auto
@@ -41,6 +42,8 @@ if TYPE_CHECKING:
     from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 
     from robokudo.annotators.object_pose_estimator import MeshBasedPoseEstimator
+
+logger = logging.getLogger(__name__)
 
 
 # %% Object class meshes
@@ -978,7 +981,7 @@ class FoundationPoseAnnotator(ThreadedAnnotator):
             )
             if self.is_plausible_track(request, tracked_pose):
                 return tracked_pose
-            self.rk_logger.debug(
+            logger.debug(
                 f"Tracked pose of {request.class_mesh.class_name} left its mask, "
                 f"estimating it anew."
             )

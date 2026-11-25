@@ -19,6 +19,7 @@ The module is used for cameras like:
 from __future__ import annotations
 
 # %% Imports
+import logging
 from collections.abc import Sequence
 
 import cv2
@@ -43,6 +44,8 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
     from robokudo.cas import CAS
+
+logger = logging.getLogger(__name__)
 
 
 # %% RGB-only camera interface
@@ -85,15 +88,15 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         )
         synchronizer.registerCallback(self.callback)
 
-        self.rk_logger.info("Subscribed to: ")
-        self.rk_logger.info(f"  {camera_config.topic_color}")
-        self.rk_logger.info(f"  {camera_config.topic_camera_info}")
+        logger.info("Subscribed to: ")
+        logger.info(f"  {camera_config.topic_color}")
+        logger.info(f"  {camera_config.topic_camera_info}")
 
         self.color_to_depth_ratio: ColorToDepthRatio = ColorToDepthRatio()
         """
         Always (1.0, 1.0) since no depth data.
         """
-        self.rk_logger.info("ROSCameraWithoutDepthInterface initialized")
+        logger.info("ROSCameraWithoutDepthInterface initialized")
 
     def rotate_camera_intrinsics(
         self,

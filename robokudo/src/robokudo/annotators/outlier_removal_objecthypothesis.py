@@ -19,6 +19,7 @@ Authors:
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import numpy as np
@@ -42,6 +43,8 @@ remaining copy of the old state for some point cloud.
 
 Authors: Sorin Arion, Naser Azizi 
 """
+
+logger = logging.getLogger(__name__)
 
 _PYTYPE_TO_ROS_FIELD: dict[type, str] = {
     int: "integer_value",
@@ -106,7 +109,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.node = ROSNodeRegistry().get()
 
@@ -115,14 +118,20 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
 
         self.node.add_on_set_parameters_callback(self.parameters_callback)
 
-        self.rk_logger.info("OutlierRemovalNode initialized with current parameters")
+        logger.info("OutlierRemovalNode initialized with current parameters")
 
     def parameters_callback(self, params: list[Parameter]) -> SetParametersResult:
+        """
+        Copy every ROS parameter that names a descriptor parameter into the descriptor.
+
+        :param params: The ROS parameters that were set
+        :return: A successful result
+        """
         for param in params:
             if hasattr(self.descriptor.parameters, param.name):
                 setattr(self.descriptor.parameters, param.name, param.value)
 
-        self.rk_logger.info("Received reconf call: " + str(params))
+        logger.info("Received reconfiguration call: " + str(params))
         return SetParametersResult(successful=True)
 
     @catch_and_raise_to_blackboard
@@ -138,7 +147,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
 
         if not pcd_cluster:
             # TODO This should not be decided by this Annotator, but by the Result Generator - Refactor and test AEs
-            self.rk_logger.warning(f"No Clusters have been found.")
+            logger.warning(f"No Clusters have been found.")
             self.feedback_message = f"No clusters have been found"
             raise Exception("No Clusters have been found.")
         end_timer = default_timer()
