@@ -139,6 +139,34 @@ def _get_concrete_generic_subclass(
 
 
 @lru_cache(maxsize=None)
+def get_mapping_data_access_object_class(
+    original_clazz: type,
+) -> type[DataAccessObject] | None:
+    """
+    Retrieve the DAO class that maps a domain class itself.
+
+    Its table holds the rows of the objects of the domain class and of all its mapped
+    subclasses, so a query for the domain class selects from it.
+
+    :param original_clazz: The domain class.
+    :return: The DAO class mapping the domain class, or None.
+    """
+    from krrood.ormatic.data_access_objects.dao import (
+        DataAccessObject,
+        PartDataAccessObject,
+    )
+
+    if issubclass(original_clazz, DataAccessObject):
+        return original_clazz
+    alternative_mapping = get_alternative_mapping(original_clazz)
+    if alternative_mapping is not None:
+        original_clazz = alternative_mapping
+    return _get_clazz_by_original_clazz(
+        DataAccessObject, original_clazz, PartDataAccessObject
+    )
+
+
+@lru_cache(maxsize=None)
 def get_data_access_object_class(
     original_clazz: type, expected_type: type | None = None
 ) -> type[DataAccessObject] | None:
@@ -173,9 +201,7 @@ def get_data_access_object_class(
 
     # Try the actual class first.
     # This is important for polymorphic inheritance to get the most specific DAO.
-    dao = _get_clazz_by_original_clazz(
-        DataAccessObject, original_clazz, PartDataAccessObject
-    )
+    dao = get_mapping_data_access_object_class(original_clazz)
     if dao is not None:
         concrete_dao = _get_concrete_generic_subclass(dao, original_clazz)
         return concrete_dao if concrete_dao is not None else dao
@@ -213,6 +239,7 @@ def clear_dao_lookup_caches() -> None:
     """
     _get_clazz_by_original_clazz.cache_clear()
     _get_concrete_generic_subclass.cache_clear()
+    get_mapping_data_access_object_class.cache_clear()
     get_data_access_object_class.cache_clear()
     get_alternative_mapping.cache_clear()
     get_part_class.cache_clear()
