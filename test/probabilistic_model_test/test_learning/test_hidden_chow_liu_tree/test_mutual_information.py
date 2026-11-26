@@ -59,7 +59,7 @@ def test_continuous_column_with_many_values_is_cut_into_equally_populated_bins()
     """
     A continuous column of distinct values falls into bins of equally many rows.
     """
-    levels = BinnedMutualInformation(number_of_bins=4).levels(
+    levels = BinnedMutualInformation(number_of_bins=4).discretize_rows(
         variables=SortedSet([Continuous("a")]), data=np.arange(100.0)[:, None]
     )
 
@@ -74,7 +74,7 @@ def test_symbolic_column_keeps_a_level_per_state_however_many_states_it_has():
     variable = Symbolic(name="a", domain=Set.from_iterable(states))
     data = np.array([hash(state) for state in states], dtype=float)[:, None]
 
-    levels = BinnedMutualInformation(number_of_bins=4).levels(
+    levels = BinnedMutualInformation(number_of_bins=4).discretize_rows(
         variables=SortedSet([variable]), data=data
     )
 

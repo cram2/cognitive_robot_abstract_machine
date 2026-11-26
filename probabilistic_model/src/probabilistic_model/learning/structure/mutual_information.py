@@ -56,7 +56,7 @@ class BinnedMutualInformation(MutualInformationEstimator):
     The number of quantile bins a continuous variable with many values is cut into.
     """
 
-    def levels(
+    def discretize_rows(
         self, *, variables: SortedSet, data: npt.NDArray[np.float64]
     ) -> npt.NDArray[np.int64]:
         """
@@ -81,7 +81,7 @@ class BinnedMutualInformation(MutualInformationEstimator):
     def estimate(
         self, *, variables: SortedSet, data: npt.NDArray[np.float64]
     ) -> npt.NDArray[np.float64]:
-        levels = self.levels(variables=variables, data=data)
+        levels = self.discretize_rows(variables=variables, data=data)
         number_of_rows, number_of_variables = levels.shape
         number_of_levels = levels.max(axis=0) + 1
         offsets = np.concatenate([[0], np.cumsum(number_of_levels)])
