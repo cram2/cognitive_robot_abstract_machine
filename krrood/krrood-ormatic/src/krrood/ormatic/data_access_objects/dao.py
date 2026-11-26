@@ -1713,7 +1713,9 @@ class StoredObjectRow:
         cls,
         *,
         stored_objects: Sequence[StoredObjectRow | sqlalchemy.Row],
-        load_objects_of_class: Callable[[type[DataAccessObject], list[int]], Iterable[Any]],
+        load_objects_of_class: Callable[
+            [type[DataAccessObject], list[int]], Iterable[Any]
+        ],
     ) -> list[Any]:
         """
         :param stored_objects: Rows of this table, or rows with the ``database_id`` and
@@ -1724,7 +1726,9 @@ class StoredObjectRow:
         """
         ids_by_class: dict[type[DataAccessObject], list[int]] = {}
         for stored_object in stored_objects:
-            dao_class = cls.dao_class_of_table(table_name=stored_object.polymorphic_type)
+            dao_class = cls.dao_class_of_table(
+                table_name=stored_object.polymorphic_type
+            )
             ids_by_class.setdefault(dao_class, []).append(stored_object.database_id)
         loaded_by_id = {
             loaded.database_id: loaded
