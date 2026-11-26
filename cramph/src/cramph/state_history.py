@@ -70,6 +70,26 @@ class StateHistoryItem:
         """
         return node.index < len(self.life_cycle_state.data)
 
+    def life_cycle_state_of(self, *, node: StatechartNode) -> LifeCycleValue:
+        """
+        :param node: A node of the statechart.
+        :return: The life cycle state of `node` in this snapshot, NOT_STARTED if it had
+            not joined the statechart yet.
+        """
+        if not self.records(node=node):
+            return LifeCycleValue.NOT_STARTED
+        return self.life_cycle_state[node]
+
+    def observation_state_of(self, *, node: StatechartNode) -> ObservationStateValue:
+        """
+        :param node: A node of the statechart.
+        :return: What `node` observed in this snapshot, UNKNOWN if it had not joined the
+            statechart yet.
+        """
+        if not self.records(node=node):
+            return ObservationStateValue.UNKNOWN
+        return self.observation_state[node]
+
     def __eq__(self, other: StateHistoryItem) -> bool:
         """
         :param other: The item to compare against.
@@ -115,6 +135,69 @@ class RunTicks:
     """
     The tick this run ended on, None while it is still running.
     """
+
+
+@dataclass(kw_only=True, frozen=True)
+class NodeRun(RunTicks):
+    """
+    One run of a statechart node, from the tick it started on to the tick it ended or
+    was reset on.
+    """
+
+    node: StatechartNode
+    """
+    The node that ran.
+    """
+
+    sequence_number: int
+    """
+    Which run of :attr:`node` this is, counted from one.
+    """
+
+    final_state: LifeCycleValue
+    """
+    The life cycle state this run ended in, or the one it is in while it still runs.
+    """
+
+    @property
+    def failed(self) -> bool:
+        """
+        :return: Whether this run ended as FAILED.
+        """
+        return self.final_state == LifeCycleValue.FAILED
+
+    @property
+    def last_tick(self) -> float:
+        """
+        :return: The tick this run ended on, infinity while it still runs.
+        """
+        return float("inf") if self.end_tick is None else self.end_tick
+
+    def overlaps(self, *, other: NodeRun) -> bool:
+        """
+        :param other: Another run.
+        :return: Whether each run started before the other ended. A run that ends on
+            the tick the other starts ended before it.
+        """
+        return self.start_tick < other.last_tick and other.start_tick < self.last_tick
+
+    def contains(self, *, other: NodeRun) -> bool:
+        """
+        :param other: Another run.
+        :return: Whether `other` started and ended while this run was active.
+        """
+        return self.start_tick <= other.start_tick and other.last_tick <= self.last_tick
+
+    def __str__(self) -> str:
+        """
+        :return: The type and name of the node, which run this is, its ticks and its
+            final state.
+        """
+        return (
+            f"{type(self.node).__name__} '{self.node.name}' "
+            f"(run {self.sequence_number}, ticks {self.start_tick}-{self.end_tick}, "
+            f"{self.final_state.name})"
+        )
 
 
 @dataclass(kw_only=True)
@@ -281,6 +364,31 @@ class StateHistory:
             for history_item in self.items_recording(node=node)
         ]
 
+    def snapshot_at_tick(self, *, tick: int) -> StateHistoryItem:
+        """
+        :param tick: A tick the history covers.
+        :return: The state at `tick`: the last snapshot taken at or before it.
+        """
+        return [item for item in self.items if item.tick_count <= tick][-1]
+
+    def last_known_observation_of(
+        self, *, node: StatechartNode, tick: int
+    ) -> ObservationStateValue:
+        """
+        :param node: A node of the statechart.
+        :param tick: A tick the history covers.
+        :return: The latest observation other than UNKNOWN `node` took at or before
+            `tick`, UNKNOWN if it took none.
+        """
+        observed = [
+            observation
+            for item in self.items
+            if item.tick_count <= tick
+            and (observation := item.observation_state_of(node=node))
+            is not ObservationStateValue.UNKNOWN
+        ]
+        return observed[-1] if observed else ObservationStateValue.UNKNOWN
+
     def items_recording(self, *, node: StatechartNode) -> list[StateHistoryItem]:
         """
         :param node: The node to look up.
@@ -300,27 +408,64 @@ class StateHistory:
             this history is still empty).
         """
         history = self.items_recording(node=node)
-        if not history:
-            return None
-        current_state = history[-1].life_cycle_state[node]
-        if current_state == LifeCycleValue.NOT_STARTED:
-            return None
-        start_index = len(history) - 1
-        while (
-            start_index > 0
-            and history[start_index - 1].life_cycle_state[node]
-            != LifeCycleValue.NOT_STARTED
+        if (
+            not history
+            or history[-1].life_cycle_state[node] == LifeCycleValue.NOT_STARTED
         ):
-            start_index -= 1
-        if not current_state.is_terminal:
-            return RunTicks(start_tick=history[start_index].tick_count, end_tick=None)
-        end_index = start_index
-        while not history[end_index].life_cycle_state[node].is_terminal:
-            end_index += 1
-        return RunTicks(
-            start_tick=history[start_index].tick_count,
-            end_tick=history[end_index].tick_count,
-        )
+            return None
+        return self.get_runs_of_node(node=node)[-1]
+
+    def get_runs_of_node(self, *, node: StatechartNode) -> list[NodeRun]:
+        """
+        :param node: The node to look up.
+        :return: Every run of `node`, in order: each starts when it leaves NOT_STARTED
+            and ends when it reaches a final state or is reset.
+        """
+        runs = []
+        start_tick = None
+        previous_state = LifeCycleValue.NOT_STARTED
+        for item in self.items_recording(node=node):
+            state = item.life_cycle_state[node]
+            if state == LifeCycleValue.NOT_STARTED and start_tick is not None:
+                runs.append(
+                    NodeRun(
+                        node=node,
+                        sequence_number=len(runs) + 1,
+                        start_tick=start_tick,
+                        end_tick=item.tick_count,
+                        final_state=previous_state,
+                    )
+                )
+                start_tick = None
+            elif (
+                state != LifeCycleValue.NOT_STARTED
+                and start_tick is None
+                and not previous_state.is_terminal
+            ):
+                start_tick = item.tick_count
+            if state.is_terminal and start_tick is not None:
+                runs.append(
+                    NodeRun(
+                        node=node,
+                        sequence_number=len(runs) + 1,
+                        start_tick=start_tick,
+                        end_tick=item.tick_count,
+                        final_state=state,
+                    )
+                )
+                start_tick = None
+            previous_state = state
+        if start_tick is not None:
+            runs.append(
+                NodeRun(
+                    node=node,
+                    sequence_number=len(runs) + 1,
+                    start_tick=start_tick,
+                    end_tick=None,
+                    final_state=previous_state,
+                )
+            )
+        return runs
 
     def __len__(self) -> int:
         return len(self.items)

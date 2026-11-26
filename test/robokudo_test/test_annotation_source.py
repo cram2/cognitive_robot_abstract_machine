@@ -83,14 +83,14 @@ def _place_cloud_in_cas(*, pipeline: Pipeline, points: numpy.ndarray) -> None:
     """
     side_length = 40
     pipeline.cas.set(
-        CASViews.CLOUD,
-        open3d.geometry.PointCloud(open3d.utility.Vector3dVector(points)),
+        view_name=CASViews.CLOUD,
+        value=open3d.geometry.PointCloud(open3d.utility.Vector3dVector(points)),
     )
     pipeline.cas.set(
-        CASViews.COLOR_IMAGE,
-        numpy.zeros((side_length, side_length, 3), dtype=numpy.uint8),
+        view_name=CASViews.COLOR_IMAGE,
+        value=numpy.zeros((side_length, side_length, 3), dtype=numpy.uint8),
     )
-    pipeline.cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+    pipeline.cas.set(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ColorToDepthRatio())
     pipeline.cas.pointcloud_camera_model = _square_camera_model(side_length=side_length)
 
 
@@ -149,8 +149,8 @@ def test_renamed_cluster_color_annotator_names_its_class(
     hypothesis = ObjectHypothesis()
     hypothesis.roi.roi = Rect(width=width, height=height)
     hypothesis.roi.mask = numpy.full((height, width), 255, dtype=numpy.uint8)
-    pipeline.cas.set(CASViews.CLOUD, open3d.geometry.PointCloud())
-    pipeline.cas.set(CASViews.COLOR_IMAGE, color_image)
+    pipeline.cas.set(view_name=CASViews.CLOUD, value=open3d.geometry.PointCloud())
+    pipeline.cas.set(view_name=CASViews.COLOR_IMAGE, value=color_image)
     pipeline.cas.annotations.append(hypothesis)
 
     assert annotator.update() == Status.SUCCESS
@@ -207,7 +207,9 @@ def test_renamed_naive_point_cloud_cluster_extractor_names_its_class(
 
     assert annotator.compute() == Status.SUCCESS
 
-    (hypothesis,) = pipeline.cas.filter_annotations_by_type(ObjectHypothesis)
+    (hypothesis,) = pipeline.cas.filter_annotations_by_type(
+        type_to_include=ObjectHypothesis
+    )
     assert hypothesis.source == NaivePointCloudClusterExtractor.get_class_name()
 
 
@@ -232,7 +234,9 @@ def test_renamed_point_cloud_cluster_extractor_names_its_class(
 
     assert annotator.compute() == Status.SUCCESS
 
-    (hypothesis,) = pipeline.cas.filter_annotations_by_type(ObjectHypothesis)
+    (hypothesis,) = pipeline.cas.filter_annotations_by_type(
+        type_to_include=ObjectHypothesis
+    )
     assert hypothesis.source == PointCloudClusterExtractor.get_class_name()
 
 
@@ -257,14 +261,14 @@ def test_renamed_tsdf_annotator_names_its_class(
         world_T_camera=None,
         timestamp_nanoseconds=0,
     )
-    pipeline.cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+    pipeline.cas.set(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ColorToDepthRatio())
     pipeline.cas.set(
-        CASViews.COLOR_IMAGE,
-        numpy.zeros((side_length, side_length, 3), dtype=numpy.uint8),
+        view_name=CASViews.COLOR_IMAGE,
+        value=numpy.zeros((side_length, side_length, 3), dtype=numpy.uint8),
     )
     pipeline.cas.set(
-        CASViews.DEPTH_IMAGE,
-        numpy.full((side_length, side_length), 1000, dtype=numpy.uint16),
+        view_name=CASViews.DEPTH_IMAGE,
+        value=numpy.full((side_length, side_length), 1000, dtype=numpy.uint16),
     )
     hypothesis = ObjectHypothesis()
     hypothesis.roi.roi = Rect(width=side_length, height=side_length)

@@ -87,7 +87,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for TIAGo perception
         """
-        tiago_config = CollectionReaderDescriptorFactory.create_descriptor("tiago")
+        tiago_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="tiago"
+        )
 
         # pc_crop_config = PointcloudCropAnnotator.Descriptor()
         # pc_crop_config.parameters.

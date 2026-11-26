@@ -19,18 +19,25 @@ from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
 )
-from probabilistic_model.learning.exceptions import (
-    StartingCircuitVariablesMismatchError,
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
     UnsupportedLeafDistributionError,
 )
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    StartingCircuitVariablesMismatchError,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationLearning,
     ExpectationMaximizationTraining,
     LearnableUnits,
 )
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.training_schedule import Convergence, MiniBatches
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.parameters.training_schedule import (
+    Convergence,
+    MiniBatches,
+)
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     factorized_gaussian_mixture,
     fully_factorized,

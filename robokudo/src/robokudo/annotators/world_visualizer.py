@@ -6,6 +6,7 @@ This annotator visualizes predefined objects and regions from a world descriptor
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import numpy as np
@@ -20,6 +21,8 @@ import robokudo.utils.o3d_helper
 from robokudo.cas import CASViews
 from robokudo.utils.region import region_obb_in_camera_coordinates
 from robokudo.world_descriptor import PredefinedObject
+
+logger = logging.getLogger(__name__)
 
 
 class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
@@ -43,7 +46,14 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
         super().__init__(name=name, descriptor=descriptor)
 
     @staticmethod
-    def _body_size(body: Body) -> np.ndarray | None:
+    def _body_size(*, body: Body) -> np.ndarray | None:
+        """
+        :return: The extent of the bounding box around the collision shapes of *body*,
+            or
+            around its visual shapes if it has no collision shapes, or ``None`` if it
+            has
+            neither.
+        """
         shape_collection = (
             body.collision
             if body.collision is not None and len(body.collision) > 0
@@ -56,8 +66,14 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
 
     @robokudo.utils.error_handling.catch_and_raise_to_blackboard
     def compute(self) -> py_trees.common.Status:
+        """
+        Visualize the bounding boxes of the world's bodies together with the point
+        cloud.
+
+        Overrides :meth:`ThreadedAnnotator.compute`.
+        """
         start_timer = default_timer()
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
 
         try:
             world_to_camera_transform = (
@@ -66,7 +82,9 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 )
             )
         except KeyError as err:
-            self.rk_logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(
+                f"Couldn't find viewpoint in the common analysis structure: {err}"
+            )
             return py_trees.common.Status.FAILURE
 
         visualized_geometries = []
@@ -79,7 +97,7 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
                 body = predefined_object.body
                 if body is None:
                     continue
-                size = self._body_size(body)
+                size = self._body_size(body=body)
                 if size is None:
                     continue
                 world_T_body = body.global_pose.to_np()
@@ -109,7 +127,9 @@ class WorldVisualizer(robokudo.annotators.core.ThreadedAnnotator):
             }
         )
 
-        self.get_annotator_output_struct().set_geometries(visualized_geometries)
+        self.get_annotator_output_struct().set_geometries(
+            geometries=visualized_geometries
+        )
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

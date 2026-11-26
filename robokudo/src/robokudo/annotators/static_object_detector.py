@@ -12,6 +12,7 @@ The detector can create object hypotheses with poses, masks, and class labels.
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 from enum import Enum
 from timeit import default_timer
@@ -62,6 +63,8 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.shape_collection import ShapeCollection
     import numpy.typing as npt
     import open3d
+
+logger = logging.getLogger(__name__)
 
 
 class StaticObjectMode(Enum):
@@ -162,7 +165,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self.color: npt.NDArray | None = None
         self.depth: npt.NDArray | None = None
         self.cloud: open3d.geometry.PointCloud | None = None
@@ -170,7 +173,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         self.object_body: Body | None = None
         self.object_bodies_by_name: dict[str, Body] = {}
 
-    def detect_from_bb_descriptor(self, color_rgb: npt.NDArray) -> ObjectHypothesis:
+    def detect_from_bb_descriptor(self, *, color_rgb: npt.NDArray) -> ObjectHypothesis:
         """
         Detect objects using the configured bounding box.
 
@@ -180,7 +183,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         object_hypothesis.id = str(0)
         object_hypothesis.source = self.get_class_name()
 
-        object_hypothesis.points = self.get_cloud_from_2d_bb_roi(color_rgb)
+        object_hypothesis.points = self.get_cloud_from_2d_bb_roi(color_rgb=color_rgb)
         # Use bounding box coordinates relative to the color image.
         object_hypothesis.roi.roi.pos.x = self.descriptor.parameters.bounding_box_x
         object_hypothesis.roi.roi.pos.y = self.descriptor.parameters.bounding_box_y
@@ -203,11 +206,19 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         return object_hypothesis
 
     @staticmethod
-    def _body_name(body: Body) -> str:
+    def _body_name(*, body: Body) -> str:
+        """
+        :return: The name of *body* without its prefix.
+        """
         return body.name.name
 
     @staticmethod
-    def _select_body_shape_collection(body: Body) -> ShapeCollection | None:
+    def _select_body_shape_collection(*, body: Body) -> ShapeCollection | None:
+        """
+        :return: The collision shapes of *body*, or its visual shapes if it has no
+            collision
+            shapes, or ``None`` if it has neither.
+        """
         if body.collision is not None and len(body.collision) > 0:
             return body.collision
         if body.visual is not None and len(body.visual) > 0:
@@ -216,6 +227,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
 
     def detect_from_body(
         self,
+        *,
         body: Body,
         object_id: int = 0,
         camera_T_world: HomogeneousTransformationMatrix | None = None,
@@ -238,11 +250,11 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         if camera_T_world is None:
             camera_T_world = self.get_cas().require_camera_observation().camera_T_world
 
-        shape_collection = self._select_body_shape_collection(body)
+        shape_collection = self._select_body_shape_collection(body=body)
         if shape_collection is None:
-            self.rk_logger.warning(
+            logger.warning(
                 "Body %s has no collision or visual shapes; skipping.",
-                self._body_name(body),
+                self._body_name(body=body),
             )
             return None
         bounding_box = shape_collection.as_bounding_box_collection_in_frame(
@@ -265,12 +277,12 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             self.get_cas(), oriented_bounding_box
         )
 
-        image_height = self.get_cas().get(CASViews.COLOR_IMAGE).shape[0]
-        image_width = self.get_cas().get(CASViews.COLOR_IMAGE).shape[1]
+        image_height = self.get_cas().get(view_name=CASViews.COLOR_IMAGE).shape[0]
+        image_width = self.get_cas().get(view_name=CASViews.COLOR_IMAGE).shape[1]
 
         if rect_outside_image(corner_points, image_width, image_height):
-            self.rk_logger.info(
-                f"ROI of object {self._body_name(body)} would be completely out of camera frame. Skipping ..."
+            logger.info(
+                f"Region of interest of object {self._body_name(body=body)} would be completely out of camera frame. Skipping ..."
             )
             return None
 
@@ -313,13 +325,13 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             object_hypothesis.annotations.append(bounding_box_annotation)
 
         self.add_classification_annotation(
-            object_hypothesis=object_hypothesis, class_name=self._body_name(body)
+            object_hypothesis=object_hypothesis, class_name=self._body_name(body=body)
         )
 
         return object_hypothesis
 
     def detect_from_body_base(
-        self, camera_T_world: HomogeneousTransformationMatrix | None = None
+        self, *, camera_T_world: HomogeneousTransformationMatrix | None = None
     ) -> list[ObjectHypothesis]:
         """
         Detect configured bodies using their world-descriptor geometry.
@@ -333,7 +345,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             if body is None:
                 continue
             object_hypothesis = self.detect_from_body(
-                body, camera_T_world=camera_T_world
+                body=body, camera_T_world=camera_T_world
             )
             if object_hypothesis is not None:
                 object_hypotheses.append(object_hypothesis)
@@ -363,9 +375,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        self.cloud = self.get_cas().get(CASViews.CLOUD)
+        self.color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
+        self.depth = self.get_cas().get(view_name=CASViews.DEPTH_IMAGE)
+        self.cloud = self.get_cas().get(view_name=CASViews.CLOUD)
 
         world_frame_required = False
         camera_T_world = None
@@ -379,9 +391,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 if annotation.body is not None
             ]
             self.object_bodies_by_name = {
-                self._body_name(body): body for body in object_bodies
+                self._body_name(body=body): body for body in object_bodies
             }
-            self.rk_logger.info(
+            logger.info(
                 f"Loaded shared world descriptor bodies: {list(self.object_bodies_by_name.keys())}"
             )
 
@@ -391,7 +403,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                     self.feedback_message = (
                         f"Couldn't find {class_name} in world descriptor"
                     )
-                    self.rk_logger.warning(self.feedback_message)
+                    logger.warning(self.feedback_message)
                     return Status.SUCCESS
 
             world_frame_required = True
@@ -399,8 +411,8 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         if world_frame_required:
             observation = self.get_cas().camera_observation
             if observation is None or observation.world_T_camera is None:
-                self.rk_logger.warning(
-                    "Could not find world-to-camera transform in the CAS"
+                logger.warning(
+                    "Could not find world-to-camera transform in the common analysis structure"
                 )
                 return Status.FAILURE
             camera_T_world = observation.camera_T_world
@@ -425,7 +437,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         object_hypotheses = []
 
         if self.descriptor.parameters.mode == StaticObjectMode.BOUNDING_BOX:
-            object_hypothesis = self.detect_from_bb_descriptor(color_rgb)
+            object_hypothesis = self.detect_from_bb_descriptor(color_rgb=color_rgb)
             if object_hypothesis is None:
                 return Status.SUCCESS
             object_hypotheses.append(object_hypothesis)
@@ -479,9 +491,11 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
                 2,
             )
 
-            self.get_annotator_output_struct().set_geometries(object_hypothesis.points)
+            self.get_annotator_output_struct().set_geometries(
+                geometries=object_hypothesis.points
+            )
 
-        self.get_annotator_output_struct().set_image(visualization_image)
+        self.get_annotator_output_struct().set_image(img=visualization_image)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
@@ -504,7 +518,12 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         object_hypothesis.annotations.append(classification_annotation)
 
     def get_rotation_list_based_on_parameters(
-        self, rotation_x: float, rotation_y: float, rotation_z: float, rotation_w: float
+        self,
+        *,
+        rotation_x: float,
+        rotation_y: float,
+        rotation_z: float,
+        rotation_w: float,
     ) -> list[float]:
         """
         Return a quaternion based on the parametrization of the Annotator.
@@ -526,7 +545,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         return rotation_list
 
     def get_cloud_from_2d_bb_roi(
-        self, color_rgb: npt.NDArray
+        self, *, color_rgb: npt.NDArray
     ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside the configured bounding
@@ -543,7 +562,9 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             height=parameters.bounding_box_height,
         )
         left, top, right, bottom = (
-            self.get_cas().color_to_depth_ratio.depth_region(box).get_corner_points()
+            self.get_cas()
+            .color_to_depth_ratio.depth_region(region=box)
+            .get_corner_points()
         )
         mask = np.zeros_like(self.depth, dtype=np.uint8)
         mask[top:bottom, left:right] = 255

@@ -82,7 +82,7 @@ class PoseKeypoint(IntEnum):
 # %% depth
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DepthFrame:
     """
     The depth measurements point clouds are built from, with matching color.
@@ -115,7 +115,9 @@ class DepthFrame:
         """
         return 255
 
-    def box_cloud(self, box: Rect, depth_truncate: float) -> open3d.geometry.PointCloud:
+    def box_cloud(
+        self, *, box: Rect, depth_truncate: float
+    ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside a box.
 
@@ -125,13 +127,15 @@ class DepthFrame:
         :return: The colored point cloud of the depth measurements inside the box.
         """
         left, top, right, bottom = self.color_to_depth_ratio.depth_region(
-            box
+            region=box
         ).get_corner_points()
         mask = np.zeros_like(self.depth_image, dtype=np.uint8)
         mask[top:bottom, left:right] = self.mask_foreground
-        return self._masked_cloud(mask, depth_truncate=depth_truncate)
+        return self._masked_cloud(mask=mask, depth_truncate=depth_truncate)
 
-    def disc_cloud(self, x: float, y: float, radius: int) -> open3d.geometry.PointCloud:
+    def disc_cloud(
+        self, *, x: float, y: float, radius: int
+    ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements inside a disc.
 
@@ -140,7 +144,7 @@ class DepthFrame:
         :param radius: Disc radius in depth image pixels.
         :return: The colored point cloud of the depth measurements inside the disc.
         """
-        center = self.color_to_depth_ratio.depth_pixel(x, y)
+        center = self.color_to_depth_ratio.depth_pixel(x=x, y=y)
         mask = np.zeros_like(self.depth_image, dtype=np.uint8)
         cv2.circle(
             mask,
@@ -149,10 +153,10 @@ class DepthFrame:
             self.mask_foreground,
             thickness=cv2.FILLED,
         )
-        return self._masked_cloud(mask)
+        return self._masked_cloud(mask=mask)
 
     def _masked_cloud(
-        self, mask: npt.NDArray[np.uint8], **cloud_settings: float
+        self, *, mask: npt.NDArray[np.uint8], **cloud_settings: float
     ) -> open3d.geometry.PointCloud:
         """
         Build the point cloud of the depth measurements a mask marks.
@@ -192,8 +196,12 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             """
 
             def __init__(self) -> None:
+                """
+                Default parameters: a pretrained ultralytics pose model inside
+                :attr:`models_directory`.
+                """
                 self.models_directory: Path = (
-                    ModuleLoader.get_module_path(PACKAGE_NAME) / "models"
+                    ModuleLoader.get_module_path(module_name=PACKAGE_NAME) / "models"
                 )
                 """
                 Directory the pose model weights are loaded from.
@@ -299,10 +307,10 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             str(parameters.models_directory / parameters.pretrained_model)
         )
         if parameters.warmup_annotator:
-            self._predict(np.zeros(parameters.warmup_image_shape, dtype=np.uint8))
+            self._predict(image=np.zeros(parameters.warmup_image_shape, dtype=np.uint8))
         return super().setup(**kwargs)
 
-    def _predict(self, image: npt.NDArray[np.uint8]) -> Results:
+    def _predict(self, *, image: npt.NDArray[np.uint8]) -> Results:
         """
         Run the pose model on an image with the configured confidence threshold and non-
         maximum suppression overlap.
@@ -336,16 +344,16 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             self.descriptor.parameters
         )
         depth_frame = self._depth_frame() if parameters.global_with_depth else None
-        result = self._predict(self.get_cas().get(CASViews.COLOR_IMAGE))
+        result = self._predict(image=self.get_cas().get(view_name=CASViews.COLOR_IMAGE))
 
         hypotheses = [
-            self._hypothesis(result, index, depth_frame)
+            self._hypothesis(result=result, index=index, depth_frame=depth_frame)
             for index in range(len(result.boxes))
         ]
         self.get_cas().annotations.extend(hypotheses)
 
         if parameters.global_with_visualization:
-            self._visualize(result, hypotheses)
+            self._visualize(result=result, hypotheses=hypotheses)
         return Status.SUCCESS
 
     def _depth_frame(self) -> DepthFrame:
@@ -358,10 +366,10 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         cas = self.get_cas()
         color_to_depth_ratio = cas.color_to_depth_ratio
         scaled_color = get_scaled_color_image_for_depth_image(
-            cas, cas.get(CASViews.COLOR_IMAGE)
+            cas, cas.get(view_name=CASViews.COLOR_IMAGE)
         )
         return DepthFrame(
-            depth_image=cas.get(CASViews.DEPTH_IMAGE),
+            depth_image=cas.get(view_name=CASViews.DEPTH_IMAGE),
             rgb_image=cv2.cvtColor(scaled_color, cv2.COLOR_BGR2RGB),
             color_to_depth_ratio=color_to_depth_ratio,
             camera_model=cas.require_camera_observation().effective_camera_model.scaled(
@@ -371,7 +379,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         )
 
     def _hypothesis(
-        self, result: Results, index: int, depth_frame: DepthFrame | None
+        self, *, result: Results, index: int, depth_frame: DepthFrame | None
     ) -> HumanHypothesis:
         """
         Turn one detection into a human hypothesis classified as a person and annotated
@@ -392,9 +400,10 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             raise NotAPoseModelException(
                 annotator_name=self.name, model=parameters.pretrained_model
             )
-        box = Rect.from_corner_points(*result.boxes.xyxy[index].cpu().numpy())
+        x1, y1, x2, y2 = result.boxes.xyxy[index].cpu().numpy()
+        box = Rect.from_corner_points(x1=x1, y1=y1, x2=x2, y2=y2)
         shrunk_box = (
-            box if parameters.shrink_bounding_box is None else self._shrink_box(box)
+            box if parameters.shrink_bounding_box is None else self._shrink_box(box=box)
         )
         keeps_full_box = depth_frame is not None and parameters.shrink_as_annotation
 
@@ -425,26 +434,30 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             return hypothesis
 
         hypothesis.points = depth_frame.box_cloud(
-            hypothesis.roi.roi, parameters.depth_truncate
+            box=hypothesis.roi.roi, depth_truncate=parameters.depth_truncate
         )
         if parameters.shrink_bounding_box is not None and keeps_full_box:
             hypothesis.annotations.append(
                 CloudAnnotation(
                     source=self.get_class_name(),
-                    points=depth_frame.box_cloud(shrunk_box, parameters.depth_truncate),
+                    points=depth_frame.box_cloud(
+                        box=shrunk_box, depth_truncate=parameters.depth_truncate
+                    ),
                 )
             )
         if parameters.generate_clouds_for_keypoints:
             hypothesis.annotations.append(
                 KeypointAnnotation(
                     source=self.get_class_name(),
-                    keypoints=self._keypoint_clouds(keypoints, depth_frame),
+                    keypoints=self._keypoint_clouds(
+                        keypoints=keypoints, depth_frame=depth_frame
+                    ),
                     kind=KeypointKind.POINT_CLOUD,
                 )
             )
         return hypothesis
 
-    def _shrink_box(self, box: Rect) -> Rect:
+    def _shrink_box(self, *, box: Rect) -> Rect:
         """
         Shrink a box around its center by
         :attr:`Descriptor.Parameters.shrink_bounding_box` of its width and height.
@@ -463,7 +476,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         )
 
     def _keypoint_clouds(
-        self, keypoints: list[BodyKeypoint], depth_frame: DepthFrame
+        self, *, keypoints: list[BodyKeypoint], depth_frame: DepthFrame
     ) -> list[BodyKeypointCloud]:
         """
         Build a point cloud from the disc of
@@ -482,7 +495,9 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
                 keypoint=keypoint,
                 points=(
                     depth_frame.disc_cloud(
-                        keypoint.x, keypoint.y, parameters.keypoint_masking_radius
+                        x=keypoint.x,
+                        y=keypoint.y,
+                        radius=parameters.keypoint_masking_radius,
                     )
                     if keypoint.confidence
                     >= parameters.keypoint_confidence_threshold_for_clouds
@@ -492,7 +507,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
             for keypoint in keypoints
         ]
 
-    def _visualize(self, result: Results, hypotheses: list[HumanHypothesis]) -> None:
+    def _visualize(self, *, result: Results, hypotheses: list[HumanHypothesis]) -> None:
         """
         Output the color image with the detections drawn by the model and, if any
         hypothesis has one, the point clouds of the hypotheses merged into one.
@@ -500,7 +515,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         :param result: The detections of the pose model on the color image.
         :param hypotheses: The human hypotheses made from the detections.
         """
-        self.get_annotator_output_struct().set_image(result.plot())
+        self.get_annotator_output_struct().set_image(img=result.plot())
         clouds = [
             hypothesis.points
             for hypothesis in hypotheses
@@ -508,5 +523,5 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         ]
         if len(clouds) > 0:
             self.get_annotator_output_struct().set_geometries(
-                concatenate_clouds(clouds)
+                geometries=concatenate_clouds(clouds)
             )

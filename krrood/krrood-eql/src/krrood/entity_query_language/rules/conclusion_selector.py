@@ -7,11 +7,16 @@ such as ExceptIf, Alternative, and Next.
 
 from __future__ import annotations
 
+import itertools
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing_extensions import Iterable, TYPE_CHECKING, Self
+from dataclasses import dataclass, field
+from typing_extensions import Any, Iterable, TYPE_CHECKING, Self
 
 from krrood.entity_query_language.exceptions import SelfReferentialInsertionError
+from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.utils import (
+    cartesian_product_while_passing_the_bindings_around,
+)
 from krrood.patterns.classproperty import classproperty
 from krrood.entity_query_language.rules.conclusion import Conclusion
 from krrood.entity_query_language.operators.set_operations import Union as EQLUnion
@@ -282,6 +287,83 @@ class Refinement(LogicalBinaryOperator, ConclusionSelector):
 
 
 @dataclass(kw_only=True, eq=False)
+class ValueCombination:
+    """
+    One value for each of several variables, equal to another combination only when it
+    holds the very same objects in the same order, since a variable ranges over the
+    objects of its domain and two equal objects are still two values.
+    """
+
+    values: tuple[Any, ...]
+    """
+    The value of each variable, in the order of the variables.
+    """
+
+    @property
+    def identities(self) -> tuple[int, ...]:
+        """
+        The identities of :attr:`values`, which holding the values keeps from being
+        reused.
+        """
+        return tuple(id(value) for value in self.values)
+
+    def __hash__(self) -> int:
+        """
+        :return: A hash of :attr:`identities`.
+        """
+        return hash(self.identities)
+
+    def __eq__(self, other: object) -> bool:
+        """
+        :return: Whether *other* holds the very same objects in the same order.
+        """
+        return (
+            isinstance(other, ValueCombination) and self.identities == other.identities
+        )
+
+
+@dataclass(kw_only=True)
+class ConcludedValueCombinations:
+    """
+    The combinations of values of :attr:`Alternative._variables_shared_by_conclusions_`
+    that one branch of an :class:`Alternative` already concluded for.
+    """
+
+    variables: tuple[Variable, ...]
+    """
+    The variables whose values make up a combination.
+    """
+
+    combinations: set[ValueCombination] = field(default_factory=set)
+    """
+    The combinations concluded for so far.
+    """
+
+    def _combination_in_(self, *, bindings: Bindings) -> ValueCombination:
+        """
+        :param bindings: Bindings holding a value for every one of :attr:`variables`.
+        :return: The combination of those values.
+        """
+        return ValueCombination(
+            values=tuple(bindings[variable._id_] for variable in self.variables)
+        )
+
+    def add(self, *, bindings: Bindings) -> None:
+        """
+        :param bindings: Bindings holding a value for every one of :attr:`variables`,
+            whose combination is now concluded for.
+        """
+        self.combinations.add(self._combination_in_(bindings=bindings))
+
+    def contains(self, *, bindings: Bindings) -> bool:
+        """
+        :param bindings: Bindings holding a value for every one of :attr:`variables`.
+        :return: Whether their combination was already concluded for.
+        """
+        return self._combination_in_(bindings=bindings) in self.combinations
+
+
+@dataclass(kw_only=True, eq=False)
 class Alternative(OR, ConclusionSelector):
     """
     A conditional branch that behaves like an "else if" clause where the left branch is
@@ -294,6 +376,58 @@ class Alternative(OR, ConclusionSelector):
         *,
         sources: OperationResult,
     ) -> Iterable[OperationResult]:
+        """
+        Overrides :meth:`OR._evaluate__`: the right branch concludes only for the values
+        of :attr:`_variables_shared_by_conclusions_` that the left branch holds for none
+        of, whatever else either branch binds.
+
+        Branches whose conclusions share no variable fall back to
+        :meth:`_evaluate_for_every_failing_binding_`.
+        """
+        shared_variables = self._variables_shared_by_conclusions_
+        if not shared_variables:
+            yield from self._evaluate_for_every_failing_binding_(sources=sources)
+            return
+        concluded = ConcludedValueCombinations(variables=shared_variables)
+        for left_value in self._evaluate_child_as_condition_(
+            child=self.left, sources=sources
+        ):
+            if left_value.is_false:
+                continue
+            for combination in cartesian_product_while_passing_the_bindings_around(
+                shared_variables, left_value
+            ):
+                concluded.add(bindings=combination.bindings)
+                yield from self._result_with_conclusions_of_(
+                    branch_result=left_value, bindings=combination.bindings
+                )
+        for right_value in self._evaluate_child_as_condition_(
+            child=self.right, sources=sources
+        ):
+            if right_value.is_false:
+                yield self._build_operation_result_with_truth_(
+                    truth=False, bindings=right_value.bindings, child_result=right_value
+                )
+                continue
+            for combination in cartesian_product_while_passing_the_bindings_around(
+                shared_variables, right_value
+            ):
+                if concluded.contains(bindings=combination.bindings):
+                    continue
+                yield from self._result_with_conclusions_of_(
+                    branch_result=right_value, bindings=combination.bindings
+                )
+
+    def _evaluate_for_every_failing_binding_(
+        self, *, sources: OperationResult
+    ) -> Iterable[OperationResult]:
+        """
+        Evaluate as an :class:`OR`, with the right branch tried for every result of the
+        left branch that fails, from the bindings that result holds.
+
+        :param sources: The current bindings.
+        :return: The results, carrying the conclusions of the branch that holds.
+        """
         for output in OR._evaluate__(self, sources=sources):
             if output.is_true:
                 self._conclusions_.update(
@@ -302,17 +436,67 @@ class Alternative(OR, ConclusionSelector):
             yield output
             self._conclusions_.clear()
 
+    @property
+    def _variables_shared_by_conclusions_(self) -> tuple[Variable, ...]:
+        """
+        The variables in the concluded value of every conclusion of either branch, for
+        whose values the branches are alternatives to each other, in the order the first
+        conclusion's value names them.
+        """
+        conclusions = [
+            conclusion
+            for node in itertools.chain([self], self._descendants_)
+            for conclusion in node._conclusions_
+        ]
+        if not conclusions:
+            return ()
+        first_conclusion, *other_conclusions = conclusions
+        variable_ids_of_other_conclusions = [
+            {variable._id_ for variable in conclusion.variables_in_concluded_value}
+            for conclusion in other_conclusions
+        ]
+        return tuple(
+            variable
+            for variable in first_conclusion.variables_in_concluded_value
+            if all(
+                variable._id_ in variable_ids
+                for variable_ids in variable_ids_of_other_conclusions
+            )
+        )
+
+    def _result_with_conclusions_of_(
+        self, *, branch_result: OperationResult, bindings: Bindings
+    ) -> Iterable[OperationResult]:
+        """
+        :param branch_result: A result of one of the two branches that holds.
+        :param bindings: The bindings of that result, extended by the values of
+            :attr:`_variables_shared_by_conclusions_`.
+        :return: This alternative's result for it, carrying the branch's conclusions.
+        """
+        self._conclusions_.update(branch_result.operand._conclusions_)
+        yield self._build_operation_result_with_truth_(
+            truth=True, bindings=bindings, child_result=branch_result
+        )
+        self._conclusions_.clear()
+
     @classmethod
     def _get_current_context_condition(
         cls,
     ) -> ConditionType:
+        """
+        :return: The refinement branch the current context belongs to, together with
+            the alternatives and refinements already attached to it, or the conditions
+            root outside of one.
+        """
         current_context = SymbolicExpression._current_parent_in_context_stack_()
-        current_context_parent = current_context._parent_
-        if (
-            isinstance(current_context_parent, Refinement)
-            and current_context is current_context_parent.right
+        branch = current_context
+        while (
+            isinstance(branch._parent_, (Alternative, Refinement))
+            and branch is branch._parent_.left
         ):
-            return current_context
+            branch = branch._parent_
+        if isinstance(branch._parent_, Refinement) and branch is branch._parent_.right:
+            return branch
         return current_context._conditions_root_
 
     @classmethod

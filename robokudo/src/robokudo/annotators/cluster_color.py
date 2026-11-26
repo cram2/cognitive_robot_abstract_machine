@@ -11,6 +11,7 @@ using HSV color space segmentation.
 
 from __future__ import annotations
 
+import logging
 import copy
 from enum import Enum
 from timeit import default_timer
@@ -31,6 +32,8 @@ from robokudo.utils.cv_helper import crop_image
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class Color(Enum):
@@ -131,7 +134,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         # This list defines the range of a certain color.
         hue_intervals = [
@@ -158,14 +161,14 @@ class ClusterColorAnnotator(BaseAnnotator):
             start_timer_jit = default_timer()
             hsv_image = np.array([[[0, 0, 0]]])
             mask = np.array([[0]])
-            self.count_colors_numba(hsv_image, mask)
+            self.count_colors_numba(hsv_image=hsv_image, mask=mask)
             end_timer_jit = default_timer()
-            self.rk_logger.info(
+            logger.info(
                 f"Pre-compilation took {(end_timer_jit - start_timer_jit):.4f}s"
             )
 
     def count_colors_numba(
-        self, hsv_image: npt.NDArray, mask: npt.NDArray
+        self, *, hsv_image: npt.NDArray, mask: npt.NDArray
     ) -> tuple[int, dict[Color, int]]:
         """
         Wrapper function for the numba version of the count colors method.
@@ -179,15 +182,15 @@ class ClusterColorAnnotator(BaseAnnotator):
             as a dict with the counted colors. The key is a Color enum from this module.
         """
         counted_pixel_sum, color_count = ClusterColorAnnotator.count_colors_numba_impl(
-            hsv_image,
-            mask,
-            len(Color),
-            self.descriptor.parameters.min_saturation_color,
-            self.descriptor.parameters.min_value_color,
-            self.descriptor.parameters.max_value_black,
-            self.descriptor.parameters.min_value_white,
-            self.descriptor.parameters.num_of_colors,
-            self.descriptor.parameters.color_range,
+            hsv_image=hsv_image,
+            mask=mask,
+            total_amount_of_colors=len(Color),
+            min_saturation_color=self.descriptor.parameters.min_saturation_color,
+            min_value_color=self.descriptor.parameters.min_value_color,
+            max_value_black=self.descriptor.parameters.max_value_black,
+            min_value_white=self.descriptor.parameters.min_value_white,
+            number_of_colors=self.descriptor.parameters.num_of_colors,
+            color_range=self.descriptor.parameters.color_range,
         )
 
         color_count_map = {}
@@ -199,6 +202,7 @@ class ClusterColorAnnotator(BaseAnnotator):
     @staticmethod
     @numba.njit
     def count_colors_numba_impl(
+        *,
         hsv_image: npt.NDArray,
         mask: npt.NDArray,
         total_amount_of_colors: int,
@@ -268,7 +272,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         return counted_pixel_sum, color_count
 
     def count_colors(
-        self, hsv_image: npt.NDArray, mask: npt.NDArray
+        self, *, hsv_image: npt.NDArray, mask: npt.NDArray
     ) -> tuple[int, dict]:
         """
         Non-numba version of the count_colors_numba_impl method.
@@ -369,31 +373,31 @@ class ClusterColorAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
 
         # List for visualization purposes
         self.cluster_color_info = []
         self.cluster_rois = []
 
-        self.create_color_annotations(color)
+        self.create_color_annotations(color=color)
 
         visualization_img = copy.deepcopy(color)
-        visualization_img = self.draw_visualization(visualization_img)
+        visualization_img = self.draw_visualization(visualization_img=visualization_img)
 
         # 3D Visualization
         vis_geometries = [
             {"name": "Cloud", "geometry": cloud},
         ]
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return Status.SUCCESS
 
-    def create_color_annotations(self, color: npt.NDArray) -> None:
+    def create_color_annotations(self, *, color: npt.NDArray) -> None:
         """
         Create color annotations for all object hypotheses.
 
@@ -410,7 +414,7 @@ class ClusterColorAnnotator(BaseAnnotator):
         """
         # Iterate over everything that is an Object hypothesis and calculate the colors
         object_hypotheses = self.get_cas().filter_annotations_by_type(
-            self.descriptor.parameters.analysis_scope
+            type_to_include=self.descriptor.parameters.analysis_scope
         )
 
         for object_hypothesis in object_hypotheses:
@@ -445,7 +449,7 @@ class ClusterColorAnnotator(BaseAnnotator):
             # Uncomment the following line if you want to use the non-numba version (roughly 100% slower)
             # color_count_result = self.count_colors(cluster_hsv_color_img, cluster_mask)
             total_pixel_count, color_count_dict = self.count_colors_numba(
-                cluster_hsv_color_img, cluster_mask
+                hsv_image=cluster_hsv_color_img, mask=cluster_mask
             )
 
             # Sort list by color count. Highest value comes first.
@@ -482,7 +486,7 @@ class ClusterColorAnnotator(BaseAnnotator):
             self.cluster_color_info.append(color_count_result_sorted_by_count)
             self.cluster_rois.append(roi)
 
-    def draw_visualization(self, visualization_img: npt.NDArray) -> npt.NDArray:
+    def draw_visualization(self, *, visualization_img: npt.NDArray) -> npt.NDArray:
         """
         Draw visualization of detected colors on the image.
 

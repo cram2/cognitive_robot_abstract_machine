@@ -6,6 +6,7 @@ shape models to segmented object point clouds.
 
 from __future__ import annotations
 
+import logging
 import copy
 from dataclasses import dataclass
 
@@ -38,8 +39,10 @@ from robokudo.utils.shape_fitting import (
     select_best_shape,
 )
 
+logger = logging.getLogger(__name__)
 
-@dataclass
+
+@dataclass(kw_only=True)
 class CylinderAxisCandidate:
     """Candidate axis direction together with a refitted cylinder."""
 
@@ -232,7 +235,9 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def compute(self) -> Status:
         """Estimate shapes and publish annotations and 3D visualizations."""
-        object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+        object_hypotheses = self.get_cas().filter_annotations_by_type(
+            type_to_include=ObjectHypothesis
+        )
 
         total_object_hypotheses = 0
         updated_object_hypotheses = 0
@@ -252,7 +257,9 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             updated_object_hypotheses += 1
 
         if len(visual_geometries) > 0:
-            self.get_annotator_output_struct().set_geometries(visual_geometries)
+            self.get_annotator_output_struct().set_geometries(
+                geometries=visual_geometries
+            )
 
         self.feedback_message = (
             f"Estimated shapes for {updated_object_hypotheses}/"
@@ -262,14 +269,17 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _estimate_shape_for_object_hypothesis(
         self,
+        *,
         object_hypothesis: ObjectHypothesis,
     ) -> tuple[Shape, list[dict[str, Any]]] | None:
         """Estimate one shape candidate for a single object hypothesis."""
         point_cloud = object_hypothesis.points
-        if not self._valid_point_cloud(point_cloud):
+        if not self._valid_point_cloud(point_cloud=point_cloud):
             return None
 
-        filtered_cloud, retained_point_indices = self._prepare_point_cloud(point_cloud)
+        filtered_cloud, retained_point_indices = self._prepare_point_cloud(
+            point_cloud=point_cloud
+        )
         if len(filtered_cloud.points) < self.descriptor.parameters.minimum_point_count:
             return None
 
@@ -279,11 +289,13 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             points=points,
         )
 
-        best_fit = self._select_best_shape_candidate(candidates)
+        best_fit = self._select_best_shape_candidate(candidates=candidates)
         if best_fit is None:
             return None
         best_fit_adapter = adapter_for_fit(best_fit)
-        self._log_selected_candidate(object_hypothesis, best_fit)
+        self._log_selected_candidate(
+            object_hypothesis=object_hypothesis, fit_result=best_fit
+        )
 
         inlier_indices_in_filtered_cloud = retained_point_indices[
             best_fit.inlier_indices
@@ -293,7 +305,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             local_indices=inlier_indices_in_filtered_cloud,
         )
 
-        shape_annotation = best_fit_adapter.to_annotation(best_fit)
+        shape_annotation = best_fit_adapter.to_annotation(fit_result=best_fit)
         shape_annotation.source = self.get_class_name()
         shape_annotation.inliers = inlier_indices_in_original_object_cloud
         visual_geometries = self._create_visualization_geometries(
@@ -303,7 +315,9 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         )
         return shape_annotation, visual_geometries
 
-    def _valid_point_cloud(self, point_cloud: o3d.geometry.PointCloud | None) -> bool:
+    def _valid_point_cloud(
+        self, *, point_cloud: o3d.geometry.PointCloud | None
+    ) -> bool:
         """Return whether a point cloud has enough points for shape estimation."""
         if point_cloud is None:
             return False
@@ -313,6 +327,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _collect_shape_candidates(
         self,
+        *,
         object_hypothesis: ObjectHypothesis,
         points: np.ndarray,
     ) -> list[FittedShape]:
@@ -325,7 +340,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
                 object_hypothesis=object_hypothesis,
                 shape_name=adapter.shape_name,
                 fit_result=self._postprocess_shape_candidate(
-                    fit_result=adapter.fit(points, fit_parameters),
+                    fit_result=adapter.fit(points=points, parameters=fit_parameters),
                     points=points,
                 ),
             )
@@ -405,6 +420,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _record_shape_candidate(
         self,
+        *,
         candidates: list[FittedShape],
         object_hypothesis: ObjectHypothesis,
         shape_name: str,
@@ -419,10 +435,12 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             return
 
         candidates.append(fit_result)
-        self._log_candidate_metrics(object_hypothesis, fit_result)
+        self._log_candidate_metrics(
+            object_hypothesis=object_hypothesis, fit_result=fit_result
+        )
 
     def _postprocess_shape_candidate(
-        self, fit_result: FittedShape | None, points: np.ndarray
+        self, *, fit_result: FittedShape | None, points: np.ndarray
     ) -> FittedShape | None:
         """Apply annotator-level stabilization policies to fitted shape candidates."""
         if isinstance(fit_result, CylinderFit):
@@ -456,7 +474,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         )
 
     def _select_best_shape_candidate(
-        self, candidates: list[FittedShape]
+        self, *, candidates: list[FittedShape]
     ) -> FittedShape | None:
         """Select the best shape candidate using descriptor preferences."""
         return select_best_shape(
@@ -478,7 +496,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         )
 
     def _prepare_point_cloud(
-        self, point_cloud: o3d.geometry.PointCloud
+        self, *, point_cloud: o3d.geometry.PointCloud
     ) -> tuple[o3d.geometry.PointCloud, np.ndarray]:
         """Return a filtered point cloud and retained index mapping."""
         filtered_cloud = copy.deepcopy(point_cloud)
@@ -498,7 +516,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         return filtered_cloud, retained_point_indices
 
     def _stabilize_cylinder_axis_if_tilted(
-        self, cylinder_fit: CylinderFit, points: np.ndarray
+        self, *, cylinder_fit: CylinderFit, points: np.ndarray
     ) -> CylinderFit:
         """Stabilize cylinder axis using principal axes and optional upright prior."""
         if not self.descriptor.parameters.stabilize_cylinder_axis_with_principal_axis:
@@ -510,7 +528,9 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             cylinder_fit=cylinder_fit,
             points=points,
         )
-        selected_candidate = self._select_cylinder_axis_candidate(candidate_fits)
+        selected_candidate = self._select_cylinder_axis_candidate(
+            candidate_fits=candidate_fits
+        )
         if selected_candidate.source == "original":
             return cylinder_fit
 
@@ -527,25 +547,30 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         return selected_candidate.fit
 
     def _refit_cylinder_axis_candidates(
-        self, cylinder_fit: CylinderFit, points: np.ndarray
+        self, *, cylinder_fit: CylinderFit, points: np.ndarray
     ) -> list[CylinderAxisCandidate]:
         """Refit configured cylinder axis candidates and include the original fit."""
         candidate_fits: list[CylinderAxisCandidate] = [
             CylinderAxisCandidate(
                 source="original",
-                axis_direction=self._normalized_vector(cylinder_fit.axis_direction),
+                axis_direction=self._normalized_vector(
+                    vector=cylinder_fit.axis_direction
+                ),
                 fit=cylinder_fit,
             )
         ]
 
-        for source, axis_direction in self._collect_cylinder_axis_candidates(points):
+        for source, axis_direction in self._collect_cylinder_axis_candidates(
+            points=points
+        ):
             aligned_axis_direction = self._align_axis_with_reference(
                 axis_direction=axis_direction,
                 reference_axis_direction=cylinder_fit.axis_direction,
             )
             if (
                 self._axis_angle_degrees(
-                    cylinder_fit.axis_direction, aligned_axis_direction
+                    first_axis=cylinder_fit.axis_direction,
+                    second_axis=aligned_axis_direction,
                 )
                 < 1.0
             ):
@@ -573,7 +598,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         return candidate_fits
 
     def _align_axis_with_reference(
-        self, axis_direction: np.ndarray, reference_axis_direction: np.ndarray
+        self, *, axis_direction: np.ndarray, reference_axis_direction: np.ndarray
     ) -> np.ndarray:
         """Return an axis direction flipped to agree with a reference direction."""
         aligned_axis_direction = np.asarray(axis_direction, dtype=np.float64).copy()
@@ -583,12 +608,14 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _should_accept_stabilized_cylinder_axis(
         self,
+        *,
         original_fit: CylinderFit,
         selected_candidate: CylinderAxisCandidate,
     ) -> bool:
         """Return whether a stabilized cylinder candidate should replace the original."""
         axis_deviation_degrees = self._axis_angle_degrees(
-            original_fit.axis_direction, selected_candidate.axis_direction
+            first_axis=original_fit.axis_direction,
+            second_axis=selected_candidate.axis_direction,
         )
         if (
             axis_deviation_degrees
@@ -608,6 +635,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _log_stabilized_cylinder_axis(
         self,
+        *,
         original_fit: CylinderFit,
         selected_candidate: CylinderAxisCandidate,
     ) -> None:
@@ -615,22 +643,23 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         if not self.descriptor.parameters.log_candidate_metrics:
             return
         axis_deviation_degrees = self._axis_angle_degrees(
-            original_fit.axis_direction, selected_candidate.axis_direction
+            first_axis=original_fit.axis_direction,
+            second_axis=selected_candidate.axis_direction,
         )
-        self.rk_logger.info(
+        logger.info(
             f"{self.name} stabilized cylinder axis: "
             f"source={selected_candidate.source}, "
-            f"deviation={axis_deviation_degrees:.2f}deg, "
+            f"deviation={axis_deviation_degrees:.2f} degrees, "
             f"score_before={original_fit.score:.3f}, "
             f"score_after={selected_candidate.fit.score:.3f}"
         )
 
     def _collect_cylinder_axis_candidates(
-        self, points: np.ndarray
+        self, *, points: np.ndarray
     ) -> list[tuple[str, np.ndarray]]:
         """Return candidate cylinder axis directions for stabilization."""
         candidate_axes: list[tuple[str, np.ndarray]] = []
-        principal_axes = self._point_cloud_principal_axes(points)
+        principal_axes = self._point_cloud_principal_axes(points=points)
         for principal_axis_index, principal_axis in enumerate(principal_axes):
             candidate_axes.append(
                 (f"principal_axis_{principal_axis_index + 1}", principal_axis)
@@ -642,13 +671,17 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
         distinct_axes: list[tuple[str, np.ndarray]] = []
         for source, axis_direction in candidate_axes:
-            if self._contains_similar_axis_direction(distinct_axes, axis_direction):
+            if self._contains_similar_axis_direction(
+                existing_axis_candidates=distinct_axes,
+                candidate_axis_direction=axis_direction,
+            ):
                 continue
             distinct_axes.append((source, axis_direction))
         return distinct_axes
 
     def _contains_similar_axis_direction(
         self,
+        *,
         existing_axis_candidates: list[tuple[str, np.ndarray]],
         candidate_axis_direction: np.ndarray,
         similarity_threshold_degrees: float = 8.0,
@@ -656,7 +689,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         """Return whether candidate axis is similar to one axis already in the list."""
         for _, existing_axis_direction in existing_axis_candidates:
             angle = self._axis_angle_degrees(
-                existing_axis_direction, candidate_axis_direction
+                first_axis=existing_axis_direction, second_axis=candidate_axis_direction
             )
             if angle <= similarity_threshold_degrees:
                 return True
@@ -673,10 +706,10 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         )
         if np.linalg.norm(preferred_axis_direction) < 1e-9:
             return None
-        return self._normalized_vector(preferred_axis_direction)
+        return self._normalized_vector(vector=preferred_axis_direction)
 
     def _select_cylinder_axis_candidate(
-        self, candidate_fits: list[CylinderAxisCandidate]
+        self, *, candidate_fits: list[CylinderAxisCandidate]
     ) -> CylinderAxisCandidate:
         """Select one cylinder axis candidate by score and optional upright preference."""
         best_candidate_by_score = max(
@@ -705,29 +738,30 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             close_candidates,
             key=lambda candidate: (
                 self._axis_angle_degrees(
-                    candidate.axis_direction, preferred_axis_direction
+                    first_axis=candidate.axis_direction,
+                    second_axis=preferred_axis_direction,
                 ),
                 -candidate.fit.score,
             ),
         )
 
-    def _point_cloud_principal_axes(self, points: np.ndarray) -> list[np.ndarray]:
+    def _point_cloud_principal_axes(self, *, points: np.ndarray) -> list[np.ndarray]:
         """Return principal point-cloud axes sorted by descending variance."""
         centered_points = points - points.mean(axis=0)
         covariance_matrix = np.cov(centered_points.T)
         eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
         sorted_indices = np.argsort(eigenvalues)[::-1]
         return [
-            self._normalized_vector(eigenvectors[:, axis_index])
+            self._normalized_vector(vector=eigenvectors[:, axis_index])
             for axis_index in sorted_indices
         ]
 
     def _axis_angle_degrees(
-        self, first_axis: np.ndarray, second_axis: np.ndarray
+        self, *, first_axis: np.ndarray, second_axis: np.ndarray
     ) -> float:
         """Return unsigned angle in degrees between two axis directions."""
-        normalized_first_axis = self._normalized_vector(first_axis)
-        normalized_second_axis = self._normalized_vector(second_axis)
+        normalized_first_axis = self._normalized_vector(vector=first_axis)
+        normalized_second_axis = self._normalized_vector(vector=second_axis)
         cosine = float(
             np.clip(
                 np.abs(np.dot(normalized_first_axis, normalized_second_axis)),
@@ -737,7 +771,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         )
         return float(np.degrees(np.arccos(cosine)))
 
-    def _normalized_vector(self, vector: np.ndarray) -> np.ndarray:
+    def _normalized_vector(self, *, vector: np.ndarray) -> np.ndarray:
         """Return normalized vector with safe fallback for near-zero norm."""
         norm = float(np.linalg.norm(vector))
         if norm < 1e-9:
@@ -745,7 +779,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         return np.asarray(vector, dtype=np.float64) / norm
 
     def _stabilize_cuboid_orientation_if_ambiguous(
-        self, cuboid_fit: CuboidFit, points: np.ndarray
+        self, *, cuboid_fit: CuboidFit, points: np.ndarray
     ) -> CuboidFit:
         """Stabilize in-plane cuboid orientation for near-square visible faces."""
         if not self.descriptor.parameters.stabilize_ambiguous_cuboid_orientation:
@@ -756,7 +790,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             smallest_axis_index,
             first_in_plane_axis_index,
             second_in_plane_axis_index,
-        ) = self._cuboid_orientation_axis_indices(extents)
+        ) = self._cuboid_orientation_axis_indices(extents=extents)
 
         if not self._cuboid_in_plane_orientation_is_ambiguous(
             extents=extents,
@@ -782,7 +816,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         )
 
     def _cuboid_orientation_axis_indices(
-        self, extents: np.ndarray
+        self, *, extents: np.ndarray
     ) -> tuple[int, int, int]:
         """Return normal-axis index followed by the two in-plane axis indices."""
         smallest_axis_index = int(np.argmin(extents))
@@ -797,6 +831,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _cuboid_in_plane_orientation_is_ambiguous(
         self,
+        *,
         extents: np.ndarray,
         first_in_plane_axis_index: int,
         second_in_plane_axis_index: int,
@@ -814,6 +849,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _stabilized_cuboid_rotation_matrix(
         self,
+        *,
         rotation_matrix: np.ndarray,
         smallest_axis_index: int,
         first_in_plane_axis_index: int,
@@ -822,7 +858,9 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         """Return a cuboid rotation matrix with canonical in-plane axes."""
         normal_axis = rotation_matrix[:, smallest_axis_index]
         normal_axis = normal_axis / max(np.linalg.norm(normal_axis), 1e-9)
-        projected_reference_axis = self._first_projected_reference_axis(normal_axis)
+        projected_reference_axis = self._first_projected_reference_axis(
+            normal_axis=normal_axis
+        )
         if projected_reference_axis is None:
             return None
 
@@ -848,7 +886,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         return stabilized_rotation_matrix
 
     def _first_projected_reference_axis(
-        self, normal_axis: np.ndarray
+        self, *, normal_axis: np.ndarray
     ) -> np.ndarray | None:
         """Return the first global reference axis that projects onto the cuboid plane."""
         reference_axes = [
@@ -857,13 +895,16 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             np.asarray([0.0, 0.0, 1.0], dtype=np.float64),
         ]
         for reference_axis in reference_axes:
-            candidate_axis = self._project_axis_onto_plane(reference_axis, normal_axis)
+            candidate_axis = self._project_axis_onto_plane(
+                axis=reference_axis, plane_normal=normal_axis
+            )
             if np.linalg.norm(candidate_axis) > 1e-6:
                 return candidate_axis
         return None
 
     def _canonical_cuboid_plane_axes(
         self,
+        *,
         projected_reference_axis: np.ndarray,
         normal_axis: np.ndarray,
         original_first_axis: np.ndarray,
@@ -889,6 +930,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _refit_cuboid_or_keep_original(
         self,
+        *,
         cuboid_fit: CuboidFit,
         points: np.ndarray,
         stabilized_rotation_matrix: np.ndarray,
@@ -909,7 +951,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         return stabilized_fit
 
     def _project_axis_onto_plane(
-        self, axis: np.ndarray, plane_normal: np.ndarray
+        self, *, axis: np.ndarray, plane_normal: np.ndarray
     ) -> np.ndarray:
         """Project axis onto the plane orthogonal to the given plane normal."""
         return np.asarray(axis, dtype=np.float64) - float(
@@ -918,6 +960,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _map_to_object_indices(
         self,
+        *,
         object_hypothesis: ObjectHypothesis,
         local_indices: np.ndarray,
     ) -> list[int]:
@@ -942,6 +985,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _create_visualization_geometries(
         self,
+        *,
         object_hypothesis: ObjectHypothesis,
         filtered_cloud: o3d.geometry.PointCloud,
         best_fit: FittedShape,
@@ -955,8 +999,8 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
             cloud=filtered_cloud,
             inlier_indices=best_fit.inlier_indices,
         )
-        fit_geometry = fit_adapter.to_o3d_geometry(best_fit)
-        frame_geometry = fit_adapter.to_coordinate_frame(best_fit)
+        fit_geometry = fit_adapter.to_o3d_geometry(fit_result=best_fit)
+        frame_geometry = fit_adapter.to_coordinate_frame(fit_result=best_fit)
 
         return [
             {
@@ -974,7 +1018,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         ]
 
     def _create_inlier_colored_cloud(
-        self, cloud: o3d.geometry.PointCloud, inlier_indices: np.ndarray
+        self, *, cloud: o3d.geometry.PointCloud, inlier_indices: np.ndarray
     ) -> o3d.geometry.PointCloud:
         """Return a copy of the cloud with inliers and outliers color coded."""
         colored_cloud = copy.deepcopy(cloud)
@@ -988,6 +1032,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
 
     def _log_rejected_candidate(
         self,
+        *,
         object_hypothesis: ObjectHypothesis,
         shape_name: str,
     ) -> None:
@@ -997,28 +1042,28 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         if not self.descriptor.parameters.log_rejection_reasons:
             return
         object_name = object_hypothesis.id if object_hypothesis.id != "" else "object"
-        self.rk_logger.info(f"{self.name} rejected {shape_name} for {object_name}")
+        logger.info(f"{self.name} rejected {shape_name} for {object_name}")
 
     def _log_candidate_metrics(
-        self, object_hypothesis: ObjectHypothesis, fit_result: FittedShape
+        self, *, object_hypothesis: ObjectHypothesis, fit_result: FittedShape
     ) -> None:
         """Log shape candidate metrics for debugging."""
         if not self.descriptor.parameters.log_candidate_metrics:
             return
         object_name = object_hypothesis.id if object_hypothesis.id != "" else "object"
-        self.rk_logger.info(
+        logger.info(
             f"{self.name} candidate {object_name}: "
-            f"{adapter_for_fit(fit_result).summary(fit_result)}"
+            f"{adapter_for_fit(fit_result).summary(fit_result=fit_result)}"
         )
 
     def _log_selected_candidate(
-        self, object_hypothesis: ObjectHypothesis, fit_result: FittedShape
+        self, *, object_hypothesis: ObjectHypothesis, fit_result: FittedShape
     ) -> None:
         """Log selected candidate metrics for debugging."""
         if not self.descriptor.parameters.log_candidate_metrics:
             return
         object_name = object_hypothesis.id if object_hypothesis.id != "" else "object"
-        self.rk_logger.info(
+        logger.info(
             f"{self.name} selected {object_name}: "
-            f"{adapter_for_fit(fit_result).summary(fit_result)}"
+            f"{adapter_for_fit(fit_result).summary(fit_result=fit_result)}"
         )

@@ -104,7 +104,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         :return: The configured pipeline for Stretch perception
         """
         camera_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
-            CAMERA_CONFIG_NAME
+            camera=CAMERA_CONFIG_NAME
         )
 
         # Isolate the target shelf layer before clustering: without this the crop keeps

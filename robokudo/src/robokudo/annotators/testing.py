@@ -20,6 +20,7 @@ The module is used for:
 
 from __future__ import annotations
 
+import logging
 import copy
 import time
 import datetime
@@ -34,6 +35,9 @@ from robokudo.annotators.core import BaseAnnotator, ThreadedAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+from krrood.patterns.called_positionally import called_positionally
+
+logger = logging.getLogger(__name__)
 
 
 class SlowAnnotator(ThreadedAnnotator):
@@ -73,11 +77,11 @@ class SlowAnnotator(ThreadedAnnotator):
 
         :return: Success status after completion
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.compute(): Start doing the heavy stuff" % self.__class__.__name__
         )
 
-        self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        self.color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         vis = copy.deepcopy(self.color)
 
         vis = cv2.putText(
@@ -90,11 +94,11 @@ class SlowAnnotator(ThreadedAnnotator):
             2,
         )
         vis = cv2.rectangle(vis, (400, 400), (650, 650), (0, 0, 255), 2)
-        self.get_annotator_output_struct().set_image(vis)
+        self.get_annotator_output_struct().set_image(img=vis)
 
         time.sleep(self.sleep_in_s)  # in s
 
-        self.rk_logger.debug(
+        logger.debug(
             "%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__
         )
         self.feedback_message = "SlowAnnotator was successful."
@@ -127,7 +131,7 @@ class EmptyAnnotator(BaseAnnotator):
         :return: SUCCESS status
         """
         vis = np.zeros((640, 480, 3), dtype="uint8")
-        self.get_annotator_output_struct().set_image(vis)
+        self.get_annotator_output_struct().set_image(img=vis)
 
         return Status.SUCCESS
 
@@ -165,7 +169,7 @@ class FailingAnnotator(ThreadedAnnotator):
 
         :return: SUCCESS or FAILURE status
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.compute(): Start doing the heavy stuff" % self.__class__.__name__
         )
         time.sleep(0.5)  # in s
@@ -179,7 +183,7 @@ class FailingAnnotator(ThreadedAnnotator):
             self.feedback_message_queue.put("Action successful")
             return Status.SUCCESS
 
-        self.rk_logger.debug(
+        logger.debug(
             "%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__
         )
 
@@ -210,20 +214,19 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
         :param name: Name of the annotator instance
         """
         super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % (self.__class__.__name__))
+        logger.debug("%s.__init__()" % (self.__class__.__name__))
 
         self.collection_readers = [self.descriptor]
         """List of collection reader descriptors"""
-        # self.rk_logger.debug("%s" % (get_line_context(self)))
 
-    def setup(self, timeout: float) -> bool:
+    def setup(self, *, timeout: float) -> bool:
         """
         Set up the collection reader.
 
         :param timeout: Maximum time to wait for setup completion
         :return: True if setup successful
         """
-        self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
+        logger.debug("%s.setup()" % self.__class__.__name__)
         return True
 
     def initialise(self) -> None:
@@ -233,7 +236,7 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
         Called on first tick and whenever status changes from non-running.
         Resets counter and clears feedback messages for all children in sequence.
         """
-        self.rk_logger.debug("%s.initialise()" % (self.__class__.__name__))
+        logger.debug("%s.initialise()" % (self.__class__.__name__))
         self.counter = 0
 
         # Clear all feedback messages when Collection Reader starts over
@@ -266,19 +269,20 @@ class FakeCollectionReaderAnnotator(BaseAnnotator):
 
         else:
             self.feedback_message = "Waiting for incoming sensor data ..."
-        self.rk_logger.debug(
+        logger.debug(
             "%s.update()[%s->%s][%s]"
             % (self.__class__.__name__, self.status, new_status, self.feedback_message)
         )
         return new_status
 
+    @called_positionally
     def terminate(self, new_status: Status) -> None:
         """
         Clean up when transitioning to non-running state.
 
         :param new_status: New status being transitioned to
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.terminate()[%s->%s]"
             % (self.__class__.__name__, self.status, new_status)
         )
@@ -351,7 +355,7 @@ class ScopedAnnotator(BaseAnnotator):
         self.descriptor.parameters.analysis_scope = []  # test overwrite => error case
 
         data_to_analyze = self.get_data_from_analysis_scope(
-            self.descriptor.parameters.analysis_scope
+            analysis_scope=self.descriptor.parameters.analysis_scope
         )
 
         # Your Annotator now has to decide which kinds of data it expects and how it would process them

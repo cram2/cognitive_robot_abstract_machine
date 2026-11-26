@@ -6,20 +6,42 @@ trainers raise the log-likelihood of their data that way.
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
+from enum import IntEnum
 from datetime import timedelta
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
 import numpy as np
+import numpy.typing as npt
 import optax
 import pytest
 from array_api_compat import array_namespace
+from random_events.set import Set
+from random_events.variable import Continuous, Integer, Symbolic
+from sortedcontainers import SortedSet
+from krrood.adapters.json_serializer import from_json
 
-from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
-from probabilistic_model.learning.training_schedule import (
+from probabilistic_model.learning.parameters.gradient_descent.exceptions import (
+    UnscheduledOptimizerError,
+)
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
+    CompilerOption,
+    CompilerVariable,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
+from probabilistic_model.learning.parameters.training_schedule import (
     Convergence,
     ConvergenceHistory,
     LearningRatePlateau,
@@ -27,14 +49,28 @@ from probabilistic_model.learning.training_schedule import (
     MiniBatchTraining,
     PlateauScheduledTraining,
 )
+from probabilistic_model.distributions.binomial import BinomialDistribution
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
+    BinomialLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.discrete_layer import (
+    SymbolicLayer,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.gaussian_layer import (
     GaussianLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.probability_table import (
+    SparseProbabilityTable,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
+    LayeredProbabilisticCircuit,
 )
 
 from .test_circuit_parameters_and_training import (
     minimum_improvement,
     parameters_shifted,
 )
+from .split_batch_training_result import SplitBatchTrainingResult
 # %% convergence criterion
 
 
@@ -45,12 +81,12 @@ class ScriptedLossTraining(MiniBatchTraining):
     epoch.
     """
 
-    losses: list[float]
+    losses: list[float | np.ndarray]
     """
-    The loss each step reports, in order.
+    The loss each step reports, in order, a float or a scalar array.
     """
 
-    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float | np.ndarray:
         return self.losses.pop(0)
 
 
@@ -269,14 +305,40 @@ def test_a_plateau_needs_an_optimizer_whose_learning_rate_can_change(jax_circuit
     A schedule for an optax optimizer with a fixed learning rate is rejected.
     """
     trainer = JaxGradientDescent(
-        jax_circuit.root, AverageNegativeLogLikelihood(), optax.adam(1e-2)
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(1e-2),
+        learning_rate_plateau=LearningRatePlateau(),
     )
     with pytest.raises(UnscheduledOptimizerError):
         trainer.start_training(
             arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
             mini_batches=MiniBatches(),
-            learning_rate_plateau=LearningRatePlateau(),
         )
+
+
+def test_every_gradient_descent_training_records_epochs_in_its_own_plateau(
+    jax_circuit,
+):
+    """
+    A training starts from a fresh copy of the plateau of its gradient descent, so an
+    epoch it records changes neither the learner's plateau nor that of another training.
+    """
+    plateau = LearningRatePlateau(patience=0)
+    trainer = JaxGradientDescent(
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.inject_hyperparams(optax.adam)(learning_rate=0.1),
+        learning_rate_plateau=plateau,
+    )
+    arguments = (jnp.zeros((1, len(jax_circuit.variables))),)
+    first = trainer.start_training(arguments=arguments, mini_batches=MiniBatches())
+    first.finish_epoch(average_loss=1.0)
+    second = trainer.start_training(arguments=arguments, mini_batches=MiniBatches())
+
+    assert first.learning_rate_plateau.best_loss == 1.0
+    assert second.learning_rate_plateau == plateau
+    assert second.learning_rate_plateau is not plateau
 
 
 def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
@@ -285,13 +347,13 @@ def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
     """
     learning_rate = 0.1
     training = JaxGradientDescent(
-        jax_circuit.root,
-        AverageNegativeLogLikelihood(),
-        optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
+        learning_rate_plateau=LearningRatePlateau(),
     ).start_training(
         arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
         mini_batches=MiniBatches(),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     training.scale_learning_rate(scale=0.5)
 
@@ -308,18 +370,20 @@ def test_torch_training_scales_the_learning_rate_of_its_optimizer(
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
     circuit = mixture_of_products_case.circuit(np).to_namespace(
         array_namespace(torch.zeros(0))
     )
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=0.1
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        learning_rate=0.1,
+        learning_rate_plateau=LearningRatePlateau(),
     )
     training = trainer.start_training(
         arguments=(torch.zeros((1, len(circuit.variables))),),
         mini_batches=MiniBatches(),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     training.scale_learning_rate(scale=0.5)
 
@@ -373,6 +437,453 @@ def test_without_a_batch_size_an_epoch_is_one_batch_of_every_row():
     assert sorted(batches[0][0]) == list(rows)
 
 
+def test_the_row_indices_of_an_epoch_select_the_rows_of_its_batches():
+    """
+    The row indices of an epoch pick out the rows of the batches of an epoch shuffled by
+    the same seed, batch by batch.
+    """
+    data = np.arange(10.0)
+    labels = np.arange(10.0) * 2
+
+    row_indices = MiniBatches(batch_size=4, seed=0).row_indices_of_epoch(
+        number_of_rows=10
+    )
+    batches = MiniBatches(batch_size=4, seed=0).batches_of_epoch(
+        arguments=(data, labels)
+    )
+
+    for rows, (batch_data, batch_labels) in zip(row_indices, batches, strict=True):
+        np.testing.assert_array_equal(batch_data, data[rows])
+        np.testing.assert_array_equal(batch_labels, labels[rows])
+
+
+@dataclass(kw_only=True)
+class BatchRecordingTraining(MiniBatchTraining):
+    """
+    Training whose steps record the batch they are given and report no loss.
+    """
+
+    batches: list[tuple[np.ndarray, ...]]
+    """
+    The batch of every step so far, in order.
+    """
+
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+        self.batches.append(batch)
+        return 0.0
+
+
+def test_a_step_on_rows_steps_on_the_batch_of_those_rows_of_every_argument():
+    """
+    A step on some rows is a step on the batch holding those rows of every training
+    array, in the order of the rows.
+    """
+    data = np.arange(10.0)
+    labels = np.arange(10.0) * 2
+    rows = np.asarray([7, 2, 5])
+    training = BatchRecordingTraining(
+        arguments=(data, labels), mini_batches=MiniBatches(), batches=[]
+    )
+
+    training.step_on_rows(rows=rows)
+
+    [(batch_data, batch_labels)] = training.batches
+    np.testing.assert_array_equal(batch_data, data[rows])
+    np.testing.assert_array_equal(batch_labels, labels[rows])
+
+
+def test_a_jax_step_on_rows_learns_what_a_step_on_the_batch_of_those_rows_learns(
+    mixture_of_products_case, jax_circuit
+):
+    """
+    Jax gradient descent stepping on rows of its training array learns the parameters of
+    stepping on the batches of those rows.
+    """
+    np.random.seed(0)
+    data = jnp.asarray(mixture_of_products_case.circuit(np).sample(12))
+    row_indices = [np.asarray([3, 0, 7, 11]), np.asarray([5, 1]), np.asarray([9])]
+
+    def trained_parameters(steps_on_rows: bool) -> list[np.ndarray]:
+        """
+        :param steps_on_rows: Whether every step is given rows instead of their batch.
+        :return: The parameters after one step on each of the rows.
+        """
+        training = JaxGradientDescent(
+            layer=jax_circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adam(1e-2),
+        ).start_training(arguments=(data,), mini_batches=MiniBatches())
+        for rows in row_indices:
+            if steps_on_rows:
+                training.step_on_rows(rows=rows)
+            else:
+                training.step_on_batch(batch=(data[rows],))
+        return [np.asarray(parameter) for parameter in training.state.parameters]
+
+    for on_rows, on_batches in zip(
+        trained_parameters(True), trained_parameters(False), strict=True
+    ):
+        np.testing.assert_allclose(on_rows, on_batches, rtol=1e-6, atol=1e-7)
+
+
+# %% losses of an epoch
+
+
+def test_an_epoch_averages_the_losses_of_its_batches_over_their_rows():
+    """
+    The loss of an epoch is the average of the scalar array losses of its batches, each
+    weighted by its number of rows, as a float.
+    """
+    batch_losses = [np.asarray(1.0), np.asarray(4.0), np.asarray(10.0)]
+    training = ScriptedLossTraining(
+        arguments=(np.zeros(5),),
+        mini_batches=MiniBatches(batch_size=2),
+        losses=list(batch_losses),
+    )
+
+    average = training.train_one_epoch()
+
+    assert type(average) is float
+    assert average == pytest.approx(
+        float(2 * batch_losses[0] + 2 * batch_losses[1] + batch_losses[2]) / 5
+    )
+
+
+def test_a_jax_step_reports_its_loss_as_a_jax_array(jax_circuit):
+    """
+    A step of jax training reports the loss of its batch as a jax array.
+    """
+    training = JaxGradientDescent(
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(1e-2),
+    ).start_training(
+        arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
+        mini_batches=MiniBatches(),
+    )
+
+    assert isinstance(training.step_on_batch(batch=training.arguments), jax.Array)
+
+
+def test_a_torch_step_reports_its_loss_as_a_tensor(mixture_of_products_case):
+    """
+    A step of torch training reports the loss of its batch as a tensor without a
+    gradient.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
+    )
+    circuit = mixture_of_products_case.circuit(np).to_namespace(
+        array_namespace(torch.zeros(0))
+    )
+    training = torch_gradient_descent.TorchGradientDescent(
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=0.1
+    ).start_training(
+        arguments=(torch.zeros((1, len(circuit.variables)), dtype=torch.float64),),
+        mini_batches=MiniBatches(),
+    )
+
+    loss = training.step_on_batch(batch=training.arguments)
+
+    assert isinstance(loss, torch.Tensor)
+    assert not loss.requires_grad
+
+
+# %% steps recorded as CUDA graphs
+
+
+def torch_parameters_after_training(
+    *,
+    host: LayeredProbabilisticCircuit,
+    device: str,
+    records_cuda_graphs: bool,
+    takes_steps_one_by_one: bool,
+) -> list[npt.NDArray[np.float64]]:
+    """
+    :param host: The circuit with numpy parameters to train and to sample the data from.
+    :param device: The torch device to train on.
+    :param records_cuda_graphs: Whether the steps may be recorded as CUDA graphs.
+    :param takes_steps_one_by_one: Whether every step is taken by
+        :meth:`TorchGradientDescent.step` with the optimizer of the training, instead
+        of by the training itself.
+    :return: The parameters after four epochs of mini-batches of 100 rows of data the
+        circuit samples, the learning rate scaled by a tenth before the last epoch.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
+    )
+    np.random.seed(0)
+    namespace = array_namespace(torch.zeros(0))
+    circuit = host.to_namespace(namespace, device=device)
+    data = namespace.asarray(host.sample(450), device=device)
+    trainer = torch_gradient_descent.TorchGradientDescent(
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        learning_rate=0.05,
+        records_cuda_graphs=records_cuda_graphs,
+        learning_rate_plateau=LearningRatePlateau(),
+    )
+    training = trainer.start_training(
+        arguments=(data,),
+        mini_batches=MiniBatches(batch_size=100, seed=0),
+    )
+    for epoch in range(4):
+        if epoch == 3:
+            training.scale_learning_rate(scale=0.1)
+        for batch in training.mini_batches.batches_of_epoch(arguments=(data,)):
+            if takes_steps_one_by_one:
+                trainer.step(optimizer=training.optimizer, arguments=batch)
+            else:
+                training.step_on_batch(batch=batch)
+    return [parameter.detach().cpu().numpy() for parameter in trainer.parameters]
+
+
+def test_batches_of_the_same_array_shapes_share_their_recorded_step():
+    """
+    Batches whose arrays have the same shapes have one batch shape, which tells them
+    apart from batches of other shapes.
+    """
+    torch = pytest.importorskip("torch")
+    torch_circuit_parameter_learning = pytest.importorskip(
+        "probabilistic_model.learning.parameters.torch_circuit_parameter_learning"
+    )
+    batch_shape = torch_circuit_parameter_learning.BatchShape.from_batch
+
+    first = batch_shape(batch=(torch.zeros(100, 3),))
+
+    assert first == batch_shape(batch=(torch.ones(100, 3),))
+    assert hash(first) == hash(batch_shape(batch=(torch.ones(100, 3),)))
+    assert first != batch_shape(batch=(torch.zeros(50, 3),))
+
+
+def test_steps_recorded_as_cuda_graphs_train_as_steps_taken_one_by_one(
+    mixture_of_products_case, edge_matrix_type
+):
+    """
+    Recording the steps as CUDA graphs and replaying them gives the parameters that
+    taking every step on its own with the same optimizer gives, also after the learning
+    rate is scaled.
+    """
+    torch = pytest.importorskip("torch")
+    if not torch.cuda.is_available():
+        pytest.skip("needs a CUDA device")
+    recorded, taken = (
+        torch_parameters_after_training(
+            host=mixture_of_products_case.circuit(np, edge_matrix_type),
+            device="cuda",
+            records_cuda_graphs=True,
+            takes_steps_one_by_one=one_by_one,
+        )
+        for one_by_one in (False, True)
+    )
+    for recorded_parameter, taken_parameter in zip(recorded, taken):
+        np.testing.assert_array_equal(recorded_parameter, taken_parameter)
+
+
+class Bit(IntEnum):
+    """
+    The values of a binary symbolic variable.
+    """
+
+    ZERO = 0
+    ONE = 1
+
+
+@pytest.fixture
+def circuit_with_symbolic_leaves() -> LayeredProbabilisticCircuit:
+    """
+    A RAT-SPN over four binary symbolic and four continuous variables, whose leaves are
+    symbolic and Gaussian layers.
+    """
+    variables = SortedSet(
+        [
+            Symbolic(name=f"bit_{index}", domain=Set.from_iterable(Bit))
+            for index in range(4)
+        ]
+        + [Continuous(f"x_{index}") for index in range(4)]
+    )
+    region_graph = RegionGraph(
+        variables=variables, depth=2, repetitions=2, seed=0
+    ).create_random_region_graph()
+    np.random.seed(0)
+    return region_graph.to_probabilistic_circuit(input_units=4, sum_units=4)
+
+
+def test_steps_recorded_as_cuda_graphs_train_symbolic_leaves_as_steps_taken_one_by_one(
+    circuit_with_symbolic_leaves,
+):
+    """
+    Recording the steps of a circuit with symbolic and Gaussian leaves as CUDA graphs
+    and replaying them gives the parameters that taking every step on its own gives, up
+    to the rounding of the gradient of the symbolic lookup, which the GPU accumulates in
+    no fixed order.
+    """
+    torch = pytest.importorskip("torch")
+    if not torch.cuda.is_available():
+        pytest.skip("needs a CUDA device")
+    recorded, taken = (
+        torch_parameters_after_training(
+            host=circuit_with_symbolic_leaves,
+            device="cuda",
+            records_cuda_graphs=True,
+            takes_steps_one_by_one=one_by_one,
+        )
+        for one_by_one in (False, True)
+    )
+    for recorded_parameter, taken_parameter in zip(recorded, taken):
+        np.testing.assert_allclose(
+            recorded_parameter, taken_parameter, rtol=0.0, atol=1e-12
+        )
+
+
+def test_every_layer_of_a_rat_spn_trains_without_host_copies(
+    circuit_with_symbolic_leaves,
+):
+    """
+    The sum, product, symbolic and Gaussian layers of a RAT-SPN all train without host
+    copies, so its steps can be recorded.
+    """
+    assert all(
+        layer.trains_without_host_copies
+        for layer in circuit_with_symbolic_leaves.root.all_layers()
+    )
+
+
+def test_a_symbolic_layer_with_a_sparse_table_does_not_train_without_host_copies(
+    circuit_with_symbolic_leaves,
+):
+    """
+    A symbolic layer whose probabilities are stored in a sparse table looks them up on
+    the host.
+    """
+    symbolic_layer = next(
+        layer
+        for layer in circuit_with_symbolic_leaves.root.all_layers()
+        if isinstance(layer, SymbolicLayer)
+    )
+
+    assert not symbolic_layer.stored_as(
+        SparseProbabilityTable
+    ).trains_without_host_copies
+
+
+def test_a_circuit_with_a_layer_that_copies_from_the_host_takes_its_steps_one_by_one():
+    """
+    Asking for CUDA graphs on a circuit with a binomial layer, which copies from the
+    host, takes every step one by one instead of recording it.
+    """
+    torch = pytest.importorskip("torch")
+    torch_gradient_descent = pytest.importorskip(
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
+    )
+    if not torch.cuda.is_available():
+        pytest.skip("needs a CUDA device")
+    count = Integer(name="count")
+    layer = BinomialLayer.from_distributions(
+        variable_index=0,
+        distributions=[
+            BinomialDistribution(
+                variable=count, number_of_trials=4, success_probability=0.3, offset=0
+            )
+        ],
+    )
+    circuit = LayeredProbabilisticCircuit(SortedSet([count]), layer).to_namespace(
+        array_namespace(torch.zeros(0)), device="cuda"
+    )
+
+    trainer = torch_gradient_descent.TorchGradientDescent(
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        records_cuda_graphs=True,
+    )
+
+    assert not trainer.replays_recorded_steps
+
+
+def test_steps_on_the_cpu_are_taken_one_by_one_even_if_cuda_graphs_are_asked_for(
+    mixture_of_products_case, edge_matrix_type
+):
+    """
+    Parameters on the CPU are trained step by step with the same optimizer, whether CUDA
+    graphs are asked for or not.
+    """
+    asked, not_asked = (
+        torch_parameters_after_training(
+            host=mixture_of_products_case.circuit(np, edge_matrix_type),
+            device="cpu",
+            records_cuda_graphs=records,
+            takes_steps_one_by_one=False,
+        )
+        for records in (True, False)
+    )
+    for asked_parameter, not_asked_parameter in zip(asked, not_asked):
+        np.testing.assert_array_equal(asked_parameter, not_asked_parameter)
+
+
+# %% batches split across devices
+
+
+def split_batch_training(*, devices: int, output: Path) -> SplitBatchTrainingResult:
+    """
+    :param devices: The number of CPU devices jax starts with.
+    :param output: The JSON file the training writes its result to.
+    :return: What :func:`split_batch_training.train_on_split_batches` gives, run in a
+        process of its own.
+    """
+    repository = Path(__file__).resolve().parents[3]
+    environment = dict(os.environ)
+    environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = (
+        CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(value=devices)
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "test.probabilistic_model_test.test_tensorized.split_batch_training",
+            str(output),
+        ],
+        cwd=repository,
+        env=environment,
+        check=True,
+    )
+    return from_json(json.loads(output.read_text()))
+
+
+def test_batches_split_across_devices_train_as_on_one_device(tmp_path: Path):
+    """
+    With four CPU devices, every batch whose rows four divides is split across them and
+    the others run whole on every device; training gives the parameters and losses of
+    training on one device, and the trained parameters are back on one device.
+    """
+    one, four = (
+        split_batch_training(devices=devices, output=tmp_path / f"{devices}.json")
+        for devices in (1, 4)
+    )
+
+    assert (four.number_of_devices, four.devices_of_state) == (4, 4)
+    assert four.devices_of_trained_parameters == 1
+    np.testing.assert_allclose(four.epoch_losses, one.epoch_losses, rtol=1e-12)
+    for split, whole in zip(four.parameters, one.parameters):
+        np.testing.assert_allclose(split, whole, rtol=1e-10, atol=1e-12)
+
+
+def test_the_largest_even_batch_size_is_a_multiple_of_the_devices(tmp_path: Path):
+    """
+    The largest batch size of at most 450 rows that four devices split evenly is 448,
+    and one device splits every batch size evenly.
+    """
+    assert (
+        split_batch_training(devices=4, output=tmp_path / "4.json").even_batch_size
+        == 448
+    )
+    assert (
+        split_batch_training(devices=1, output=tmp_path / "1.json").even_batch_size
+        == 450
+    )
+
+
 # %% training until convergence
 
 
@@ -403,7 +914,9 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
         events = jnp.asarray(data)
         before = float(jnp.mean(circuit.log_likelihood(events=events)))
         run = JaxGradientDescent(
-            circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adam(5e-2),
         ).minimize_until_converged(
             events,
             convergence=training_convergence,
@@ -424,7 +937,7 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
 
     case = mixture_of_products_case
@@ -438,7 +951,7 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     events = namespace.asarray(data)
     before = float(circuit.log_likelihood(events=events).mean())
     run = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize_until_converged(
         events,
         convergence=training_convergence,

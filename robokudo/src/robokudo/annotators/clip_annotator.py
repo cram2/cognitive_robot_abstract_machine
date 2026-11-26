@@ -1,9 +1,10 @@
 """
-Zero-shot classification of images against a vocabulary with CLIP.
+Zero-shot classification of object hypotheses with CLIP.
 """
 
 from __future__ import annotations
 
+import logging
 import faiss
 import numpy as np
 import torch
@@ -18,6 +19,8 @@ from robokudo.types.annotation import Classification
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class CLIPAnnotator(ZeroShotClassificationAnnotator):
@@ -63,9 +66,16 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator):
         name: str = "CLIPAnnotator",
         descriptor: CLIPAnnotator.Descriptor | None = None,
     ) -> None:
+        """
+        Load the CLIP model named in the descriptor and index the text embeddings of its
+        vocabulary.
+
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
+        """
         super().__init__(name=name, descriptor=descriptor)
 
-        self.rk_logger.debug(f"Starting to init {self.__class__.__name__}")
+        logger.debug(f"Starting to initialize {self.__class__.__name__}")
 
         self.clip_model = CLIPModel.from_pretrained(
             self.descriptor.parameters.model_name
@@ -104,9 +114,11 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator):
             text_features = text_features.cpu().numpy()
         self.vocabulary_index.add(text_features)
 
-        self.rk_logger.debug(f"Initialized {self.__class__.__name__}")
+        logger.debug(f"Initialized {self.__class__.__name__}")
 
-    def _get_image_features(self, images: list[Image.Image]) -> npt.NDArray[np.float32]:
+    def _get_image_features(
+        self, *, images: list[Image.Image]
+    ) -> npt.NDArray[np.float32]:
         """
         Get normalized image features for the given images.
 
@@ -136,6 +148,7 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator):
 
     def _search_index(
         self,
+        *,
         features: npt.NDArray[np.float32],
         k: int,
         use_softmax: bool,
@@ -167,9 +180,9 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator):
 
         return class_similarities, class_indices
 
-    def classify(self, images: list[Image.Image]) -> list[list[Classification]]:
+    def classify(self, *, images: list[Image.Image]) -> list[list[Classification]]:
         class_similarities, class_indices = self._search_index(
-            features=self._get_image_features(images),
+            features=self._get_image_features(images=images),
             k=self._candidate_count(),
             use_softmax=self.descriptor.parameters.use_softmax,
             save_top_k=self.descriptor.parameters.save_top_k,

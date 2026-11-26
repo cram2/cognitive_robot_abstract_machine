@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
-from krrood.adapters import json_serializer
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
@@ -68,7 +66,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
+class Layer(DataclassDeepcopyMixin, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 
@@ -114,6 +112,15 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         :return: The number of parameters stored in this layer alone.
         """
         raise NotImplementedError
+
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :return: Whether a training step through this layer copies nothing from the
+            host to the device of its parameters, as recording the step as a CUDA graph
+            requires.
+        """
+        return False
 
     def validate(self):
         """
@@ -221,8 +228,25 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
             parameter for layer in self.all_layers() for parameter in layer.parameters
         ]
 
+    def parameters_by_layer(
+        self, *, parameters: list[BackendArray]
+    ) -> list[list[BackendArray]]:
+        """
+        :param parameters: Arrays in the order and with the shapes of
+            :attr:`circuit_parameters`.
+        :return: The arrays of every layer, the layers in the order of
+            :meth:`all_layers`.
+        """
+        result = []
+        position = 0
+        for layer in self.all_layers():
+            number_of_arrays = len(layer.parameters)
+            result.append(parameters[position : position + number_of_arrays])
+            position += number_of_arrays
+        return result
+
     def projected_circuit_parameters(
-        self, parameters: list[BackendArray]
+        self, *, parameters: list[BackendArray]
     ) -> list[BackendArray]:
         """
         :param parameters: Arrays in the order and with the shapes of
@@ -230,19 +254,15 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         :return: The arrays with those of every layer replaced by its
             :meth:`projected_parameters`.
         """
-        result = []
-        position = 0
-        for layer in self.all_layers():
-            number_of_arrays = len(layer.parameters)
-            result.extend(
-                layer.projected_parameters(
-                    parameters=parameters[position : position + number_of_arrays]
-                )
+        return [
+            projected
+            for layer, own in zip(
+                self.all_layers(), self.parameters_by_layer(parameters=parameters)
             )
-            position += number_of_arrays
-        return result
+            for projected in layer.projected_parameters(parameters=own)
+        ]
 
-    def copy_with_circuit_parameters(self, parameters: list[BackendArray]) -> Layer:
+    def copy_with_circuit_parameters(self, *, parameters: list[BackendArray]) -> Layer:
         """
         Copy the circuit rooted here with other parameter arrays, keeping every layer
         that several parents share shared. It runs under :func:`jax.jit`.
@@ -252,15 +272,12 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
         :return: The root of the copy.
         """
         order = self.all_layers()
-        parameters_of_layer: dict[int, list[BackendArray]] = {}
-        position = 0
-        for layer in order:
-            number_of_arrays = len(layer.parameters)
-            parameters_of_layer[id(layer)] = parameters[
-                position : position + number_of_arrays
-            ]
-            position += number_of_arrays
-
+        parameters_of_layer = {
+            id(layer): own
+            for layer, own in zip(
+                order, self.parameters_by_layer(parameters=parameters)
+            )
+        }
         copies: dict[int, Layer] = {}
         for layer in reversed(order):
             copy_of_layer = layer.copy_with_child_layers(
@@ -747,46 +764,6 @@ class Layer(SubclassJSONSerializer, DataclassDeepcopyMixin, ABC):
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.number_of_nodes})"
-
-    # %% serialization
-
-    @classmethod
-    def serialized_fields(cls) -> list[dataclasses.Field]:
-        """
-        :return: The dataclass fields that describe a layer, which are the ones its
-            constructor takes. The caches a layer fills in on its own are declared with
-            ``init=False`` and are left out.
-        """
-        return [field_ for field_ in dataclasses.fields(cls) if field_.init]
-
-    def to_json(self, **kwargs) -> dict[str, Any]:
-        """
-        Serialize this layer through the fields it declares.
-
-        The parameter arrays, the child layers and the sparse edge and weight blocks are
-        all types that :mod:`krrood.adapters.json_serializer` serializes generically, so
-        a layer type is serializable by declaring its fields and none of them has to
-        write a method per field.
-
-        :param kwargs: Keyword arguments to hand on to the nested ``to_json`` calls.
-        :return: The JSON dict.
-        """
-        result = super().to_json(**kwargs)
-        for field_ in self.serialized_fields():
-            result[field_.name] = json_serializer.to_json(
-                getattr(self, field_.name), **kwargs
-            )
-        return result
-
-    @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        return cls(
-            **{
-                field_.name: json_serializer.from_json(data[field_.name], **kwargs)
-                for field_ in cls.serialized_fields()
-                if field_.name in data
-            }
-        )
 
 
 @dataclass(eq=False, repr=False)

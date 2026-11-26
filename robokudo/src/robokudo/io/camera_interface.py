@@ -45,7 +45,7 @@ from typing_extensions import Any, TYPE_CHECKING
 from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.classproperty import classproperty
 from robokudo.cas import CASViews, CAS
-from robokudo.defs import PACKAGE_NAME
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
 from robokudo.descriptors.camera_configs.components import TfComponent
 from robokudo.exceptions import (
     CameraDataMissing,
@@ -57,6 +57,9 @@ from robokudo.io.exceptions import (
     CameraAnnotationAmbiguous,
     CameraFrameIsReferenceFrame,
     FrameNamesSeveralBodies,
+    CompressedDepthDecodingFailed,
+    UnsupportedDepthCompression,
+    UnsupportedDepthEncoding,
 )
 from robokudo.io.camera_model_adapters import RosCameraModelAdapter
 from robokudo.types.camera import CameraObservation
@@ -83,6 +86,8 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from robokudo.types.cv import ColorToDepthRatio
+
+logger = logging.getLogger(__name__)
 
 
 # %% Camera definitions
@@ -116,10 +121,6 @@ class CameraInterface(object):
         self.camera_config: Any = camera_config
         """
         Camera configuration object.
-        """
-        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """
-        RoboKudo logger instance.
         """
 
     def has_new_data(self) -> bool:
@@ -259,7 +260,7 @@ class CameraInterface(object):
                 parent=reference_body,
                 child=camera_body,
                 world=world,
-                name=self._standalone_mount_name(camera_body),
+                name=self._standalone_mount_name(camera_body=camera_body),
             )
             world.add_connection(mount)
         return mount
@@ -273,11 +274,11 @@ class CameraInterface(object):
         return (
             camera_body.parent_connection is not None
             and camera_body.parent_connection.name
-            == cls._standalone_mount_name(camera_body)
+            == cls._standalone_mount_name(camera_body=camera_body)
         )
 
     @staticmethod
-    def _standalone_mount_name(camera_body: Body) -> PrefixedName:
+    def _standalone_mount_name(*, camera_body: Body) -> PrefixedName:
         """
         Identify the adjustable mount created for one standalone camera.
         """
@@ -343,8 +344,8 @@ class CameraInterface(object):
             timestamp_nanoseconds=timestamp_nanoseconds,
         )
         if world_T_camera is not None and world_T_camera.child_frame is not camera.root:
-            observation = observation.with_world_T_camera(
-                HomogeneousTransformationMatrix(
+            observation = observation.copy_with_world_T_camera(
+                world_T_camera=HomogeneousTransformationMatrix(
                     data=world_T_camera,
                     reference_frame=world_T_camera.reference_frame,
                     child_frame=camera.root,
@@ -423,17 +424,17 @@ class CameraInterface(object):
                             parent=existing_root,
                             child=camera_body,
                             world=world,
-                            name=self._standalone_mount_name(camera_body),
+                            name=self._standalone_mount_name(camera_body=camera_body),
                         )
                     )
             world.add_semantic_annotation(camera)
 
-    def set_data(self, *, cas: CAS, world: World) -> None:
+    def set_data(self, *, cas: CAS, world: World) -> bool | None:
         """
-        Read in and convert the latest data and put it into the CAS, placing the camera
-        in ``world`` where it was when it recorded the data, if that is known.
+        Populate the CAS with one acquisition, placing the camera in ``world``.
 
-        .. note:: Keep data callbacks light and do the conversion here.
+        Return ``False`` when an acquisition is discarded; ``None`` or ``True``
+        indicates successful delivery.
 
         :param cas: The CAS where the data should be placed in
         :param world: The world perception perceives into
@@ -626,7 +627,7 @@ class ROSCameraInterface(CameraInterface):
             and angle <= self.camera_config.tolerated_camera_pose_angle
         ):
             return
-        self.rk_logger.warning(
+        logger.warning(
             f"The world places camera '{self.tf_from}' {distance:.3f} m and "
             f"{math.degrees(angle):.1f} degrees away from where TF places it in "
             f"'{self.tf_to}'; perceived objects follow TF and may be misplaced "
@@ -647,11 +648,13 @@ class ROSCameraInterface(CameraInterface):
         """
         frame = self.latest_frame
         camera_frame = frame.camera_info.header.frame_id or self.camera_config.tf_from
-        self.validate_camera_frame_for_tf(camera_frame)
+        self.validate_camera_frame_for_tf(camera_frame=camera_frame)
         self.store_camera_observation(
             cas=cas,
             world=world,
-            camera_model=RosCameraModelAdapter.from_camera_info(frame.camera_info),
+            camera_model=RosCameraModelAdapter.from_camera_info(
+                camera_info=frame.camera_info
+            ),
             camera_frame=camera_frame,
             timestamp_nanoseconds=Time.from_msg(frame.timestamp).nanoseconds,
             modalities=frame.modalities,
@@ -660,7 +663,7 @@ class ROSCameraInterface(CameraInterface):
             ),
         )
 
-    def validate_camera_frame_for_tf(self, camera_frame: str) -> None:
+    def validate_camera_frame_for_tf(self, *, camera_frame: str) -> None:
         """
         Require the image optical frame to match the configured TF source.
         """
@@ -674,14 +677,13 @@ class ROSCameraInterface(CameraInterface):
 
 def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
     """
-    Convert compressed depth image to proper depth format.
-
-    This is a workaround for handling compressed depth images in ROS.
-    Source: https://answers.ros.org/question/249775/display-compresseddepth-image-python-cv2/
+    Decode a compressed-depth acquisition into unsigned millimeter samples.
 
     :param msg: Compressed depth image message
     :return: Depth image as numpy array
-    :raises Exception: If compression type is wrong or decoding fails
+    :raises UnsupportedDepthCompression: If the message uses a different transport.
+    :raises CompressedDepthDecodingFailed: If the image payload cannot be decoded.
+    :raises UnsupportedDepthEncoding: If the depth representation is unsupported.
     """
     # 'msg' as type CompressedImage
     depth_fmt, compr_type = msg.format.split(";")
@@ -689,10 +691,7 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
     depth_fmt = depth_fmt.strip()
     compr_type = compr_type.strip()
     if "compressedDepth" not in compr_type:
-        raise Exception(
-            "Compression type is not 'compressedDepth'."
-            "You probably subscribed to the wrong topic."
-        )
+        raise UnsupportedDepthCompression(compression=compr_type)
 
     # remove header from raw data
     depth_header_size = 12
@@ -703,16 +702,12 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
     )
     # replaced np.fromstring with np.frombuffer because np.fromstring is deprecated in newer versions of numpy
     if depth_img_raw is None:
-        # probably wrong header size
-        raise Exception(
-            "Could not decode compressed depth image."
-            "You may need to change 'depth_header_size'!"
-        )
+        raise CompressedDepthDecodingFailed()
 
-    if depth_fmt == "16UC1":
+    if depth_fmt == ROSImageEncoding.UINT16_SINGLE_CHANNEL:
         # write raw image data
         return depth_img_raw
-    elif depth_fmt == "32FC1":
+    if depth_fmt == ROSImageEncoding.FLOAT32_SINGLE_CHANNEL:
         raw_header = msg.data[:depth_header_size]
         # header: int, float, float
         [compfmt, depthQuantA, depthQuantB] = struct.unpack("iff", raw_header)
@@ -723,11 +718,10 @@ def depth_convert_workaround(msg: CompressedImage) -> npt.NDArray:
         depth_img_scaled[depth_img_raw == 0] = 0
 
         # depth_img_scaled provides distance in meters as f32
-        # for storing it as png, we need to convert it to 16UC1 again (depth in mm)
+        # PNG storage requires unsigned 16-bit depth in millimeters.
         depth_img_mm = (depth_img_scaled * 1000).astype(np.uint16)
         return depth_img_mm
-    else:
-        raise Exception("Decoding of '" + depth_fmt + "' is not implemented!")
+    raise UnsupportedDepthEncoding(encoding=depth_fmt)
 
 
 # %% camera frame
@@ -788,14 +782,19 @@ class CameraFrame:
         color_image = (
             cv2.imdecode(np.frombuffer(color_data.data, np.uint8), cv2.IMREAD_COLOR)
             if isinstance(color_data, CompressedImage)
-            else bridge.imgmsg_to_cv2(color_data, "bgr8")
+            else bridge.imgmsg_to_cv2(
+                img_msg=color_data, desired_encoding=ROSImageEncoding.BGR8
+            )
         )
         if depth_data is None:
             depth_image = None
         elif isinstance(depth_data, CompressedImage):
             depth_image = depth_convert_workaround(depth_data)
         else:
-            depth_image = bridge.imgmsg_to_cv2(depth_data, "32FC1")
+            depth_image = bridge.imgmsg_to_cv2(
+                img_msg=depth_data,
+                desired_encoding=ROSImageEncoding.FLOAT32_SINGLE_CHANNEL,
+            )
         return cls(
             color_image=color_image,
             depth_image=depth_image,
@@ -855,10 +854,10 @@ class KinectCameraInterface(ROSCameraInterface):
         )
         ts.registerCallback(self.callback)
 
-        self.rk_logger.info("Subscribed to: ")
-        self.rk_logger.info(f"  {camera_config.topic_color}")
-        self.rk_logger.info(f"  {camera_config.topic_depth}")
-        self.rk_logger.info(f"  {camera_config.topic_camera_info}")
+        logger.info("Subscribed to: ")
+        logger.info(f"  {camera_config.topic_color}")
+        logger.info(f"  {camera_config.topic_depth}")
+        logger.info(f"  {camera_config.topic_camera_info}")
 
         self.color_to_depth_ratio: ColorToDepthRatio | None = None
         """
@@ -890,7 +889,7 @@ class KinectCameraInterface(ROSCameraInterface):
     def get_node(self) -> rclpy.node.Node:
         return self.node
 
-    def blackhole_callback(self, data: Any) -> None:
+    def blackhole_callback(self, *, data: Any) -> None:
         """
         This callback is just a dummy to receive data coming from a workaround
         subscription to handle problems with the ApproximateTimeSynchronizer.
@@ -916,8 +915,8 @@ class KinectCameraInterface(ROSCameraInterface):
         :param camera_info: Camera calibration message
         :raises CameraDataMissing: If the frame has no depth image.
         """
-        if self.rk_logger.isEnabledFor(logging.DEBUG):
-            self.rk_logger.debug("Received data:")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Received data:")
 
             color_time = Time(
                 seconds=color_data.header.stamp.sec,
@@ -929,7 +928,7 @@ class KinectCameraInterface(ROSCameraInterface):
                     seconds=depth_data.header.stamp.sec,
                     nanoseconds=depth_data.header.stamp.nanosec,
                 )
-                self.rk_logger.debug(
+                logger.debug(
                     f"  Color time - Depth time: {(color_time - depth_time).nanoseconds / 1e9:.6f}"
                 )
 
@@ -938,7 +937,7 @@ class KinectCameraInterface(ROSCameraInterface):
                     seconds=camera_info.header.stamp.sec,
                     nanoseconds=camera_info.header.stamp.nanosec,
                 )
-                self.rk_logger.debug(
+                logger.debug(
                     f"  Color time - Camera Info time: {(color_time - camera_info_time).nanoseconds / 1e9:.6f}"
                 )
 
@@ -967,9 +966,11 @@ class KinectCameraInterface(ROSCameraInterface):
 
             self.color_to_depth_ratio = self.camera_config.color_to_depth_ratio
 
-            cas.set(CASViews.COLOR_IMAGE, color_image)
-            cas.set(CASViews.DEPTH_IMAGE, frame.depth_image)
-            cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.color_to_depth_ratio)
+            cas.set(view_name=CASViews.COLOR_IMAGE, value=color_image)
+            cas.set(view_name=CASViews.DEPTH_IMAGE, value=frame.depth_image)
+            cas.set(
+                view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=self.color_to_depth_ratio
+            )
             self.store_latest_frame_observation(cas=cas, world=world)
 
             self._has_new_data = False

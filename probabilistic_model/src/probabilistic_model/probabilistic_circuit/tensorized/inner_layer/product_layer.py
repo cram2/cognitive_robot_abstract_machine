@@ -204,6 +204,13 @@ class ProductLayer(InnerLayer):
         return 0
 
     @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` for product layers, which do.
+        """
+        return True
+
+    @property
     def scope_width(self) -> int:
         """
         :return: The number of variables up to the largest index in the scope of this
@@ -239,7 +246,7 @@ class ProductLayer(InnerLayer):
     # %% queries
 
     def combine_factors(
-        self, child_results: list[BackendArray], reduction: RowReduction
+        self, *, child_results: list[BackendArray], reduction: RowReduction
     ) -> BackendArray:
         """
         Combine, per node, the results of the child nodes it multiplies.
@@ -251,11 +258,10 @@ class ProductLayer(InnerLayer):
         :return: The combined result with the nodes of this layer last, an array of that
             backend.
         """
-        namespace = array_namespace(*child_results)
-        values = self.edges.values_of_columns(
-            values=namespace.concat(child_results, axis=-1)
+        return self.edges.reduce_child_values_by_row(
+            values=array_namespace(*child_results).concat(child_results, axis=-1),
+            reduction=reduction,
         )
-        return self.edges.reduce_by_row(values=values, reduction=reduction)
 
     @memoized
     def log_likelihood_of_nodes(
@@ -265,7 +271,9 @@ class ProductLayer(InnerLayer):
             child_layer.log_likelihood_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self.combine_factors(child_results, RowReduction.SUM)
+        return self.combine_factors(
+            child_results=child_results, reduction=RowReduction.SUM
+        )
 
     @memoized
     def cumulative_distribution_of_nodes(
@@ -275,7 +283,9 @@ class ProductLayer(InnerLayer):
             child_layer.cumulative_distribution_of_nodes(events=events, cache=cache)
             for child_layer in self.child_layers
         ]
-        return self.combine_factors(child_results, RowReduction.PRODUCT)
+        return self.combine_factors(
+            child_results=child_results, reduction=RowReduction.PRODUCT
+        )
 
     @memoized
     def probability_of_simple_event_of_nodes(
@@ -293,8 +303,10 @@ class ProductLayer(InnerLayer):
         ]
         namespace = array_namespace(*child_results)
         combined = self.combine_factors(
-            [namespace.reshape(result, (1, -1)) for result in child_results],
-            RowReduction.PRODUCT,
+            child_results=[
+                namespace.reshape(result, (1, -1)) for result in child_results
+            ],
+            reduction=RowReduction.PRODUCT,
         )
         return namespace.reshape(combined, (-1,))
 
@@ -358,7 +370,8 @@ class ProductLayer(InnerLayer):
         # the moments of a decomposable product are the moments of the factor that owns
         # the variable, so summing the (zero padded) child moments is the right reduction
         return self.combine_factors(
-            [child_result.T for child_result in child_results], RowReduction.SUM
+            child_results=[child_result.T for child_result in child_results],
+            reduction=RowReduction.SUM,
         ).T
 
     def sample_forward(
@@ -411,8 +424,10 @@ class ProductLayer(InnerLayer):
         :return: The log-probability of every node, the sum over its factors.
         """
         return self.combine_factors(
-            [child_result.log_probabilities for child_result in child_results],
-            RowReduction.SUM,
+            child_results=[
+                child_result.log_probabilities for child_result in child_results
+            ],
+            reduction=RowReduction.SUM,
         )
 
     @memoized

@@ -25,7 +25,10 @@ from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner
 from cramph.context import ContextExtension
 from cramph.data_types import LifeCycleValue, ObservationStateValue
-from giskardpy.motion_statechart.exceptions import NoProgressError
+from giskardpy.motion_statechart.exceptions import (
+    NoProgressError,
+    PositionLimitBlockedError,
+)
 from cramph.node import (
     CancelStatechart,
     CompositeNode,
@@ -34,6 +37,10 @@ from cramph.node import (
 )
 from giskardpy.motion_statechart.graph_node import ConvergingTask, MotionStatechartNode
 from cramph.monitors import CountSimulationTimeSeconds
+from semantic_digital_twin.world_description.degree_of_freedom import (
+    DegreeOfFreedom,
+    PositionLimitSide,
+)
 
 # %% watching tasks
 
@@ -404,6 +411,32 @@ class AnyMonitoredTaskShortOfItsGoal(EndedByOwner, MotionStatechartNode):
         )
 
 
+# %% position limits a stalled task drives a degree of freedom into
+
+
+@dataclass(kw_only=True)
+class BlockedPositionLimit:
+    """
+    A position limit that a degree of freedom lies at while a task's error would fall by
+    moving it further, past the limit.
+    """
+
+    degree_of_freedom: DegreeOfFreedom
+    """
+    The degree of freedom lying at the limit.
+    """
+
+    side: PositionLimitSide
+    """
+    Which of its two position limits it lies at.
+    """
+
+    task: ConvergingTask
+    """
+    The task whose error would fall by moving past the limit.
+    """
+
+
 # %% watching a whole goal
 
 
@@ -412,10 +445,6 @@ class StillProgressing(EndedByOwner, CompositeNode):
     """
     Turns ``False`` once nothing under :attr:`monitored_node` has approached its goal
     for :attr:`timeout`.
-
-    Watching each converging task separately, rather than one combined error, keeps the
-    measure meaningful for a :class:`~cramph.composites.Sequence`, whose steps run one
-    after another, and names the task that is actually stuck.
 
     Wire :meth:`cancel_motion` to abort a motion that is no longer making progress, or
     the negation of its observation to a node's fail condition to give up on that node.
@@ -488,6 +517,91 @@ class StillProgressing(EndedByOwner, CompositeNode):
         if self._not_approaching is None:
             return []
         return self._not_approaching.stalled_tasks
+
+    def find_blocked_position_limits(
+        self,
+        *,
+        range_fraction: float = 0.001,
+        negligible_slope_fraction: float = 1e-3,
+    ) -> list[BlockedPositionLimit]:
+        """
+        Find the position limits that the stalled tasks drive the degrees of freedom
+        with a hardware interface into, at the world's current state.
+
+        :param range_fraction: See :meth:`DegreeOfFreedomLimits.reached_position_limits`.
+        :param negligible_slope_fraction: Fraction of a task's steepest error slope at or
+            below which a slope counts as zero.
+        :return: Per stalled task, every limit a degree of freedom lies at whose
+            crossing would make the task's error fall.
+        """
+        stalled_tasks = self.stalled_tasks
+        world = self.context.world
+        controlled_degrees_of_freedom = [
+            degree_of_freedom
+            for degree_of_freedom in world.degrees_of_freedom
+            if degree_of_freedom.has_hardware_interface
+        ]
+        reached_limits = {
+            degree_of_freedom: sides
+            for degree_of_freedom in controlled_degrees_of_freedom
+            if (
+                sides := degree_of_freedom.limits.reached_position_limits(
+                    position=world.state[degree_of_freedom.id].position,
+                    range_fraction=range_fraction,
+                )
+            )
+        }
+        if not stalled_tasks or not reached_limits:
+            return []
+        slopes = self._error_slopes(
+            tasks=stalled_tasks, degrees_of_freedom=controlled_degrees_of_freedom
+        )
+        negligible_slopes = negligible_slope_fraction * np.abs(slopes).max(axis=1)
+        return [
+            BlockedPositionLimit(
+                degree_of_freedom=degree_of_freedom, side=side, task=task
+            )
+            for task, task_slopes, negligible_slope in zip(
+                stalled_tasks, slopes, negligible_slopes
+            )
+            for degree_of_freedom, slope in zip(
+                controlled_degrees_of_freedom, task_slopes
+            )
+            for side in reached_limits.get(degree_of_freedom, [])
+            if abs(slope) > negligible_slope and slope * side < 0
+        ]
+
+    def _error_slopes(
+        self, *, tasks: list[ConvergingTask], degrees_of_freedom: list[DegreeOfFreedom]
+    ) -> NDArray[np.float64]:
+        """
+        :param tasks: Tasks of this node.
+        :param degrees_of_freedom: Degrees of freedom of the world this node runs in.
+        :return: The derivative of each task's error, one row per task, with respect to
+            the position of each of ``degrees_of_freedom``, one column each, at the
+            world's current state.
+        """
+        world = self.context.world
+        float_variable_data = self.context.float_variable_data
+        jacobian = (
+            sm.Vector([task.error_signal for task in tasks])
+            .jacobian(
+                variables=[
+                    degree_of_freedom.variables.position
+                    for degree_of_freedom in degrees_of_freedom
+                ]
+            )
+            .compile(
+                parameters=VariableParameters.from_lists(
+                    world.state.position_float_variables,
+                    float_variable_data.variables,
+                ),
+                sparse=False,
+            )
+        )
+        return np.asarray(
+            jacobian(world.state.positions, float_variable_data.data), dtype=float
+        ).reshape(len(tasks), len(degrees_of_freedom))
 
     def cancel_motion(self) -> CancelStatechart:
         """
@@ -613,8 +727,17 @@ class _CancelBecauseNoProgress(CancelStatechart):
     def create_exception(self) -> NoProgressError:
         """
         :return: An error naming the tasks that are stalled when this node starts, see
-            :meth:`~cramph.node.CancelStatechart.create_exception`.
+            :meth:`~cramph.node.CancelStatechart.create_exception`, and the position
+            limits blocking them if any do, see
+            :meth:`StillProgressing.find_blocked_position_limits`.
         """
+        blocked_position_limits = self.progress_monitor.find_blocked_position_limits()
+        if blocked_position_limits:
+            return PositionLimitBlockedError(
+                progress_monitor=self.progress_monitor,
+                stalled_tasks=self.progress_monitor.stalled_tasks,
+                blocked_position_limits=blocked_position_limits,
+            )
         return NoProgressError(
             progress_monitor=self.progress_monitor,
             stalled_tasks=self.progress_monitor.stalled_tasks,

@@ -18,11 +18,13 @@ from random_events.variable import Symbolic
 from random_events.interval import SimpleInterval
 from sortedcontainers import SortedSet
 
-from probabilistic_model.learning.gradient_descent import CrossEntropy
-from probabilistic_model.learning.region_graph.exceptions import (
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    CrossEntropy,
+)
+from probabilistic_model.learning.structure.region_graph.exceptions import (
     PredictedVariableInRegionGraphError,
 )
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,

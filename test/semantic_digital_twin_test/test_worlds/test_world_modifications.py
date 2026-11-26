@@ -31,13 +31,15 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
     Oven,
 )
-from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    Vector3,
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     Connection6DoF,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -96,8 +98,13 @@ class ConnectionModificationTestCase(unittest.TestCase):
 
             dof = DegreeOfFreedom(name=PrefixedName("dofyboi"))
             w.add_degree_of_freedom(dof)
-            connection = RevoluteConnection(
-                b1, b2, axis=Vector3.from_iterable([0, 0, 1]), raw_dof=dof
+            connection = ScrewAxisConnection(
+                parent=b1,
+                child=b2,
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.from_iterable([0, 0, 1])
+                ),
+                raw_dof=dof,
             )
             w.add_connection(connection)
         assert connection.dof.has_hardware_interface is False
@@ -122,10 +129,12 @@ class ConnectionModificationTestCase(unittest.TestCase):
             dof = DegreeOfFreedom(name=PrefixedName("dofyboi"))
             world.add_degree_of_freedom(dof)
             world.add_connection(
-                PrismaticConnection(
+                ScrewAxisConnection(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.from_iterable([0, 0, 1])
+                    ),
                     parent=b2,
                     child=b3,
-                    axis=Vector3.from_iterable([0, 0, 1]),
                     raw_dof=dof,
                 )
             )
@@ -477,8 +486,13 @@ def test_revert_add_degree_of_freedom():
         world.add_kinematic_structure_entity(b2)
         dof = DegreeOfFreedom(name=PrefixedName("dof"))
         world.add_degree_of_freedom(dof)
-        connection = RevoluteConnection(
-            b1, b2, axis=Vector3.from_iterable([0, 0, 1]), raw_dof=dof
+        connection = ScrewAxisConnection(
+            parent=b1,
+            child=b2,
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.from_iterable([0, 0, 1])
+            ),
+            raw_dof=dof,
         )
         world.add_connection(connection)
 
@@ -510,8 +524,13 @@ def test_revert_remove_degree_of_freedom():
         world.add_kinematic_structure_entity(b2)
         dof = DegreeOfFreedom(name=PrefixedName("dof"))
         world.add_degree_of_freedom(dof)
-        connection = RevoluteConnection(
-            b1, b2, axis=Vector3.from_iterable([0, 0, 1]), raw_dof=dof
+        connection = ScrewAxisConnection(
+            parent=b1,
+            child=b2,
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.from_iterable([0, 0, 1])
+            ),
+            raw_dof=dof,
         )
         world.add_connection(connection)
     with world.modify_world():
@@ -638,13 +657,23 @@ def test_revert_set_dofs_has_hardware_interface_restores_per_dof_previous_value(
         world.add_degree_of_freedom(dof1)
         world.add_degree_of_freedom(dof2)
         world.add_connection(
-            RevoluteConnection(
-                b1, b2, axis=Vector3.from_iterable([0, 0, 1]), raw_dof=dof1
+            ScrewAxisConnection(
+                parent=b1,
+                child=b2,
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.from_iterable([0, 0, 1])
+                ),
+                raw_dof=dof1,
             )
         )
         world.add_connection(
-            RevoluteConnection(
-                b2, b3, axis=Vector3.from_iterable([0, 0, 1]), raw_dof=dof2
+            ScrewAxisConnection(
+                parent=b2,
+                child=b3,
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.from_iterable([0, 0, 1])
+                ),
+                raw_dof=dof2,
             )
         )
     with world.modify_world():

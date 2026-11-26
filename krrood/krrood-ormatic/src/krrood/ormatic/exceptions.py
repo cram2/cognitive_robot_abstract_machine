@@ -1,3 +1,8 @@
+"""
+Errors raised while generating ORM interfaces and while converting between domain
+objects and their data access objects.
+"""
+
 from __future__ import annotations
 
 import zoneinfo
@@ -206,3 +211,60 @@ class ConversionOrderCycle(DataclassException, ValueError):
             constraint.suggest_correction() for constraint in self.cycle
         )
         return f"break the cycle by one of: {corrections}."
+
+
+@dataclass(kw_only=True)
+class StoredObjectTableNotUniqueError(DataclassException, LookupError):
+    """
+    Raised when not exactly one class maps the table every stored object has a row in.
+    """
+
+    table_classes: list[type]
+    """
+    The classes mapping that table in the process.
+    """
+
+    def error_message(self) -> str:
+        if not self.table_classes:
+            return "No class maps the table of every stored object."
+        return (
+            f"Several classes map the table of every stored object: "
+            f"{self.table_classes}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Import krrood.ormatic.stored_object, which every generated ORM interface "
+            "imports, and map the table with no other class."
+        )
+
+
+@dataclass(kw_only=True)
+class PartOfDetachedObjectNotLoadedError(DataclassException, LookupError):
+    """
+    Raised when a DAO outside any session is asked for a part it never loaded, so the
+    fields of that secondary base cannot be read.
+    """
+
+    data_access_object: Any
+    """
+    The DAO asked for the part.
+    """
+
+    part_class: type
+    """
+    The class of the part that was never loaded.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.data_access_object).__name__} with id "
+            f"{self.data_access_object.database_id} is not in a session and never "
+            f"loaded its {self.part_class.__name__}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Convert or read the DAO while its session is open, or add it to a session "
+            "again before asking for its parts."
+        )

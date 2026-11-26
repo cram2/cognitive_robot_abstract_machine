@@ -1,0 +1,4 @@
+tests_directory = "test"
+
+[assigned_tests]
+missing = ["test/base_test/test_chain_base.py"]

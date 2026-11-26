@@ -49,7 +49,8 @@ def detector_on_half_resolution_depth(
 
     depth_height, depth_width = 20, 40
     detector.get_cas().set(
-        CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio(horizontal=0.5, vertical=0.5)
+        view_name=CASViews.COLOR_TO_DEPTH_RATIO,
+        value=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
     )
     detector.depth = np.full((depth_height, depth_width), 1000, dtype=np.uint16)
     detector.camera_model = PinholeCameraModel(
@@ -67,6 +68,10 @@ def detector_on_half_resolution_depth(
 def test_bounding_box_cloud_covers_box_on_depth_resolution(
     detector_on_half_resolution_depth: StaticObjectDetectorAnnotator,
 ):
+    """
+    With a depth image at half the color resolution, the bounding box cloud has one
+    point per depth pixel the scaled box covers.
+    """
     detector = detector_on_half_resolution_depth
     parameters = detector.descriptor.parameters
     parameters.bounding_box_x = 4
@@ -75,7 +80,7 @@ def test_bounding_box_cloud_covers_box_on_depth_resolution(
     parameters.bounding_box_height = 8
     color_rgb = np.zeros((*detector.depth.shape, 3), dtype=np.uint8)
 
-    cloud = detector.get_cloud_from_2d_bb_roi(color_rgb)
+    cloud = detector.get_cloud_from_2d_bb_roi(color_rgb=color_rgb)
 
     depth_box_area = (7 - 2) * (7 - 3)
     assert len(cloud.points) == depth_box_area
@@ -155,7 +160,9 @@ def observed_offset_body(
         world_T_camera=world_T_camera,
         timestamp_nanoseconds=0,
     )
-    detector.get_cas().set(CASViews.COLOR_IMAGE, np.zeros((40, 80, 3), dtype=np.uint8))
+    detector.get_cas().set(
+        view_name=CASViews.COLOR_IMAGE, value=np.zeros((40, 80, 3), dtype=np.uint8)
+    )
     detector.get_cas().pointcloud_camera_model = detector.camera_model
     detector.cloud = open3d.geometry.PointCloud(
         open3d.utility.Vector3dVector([[1.0, -1.0, 6.0], [1.0, -1.0, 8.0]])
@@ -181,9 +188,9 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
     world_T_camera = observed_offset_body.world_T_camera
 
     hypothesis = (
-        detector.detect_from_body(body, camera_T_world=world_T_camera.inverse())
+        detector.detect_from_body(body=body, camera_T_world=world_T_camera.inverse())
         if explicit_camera_transform
-        else detector.detect_from_body(body)
+        else detector.detect_from_body(body=body)
     )
 
     assert isinstance(hypothesis, ObjectHypothesis)
@@ -224,7 +231,7 @@ def test_renamed_bounding_box_detection_names_detector_class(
     detector.name = renamed_annotator_name
     color_rgb = np.zeros((*detector.depth.shape, 3), dtype=np.uint8)
 
-    hypothesis = detector.detect_from_bb_descriptor(color_rgb)
+    hypothesis = detector.detect_from_bb_descriptor(color_rgb=color_rgb)
 
     assert hypothesis.source == StaticObjectDetectorAnnotator.get_class_name()
 
@@ -239,6 +246,6 @@ def test_renamed_body_detection_names_detector_class(
     detector = observed_offset_body.detector
     detector.name = renamed_annotator_name
 
-    hypothesis = detector.detect_from_body(observed_offset_body.body)
+    hypothesis = detector.detect_from_body(body=observed_offset_body.body)
 
     assert hypothesis.source == StaticObjectDetectorAnnotator.get_class_name()

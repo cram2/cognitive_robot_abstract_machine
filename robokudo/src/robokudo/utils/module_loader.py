@@ -114,7 +114,7 @@ class ModuleLoader:
         """
 
     def _load_module(
-        self, ros_pkg_name: str, module_type: RobokudoModuleType, module_name: str
+        self, *, ros_pkg_name: str, module_type: RobokudoModuleType, module_name: str
     ) -> ModuleType:
         """
         Dynamically import a submodule of the 'robokudo' package (or another package).
@@ -141,7 +141,9 @@ class ModuleLoader:
             loaded_module = importlib.import_module(import_path)
         return loaded_module
 
-    def load_ae(self, ros_pkg_name: str, module_name: str) -> AnalysisEngineInterface:
+    def load_ae(
+        self, *, ros_pkg_name: str, module_name: str
+    ) -> AnalysisEngineInterface:
         """
         Load an Analysis Engine (AE).
 
@@ -154,13 +156,15 @@ class ModuleLoader:
                 :return: Root of loaded analysis engine
         """
         module_type = RobokudoModuleType.AnalysisEngine
-        loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
+        loaded_module = self._load_module(
+            ros_pkg_name=ros_pkg_name, module_type=module_type, module_name=module_name
+        )
 
         # e.g. the module should define: class AnalysisEngine: ...
         loaded_ae = loaded_module.AnalysisEngine()
         return loaded_ae
 
-    def load_annotator(self, ros_pkg_name: str, module_name: str) -> ModuleType:
+    def load_annotator(self, *, ros_pkg_name: str, module_name: str) -> ModuleType:
         """
         Load an annotator module.
 
@@ -172,10 +176,12 @@ class ModuleLoader:
         :rtype: module
         """
         module_type = RobokudoModuleType.Annotator
-        loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
+        loaded_module = self._load_module(
+            ros_pkg_name=ros_pkg_name, module_type=module_type, module_name=module_name
+        )
         return loaded_module
 
-    def load_camera_config(self, ros_pkg_name: str, module_name: str) -> Any:
+    def load_camera_config(self, *, ros_pkg_name: str, module_name: str) -> Any:
         """
         Load a camera config module.
 
@@ -189,7 +195,9 @@ class ModuleLoader:
         )
 
         module_type = RobokudoModuleType.CameraConfig
-        loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
+        loaded_module = self._load_module(
+            ros_pkg_name=ros_pkg_name, module_type=module_type, module_name=module_name
+        )
         for name, obj in loaded_module.__dict__.items():
             if (
                 isinstance(obj, type)
@@ -200,7 +208,7 @@ class ModuleLoader:
         return None
         # return loaded_module.CameraConfig()
 
-    def load_io(self, ros_pkg_name: str, module_name: str) -> ModuleType:
+    def load_io(self, *, ros_pkg_name: str, module_name: str) -> ModuleType:
         """
         Load an I/O module.
 
@@ -210,12 +218,14 @@ class ModuleLoader:
         :return: Loaded IO module
         """
         module_type = RobokudoModuleType.IO
-        loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
+        loaded_module = self._load_module(
+            ros_pkg_name=ros_pkg_name, module_type=module_type, module_name=module_name
+        )
         # return loaded_module.YourIoClass()
         return loaded_module
 
     def load_world_descriptor(
-        self, ros_pkg_name: str, module_name: str
+        self, *, ros_pkg_name: str, module_name: str
     ) -> BaseWorldDescriptor:
         """
         Load a WorldDescriptor given the module name and the ros package name.
@@ -235,7 +245,9 @@ class ModuleLoader:
         loaded_world_descriptor = loaded_module.WorldDescriptor()
         return loaded_world_descriptor
 
-    def load_tree_components(self, ros_pkg_name: str, module_name: str) -> ModuleType:
+    def load_tree_components(
+        self, *, ros_pkg_name: str, module_name: str
+    ) -> ModuleType:
         """
         Load tree components.
 
@@ -245,10 +257,12 @@ class ModuleLoader:
         :return: Loaded tree components module
         """
         module_type = RobokudoModuleType.TreeComponents
-        loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
+        loaded_module = self._load_module(
+            ros_pkg_name=ros_pkg_name, module_type=module_type, module_name=module_name
+        )
         return loaded_module
 
-    def load_types(self, ros_pkg_name: str, module_name: str) -> ModuleType:
+    def load_types(self, *, ros_pkg_name: str, module_name: str) -> ModuleType:
         """
         Load a 'types' module, or a class if needed.
 
@@ -257,10 +271,12 @@ class ModuleLoader:
         :return: Loaded types module
         """
         module_type = RobokudoModuleType.Types
-        loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
+        loaded_module = self._load_module(
+            ros_pkg_name=ros_pkg_name, module_type=module_type, module_name=module_name
+        )
         return loaded_module
 
-    def load_utils(self, ros_pkg_name: str, module_name: str) -> ModuleType:
+    def load_utils(self, *, ros_pkg_name: str, module_name: str) -> ModuleType:
         """
         Load a 'utils' module, or a class if needed.
 
@@ -269,11 +285,14 @@ class ModuleLoader:
         :return: Loaded utility module
         """
         module_type = RobokudoModuleType.Utils
-        loaded_module = self._load_module(ros_pkg_name, module_type, module_name)
+        loaded_module = self._load_module(
+            ros_pkg_name=ros_pkg_name, module_type=module_type, module_name=module_name
+        )
         return loaded_module
 
     def get_file_paths(
         self,
+        *,
         ros_pkg_name: str,
         module_type: RobokudoModuleType,
         dir_name: str,
@@ -308,7 +327,11 @@ class ModuleLoader:
         return []
 
     @staticmethod
-    def get_module_path(module_name: str) -> Path:
+    def get_module_path(*, module_name: str) -> Path:
+        """
+        :param module_name: Name of an importable package.
+        :return: The directory on disk that holds the package's files.
+        """
         files = importlib.resources.files(module_name)
         with as_file(files) as path:
             return Path(path)

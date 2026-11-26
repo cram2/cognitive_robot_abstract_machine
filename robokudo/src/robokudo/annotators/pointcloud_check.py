@@ -20,6 +20,7 @@ The annotator supports:
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import open3d as o3d
@@ -29,6 +30,8 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
 from robokudo.exceptions import PointCloudThresholdError, PointCloudThresholdRelation
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
+
+logger = logging.getLogger(__name__)
 
 
 class PointcloudCheckAnnotator(BaseAnnotator):
@@ -92,7 +95,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         assert isinstance(cloud, o3d.geometry.PointCloud)
         point_count = len(cloud.points)
         if point_count < self.descriptor.parameters.point_threshold:
@@ -106,7 +109,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
                     relation=PointCloudThresholdRelation.BELOW,
                 )
 
-            self.rk_logger.info(
+            logger.info(
                 f"Scene Pointcloud size({point_count}) is below "
                 f"threshold of {self.descriptor.parameters.point_threshold}"
             )
@@ -124,7 +127,7 @@ class PointcloudCheckAnnotator(BaseAnnotator):
                     relation=PointCloudThresholdRelation.ABOVE,
                 )
 
-            self.rk_logger.info(
+            logger.info(
                 f"Scene Pointcloud size({point_count}) is above "
                 f"threshold of {self.descriptor.parameters.point_threshold}"
             )

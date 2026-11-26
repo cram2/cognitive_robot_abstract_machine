@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from krrood_compute_resources.machine import MachineDivision
+from krrood_compute_resources.devices import Device
+from krrood_compute_resources.machine import MachineDivision, MachineShare
 
 from experiments.circuit_learning.datasets import (
     DatasetName,
@@ -21,6 +22,10 @@ from experiments.circuit_learning.methods import LearningMethod
 from experiments.circuit_learning.records import BenchmarkRun, RunKind
 from experiments.circuit_learning.runner import BenchmarkRunner
 from experiments.circuit_learning.settings import ComputationSetting
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
+    CompilerOption,
+    CompilerVariable,
+)
 
 # %% fixtures
 
@@ -79,3 +84,53 @@ def test_run_without_a_share_fails(prepared_cache: Path):
     )
     with pytest.raises(NoShareForRunError):
         runner_without_graphics_processor(cache=prepared_cache).run_pending(runs=[run])
+
+
+# %% compiler options of a run
+
+
+def compiler_options_of_share(*, cache: Path, device: Device) -> list[str]:
+    """
+    :param cache: The cache of the runner.
+    :param device: The device of a share of 25 processor cores.
+    :return: The options the runner gives the XLA compiler of a run on that share.
+    """
+    share = MachineShare(
+        device=device,
+        processor_cores=set(range(25)),
+        memory_budget_bytes=2**30,
+        host_memory_limit_bytes=2**30,
+    )
+    environment = runner_without_graphics_processor(cache=cache).run_environment(
+        share=share
+    )
+    return environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS].split()
+
+
+def test_a_run_on_processor_cores_gets_a_jax_device_per_power_of_two_cores(
+    prepared_cache: Path,
+):
+    """
+    A run on a share of 25 processor cores computes with jax on 16 CPU devices, the
+    largest power of two of at most 25.
+    """
+    assert CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(
+        value=16
+    ) in compiler_options_of_share(
+        cache=prepared_cache, device=Device.CENTRAL_PROCESSOR
+    )
+
+
+def test_a_run_on_the_graphics_processor_keeps_one_jax_host_device(
+    prepared_cache: Path,
+):
+    """
+    A run on a share of the GPU leaves the number of CPU devices of jax alone.
+    """
+    options = compiler_options_of_share(
+        cache=prepared_cache, device=Device.GRAPHICS_PROCESSOR
+    )
+    assert not any(
+        option.startswith(CompilerOption.HOST_PLATFORM_DEVICE_COUNT)
+        for option in options
+    )

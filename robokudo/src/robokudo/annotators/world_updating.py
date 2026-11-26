@@ -4,6 +4,7 @@ Putting the objects a pass perceived into the world its pipeline perceives into.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from py_trees.common import Status
@@ -12,6 +13,8 @@ from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.exceptions import CameraPoseOutsideWorldError
 from robokudo.perception_beliefs import ObjectMatcher, PerceptionBelief
 from robokudo.types.scene import ObjectHypothesis
+
+logger = logging.getLogger(__name__)
 
 # %% world updating
 
@@ -52,9 +55,7 @@ class WorldUpdatingAnnotator(BaseAnnotator):
             or observation.world_T_camera is None
             or observation.world_T_camera.reference_frame is None
         ):
-            self.rk_logger.warning(
-                "Leaving out a pass without a camera pose in the world."
-            )
+            logger.warning("Leaving out a pass without a camera pose in the world.")
             return Status.SUCCESS
         world_T_camera = observation.world_T_camera
         with self.world.modify_world():
@@ -67,7 +68,9 @@ class WorldUpdatingAnnotator(BaseAnnotator):
                 )
             beliefs = [
                 belief
-                for hypothesis in cas.filter_annotations_by_type(ObjectHypothesis)
+                for hypothesis in cas.filter_annotations_by_type(
+                    type_to_include=ObjectHypothesis
+                )
                 if (
                     belief := PerceptionBelief.from_hypothesis(
                         hypothesis=hypothesis,

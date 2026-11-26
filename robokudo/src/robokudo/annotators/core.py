@@ -42,9 +42,9 @@ from robokudo.annotators.outputs import (
 from robokudo.annotator_parameters import AnnotatorPredefinedParameters
 from robokudo.annotators.exceptions import InvalidAnalysisData, EmptyAnalysisScope
 from robokudo.cas import CAS, CASViews
-from robokudo.defs import PACKAGE_NAME
 from robokudo.types.core import Annotation
 from robokudo.utils.tree import find_parent_of_type
+from krrood.patterns.called_positionally import called_positionally
 
 """
 This module contains superclasses for annotators.  the two main superclasses are Base- and ThreadedAnnotator.
@@ -52,6 +52,8 @@ The first superclass provides convenience methods to access the CAS,
 the tree structure as well as GUI result related functionality.
 The threaded annotator provides functionality to call long-running annotators without blocking the main thread.
 """
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAnnotator(Behaviour):
@@ -135,7 +137,6 @@ class BaseAnnotator(Behaviour):
         self,
         name: str = "Annotator",
         descriptor: BaseAnnotator.Descriptor | None = None,
-        ros_pkg_name: str = PACKAGE_NAME,
     ) -> None:
         """
         Initialize the BaseAnnotator.
@@ -144,17 +145,12 @@ class BaseAnnotator(Behaviour):
 
         :param name: Name of the annotator instance
         :param descriptor: Configuration descriptor
-        :param ros_pkg_name: Name of the ROS package
         """
         super().__init__(name)
         if descriptor is None:
             descriptor = self.Descriptor()
 
-        # self.rk_logger = get_logger(ros_pkg_name)
-        self.rk_logger = logging.getLogger(ros_pkg_name)
-
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
-        # self.rk_logger.debug("%s" % (get_line_context(self)))
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self.descriptor = descriptor
 
     def setup(self, **kwargs: Any) -> bool:
@@ -168,7 +164,7 @@ class BaseAnnotator(Behaviour):
         and create or use ROS entities on it. See :class:`BaseAnnotator` for its
         ownership contract.
         """
-        self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
+        logger.debug("%s.setup()" % self.__class__.__name__)
         return True
 
     def initialise(self) -> None:
@@ -177,7 +173,7 @@ class BaseAnnotator(Behaviour):
 
         Called when first tick is received and anytime status is not running.
         """
-        self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
+        logger.debug("%s.initialise()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """
@@ -189,6 +185,7 @@ class BaseAnnotator(Behaviour):
         """
         return Status.SUCCESS
 
+    @called_positionally
     def terminate(self, new_status: Status) -> None:
         """
         Handle annotator termination.
@@ -197,21 +194,21 @@ class BaseAnnotator(Behaviour):
 
         :param new_status: New status of the behavior (SUCCESS, FAILURE, or INVALID)
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.terminate()[%s->%s]"
             % (self.__class__.__name__, self.status, new_status)
         )
 
-    def key_callback(self, key: int) -> None:
+    def key_callback(self, *, key: int) -> None:
         """
         Handle keyboard input events.
 
         :param key: Key code of the pressed key
         """
-        self.rk_logger.debug("%s.keyCallback() got %i" % (self.__class__.__name__, key))
+        logger.debug("%s.keyCallback() got %i" % (self.__class__.__name__, key))
 
     def mouse_callback(
-        self, event: int, x: int, y: int, flags: int, param: int
+        self, *, event: int, x: int, y: int, flags: int, param: int
     ) -> None:
         """
         Handle mouse interaction events in the visualizer window.
@@ -222,7 +219,7 @@ class BaseAnnotator(Behaviour):
         :param flags: Flags passed by OpenCV
         :param param: Parameters passed by OpenCV
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.mouseCallback() got %i at (%i,%i)"
             % (self.__class__.__name__, event, x, y)
         )
@@ -281,8 +278,8 @@ class BaseAnnotator(Behaviour):
         # This check adds dynamically added annotators to the output struct that have
         # not been in the tree during the setup() of it.
         if self.name not in annotator_outputs.outputs:
-            self.rk_logger.debug(
-                f"Annotator {self.name} was not in AnnotatorOutput struct. Adding it now."
+            logger.debug(
+                f"Annotator {self.name} was not in AnnotatorOutput structure. Adding it now."
             )
             self.add_self_to_annotator_output_struct()
         return self.get_annotator_outputs().outputs[self.name]
@@ -299,7 +296,7 @@ class BaseAnnotator(Behaviour):
         )
         annotator_output_pipeline_map_buffer.map[
             self.get_parent_pipeline().name
-        ].init_annotator(self.name)
+        ].init_annotator(annotator_name=self.name)
 
     @classmethod
     def get_class_name(cls) -> str:
@@ -310,7 +307,7 @@ class BaseAnnotator(Behaviour):
         return cls.__name__
 
     def get_data_from_analysis_scope(
-        self, analysis_scope: list[str | type]
+        self, *, analysis_scope: list[str | type]
     ) -> dict[str | type, Any]:
         """
         Look up data to analyze based on a list of Types or String constants.
@@ -343,18 +340,18 @@ class BaseAnnotator(Behaviour):
             # CASViews are string values
             if isinstance(content, str):
                 if content not in CASViews:
-                    self.rk_logger.warning(
+                    logger.warning(
                         "You have passed a string that is not defining a valid CASView from robokudo.cas.CASViews"
                     )
-                result[content] = self.get_cas().get(content)
+                result[content] = self.get_cas().get(view_name=content)
             elif issubclass(content, Annotation):
                 # We assume that typically only few annotations are requested here
                 # Otherwise we should iterate over all annotations and filter once to save resources
-                result[content] = self.get_cas().filter_annotations_by_type(content)
-            else:
-                self.rk_logger.error(
-                    f"Couldn't lookup data {content} - Unsupported type"
+                result[content] = self.get_cas().filter_annotations_by_type(
+                    type_to_include=content
                 )
+            else:
+                logger.error(f"Couldn't lookup data {content} - Unsupported type")
 
         if len(result) == 0:
             raise EmptyAnalysisScope(analysis_scope=analysis_scope)
@@ -368,7 +365,7 @@ class BaseAnnotator(Behaviour):
         if not hasattr(self, "_times"):
             setattr(self, "_times", defaultdict(list))
 
-    def set_time_recording(self, value: float, func: str = "update") -> None:
+    def set_time_recording(self, *, value: float, func: str = "update") -> None:
         """
         Record timing information for a function.
 
@@ -406,7 +403,7 @@ class BaseAnnotator(Behaviour):
             )
             self.published_variables: dict[str, float] = dict()
 
-    def update_published_variable(self, name: str, value: float) -> None:
+    def update_published_variable(self, *, name: str, value: float) -> None:
         """
         Store a value that shall be published whenever self.publish_variables() is
         called.
@@ -475,7 +472,7 @@ class Worker(object):
         self._fn: Callable = fn
         self._args: tuple = args
 
-    def start(self, callback: Callable | None = None) -> threading.Thread:
+    def start(self, *, callback: Callable | None = None) -> threading.Thread:
         """
         Start executing the function in a separate thread.
 
@@ -521,7 +518,7 @@ class ThreadedAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self.compute_worker: Worker | None = None
         self.compute_worker_started: bool = False
         self.compute_worker_thread: threading.Thread | None = None
@@ -532,7 +529,7 @@ class ThreadedAnnotator(BaseAnnotator):
 
         Called when first tick is received and anytime status is not running.
         """
-        self.rk_logger.debug("%s.initialise()" % self.__class__.__name__)
+        logger.debug("%s.initialise()" % self.__class__.__name__)
         self.compute_worker = Worker(self.compute)
 
     def update(self) -> Status:
@@ -546,7 +543,7 @@ class ThreadedAnnotator(BaseAnnotator):
 
         :return: Status of the behavior after update
         """
-        self.rk_logger.debug("%s.update()" % self.__class__.__name__)
+        logger.debug("%s.update()" % self.__class__.__name__)
         if self.compute_worker.future.running():
             return Status.RUNNING
         elif not self.compute_worker_started:
@@ -561,7 +558,7 @@ class ThreadedAnnotator(BaseAnnotator):
         result = self.compute_worker.future.result()
 
         if result is None:
-            self.rk_logger.error(
+            logger.error(
                 "Your Annotator didn't return a Status. Please fix. Will return SUCCESS."
             )
             return Status.SUCCESS
@@ -575,15 +572,16 @@ class ThreadedAnnotator(BaseAnnotator):
         This method should be overridden by subclasses to implement the actual
         computation logic.
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.compute(): Start doing the heavy stuff" % self.__class__.__name__
         )
         time.sleep(0.5)  # in seconds
-        self.rk_logger.debug(
+        logger.debug(
             "%s.compute(): Stop doing the heavy stuff" % self.__class__.__name__
         )
         return Status.SUCCESS
 
+    @called_positionally
     def terminate(self, new_status: Status) -> None:
         """
         Handle annotator termination.
@@ -593,7 +591,7 @@ class ThreadedAnnotator(BaseAnnotator):
 
         :param new_status: New status of the behavior (SUCCESS, FAILURE, or INVALID)
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.terminate()[%s->%s]"
             % (self.__class__.__name__, self.status, new_status)
         )

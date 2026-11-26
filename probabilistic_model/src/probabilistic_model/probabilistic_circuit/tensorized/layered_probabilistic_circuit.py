@@ -32,7 +32,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     SampleArray,
     SampleValues,
 )
-from probabilistic_model.learning.gradient_descent import (
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
     AverageNegativeLogLikelihood,
     Loss,
 )
@@ -309,7 +309,8 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             structure.
         """
         return self.__class__(
-            self.variables, self.root.copy_with_circuit_parameters(parameters)
+            self.variables,
+            self.root.copy_with_circuit_parameters(parameters=parameters),
         )
 
     def to_namespace(
@@ -361,13 +362,15 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         :return: This circuit.
         """
         # jax is optional, see the core boundary in pyproject.toml
-        from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+        from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+            JaxGradientDescent,
+        )
 
         self.root = JaxGradientDescent(
-            self.root,
-            AverageNegativeLogLikelihood() if loss is None else loss,
-            optimizer,
-        ).minimize(epochs, self.encoded(data))
+            layer=self.root,
+            loss=AverageNegativeLogLikelihood() if loss is None else loss,
+            optimizer=optimizer,
+        ).minimize(self.encoded(data), epochs=epochs)
         return self
 
     def raise_if_parameters_are_not_on_host(self):
@@ -1039,7 +1042,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         self.root = self.root.marginal(kept, cache=cache)
         return [
             LayerNode(
-                cache.result_of(ProductLayer.marginal, node.layer),
+                cache.result_of(query=ProductLayer.marginal, layer=node.layer),
                 int(np.cumsum(node.layer.nodes_over(kept=kept, cache=cache))[node.node])
                 - 1,
             )

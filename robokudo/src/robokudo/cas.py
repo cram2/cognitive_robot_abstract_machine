@@ -117,7 +117,7 @@ class CASViews(StrEnum):
 
 
 # %% Common analysis structure
-@dataclass
+@dataclass(kw_only=True)
 class CAS:
     """
     The main data representation in RoboKudo.
@@ -269,7 +269,7 @@ class CAS:
     def ground_truth_world_ref(self, value: World) -> None:
         self.views[CASViews.GROUND_TRUTH_WORLD_REFERENCE] = value
 
-    def get(self, view_name: str) -> Any:
+    def get(self, *, view_name: str) -> Any:
         """
         Get a view by name.
 
@@ -279,7 +279,7 @@ class CAS:
         """
         return self.views[view_name]
 
-    def contains(self, view_name: str) -> bool:
+    def contains(self, *, view_name: str) -> bool:
         """
         Check if a view exists.
 
@@ -288,7 +288,7 @@ class CAS:
         """
         return view_name in self.views
 
-    def get_copy(self, view_name: str) -> Any:
+    def get_copy(self, *, view_name: str) -> Any:
         """
         Get a deep copy of a view.
 
@@ -298,7 +298,7 @@ class CAS:
         """
         return copy.deepcopy(self.views[view_name])
 
-    def set(self, view_name: str, value: Any) -> None:
+    def set(self, *, view_name: str, value: Any) -> None:
         """
         Put data in the CAS index by a given view name. This method will make a deepcopy of value.
 
@@ -307,7 +307,7 @@ class CAS:
         """
         self.views[view_name] = copy.deepcopy(value)
 
-    def set_ref(self, view_name: str, value: Any) -> None:
+    def set_ref(self, *, view_name: str, value: Any) -> None:
         """
         Put data in the CAS index by a given view name. In contrast to set(), this will not make a copy but just
         does an assignment.
@@ -320,7 +320,7 @@ class CAS:
     T = TypeVar("T")
 
     @staticmethod
-    def filter_by_type(type_to_include: type[T], input_list: list[Any]) -> list[T]:
+    def filter_by_type(*, type_to_include: type[T], input_list: list[Any]) -> list[T]:
         """
         Filter a list to include only objects of a specific type.
 
@@ -332,18 +332,20 @@ class CAS:
             element for element in input_list if isinstance(element, type_to_include)
         ]
 
-    def filter_annotations_by_type(self, type_to_include: type[T]) -> list[T]:
+    def filter_annotations_by_type(self, *, type_to_include: type[T]) -> list[T]:
         """
         Filter annotations to include only those of a specific type.
 
         :param type_to_include: Type to filter for
         :return: A filtered list of annotations in CAS
         """
-        return CAS.filter_by_type(type_to_include, self.annotations)
+        return CAS.filter_by_type(
+            type_to_include=type_to_include, input_list=self.annotations
+        )
 
     @staticmethod
     def _filter_objects(
-        objects: list[Any], criteria: dict[str, tuple[str, Any]]
+        *, objects: list[Any], criteria: dict[str, tuple[str, Any]]
     ) -> list[Any]:
         """
         Filters a list of objects based on specified criteria.
@@ -379,6 +381,7 @@ class CAS:
 
     def filter_by_type_and_criteria(
         self,
+        *,
         type_to_include: type,
         input_list: list[Any],
         criteria: dict[str, tuple[str, Any]],
@@ -392,5 +395,7 @@ class CAS:
                          the comparison operator as a string ("==", ">", "<", ">=", "<=") and the value to compare against.
         :return: A list of objects of type 'type_to_include' that match all specified attribute values.
         """
-        annotations = self.filter_by_type(type_to_include, input_list)
-        return self._filter_objects(annotations, criteria)
+        annotations = self.filter_by_type(
+            type_to_include=type_to_include, input_list=input_list
+        )
+        return self._filter_objects(objects=annotations, criteria=criteria)

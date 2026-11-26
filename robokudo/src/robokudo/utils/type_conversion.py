@@ -188,7 +188,7 @@ def convert_ros_to_cv_image(ros_image: Image) -> npt.NDArray:
     :return: OpenCV image array
     :raises ValueError: If conversion fails
     """
-    cv_rgb_image = _CV_BRIDGE_WORKAROUND.imgmsg_to_cv2(ros_image)
+    cv_rgb_image = _CV_BRIDGE_WORKAROUND.imgmsg_to_cv2(img_msg=ros_image)
     return cv_rgb_image
 
 
@@ -201,6 +201,6 @@ def convert_cv_to_ros_image(cv_image: npt.NDArray) -> Image:
     :raises ValueError: If conversion fails
     """
     ros_rgb_image = _CV_BRIDGE_WORKAROUND.cv2_to_imgmsg(
-        cv_image, encoding="passthrough"
+        cv_image=cv_image, encoding="passthrough"
     )
     return ros_rgb_image

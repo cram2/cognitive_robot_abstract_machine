@@ -16,7 +16,7 @@ from random_events.set import Set
 from random_events.sigma_algebra import AbstractCompositeSet
 from random_events.variable import Variable
 from sortedcontainers import SortedSet
-from typing_extensions import Any, Self
+from typing_extensions import TYPE_CHECKING, Any, Self
 
 from probabilistic_model.distributions.distributions import (
     DiscreteDistribution,
@@ -123,9 +123,20 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         :return: The states as floats in an array of the backend of the parameters, the
             way the layer reads the values of events.
         """
-        return self.namespace.asarray(
-            self.states, dtype=self.floating_point_type, device=self.device
+        return self.namespace.astype(
+            self.structure_array_copies.placed(
+                array=self.states, values=self.parameters[0]
+            ),
+            self.floating_point_type,
         )
+
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` as the :attr:`table` reads its
+        probabilities.
+        """
+        return self.table.trains_without_host_copies
 
     def validate_own(self):
         """
@@ -165,9 +176,9 @@ class DiscreteLayer(UnivariateInputLayer, ABC):
         if values.shape[1] == 1:
             values = values[:, 0]
         states = self.float_states
-        positions = self.namespace.minimum(
+        positions = self.namespace.clip(
             self.namespace.searchsorted(states, values),
-            max(self.number_of_states - 1, 0),
+            max=max(self.number_of_states - 1, 0),
         )
         found = (
             self.namespace.reshape(

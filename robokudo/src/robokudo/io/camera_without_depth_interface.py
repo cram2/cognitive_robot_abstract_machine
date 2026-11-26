@@ -21,6 +21,7 @@ The module is used for:
 from __future__ import annotations
 
 # %% Imports
+import logging
 import time
 
 from typing_extensions import TYPE_CHECKING, Any
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
 
     from robokudo.cas import CAS
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 TYPE_VIDEO: int = 0
@@ -113,7 +116,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         """
         Backup of image for single-image file mode.
         """
-        self.rk_logger.info("OpenCVCameraWithoutDepthInterface initialized")
+        logger.info("OpenCVCameraWithoutDepthInterface initialized")
 
     def has_new_data(self) -> bool:
         """
@@ -156,7 +159,7 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
             retval = True
         timestamp_nanoseconds = time.time_ns()
 
-        self.rk_logger.debug(
+        logger.debug(
             "loaded frame {} of {}".format(
                 self.video_capture.get(cv2.CAP_PROP_POS_FRAMES),
                 self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT),
@@ -219,9 +222,9 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         if self.camera_config.update_global_with_depth_parameter:
             AnnotatorPredefinedParameters.global_with_depth = depth is not None
 
-        cas.set(CASViews.COLOR_IMAGE, color)
-        cas.set(CASViews.DEPTH_IMAGE, depth)
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, color_to_depth_ratio)
+        cas.set(view_name=CASViews.COLOR_IMAGE, value=color)
+        cas.set(view_name=CASViews.DEPTH_IMAGE, value=depth)
+        cas.set(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=color_to_depth_ratio)
         camera_frame = camera_info.header.frame_id or self.camera_config.camera_frame
         modalities = (
             (CameraModality.COLOR, CameraModality.DEPTH)
@@ -231,7 +234,9 @@ class OpenCVCameraWithoutDepthInterface(CameraInterface):
         self.store_camera_observation(
             cas=cas,
             world=world,
-            camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+            camera_model=RosCameraModelAdapter.from_camera_info(
+                camera_info=camera_info
+            ),
             camera_frame=camera_frame,
             timestamp_nanoseconds=timestamp_nanoseconds,
             modalities=modalities,

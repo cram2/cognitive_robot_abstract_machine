@@ -14,6 +14,7 @@ It supports:
 from __future__ import annotations
 
 # %% Imports
+import logging
 from copy import deepcopy
 
 import cv2
@@ -37,6 +38,8 @@ if TYPE_CHECKING:
     import numpy.typing as npt
     from robokudo.annotators.core import BaseAnnotator
     from robokudo.cas import CAS
+
+logger = logging.getLogger(__name__)
 
 
 def transform_pose_from_camera_to_world(
@@ -216,7 +219,9 @@ def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
         scale_x=color_to_depth_ratio.horizontal,
         scale_y=color_to_depth_ratio.vertical,
     )
-    annotator.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(camera_model)
+    annotator.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+        camera_model=camera_model
+    )
 
 
 def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
@@ -234,7 +239,7 @@ def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
     :param annotator: Annotator to get image from
     :return: The resized color image.
     """
-    img = annotator.get_cas().get_copy(CASViews.COLOR_IMAGE)
+    img = annotator.get_cas().get_copy(view_name=CASViews.COLOR_IMAGE)
     resized_color = None
 
     if annotator.descriptor.parameters.global_with_depth:
@@ -243,7 +248,7 @@ def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
                 annotator.get_cas(), img
             )
         except ColorToDepthRatioMissing as e:  # pylint: disable=invalid-name
-            annotator.rk_logger.error(
+            logger.error(
                 f"No color to depth ratio set by your camera driver! Can't preprocess: {e}"
             )
     else:

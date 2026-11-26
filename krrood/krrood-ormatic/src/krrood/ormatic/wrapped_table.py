@@ -1,3 +1,7 @@
+"""
+The tables ORMatic generates or reuses, and the columns and relationships they hold.
+"""
+
 from __future__ import annotations
 
 import hashlib
@@ -12,6 +16,11 @@ from typing_extensions import List, TYPE_CHECKING, Optional, Set, get_origin
 
 from krrood.ormatic.field_storage import FieldStorage
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
+from krrood.ormatic.data_access_objects.dao import (
+    RelationshipInformationKey,
+)
+from krrood.ormatic.stored_object import StoredObjectDAO
+from krrood.patterns.interface import Interface
 from krrood.class_diagrams.class_diagram import (
     WrappedClass,
     Inheritance,
@@ -117,6 +126,13 @@ class AssociationObject:
     The name of the primary key column, if any.
     """
 
+    declared_type_reference: str | None = None
+    """
+    The qualified name of the type the collection is declared with, if that type is open
+    and its objects are therefore loaded through
+    :class:`~krrood.ormatic.stored_object.StoredObjectDAO`.
+    """
+
     @property
     def table_name(self):
         """
@@ -162,13 +178,35 @@ class AssociationObject:
         """
         :return: The relationship constructors for this association table.
         """
+        if self.declared_type_reference is None:
+            return [
+                ColumnConstructor(
+                    name="target",
+                    type=f"Mapped[{self.right_table_name}]",
+                    constructor=f"relationship('{self.right_table_name}', foreign_keys=[{self.right_foreign_key}], lazy='selectin')",
+                )
+            ]
+        root = module_and_class_name(StoredObjectDAO)
         return [
             ColumnConstructor(
                 name="target",
-                type=f"Mapped[{self.right_table_name}]",
-                constructor=f"relationship('{self.right_table_name}', foreign_keys=[{self.right_foreign_key}], lazy='selectin')",
+                type=f"Mapped[{root}]",
+                constructor=(
+                    f"relationship({root}, "
+                    f"primaryjoin=lambda: {self.name}.{self.right_foreign_key} == {root}.database_id, "
+                    f"foreign_keys=lambda: [{self.name}.{self.right_foreign_key}], lazy='selectin', "
+                    f"info={{{_information_key(RelationshipInformationKey.DECLARED_TYPE)}: {self.declared_type_reference}}})"
+                ),
             )
         ]
+
+
+def _information_key(key: RelationshipInformationKey) -> str:
+    """
+    :param key: A key of the information a generated relationship carries.
+    :return: The key as generated code spells it.
+    """
+    return f"{RelationshipInformationKey.__name__}.{key.name}"
 
 
 class TableLike(ABC):
@@ -197,6 +235,21 @@ class TableLike(ABC):
     @property
     @abstractmethod
     def qualified_full_primary_key_name(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def domain_class(self) -> type:
+        """
+        :return: The class whose objects this table holds rows of.
+        """
+
+    @property
+    @abstractmethod
+    def own_attribute_names(self) -> set[str]:
+        """
+        :return: The names of the columns and relationships this table maps, including
+            those it inherits where they cannot be told apart.
+        """
 
 
 @dataclass(kw_only=True)
@@ -246,6 +299,80 @@ class ExternalTable(TableLike):
         """
         return {prop.key for prop in sqlalchemy.inspect(self.dao_class).attrs}
 
+    @property
+    def domain_class(self) -> type:
+        clazz = self.wrapped_clazz.clazz
+        return get_origin(clazz) or clazz
+
+    @property
+    def own_attribute_names(self) -> set[str]:
+        return self.mapped_field_names
+
+    @property
+    def part_class_name(self) -> str:
+        """
+        :return: The name of a part class a dependent interface generates for this
+            table.
+        """
+        return f"{self.dao_class.__name__}Part"
+
+    @property
+    def domain_class_reference(self) -> str:
+        """
+        :return: The qualified name of the class the table's DAO maps.
+        """
+        return module_and_class_name(self.dao_class.original_class())
+
+    @property
+    def part_relationships(self) -> list[ColumnConstructor]:
+        """
+        :return: The relationships this table's own DAO class declares, as a part class
+            of the table declares them.
+        """
+        mapper = sqlalchemy.inspect(self.dao_class)
+        dao_reference = self.qualified_reference
+        result = []
+        for relationship in mapper.relationships:
+            if relationship.parent is not mapper:
+                continue
+            target = relationship.mapper.class_
+            target_reference = module_and_class_name(target)
+            if relationship.uselist:
+                [association_column] = relationship.remote_side
+                arguments = (
+                    f"{target_reference}, "
+                    f"collection_class={module_and_class_name(relationship.collection_class)}, "
+                    f"cascade='all, delete-orphan', "
+                    f"foreign_keys=lambda: [{target_reference}.{association_column.key}], "
+                    f"lazy='selectin'"
+                )
+            else:
+                own_foreign_key = (
+                    f"{dao_reference}.{next(iter(relationship.local_columns)).key}"
+                )
+                arguments = (
+                    f"{target_reference}, uselist=False, "
+                    f"foreign_keys=lambda: [{own_foreign_key}], post_update=True"
+                )
+                declared_type = relationship.info.get(
+                    RelationshipInformationKey.DECLARED_TYPE
+                )
+                if declared_type is not None:
+                    arguments += (
+                        f", primaryjoin=lambda: {own_foreign_key} == "
+                        f"{target_reference}.database_id, "
+                        f"info={{{_information_key(RelationshipInformationKey.DECLARED_TYPE)}: "
+                        f"{module_and_class_name(declared_type)}}}"
+                    )
+            result.append(
+                ColumnConstructor(
+                    name=relationship.key,
+                    type=f"Mapped[{target_reference}]",
+                    constructor=f"relationship({arguments}, overlaps='{relationship.key}')",
+                )
+            )
+        return result
+
 
 @dataclass(kw_only=True)
 class WrappedTable(TableLike):
@@ -285,6 +412,13 @@ class WrappedTable(TableLike):
     List of relationships that should be added to the table.
     """
 
+    part_relationships: list[ColumnConstructor] = field(
+        default_factory=list, init=False
+    )
+    """
+    The relationships of this table as the part class of an open class declares them.
+    """
+
     mapper_args: dict[str, str] = field(default_factory=dict, init=False)
     """
     Keyword Arguments for the sqlalchemy mapper.
@@ -307,30 +441,35 @@ class WrappedTable(TableLike):
     """
 
     @property
-    def primary_key(self):
-        if self.parent_table is not None:
-            column_type = (
-                f"ForeignKey({self.parent_table.qualified_full_primary_key_name})"
-            )
-        else:
-            column_type = "Integer"
-
+    def primary_key(self) -> ColumnConstructor:
+        """
+        :return: The primary key, which refers to the row of the parent table, or to the
+            object's row in the table of every stored object for a root table. The
+            reference is checked at commit, since a flush may insert a part first.
+        """
+        referenced_table = self.parent_table or self.ormatic.stored_object_table
+        column_type = (
+            f"ForeignKey({referenced_table.qualified_full_primary_key_name}, "
+            f"deferrable=True, initially='DEFERRED')"
+        )
         return ColumnConstructor(
             name=self.primary_key_name,
             type=f"Mapped[{module_and_class_name(int)}]",
             constructor=f"mapped_column({column_type}, primary_key=True, use_existing_column=True)",
         )
 
-    def create_mapper_args(self):
+    def create_mapper_args(self) -> None:
+        """
+        Declare the table's polymorphic identity and how it joins its parent table; a
+        root table also gets the type column of its hierarchy.
+        """
         # every root is unconditionally polymorphic-ready: a downstream package can subclass it
         if self.parent_table is None:
             self.custom_columns.append(
-                (
-                    ColumnConstructor(
-                        name=self.polymorphic_on_name,
-                        type="Mapped[str]",
-                        constructor="mapped_column(String(255), nullable=False, use_existing_column=True)",
-                    )
+                ColumnConstructor(
+                    name=self.polymorphic_on_name,
+                    type="Mapped[str]",
+                    constructor="mapped_column(String(255), nullable=False, use_existing_column=True)",
                 )
             )
             self.mapper_args.update(
@@ -339,17 +478,16 @@ class WrappedTable(TableLike):
                     "'polymorphic_identity'": f"'{self.tablename}'",
                 }
             )
+            return
 
-        # this inherits from something
-        if self.parent_table is not None:
-            self.mapper_args.update(
-                {
-                    "'polymorphic_identity'": f"'{self.tablename}'",
-                    "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.qualified_full_primary_key_name}",
-                    # batch subclass-table loads instead of one SELECT per instance
-                    "'polymorphic_load'": "'selectin'",
-                }
-            )
+        self.mapper_args.update(
+            {
+                "'polymorphic_identity'": f"'{self.tablename}'",
+                "'inherit_condition'": f"{self.primary_key_name} == {self.parent_table.qualified_full_primary_key_name}",
+                # batch subclass-table loads instead of one SELECT per instance
+                "'polymorphic_load'": "'selectin'",
+            }
+        )
 
     @property
     def qualified_reference(self) -> str:
@@ -559,25 +697,109 @@ class WrappedTable(TableLike):
             return False
 
     @cached_property
+    def domain_class(self) -> type:
+        """
+        :return: The class whose objects this table holds, which for an alternative
+            mapping is the class it maps.
+        """
+        clazz = self.wrapped_clazz.clazz
+        if self.is_alternatively_mapped:
+            clazz = clazz.original_class()
+        return get_origin(clazz) or clazz
+
+    @property
+    def own_attribute_names(self) -> set[str]:
+        return (
+            {column.name for column in self.builtin_columns}
+            | {column.name for column in self.custom_columns}
+            | {column.name for column in self.foreign_keys}
+            | {column.name for column in self.relationships}
+        )
+
+    @cached_property
+    def mapped_ancestor_tables(self) -> list[TableLike]:
+        """
+        :return: The tables of the mapped base classes of the domain class, nearest
+            first.
+        """
+        result = []
+        for ancestor in self.domain_class.__mro__[1:]:
+            table = self.ormatic.tables_by_class.get(ancestor)
+            if table is not None and not any(table is known for known in result):
+                result.append(table)
+        return result
+
+    @cached_property
+    def primary_chain_tables(self) -> list[TableLike]:
+        """
+        :return: The tables this table inherits, from its parent table up to the root
+            table of its hierarchy.
+        """
+        result = []
+        table = self.parent_table
+        while table is not None:
+            result.append(table)
+            table = table.parent_table if isinstance(table, WrappedTable) else None
+        return result
+
+    @cached_property
+    def secondary_base_tables(self) -> list[TableLike]:
+        """
+        :return: The tables of the mapped base classes outside the primary chain whose
+            rows this table's DAO holds as parts; those its parent table's class already
+            has are left to the parent table.
+        """
+        parent_class = (
+            None if self.parent_table is None else self.parent_table.domain_class
+        )
+        return [
+            table
+            for table in self.mapped_ancestor_tables
+            if not any(
+                table is chain_table for chain_table in self.primary_chain_tables
+            )
+            and not (
+                parent_class is not None
+                and issubclass(parent_class, table.domain_class)
+            )
+        ]
+
+    @cached_property
+    def is_interface(self) -> bool:
+        """
+        :return: Whether the domain class is an interface, mapped without fields.
+        """
+        return isclass(self.domain_class) and Interface.is_interface(
+            class_=self.domain_class
+        )
+
+    @property
+    def has_part_class(self) -> bool:
+        """
+        :return: Whether the domain class is open, so other classes' DAOs hold rows of
+            this table through a part class.
+        """
+        return self.domain_class in self.ormatic.open_classes
+
+    @property
+    def part_class_name(self) -> str:
+        """
+        :return: The name of the part class of this table.
+        """
+        return f"{self.tablename}Part"
+
+    @cached_property
     def fields(self) -> list[WrappedField]:
         """
         :return: The list of fields specified only in this associated dataclass that should be mapped.
         """
-        # Collect all inherited mapped field names up the chain
+        if self.is_interface:
+            return []
+
+        # fields a mapped base class stores live in that base class's table
         inherited_mapped_names: set[str] = set()
-        p = self.parent_table
-        while p is not None:
-            if isinstance(p, ExternalTable):
-                # Its dependency's own ancestry (local or external) is already baked
-                # into its live mapped attributes, so one introspection covers it all.
-                inherited_mapped_names.update(p.mapped_field_names)
-                break
-            # Check what the parent actually created
-            inherited_mapped_names.update(c.name for c in p.builtin_columns)
-            inherited_mapped_names.update(c.name for c in p.custom_columns)
-            inherited_mapped_names.update(c.name for c in p.foreign_keys)
-            inherited_mapped_names.update(c.name for c in p.relationships)
-            p = p.parent_table
+        for table in [*self.primary_chain_tables, *self.mapped_ancestor_tables]:
+            inherited_mapped_names.update(table.own_attribute_names)
 
         # Keep only fields that are not inherited by name
         result = [
@@ -613,7 +835,14 @@ class WrappedTable(TableLike):
         return result
 
     @memoize
-    def parse_fields(self):
+    def parse_fields(self) -> None:
+        """
+        Create the columns and relationships of this table, after those of the tables of
+        its mapped base classes, which store the fields those classes declare.
+        """
+        for table in [*self.primary_chain_tables, *self.mapped_ancestor_tables]:
+            if isinstance(table, WrappedTable):
+                table.parse_fields()
 
         for f in self.fields:
             logger.info("=" * 80)
@@ -726,8 +955,10 @@ class WrappedTable(TableLike):
         :param wrapped_field: The field to get the information from.
         """
         # create foreign key
-        fk_name = f"_{wrapped_field.field.name}{self.ormatic.foreign_key_postfix}"
-        fk_type = (
+        foreign_key_name = (
+            f"_{wrapped_field.field.name}{self.ormatic.foreign_key_postfix}"
+        )
+        foreign_key_type = (
             f"Mapped[{module_and_class_name(Optional)}[{module_and_class_name(int)}]]"
             if wrapped_field.is_optional
             else "Mapped[int]"
@@ -739,23 +970,62 @@ class WrappedTable(TableLike):
         )
 
         # columns have to be nullable and use_alter=True since the insertion order might be incorrect otherwise
-        fk_column_constructor = f"mapped_column(ForeignKey('{target_wrapped_table.full_primary_key_name}', use_alter=True), nullable=True, use_existing_column=True)"
+        foreign_key_column_constructor = f"mapped_column(ForeignKey('{target_wrapped_table.full_primary_key_name}', use_alter=True), nullable=True, use_existing_column=True)"
 
         self.foreign_keys.append(
             ColumnConstructor(
-                name=fk_name, type=fk_type, constructor=fk_column_constructor
+                name=foreign_key_name,
+                type=foreign_key_type,
+                constructor=foreign_key_column_constructor,
             )
         )
 
         # create relationship to remote side
-        rel_name = f"{wrapped_field.field.name}"
-        rel_type = f"Mapped[{target_wrapped_table.tablename}]"
+        relationship_name = wrapped_field.field.name
+        own_foreign_key = f"{self.tablename}.{foreign_key_name}"
         # relationships have to be post updated since since it won't work in the case of subclasses with another ref otherwise
         # they also stay lazy: eager selectin would cascade through many-to-one
         # cycles at query time; from_dao resolves them via the identity map instead
-        rel_constructor = f"relationship('{target_wrapped_table.tablename}', uselist=False, foreign_keys=[{fk_name}], post_update=True)"
-        self.relationships.append(
-            ColumnConstructor(name=rel_name, type=rel_type, constructor=rel_constructor)
+        if target_wrapped_table.domain_class in self.ormatic.open_classes:
+            root = module_and_class_name(StoredObjectDAO)
+            self.ormatic.imported_modules.add(
+                target_wrapped_table.domain_class.__module__
+            )
+            relationship_type = f"Mapped[{root}]"
+            relationship_arguments = (
+                f"{root}, uselist=False, "
+                f"primaryjoin=lambda: {own_foreign_key} == {root}.database_id, "
+                f"foreign_keys=lambda: [{own_foreign_key}], post_update=True, "
+                f"info={{{_information_key(RelationshipInformationKey.DECLARED_TYPE)}: "
+                f"{module_and_class_name(target_wrapped_table.domain_class)}}}"
+            )
+        else:
+            relationship_type = f"Mapped[{target_wrapped_table.tablename}]"
+            relationship_arguments = (
+                f"'{target_wrapped_table.tablename}', uselist=False, "
+                f"foreign_keys=lambda: [{own_foreign_key}], post_update=True"
+            )
+        self.add_relationship(
+            column_constructor=ColumnConstructor(
+                name=relationship_name,
+                type=relationship_type,
+                constructor=f"relationship({relationship_arguments})",
+            )
+        )
+
+    def add_relationship(self, *, column_constructor: ColumnConstructor) -> None:
+        """
+        Add a relationship to this table, and its copy to the table's part class.
+
+        :param column_constructor: The relationship.
+        """
+        self.relationships.append(column_constructor)
+        self.part_relationships.append(
+            ColumnConstructor(
+                name=column_constructor.name,
+                type=column_constructor.type,
+                constructor=f"{column_constructor.constructor[:-1]}, overlaps='{column_constructor.name}')",
+            )
         )
 
     def create_many_to_many_relationship(self, *, wrapped_field: WrappedField):
@@ -779,28 +1049,38 @@ class WrappedTable(TableLike):
         # create foreign key names for the association table
         # Always disambiguate sides using source_/target_ prefixes to avoid
         # duplicated column names in self-referential relationships
-        left_fk_name = (
+        left_foreign_key_name = (
             f"_source_{self.tablename.lower()}{self.ormatic.foreign_key_postfix}"
         )
-        right_fk_name = f"_target_{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
+        right_foreign_key_name = f"_target_{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
 
         # create association table metadata
+        target_is_open = target_wrapped_table.domain_class in self.ormatic.open_classes
+        if target_is_open:
+            self.ormatic.imported_modules.add(
+                target_wrapped_table.domain_class.__module__
+            )
         association_table = AssociationObject(
             name=association_table_name,
             left_table_name=self.tablename,
-            left_foreign_key=left_fk_name,
+            left_foreign_key=left_foreign_key_name,
             left_primary_key=self.full_primary_key_name,
             right_table_name=target_wrapped_table.tablename,
-            right_foreign_key=right_fk_name,
+            right_foreign_key=right_foreign_key_name,
             right_primary_key=target_wrapped_table.full_primary_key_name,
             primary_key_name="database_id",
+            declared_type_reference=(
+                module_and_class_name(target_wrapped_table.domain_class)
+                if target_is_open
+                else None
+            ),
         )
 
         # add association table to ORMatic
         self.ormatic.association_objects.append(association_table)
 
         # create a relationship
-        rel_name = f"{wrapped_field.field.name}"
+        relationship_name = wrapped_field.field.name
 
         # SQLAlchemy instruments a collection class in place (it needs an appender
         # method), which an immutable domain container such as tuple cannot provide.
@@ -815,8 +1095,8 @@ class WrappedTable(TableLike):
         container_name = module_and_class_name(collection_class_type)
 
         # Association Object pattern
-        rel_type = f"Mapped[{container_name}[{association_table.name}]]"
-        rel_constructor = (
+        relationship_type = f"Mapped[{container_name}[{association_table.name}]]"
+        relationship_constructor = (
             f"relationship('{association_table.name}', "
             f"collection_class={container_name}, "
             f"cascade='all, delete-orphan', "
@@ -824,8 +1104,12 @@ class WrappedTable(TableLike):
             f"lazy='selectin')"
         )
 
-        self.relationships.append(
-            ColumnConstructor(name=rel_name, type=rel_type, constructor=rel_constructor)
+        self.add_relationship(
+            column_constructor=ColumnConstructor(
+                name=relationship_name,
+                type=relationship_type,
+                constructor=relationship_constructor,
+            )
         )
 
     def create_json_column(self, *, wrapped_field: WrappedField):
@@ -882,11 +1166,14 @@ class WrappedTable(TableLike):
         )
 
     @property
-    def base_class_name(self):
-        if self.parent_table is not None:
-            return self.parent_table.qualified_reference
-        else:
+    def base_class_name(self) -> str:
+        """
+        :return: The reference to the DAO class of the parent table, or the declarative
+            base for a root table.
+        """
+        if self.parent_table is None:
             return "Base"
+        return self.parent_table.qualified_reference
 
     def __hash__(self):
         return hash(self.wrapped_clazz)

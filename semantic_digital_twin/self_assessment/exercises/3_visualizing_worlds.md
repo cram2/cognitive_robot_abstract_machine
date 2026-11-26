@@ -24,10 +24,7 @@ You will:
 
 ```{code-cell} ipython3
 :tags: [remove-input]
-import os
 import logging
-from importlib.resources import files
-from pathlib import Path
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
@@ -42,8 +39,7 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [exercise]
-root = Path(files("semantic_digital_twin")).parent.parent
-table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
+table_urdf = "package://iai_objects/urdf/table.urdf"
 world = URDFParser.from_file(table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
@@ -56,8 +52,7 @@ viz = ...
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-root = Path(files("semantic_digital_twin")).parent.parent
-table_urdf = os.path.join(root, "resources", "urdf", "table.urdf")
+table_urdf = "package://iai_objects/urdf/table.urdf"
 world = URDFParser.from_file(table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
