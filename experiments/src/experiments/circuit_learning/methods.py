@@ -100,6 +100,27 @@ class LearningMethod(StrEnum):
     HIDDEN_CHOW_LIU_TREE = "hidden Chow-Liu tree"
 
 
+# %% learners
+
+
+@dataclass(kw_only=True)
+class ParameterLearnerBuilder(ABC):
+    """
+    A builder of the learner that trains the parameters of a circuit in a setting.
+    """
+
+    @abstractmethod
+    def learner(
+        self, *, root: Layer, setting: ComputationSetting
+    ) -> CircuitParameterLearning:
+        """
+        :param root: The root of the circuit placed as the setting says.
+        :param setting: The setting that trains.
+        :return: The learner that trains the circuit in the setting.
+        """
+        raise NotImplementedError
+
+
 # %% training context
 
 
@@ -154,19 +175,21 @@ class TrainingContext:
         circuit: LayeredProbabilisticCircuit,
         setting: ComputationSetting,
         rows: npt.NDArray[np.float64],
+        learner_builder: ParameterLearnerBuilder,
     ) -> int:
         """
         :param circuit: The circuit, with host parameters.
         :param setting: The setting that trains.
         :param rows: The encoded training rows.
-        :return: The most rows whose log-likelihood gradient fits in the memory budget,
-            as XLA measures it for the circuit in jax on the setting's device with the
-            setting's edges, at most all rows.
+        :param learner_builder: The builder of the learner that trains.
+        :return: The most rows a training step of the builder's learner fits in the
+            memory budget, as XLA measures the step in jax on the setting's device with
+            the setting's edges, at most all rows.
         """
         jax_setting = dataclasses.replace(setting, array_library=ArrayLibrary.JAX)
         placed = jax_setting.placed(circuit=circuit)
-        step_memory = JaxGradientDescent(
-            layer=placed.root, loss=AverageNegativeLogLikelihood()
+        step_memory = learner_builder.learner(
+            root=placed.root, setting=jax_setting
         ).step_memory(jax_setting.asarray(rows=placed.encoded(rows)))
         batch_size = MiniBatches.fitting_in_memory(
             memory=self.device_memory(setting=setting), step_memory=step_memory
@@ -207,7 +230,7 @@ class TrainingContext:
 
 
 @dataclass(kw_only=True)
-class ExpectationMaximizationPhase:
+class ExpectationMaximizationPhase(ParameterLearnerBuilder):
     """
     Tensorized expectation maximization with one schedule of updates, trained until the
     training context's convergence stops it.
@@ -247,11 +270,6 @@ class ExpectationMaximizationPhase:
     def learner(
         self, *, root: Layer, setting: ComputationSetting
     ) -> CircuitParameterLearning:
-        """
-        :param root: The root of the circuit placed as the setting says.
-        :param setting: The setting that trains, with jax or torch arrays.
-        :return: The expectation maximization of the setting's array library.
-        """
         if setting.array_library is ArrayLibrary.TORCH:
             return TorchExpectationMaximization(
                 layer=root,
@@ -366,7 +384,7 @@ class RandomTensorizedSumProductNetworkLearning(BenchmarkMethod, ABC):
 
 @dataclass(kw_only=True)
 class RandomTensorizedSumProductNetworkByMiniBatches(
-    RandomTensorizedSumProductNetworkLearning, ABC
+    RandomTensorizedSumProductNetworkLearning, ParameterLearnerBuilder, ABC
 ):
     """
     A RAT-SPN whose parameters a learner of the setting's array library trains on
@@ -377,17 +395,6 @@ class RandomTensorizedSumProductNetworkByMiniBatches(
     """
     The most rows per step, fewer if they do not fit in memory.
     """
-
-    @abstractmethod
-    def learner(
-        self, *, root: Layer, setting: ComputationSetting
-    ) -> CircuitParameterLearning:
-        """
-        :param root: The root of the circuit placed as the setting says.
-        :param setting: The setting that trains.
-        :return: The learner that trains the circuit in the setting.
-        """
-        raise NotImplementedError
 
     def learn(
         self,
@@ -406,7 +413,9 @@ class RandomTensorizedSumProductNetworkByMiniBatches(
             rows=rows,
             most_rows_per_step=min(
                 self.batch_size,
-                context.rows_per_step(circuit=host, setting=setting, rows=rows),
+                context.rows_per_step(
+                    circuit=host, setting=setting, rows=rows, learner_builder=self
+                ),
             ),
             seed=self.seed,
         )
@@ -681,7 +690,6 @@ class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
             seed=self.seed,
         ).build_circuit(data=rows)
         circuit = setting.placed(circuit=host)
-        rows_per_step = context.rows_per_step(circuit=host, setting=setting, rows=rows)
         histories = []
         for phase in self.phases:
             run = context.train_until_converged(
@@ -689,7 +697,15 @@ class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
                 circuit=circuit,
                 setting=setting,
                 rows=rows,
-                most_rows_per_step=min(phase.batch_size or len(rows), rows_per_step),
+                most_rows_per_step=min(
+                    phase.batch_size or len(rows),
+                    context.rows_per_step(
+                        circuit=host,
+                        setting=setting,
+                        rows=rows,
+                        learner_builder=phase,
+                    ),
+                ),
                 seed=self.seed,
             )
             circuit.root = run.trained_root
