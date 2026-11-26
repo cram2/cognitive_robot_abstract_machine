@@ -1135,6 +1135,10 @@ def _scale_factor_at_root(scaling: LinearBufferZoneScaling, world: World) -> flo
 def test_linear_buffer_zone_scaling_is_proportional_to_the_goal_distance(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A contact point a quarter of the full scale goal distance away from the goal gets a
+    factor of a quarter.
+    """
     scaling = _linear_scaling_at_goal(
         cylinder_bot_world, x=0.25, full_scale_goal_distance=1.0
     )
@@ -1145,6 +1149,9 @@ def test_linear_buffer_zone_scaling_is_proportional_to_the_goal_distance(
 def test_linear_buffer_zone_scaling_stops_at_its_minimum_close_to_the_goal(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A contact point at the goal gets the minimum factor, not zero.
+    """
     scaling = _linear_scaling_at_goal(cylinder_bot_world, full_scale_goal_distance=1.0)
 
     assert _scale_factor_at_root(scaling, cylinder_bot_world) == pytest.approx(
@@ -1155,6 +1162,9 @@ def test_linear_buffer_zone_scaling_stops_at_its_minimum_close_to_the_goal(
 def test_linear_buffer_zone_scaling_stops_at_its_maximum_far_from_the_goal(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A contact point beyond the full scale goal distance gets the maximum factor.
+    """
     scaling = _linear_scaling_at_goal(
         cylinder_bot_world, x=2.0, full_scale_goal_distance=1.0
     )
@@ -1293,6 +1303,10 @@ def test_each_external_contact_is_scaled_by_its_own_distance_to_the_goal(
 def test_scaled_buffer_zone_never_drops_below_the_violated_distance(
     cylinder_bot_world: World,
 ) -> None:
+    """
+    A contact whose scaled buffer zone would be smaller than its violated distance is
+    kept outside its violated distance instead.
+    """
     robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
     scaling = _linear_scaling_at_goal(
         cylinder_bot_world, full_scale_goal_distance=100.0

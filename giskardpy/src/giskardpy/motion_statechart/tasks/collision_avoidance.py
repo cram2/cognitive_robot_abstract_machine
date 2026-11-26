@@ -389,6 +389,11 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         return groups
 
     def build_artifacts(self) -> MotionNodeArtifacts:
+        """
+        :return: One inequality constraint per avoided contact that keeps its distance
+            above its buffer zone distance, scaled by :attr:`buffer_zone_scaling`, and
+            an observation that is True while no contact is violated.
+        """
         artifacts = MotionNodeArtifacts()
         manager = self.collision_variable_manager
         for contact in self.avoided_contacts:
