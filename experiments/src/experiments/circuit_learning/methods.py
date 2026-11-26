@@ -14,6 +14,7 @@ from enum import StrEnum
 
 import jax
 import numpy as np
+import numpy.typing as npt
 import optax
 import pandas as pd
 from typing_extensions import Self
@@ -179,7 +180,7 @@ class TrainingContext:
         learner: CircuitParameterLearning,
         circuit: LayeredProbabilisticCircuit,
         setting: ComputationSetting,
-        rows: np.ndarray,
+        rows: npt.NDArray[np.float64],
         most_rows_per_step: int,
         seed: int,
     ) -> TrainingRun:

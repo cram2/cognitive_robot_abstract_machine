@@ -19,7 +19,6 @@ from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu
     HiddenChowLiuTree,
 )
 from probabilistic_model.learning.structure.mutual_information import (
-    DiscretizedData,
     PairwiseMutualInformation,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
@@ -43,8 +42,8 @@ def test_chow_liu_tree_joins_the_most_dependent_pairs(bits):
     """
     The Chow-Liu tree connects the pairs of variables that copy each other.
     """
-    mutual_information = PairwiseMutualInformation(
-        discretized=DiscretizedData(variables=bits.variables, data=bits.rows())
+    mutual_information = PairwiseMutualInformation.from_rows(
+        variables=bits.variables, data=bits.rows(), number_of_bins=10
     ).compute()
 
     tree = ChowLiuTree.from_mutual_information(mutual_information=mutual_information)

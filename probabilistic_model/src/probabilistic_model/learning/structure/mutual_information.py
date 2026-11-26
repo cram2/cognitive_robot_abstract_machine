@@ -6,71 +6,16 @@ Chow-Liu trees are built on.
 from __future__ import annotations
 
 # %% imports
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
-from random_events.variable import Continuous, Variable
+import numpy.typing as npt
+import pandas as pd
+from random_events.variable import Continuous
 from sortedcontainers import SortedSet
+from typing_extensions import Self
 
-
-# %% discretized data
-
-
-@dataclass(kw_only=True)
-class DiscretizedData:
-    """
-    The rows of a dataset with every value replaced by the index of its state: the value
-    itself for a discrete variable, the quantile bin for a continuous one.
-    """
-
-    variables: SortedSet
-    """
-    The variables, one per column.
-    """
-
-    data: np.ndarray
-    """
-    The rows, encoded as the circuits read them.
-    """
-
-    number_of_bins: int = 10
-    """
-    The number of equally populated bins a continuous variable is cut into.
-    """
-
-    states: np.ndarray = field(init=False)
-    """
-    The state index of every value, shape (#rows, #variables).
-    """
-
-    number_of_states: np.ndarray = field(init=False)
-    """
-    The number of states of every variable.
-    """
-
-    def __post_init__(self) -> None:
-        """
-        Replaces every value of the data by the index of its state.
-        """
-        columns = [
-            self.state_column(variable=variable, values=self.data[:, index])
-            for index, variable in enumerate(self.variables)
-        ]
-        self.states = np.stack(columns, axis=1).astype(np.int64)
-        self.number_of_states = np.maximum(self.states.max(axis=0) + 1, 1)
-
-    def state_column(self, *, variable: Variable, values: np.ndarray) -> np.ndarray:
-        """
-        :param variable: The variable of the column.
-        :param values: The values of the column.
-        :return: The state index of every value.
-        """
-        if isinstance(variable, Continuous):
-            edges = np.unique(
-                np.quantile(values, np.linspace(0, 1, self.number_of_bins + 1)[1:-1])
-            )
-            return np.searchsorted(edges, values, side="right")
-        return np.unique(values, return_inverse=True)[1]
+from probabilistic_model.causal_structure.discretization import Discretizer
 
 
 # %% mutual information
@@ -83,22 +28,51 @@ class PairwiseMutualInformation:
     columns of discretized data.
     """
 
-    discretized: DiscretizedData
+    levels: npt.NDArray[np.int64]
     """
-    The data.
+    The level of every value, shape (#rows, #variables), counted from zero per variable.
     """
 
-    def compute(self) -> np.ndarray:
+    @classmethod
+    def from_rows(
+        cls,
+        *,
+        variables: SortedSet,
+        data: npt.NDArray[np.float64],
+        number_of_bins: int,
+    ) -> Self:
+        """
+        :param variables: The variables, one per column.
+        :param data: The rows, encoded as the circuits read them.
+        :param number_of_bins: The number of quantile bins a continuous variable with
+            many values is cut into.
+        :return: The mutual information of the rows, every value of a symbolic variable
+            its own level.
+        """
+        frame = pd.DataFrame(
+            {
+                variable.name: (
+                    data[:, index]
+                    if isinstance(variable, Continuous)
+                    else data[:, index].astype(str)
+                )
+                for index, variable in enumerate(variables)
+            }
+        )
+        levels = Discretizer(bin_count=number_of_bins).fit_transform(frame)
+        return cls(levels=levels.to_numpy(dtype=np.int64))
+
+    def compute(self) -> npt.NDArray[np.float64]:
         """
         :return: The symmetric matrix of mutual information, zero on the diagonal.
         """
-        states = self.discretized.states
-        number_of_rows = len(states)
-        offsets = np.concatenate([[0], np.cumsum(self.discretized.number_of_states)])
+        number_of_rows, number_of_variables = self.levels.shape
+        number_of_levels = self.levels.max(axis=0) + 1
+        offsets = np.concatenate([[0], np.cumsum(number_of_levels)])
         one_hot = np.zeros((number_of_rows, int(offsets[-1])), dtype=np.float32)
         one_hot[
-            np.repeat(np.arange(number_of_rows), states.shape[1]),
-            (states + offsets[:-1]).ravel(),
+            np.repeat(np.arange(number_of_rows), number_of_variables),
+            (self.levels + offsets[:-1]).ravel(),
         ] = 1.0
         joint = (one_hot.T @ one_hot).astype(float) / number_of_rows
         marginal = np.diag(joint)
@@ -106,14 +80,11 @@ class PairwiseMutualInformation:
             terms = np.where(
                 joint > 0, joint * np.log(joint / np.outer(marginal, marginal)), 0.0
             )
-        number_of_variables = len(self.discretized.number_of_states)
-        state_of_variable = np.zeros((int(offsets[-1]), number_of_variables))
-        state_of_variable[
+        level_of_variable = np.zeros((int(offsets[-1]), number_of_variables))
+        level_of_variable[
             np.arange(int(offsets[-1])),
-            np.repeat(
-                np.arange(number_of_variables), self.discretized.number_of_states
-            ),
+            np.repeat(np.arange(number_of_variables), number_of_levels),
         ] = 1.0
-        result = state_of_variable.T @ terms @ state_of_variable
+        result = level_of_variable.T @ terms @ level_of_variable
         np.fill_diagonal(result, 0.0)
         return result

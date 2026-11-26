@@ -7,9 +7,10 @@ latent variable with a fixed number of states that the observed variable hangs b
 from __future__ import annotations
 
 # %% imports
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
+import numpy.typing as npt
 from random_events.variable import Continuous, Symbolic, Variable
 from scipy.sparse.csgraph import breadth_first_order, minimum_spanning_tree
 from sortedcontainers import SortedSet
@@ -18,8 +19,11 @@ from probabilistic_model.learning.structure.exceptions import (
     UnsupportedStructureVariableError,
 )
 from probabilistic_model.learning.structure.mutual_information import (
-    DiscretizedData,
     PairwiseMutualInformation,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
+    DenseEdgeValues,
+    VariableIndices,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
     Layer,
@@ -58,18 +62,20 @@ class ChowLiuTree:
     information, rooted at the first variable.
     """
 
-    parents: np.ndarray
+    parents: VariableIndices
     """
     The parent of every variable, ``-1`` for the root.
     """
 
-    order: np.ndarray
+    order: VariableIndices
     """
     The variables in breadth-first order from the root, parents before children.
     """
 
     @classmethod
-    def from_mutual_information(cls, *, mutual_information: np.ndarray) -> ChowLiuTree:
+    def from_mutual_information(
+        cls, *, mutual_information: npt.NDArray[np.float64]
+    ) -> ChowLiuTree:
         """
         :param mutual_information: The symmetric matrix of pairwise mutual information.
         :return: The maximum spanning tree of the complete graph weighted by it.
@@ -82,7 +88,7 @@ class ChowLiuTree:
             tree, i_start=0, directed=False, return_predecessors=True
         )
         parents = np.where(predecessors < 0, -1, predecessors)
-        return cls(parents=parents, order=order)
+        return cls(parents=parents.astype(np.int64), order=order.astype(np.int64))
 
 
 # %% initial parameters
@@ -101,7 +107,7 @@ class RandomInitialParameters:
     The variables of the circuit, one per column of the data.
     """
 
-    data: np.ndarray
+    data: npt.NDArray[np.float64]
     """
     The rows, encoded as the circuits read them.
     """
@@ -111,10 +117,21 @@ class RandomInitialParameters:
     The number of states of every latent variable.
     """
 
-    random_number_generator: np.random.Generator
+    seed: int
     """
-    The source of the parameters.
+    The seed of the parameters.
     """
+
+    random_number_generator: np.random.Generator = field(init=False, repr=False)
+    """
+    The source of the parameters, drawn from :attr:`seed`.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Seeds :attr:`random_number_generator`.
+        """
+        self.random_number_generator = np.random.default_rng(self.seed)
 
     def input_layer(self, *, variable_index: int) -> Layer:
         """
@@ -148,7 +165,7 @@ class RandomInitialParameters:
             )
         raise UnsupportedStructureVariableError(variable=variable)
 
-    def transition_weights(self, *, parent: int | None) -> np.ndarray:
+    def transition_weights(self, *, parent: int | None) -> DenseEdgeValues:
         """
         :param parent: The index of the parent variable, ``None`` for the root.
         :return: The unnormalized weight of every state of the child's latent variable
@@ -185,8 +202,8 @@ class HiddenChowLiuTree:
 
     number_of_bins: int = 10
     """
-    The number of quantile bins a continuous variable is cut into for the mutual
-    information.
+    The number of quantile bins a continuous variable with many values is cut into for
+    the mutual information.
     """
 
     seed: int = 0
@@ -194,25 +211,23 @@ class HiddenChowLiuTree:
     The seed of the random initial parameters.
     """
 
-    def build_circuit(self, *, data: np.ndarray) -> LayeredProbabilisticCircuit:
+    def build_circuit(
+        self, *, data: npt.NDArray[np.float64]
+    ) -> LayeredProbabilisticCircuit:
         """
         :param data: The rows, encoded as the circuits read them.
         :return: The hidden Chow-Liu tree circuit with random initial numpy parameters.
         """
         tree = ChowLiuTree.from_mutual_information(
-            mutual_information=PairwiseMutualInformation(
-                discretized=DiscretizedData(
-                    variables=self.variables,
-                    data=data,
-                    number_of_bins=self.number_of_bins,
-                )
+            mutual_information=PairwiseMutualInformation.from_rows(
+                variables=self.variables, data=data, number_of_bins=self.number_of_bins
             ).compute()
         )
         parameters = RandomInitialParameters(
             variables=self.variables,
             data=data,
             hidden_states=self.hidden_states,
-            random_number_generator=np.random.default_rng(self.seed),
+            seed=self.seed,
         )
         units: dict[int, Layer] = {}
         for variable_index in tree.order[::-1].tolist():
@@ -237,7 +252,7 @@ class HiddenChowLiuTree:
         return LayeredProbabilisticCircuit(SortedSet(self.variables), root)
 
     @staticmethod
-    def mixture_layer(*, child_layer: Layer, weights: np.ndarray) -> SumLayer:
+    def mixture_layer(*, child_layer: Layer, weights: DenseEdgeValues) -> SumLayer:
         """
         :param child_layer: The layer whose units are mixed.
         :param weights: The unnormalized weight of every unit of the child layer in
