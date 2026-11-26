@@ -53,6 +53,28 @@ def test_a_query_for_a_field_typed_with_a_parametrized_generic_selects_its_objec
     assert [dao.label for dao in result] == ["plain"]
 
 
+def test_a_field_typed_with_a_parametrization_round_trips_a_subclass_binding_it(
+    session, database
+):
+    """
+    A field typed with a parametrization of a generic stores an object of a subclass
+    that binds that parametrization, and loads it back as that subclass.
+    """
+    holder = WheeledBaseHolder(base=RoverBase(label="rover"))
+    session.add(to_dao(holder))
+    session.commit()
+    session.expunge_all()
+    holder_variable = variable(WheeledBaseHolder, domain=None)
+
+    [dao] = eql_to_sql(an(entity(holder_variable)), session).evaluate()
+    reconstructed = dao.from_dao()
+
+    assert (type(reconstructed.base), reconstructed.base.label) == (
+        RoverBase,
+        holder.base.label,
+    )
+
+
 def test_a_query_for_a_generic_base_filters_on_a_field_of_its_type_parameter(
     session, database
 ):
