@@ -6,7 +6,7 @@ which statements.
 from __future__ import annotations
 
 import gc
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import batched
@@ -23,6 +23,7 @@ from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
     StoredObjectColumn,
     StoredObjectRow,
+    selectin_loading,
 )
 from krrood.ormatic.data_access_objects.helper import (
     get_mapping_data_access_object_class,
@@ -47,6 +48,13 @@ class RelationshipLoading(StrEnum):
     """
     Every relationship loads when it is first read. Use it when few of the loaded
     objects' relationships are read, since every eager relationship costs statements.
+    """
+
+    FOR_CONVERSION = "for_conversion"
+    """
+    Every relationship of the selected objects loads with them, as inside
+    :func:`~krrood.ormatic.data_access_objects.dao.selectin_loading`. Use it when the
+    results are converted to domain objects.
     """
 
 
@@ -241,7 +249,7 @@ class ResultLoading:
         :return: The options the statement takes, reaching also the relationships that
             subclasses of the loaded classes declare.
         """
-        if self.relationship_loading == RelationshipLoading.AS_MAPPED:
+        if self.relationship_loading != RelationshipLoading.ON_ACCESS:
             return ()
         subclass_relationships = (
             relationship.class_attribute
@@ -252,13 +260,18 @@ class ResultLoading:
         )
         return (lazyload("*"), *map(lazyload, subclass_relationships))
 
-    def create_evaluation_context(self) -> AbstractContextManager:
+    @contextmanager
+    def create_evaluation_context(self, *, session: Session) -> Iterator[None]:
         """
+        :param session: The session the evaluation loads with.
         :return: The context an evaluation with this result loading runs in.
         """
-        if self.pauses_garbage_collection:
-            return GarbageCollectionPause()
-        return nullcontext()
+        with ExitStack() as stack:
+            if self.pauses_garbage_collection:
+                stack.enter_context(GarbageCollectionPause())
+            if self.relationship_loading == RelationshipLoading.FOR_CONVERSION:
+                stack.enter_context(selectin_loading(session))
+            yield
 
     def load_selected_objects(
         self,

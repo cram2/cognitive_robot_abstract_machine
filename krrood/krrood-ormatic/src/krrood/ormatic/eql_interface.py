@@ -960,7 +960,7 @@ class EQLTranslator:
 
         :return: Query results
         """
-        with self.result_loading.create_evaluation_context():
+        with self.result_loading.create_evaluation_context(session=self.session):
             if isinstance(self.select_like, SetOf):
                 return self._evaluate_set_of()
             return self._evaluate_entity()
