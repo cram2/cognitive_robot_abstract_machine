@@ -9,7 +9,7 @@ import threading
 import weakref
 from collections.abc import Iterable
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from functools import lru_cache
 from itertools import batched, count
@@ -26,7 +26,7 @@ from sqlalchemy.orm import (
     make_transient_to_detached,
     selectinload,
 )
-from typing_extensions import get_origin, Any, Callable, Sequence, TypeVar
+from typing_extensions import get_origin, Any, Callable, Sequence, TypeAlias, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute, IndexByValue
@@ -36,6 +36,7 @@ from krrood.ormatic.base import Base
 from krrood.ormatic.collection_shape import (
     AssociationLeafAttribute,
     CollectionLevel,
+    Container,
     CollectionShape,
     LevelColumnNames,
     MappingLevel,
@@ -66,6 +67,11 @@ from krrood.patterns.has_generic import HasGeneric
 from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
 
 logger = logging.getLogger(__name__)
+
+DomainObject: TypeAlias = Any
+"""
+An object of a domain class that a DAO maps.
+"""
 _repr_thread_local = threading.local()
 
 T = TypeVar("T")
@@ -254,6 +260,213 @@ class CollectionRelationship:
         :return: Whether a container of the collection holds its elements by key.
         """
         return any(level.is_keyed for level in self.levels)
+
+
+@dataclass(kw_only=True, frozen=True)
+class LoadedContainerPlace:
+    """
+    A container of a collection being read back from an association table, and where it
+    lies within its holder.
+    """
+
+    container: list
+    """
+    The container, a list while it is read back.
+    """
+
+    reference: Attribute | IndexByValue
+    """
+    The access path from the holder of the collection to the container.
+    """
+
+    path: tuple[int, ...] = ()
+    """
+    The positions of the container in the levels outside it.
+    """
+
+
+@dataclass(kw_only=True)
+class AssociationRowReader:
+    """
+    Reads the rows of an association table back into the collection they describe,
+    whose containers stay lists until the objects they hold are complete.
+    """
+
+    relationship: CollectionRelationship
+    """
+    The collection relationship holding the rows.
+    """
+
+    holder: DomainObject
+    """
+    The domain object the collection belongs to.
+    """
+
+    state: FromDataAccessObjectState
+    """
+    The conversion state.
+    """
+
+    collection: list = field(default_factory=list)
+    """
+    The collection read back so far.
+    """
+
+    places_by_path: dict[tuple[int, ...], LoadedContainerPlace] = field(
+        default_factory=dict
+    )
+    """
+    The inner containers read back so far, by their positions.
+    """
+
+    def read_rows(self, *, rows: Iterable[AssociationDataAccessObject]) -> list:
+        """
+        :param rows: The rows of the association table, in the order of their positions.
+        :return: The collection the rows describe.
+        """
+        for row in rows:
+            self._read_row(row=row)
+        return self.collection
+
+    def _read_row(self, *, row: AssociationDataAccessObject) -> None:
+        """
+        Add the value a row holds, or the empty container it marks, to the collection.
+
+        :param row: A row of the association table.
+        """
+        place = LoadedContainerPlace(
+            container=self.collection,
+            reference=Attribute(_attribute_name_=self.relationship.key, _child_=None),
+        )
+        innermost_level = self.relationship.levels[-1]
+        for level in self.relationship.levels:
+            index = getattr(row, level.column_names.index)
+            if index is None:
+                return
+            if level is innermost_level:
+                self._add_element(
+                    row=row, level=level, place=place, element=self._value(row=row)
+                )
+                return
+            place = self._inner_place(row=row, level=level, place=place, index=index)
+
+    def _inner_place(
+        self,
+        *,
+        row: AssociationDataAccessObject,
+        level: AssociationLevel,
+        place: LoadedContainerPlace,
+        index: int,
+    ) -> LoadedContainerPlace:
+        """
+        :param row: A row of the association table.
+        :param level: The level of the container at *place*.
+        :param place: A container the row's value lies in.
+        :param index: The position the row gives within the container at *place*.
+        :return: The inner container at the position, added if this is its first row.
+        """
+        path = (*place.path, index)
+        if path not in self.places_by_path:
+            inner_place = self._add_element(
+                row=row, level=level, place=place, element=[]
+            )
+            self.places_by_path[path] = LoadedContainerPlace(
+                container=inner_place.container,
+                reference=inner_place.reference,
+                path=path,
+            )
+        return self.places_by_path[path]
+
+    def _add_element(
+        self,
+        *,
+        row: AssociationDataAccessObject,
+        level: AssociationLevel,
+        place: LoadedContainerPlace,
+        element: Any,
+    ) -> LoadedContainerPlace:
+        """
+        Add an element, with the key the row gives it, to the container at *place*.
+
+        :param row: A row of the association table.
+        :param level: The level of the container at *place*.
+        :param place: The container.
+        :param element: The element.
+        :return: Where the element lies.
+        """
+        collection_level = level.collection_level
+        key = self._key(row=row, level=level)
+        position = collection_level.add_loaded_element(
+            container=place.container, key=key, element=element
+        )
+        if level.is_keyed:
+            self._remember_alternative_mapping(
+                value=key,
+                reference=self._reference_through(
+                    reference=place.reference,
+                    path=collection_level.loaded_key_path(position=position),
+                ),
+            )
+        element_reference = self._reference_through(
+            reference=place.reference,
+            path=collection_level.loaded_element_path(position=position),
+        )
+        self._remember_alternative_mapping(value=element, reference=element_reference)
+        return LoadedContainerPlace(container=element, reference=element_reference)
+
+    def _key(self, *, row: AssociationDataAccessObject, level: AssociationLevel) -> Any:
+        """
+        :param row: A row of the association table.
+        :param level: A level of the collection.
+        :return: The key the row gives its element in the level, the domain object of
+            a mapped key, None for an unkeyed level.
+        """
+        if level.key_relationship is not None:
+            return _read_single_relationship(row, level.key_relationship).from_dao(
+                state=self.state
+            )
+        if level.is_keyed:
+            return getattr(row, level.column_names.key)
+        return None
+
+    def _value(self, *, row: AssociationDataAccessObject) -> Any:
+        """
+        :param row: A row of the association table.
+        :return: The value the row holds, the domain object of a mapped value.
+        """
+        if self.relationship.holds_values_in_column:
+            return getattr(row, AssociationLeafAttribute.VALUE)
+        return _read_single_relationship(
+            row, self.relationship.association_target_relationship
+        ).from_dao(state=self.state)
+
+    @staticmethod
+    def _reference_through(
+        *, reference: Attribute | IndexByValue, path: tuple[int, ...]
+    ) -> Attribute | IndexByValue:
+        """
+        :param reference: The access path to a container.
+        :param path: The indices leading from the container to one of its elements.
+        :return: The access path to the element.
+        """
+        for index in path:
+            reference = IndexByValue(_key_=index, _child_=reference)
+        return reference
+
+    def _remember_alternative_mapping(
+        self, *, value: Any, reference: Attribute | IndexByValue
+    ) -> None:
+        """
+        Remember to replace the value at the reference by its domain object, if it is an
+        alternative mapping.
+
+        :param value: A key or element read back.
+        :param reference: The access path from the holder to the value.
+        """
+        if isinstance(value, AlternativeMapping):
+            self.state._alternative_mappings_being_referenced[value].append(
+                (self.holder, reference)
+            )
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -1081,7 +1294,7 @@ class DataAccessObject(HasGeneric[T]):
     def _fill_collection_relationship(
         self,
         *,
-        source_object: Any,
+        source_object: DomainObject,
         relationship: CollectionRelationship,
         state: ToDataAccessObjectState,
     ) -> None:
@@ -1107,7 +1320,7 @@ class DataAccessObject(HasGeneric[T]):
             )
             return
 
-        dao_collection = [
+        data_access_objects = [
             self._get_or_queue_referenced_dao(
                 source_object=item,
                 state=state,
@@ -1117,19 +1330,15 @@ class DataAccessObject(HasGeneric[T]):
             for item in source_collection
         ]
 
-        # The instrumented DAO attribute expects an iterable duck-typed as its own
-        # collection class; an immutable domain container (tuple) is held as a
-        # list at the ORM layer (see WrappedTable.create_many_to_many_relationship),
-        # so it must be assigned as one here too.
         assignable_container_type = (
             list if type(source_collection) is tuple else type(source_collection)
         )
-        setattr(self, relationship.key, assignable_container_type(dao_collection))
+        setattr(self, relationship.key, assignable_container_type(data_access_objects))
 
     def _association_rows(
         self,
         *,
-        container: Any,
+        container: Container,
         relationship: CollectionRelationship,
         positions: tuple[AssociationRowPosition, ...],
         state: ToDataAccessObjectState,
@@ -1439,23 +1648,26 @@ class DataAccessObject(HasGeneric[T]):
             domain_object = state.get(source=work_item.dao_instance)
             if domain_object is not None and id(domain_object) not in processed_ids:
                 self._finish_association_collections(
-                    dao_instance=work_item.dao_instance, domain_object=domain_object
+                    data_access_object=work_item.dao_instance,
+                    domain_object=domain_object,
                 )
                 self._finalize_object_containers(domain_object=domain_object)
                 processed_ids.add(id(domain_object))
 
     @staticmethod
     def _finish_association_collections(
-        *, dao_instance: DataAccessObject, domain_object: Any
+        *, data_access_object: DataAccessObject, domain_object: DomainObject
     ) -> None:
         """
         Turn the entries of every keyed container read back from an association table
         into a dictionary, now that the objects they hold are complete.
 
-        :param dao_instance: The DAO the domain object was read back from.
+        :param data_access_object: The DAO the domain object was read back from.
         :param domain_object: The domain object.
         """
-        for relationship in get_dao_schema(type(dao_instance)).collection_relationships:
+        for relationship in get_dao_schema(
+            type(data_access_object)
+        ).collection_relationships:
             if not relationship.has_keyed_level:
                 continue
             value = getattr(domain_object, relationship.key, None)
@@ -1794,12 +2006,16 @@ class DataAccessObject(HasGeneric[T]):
             _read_single_relationship(row, single_relationship)
             for single_relationship in single_relationships
         ]
-        return [dao for dao in referenced if dao is not None]
+        return [
+            data_access_object
+            for data_access_object in referenced
+            if data_access_object is not None
+        ]
 
     def _populate_collection_relationship(
         self,
         *,
-        domain_object: Any,
+        domain_object: DomainObject,
         relationship: CollectionRelationship,
         state: FromDataAccessObjectState,
     ) -> None:
@@ -1815,21 +2031,19 @@ class DataAccessObject(HasGeneric[T]):
             object.__setattr__(domain_object, relationship.key, None)
             return
         if relationship.association_class is not None:
+            reader = AssociationRowReader(
+                relationship=relationship, holder=domain_object, state=state
+            )
             object.__setattr__(
-                domain_object,
-                relationship.key,
-                self._collection_from_association_rows(
-                    domain_object=domain_object,
-                    relationship=relationship,
-                    rows=value,
-                    state=state,
-                ),
+                domain_object, relationship.key, reader.read_rows(rows=value)
             )
             return
 
         instances = [
-            self._get_or_allocate_domain_object(dao_instance=dao, state=state)
-            for dao in value
+            self._get_or_allocate_domain_object(
+                dao_instance=data_access_object, state=state
+            )
+            for data_access_object in value
         ]
         for index, instance in enumerate(instances):
             if isinstance(instance, AlternativeMapping):
@@ -1846,162 +2060,6 @@ class DataAccessObject(HasGeneric[T]):
                 )
         # a fresh list, so the domain object does not alias the DAO's collection
         object.__setattr__(domain_object, relationship.key, list(instances))
-
-    def _collection_from_association_rows(
-        self,
-        *,
-        domain_object: Any,
-        relationship: CollectionRelationship,
-        rows: Iterable[AssociationDataAccessObject],
-        state: FromDataAccessObjectState,
-    ) -> list:
-        """
-        :param domain_object: The domain object the collection belongs to.
-        :param relationship: The collection relationship holding the rows.
-        :param rows: The rows of the association table, in the order of their positions.
-        :param state: The conversion state.
-        :return: The collection the rows describe, its containers read back as lists
-            that :meth:`_finish_association_collections` finishes; its alternatively
-            mapped keys and values are remembered to be replaced by their domain objects.
-        """
-        levels = relationship.levels
-        root = []
-        containers_by_path = {}
-        for row in rows:
-            container = root
-            path = ()
-            reference = Attribute(_attribute_name_=relationship.key, _child_=None)
-            for depth, level in enumerate(levels):
-                collection_level = level.collection_level
-                index = getattr(row, level.column_names.index)
-                if index is None:
-                    break
-                path = (*path, index)
-                key = self._association_row_key(row=row, level=level, state=state)
-                is_innermost = depth + 1 == len(levels)
-                if is_innermost or path not in containers_by_path:
-                    element = (
-                        self._association_row_value(
-                            row=row, relationship=relationship, state=state
-                        )
-                        if is_innermost
-                        else []
-                    )
-                    position = collection_level.add_loaded_element(
-                        container=container, key=key, element=element
-                    )
-                    if level.is_keyed:
-                        self._remember_alternative_mapping_reference(
-                            value=key,
-                            domain_object=domain_object,
-                            reference=self._reference_through(
-                                reference=reference,
-                                path=collection_level.loaded_key_path(
-                                    position=position
-                                ),
-                            ),
-                            state=state,
-                        )
-                    if is_innermost:
-                        self._remember_alternative_mapping_reference(
-                            value=element,
-                            domain_object=domain_object,
-                            reference=self._reference_through(
-                                reference=reference,
-                                path=collection_level.loaded_element_path(
-                                    position=position
-                                ),
-                            ),
-                            state=state,
-                        )
-                        break
-                    containers_by_path[path] = (element, position)
-                container, position = containers_by_path[path]
-                reference = self._reference_through(
-                    reference=reference,
-                    path=collection_level.loaded_element_path(position=position),
-                )
-        return root
-
-    @staticmethod
-    def _reference_through(
-        *, reference: Attribute | IndexByValue, path: tuple[int, ...]
-    ) -> Attribute | IndexByValue:
-        """
-        :param reference: The access path to a container.
-        :param path: The indices leading from the container to one of its elements.
-        :return: The access path to the element.
-        """
-        for index in path:
-            reference = IndexByValue(_key_=index, _child_=reference)
-        return reference
-
-    @staticmethod
-    def _remember_alternative_mapping_reference(
-        *,
-        value: Any,
-        domain_object: Any,
-        reference: Attribute | IndexByValue,
-        state: FromDataAccessObjectState,
-    ) -> None:
-        """
-        Remember to replace the value at the reference by its domain object, if it is an
-        alternative mapping.
-
-        :param value: A value read back.
-        :param domain_object: The domain object the reference starts at.
-        :param reference: The access path to the value.
-        :param state: The conversion state.
-        """
-        if isinstance(value, AlternativeMapping):
-            state._alternative_mappings_being_referenced[value].append(
-                (domain_object, reference)
-            )
-
-    def _association_row_key(
-        self,
-        *,
-        row: AssociationDataAccessObject,
-        level: AssociationLevel,
-        state: FromDataAccessObjectState,
-    ) -> Any:
-        """
-        :param row: A row of an association table.
-        :param level: A level of the collection the table holds.
-        :param state: The conversion state.
-        :return: The key the row gives its element in the level, None for an unkeyed
-            level.
-        """
-        if level.key_relationship is not None:
-            return self._get_or_allocate_domain_object(
-                dao_instance=_read_single_relationship(row, level.key_relationship),
-                state=state,
-            )
-        if level.is_keyed:
-            return getattr(row, level.column_names.key)
-        return None
-
-    def _association_row_value(
-        self,
-        *,
-        row: AssociationDataAccessObject,
-        relationship: CollectionRelationship,
-        state: FromDataAccessObjectState,
-    ) -> Any:
-        """
-        :param row: A row of the association table of the relationship.
-        :param relationship: The collection relationship holding the row.
-        :param state: The conversion state.
-        :return: The value the row holds, the domain object of a mapped value.
-        """
-        if relationship.holds_values_in_column:
-            return getattr(row, AssociationLeafAttribute.VALUE)
-        return self._get_or_allocate_domain_object(
-            dao_instance=_read_single_relationship(
-                row, relationship.association_target_relationship
-            ),
-            state=state,
-        )
 
     def _get_or_allocate_domain_object(
         self, *, dao_instance: DataAccessObject, state: FromDataAccessObjectState

@@ -5,6 +5,7 @@ Dataclasses whose fields cover every way ORMatic can store a field.
 from __future__ import annotations
 
 import datetime
+import enum
 from dataclasses import dataclass
 
 from typing_extensions import Any, Dict, List, Type
@@ -31,6 +32,24 @@ class UnmappedRecord:
     number: int
     """
     A number.
+    """
+
+
+class StorageColour(enum.Enum):
+    """
+    An enum, which a column of its own type holds.
+    """
+
+    RED = 1
+    """
+    A colour.
+    """
+
+
+class ValueWithoutSerializer:
+    """
+    A class that no table maps and no serializer writes; it is not a dataclass, since
+    the serializer for any dataclass would write it.
     """
 
 

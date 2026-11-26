@@ -20,7 +20,7 @@ from krrood.ormatic.collection_shape import (
     CollectionShape,
     MappingLevel,
 )
-from krrood.ormatic.field_storage import FieldStorage, FieldToStore
+from krrood.ormatic.field_storage import FieldStorage, FieldToStore, ValueStorage
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import (
     RelationshipInformationKey,
@@ -1016,6 +1016,7 @@ class WrappedTable(TableLike):
                 name=wrapped_field.field.name,
                 value_type=wrapped_field.type_endpoint,
                 nullable=wrapped_field.is_optional,
+                storage=ValueStorage.COLUMN,
             )
         )
 
@@ -1145,13 +1146,11 @@ class WrappedTable(TableLike):
 
         :param wrapped_field: The field holding the collection.
         """
-        shape = FieldToStore(
-            wrapped_field=wrapped_field, ormatic=self.ormatic
-        ).collection_shape
+        field_to_store = FieldToStore(wrapped_field=wrapped_field, ormatic=self.ormatic)
+        shape = field_to_store.collection_shape
         association_table_name = (
             f"{self.tablename}_{wrapped_field.field.name}_association"
         )
-        mapped_classes = self.ormatic.mapped_classes
 
         key_references = {}
         key_columns = {}
@@ -1159,7 +1158,8 @@ class WrappedTable(TableLike):
             if not isinstance(level, MappingLevel):
                 continue
             nullable = level.depth > 1
-            if level.key_type in mapped_classes:
+            key_storage = field_to_store.value_storage(value_type=level.key_type)
+            if key_storage is ValueStorage.REFERENCE:
                 key_table = self.get_table_of_class(
                     clazz=level.key_type, wrapped_field=wrapped_field
                 )
@@ -1174,11 +1174,13 @@ class WrappedTable(TableLike):
                     name=level.column_names.key,
                     value_type=level.key_type,
                     nullable=nullable,
+                    storage=key_storage,
                 )
 
         target_reference = None
         value_column = None
-        if shape.leaf_type in mapped_classes:
+        leaf_storage = field_to_store.value_storage(value_type=shape.leaf_type)
+        if leaf_storage is ValueStorage.REFERENCE:
             target_table = self.get_table_of_class(
                 clazz=shape.leaf_type, wrapped_field=wrapped_field
             )
@@ -1195,6 +1197,7 @@ class WrappedTable(TableLike):
                 name=AssociationLeafAttribute.VALUE,
                 value_type=shape.leaf_type,
                 nullable=shape.is_nested,
+                storage=leaf_storage,
             )
 
         association_table = AssociationObject(
@@ -1210,9 +1213,6 @@ class WrappedTable(TableLike):
         )
         self.ormatic.association_objects.append(association_table)
 
-        # SQLAlchemy instruments a collection class in place (it needs an appender
-        # method), which tuples, sets and dictionaries of rows cannot provide in order.
-        # The rows are therefore held as a list; from_dao rebuilds the domain container.
         container_name = module_and_class_name(list)
         collection_class = association_table.collection_class_constructor(
             ormatic=self.ormatic
@@ -1264,35 +1264,26 @@ class WrappedTable(TableLike):
         )
 
     def value_column(
-        self, *, name: str, value_type: Any, nullable: bool
+        self, *, name: str, value_type: type, nullable: bool, storage: ValueStorage
     ) -> ColumnConstructor:
         """
         :param name: The name of the column.
         :param value_type: The type of the values the column holds.
         :param nullable: Whether the column may hold None.
-        :return: A column holding the values in a column of their own type: text for a
-            string, the type SQLAlchemy derives for another builtin, the type mapping's
-            column type, and JSON for any other type.
+        :param storage: How the values are stored, :attr:`ValueStorage.COLUMN` or
+            :attr:`ValueStorage.JSON`.
+        :return: A column holding the values: for a column of their own type, text for
+            a string, the type mapping's column type for a mapped type, else the type
+            SQLAlchemy derives.
         """
-        if value_type in FieldToStore.sqlalchemy_builtins:
-            self.ormatic.imported_modules.add(value_type.__module__)
-            annotation = module_and_class_name(value_type)
-            column_type = (
-                module_and_class_name(sqlalchemy.types.Text)
-                if value_type is str
-                else None
-            )
-        elif value_type in self.ormatic.type_mappings:
-            self.ormatic.imported_modules.add(value_type.__module__)
-            custom_type = self.ormatic.type_mappings[value_type]
-            # registered under the exact type, so the generated interface maps it
-            self.ormatic.type_mappings[value_type] = custom_type
-            annotation = module_and_class_name(value_type)
-            column_type = module_and_class_name(custom_type)
-        else:
+        if storage is ValueStorage.JSON:
             self.ormatic.imported_modules.add("typing_extensions")
             annotation = module_and_class_name(Any)
             column_type = "JSON"
+        else:
+            self.ormatic.imported_modules.add(value_type.__module__)
+            annotation = module_and_class_name(value_type)
+            column_type = self._column_type(value_type=value_type)
         if nullable:
             annotation = f"{module_and_class_name(Optional)}[{annotation}]"
         arguments = [
@@ -1305,6 +1296,23 @@ class WrappedTable(TableLike):
             type=f"Mapped[{annotation}]",
             constructor=f"mapped_column({', '.join(arguments)})",
         )
+
+    def _column_type(self, *, value_type: type) -> str | None:
+        """
+        :param value_type: A type with a column type of its own.
+        :return: The column type to name for values of the type, or None where
+            SQLAlchemy derives it from the annotation.
+        """
+        if value_type is str:
+            return module_and_class_name(sqlalchemy.types.Text)
+        if value_type in FieldToStore.sqlalchemy_builtins:
+            return None
+        if value_type not in self.ormatic.type_mappings:
+            return None
+        custom_type = self.ormatic.type_mappings[value_type]
+        # registered under the exact type, so the generated interface maps it
+        self.ormatic.type_mappings[value_type] = custom_type
+        return module_and_class_name(custom_type)
 
     def create_json_column(self, *, wrapped_field: WrappedField):
         """
@@ -1364,6 +1372,7 @@ class WrappedTable(TableLike):
                 name=wrapped_field.field.name,
                 value_type=wrapped_field.type_endpoint,
                 nullable=wrapped_field.is_optional,
+                storage=ValueStorage.COLUMN,
             )
         )
 

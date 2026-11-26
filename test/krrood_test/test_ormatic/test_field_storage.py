@@ -1,12 +1,24 @@
+import datetime
 import logging
 
 import pytest
 
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
-from krrood.ormatic.field_storage import CustomTypeRule, FieldStorage, FieldToStore
+from krrood.ormatic.field_storage import (
+    CustomTypeRule,
+    FieldStorage,
+    FieldToStore,
+    ValueStorage,
+)
 from krrood.ormatic.ormatic import ORMatic
-from ..dataset.field_storage_classes import FieldsOfEveryStorage, StorageLeaf
+from ..dataset.field_storage_classes import (
+    FieldsOfEveryStorage,
+    StorageColour,
+    StorageLeaf,
+    UnmappedRecord,
+    ValueWithoutSerializer,
+)
 
 # %% helpers
 
@@ -64,6 +76,29 @@ def test_field_is_stored_the_way_its_type_calls_for(ormatic, field_name, storage
         )
         is storage
     )
+
+
+@pytest.mark.parametrize(
+    "value_type, storage",
+    [
+        (StorageLeaf, ValueStorage.REFERENCE),
+        (int, ValueStorage.COLUMN),
+        (str, ValueStorage.COLUMN),
+        (StorageColour, ValueStorage.COLUMN),
+        (datetime.date, ValueStorage.COLUMN),
+        (UnmappedRecord, ValueStorage.JSON),
+        (type, ValueStorage.COLUMN),
+        (ValueWithoutSerializer, ValueStorage.NOT_STORED),
+    ],
+)
+def test_key_or_value_of_a_collection_is_stored_the_way_its_type_calls_for(
+    ormatic, value_type, storage
+):
+    field_to_store = FieldToStore(
+        wrapped_field=field_named(ormatic, "leaves_by_name"), ormatic=ormatic
+    )
+
+    assert field_to_store.value_storage(value_type=value_type) is storage
 
 
 def test_classification_logs_how_the_field_is_stored(ormatic, caplog):
