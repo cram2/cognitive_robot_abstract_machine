@@ -81,7 +81,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with nested belief state processing
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         second_seq = Sequence(name="Belief State Pipeline", memory=True)
         second_seq.add_children(

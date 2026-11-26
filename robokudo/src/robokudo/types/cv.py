@@ -82,7 +82,7 @@ class Rect(Type):
     """
 
     @classmethod
-    def from_corner_points(cls, x1: float, y1: float, x2: float, y2: float) -> Rect:
+    def from_corner_points(cls, *, x1: float, y1: float, x2: float, y2: float) -> Rect:
         """
         :param x1: Horizontal coordinate of the top-left corner.
         :param y1: Vertical coordinate of the top-left corner.
@@ -125,7 +125,7 @@ class ColorToDepthRatio:
         """
         return self.horizontal == 1.0 and self.vertical == 1.0
 
-    def depth_pixel(self, x: float, y: float) -> Point2D:
+    def depth_pixel(self, *, x: float, y: float) -> Point2D:
         """
         :param x: Horizontal position in color image pixels.
         :param y: Vertical position in color image pixels.
@@ -133,7 +133,7 @@ class ColorToDepthRatio:
         """
         return Point2D(x=int(x * self.horizontal), y=int(y * self.vertical))
 
-    def depth_region(self, region: Rect) -> Rect:
+    def depth_region(self, *, region: Rect) -> Rect:
         """
         :param region: A region in color image pixels.
         :return: The depth image pixels covering the same region.
@@ -146,7 +146,9 @@ class ColorToDepthRatio:
             y2=bottom * self.vertical,
         )
 
-    def color_pixels(self, depth_pixels: npt.NDArray[np.int_]) -> npt.NDArray[np.int_]:
+    def color_pixels(
+        self, *, depth_pixels: npt.NDArray[np.int_]
+    ) -> npt.NDArray[np.int_]:
         """
         :param depth_pixels: The (x, y) of depth image pixels, one pixel per row.
         :return: The (x, y) of the color image pixel at each of those pixels, one pixel
@@ -225,7 +227,7 @@ class KeyPoint(Point2D):
     """Object class ID."""
 
     @classmethod
-    def from_cv(cls, keypoint: cv2.KeyPoint) -> KeyPoint:
+    def from_cv(cls, *, keypoint: cv2.KeyPoint) -> KeyPoint:
         """Create a keypoint from an OpenCV keypoint.
 
         :return: The created keypoint.

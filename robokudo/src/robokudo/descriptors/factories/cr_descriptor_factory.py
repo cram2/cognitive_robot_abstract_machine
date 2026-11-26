@@ -86,7 +86,7 @@ class CollectionReaderDescriptorFactory:
     @staticmethod
     @called_positionally
     def create_descriptor(
-        camera: str, **kwargs: Any
+        *, camera: str, **kwargs: Any
     ) -> CollectionReaderAnnotator.Descriptor:
         """
         Create a CollectionReader descriptor for the specified camera.
@@ -99,7 +99,7 @@ class CollectionReaderDescriptorFactory:
         :raises TypeError: If the keyword arguments are invalid for the camera config
             class.
         """
-        camera_config = CameraConfigRegistry.create_config(camera, **kwargs)
+        camera_config = CameraConfigRegistry.create_config(config_type=camera, **kwargs)
         return CollectionReaderAnnotator.Descriptor(
             camera_config=camera_config,
             camera_interface=CollectionReaderDescriptorFactory._camera_interface_types[

@@ -164,7 +164,8 @@ class RectifiedDepthFrame:
             (self.images.depth.height, self.images.depth.width), dtype=np.float32
         )
         depth[:] = bridge.imgmsg_to_cv2(
-            self.images.depth, ROSImageEncoding.FLOAT32_SINGLE_CHANNEL
+            img_msg=self.images.depth,
+            desired_encoding=ROSImageEncoding.FLOAT32_SINGLE_CHANNEL,
         )
         depth[~np.isfinite(depth) | (depth <= 0) | (depth > max_depth)] = 0
         depth *= RayTracer.millimeters_per_meter
@@ -385,16 +386,18 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         """
         calibration = frame.rectified_calibration()
         color = np.ascontiguousarray(
-            self.bridge.imgmsg_to_cv2(frame.images.color, ROSImageEncoding.BGR8)
+            self.bridge.imgmsg_to_cv2(
+                img_msg=frame.images.color, desired_encoding=ROSImageEncoding.BGR8
+            )
         )
         depth = frame.millimeter_depth(
             bridge=self.bridge, max_depth=self.camera_config.max_depth
         )
-        cas.set(CASViews.COLOR_IMAGE, color)
-        cas.set(CASViews.DEPTH_IMAGE, depth)
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+        cas.set(view_name=CASViews.COLOR_IMAGE, value=color)
+        cas.set(view_name=CASViews.DEPTH_IMAGE, value=depth)
+        cas.set(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ColorToDepthRatio())
         camera_frame = frame.images.color.header.frame_id
-        self.validate_camera_frame_for_tf(camera_frame)
+        self.validate_camera_frame_for_tf(camera_frame=camera_frame)
         world_T_camera = self.static_world_T_camera_if_configured(
             world=world, camera_frame=camera_frame
         )
@@ -405,7 +408,9 @@ class RectifiedDepthCameraInterface(ROSCameraInterface):
         self.store_camera_observation(
             cas=cas,
             world=world,
-            camera_model=RosCameraModelAdapter.from_camera_info(calibration),
+            camera_model=RosCameraModelAdapter.from_camera_info(
+                camera_info=calibration
+            ),
             camera_frame=camera_frame,
             timestamp_nanoseconds=Time.from_msg(frame.images.header.stamp).nanoseconds,
             modalities=(CameraModality.COLOR, CameraModality.DEPTH),

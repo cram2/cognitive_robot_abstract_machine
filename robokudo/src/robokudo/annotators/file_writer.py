@@ -101,7 +101,9 @@ class FileWriter(BaseAnnotator):
                 f"{self.descriptor.parameters.target_dir} is not existing or not a directory"
             )
 
-    def generate_full_file_path_(self, data_type: CASViews, file_extension: str) -> str:
+    def generate_full_file_path_(
+        self, *, data_type: CASViews, file_extension: str
+    ) -> str:
         """
         Generate the full filename and path where data should be stored.
 
@@ -146,8 +148,8 @@ class FileWriter(BaseAnnotator):
             )
             return Status.FAILURE
 
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
-        depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
+        depth = self.get_cas().get(view_name=CASViews.DEPTH_IMAGE)
         observation = self.get_cas().require_camera_observation()
 
         cv2.imwrite(

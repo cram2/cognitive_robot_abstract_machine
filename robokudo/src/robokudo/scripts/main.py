@@ -130,7 +130,9 @@ def main() -> None:
     # 3. Logging setup
     logger = logging.getLogger(LOGGING_IDENTIFIER_MAIN_EXECUTABLE)
 
-    log_cfg_file = ModuleLoader.get_module_path(PACKAGE_NAME) / "logging_levels.yaml"
+    log_cfg_file = (
+        ModuleLoader.get_module_path(module_name=PACKAGE_NAME) / "logging_levels.yaml"
+    )
     configure_logging(logging_config_file_name=str(log_cfg_file))
 
     # 4. Create a main ROS node

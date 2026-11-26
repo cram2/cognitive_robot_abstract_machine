@@ -76,7 +76,7 @@ class ByteTrackAnnotator(BaseAnnotator):
         self.last_ts = data_ts
 
         object_hypotheses: list[ObjectHypothesis] = cas.filter_annotations_by_type(
-            ObjectHypothesis
+            type_to_include=ObjectHypothesis
         )
         if len(object_hypotheses) == 0:
             logger.debug(
@@ -123,7 +123,7 @@ class ByteTrackAnnotator(BaseAnnotator):
         classifications: list[Classification] = []
         for object_hypothesis in object_hypotheses:
             classification = cas.filter_by_type(
-                Classification, object_hypothesis.annotations
+                type_to_include=Classification, input_list=object_hypothesis.annotations
             )
             if len(classification) == 0:
                 break
@@ -149,18 +149,18 @@ class ByteTrackAnnotator(BaseAnnotator):
         detections = sv.Detections(**detections)
         tracked_detections = self.tracker.update(detections)
 
-        self.visualize(tracked_detections)
+        self.visualize(tracked_detections=tracked_detections)
 
         return Status.SUCCESS
 
-    def visualize(self, tracked_detections: sv.Detections) -> None:
+    def visualize(self, *, tracked_detections: sv.Detections) -> None:
         """
         Visualize the tracked detections and set the resulting image in the annotator output struct.
 
         :param tracked_detections: The tracked detections to visualize.
         """
         vis_image: npt.NDArray[np.uint8] = copy.deepcopy(
-            self.get_cas().get(CASViews.COLOR_IMAGE)
+            self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         )
 
         if (
@@ -184,4 +184,4 @@ class ByteTrackAnnotator(BaseAnnotator):
                 scene=vis_image, detections=tracked_detections, labels=labels
             )
 
-        self.get_annotator_output_struct().set_image(vis_image)
+        self.get_annotator_output_struct().set_image(img=vis_image)

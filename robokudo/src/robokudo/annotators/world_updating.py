@@ -68,7 +68,9 @@ class WorldUpdatingAnnotator(BaseAnnotator):
                 )
             beliefs = [
                 belief
-                for hypothesis in cas.filter_annotations_by_type(ObjectHypothesis)
+                for hypothesis in cas.filter_annotations_by_type(
+                    type_to_include=ObjectHypothesis
+                )
                 if (
                     belief := PerceptionBelief.from_hypothesis(
                         hypothesis=hypothesis,

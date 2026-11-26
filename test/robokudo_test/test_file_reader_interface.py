@@ -1,3 +1,7 @@
+"""
+Tests of replaying a recording directory with the file reader camera interface.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -31,7 +35,7 @@ def file_reader(tmp_path: Path) -> FileReaderInterface:
         assert cv2.imwrite(
             str(image_path), np.full((2, 2, 3), timestamp, dtype=np.uint8)
         )
-    return FileReaderInterface(configuration)
+    return FileReaderInterface(camera_config=configuration)
 
 
 def test_reads_frames_in_file_order(file_reader: FileReaderInterface) -> None:
@@ -64,7 +68,7 @@ def test_empty_directory_has_no_frames(tmp_path: Path, loop: bool) -> None:
     An empty recording stays exhausted even when looping is enabled.
     """
     reader = FileReaderInterface(
-        FileReaderCameraConfig(target_dir=str(tmp_path), loop=loop)
+        camera_config=FileReaderCameraConfig(target_dir=str(tmp_path), loop=loop)
     )
     assert reader.has_new_data() is False
     assert reader.get_next_data() is None
@@ -81,7 +85,7 @@ def test_rejects_unknown_view_suffix(tmp_path: Path) -> None:
     (tmp_path / f"{configuration.filename_prefix}0_unknown_view.png").touch()
 
     with pytest.raises(InvalidFileSource):
-        FileReaderInterface(configuration)
+        FileReaderInterface(camera_config=configuration)
 
 
 def test_recording_keys_are_views(file_reader: FileReaderInterface) -> None:

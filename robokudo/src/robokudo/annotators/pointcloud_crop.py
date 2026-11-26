@@ -128,8 +128,8 @@ class PointcloudCropAnnotator(BaseAnnotator):
         start_timer = default_timer()
         logger.warning(f"{self.__class__.__name__} called for update()")
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
-        self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
+        self.color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
         color_to_depth_ratio = self.get_cas().color_to_depth_ratio
 
@@ -156,8 +156,8 @@ class PointcloudCropAnnotator(BaseAnnotator):
                 self.get_cas(), cropped_cloud
             )
 
-        self.get_cas().set_ref(CASViews.CLOUD, cropped_cloud)
-        self.get_annotator_output_struct().set_geometries(cropped_cloud)
+        self.get_cas().set_ref(view_name=CASViews.CLOUD, value=cropped_cloud)
+        self.get_annotator_output_struct().set_geometries(geometries=cropped_cloud)
 
         mask_scale = 1.0 / color_to_depth_ratio.horizontal
         mask = get_mask_from_pointcloud(
@@ -168,7 +168,7 @@ class PointcloudCropAnnotator(BaseAnnotator):
             crop_to_ref=True,
         )
         combined_mask_color = cv2.addWeighted(self.color, 0.5, mask, 0.5, 0)
-        self.get_annotator_output_struct().set_image(combined_mask_color)
+        self.get_annotator_output_struct().set_image(img=combined_mask_color)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
