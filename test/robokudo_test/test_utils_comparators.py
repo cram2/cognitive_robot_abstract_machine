@@ -1,3 +1,7 @@
+"""
+Tests of the comparators that match query values against object hypotheses.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -32,6 +36,9 @@ if TYPE_CHECKING:
 
 
 class TestUtilsComparators(object):
+    """
+    Tests of the similarity each comparator computes.
+    """
 
     @pytest.mark.parametrize(
         ["query_value", "obj_value", "expected_similarity"],
@@ -106,9 +113,9 @@ class TestUtilsComparators(object):
         expected_similarity: float,
     ):
         comparator = TranslationComparator(weight=1.0, max_distance=1.0)
-        assert comparator.compute_similarity(query_value, obj_value) == pytest.approx(
-            expected_similarity
-        )
+        assert comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        ) == pytest.approx(expected_similarity)
 
     @pytest.fixture
     def bounding_box_from_tuple(
@@ -143,7 +150,9 @@ class TestUtilsComparators(object):
         obj_bbox = bounding_box_from_tuple(obj_value)
         comparator = BboxComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_bbox, obj_bbox)
+        similarity = comparator.compute_similarity(
+            query_value=query_bbox, obj_value=obj_bbox
+        )
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
 
@@ -164,7 +173,9 @@ class TestUtilsComparators(object):
     ):
         comparator = SizeComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_value, obj_value)
+        similarity = comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        )
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
 
@@ -212,7 +223,9 @@ class TestUtilsComparators(object):
         obj_color_hist = ColorHistogram()
         obj_color_hist.hist = obj_hist.astype(np.float32)
 
-        similarity = comparator.compute_similarity(query_color_hist, obj_color_hist)
+        similarity = comparator.compute_similarity(
+            query_value=query_color_hist, obj_value=obj_color_hist
+        )
 
         assert isinstance(similarity, float)
         assert similarity == expected_similarity
@@ -243,7 +256,9 @@ class TestUtilsComparators(object):
         obj_color.color = obj_value[0]
         obj_color.ratio = obj_value[1]
 
-        similarity = comparator.compute_similarity(query_color, obj_color)
+        similarity = comparator.compute_similarity(
+            query_value=query_color, obj_value=obj_color
+        )
 
         assert isinstance(similarity, float)
         assert similarity == expected_similarity
@@ -268,7 +283,9 @@ class TestUtilsComparators(object):
     ):
         comparator = AdditionalDataComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_value, obj_value)
+        similarity = comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        )
 
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
@@ -301,7 +318,9 @@ class TestUtilsComparators(object):
 
         comparator = RoiComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_rect, obj_rect)
+        similarity = comparator.compute_similarity(
+            query_value=query_rect, obj_value=obj_rect
+        )
 
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
@@ -339,7 +358,9 @@ class TestUtilsComparators(object):
     ):
         comparator = MaskComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_value, obj_value)
+        similarity = comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        )
 
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
@@ -399,7 +420,9 @@ class TestUtilsComparators(object):
     ):
         comparator = ClassificationComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_value, obj_value)
+        similarity = comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        )
 
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
@@ -479,7 +502,9 @@ class TestUtilsComparators(object):
     def test_image_roi_comparator(self, query_value, obj_value, expected_similarity):
         comparator = ImageROIComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_value, obj_value)
+        similarity = comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        )
 
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
@@ -499,7 +524,9 @@ class TestUtilsComparators(object):
     def test_orientation_comparator(self, query_value, obj_value, expected_similarity):
         comparator = OrientationComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_value, obj_value)
+        similarity = comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        )
 
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)
@@ -545,7 +572,9 @@ class TestUtilsComparators(object):
     def test_pose_comparator(self, query_value, obj_value, expected_similarity):
         comparator = PoseComparator(weight=1.0)
 
-        similarity = comparator.compute_similarity(query_value, obj_value)
+        similarity = comparator.compute_similarity(
+            query_value=query_value, obj_value=obj_value
+        )
 
         assert isinstance(similarity, float)
         assert similarity == pytest.approx(expected_similarity)

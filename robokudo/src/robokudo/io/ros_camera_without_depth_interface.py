@@ -100,6 +100,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
     def rotate_camera_intrinsics(
         self,
+        *,
         intrinsic_matrix: npt.NDArray,
         image_size: tuple[int, int],
         rotation: ImageRotation = ImageRotation.COUNTERCLOCKWISE_90,
@@ -160,7 +161,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
     @staticmethod
     def rotate_camera_distortion(
-        coefficients: Sequence[float], distortion_model: str, rotation: ImageRotation
+        *, coefficients: Sequence[float], distortion_model: str, rotation: ImageRotation
     ) -> tuple[float, ...]:
         """
         Express lens distortion in the rotated image-axis convention.
@@ -205,6 +206,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
 
     def rotate_image_and_intrinsics(
         self,
+        *,
         image: npt.NDArray,
         intrinsic_matrix: npt.NDArray,
         rotation: ImageRotation = ImageRotation.COUNTERCLOCKWISE_90,
@@ -229,7 +231,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
             raise UnsupportedImageRotation(rotation=rotation)
 
         rotated_intrinsics, new_size = self.rotate_camera_intrinsics(
-            intrinsic_matrix, (width, height), rotation
+            intrinsic_matrix=intrinsic_matrix,
+            image_size=(width, height),
+            rotation=rotation,
         )
         return rotated_image, rotated_intrinsics, new_size
 
@@ -272,7 +276,7 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
         """
         rotated_image, rotated_intrinsics, (width, height) = (
             self.rotate_image_and_intrinsics(
-                color_image,
+                image=color_image,
                 intrinsic_matrix=np.array(camera_info.k).reshape(3, 3),
                 rotation=rotation,
             )
@@ -307,9 +311,9 @@ class ROSCameraWithoutDepthInterface(ROSCameraInterface):
                     rotation=self.camera_config.rotate_image,
                 )
 
-            cas.set(CASViews.COLOR_IMAGE, color_image)
-            cas.set(CASViews.DEPTH_IMAGE, None)
-            cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+            cas.set(view_name=CASViews.COLOR_IMAGE, value=color_image)
+            cas.set(view_name=CASViews.DEPTH_IMAGE, value=None)
+            cas.set(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ColorToDepthRatio())
             self.store_latest_frame_observation(cas=cas, world=world)
 
             self._has_new_data = False

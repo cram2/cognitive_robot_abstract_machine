@@ -54,7 +54,7 @@ def test_interface_publishes_aligned_body_color_rgbd_frame() -> None:
     interface.set_data(cas=cas, world=world)
 
     assert cas.color_image.shape[:2] == cas.depth_image.shape
-    assert cas.get(CASViews.OBJECT_IMAGE).shape == cas.depth_image.shape
+    assert cas.get(view_name=CASViews.OBJECT_IMAGE).shape == cas.depth_image.shape
     assert not any(isinstance(view, CameraInfo) for view in cas.views.values())
     context = interface.context_resolver.resolve(perception_world=world)
     assert cas.ground_truth_world_ref is context.world
@@ -165,7 +165,7 @@ def test_interface_publishes_shared_rendered_frame(monkeypatch: MonkeyPatch) -> 
         cas.depth_image, frame.depth_in_millimeters.swapaxes(0, 1)
     )
     np.testing.assert_array_equal(
-        cas.get(CASViews.OBJECT_IMAGE), frame.segmentation.swapaxes(0, 1)
+        cas.get(view_name=CASViews.OBJECT_IMAGE), frame.segmentation.swapaxes(0, 1)
     )
-    assert cas.get(CASViews.BODY_COLORS) == frame.body_colors
+    assert cas.get(view_name=CASViews.BODY_COLORS) == frame.body_colors
     assert cas.camera_observation.effective_camera_model is frame.camera_model

@@ -23,7 +23,7 @@ from robokudo.types.cv import Points3D, ImageROI
 from robokudo.types.tf import Pose
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FaceAnnotation(ImageROI, Points3D, Pose):
     """Face detection result combining 2D, 3D and pose information.
 
@@ -40,7 +40,7 @@ class FaceAnnotation(ImageROI, Points3D, Pose):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MimicAnnotation(Annotation):
     """Facial expression or mimic detection result.
 
@@ -53,7 +53,7 @@ class MimicAnnotation(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AttributeAnnotation(Annotation):
     """Generic human attribute annotation.
 
@@ -71,7 +71,7 @@ class AttributeAnnotation(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActivityAnnotation(Annotation):
     """Human activity detection result.
 
@@ -96,7 +96,7 @@ class ActivityAnnotation(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyKeypoint:
     """
     The position of one body part, such as the nose or the left knee, in an image.
@@ -118,7 +118,7 @@ class BodyKeypoint:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyKeypointCloud:
     """
     The depth measurements around a body keypoint.
@@ -151,7 +151,7 @@ class KeypointKind(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeypointAnnotation(Annotation):
     """
     The body keypoints of one human, indexed by

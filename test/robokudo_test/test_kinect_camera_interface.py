@@ -64,12 +64,16 @@ def receive_a_frame(
     :param acquisition_time: When the frame was taken; the start of time if None.
     """
     bridge = CVBridgeWorkaround()
-    color_image = bridge.cv2_to_imgmsg(np.zeros((4, 4, 3), dtype=np.uint8), "bgr8")
+    color_image = bridge.cv2_to_imgmsg(
+        cv_image=np.zeros((4, 4, 3), dtype=np.uint8), encoding="bgr8"
+    )
     if acquisition_time is not None:
         color_image.header.stamp = acquisition_time
     camera_interface.callback(
         color_image,
-        bridge.cv2_to_imgmsg(np.zeros((4, 4), dtype=np.float32), "32FC1"),
+        bridge.cv2_to_imgmsg(
+            cv_image=np.zeros((4, 4), dtype=np.float32), encoding="32FC1"
+        ),
         CameraInfo(width=4, height=4, k=[1.0, 0.0, 2.0, 0.0, 1.0, 2.0, 0.0, 0.0, 1.0]),
     )
 
@@ -126,7 +130,9 @@ class TestUndecodableFrame:
         bridge = CVBridgeWorkaround()
         with pytest.raises(CameraDataMissing):
             camera_interface.callback(
-                bridge.cv2_to_imgmsg(np.zeros((4, 4, 3), dtype=np.uint8), "bgr8"),
+                bridge.cv2_to_imgmsg(
+                    cv_image=np.zeros((4, 4, 3), dtype=np.uint8), encoding="bgr8"
+                ),
                 None,
                 CameraInfo(width=4, height=4),
             )

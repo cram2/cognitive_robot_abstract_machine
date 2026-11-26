@@ -16,7 +16,7 @@ from robokudo.descriptors.camera_configs.components import (
 from robokudo.types.cv import ColorToDepthRatio
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class FileReaderCameraConfig(BaseCameraConfig, StaticCameraTransformComponent):
     """
     Configuration class for file-based camera data playback.

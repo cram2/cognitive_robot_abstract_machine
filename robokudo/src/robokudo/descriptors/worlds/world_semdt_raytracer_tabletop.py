@@ -1,10 +1,10 @@
 """
-World descriptor of a tabletop scene for camera simulation with the SemDT ray tracer.
+World descriptor ``world_semdt_raytracer_tabletop``: a table with boxes, a cup and a
+milk carton, rendered by the semantic digital twin ray tracer.
 """
 
-from __future__ import annotations
-
 # %% Imports
+from __future__ import annotations
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
     CameraRange,
@@ -38,7 +38,8 @@ class WorldDescriptor(BaseWorldDescriptor):
 
     def __init__(self) -> None:
         """
-        Adds the table, the objects on it and the camera to the world.
+        Place the table, its surface region, a red and a blue box, a cup and a milk
+        carton on it and the camera optical frame in the world.
         """
         super().__init__()
         root = self.world.root
@@ -99,7 +100,7 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
         ]
 
-        self.build_objects(root, object_specs)
+        self.build_objects(root=root, specs=object_specs)
 
         cup_color = Color.from_rgba(red=0.18, green=0.78, blue=0.28, opacity=1.0)
         milk_color = Color.from_rgba(red=0.95, green=0.85, blue=0.10, opacity=1.0)
@@ -162,11 +163,11 @@ class WorldDescriptor(BaseWorldDescriptor):
                 reference_frame=root,
             )
 
-        self.build_regions(root, region_specs)
+        self.build_regions(root=root, specs=region_specs)
         camera_name = PrefixedName(name="semdt_camera_optical_frame")
         self.build_camera(
-            root,
-            CameraPlacement(
+            parent=root,
+            placement=CameraPlacement(
                 camera=Camera(
                     name=camera_name,
                     root=Body(name=camera_name),

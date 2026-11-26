@@ -50,9 +50,12 @@ def stereo_frame(node: Node) -> RectifiedDepthFrame:
     Provide aligned images whose raw and rectified intrinsics differ.
     """
     bridge = CVBridgeWorkaround()
-    color = bridge.cv2_to_imgmsg(np.zeros((2, 3, 4), dtype=np.uint8), "bgra8")
+    color = bridge.cv2_to_imgmsg(
+        cv_image=np.zeros((2, 3, 4), dtype=np.uint8), encoding="bgra8"
+    )
     depth = bridge.cv2_to_imgmsg(
-        np.array([[1.5, np.nan, np.inf], [0, -1, 20]], dtype=np.float32), "32FC1"
+        cv_image=np.array([[1.5, np.nan, np.inf], [0, -1, 20]], dtype=np.float32),
+        encoding="32FC1",
     )
     calibration = CameraInfo(width=3, height=2)
     calibration.k = [200.0, 0.0, 1.0, 0.0, 200.0, 1.0, 0.0, 0.0, 1.0]
@@ -82,9 +85,9 @@ def test_rectified_depth_uses_projection_and_millimeters(
     cas = CAS()
     assert interface.set_data(cas=cas, world=World()) is True
     np.testing.assert_array_equal(
-        cas.get(CASViews.DEPTH_IMAGE), [[1500, 0, 0], [0, 0, 0]]
+        cas.get(view_name=CASViews.DEPTH_IMAGE), [[1500, 0, 0], [0, 0, 0]]
     )
-    assert cas.get(CASViews.COLOR_IMAGE).shape == (2, 3, 3)
+    assert cas.get(view_name=CASViews.COLOR_IMAGE).shape == (2, 3, 3)
     assert cas.camera_observation.effective_camera_model.focal_length_x == original.p[0]
     assert stereo_frame.calibration == original
     assert interface.has_new_data() is False
@@ -109,14 +112,15 @@ def test_rectified_depth_preprocessor_preserves_metric_pointcloud(
     interface.receive_frame(stereo_frame.images, stereo_frame.calibration)
     assert interface.set_data(cas=pipeline.cas, world=pipeline.world) is True
     pipeline.cas.set(
-        CASViews.DEPTH_IMAGE,
-        pipeline.cas.get(CASViews.DEPTH_IMAGE).astype(depth_dtype),
+        view_name=CASViews.DEPTH_IMAGE,
+        value=pipeline.cas.get(view_name=CASViews.DEPTH_IMAGE).astype(depth_dtype),
     )
 
     assert preprocessor.update() is Status.SUCCESS
 
     np.testing.assert_allclose(
-        np.asarray(pipeline.cas.get(CASViews.CLOUD).points), [[-0.015, -0.015, 1.5]]
+        np.asarray(pipeline.cas.get(view_name=CASViews.CLOUD).points),
+        [[-0.015, -0.015, 1.5]],
     )
 
 
@@ -273,7 +277,7 @@ def test_stereo_sources_share_interface(
     All source presets select the same backend-independent acquisition code.
     """
     descriptor = CollectionReaderDescriptorFactory.create_descriptor(
-        configuration_type.registry_name, lookup_viewpoint=False
+        camera=configuration_type.registry_name, lookup_viewpoint=False
     )
     assert type(descriptor.parameters.camera_interface) is RectifiedDepthCameraInterface
     assert type(descriptor.parameters.camera_config) is configuration_type

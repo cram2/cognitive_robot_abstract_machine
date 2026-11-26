@@ -35,8 +35,12 @@ from ._perception_world import camera_interface
 # %% Camera behavior
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CustomDataclassView:
+    """
+    A dataclass stored as an extra CAS view.
+    """
+
     label: str
     confidence: float
 
@@ -58,26 +62,32 @@ def storage_instance():
 
 @pytest.fixture()
 def cas_data():
+    """
+    :return: A CAS holding a random color image and a random depth image.
+    """
     cas = CAS()
-    """
-    Mock CAS data for testing.
-    """
-    cas.set(CASViews.COLOR_IMAGE, np.random.rand(100, 100, 3))
-    cas.set(CASViews.DEPTH_IMAGE, np.random.rand(100, 100))
+    cas.set(view_name=CASViews.COLOR_IMAGE, value=np.random.rand(100, 100, 3))
+    cas.set(view_name=CASViews.DEPTH_IMAGE, value=np.random.rand(100, 100))
 
     return cas
 
 
 def store_cas_in_storage(storage_instance, cas_data):
-    flat_cas = storage_instance.generate_dict_from_real_cas(cas_data)
+    """
+    Store *cas_data* the way the storage writer does: first each view, then the CAS
+    document that points to them.
+
+    :return: The result of storing the CAS document.
+    """
+    flat_cas = storage_instance.generate_dict_from_real_cas(cas=cas_data)
     flat_cas["view_ids"] = {}
 
     # step 1: persist each view
-    storage_instance.store_views_in_mongo(flat_cas)
+    storage_instance.store_views_in_mongo(cas_dict=flat_cas)
 
     # step 2: persist cas and pointers to each view
     del flat_cas["views"]
-    return storage_instance.store_cas_dict(flat_cas)
+    return storage_instance.store_cas_dict(cas_dict=flat_cas)
 
 
 def create_point_cloud():
@@ -114,7 +124,7 @@ class TestStorage:
     A CAS stored through :class:`Storage` is loaded back unchanged.
     """
 
-    def test_drop_database(self, storage_instance):
+    def test_drop_database(self, *, storage_instance):
         db_name = storage_instance.db_name
         storage_instance.drop_database()
 
@@ -128,18 +138,18 @@ class TestStorage:
         client = pymongo.MongoClient(host=mongo_host, port=mongo_port)
         assert db_name not in client.list_database_names()
 
-    def test_store_and_retrieve_cas(self, storage_instance, cas_data):
+    def test_store_and_retrieve_cas(self, *, storage_instance, cas_data):
         result = store_cas_in_storage(storage_instance, cas_data)
         # Generate a dict from the CAS and store it
-        flat_cas = storage_instance.generate_dict_from_real_cas(cas_data)
+        flat_cas = storage_instance.generate_dict_from_real_cas(cas=cas_data)
         flat_cas["view_ids"] = {}
 
         # step 1: persist each view
-        storage_instance.store_views_in_mongo(flat_cas)
+        storage_instance.store_views_in_mongo(cas_dict=flat_cas)
 
         # step 2: persist cas and pointers to each view
         del flat_cas["views"]
-        result = storage_instance.store_cas_dict(flat_cas)
+        result = storage_instance.store_cas_dict(cas_dict=flat_cas)
 
         assert result.acknowledged
 
@@ -171,15 +181,15 @@ class TestStorage:
 
         result = store_cas_in_storage(storage_instance, cas_data)
 
-        flat_cas = storage_instance.generate_dict_from_real_cas(cas_data)
+        flat_cas = storage_instance.generate_dict_from_real_cas(cas=cas_data)
         flat_cas["view_ids"] = {}
 
         # step 1: persist each view
-        storage_instance.store_views_in_mongo(flat_cas)
+        storage_instance.store_views_in_mongo(cas_dict=flat_cas)
 
         # step 2: persist cas and pointers to each view
         del flat_cas["views"]
-        result = storage_instance.store_cas_dict(flat_cas)
+        result = storage_instance.store_cas_dict(cas_dict=flat_cas)
 
         assert result.acknowledged
 
@@ -199,7 +209,7 @@ class TestStorage:
 
         # Bring flat CAS representation into the proper CAS class
         for view_name, view_content in retrieved_cas_record["views"].items():
-            retrieved_cas.set(view_name, view_content)
+            retrieved_cas.set(view_name=view_name, value=view_content)
 
         storage_instance.load_annotations_from_mongo_in_cas(
             cas_document=retrieved_cas_record, cas=retrieved_cas, world=World()
@@ -207,10 +217,12 @@ class TestStorage:
 
         # Compare the most important views: COLOR and DEPTH Image
         assert np.array_equal(
-            cas_data.get(CASViews.COLOR_IMAGE), retrieved_cas.get(CASViews.COLOR_IMAGE)
+            cas_data.get(view_name=CASViews.COLOR_IMAGE),
+            retrieved_cas.get(view_name=CASViews.COLOR_IMAGE),
         )
         assert np.array_equal(
-            cas_data.get(CASViews.DEPTH_IMAGE), retrieved_cas.get(CASViews.DEPTH_IMAGE)
+            cas_data.get(view_name=CASViews.DEPTH_IMAGE),
+            retrieved_cas.get(view_name=CASViews.DEPTH_IMAGE),
         )
 
         assert len(retrieved_cas.annotations) == 1
@@ -230,7 +242,9 @@ class TestStorage:
             np.asarray(test_pcd.points), np.asarray(retrieved_oh.points.points)
         )
 
-    def test_annotations_are_serialized_with_krrood(self, storage_instance, cas_data):
+    def test_annotations_are_serialized_with_krrood(
+        self, *, storage_instance, cas_data
+    ):
         oh = ObjectHypothesis()
         oh.source = "test_storage"
         oh.id = 1
@@ -253,10 +267,14 @@ class TestStorage:
         """
         Views of types the CAS does not declare are loaded back with their values.
         """
-        cas_data.set("custom_json", {"labels": ["cup", "plate"], "valid": True})
-        cas_data.set("custom_tuple", (1.2, 3.4))
-        cas_data.set("custom_numpy", np.array([[1, 2], [3, 4]], dtype=np.int16))
-        cas_data.set("custom_cloud", create_point_cloud())
+        cas_data.set(
+            view_name="custom_json", value={"labels": ["cup", "plate"], "valid": True}
+        )
+        cas_data.set(view_name="custom_tuple", value=(1.2, 3.4))
+        cas_data.set(
+            view_name="custom_numpy", value=np.array([[1, 2], [3, 4]], dtype=np.int16)
+        )
+        cas_data.set(view_name="custom_cloud", value=create_point_cloud())
         cas_data.pointcloud_camera_model = create_camera_model()
 
         result = store_cas_in_storage(storage_instance, cas_data)
@@ -299,7 +317,8 @@ class TestStorage:
         dataclass.
         """
         cas_data.set(
-            "custom_dataclass", CustomDataclassView(label="cup", confidence=0.9)
+            view_name="custom_dataclass",
+            value=CustomDataclassView(label="cup", confidence=0.9),
         )
 
         result = store_cas_in_storage(storage_instance, cas_data)
@@ -325,12 +344,12 @@ class TestStorage:
             pass
 
         cas = CAS()
-        cas.set(CASViews.COLOR_IMAGE, np.random.rand(10, 10, 3))
-        cas.set(CASViews.DEPTH_IMAGE, np.random.rand(10, 10))
-        cas.set("custom_unsupported", UnsupportedView())
+        cas.set(view_name=CASViews.COLOR_IMAGE, value=np.random.rand(10, 10, 3))
+        cas.set(view_name=CASViews.DEPTH_IMAGE, value=np.random.rand(10, 10))
+        cas.set(view_name="custom_unsupported", value=UnsupportedView())
 
         with pytest.raises(TypeError):
-            Storage.generate_dict_from_real_cas(cas)
+            Storage.generate_dict_from_real_cas(cas=cas)
 
     def test_camera_observation_roundtrip_preserves_current_frame_state(
         self, *, storage_instance: Storage, cas_data: CAS
@@ -388,7 +407,9 @@ class TestStorage:
         assert retrieved_cas_record is not None
         retrieved_cas_record["views"] = {}
         replay_world = World()
-        RecordedCameraWorld(observation).install(replay_world)
+        RecordedCameraWorld(observation=observation).install(
+            reasoning_world=replay_world
+        )
         storage_instance.load_views_from_mongo_in_cas(
             cas_document=retrieved_cas_record, world=replay_world
         )

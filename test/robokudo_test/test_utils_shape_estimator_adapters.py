@@ -1,3 +1,9 @@
+"""
+Tests of the shape estimator adapters.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 
 from robokudo.utils.shape_estimator_adapters import (
@@ -12,6 +18,10 @@ from robokudo.utils.shape_fitting import CuboidFit, CylinderFit, SphereFit
 
 
 class TestUtilsShapeEstimatorAdapters:
+    """
+    Tests of the summaries the shape fit adapters give.
+    """
+
     def test_sphere_summary_returns_dataclass_with_compact_text(self) -> None:
         fit = SphereFit(
             center=np.zeros(3, dtype=np.float64),
@@ -22,7 +32,7 @@ class TestUtilsShapeEstimatorAdapters:
             score=0.98765,
         )
 
-        summary = SPHERE_FIT_ADAPTER.summary(fit)
+        summary = SPHERE_FIT_ADAPTER.summary(fit_result=fit)
 
         assert isinstance(summary, SphereFitSummary)
         assert summary.radius == 0.12345
@@ -43,7 +53,7 @@ class TestUtilsShapeEstimatorAdapters:
             score=0.98765,
         )
 
-        summary = CYLINDER_FIT_ADAPTER.summary(fit)
+        summary = CYLINDER_FIT_ADAPTER.summary(fit_result=fit)
 
         assert isinstance(summary, CylinderFitSummary)
         assert summary.height == 1.23456
@@ -63,7 +73,7 @@ class TestUtilsShapeEstimatorAdapters:
             score=0.98765,
         )
 
-        summary = CUBOID_FIT_ADAPTER.summary(fit)
+        summary = CUBOID_FIT_ADAPTER.summary(fit_result=fit)
 
         assert isinstance(summary, CuboidFitSummary)
         assert summary.extents == [0.123, 1.235, 2.346]

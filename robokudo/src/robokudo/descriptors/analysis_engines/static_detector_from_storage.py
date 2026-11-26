@@ -75,7 +75,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for static object detection
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         sod = StaticObjectDetectorAnnotator.Descriptor()
         sod.parameters.bounding_box_x = 40

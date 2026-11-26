@@ -68,10 +68,10 @@ class ROIAdjusterAnnotator(BaseAnnotator):
         :return: SUCCESS after adjusting all ROIs
         """
         start_timer = default_timer()
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
 
         object_hypotheses = self.get_cas().filter_annotations_by_type(
-            self.descriptor.parameters.analysis_scope
+            type_to_include=self.descriptor.parameters.analysis_scope
         )
         for object_hypothesis in object_hypotheses:
             adjust_image_roi(

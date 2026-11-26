@@ -1,5 +1,6 @@
 """
-World descriptor of the IAI kitchen with a cereal box and a milk carton near the kitchen island.
+World descriptor ``world_iai_kitchen20``: a cereal box and a milk carton on the kitchen
+island of the IAI kitchen.
 """
 
 from __future__ import annotations
@@ -14,12 +15,13 @@ from semantic_digital_twin.world_description.geometry import Scale
 
 class WorldDescriptor(BaseWorldDescriptor):
     """
-    The IAI kitchen with a cereal box and a milk carton and the kitchen island as region.
+    A cereal box and a milk carton on the kitchen island region of the IAI kitchen.
     """
 
     def __init__(self) -> None:
         """
-        Adds the objects and the region to the world.
+        Place the cereal box, the milk carton and the kitchen island region in the
+        world.
         """
         super().__init__()
         root = self.world.root
@@ -59,5 +61,5 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
         ]
 
-        self.build_objects(root, object_specs)
-        self.build_regions(root, region_specs)
+        self.build_objects(root=root, specs=object_specs)
+        self.build_regions(root=root, specs=region_specs)

@@ -57,10 +57,12 @@ class ObjectPoseVisualizer(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        visualization_img = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        visualization_img = self.get_cas().get_copy(view_name=CASViews.COLOR_IMAGE)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
 
-        object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+        object_hypotheses = self.get_cas().filter_annotations_by_type(
+            type_to_include=ObjectHypothesis
+        )
 
         geometries_to_visualize = []
         object_id = 0
@@ -82,13 +84,13 @@ class ObjectPoseVisualizer(BaseAnnotator):
 
             object_id += 1
 
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         vis_geometries = [
             {"name": "Cloud", "geometry": cloud},
         ]
         vis_geometries.extend(geometries_to_visualize)
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

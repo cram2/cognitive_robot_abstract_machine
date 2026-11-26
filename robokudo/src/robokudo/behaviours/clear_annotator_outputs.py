@@ -16,7 +16,7 @@ from robokudo.pipeline import Pipeline
 logger = logging.getLogger(__name__)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ClearAnnotatorOutputs(Behaviour):
     """
     Clears the annotator outputs of the nearest pipeline it is part of.

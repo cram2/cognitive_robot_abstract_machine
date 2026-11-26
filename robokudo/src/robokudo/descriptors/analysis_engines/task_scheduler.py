@@ -33,7 +33,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a pipeline which can schedule different perception tasks in a basic way.
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         # Annotator definition
         collection_reader = CollectionReaderAnnotator(descriptor=kinect_config)
