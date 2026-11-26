@@ -23,6 +23,7 @@ from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.vis.visualizer import Visualizer
+from krrood.patterns.called_positionally import called_positionally
 
 
 class CVVisualizer(Visualizer, Visualizer.Observer):
@@ -47,7 +48,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
         Initialize the OpenCV visualizer.
         """
         super().__init__(*args, **kwargs)
-        self.shared_visualizer_state.register_observer(self)
+        self.shared_visualizer_state.register_observer(observer=self)
 
     def tick(self) -> None:
         """
@@ -111,6 +112,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             cv2.setMouseCallback(window_title, self.mouse_callback_cv)
             cv2.imshow(window_title, img_with_annotator_text)
 
+    @called_positionally
     def mouse_callback_cv(
         self, event: int, x: int, y: int, flags: int, param: Any
     ) -> None:
@@ -130,7 +132,9 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
 
         vis_state: Visualizer.SharedState = self.shared_visualizer_state
         active_annotator_instance: BaseAnnotator = vis_state.active_annotator
-        active_annotator_instance.mouse_callback(event, x, y, flags, param)
+        active_annotator_instance.mouse_callback(
+            event=event, x=x, y=y, flags=flags, param=param
+        )
 
     def window_title(self) -> str:
         """
@@ -140,8 +144,8 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
 
     def notify(
         self,
+        *,
         observable: Visualizer.Observable,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
         """
@@ -175,7 +179,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             return
 
         # Key Callback returns false when execution should be stopped.
-        if not cv_visualizer_for_key.handle_keycallback(key):
+        if not cv_visualizer_for_key.handle_keycallback(key=key):
             cv_visualizer_for_key.indicate_termination_var = True
 
     @staticmethod
@@ -210,7 +214,7 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
 
         return None
 
-    def handle_keycallback(self, key: int) -> bool:
+    def handle_keycallback(self, *, key: int) -> bool:
         """
         Handle a key-press that happened in the corresponding GUI of this GUIHandler.
 
@@ -262,5 +266,5 @@ class CVVisualizer(Visualizer, Visualizer.Observer):
             blackboard.set("pipeline_trigger", True)
 
         # all other keys can be handled by the annotator
-        active_annotator_instance.key_callback(key)
+        active_annotator_instance.key_callback(key=key)
         return True

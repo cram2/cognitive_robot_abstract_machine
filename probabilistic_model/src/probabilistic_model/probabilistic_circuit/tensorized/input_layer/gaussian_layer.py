@@ -15,7 +15,7 @@ from random_events.variable import Variable
 from krrood.patterns.classproperty import classproperty
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
-from typing_extensions import Self
+from typing_extensions import TYPE_CHECKING, Self
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,

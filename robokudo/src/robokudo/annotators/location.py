@@ -88,6 +88,7 @@ class LocationAnnotator(ThreadedAnnotator):
 
     def add_location_in_object_hypotheses(
         self,
+        *,
         region: Region,
         world_to_camera_transform_matrix: npt.NDArray,
         object_hypotheses: Iterable[ObjectHypothesis],
@@ -149,21 +150,23 @@ class LocationAnnotator(ThreadedAnnotator):
         world_to_camera_transform_matrix = get_world_to_camera_transform_matrix(
             self.get_cas()
         )
-        object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+        object_hypotheses = self.get_cas().filter_annotations_by_type(
+            type_to_include=ObjectHypothesis
+        )
 
         for region_name, region in active_regions.items():
             if len(self.descriptor.parameters.desired_regions) == 0:
                 self.add_location_in_object_hypotheses(
-                    region,
-                    world_to_camera_transform_matrix,
-                    object_hypotheses,
+                    region=region,
+                    world_to_camera_transform_matrix=world_to_camera_transform_matrix,
+                    object_hypotheses=object_hypotheses,
                 )
 
             elif region_name in self.descriptor.parameters.desired_regions:
                 self.add_location_in_object_hypotheses(
-                    region,
-                    world_to_camera_transform_matrix,
-                    object_hypotheses,
+                    region=region,
+                    world_to_camera_transform_matrix=world_to_camera_transform_matrix,
+                    object_hypotheses=object_hypotheses,
                 )
 
         end_timer = default_timer()

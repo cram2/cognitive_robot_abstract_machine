@@ -1,3 +1,7 @@
+"""
+Annotator that extracts SIFT features with OpenCV.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -49,7 +53,7 @@ class SIFTAnnotator(ThreadedAnnotator):
         cas = self.get_cas()
 
         object_hypotheses: list[ObjectHypothesis] = cas.filter_annotations_by_type(
-            ObjectHypothesis
+            type_to_include=ObjectHypothesis
         )
         if len(object_hypotheses) == 0:
             return Status.FAILURE
@@ -57,8 +61,8 @@ class SIFTAnnotator(ThreadedAnnotator):
         color_to_depth_ratio = cas.color_to_depth_ratio
         camera_model = cas.require_camera_observation().effective_camera_model
 
-        color_image = cas.get_copy(CASViews.COLOR_IMAGE)
-        depth_image = cas.get_copy(CASViews.DEPTH_IMAGE)
+        color_image = cas.get_copy(view_name=CASViews.COLOR_IMAGE)
+        depth_image = cas.get_copy(view_name=CASViews.DEPTH_IMAGE)
         grey_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
 
         visualization_image = color_image.copy()
@@ -99,20 +103,24 @@ class SIFTAnnotator(ThreadedAnnotator):
             all_keypoints.extend(keypoints)
 
             visualization_image = self._draw_visualization(
-                color_image,
-                visualization_image,
-                keypoints,
+                color_image=color_image,
+                visualization_image=visualization_image,
+                current_keypoints=keypoints,
             )
 
         point_cloud = self._keypoints_to_point_cloud(
-            all_keypoints, depth_image, camera_model, color_to_depth_ratio
+            keypoints=all_keypoints,
+            depth_image=depth_image,
+            intrinsics=camera_model,
+            color_to_depth_ratio=color_to_depth_ratio,
         )
-        self.get_annotator_output_struct().set_image(visualization_image)
-        self.get_annotator_output_struct().set_geometries(point_cloud)
+        self.get_annotator_output_struct().set_image(img=visualization_image)
+        self.get_annotator_output_struct().set_geometries(geometries=point_cloud)
         return Status.SUCCESS
 
     def _draw_visualization(
         self,
+        *,
         color_image: numpy_types.NDArray[numpy.uint8],
         visualization_image: numpy_types.NDArray[numpy.uint8],
         current_keypoints: Sequence[cv2.KeyPoint],
@@ -135,6 +143,7 @@ class SIFTAnnotator(ThreadedAnnotator):
 
     def _keypoints_to_point_cloud(
         self,
+        *,
         keypoints: list[cv2.KeyPoint],
         depth_image: numpy_types.NDArray,
         intrinsics: PinholeCameraModel,
@@ -183,7 +192,9 @@ class SIFTAnnotator(ThreadedAnnotator):
             spatial_points.append([position_x, position_y, depth])
             responses.append(keypoint.response)
 
-        colors = self._keypoint_colors(keypoints, numpy.array(responses))
+        colors = self._keypoint_colors(
+            keypoints=keypoints, responses=numpy.array(responses)
+        )
 
         point_cloud = open3d.geometry.PointCloud()
         point_cloud.points = open3d.utility.Vector3dVector(
@@ -194,6 +205,7 @@ class SIFTAnnotator(ThreadedAnnotator):
 
     @staticmethod
     def _keypoint_colors(
+        *,
         keypoints: list[cv2.KeyPoint],
         responses: numpy_types.NDArray,
     ) -> numpy_types.NDArray[numpy.float64]:

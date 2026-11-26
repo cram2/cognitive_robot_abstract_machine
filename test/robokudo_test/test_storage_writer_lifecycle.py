@@ -1,3 +1,9 @@
+"""
+Tests of when the storage writer resets its database.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import robokudo.annotators.storage as storage_module
@@ -6,14 +12,16 @@ from robokudo.annotators.storage import StorageWriter
 # %% storage preparation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StorageResetRecorder:
     """
     Record database resets requested by a storage writer.
     """
 
     database_name: str
-    """Name of the database associated with the recorder."""
+    """
+    Name of the database associated with the recorder.
+    """
 
     reset_count: int = 0
     """

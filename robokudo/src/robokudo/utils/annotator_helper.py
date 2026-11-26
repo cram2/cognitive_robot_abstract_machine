@@ -219,7 +219,9 @@ def scale_camera_intrinsics(annotator: BaseAnnotator) -> None:
         scale_x=color_to_depth_ratio.horizontal,
         scale_y=color_to_depth_ratio.vertical,
     )
-    annotator.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(camera_model)
+    annotator.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
+        camera_model=camera_model
+    )
 
 
 def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
@@ -237,7 +239,7 @@ def get_color_image(annotator: BaseAnnotator) -> npt.NDArray:
     :param annotator: Annotator to get image from
     :return: The resized color image.
     """
-    img = annotator.get_cas().get_copy(CASViews.COLOR_IMAGE)
+    img = annotator.get_cas().get_copy(view_name=CASViews.COLOR_IMAGE)
     resized_color = None
 
     if annotator.descriptor.parameters.global_with_depth:

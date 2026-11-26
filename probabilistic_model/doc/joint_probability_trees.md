@@ -104,8 +104,8 @@ fig.show()
 Next, we have to overload the c45 method of the JPT class to see the learning progress.
 
 ```{code-cell} ipython3
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree as JPT
+from probabilistic_model.learning.structure.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree as JPT
 
 class TutorialJPT(JPT):
     

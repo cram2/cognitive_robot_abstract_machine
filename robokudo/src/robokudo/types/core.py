@@ -14,7 +14,7 @@ The module defines:
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Type:
     """Base class for all Robokudo types.
 
@@ -25,7 +25,7 @@ class Type:
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Identifiable(Type):
     """Mixin class for types that need unique identification.
 
@@ -38,7 +38,7 @@ class Identifiable(Type):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Nameable(Type):
     """Mixin class for types that need a name.
 
@@ -51,7 +51,7 @@ class Nameable(Type):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Query(Type):
     """Type representing a query in the system.
 
@@ -64,7 +64,7 @@ class Query(Type):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Annotation(Type):
     """Base class for all annotations.
 
@@ -77,7 +77,7 @@ class Annotation(Type):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class IdentifiableAnnotation(Annotation, Identifiable):
     """Annotation type with unique identification.
 

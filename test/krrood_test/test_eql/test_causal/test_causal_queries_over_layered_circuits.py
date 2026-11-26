@@ -19,7 +19,7 @@ from krrood.parametrization.causal_search import ScoredIntervention
 from krrood.entity_query_language.query.match import Match
 from krrood.parametrization.model_registries import RelationalCircuitRegistry
 from krrood.parametrization.parameterizer import UnderspecifiedParameters
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LayeredLearning
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,

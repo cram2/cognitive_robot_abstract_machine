@@ -1,3 +1,9 @@
+"""
+Camera configuration of a Kinect on a robot, registered as ``kinect``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 from typing_extensions import ClassVar
@@ -12,7 +18,7 @@ from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraCon
 from robokudo.types.cv import ColorToDepthRatio
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class KinectCameraConfig(
     BaseCameraConfig,
     RGBDComponent,

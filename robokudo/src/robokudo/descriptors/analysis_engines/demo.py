@@ -84,7 +84,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             and slow processing simulation, which can be useful for debugging.
         """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "kinect_wo_tf"
+            camera="kinect_wo_tf"
         )
 
         seq = Pipeline("RWPipeline")

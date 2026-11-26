@@ -122,7 +122,7 @@ def rewritten(
     executor = executor_for(
         [*extensions, PlanRewriting(transformations=list(plan_transformations))]
     )
-    executor.prepare(statechart_of(executor, plan))
+    executor.prepare(statechart=statechart_of(executor, plan))
     return plan
 
 
@@ -138,7 +138,7 @@ def prepared_plan_nodes(
     executor = simulated_executor(
         [*extensions, PlanRewriting(transformations=list(plan_transformations))]
     )
-    executor.prepare(statechart_of(executor, plan))
+    executor.prepare(statechart=statechart_of(executor, plan))
     return executor.plan_nodes
 
 
@@ -192,7 +192,7 @@ def joint_goal_of(torso_move: MoveTorsoAction) -> JointPositionList:
 # %% transformations under test
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGrippersBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
     """
     Puts two distinguishable gripper goals in front of the goal a torso move expands
@@ -203,20 +203,20 @@ class MoveGrippersBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
-    def anchor(self, plan_node: MoveTorsoAction) -> StatechartNode:
+    def anchor(self, *, plan_node: MoveTorsoAction) -> StatechartNode:
         return joint_goal_of(plan_node)
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [
             gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN),
             gripper_goal(plan_node.robot.right_arm.end_effector, GripperState.CLOSE),
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGrippersAfterTorsoMotion(MoveGrippersBeforeTorsoMotion):
     """
     Puts the same gripper goals behind that goal instead.
@@ -227,7 +227,7 @@ class MoveGrippersAfterTorsoMotion(MoveGrippersBeforeTorsoMotion):
         return InsertionPosition.AFTER
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
     """
     Puts an action, which expands in turn, in front of the goal a torso move expands
@@ -238,17 +238,17 @@ class ParkArmsBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
-    def anchor(self, plan_node: MoveTorsoAction) -> StatechartNode:
+    def anchor(self, *, plan_node: MoveTorsoAction) -> StatechartNode:
         return joint_goal_of(plan_node)
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [ParkArmsAction(arms=plan_node.robot.all_arms)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGripperLastInTheReachBody(SequentialInsertion[ReachAction]):
     """
     Puts a gripper goal at the end of the sequence a reach expands into.
@@ -258,13 +258,13 @@ class MoveGripperLastInTheReachBody(SequentialInsertion[ReachAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.AFTER
 
-    def is_applicable(self, plan_node: ReachAction) -> bool:
+    def is_applicable(self, *, plan_node: ReachAction) -> bool:
         return True
 
-    def anchor(self, plan_node: ReachAction) -> StatechartNode:
+    def anchor(self, *, plan_node: ReachAction) -> StatechartNode:
         return plan_node.nodes[-1]
 
-    def nodes_to_insert(self, plan_node: ReachAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: ReachAction) -> list[StatechartNode]:
         return [
             gripper_goal(plan_node.robot.right_arm.end_effector, GripperState.CLOSE)
         ]
@@ -292,27 +292,27 @@ def detect_actions_of(plan: StatechartNode) -> list[DetectAction]:
 # %% what makes a transformation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutRewrite(PlanTransformation[MoveTorsoAction]):
     """
     Says which nodes it applies to without saying how to rewrite the plan around them.
     """
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutApplicability(PlanTransformation[MoveTorsoAction]):
     """
     Rewrites the plan without saying whether the case at hand needs it.
     """
 
-    def apply(self, plan_node: MoveTorsoAction) -> None:
+    def apply(self, *, plan_node: MoveTorsoAction) -> None:
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGripperBeforeEveryAction(SequentialInsertion[Action]):
     """
     Puts a gripper goal in front of every action, whatever its type.
@@ -322,54 +322,54 @@ class MoveGripperBeforeEveryAction(SequentialInsertion[Action]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: Action) -> bool:
+    def is_applicable(self, *, plan_node: Action) -> bool:
         return True
 
-    def anchor(self, plan_node: Action) -> StatechartNode:
+    def anchor(self, *, plan_node: Action) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: Action) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: Action) -> list[StatechartNode]:
         return [
             gripper_goal(plan_node.robot.right_arm.end_effector, GripperState.CLOSE)
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutPosition(SequentialInsertion[MoveTorsoAction]):
     """
     Inserts nodes without saying where they go.
     """
 
-    def anchor(self, plan_node: MoveTorsoAction) -> StatechartNode:
+    def anchor(self, *, plan_node: MoveTorsoAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutMatchedType(PlanTransformation):
     """
     Rewrites nothing and binds no type, to be asked what it matches.
     """
 
-    def is_applicable(self, plan_node: StatechartNode) -> bool:
+    def is_applicable(self, *, plan_node: StatechartNode) -> bool:
         return True
 
-    def apply(self, plan_node: StatechartNode) -> None:
+    def apply(self, *, plan_node: StatechartNode) -> None:
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationOnAnUnmatchableType(PlanTransformation[GraspCandidate]):
     """
     Binds a type that is no statechart node.
     """
 
-    def is_applicable(self, plan_node: StatechartNode) -> bool:
+    def is_applicable(self, *, plan_node: StatechartNode) -> bool:
         return True
 
-    def apply(self, plan_node: StatechartNode) -> None:
+    def apply(self, *, plan_node: StatechartNode) -> None:
         pass
 
 
@@ -389,7 +389,7 @@ def test_a_transformation_bound_to_an_unmatchable_type_is_rejected() -> None:
     """
     with pytest.raises(CannotMatchOnType):
         TransformationOnAnUnmatchableType().matches_node(
-            MoveTorsoAction(torso_state=TorsoState.HIGH)
+            plan_node=MoveTorsoAction(torso_state=TorsoState.HIGH)
         )
 
 
@@ -420,7 +420,7 @@ def test_a_transformation_that_says_no_position_cannot_be_built():
         TransformationWithoutPosition()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGripperBeforeHighTorso(SequentialInsertion[MoveTorsoAction]):
     """
     Puts a gripper goal in front of a torso move, but only when the torso goes up.
@@ -430,13 +430,13 @@ class MoveGripperBeforeHighTorso(SequentialInsertion[MoveTorsoAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return plan_node.torso_state is TorsoState.HIGH
 
-    def anchor(self, plan_node: MoveTorsoAction) -> StatechartNode:
+    def anchor(self, *, plan_node: MoveTorsoAction) -> StatechartNode:
         return joint_goal_of(plan_node)
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
@@ -511,8 +511,8 @@ def test_a_transformation_bound_to_an_action_type_selects_the_actions_of_it(
     parking = ParkArmsAction(arms=view.all_arms)
 
     assert transformation.matched_type is MoveTorsoAction
-    assert transformation.matches_node(torso)
-    assert not transformation.matches_node(parking)
+    assert transformation.matches_node(plan_node=torso)
+    assert not transformation.matches_node(plan_node=parking)
 
 
 def test_a_transformation_bound_to_the_base_type_selects_every_action(
@@ -527,8 +527,8 @@ def test_a_transformation_bound_to_the_base_type_selects_every_action(
     torso = MoveTorsoAction(torso_state=TorsoState.HIGH)
 
     assert transformation.matched_type is Action
-    assert transformation.matches_node(torso)
-    assert not transformation.matches_node(Sequence(nodes=[torso]))
+    assert transformation.matches_node(plan_node=torso)
+    assert not transformation.matches_node(plan_node=Sequence(nodes=[torso]))
 
 
 # %% inserting
@@ -708,7 +708,7 @@ def test_a_reach_not_yet_expanded_has_no_final_approach(pr2_apartment_context):
     milk = world.get_semantic_annotations_by_type(Milk)[0]
 
     with pytest.raises(ReachHasNoFinalApproach):
-        DetectBeforeGrasp().final_approach(reach_action(milk, view))
+        DetectBeforeGrasp().final_approach(plan_node=reach_action(milk, view))
 
 
 def test_a_reach_does_not_perceive_without_the_transformation(
@@ -818,8 +818,8 @@ def test_the_drawer_is_only_opened_for_an_object_that_lies_in_one(
     in_the_open = pick_up_action(milk, view.right_arm)
     rewritten(Sequence(nodes=[in_a_drawer, in_the_open]), extensions)
 
-    assert transformation.is_applicable(in_a_drawer)
-    assert not transformation.is_applicable(in_the_open)
+    assert transformation.is_applicable(plan_node=in_a_drawer)
+    assert not transformation.is_applicable(plan_node=in_the_open)
 
 
 def test_a_drawer_reports_how_far_it_stands_open(pr2_apartment_context):
@@ -853,13 +853,13 @@ def test_a_drawer_that_already_stands_open_needs_no_opening(pr2_apartment_contex
 
     pick_up = pick_up_action(spoon, view.right_arm)
     rewritten(Sequence(nodes=[pick_up]), extensions)
-    assert transformation.is_applicable(pick_up)
+    assert transformation.is_applicable(plan_node=pick_up)
 
     connection = drawer.root.parent_connection
     connection.position = connection.dof.limits.upper.position
     world.notify_state_change()
 
-    assert not transformation.is_applicable(pick_up)
+    assert not transformation.is_applicable(plan_node=pick_up)
 
 
 def test_opening_a_drawer_tries_its_standing_pose_with_the_opening(
@@ -873,7 +873,9 @@ def test_opening_a_drawer_tries_its_standing_pose_with_the_opening(
     drawer = drawer_holding(world.get_semantic_annotations_by_type(Spoon)[0], world)
 
     [opening] = OpenDrawerBeforeMoveAndPickUp().opening_nodes(
-        drawer, view.right_arm, simulated_executor(extensions).context
+        drawer=drawer,
+        arm=view.right_arm,
+        context=simulated_executor(extensions).context,
     )
 
     assert is_grounding(opening, MoveAndOpenAction)
@@ -889,7 +891,9 @@ def test_opening_a_drawer_stands_where_it_is_opened_from(pr2_apartment_context):
     drawer = drawer_holding(world.get_semantic_annotations_by_type(Spoon)[0], world)
 
     [opening] = OpenDrawerBeforeMoveAndPickUp().opening_nodes(
-        drawer, view.right_arm, simulated_executor(extensions).context
+        drawer=drawer,
+        arm=view.right_arm,
+        context=simulated_executor(extensions).context,
     )
     standing_positions = (
         opening.statement._kwargs_["navigate"]._kwargs_["planar_goal_pose"]._domain_
@@ -909,7 +913,9 @@ def test_opening_a_drawer_faces_the_handle_where_it_is_when_it_opens_it(
     world, view, extensions = pr2_apartment_context
     drawer = drawer_holding(world.get_semantic_annotations_by_type(Spoon)[0], world)
     [opening] = OpenDrawerBeforeMoveAndPickUp().opening_nodes(
-        drawer, view.right_arm, simulated_executor(extensions).context
+        drawer=drawer,
+        arm=view.right_arm,
+        context=simulated_executor(extensions).context,
     )
 
     drawer.root.parent_connection.position = OPENED_DRAWER_POSITION
@@ -1193,7 +1199,7 @@ def test_the_drawer_is_opened_once_in_front_of_a_move_and_pick_up_still_to_be_gr
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
     move_and_pick_up = MoveAndPickUpAction.from_graspable_by_closest_grasps(
-        spoon, view.right_arm, context_of(extensions)
+        graspable=spoon, arm=view.right_arm, context=context_of(extensions)
     )
     plan = rewritten(
         Sequence(nodes=[StatementNode(statement=move_and_pick_up)]),
@@ -1222,10 +1228,10 @@ def test_the_drawer_is_opened_in_front_of_a_transports_pick_up_before_it_is_grou
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
 
     transport = TransportAction.from_graspable_by_closest_grasps(
-        spoon,
-        Pose(reference_frame=world.root),
-        view.right_arm,
-        context_of(extensions),
+        graspable=spoon,
+        goal_pose=Pose(reference_frame=world.root),
+        arm=view.right_arm,
+        context=context_of(extensions),
     )
     plan = rewritten(Sequence(nodes=[transport]), extensions, plan_transformations)
 
@@ -1302,10 +1308,10 @@ def test_a_transport_of_an_object_in_no_drawer_is_left_alone(pr2_apartment_conte
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     transport = TransportAction.from_graspable_by_closest_grasps(
-        milk,
-        Pose(reference_frame=world.root),
-        view.right_arm,
-        context_of(extensions),
+        graspable=milk,
+        goal_pose=Pose(reference_frame=world.root),
+        arm=view.right_arm,
+        context=context_of(extensions),
     )
 
     plan = rewritten(Sequence(nodes=[transport]), extensions, plan_transformations)
@@ -1360,7 +1366,7 @@ def test_the_arms_are_parked_around_every_step_of_a_pick_and_place(
 # %% inserting where no fitting control structure node runs the anchor
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveLeftGripperAfterTorso(SequentialInsertion[MoveTorsoAction]):
     """
     Puts a left gripper goal behind a torso move.
@@ -1370,39 +1376,39 @@ class MoveLeftGripperAfterTorso(SequentialInsertion[MoveTorsoAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.AFTER
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
-    def anchor(self, plan_node: MoveTorsoAction) -> StatechartNode:
+    def anchor(self, *, plan_node: MoveTorsoAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsAfterTorso(MoveLeftGripperAfterTorso):
     """
     Puts an action behind a torso move instead.
     """
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [ParkArmsAction(arms=plan_node.robot.all_arms)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveLeftGripperAlongsideTorso(ParallelInsertion[MoveTorsoAction]):
     """
     Moves the left gripper while the torso moves.
     """
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
-    def anchor(self, plan_node: MoveTorsoAction) -> StatechartNode:
+    def anchor(self, *, plan_node: MoveTorsoAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
@@ -1491,7 +1497,7 @@ def test_a_node_inserted_alongside_one_running_in_parallel_joins_that_parallel(
 # %% transformations that collide on one node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveLeftGripperBeforeTorso(SequentialInsertion[MoveTorsoAction]):
     """
     Puts a left gripper goal in front of a torso move.
@@ -1501,23 +1507,23 @@ class MoveLeftGripperBeforeTorso(SequentialInsertion[MoveTorsoAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
-    def anchor(self, plan_node: MoveTorsoAction) -> StatechartNode:
+    def anchor(self, *, plan_node: MoveTorsoAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveRightGripperBeforeTorso(MoveLeftGripperBeforeTorso):
     """
     Puts a right gripper goal there instead.
     """
 
-    def nodes_to_insert(self, plan_node: MoveTorsoAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MoveTorsoAction) -> list[StatechartNode]:
         return [
             gripper_goal(plan_node.robot.right_arm.end_effector, GripperState.CLOSE)
         ]

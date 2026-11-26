@@ -1,6 +1,5 @@
 """
-Turns ProcTHOR bodies that follow ProcTHOR's naming convention into drawer, door and
-dresser annotations with their handles and parts.
+Building the drawers, doors and dressers of ProcTHOR houses from their bodies.
 """
 
 from __future__ import annotations
@@ -9,8 +8,9 @@ import re
 
 import numpy as np
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
@@ -24,7 +24,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
     Door,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
@@ -99,7 +102,11 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
             world_root_T_self=world_T_handle,
         )
         door.add(part=handle)
-    door.mount_on_movable_joint(RevoluteConnectionSpecification(axis=Vector3.Z()))
+    door.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        )
+    )
 
     return door
 

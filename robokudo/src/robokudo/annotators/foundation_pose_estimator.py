@@ -54,7 +54,7 @@ class EnginePrecision(StrEnum):
 # %% FoundationPose estimator
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FoundationPoseEstimator(MeshBasedPoseEstimator):
     """
     FoundationPose with its refine and score networks running as TensorRT engines.
@@ -103,24 +103,26 @@ class FoundationPoseEstimator(MeshBasedPoseEstimator):
             max_depth=self.usable_depth_range.maximum_distance,
         )
 
-    def load_meshes(self, mesh_files: list[Path]) -> None:
+    def load_meshes(self, *, mesh_files: list[Path]) -> None:
         """
         Like :meth:`MeshBasedPoseEstimator.load_meshes`, and also run a first estimate and
         track, since the first TensorRT inferences are slow.
         """
         for mesh_file in mesh_files:
-            self.select_mesh(mesh_file)
+            self.select_mesh(mesh_file=mesh_file)
         if not mesh_files:
             return
         warm_up_object_observation = self.warm_up_object_observation
-        pose = self.estimate_pose(warm_up_object_observation)
+        pose = self.estimate_pose(object_observation=warm_up_object_observation)
         if pose is not None:
-            self.track_pose(warm_up_object_observation, pose)
+            self.track_pose(
+                object_observation=warm_up_object_observation, previous_pose=pose
+            )
 
-    def select_mesh(self, mesh_file: Path) -> None:
+    def select_mesh(self, *, mesh_file: Path) -> None:
         self.foundation_pose.set_mesh(mesh_file_path=str(mesh_file))
 
-    def estimate_pose(self, object_observation: ObjectObservation) -> Pose | None:
+    def estimate_pose(self, *, object_observation: ObjectObservation) -> Pose | None:
         frame = object_observation.frame
         result = self.foundation_pose.estimate(
             rgb=frame.color_image,
@@ -134,7 +136,7 @@ class FoundationPoseEstimator(MeshBasedPoseEstimator):
         return HomogeneousTransformationMatrix(data=pose_matrix).pose
 
     def track_pose(
-        self, object_observation: ObjectObservation, previous_pose: Pose
+        self, *, object_observation: ObjectObservation, previous_pose: Pose
     ) -> Pose:
         frame = object_observation.frame
         pose_matrix, _, _ = self.foundation_pose.track(

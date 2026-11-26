@@ -5,6 +5,8 @@ step allocates, and the batch size that fits.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -13,15 +15,22 @@ from array_api_compat import array_namespace
 
 from krrood_compute_resources.memory import HostMemory
 
-from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
-from probabilistic_model.learning.exceptions import (
+from probabilistic_model.learning.parameters.step_memory import (
+    ProbeMeasurement,
+    StepMemory,
+)
+from probabilistic_model.learning.parameters.exceptions import (
     NotEnoughMemoryError,
     UnmeasurableHostStepMemoryError,
     UnmeasurableStepMemoryError,
 )
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
-from probabilistic_model.learning.training_schedule import MiniBatches
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 
 from ...krrood_compute_resources_test.dataset.memory import FixedFreeMemory
 # %% memory of a step
@@ -90,7 +99,9 @@ def test_a_jax_circuit_on_the_cpu_is_trained_in_host_memory(mixture_of_products_
         circuit = mixture_of_products_case.circuit(np).to_namespace(
             jnp, device=jax.devices("cpu")[0]
         )
-        trainer = JaxGradientDescent(circuit.root, AverageNegativeLogLikelihood())
+        trainer = JaxGradientDescent(
+            layer=circuit.root, loss=AverageNegativeLogLikelihood()
+        )
 
     assert isinstance(trainer.device_memory(), HostMemory)
 
@@ -105,10 +116,78 @@ def test_a_compiled_jax_step_needs_memory_for_every_row(mixture_of_products_case
     with jax.enable_x64(True):
         circuit = case.circuit(np).to_namespace(jnp)
         step_memory = JaxGradientDescent(
-            circuit.root, AverageNegativeLogLikelihood()
+            layer=circuit.root, loss=AverageNegativeLogLikelihood()
         ).step_memory(jnp.asarray(data))
 
     assert step_memory.bytes_per_row > 0
+
+
+@dataclass(kw_only=True)
+class StepBytesGivenPerBatchSize(JaxGradientDescent):
+    """
+    A jax trainer whose steps report given bytes per batch size instead of compiling,
+    recording the batch sizes it was probed on.
+    """
+
+    step_bytes_by_rows: dict[int, int]
+    """
+    The bytes a step on each number of rows reports.
+    """
+
+    probed_rows: list[int] = field(default_factory=list)
+    """
+    The number of rows of every batch probed, in order.
+    """
+
+    def probe_step_bytes(self, *, batch: tuple[jax.Array, ...]) -> int:
+        rows = batch[0].shape[0]
+        self.probed_rows.append(rows)
+        return self.step_bytes_by_rows[rows]
+
+
+def test_memory_that_shrinks_from_the_smallest_batches_is_probed_on_larger_ones(
+    mixture_of_products_case,
+):
+    """
+    When the step on twice the rows reports no more memory, the next probe doubles the
+    rows again, and the memory is the line through the first pair that grows.
+    """
+    step_bytes_by_rows = {64: 512728, 128: 462296, 256: 859608}
+    with jax.enable_x64(True):
+        circuit = mixture_of_products_case.circuit(np).to_namespace(jnp)
+        trainer = StepBytesGivenPerBatchSize(
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            step_bytes_by_rows=step_bytes_by_rows,
+        )
+        step_memory = trainer.step_memory(jnp.zeros((1000, 2)))
+
+    assert trainer.probed_rows == [64, 128, 256]
+    assert step_memory == StepMemory.from_two_probes(
+        smaller=ProbeMeasurement(rows=128, step_bytes=step_bytes_by_rows[128]),
+        larger=ProbeMeasurement(rows=256, step_bytes=step_bytes_by_rows[256]),
+    )
+
+
+def test_memory_that_never_grows_up_to_all_rows_is_unmeasurable(
+    mixture_of_products_case,
+):
+    """
+    A step that reports no more memory for more rows, however many rows there are, gives
+    no memory per row.
+    """
+    with jax.enable_x64(True):
+        circuit = mixture_of_products_case.circuit(np).to_namespace(jnp)
+        trainer = StepBytesGivenPerBatchSize(
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            step_bytes_by_rows={64: 500, 128: 500, 256: 400},
+        )
+
+        with pytest.raises(UnmeasurableStepMemoryError):
+            trainer.step_memory(jnp.zeros((300, 2)))
+
+    assert trainer.probed_rows == [64, 128, 256]
 
 
 @pytest.fixture
@@ -119,21 +198,24 @@ def torch_trainer(mixture_of_products_case, request):
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
+    )
+    torch_circuit_parameter_learning = pytest.importorskip(
+        "probabilistic_model.learning.parameters.torch_circuit_parameter_learning"
     )
     device = torch.device(request.param)
     if (
         device.type
-        == torch_gradient_descent.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+        == torch_circuit_parameter_learning.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+        and not torch.cuda.is_available()
     ):
-        if not torch.cuda.is_available():
-            pytest.skip("no CUDA device")
+        pytest.skip("no CUDA device")
     case = mixture_of_products_case
     np.random.seed(0)
     namespace = array_namespace(torch.zeros(0))
     circuit = case.circuit(np).to_namespace(namespace, device=device)
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood()
+        layer=circuit.root, loss=AverageNegativeLogLikelihood()
     )
     return trainer, namespace.asarray(case.circuit(np).sample(20000), device=device)
 

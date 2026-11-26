@@ -35,7 +35,7 @@ from ._yolo_mock import (
 # %% scene setup
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CupScene(BlackWallScene):
     """
     The black wall scene, in which the mock model detects a cup.
@@ -75,7 +75,9 @@ class CupScene(BlackWallScene):
         """
         :return: The corners (x1, y1, x2, y2) of the cup in color image pixels.
         """
-        return [int(corner) for corner in self.cup_box.corners_in(self.color_image())]
+        return [
+            int(corner) for corner in self.cup_box.corners_in(image=self.color_image())
+        ]
 
     def descriptor(self) -> YoloAnnotator.Descriptor:
         """
@@ -97,7 +99,9 @@ class CupScene(BlackWallScene):
         :return: An annotator whose CAS holds a color image and a matching depth image.
         """
         annotator = YoloAnnotator(descriptor=descriptor)
-        self.place_in_pipeline(annotator, color_to_depth_ratio)
+        self.place_in_pipeline(
+            annotator=annotator, color_to_depth_ratio=color_to_depth_ratio
+        )
         return annotator
 
     def cup_shaped_hypothesis(self) -> ObjectHypothesis:
@@ -147,7 +151,12 @@ def _depth_descriptor(scene: CupScene) -> YoloAnnotator.Descriptor:
 
 
 def _hypotheses(annotator: YoloAnnotator) -> list[ObjectHypothesis]:
-    return annotator.get_cas().filter_annotations_by_type(ObjectHypothesis)
+    """
+    :return: The object hypotheses the annotator put into its CAS.
+    """
+    return annotator.get_cas().filter_annotations_by_type(
+        type_to_include=ObjectHypothesis
+    )
 
 
 def _only_hypothesis(annotator: YoloAnnotator) -> ObjectHypothesis:
@@ -353,7 +362,7 @@ def _segmented_cup_mask(model_loader: MockModelLoader, scene: CupScene) -> np.nd
     """
     image = scene.color_image()
     segmentation = model_loader.segmentation_model.segment(
-        image, scene.cup_box.corners_in(image)
+        image=image, corners=scene.cup_box.corners_in(image=image)
     )
     x1, y1, x2, y2 = scene.cup_corners()
     return (segmentation[y1:y2, x1:x2] * YoloAnnotator.mask_foreground).astype(np.uint8)

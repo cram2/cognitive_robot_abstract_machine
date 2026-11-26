@@ -19,10 +19,12 @@ from probabilistic_model.causal_structure.learning import (
     PeterClarkStructureLearner,
     RelationalCausalStructureLearner,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.learning_method import LearningMethod
-from probabilistic_model.learning.row_kernel_mixture import RowKernelMixture
+from probabilistic_model.learning.structure.row_kernel_mixture import RowKernelMixture
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
     MarginalDeterminismTreeNode,

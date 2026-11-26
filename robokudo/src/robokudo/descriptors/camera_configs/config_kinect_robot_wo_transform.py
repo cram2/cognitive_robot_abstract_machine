@@ -1,3 +1,10 @@
+"""
+Camera configuration of a Kinect on a robot without a TF pose lookup, registered as
+``kinect_wo_tf``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar
@@ -5,7 +12,7 @@ from typing_extensions import ClassVar
 from robokudo.descriptors.camera_configs.config_kinect_robot import KinectCameraConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class KinectWoTfCameraConfig(KinectCameraConfig):
     """
     Configuration class for a Kinect camera setup without transform lookup.

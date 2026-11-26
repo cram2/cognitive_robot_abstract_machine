@@ -1,5 +1,5 @@
 """
-Builds a world from a ProcTHOR house description: its rooms, walls, doors and objects.
+Reading ProcTHOR houses into worlds.
 """
 
 from __future__ import annotations
@@ -17,12 +17,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.adapters.procthor.exceptions import (
     ProcthorDoorWallNotFound,
     UnpairedProcthorWalls,
 )
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -252,7 +253,13 @@ class ProcthorDoor:
             )
             door.add(part=handle)
 
-        door.mount_on_movable_joint(RevoluteConnectionSpecification(axis=Vector3.Z()))
+        door.mount_on_movable_joint(
+            ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
+            )
+        )
         return door
 
     def add_to_world(self, *, world: World) -> Door | DoubleDoor:

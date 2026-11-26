@@ -28,8 +28,8 @@ def test_cluster_extractor_requires_pointcloud_camera_model(
     Both clustering paths report a missing point cloud projection model.
     """
     cas = CAS()
-    cas.set_ref(CASViews.CLOUD, open3d.geometry.PointCloud())
-    cas.set_ref(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+    cas.set_ref(view_name=CASViews.CLOUD, value=open3d.geometry.PointCloud())
+    cas.set_ref(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ColorToDepthRatio())
     extractor = extractor_type()
     monkeypatch.setattr(extractor, "get_cas", lambda: cas)
 

@@ -97,11 +97,11 @@ class ClusterPositionAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         centroids_to_visualize: list[open3d.geometry.TriangleMesh] = []
 
         object_hypotheses = self.get_cas().filter_annotations_by_type(
-            scene.ObjectHypothesis
+            type_to_include=scene.ObjectHypothesis
         )
 
         for object_hypothesis in object_hypotheses:
@@ -111,8 +111,8 @@ class ClusterPositionAnnotator(BaseAnnotator):
             if self.descriptor.parameters.analysis_scope == annotation.CloudAnnotation:
                 cloud_annotations: list[annotation.CloudAnnotation] = (
                     CAS.filter_by_type(
-                        annotation.CloudAnnotation,
-                        object_hypothesis.annotations,
+                        type_to_include=annotation.CloudAnnotation,
+                        input_list=object_hypothesis.annotations,
                     )
                 )
                 if len(cloud_annotations) == 0:
@@ -129,10 +129,12 @@ class ClusterPositionAnnotator(BaseAnnotator):
 
             centroid = cluster_cloud.get_center()
 
-            position = self.position_annotation_from_centroid(centroid)
+            position = self.position_annotation_from_centroid(centroid=centroid)
             object_hypothesis.annotations.append(position)
 
-            self.add_centroid_to_visualization(centroid, centroids_to_visualize)
+            self.add_centroid_to_visualization(
+                centroid=centroid, centroids_to_visualize=centroids_to_visualize
+            )
 
         # Visualization
         visualization_geometries = [
@@ -140,14 +142,16 @@ class ClusterPositionAnnotator(BaseAnnotator):
         ]
         visualization_geometries.extend(centroids_to_visualize)
 
-        self.get_annotator_output_struct().set_geometries(visualization_geometries)
+        self.get_annotator_output_struct().set_geometries(
+            geometries=visualization_geometries
+        )
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return Status.SUCCESS
 
     def position_annotation_from_centroid(
-        self, centroid: list[float]
+        self, *, centroid: list[float]
     ) -> annotation.PositionAnnotation:
         """
         Create position annotation from centroid.
@@ -162,6 +166,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
 
     def add_centroid_to_visualization(
         self,
+        *,
         centroid: list[float],
         centroids_to_visualize: list[open3d.geometry.TriangleMesh],
     ) -> None:

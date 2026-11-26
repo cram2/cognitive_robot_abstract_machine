@@ -103,7 +103,7 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
     }
 
     reader = RGBDFileReaderInterface(
-        FileReaderCameraConfig(
+        camera_config=FileReaderCameraConfig(
             target_dir=str(tmp_path),
             loop=False,
             color_to_depth_ratio=ColorToDepthRatio(),

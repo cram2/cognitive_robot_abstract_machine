@@ -70,7 +70,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             before running this pipeline, or it will not display anything.
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "mongo", db_name="store_with_annotations"
+            camera="mongo", db_name="store_with_annotations"
         )
 
         seq = Pipeline("StoragePipeline")

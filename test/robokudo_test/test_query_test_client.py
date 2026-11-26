@@ -1,3 +1,9 @@
+"""
+Tests of the query test client's action client.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field, is_dataclass
 from typing_extensions import Any
 
@@ -7,14 +13,16 @@ from rclpy.node import Node
 from robokudo.scripts import query_test_client
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeForActionClient:
     """
     Record the node associated with an action client.
     """
 
     node: Node
-    """Node supplied while constructing the action client."""
+    """
+    Node supplied while constructing the action client.
+    """
 
     action_type: Any
     """
@@ -22,7 +30,9 @@ class NodeForActionClient:
     """
 
     action_name: str
-    """Name through which the action is reached."""
+    """
+    Name through which the action is reached.
+    """
 
     destroyed: bool = field(init=False, default=False)
     """
@@ -35,7 +45,7 @@ class NodeForActionClient:
         """
         self.destroyed = True
 
-    def wait_for_server(self, timeout_sec: float) -> bool:
+    def wait_for_server(self, *, timeout_sec: float) -> bool:
         """
         Report that no action server is available.
 
@@ -45,7 +55,7 @@ class NodeForActionClient:
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedReadiness:
     """
     Record whether client readiness was reported.

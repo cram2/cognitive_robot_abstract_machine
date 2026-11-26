@@ -1,8 +1,13 @@
+"""
+Exceptions of the adapters that read worlds from files and export them to simulators.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from semantic_digital_twin.exceptions import ParsingError
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import ParsingError, UsageError
 
 
 @dataclass
@@ -54,3 +59,27 @@ class UnexpectedArrayShape(ParsingError):
 
     def suggest_correction(self) -> str:
         return f"Pass {self.array_name} with shape {self.expected_shape}."
+
+
+@dataclass(kw_only=True)
+class ScrewJointUnsupportedByMujocoError(UsageError):
+    """
+    Raised when a connection that rotates and translates at once is exported to MuJoCo,
+    which has hinge and slide joints but no helical joint.
+    """
+
+    connection_name: PrefixedName
+    """
+    The name of the helical connection that was exported.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"MuJoCo has no joint for the helical connection '{self.connection_name}'."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "export only connections whose screw axis behaves like a revolute or "
+            "prismatic connection."
+        )

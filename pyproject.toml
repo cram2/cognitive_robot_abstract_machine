@@ -192,4 +192,6 @@ exclude = [
     '^test/cognitive_robot_abstract_machine_test/dataset/orm_interface_imports/',
     # the ripple down rules expert answers, left unchecked for now
     '^test/krrood_test/test_ripple_down_rules/test_expert_answers/',
+    # the tests, left unchecked
+    '^test/',
 ]

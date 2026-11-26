@@ -21,7 +21,7 @@ from semantic_digital_twin.robots.robotiq_85_gripper import (
 # %% driving grippers through their parallel gripper command servers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveRobotiqGrippersThroughTheirActionServers(
     ConfigurationTransformation[OperatesGripper]
 ):
@@ -34,11 +34,11 @@ class DriveRobotiqGrippersThroughTheirActionServers(
     DAiSy, are left as they are.
     """
 
-    def is_applicable(self, plan_node: OperatesGripper) -> bool:
+    def is_applicable(self, *, plan_node: OperatesGripper) -> bool:
         return any(
             isinstance(end_effector, HasParallelGripperCommandServer)
             for end_effector in plan_node.robot.all_end_effectors
         )
 
-    def apply(self, plan_node: OperatesGripper) -> None:
+    def apply(self, *, plan_node: OperatesGripper) -> None:
         plan_node.gripper_goal_type = RobotiqGripperActionServerTask

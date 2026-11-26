@@ -5,9 +5,7 @@ Actions that move the robot's own body: its torso, grippers, fingers and arms.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 
-from typing_extensions import Any
 
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -191,11 +189,13 @@ class FollowToolCenterPointPathAction(
 
     def create_steps(self) -> list[StatechartNode]:
         waypoints = Sequence(
-            nodes=[self._waypoint_goal(pose) for pose in self.target_locations.poses]
+            nodes=[
+                self._waypoint_goal(target=pose) for pose in self.target_locations.poses
+            ]
         )
         return [waypoints, *self.keep_base_still()]
 
-    def _waypoint_goal(self, target: Pose) -> CartesianPose:
+    def _waypoint_goal(self, *, target: Pose) -> CartesianPose:
         """
         :param target: The waypoint the tool center point passes through.
         :return: The task reaching that waypoint.
@@ -208,13 +208,6 @@ class FollowToolCenterPointPathAction(
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
         )
-
-    def validate(
-        self,
-        result: Any | None = None,
-        max_wait_time: timedelta = timedelta(seconds=2),
-    ):
-        pass
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

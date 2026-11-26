@@ -36,9 +36,9 @@ def test_shared_encoding_preserves_ros_image(
     ROS messages and converted arrays retain the selected encoding and pixels.
     """
     bridge = CVBridgeWorkaround()
-    message = bridge.cv2_to_imgmsg(image, encoding=encoding)
+    message = bridge.cv2_to_imgmsg(cv_image=image, encoding=encoding)
 
     assert message.encoding == encoding.value
     np.testing.assert_array_equal(
-        bridge.imgmsg_to_cv2(message, desired_encoding=encoding), image
+        bridge.imgmsg_to_cv2(img_msg=message, desired_encoding=encoding), image
     )
