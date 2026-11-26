@@ -6,18 +6,20 @@ in, shared by every process of the run.
 from __future__ import annotations
 
 # %% imports
+import json
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
-from krrood.entity_query_language.factories import an, entity, the, variable
+from krrood.adapters.json_serializer import from_json, to_json
+from krrood.entity_query_language.factories import an, entity, variable
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.ormatic.utils import create_engine
 from sqlalchemy.orm import sessionmaker
 from typing_extensions import Any
 
-from experiments.circuit_learning.records import BenchmarkRun, RunRecord, TrainedCircuit
+from experiments.circuit_learning.records import BenchmarkRun, RunRecord
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
@@ -82,25 +84,44 @@ class BenchmarkDatabase:
                 for dao in sorted(records, key=lambda dao: dao.database_id)
             ]
 
-    def trained_circuit(self, *, run: BenchmarkRun) -> LayeredProbabilisticCircuit:
+
+# %% trained circuits
+
+
+@dataclass(kw_only=True)
+class TrainedCircuitFiles:
+    """
+    The circuits training runs learned, one JSON file per run, kept for the runs that
+    measure their queries.
+    """
+
+    directory: Path
+    """
+    The directory of the files.
+    """
+
+    def path(self, *, training_run: BenchmarkRun) -> Path:
         """
-        :param run: A training run that finished.
+        :param training_run: A training run.
+        :return: The file of the circuit it learned.
+        """
+        return self.directory / f"{training_run.key}.json"
+
+    def write(
+        self, *, training_run: BenchmarkRun, circuit: LayeredProbabilisticCircuit
+    ) -> None:
+        """
+        :param training_run: The training run that learned the circuit.
+        :param circuit: The learned circuit, with host parameters.
+        """
+        self.directory.mkdir(parents=True, exist_ok=True)
+        with self.path(training_run=training_run).open("w") as file:
+            json.dump(to_json(circuit), file)
+
+    def read(self, *, training_run: BenchmarkRun) -> LayeredProbabilisticCircuit:
+        """
+        :param training_run: A training run that finished.
         :return: The circuit it learned.
         """
-        trained = variable(TrainedCircuit, domain=None)
-        query = the(
-            entity(trained).where(
-                trained.training_run.kind == run.kind,
-                trained.training_run.dataset == run.dataset,
-                trained.training_run.method == run.method,
-                trained.training_run.setting.array_library == run.setting.array_library,
-                trained.training_run.setting.device == run.setting.device,
-                trained.training_run.setting.floating_point_type
-                == run.setting.floating_point_type,
-                trained.training_run.setting.edge_representation
-                == run.setting.edge_representation,
-            )
-        )
-        with self.session_maker() as session:
-            [dao] = eql_to_sql(query, session).evaluate()
-            return dao.from_dao().circuit
+        with self.path(training_run=training_run).open() as file:
+            return from_json(json.load(file))
