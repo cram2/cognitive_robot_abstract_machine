@@ -15,7 +15,7 @@ import sqlalchemy
 from sqlalchemy import Select
 from sqlalchemy.orm import Session, lazyload
 from sqlalchemy.sql.base import ExecutableOption
-from typing_extensions import Any, Iterator, Sequence
+from typing_extensions import Any, Iterable, Iterator, Sequence, get_origin
 
 from krrood.entity_query_language.core.base_expressions import HasExpression
 from krrood.entity_query_language.query.query import Entity
@@ -79,7 +79,8 @@ class SelectedObjectRestriction(StrEnum):
     SELECTION_JOIN = "selection_join"
     """
     It joins the query's selection, which the database evaluates again for it. Use it
-    when the selection is cheap and selects very many objects.
+    when the selection is cheap and selects very many objects. A query with a limit
+    binds the ids instead, since evaluating it again may select other objects.
     """
 
 
@@ -180,20 +181,26 @@ class ResultLoading:
     """
 
     @classmethod
-    def from_query(cls, *, query: HasExpression) -> ResultLoading:
+    def from_query(
+        cls,
+        *,
+        query: HasExpression,
+        relationship_loading: RelationshipLoading = RelationshipLoading.ON_ACCESS,
+    ) -> ResultLoading:
         """
         :param query: The EQL query to evaluate, or the object standing for it.
-        :return: A result loading that loads the query's objects with few statements:
-            relationships on access, and one statement per class where the selected
-            class's objects may be of several classes.
+        :param relationship_loading: When the relationships of the results load.
+        :return: A result loading that loads the query's objects with few statements,
+            one statement per class where the selected class's objects may be of
+            several classes.
         """
         expression = query._get_expression_()
         if not isinstance(expression, Entity) or not cls._selects_several_classes(
             domain_type=expression._type_
         ):
-            return cls(relationship_loading=RelationshipLoading.ON_ACCESS)
+            return cls(relationship_loading=relationship_loading)
         return cls(
-            relationship_loading=RelationshipLoading.ON_ACCESS,
+            relationship_loading=relationship_loading,
             subclass_loading=SubclassLoading.ONE_QUERY_PER_CLASS,
         )
 
@@ -203,7 +210,8 @@ class ResultLoading:
         :param domain_type: The class a query selects the objects of.
         :return: Whether those objects may be loaded as other classes than its own.
         """
-        if domain_type is None or get_part_class(domain_type) is not None:
+        domain_type = get_origin(domain_type) or domain_type
+        if not isinstance(domain_type, type) or get_part_class(domain_type) is not None:
             return True
         dao_class = get_mapping_data_access_object_class(domain_type)
         if dao_class is None:
@@ -221,14 +229,25 @@ class ResultLoading:
             and self.result_content == ResultContent.DATA_ACCESS_OBJECTS
         )
 
-    @property
-    def loader_options(self) -> tuple[ExecutableOption, ...]:
+    def build_loader_options(
+        self, *, loaded_classes: Iterable[Any]
+    ) -> tuple[ExecutableOption, ...]:
         """
-        :return: The options every statement that loads data access objects takes.
+        :param loaded_classes: The data access object classes, or aliases of them, that a
+            statement loads.
+        :return: The options the statement takes, reaching also the relationships that
+            subclasses of the loaded classes declare.
         """
-        if self.relationship_loading == RelationshipLoading.ON_ACCESS:
-            return (lazyload("*"),)
-        return ()
+        if self.relationship_loading == RelationshipLoading.AS_MAPPED:
+            return ()
+        subclass_relationships = (
+            relationship.class_attribute
+            for loaded_class in loaded_classes
+            for mapper in sqlalchemy.inspect(loaded_class).mapper.self_and_descendants
+            for relationship in mapper.relationships
+            if relationship.parent is mapper
+        )
+        return (lazyload("*"), *map(lazyload, subclass_relationships))
 
     def evaluation_context(self) -> AbstractContextManager:
         """
@@ -277,7 +296,9 @@ class ResultLoading:
             tables = sqlalchemy.inspect(dao_class).selectable
             statement = sqlalchemy.select(tables).select_from(tables)
         else:
-            statement = sqlalchemy.select(dao_class).options(*self.loader_options)
+            statement = sqlalchemy.select(dao_class).options(
+                *self.build_loader_options(loaded_classes=[dao_class])
+            )
         if self.selected_object_restriction == SelectedObjectRestriction.BOUND_IDS:
             for batch in batched(ids, self.ids_per_statement):
                 yield statement.where(dao_class.database_id.in_(batch))

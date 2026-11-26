@@ -5,7 +5,7 @@ objects.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing_extensions import Callable, Any, Iterable
 import operator
 
@@ -20,8 +20,9 @@ from sqlalchemy import (
     case,
     not_ as sa_not,
     exists as sqlalchemy_exists,
+    ColumnElement,
 )
-from sqlalchemy.orm import Session, aliased, sessionmaker
+from sqlalchemy.orm import ColumnProperty, Session, aliased, sessionmaker
 
 from krrood.entity_query_language.query.query import (
     Query,
@@ -70,7 +71,12 @@ from krrood.ormatic.exceptions import (
     NoDAOFoundForSelectionError,
     UnsupportedResultLoadingError,
 )
-from krrood.ormatic.result_loading import ResultContent, ResultLoading
+from krrood.ormatic.result_loading import (
+    RelationshipLoading,
+    ResultContent,
+    ResultLoading,
+    SelectedObjectRestriction,
+)
 
 
 @dataclass(kw_only=True)
@@ -646,6 +652,11 @@ class EQLTranslator:
     How the evaluation loads the objects the query selects.
     """
 
+    ordering_column: ColumnElement | None = None
+    """
+    The column the translated query orders by, without its direction.
+    """
+
     @property
     def quantifier_type(self) -> type[ResultQuantifier]:
         """
@@ -927,6 +938,7 @@ class EQLTranslator:
                 col = self.translate_attribute(query=ordered_by_variable)
             else:
                 col = self._translate_comparator_operand(operand=ordered_by_variable)
+            self.ordering_column = col
             if self.eql_query._ordered_by_builder_.descending:
                 col = col.desc()
             self.sql_query = self.sql_query.order_by(col)
@@ -961,7 +973,7 @@ class EQLTranslator:
             raise UnsupportedQuantifierError(quantifier_type=self.quantifier_type)
         if self.result_loading.loads_selected_rows:
             bound_query = self.session.scalars(
-                self.sql_query.options(*self.result_loading.loader_options)
+                self.sql_query.options(*self._loader_options_of_selected_classes())
             )
             if issubclass(self.quantifier_type, The):
                 return self._object_daos(results=[bound_query.one()])
@@ -974,7 +986,13 @@ class EQLTranslator:
             selected_objects = list(rows.all())
         if self.result_loading.result_content == ResultContent.DATABASE_IDS:
             return [selected_object.database_id for selected_object in selected_objects]
-        return self.result_loading.load_selected_objects(
+        result_loading = self.result_loading
+        if self.eql_query._limit_ is not None:
+            result_loading = replace(
+                result_loading,
+                selected_object_restriction=SelectedObjectRestriction.BOUND_IDS,
+            )
+        return result_loading.load_selected_objects(
             session=self.session,
             selection=selection,
             selected_objects=selected_objects,
@@ -986,10 +1004,25 @@ class EQLTranslator:
             ``polymorphic_type`` of every object instead of the object.
         """
         selected_entity = self.sql_query.column_descriptions[0]["entity"]
+        ordering_columns = [] if self.ordering_column is None else [self.ordering_column]
         return self.sql_query.with_only_columns(
             selected_entity.database_id.label("database_id"),
             selected_entity.polymorphic_type.label("polymorphic_type"),
+            *ordering_columns,
             maintain_column_froms=True,
+        )
+
+    def _loader_options_of_selected_classes(self) -> tuple[Any, ...]:
+        """
+        :return: The loader options of :attr:`result_loading` for the classes the
+            translated query selects.
+        """
+        return self.result_loading.build_loader_options(
+            loaded_classes=[
+                description["entity"]
+                for description in self.sql_query.column_descriptions
+                if description["entity"] is not None
+            ]
         )
 
     def _object_daos(self, *, results: list[Any]) -> list[Any]:
@@ -1007,7 +1040,9 @@ class EQLTranslator:
             StoredObjectDAO.object_daos(
                 session=self.session,
                 stored_objects=stored_objects,
-                loader_options=self.result_loading.loader_options,
+                loader_options=self.result_loading.build_loader_options(
+                    loaded_classes=()
+                ),
                 ids_per_statement=self.result_loading.ids_per_statement,
             )
         )
@@ -1035,7 +1070,7 @@ class EQLTranslator:
         if not self.result_loading.loads_selected_rows:
             raise UnsupportedResultLoadingError(result_loading=self.result_loading)
         rows = self.session.execute(
-            self.sql_query.options(*self.result_loading.loader_options)
+            self.sql_query.options(*self._loader_options_of_selected_classes())
         ).all()
 
         if all_variables:
@@ -1522,12 +1557,39 @@ class EQLTranslator:
                     dao_class=current_dao, attribute_name=name
                 )
 
-            if not hasattr(current_dao, name):
-                raise MissingColumnError(dao_class=current_dao, attribute_name=name)
-
-            return getattr(current_dao, name)
+            if hasattr(current_dao, name):
+                return getattr(current_dao, name)
+            return self._join_subclass_columns(dao_class=current_dao, attribute_name=name)
 
         raise EmptyAttributeChainError(dao_class=current_dao, attribute_names=names)
+
+    def _join_subclass_columns(
+        self, *, dao_class: Any, attribute_name: str
+    ) -> ColumnElement:
+        """
+        :param dao_class: A DAO class, or an alias of one, whose subclasses map a column
+            it does not, such as a field typed with the type parameter of a generic.
+        :param attribute_name: The attribute.
+        :return: The value of the column for every object, from the table of whichever
+            of the subclasses joined to the query declares it for the object.
+        :raises MissingColumnError: If no subclass maps the column.
+        """
+        columns = {
+            column.table: column
+            for mapper in sqlalchemy.inspection.inspect(dao_class).mapper.self_and_descendants
+            if isinstance(mapper.attrs.get(attribute_name), ColumnProperty)
+            for column in mapper.attrs[attribute_name].columns
+        }
+        if not columns:
+            raise MissingColumnError(dao_class=dao_class, attribute_name=attribute_name)
+        values = []
+        for table, column in columns.items():
+            table_alias = table.alias()
+            self.sql_query = self.sql_query.outerjoin(
+                table_alias, table_alias.c.database_id == dao_class.database_id
+            )
+            values.append(table_alias.corresponding_column(column))
+        return func.coalesce(*values) if len(values) > 1 else values[0]
 
     def _join_part_holding(self, *, dao_class: Any, attribute_name: str) -> Any:
         """
@@ -1765,5 +1827,11 @@ class SQLAlchemyBackend(SelectiveBackend):
 
     def _evaluate(self, *, expression: Query) -> Iterable:
         session = self.session_maker()
-        translator = eql_to_sql(expression, session)
+        translator = eql_to_sql(
+            expression,
+            session,
+            result_loading=ResultLoading.from_query(
+                query=expression, relationship_loading=RelationshipLoading.AS_MAPPED
+            ),
+        )
         yield from translator.evaluate()

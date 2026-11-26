@@ -44,13 +44,13 @@ def test_a_query_for_a_field_typed_with_a_parametrized_generic_selects_its_objec
     Selecting the objects that a field typed with a parametrization of a generic holds
     finds them.
     """
-    session.add(to_dao(WheeledBaseHolder(base=RoverBase(label="rover"))))
+    session.add(to_dao(WheeledBaseHolder(base=WheeledBase(label="plain"))))
     session.commit()
     holder = variable(WheeledBaseHolder, domain=None)
 
     result = eql_to_sql(an(entity(holder.base)), session).evaluate()
 
-    assert [dao.label for dao in result] == ["rover"]
+    assert [dao.label for dao in result] == ["plain"]
 
 
 def test_a_query_for_a_generic_base_filters_on_a_field_of_its_type_parameter(

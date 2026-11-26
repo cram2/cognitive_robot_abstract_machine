@@ -7,7 +7,7 @@ name = "krrood-ormatic"
 dynamic = ["version"]
 description = "ORMatic: SQLAlchemy interfaces generated from dataclasses, queried with EQL."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "LGPL-3.0-only"
 classifiers = [
     "Development Status :: 3 - Alpha",
