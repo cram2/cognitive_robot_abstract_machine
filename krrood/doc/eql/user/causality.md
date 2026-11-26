@@ -247,7 +247,7 @@ from probabilistic_model.causal_structure.domain_causal_knowledge import (
 from probabilistic_model.causal_structure.learning import (
     RelationalCausalStructureLearner,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
@@ -403,7 +403,7 @@ Here `SceneRoom` stands for the class the relational circuit models and `rooms` 
 training instances:
 
 ```python
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LayeredLearning
 from probabilistic_model.probabilistic_circuit.relational.part_learning_methods import (
     PartLearningMethods,

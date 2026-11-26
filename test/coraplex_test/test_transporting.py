@@ -93,8 +93,8 @@ def _pick_up_the_milk(
             planar_goal_pose=variable(
                 Pose2D,
                 domain=ReachabilityLocation(
-                    Pose(reference_frame=milk.root),
-                    robot.right_arm,
+                    target_pose=Pose(reference_frame=milk.root),
+                    arm=robot.right_arm,
                     context=context_of(extensions),
                 ),
             )
@@ -123,8 +123,8 @@ def _place_at(
                 planar_goal_pose=variable(
                     Pose2D,
                     domain=ReachabilityLocation(
-                        target,
-                        robot.right_arm,
+                        target_pose=target,
+                        arm=robot.right_arm,
                         context=context_of(extensions),
                     ),
                 )
@@ -200,7 +200,10 @@ def test_a_transport_of_a_graspable_stands_around_the_object_then_the_target(
     target = Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root)
 
     transport = TransportAction.from_graspable_by_closest_grasps(
-        milk, target, robot.right_arm, context_of(extensions)
+        graspable=milk,
+        goal_pose=target,
+        arm=robot.right_arm,
+        context=context_of(extensions),
     )
 
     pick_up_location = _standing_positions(transport.pick_up._kwargs_["navigate"])
@@ -440,7 +443,11 @@ def _assert_each_standing_pose_tries_its_grasps_closest_first(
             :, 3
         ]
         closeness = [
-            GraspCloseness.from_grasp(grasp_of(step), world_T_object, world_P_standing)
+            GraspCloseness.from_grasp(
+                grasp=grasp_of(step),
+                world_T_object=world_T_object,
+                world_P_standing=world_P_standing,
+            )
             for step in steps_from_one_pose
         ]
         assert closeness == sorted(closeness)
@@ -452,9 +459,9 @@ def _closeness(grasp: GraspCandidate, standing_position: Pose) -> GraspCloseness
     """
     world = grasp.graspable.root._world
     return GraspCloseness.from_grasp(
-        grasp,
-        grasp.graspable.root.global_transform.to_np(),
-        world.transform(standing_position, world.root).to_np()[:, 3],
+        grasp=grasp,
+        world_T_object=grasp.graspable.root.global_transform.to_np(),
+        world_P_standing=world.transform(standing_position, world.root).to_np()[:, 3],
     )
 
 
@@ -577,7 +584,7 @@ def test_a_pick_up_of_a_graspable_tries_each_standing_pose_with_its_closest_gras
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
-        milk, robot.right_arm, context_of(extensions)
+        graspable=milk, arm=robot.right_arm, context=context_of(extensions)
     )
 
     pick_ups = list(
@@ -603,9 +610,9 @@ def test_a_pick_up_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
-        milk,
-        robot.right_arm,
-        context_of(extensions),
+        graspable=milk,
+        arm=robot.right_arm,
+        context=context_of(extensions),
         number_of_grasps=NON_DEFAULT_NUMBER_OF_GRASPS,
     )
 
@@ -631,7 +638,7 @@ def test_a_pick_up_of_a_graspable_tries_the_grasps_from_each_standing_pose_close
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     step = MoveAndPickUpAction.from_graspable_by_closest_grasps(
-        milk, robot.right_arm, context_of(extensions)
+        graspable=milk, arm=robot.right_arm, context=context_of(extensions)
     )
 
     pick_ups = list(
@@ -652,10 +659,10 @@ def test_a_transport_of_a_graspable_picks_it_up_by_the_closest_grasps(
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
-        milk,
-        Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
-        robot.right_arm,
-        context_of(extensions),
+        graspable=milk,
+        goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
+        arm=robot.right_arm,
+        context=context_of(extensions),
     )
 
     pick_ups = list(
@@ -678,10 +685,10 @@ def test_a_transport_of_a_graspable_tries_as_many_closest_grasps_as_asked_for(
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
-        milk,
-        Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
-        robot.right_arm,
-        context_of(extensions),
+        graspable=milk,
+        goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
+        arm=robot.right_arm,
+        context=context_of(extensions),
         number_of_grasps=NON_DEFAULT_NUMBER_OF_GRASPS,
     )
 
@@ -742,10 +749,10 @@ def test_a_transport_of_a_graspable_faces_it_where_it_is_when_it_picks_it_up(
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     transport = TransportAction.from_graspable_by_closest_grasps(
-        milk,
-        Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
-        robot.right_arm,
-        context_of(extensions),
+        graspable=milk,
+        goal_pose=Pose.from_xyz_rpy(4.0, 1.5, 0.9, reference_frame=world.root),
+        arm=robot.right_arm,
+        context=context_of(extensions),
     )
 
     _move_the_milk(world)
@@ -809,7 +816,9 @@ def test_a_move_and_open_faces_the_handle_where_it_is_when_it_opens_the_containe
     world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
     move_and_open = MoveAndOpenAction.from_standing_position(
-        Pose(reference_frame=world.root), handle.grasp_candidates()[0], robot.left_arm
+        standing_position=Pose(reference_frame=world.root),
+        grasp=handle.grasp_candidates()[0],
+        arm=robot.left_arm,
     )
 
     world.get_connection_by_name(f"{DRAWER}_joint").position = OPENED_DRAWER_POSITION
@@ -874,7 +883,7 @@ def test_a_move_and_open_from_a_standing_position_opens_the_given_handle(
     standing_position = Pose2D(reference_frame=world.root)
 
     move_and_open = MoveAndOpenAction.from_standing_position(
-        standing_position, grasp, robot.left_arm
+        standing_position=standing_position, grasp=grasp, arm=robot.left_arm
     )
 
     assert move_and_open.navigate.planar_goal_pose is standing_position
@@ -897,7 +906,7 @@ def test_an_opening_of_a_handle_is_grounded_by_every_grasp_the_handle_offers(
 
     openings = list(
         EntityQueryLanguageGenerativeBackend().evaluate(
-            expression=OpenAction.from_handle(handle, robot.left_arm)
+            expression=OpenAction.from_handle(handle=handle, arm=robot.left_arm)
         )
     )
 
@@ -918,7 +927,7 @@ def test_an_opening_of_a_handle_first_tries_the_grasp_facing_the_robot(
     """
     world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
-    opening = OpenAction.from_handle(handle, robot.left_arm)
+    opening = OpenAction.from_handle(handle=handle, arm=robot.left_arm)
     horizontally_approached = [
         grasp
         for grasp in handle.grasp_candidates()
@@ -950,7 +959,7 @@ def test_a_move_and_open_tries_the_grasps_from_each_standing_pose_closest_first(
     world, robot, extensions = pr2_apartment_context
     handle = Handle(root=world.get_body_by_name(DRAWER_HANDLE))
     step = MoveAndOpenAction.from_handle_by_closest_grasps(
-        handle, robot.left_arm, context_of(extensions)
+        handle=handle, arm=robot.left_arm, context=context_of(extensions)
     )
 
     openings = list(

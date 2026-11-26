@@ -1,3 +1,10 @@
+"""
+Fits a Nyga distribution on samples of a mixture of normals, logs it and its
+parameters to mlflow as a model, loads it back and plots it.
+"""
+
+from __future__ import annotations
+
 import json
 import tempfile
 
@@ -7,7 +14,7 @@ import plotly.graph_objects as go
 import tqdm
 from random_events.variable import Continuous
 
-from probabilistic_model.learning.nyga_induction import NygaInduction
+from probabilistic_model.learning.structure.nyga_induction import NygaInduction
 from probabilistic_model.interfaces.mlflow_integration import (
     infer_signature,
     ProbabilisticModelWrapper,

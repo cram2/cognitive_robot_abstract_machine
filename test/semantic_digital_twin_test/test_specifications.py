@@ -22,9 +22,7 @@ from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     FixedConnectionSpecification,
     Connection6DoFSpecification,
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
-    ScrewConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
@@ -56,7 +54,6 @@ from semantic_digital_twin.exceptions import (
     HandleWiderThanLong,
     InvalidPlaneDimensions,
     MergedRobotAnnotationNotFound,
-    MissingConnectionAxisError,
     ParsingError,
     PartWholeCardinalityError,
     PartWholeFieldInAnnotationKwargs,
@@ -90,6 +87,7 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
+    ScrewAxis,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
@@ -104,9 +102,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker i
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
-    ScrewConnection,
+    ScrewAxisConnection,
     Connection6DoF,
     OmniDrive,
 )
@@ -165,10 +161,14 @@ def test_region_specification_uses_connection_specification(empty_world):
     spec = RegionSpecification.box(
         "sliding_region",
         Scale(1, 1, 1),
-        connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
+        connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.Z()
+            ),
+        ),
     )
     region = spec.spawn(empty_world)
-    assert isinstance(region.parent_connection, PrismaticConnection)
+    assert region.parent_connection.behaves_like_a_prismatic_connection
 
 
 def test_body_and_connection_pose_and_name_override(empty_world):
@@ -195,10 +195,14 @@ def test_body_and_connection_active(empty_world):
     spec = BodySpecification.box(
         "drawer",
         Scale(1, 1, 1),
-        connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
+        connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.Z()
+            ),
+        ),
     )
     body = spec.spawn(empty_world)
-    assert isinstance(body.parent_connection, PrismaticConnection)
+    assert body.parent_connection.behaves_like_a_prismatic_connection
 
 
 def test_child_specification_recursion(empty_world):
@@ -226,13 +230,15 @@ def test_active_annotation_spawns(empty_world):
     spec = Drawer.get_annotation_specification(
         "drawer",
         BodySpecification.box("drawer", Scale(0.4, 0.5, 0.6)),
-        parent_connection_specification=PrismaticConnectionSpecification(
-            axis=Vector3.X()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         ),
     )
     annotation = spec.spawn(empty_world)
     assert isinstance(annotation, Drawer)
-    assert isinstance(annotation.movable_joint, PrismaticConnection)
+    assert annotation.movable_joint.behaves_like_a_prismatic_connection
 
 
 def test_annotation_root_connection_specification_overrides_type(empty_world):
@@ -250,11 +256,10 @@ def test_annotation_root_connection_specification_overrides_type(empty_world):
     assert isinstance(annotation.root.parent_connection, Connection6DoF)
 
 
-def test_active_connection_specification_requires_axis():
-    # An axis-less single-DoF connection is meaningless, so it cannot be built at all.
-    # This replaces the former spawn-time MissingConnectionAxisError for specifications.
+def test_screw_axis_connection_specification_requires_screw_axis():
+    # A single-DoF connection without a screw axis is meaningless, so it cannot be built.
     with pytest.raises(TypeError):
-        PrismaticConnectionSpecification()
+        ScrewAxisConnectionSpecification()
 
 
 def test_nested_annotation_on_non_part_whole_field_raises():
@@ -305,16 +310,22 @@ def test_create_world_is_repeatable():
 
 
 def test_world_specification_from_urdf_environment():
+    """
+    A world specification from a URDF creates a non-empty world.
+    """
     world = WorldSpecification.from_urdf(
-        os.path.join(RESOURCES, "urdf", "table.urdf")
+        "package://iai_objects/urdf/table.urdf"
     ).create_world()
     assert not world.is_empty()
     assert world.root is not None
 
 
 def test_materialized_environments_share_no_entity_ids():
+    """
+    Two worlds created from one specification share no entity IDs.
+    """
     specification = WorldSpecification.from_urdf(
-        os.path.join(RESOURCES, "urdf", "table.urdf")
+        "package://iai_objects/urdf/table.urdf"
     )
     first = specification.create_world()
     second = specification.create_world()
@@ -413,10 +424,15 @@ def test_world_specification_from_gazebo_environment():
         lambda: BodySpecification.box("shape", Scale(1, 1, 1)),
         lambda: BodySpecification.sphere("shape", 0.5),
         lambda: BodySpecification.cylinder("shape", 0.4, 1.0),
-        lambda: BodySpecification.mesh("shape", str(RESOURCES / "stl" / "milk.stl")),
+        lambda: BodySpecification.mesh(
+            "shape", "package://iai_objects/objects/milk.stl"
+        ),
     ],
 )
 def test_shape_constructors_spawn(empty_world, make_spec):
+    """
+    Each shape constructor spawns a body with collision on a fixed connection.
+    """
     body = make_spec().spawn(empty_world)
     assert isinstance(body, Body)
     assert len(body.collision.shapes) >= 1
@@ -437,7 +453,7 @@ def test_from_event_constructor_spawns(empty_world):
         lambda pose: BodySpecification.sphere("shape", 0.5, parent_T_self=pose),
         lambda pose: BodySpecification.cylinder("shape", 0.4, 1.0, parent_T_self=pose),
         lambda pose: BodySpecification.mesh(
-            "shape", str(RESOURCES / "stl" / "milk.stl"), parent_T_self=pose
+            "shape", "package://iai_objects/objects/milk.stl", parent_T_self=pose
         ),
         lambda pose: BodySpecification.from_event(
             "shape",
@@ -455,6 +471,9 @@ def test_from_event_constructor_spawns(empty_world):
     ],
 )
 def test_shape_constructors_apply_parent_T_self(empty_world, make_spec):
+    """
+    Each shape constructor places its entity at the pose it is given.
+    """
     pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
     entity = make_spec(pose).spawn(empty_world)
     root_T_entity = empty_world.compute_forward_kinematics(empty_world.root, entity)
@@ -716,9 +735,12 @@ def test_a_robot_is_spawned_from_the_description_it_reads_itself(empty_world):
 
 
 def test_world_specification_from_urdf_with_robot():
+    """
+    A robot specification places the PR2 on an omnidirectional drive below the world root.
+    """
     try:
         world = WorldSpecification.from_urdf(
-            os.path.join(RESOURCES, "urdf", "table.urdf"),
+            "package://iai_objects/urdf/table.urdf",
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
         ).create_world()
     except ParsingError as error:
@@ -1119,27 +1141,30 @@ def test_connection_6dof_spec_binds_type_without_params():
 
 def test_active_1dof_spec_captures_parameters():
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.0)
-    axis = Vector3.Z()
-    spec = PrismaticConnectionSpecification(
-        axis=axis, multiplier=2.0, offset=0.5, dof_limits=limits
+    screw_axis = ScrewAxis(translation_per_unit_position=Vector3.Z())
+    spec = ScrewAxisConnectionSpecification(
+        screw_axis=screw_axis,
+        multiplier=2.0,
+        offset=0.5,
+        dof_limits=limits,
     )
-    assert spec.connection_type is PrismaticConnection
-    assert spec.axis is axis
+    assert spec.connection_type is ScrewAxisConnection
+    assert spec.screw_axis is screw_axis
     assert spec.multiplier == 2.0
     assert spec.offset == 0.5
     assert spec.dof_limits is limits
 
 
 def test_active_1dof_spec_defaults():
-    axis = Vector3.Z()
-    spec = RevoluteConnectionSpecification(axis=axis)
-    assert spec.connection_type is RevoluteConnection
+    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3.Z())
+    spec = ScrewAxisConnectionSpecification(screw_axis=screw_axis)
+    assert spec.connection_type is ScrewAxisConnection
     assert spec._create_with_dofs_kwargs() == {
-        "axis": axis,
         "multiplier": 1.0,
         "offset": 0.0,
         "dof_limits": None,
         "dynamics": JointDynamics(),
+        "screw_axis": screw_axis,
     }
 
 
@@ -1166,10 +1191,12 @@ def _build_connection_specification(
     """
     Build a specification, supplying the parameters its own family requires.
     """
-    if issubclass(specification_type, ScrewConnectionSpecification):
-        return specification_type(axis=Vector3.Z(), screw_pitch=0.005)
-    if issubclass(specification_type, ActiveConnection1DOFSpecification):
-        return specification_type(axis=Vector3.Z())
+    if issubclass(specification_type, ScrewAxisConnectionSpecification):
+        return specification_type(
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=0.005
+            ),
+        )
     return specification_type()
 
 
@@ -1211,10 +1238,11 @@ def test_connection_spec_connect_defaults_parent_to_root(empty_world):
 def test_connection_spec_connect_active_forwards_kwargs(empty_world):
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.5)
     child = BodySpecification.box("slider", Scale(1, 1, 1)).to_domain_object()
-    connection = PrismaticConnectionSpecification(
-        axis=Vector3.Z(), dof_limits=limits
+    connection = ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.Z()),
+        dof_limits=limits,
     ).connect(empty_world, child=child)
-    assert isinstance(connection, PrismaticConnection)
+    assert connection.behaves_like_a_prismatic_connection
     assert connection.dof.limits.upper.velocity == 1.5
     assert connection.dof.limits.lower.velocity == -1.5
 
@@ -1222,12 +1250,14 @@ def test_connection_spec_connect_active_forwards_kwargs(empty_world):
 @pytest.mark.parametrize(
     "specification",
     [
-        RevoluteConnectionSpecification(
-            axis=Vector3.Z(), dynamics=JointDynamics(damping=0.7, dry_friction=0.3)
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            dynamics=JointDynamics(damping=0.7, dry_friction=0.3),
         ),
-        ScrewConnectionSpecification(
-            axis=Vector3.Z(),
-            screw_pitch=0.005,
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=0.005
+            ),
             dynamics=JointDynamics(damping=0.7, dry_friction=0.3),
         ),
     ],
@@ -1243,11 +1273,15 @@ def test_connection_spec_connect_applies_dynamics(
 
 def test_screw_connection_spec_connect_forwards_pitch(empty_world):
     child = BodySpecification.box("cap", Scale(1, 1, 1)).to_domain_object()
-    connection = ScrewConnectionSpecification(
-        axis=Vector3.Z(), screw_pitch=0.005
+    connection = ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+            axis=Vector3.Z(), pitch=0.005
+        ),
     ).connect(empty_world, child=child)
-    assert isinstance(connection, ScrewConnection)
-    assert connection.screw_pitch == 0.005
+    assert np.allclose(
+        connection.screw_axis.translation_per_unit_position,
+        connection.screw_axis.rotation_per_unit_position * (0.005 / (2 * np.pi)),
+    )
 
 
 def test_connection_spec_connect_applies_pose(empty_world):
@@ -1317,8 +1351,9 @@ def _door_on_hinge_specification() -> BodySpecification:
     return BodySpecification.box(
         "door",
         Scale(0.03, 1, 2),
-        connection_specification=RevoluteConnectionSpecification(
-            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+        connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            connection_T_child=_hinge_T_door(),
         ),
     )
 
@@ -1397,11 +1432,12 @@ def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
     handle = empty_world.get_body_by_name("handle")
     root_T_door = empty_world.compute_forward_kinematics(empty_world.root, door)
 
-    connection = RevoluteConnectionSpecification(
-        axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+    connection = ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        connection_T_child=_hinge_T_door(),
     ).reconnect(empty_world, door)
 
-    assert isinstance(door.parent_connection, RevoluteConnection)
+    assert door.parent_connection.behaves_like_a_revolute_connection
     assert door.parent_connection is connection
     assert connection.parent is empty_world.root
     assert handle.parent_kinematic_structure_entity is door
@@ -1414,8 +1450,9 @@ def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
 
 def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
     door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
-    connection = RevoluteConnectionSpecification(
-        axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+    connection = ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        connection_T_child=_hinge_T_door(),
     ).reconnect(empty_world, door)
     angle = np.pi / 2
 
@@ -1437,11 +1474,13 @@ def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
 @pytest.mark.parametrize(
     "joint_specification",
     [
-        RevoluteConnectionSpecification(
-            axis=Vector3.Z(), offset=0.3, connection_T_child=_hinge_T_door()
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            offset=0.3,
+            connection_T_child=_hinge_T_door(),
         ),
-        RevoluteConnectionSpecification(
-            axis=Vector3.Z(),
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=0.2, upper_position=1.0
             ),
@@ -1471,8 +1510,10 @@ def test_reconnect_keeps_the_child_where_it_is_when_the_joint_starts_away_from_z
 
 def test_reconnect_keeps_the_name_of_the_specification(empty_world):
     door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
-    specification = RevoluteConnectionSpecification(
-        name="front_door_hinge", axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+    specification = ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        name="front_door_hinge",
+        connection_T_child=_hinge_T_door(),
     )
 
     connection = specification.reconnect(empty_world, door)
@@ -1486,13 +1527,17 @@ def test_reconnect_releases_the_degrees_of_freedom_of_the_replaced_connection(
     drawer = BodySpecification.box(
         "drawer",
         Scale(0.5, 0.5, 0.2),
-        connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
+        connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
+        ),
     ).spawn(empty_world)
     [replaced_degree_of_freedom] = drawer.parent_connection.dofs
 
-    connection = RevoluteConnectionSpecification(axis=Vector3.Z()).reconnect(
-        empty_world, drawer
-    )
+    connection = ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+    ).reconnect(empty_world, drawer)
 
     assert set(empty_world.degrees_of_freedom) == set(connection.dofs)
     assert replaced_degree_of_freedom not in empty_world.degrees_of_freedom
@@ -1504,8 +1549,9 @@ def test_connection_T_child_survives_orm_round_trip(empty_world):
         Door.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.03, 1, 2)
         ),
-        parent_connection_specification=RevoluteConnectionSpecification(
-            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            connection_T_child=_hinge_T_door(),
         ),
     )
 
@@ -1707,13 +1753,13 @@ def test_annotation_spec_active_door(empty_world):
         Door.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.03, 1, 2)
         ),
-        parent_connection_specification=RevoluteConnectionSpecification(
-            axis=Vector3.Z()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         ),
     )
     annotation = spec.spawn(empty_world)
     assert isinstance(annotation, Door)
-    assert isinstance(annotation.movable_joint, RevoluteConnection)
+    assert annotation.movable_joint.behaves_like_a_revolute_connection
 
 
 def test_annotation_spec_aperture_region(empty_world):
@@ -1789,8 +1835,9 @@ def test_door_joint_survives_mounting_the_door_as_a_part(empty_world):
         Door.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.03, 1, 2)
         ),
-        parent_connection_specification=RevoluteConnectionSpecification(
-            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            connection_T_child=_hinge_T_door(),
         ),
     )
 
@@ -1799,7 +1846,7 @@ def test_door_joint_survives_mounting_the_door_as_a_part(empty_world):
     )
 
     [door] = cabinet.doors
-    assert isinstance(door.movable_joint, RevoluteConnection)
+    assert door.movable_joint.behaves_like_a_revolute_connection
     assert door.movable_joint.parent is cabinet.root
     np.testing.assert_allclose(
         door.movable_joint.connection_T_child_expression.to_np(),
@@ -1817,8 +1864,10 @@ def test_drawer_joint_survives_mounting_the_drawer_as_a_part(empty_world):
         Drawer.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.4, 0.5, 0.6)
         ),
-        parent_connection_specification=PrismaticConnectionSpecification(
-            axis=Vector3.X()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         ),
     )
 
@@ -1827,7 +1876,7 @@ def test_drawer_joint_survives_mounting_the_drawer_as_a_part(empty_world):
     )
 
     [drawer] = cabinet.drawers
-    assert isinstance(drawer.movable_joint, PrismaticConnection)
+    assert drawer.movable_joint.behaves_like_a_prismatic_connection
     assert drawer.movable_joint.parent is cabinet.root
 
 
@@ -1940,8 +1989,11 @@ def test_annotation_connection_limits_threaded(empty_world):
         Drawer.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.4, 0.5, 0.6)
         ),
-        parent_connection_specification=PrismaticConnectionSpecification(
-            axis=Vector3.Z(), dof_limits=limits
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.Z()
+            ),
+            dof_limits=limits,
         ),
     )
     drawer = spec.spawn(empty_world)
@@ -2035,8 +2087,9 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
         Drawer.get_default_root_kinematic_structure_entity_specification(
             scale=Scale(0.4, 0.5, 0.6)
         ),
-        parent_connection_specification=RevoluteConnectionSpecification(
-            axis=Vector3.Z(), connection_T_child=_hinge_T_door()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            connection_T_child=_hinge_T_door(),
         ),
         part_specifications={
             "handle": Handle.get_annotation_specification(
@@ -2091,8 +2144,10 @@ def test_nested_composite_matches_manual_construction(empty_world):
     drawer = Drawer.get_annotation_specification(
         "drawer",
         Drawer.get_default_root_kinematic_structure_entity_specification(scale=scale),
-        parent_connection_specification=PrismaticConnectionSpecification(
-            axis=Vector3.X()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
         ),
         part_specifications={
             "handle": Handle.get_annotation_specification(
@@ -2105,7 +2160,7 @@ def test_nested_composite_matches_manual_construction(empty_world):
     ).spawn(empty_world)
 
     assert isinstance(drawer.handle, Handle)
-    assert isinstance(drawer.movable_joint, PrismaticConnection)
+    assert drawer.movable_joint.behaves_like_a_prismatic_connection
     assert drawer.handle.root.parent_connection.parent is drawer.root
 
     manual_world = _fresh_world()
@@ -2114,8 +2169,10 @@ def test_nested_composite_matches_manual_construction(empty_world):
             name="drawer_manual",
             world=manual_world,
             scale=scale,
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.X()
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X()
+                ),
             ),
         )
         manual_handle = Handle.create_with_new_body_in_world(

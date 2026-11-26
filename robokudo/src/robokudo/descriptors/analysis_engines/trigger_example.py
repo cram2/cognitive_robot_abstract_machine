@@ -76,7 +76,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with trigger mechanism
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         seq = Pipeline("RWPipeline")
 

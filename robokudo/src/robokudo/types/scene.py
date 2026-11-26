@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 AnnotationType = TypeVar("AnnotationType", bound=Annotation)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnalyzableAnnotation(IdentifiableAnnotation):
     """
     An Annotation that describes an entity observed in the scene, that shall be analyzed further.
@@ -77,7 +77,7 @@ class AnalyzableAnnotation(IdentifiableAnnotation):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectHypothesis(AnalyzableAnnotation):
     """
     Hypothesis about an object in the scene.
@@ -118,7 +118,7 @@ class ObjectHypothesis(AnalyzableAnnotation):
         return semantic_class
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HumanHypothesis(ObjectHypothesis):
     """
     Hypothesis about a human in the scene.
@@ -148,7 +148,7 @@ class HumanHypothesis(ObjectHypothesis):
         return Human
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionHypothesis(AnalyzableAnnotation, Nameable):
     """
     Hypothesis about a region in the scene.
@@ -160,7 +160,7 @@ class RegionHypothesis(AnalyzableAnnotation, Nameable):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParthoodHypothesis(AnalyzableAnnotation, Nameable):
     """
     Hypothesis about a part of an object: a feature, such as a logo, or a component,
@@ -171,11 +171,15 @@ class ParthoodHypothesis(AnalyzableAnnotation, Nameable):
     """
 
 
-@dataclass
-class ParthoodComponentHypothesis(ParthoodHypothesis): ...
+@dataclass(kw_only=True)
+class ParthoodComponentHypothesis(ParthoodHypothesis):
+    """
+    Hypothesis about a component of an object, such as the control unit of an electrical
+    device.
+    """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParthoodFeatureHypothesis(ParthoodHypothesis):
     """
     Hypothesis about a surface or visual feature of an object, such as a logo, text, a
@@ -185,7 +189,7 @@ class ParthoodFeatureHypothesis(ParthoodHypothesis):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OccupiedAnnotation(Annotation):
     """
     Annotation indicating region occupancy.

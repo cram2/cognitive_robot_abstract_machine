@@ -1,3 +1,9 @@
+"""
+Tests of RoboKudo's behaviour tree components.
+"""
+
+from __future__ import annotations
+
 from typing_extensions import Any
 
 import py_trees
@@ -29,6 +35,10 @@ class DummyBehaviour(py_trees.behaviour.Behaviour):
 
 
 class TestTreeComponents:
+    """
+    Tests of RoboKudo's task schedulers.
+    """
+
     def test_iterative_task_scheduler(self):
         leaf_behaviour1 = DummyBehaviour("Behaviour1")
         par1 = py_trees.composites.Parallel(
@@ -92,7 +102,7 @@ class TestTreeComponents:
         assert all([leaf_behaviour1._setup, leaf_behaviour2._setup])
 
         query_goal = {"query": "detect"}
-        scheduler.get_cas().set(CASViews.QUERY, query_goal)
+        scheduler.get_cas().set(view_name=CASViews.QUERY, value=query_goal)
 
         status = scheduler.update()
         assert status == py_trees.common.Status.SUCCESS
@@ -100,7 +110,7 @@ class TestTreeComponents:
         assert task.children[0].name == par1.name
 
         query_goal = {"query": "track"}
-        scheduler.get_cas().set(CASViews.QUERY, query_goal)
+        scheduler.get_cas().set(view_name=CASViews.QUERY, value=query_goal)
 
         status = scheduler.update()
         assert status == py_trees.common.Status.SUCCESS
@@ -108,7 +118,7 @@ class TestTreeComponents:
         assert task.children[0].name == par2.name
 
         query_goal = {"query": "non-existent-query-goal"}
-        scheduler.get_cas().set(CASViews.QUERY, query_goal)
+        scheduler.get_cas().set(view_name=CASViews.QUERY, value=query_goal)
 
         status = scheduler.update()
         assert status == py_trees.common.Status.FAILURE

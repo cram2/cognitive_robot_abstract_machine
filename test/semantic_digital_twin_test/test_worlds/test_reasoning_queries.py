@@ -1,3 +1,9 @@
+"""
+Tests of the reasoning queries over worlds and of the world reasoner.
+"""
+
+from __future__ import annotations
+
 import os
 
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -16,10 +22,6 @@ from semantic_digital_twin.reasoning.reasoner import CaseReasoner
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-)
 from semantic_digital_twin.world_description.geometry import Color
 
 
@@ -48,17 +50,11 @@ def test_load_environment_names_are_stringifiable():
 
 
 def test_world_reasoner_reason_returns_dicts():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-    )
+    """
+    Reasoning over the kitchen returns a dictionary.
+    """
     world = URDFParser.from_file(
-        file_path=os.path.join(urdf_dir, "kitchen-small.urdf")
+        file_path="package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     ).create_world()
     reasoner = WorldReasoner(world)
 
@@ -261,23 +257,12 @@ def test_sort_annotations_by_volume(kitchen_environment_fixture):
 def test_world_reasoner_leaves_urdf_doors_and_drawers_on_their_own_joints():
     """
     Doors and drawers loaded from a URDF hang straight from their cabinet on an active
-    connection, e.g. ``iai_fridge_main`` -> (revolute) -> ``iai_fridge_door`` in
-    ``coraplex``'s ``kitchen-small.urdf``.
-
-    Recognising them must not change the
-    kinematic structure: each one's joint is that connection.
+    connection, e.g. ``iai_fridge_main`` -> ``iai_fridge_door`` in ``kitchen-small.urdf``.
+    Recognising them must not change the kinematic structure: each one's joint is that
+    connection.
     """
-    coraplex_worlds_directory = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "..",
-        "..",
-        "coraplex",
-        "resources",
-        "worlds",
-    )
     world = URDFParser.from_file(
-        file_path=os.path.join(coraplex_worlds_directory, "kitchen-small.urdf")
+        file_path="package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     ).create_world()
     connections_before_reasoning = set(world.connections)
     reasoner = WorldReasoner(world)
@@ -288,8 +273,8 @@ def test_world_reasoner_leaves_urdf_doors_and_drawers_on_their_own_joints():
     doors = world.get_semantic_annotations_by_type(Door)
     assert doors
     for door in doors:
-        assert isinstance(door.movable_joint, RevoluteConnection)
+        assert door.movable_joint.behaves_like_a_revolute_connection
     drawers = world.get_semantic_annotations_by_type(Drawer)
     assert drawers
     for drawer in drawers:
-        assert isinstance(drawer.movable_joint, PrismaticConnection)
+        assert drawer.movable_joint.behaves_like_a_prismatic_connection

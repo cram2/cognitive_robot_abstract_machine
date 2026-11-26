@@ -15,11 +15,12 @@ from typing_extensions import Any
 from ultralytics.engine.results import Results
 
 from robokudo.types.human import BodyKeypoint
+from krrood.patterns.called_positionally import called_positionally
 
 # %% detection model
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NormalizedBox:
     """
     A bounding box given as fractions of the image width and height.
@@ -45,7 +46,7 @@ class NormalizedBox:
     Fraction of the image height above the box's bottom edge.
     """
 
-    def corners_in(self, image: np.ndarray) -> list[float]:
+    def corners_in(self, *, image: np.ndarray) -> list[float]:
         """
         :return: The corners (x1, y1, x2, y2) of the box in pixels of the given image.
         """
@@ -58,7 +59,7 @@ class NormalizedBox:
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NormalizedKeypoint:
     """
     A body keypoint given as fractions of the image width and height.
@@ -79,7 +80,7 @@ class NormalizedKeypoint:
     Confidence that the keypoint is visible at this position.
     """
 
-    def in_pixels_of(self, image: np.ndarray) -> BodyKeypoint:
+    def in_pixels_of(self, *, image: np.ndarray) -> BodyKeypoint:
         """
         :return: The keypoint in pixels of the given image.
         """
@@ -89,7 +90,7 @@ class NormalizedKeypoint:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockDetection:
     """
     A detection the mock model reports on every image.
@@ -116,7 +117,7 @@ class MockDetection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockDetectionModel:
     """
     YOLO mock reporting its predefined detections on any image.
@@ -147,6 +148,7 @@ class MockDetectionModel:
     The further ultralytics prediction settings of the last prediction, by keyword.
     """
 
+    @called_positionally
     def predict(
         self, image: np.ndarray, conf: float, **prediction_settings: Any
     ) -> list[Results]:
@@ -162,7 +164,7 @@ class MockDetectionModel:
         boxes = torch.tensor(
             [
                 [
-                    *detection.box.corners_in(image),
+                    *detection.box.corners_in(image=image),
                     detection.confidence,
                     detection.class_id,
                 ]
@@ -176,7 +178,7 @@ class MockDetectionModel:
                     [
                         [pixel.x, pixel.y, pixel.confidence]
                         for pixel in (
-                            keypoint.in_pixels_of(image)
+                            keypoint.in_pixels_of(image=image)
                             for keypoint in detection.keypoints
                         )
                     ]
@@ -195,13 +197,13 @@ class MockDetectionModel:
 # %% segmentation model
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TopHalfSegmentationModel:
     """
     SAM mock segmenting the upper half of every prompted bounding box.
     """
 
-    def segment(self, image: np.ndarray, corners: list[float]) -> np.ndarray:
+    def segment(self, *, image: np.ndarray, corners: list[float]) -> np.ndarray:
         """
         :return: A mask on the image covering the upper half of the box.
         """
@@ -210,18 +212,19 @@ class TopHalfSegmentationModel:
         mask[y1 : (y1 + y2) // 2, x1:x2] = 1.0
         return mask
 
+    @called_positionally
     def predict(self, image: np.ndarray, bboxes: list[list[float]]) -> list[Results]:
         """
         :return: The segmentation of the first prompted box.
         """
-        mask = self.segment(image, bboxes[0])
+        mask = self.segment(image=image, corners=bboxes[0])
         return [Results(image, path="", names={}, masks=torch.tensor(mask[None]))]
 
 
 # %% model loading
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockModelLoader:
     """
     The models handed out in place of the ones ultralytics would load.
@@ -249,6 +252,7 @@ class MockModelLoader:
     The locations the segmentation model was loaded from.
     """
 
+    @called_positionally
     def load_model(self, location: str) -> MockDetectionModel:
         """
         Mock of constructing a YOLO model from the given location.
@@ -256,6 +260,7 @@ class MockModelLoader:
         self.loaded_model_locations.append(location)
         return self.model
 
+    @called_positionally
     def load_segmentation_model(self, location: str) -> TopHalfSegmentationModel:
         """
         Mock of constructing a SAM model from the given location.

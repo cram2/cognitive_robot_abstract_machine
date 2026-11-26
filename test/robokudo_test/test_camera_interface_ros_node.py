@@ -39,7 +39,7 @@ class CameraConfigWithoutTF(TfComponent):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegisteredNode:
     """
     Mimic a registered ROS node.

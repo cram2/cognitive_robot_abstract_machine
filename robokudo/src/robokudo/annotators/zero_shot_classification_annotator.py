@@ -81,7 +81,7 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
         return cv2.FONT_HERSHEY_COMPLEX
 
     @abstractmethod
-    def classify(self, images: list[Image.Image]) -> list[list[Classification]]:
+    def classify(self, *, images: list[Image.Image]) -> list[list[Classification]]:
         """
         Classify each image against the vocabulary.
 
@@ -91,21 +91,23 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
         """
 
     @staticmethod
-    def _rgb_image(color_image: npt.NDArray[np.uint8]) -> Image.Image:
+    def _rgb_image(*, color_image: npt.NDArray[np.uint8]) -> Image.Image:
         """
         :param color_image: A color image in the BGR channel order of the CAS.
         :return: The color image in the RGB channel order :meth:`classify` expects.
         """
         return Image.fromarray(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
 
-    def _analyze_scene(self, color_image: npt.NDArray[np.uint8]) -> Status:
+    def _analyze_scene(self, *, color_image: npt.NDArray[np.uint8]) -> Status:
         """
         Analyze the entire color image.
 
         :param color_image: The color image to analyze.
         :return: The py_trees status.
         """
-        classifications = self.classify([self._rgb_image(color_image)])[0]
+        classifications = self.classify(
+            images=[self._rgb_image(color_image=color_image)]
+        )[0]
         self.get_cas().annotations.extend(classifications)
 
         visualization_img = color_image.copy()
@@ -130,10 +132,12 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
                 f"confidence\t {classification.confidence:.4f}"
             )
 
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
         return Status.SUCCESS
 
-    def _analyze_object_hypotheses(self, color_image: npt.NDArray[np.uint8]) -> Status:
+    def _analyze_object_hypotheses(
+        self, *, color_image: npt.NDArray[np.uint8]
+    ) -> Status:
         """
         Analyze the object hypothesis using the given color image.
 
@@ -141,7 +145,7 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
         :return: The py_trees status.
         """
         ohs: list[ObjectHypothesis] = self.get_cas().filter_annotations_by_type(
-            ObjectHypothesis
+            type_to_include=ObjectHypothesis
         )
         if len(ohs) == 0:
             logger.info("Found 0 object hypotheses to analyze")
@@ -155,13 +159,13 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
                 return Status.SUCCESS
 
         # Create per-object image crop
-        rgb_image = self._rgb_image(color_image)
+        rgb_image = self._rgb_image(color_image=color_image)
         cropped_images = [rgb_image.crop(oh.roi.roi.get_corner_points()) for oh in ohs]
 
         visualization_img = color_image.copy()
 
         for object_hypothesis, classifications in zip(
-            ohs, self.classify(cropped_images)
+            ohs, self.classify(images=cropped_images)
         ):
             logger.info(
                 f"Classification results for object hypothesis identifier: '{object_hypothesis.id}'"
@@ -194,7 +198,7 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
                     f"with confidence {classification.confidence:.4f}"
                 )
 
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
         return Status.SUCCESS
 
     def compute(self) -> Status:
@@ -207,12 +211,12 @@ class ZeroShotClassificationAnnotator(ThreadedAnnotator, ABC):
         start_time = time.perf_counter()
         analysis_scope = self.descriptor.parameters.analysis_scope
 
-        color_image = self.get_cas().get(CASViews.COLOR_IMAGE).copy()
+        color_image = self.get_cas().get(view_name=CASViews.COLOR_IMAGE).copy()
 
         if analysis_scope == CASViews.COLOR_IMAGE:
-            status = self._analyze_scene(color_image)
+            status = self._analyze_scene(color_image=color_image)
         elif analysis_scope == ObjectHypothesis:
-            status = self._analyze_object_hypotheses(color_image)
+            status = self._analyze_object_hypotheses(color_image=color_image)
         else:
             self.feedback_message = f"Unknown analysis scope: {analysis_scope}"
             return Status.FAILURE

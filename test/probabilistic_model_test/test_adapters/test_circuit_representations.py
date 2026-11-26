@@ -23,7 +23,7 @@ from probabilistic_model.adapters.rustworkx_tensorized.tensorized_to_rustworkx i
     LayeredCircuitToRustworkxCircuitConverter,
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit as RustworkxProbabilisticCircuit,
     ProductUnit,

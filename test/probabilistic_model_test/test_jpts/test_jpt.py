@@ -1,3 +1,7 @@
+"""
+Tests of learning joint probability trees.
+"""
+
 from __future__ import annotations
 
 import json
@@ -24,12 +28,12 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
 )
 from probabilistic_model.distributions.gaussian import GaussianDistribution
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import (
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
     AnnotatedVariable,
     infer_variables_from_dataframe,
 )
-from probabilistic_model.learning.nyga_induction import NygaInduction
+from probabilistic_model.learning.structure.nyga_induction import NygaInduction
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
     ProductUnit,

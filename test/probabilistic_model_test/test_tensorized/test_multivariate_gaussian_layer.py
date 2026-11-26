@@ -34,7 +34,7 @@ from probabilistic_model.distributions.truncated_multivariate_gaussian import (
     MomentIntegration,
 )
 from probabilistic_model.exceptions import NoClosedFormError
-from probabilistic_model.learning.gaussian_mixture.gaussian_mixture_model import (
+from probabilistic_model.learning.structure.gaussian_mixture.gaussian_mixture_model import (
     GaussianMixtureModel,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (

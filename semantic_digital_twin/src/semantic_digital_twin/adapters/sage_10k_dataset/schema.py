@@ -1,9 +1,11 @@
 """
-The Sage 10k dataset's scene description, mirrored in dataclasses that build a world.
+The scenes of the SAGE-10k dataset as its JSON files describe them, and building worlds
+from them.
 """
 
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -28,9 +30,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoorWithType,
 )
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -726,8 +731,10 @@ class Sage10kDoor(Sage10kWithID):
             )
 
         return door.mount_on_movable_joint(
-            RevoluteConnectionSpecification(
-                axis=Vector3.Z(),
+            ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=limits,
             )
         )

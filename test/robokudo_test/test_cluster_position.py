@@ -1,3 +1,7 @@
+"""
+Tests of the cluster position annotator.
+"""
+
 # %% imports
 
 from __future__ import annotations
@@ -38,7 +42,7 @@ def test_position_requires_nonempty_cloud(
     annotator.descriptor.parameters.analysis_scope = analysis_scope
     pipeline.add_child(annotator)
     pipeline.setup()
-    pipeline.cas.set(CASViews.CLOUD, cloud)
+    pipeline.cas.set(view_name=CASViews.CLOUD, value=cloud)
     pipeline.cas.annotations.append(hypothesis)
 
     assert annotator.update() == Status.SUCCESS

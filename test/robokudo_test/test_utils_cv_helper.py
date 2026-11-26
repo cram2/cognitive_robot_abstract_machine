@@ -1,3 +1,9 @@
+"""
+Tests of the OpenCV helper utilities.
+"""
+
+from __future__ import annotations
+
 import copy
 
 import numpy as np
@@ -31,6 +37,10 @@ from robokudo.utils.cv_helper import (
 
 
 class TestUtilsCVHelper(object):
+    """
+    Tests of the OpenCV helper functions.
+    """
+
     @pytest.fixture()
     def annotator_in_pipeline(self) -> BaseAnnotator:
         root = Pipeline("Sequence")
@@ -135,8 +145,8 @@ class TestUtilsCVHelper(object):
         image = np.zeros((height, width, 3), dtype=np.uint8)
 
         cas.set(
-            robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
-            ColorToDepthRatio(horizontal=scalex, vertical=scaley),
+            view_name=robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
+            value=ColorToDepthRatio(horizontal=scalex, vertical=scaley),
         )
 
         annotator_in_pipeline.camera_intrinsics = copy.deepcopy(kinect_intrinsics)
@@ -151,7 +161,7 @@ class TestUtilsCVHelper(object):
         self, annotator_in_pipeline: BaseAnnotator
     ):
         cas = annotator_in_pipeline.get_cas()
-        cas.set(robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO, None)
+        cas.set(view_name=robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO, value=None)
         image = np.zeros((640, 480, 3), dtype=np.uint8)
         assert pytest.raises(
             RuntimeError, get_scaled_color_image_for_depth_image, cas, image
@@ -255,9 +265,9 @@ class TestUtilsCVHelper(object):
             image, x, y, w, h, value=(255, 0, 0)
         )
 
-        assert (
-            np.sum(modified_image != 0) == expected_points
-        ), f"Expected {expected_points} pixels to be set"
+        assert np.sum(modified_image != 0) == expected_points, (
+            f"Expected {expected_points} pixels to be set"
+        )
         assert image.shape == modified_image.shape, "Image shape changed"
 
     @pytest.mark.parametrize(
@@ -379,24 +389,24 @@ class TestUtilsCVHelper(object):
 
         new_x, new_y, new_width, new_height = adjust_roi(image, roi, offset)
 
-        assert (
-            0 <= new_x < w
-        ), f"{roi} x should be expanded by {offset} within image width"
-        assert (
-            0 <= new_y < h
-        ), f"{roi} y should be expanded by {offset} within image width"
-        assert (
-            1 <= new_width <= w
-        ), f"{roi} width should be at least 1 and within image width"
-        assert (
-            1 <= new_height <= h
-        ), f"{roi} width should be at least 1 and within image width"
-        assert (
-            1 <= new_x + new_width <= w
-        ), f"{roi} width should be expanded by {offset} within image width"
-        assert (
-            1 <= new_y + new_height <= h
-        ), f"{roi} height should be expanded by {offset} within image width"
+        assert 0 <= new_x < w, (
+            f"{roi} x should be expanded by {offset} within image width"
+        )
+        assert 0 <= new_y < h, (
+            f"{roi} y should be expanded by {offset} within image width"
+        )
+        assert 1 <= new_width <= w, (
+            f"{roi} width should be at least 1 and within image width"
+        )
+        assert 1 <= new_height <= h, (
+            f"{roi} width should be at least 1 and within image width"
+        )
+        assert 1 <= new_x + new_width <= w, (
+            f"{roi} width should be expanded by {offset} within image width"
+        )
+        assert 1 <= new_y + new_height <= h, (
+            f"{roi} height should be expanded by {offset} within image width"
+        )
 
     @pytest.mark.parametrize(
         ["image_dim", "roi", "offset"],
@@ -464,24 +474,24 @@ class TestUtilsCVHelper(object):
 
         adjust_image_roi(image, image_roi, offset)
 
-        assert (
-            0 <= image_roi.roi.pos.x <= w
-        ), f"{roi} x should be expanded by {offset} within image width"
-        assert (
-            0 <= image_roi.roi.pos.y <= h
-        ), f"{roi} y should be expanded by {offset} within image width"
-        assert (
-            1 <= image_roi.roi.width <= w
-        ), f"{roi} width should be at least 1 and within image width"
-        assert (
-            1 <= image_roi.roi.height <= h
-        ), f"{roi} width should be at least 1 and within image width"
-        assert (
-            1 <= image_roi.roi.pos.x + image_roi.roi.width <= w
-        ), f"{roi} width should be expanded by {offset} within image width"
-        assert (
-            1 <= image_roi.roi.pos.y + image_roi.roi.height <= h
-        ), f"{roi} height should be expanded by {offset} within image width"
+        assert 0 <= image_roi.roi.pos.x <= w, (
+            f"{roi} x should be expanded by {offset} within image width"
+        )
+        assert 0 <= image_roi.roi.pos.y <= h, (
+            f"{roi} y should be expanded by {offset} within image width"
+        )
+        assert 1 <= image_roi.roi.width <= w, (
+            f"{roi} width should be at least 1 and within image width"
+        )
+        assert 1 <= image_roi.roi.height <= h, (
+            f"{roi} width should be at least 1 and within image width"
+        )
+        assert 1 <= image_roi.roi.pos.x + image_roi.roi.width <= w, (
+            f"{roi} width should be expanded by {offset} within image width"
+        )
+        assert 1 <= image_roi.roi.pos.y + image_roi.roi.height <= h, (
+            f"{roi} height should be expanded by {offset} within image width"
+        )
 
     @pytest.mark.parametrize(
         ["mask", "offset", "fill_value"],

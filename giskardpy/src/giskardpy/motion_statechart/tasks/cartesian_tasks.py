@@ -15,6 +15,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from cramph.composites import Parallel
 from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
+from cramph.world_access import WorldAccess
 from giskardpy.motion_statechart.forward_kinematics_binding import (
     ForwardKinematicsBinding,
 )
@@ -778,6 +779,14 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
     """
     The pose of the link bound when this task starts.
     """
+
+    def compute_world_access(self) -> WorldAccess:
+        """
+        :return: What :meth:`~giskardpy.motion_statechart.graph_node.MotionStatechartNode.compute_world_access`
+            returns, with what its constraints move counted as held, since they keep
+            it where it was.
+        """
+        return super().compute_world_access().treat_moved_as_held()
 
     def set_up(self) -> None:
         """

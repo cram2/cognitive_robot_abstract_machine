@@ -5,13 +5,13 @@
   </material>
   <link name="named_mesh_link">
     <visual>
-      <geometry><mesh filename="stl/milk.stl"/></geometry>
+      <geometry><mesh filename="package://iai_objects/objects/milk.stl"/></geometry>
       <material name="countertop"/>
     </visual>
   </link>
   <link name="inline_mesh_link">
     <visual>
-      <geometry><mesh filename="stl/milk.stl"/></geometry>
+      <geometry><mesh filename="package://iai_objects/objects/milk.stl"/></geometry>
       <material name="red">
         <color rgba="0.8 0 0 1"/>
       </material>
@@ -19,7 +19,7 @@
   </link>
   <link name="uncolored_mesh_link">
     <visual>
-      <geometry><mesh filename="stl/milk.stl"/></geometry>
+      <geometry><mesh filename="package://iai_objects/objects/milk.stl"/></geometry>
     </visual>
   </link>
   <link name="painted_mesh_link">

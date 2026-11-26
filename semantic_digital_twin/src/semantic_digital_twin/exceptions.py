@@ -21,6 +21,7 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from krrood_spatial_math.spatial_types import ScrewAxis
     from semantic_digital_twin.semantic_annotations.semantic_relationship import (
         IsSemanticRelationship,
     )
@@ -818,22 +819,53 @@ class MissingConnectionParentError(UsageError):
         )
 
 
-@dataclass
-class MissingConnectionAxisError(UsageError):
+@dataclass(kw_only=True)
+class UnnormalizedScrewAxisError(UsageError):
     """
-    Raised when an active connection is created without a movement axis.
+    Raised when the screw axis of a screw axis connection is not normalized: one that
+    rotates must rotate one radian per unit of position, and one that does not rotate
+    must translate one meter per unit of position.
     """
 
-    connection_type_name: str
+    screw_axis: ScrewAxis
     """
-    The name of the active connection type that was created without an axis.
+    The screw axis the connection was given.
     """
 
     def error_message(self) -> str:
-        return f"'{self.connection_type_name}' is an active connection and requires an axis."
+        return (
+            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} is not "
+            f"normalized."
+        )
 
     def suggest_correction(self) -> str:
-        return "pass a movement axis via the 'axis' keyword argument."
+        return (
+            "give a rotating screw axis a unit rotation per unit of position, and one "
+            "that only translates a unit translation; use the multiplier to scale the "
+            "position."
+        )
+
+
+@dataclass(kw_only=True)
+class ScrewAxisWithoutTranslationError(UsageError):
+    """
+    Raised when a translation is asked of a screw axis connection that only rotates its
+    child, so that no position advances the child along the axis.
+    """
+
+    screw_axis: ScrewAxis
+    """
+    The screw axis of the connection.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} has no "
+            f"translation, so the child never translates along it."
+        )
+
+    def suggest_correction(self) -> str:
+        return "give the rotation as a position in radians instead."
 
 
 @dataclass

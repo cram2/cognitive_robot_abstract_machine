@@ -52,6 +52,7 @@ from cramph.exceptions import (
     UnknownTransitionKindError,
 )
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
+from cramph.world_access import WorldAccess
 from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import (
@@ -73,6 +74,7 @@ from cramph.structure_change_recorder import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from cramph.state_history import StateHistory
     from cramph.statechart import Statechart
     from semantic_digital_twin.world import World
 
@@ -283,6 +285,24 @@ class TransitionCondition(SubclassJSONSerializer):
             for variable in self.expression.free_variables()
             if isinstance(variable, ConditionVariable)
         ]
+
+    def was_true_at_tick(self, *, history: StateHistory, tick: int) -> bool:
+        """
+        :param history: The history of the statechart the condition's nodes run in.
+        :param tick: A tick the history covers.
+        :return: Whether the condition was true in the state recorded at `tick`.
+        """
+        variables: list[DerivedConditionVariable] = self.expression.free_variables()
+        if not variables:
+            return self.expression.is_constant_true()
+        value = self.expression.substitute(
+            old_variables=variables,
+            new_variables=[
+                Scalar(float(variable.truth_value_at_tick(history=history, tick=tick)))
+                for variable in variables
+            ],
+        )
+        return value.is_constant_true()
 
     @property
     def node_dependencies(self) -> list[StatechartNode]:
@@ -597,6 +617,16 @@ class DerivedConditionVariable(ConditionVariable, ABC):
         """
 
     @abstractmethod
+    def truth_value_at_tick(
+        self, *, history: StateHistory, tick: int
+    ) -> ObservationStateValue:
+        """
+        :param history: The history of the statechart this variable's node runs in.
+        :param tick: A tick the history covers.
+        :return: The value this variable held in the state recorded at `tick`.
+        """
+
+    @abstractmethod
     def for_node(self, *, node: StatechartNode) -> Self:
         """
         :param node: The node to apply this variable's test to.
@@ -685,6 +715,15 @@ class LifeCyclePredicateVariable(DerivedConditionVariable):
     def for_node(self, *, node: StatechartNode) -> Self:
         return node._life_cycle_predicate(predicate=self.predicate)
 
+    def truth_value_at_tick(
+        self, *, history: StateHistory, tick: int
+    ) -> ObservationStateValue:
+        return self.predicate.truth_value(
+            life_cycle_value=history.snapshot_at_tick(tick=tick).life_cycle_state_of(
+                node=self.statechart_node
+            )
+        )
+
     def expression(self) -> Scalar:
         """
         :return: The truth table of this predicate over the life cycle state of its node.
@@ -736,6 +775,20 @@ class ObservationPredicateVariable(DerivedConditionVariable):
 
     def for_node(self, *, node: StatechartNode) -> Self:
         return node._observation_predicate(predicate=self.predicate)
+
+    def truth_value_at_tick(
+        self, *, history: StateHistory, tick: int
+    ) -> ObservationStateValue:
+        match self.predicate.reading:
+            case ObservationReading.CURRENT:
+                observation = history.snapshot_at_tick(tick=tick).observation_state_of(
+                    node=self.statechart_node
+                )
+            case ObservationReading.LAST:
+                observation = history.last_known_observation_of(
+                    node=self.statechart_node, tick=tick
+                )
+        return self.predicate.truth_value(observation=observation)
 
     def expression(self) -> Scalar:
         """
@@ -1101,6 +1154,13 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             ancestors.append(ancestor)
             ancestor = ancestor.parent_node
         return ancestors
+
+    def is_ancestor_or_descendant_of(self, *, other: StatechartNode) -> bool:
+        """
+        :param other: Another node.
+        :return: Whether this node is `other`, holds it or is held by it.
+        """
+        return self is other or self in other.path or other in self.path
 
     def find_upwards(
         self, *, predicate: Callable[[StatechartNode], bool]
@@ -1643,6 +1703,17 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         :return: A NodeArtifacts instance that describes this node.
         """
         return NodeArtifacts()
+
+    def compute_world_access(self) -> WorldAccess:
+        """
+        :return: What this built node changes and reads in the world: here, the degrees
+            of freedom its observation reads.
+        """
+        return WorldAccess(
+            read_degrees_of_freedom=WorldAccess.degrees_of_freedom_in_expression(
+                expression=self.artifacts.observation
+            )
+        )
 
     def on_tick(self) -> ObservationStateValue | None:
         """
