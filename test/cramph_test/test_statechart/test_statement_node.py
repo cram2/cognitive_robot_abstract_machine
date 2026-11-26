@@ -205,6 +205,37 @@ def test_a_statement_of_a_sequence_grounds_to_the_sequence_its_chosen_child_hold
     assert step.grounded_nodes == [candidate]
 
 
+# %% statements sharing a variable
+
+
+def test_a_later_statement_takes_the_value_an_earlier_one_was_grounded_with(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The earlier statement only admits the second name, so the later one, which admits
+    both, takes the second name as well.
+    """
+    name = variable(str, domain=["first", "second"])
+    earlier_statement = a(NodeSucceedingOnObservingTrue)(
+        name=name, observation=ObservationStateValue.TRUE
+    )
+    earlier_statement.where(earlier_statement.name == "second")
+    earlier = StatementNode(statement=earlier_statement)
+    later = StatementNode(
+        statement=a(NodeSucceedingOnObservingTrue)(
+            name=name, observation=ObservationStateValue.TRUE
+        )
+    )
+    sequence = Sequence(nodes=[earlier, later])
+
+    _run(statechart_executor, ChooserRunningEveryCandidate(), sequence)
+
+    assert [step.grounded_nodes[0].name for step in (earlier, later)] == [
+        "second",
+        "second",
+    ]
+
+
 # %% the candidates of a statement
 
 

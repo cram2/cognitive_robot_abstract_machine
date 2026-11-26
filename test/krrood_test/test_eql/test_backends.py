@@ -28,6 +28,8 @@ from krrood.entity_query_language.backends import (
     EntityQueryLanguageBackend,
     EntityQueryLanguageGenerativeBackend,
 )
+from krrood.entity_query_language.enums import CombinationOrder
+from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.ormatic.eql_interface import SQLAlchemyBackend
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.core.base_expressions import (
@@ -638,3 +640,115 @@ def test_a_sampled_row_is_a_role_of_the_operation_result_of_its_bindings(
     assert Role.roles_for(
         role_taker=row.role_taker, role_type=ProbabilisticOperationResult
     ) == [row]
+
+
+# %% enumerating combinations by rank sum
+
+
+def test_combinations_by_rank_sum_combine_the_early_values_of_every_variable_first() -> (
+    None
+):
+    values = [0.0, 1.0, 2.0]
+    query = a(KRROODPosition)(x=variable_from(values), y=variable_from(values), z=0.0)
+    backend = EntityQueryLanguageGenerativeBackend(
+        combination_order=CombinationOrder.RANK_SUM
+    )
+
+    positions = list(query.evaluate(backend=backend))
+
+    assert [(position.x, position.y) for position in positions] == list(
+        CartesianProductByRankSum(factors=[values, values])
+    )
+
+
+def test_combinations_by_rank_sum_give_a_shared_variable_one_value() -> None:
+    """
+    The variable both coordinates read takes one value per combination, combined by rank
+    sum with the values of the third coordinate.
+    """
+    values = [0.0, 1.0, 2.0]
+    heights = [5.0, 6.0]
+    shared = variable_from(values)
+    query = a(KRROODPosition)(x=shared, y=shared, z=variable_from(heights))
+    backend = EntityQueryLanguageGenerativeBackend(
+        combination_order=CombinationOrder.RANK_SUM
+    )
+
+    positions = list(query.evaluate(backend=backend))
+
+    assert [(position.x, position.y, position.z) for position in positions] == [
+        (value, value, height)
+        for value, height in CartesianProductByRankSum(factors=[values, heights])
+    ]
+
+
+# %% answering a match under values given for some of its variables
+
+
+def test_a_given_value_fixes_its_variable_in_every_answer() -> None:
+    x = variable_from([0.0, 1.0, 2.0])
+    heights = [5.0, 6.0]
+    query = a(KRROODPosition)(x=x, y=0.0, z=variable_from(heights))
+
+    answers = list(
+        EntityQueryLanguageGenerativeBackend().evaluate_under(
+            expression=query, variable_values={x._id_: 1.0}
+        )
+    )
+
+    assert [(answer.value.x, answer.value.z) for answer in answers] == [
+        (1.0, height) for height in heights
+    ]
+
+
+def test_an_answer_reports_the_values_its_variables_took() -> None:
+    x = variable_from([0.0, 1.0])
+    z = variable_from([5.0, 6.0])
+    query = a(KRROODPosition)(x=x, y=0.0, z=z)
+
+    answers = list(
+        EntityQueryLanguageGenerativeBackend().evaluate_under(
+            expression=query, variable_values={}
+        )
+    )
+
+    assert [
+        (answer.variable_values[x._id_], answer.variable_values[z._id_])
+        for answer in answers
+    ] == [(answer.value.x, answer.value.z) for answer in answers]
+
+
+def test_a_variable_shared_by_nested_matches_takes_one_value() -> None:
+    """
+    The positions of a pose and of the pose nested in it read one variable, so a given
+    value of it fixes both.
+    """
+    x = variable_from([0.0, 1.0, 2.0])
+    query = a(KRROODPositions)(
+        positions=[
+            a(KRROODPosition)(x=x, y=0.0, z=0.0),
+            a(KRROODPosition)(x=x, y=1.0, z=0.0),
+        ],
+        some_strings=[],
+    )
+
+    [answer] = EntityQueryLanguageGenerativeBackend().evaluate_under(
+        expression=query, variable_values={x._id_: 2.0}
+    )
+
+    assert [position.x for position in answer.value.positions] == [2.0, 2.0]
+
+
+def test_the_where_conditions_of_a_nested_match_hold_for_the_instance_built_for_it() -> (
+    None
+):
+    values = [0.0, 1.0, 2.0]
+    inner = a(KRROODPosition)(x=variable_from(values), y=0.0, z=0.0)
+    inner.where(inner.x > 0.5)
+    query = a(KRROODPositions)(positions=[inner], some_strings=[])
+
+    holders = list(query.evaluate(backend=EntityQueryLanguageGenerativeBackend()))
+
+    assert [holder.positions[0].x for holder in holders] == [
+        value for value in values if value > 0.5
+    ]

@@ -570,7 +570,12 @@ class Match(
             match=self, access_path_name=access_path_name
         )
 
-    def _construct_instance_from_bindings_(self, *, bindings: Bindings) -> T:
+    def _construct_instance_from_bindings_(
+        self,
+        *,
+        bindings: Bindings,
+        constructed_instances: dict[uuid.UUID, Any] | None = None,
+    ) -> T:
         """
         Construct an instance of the matched type from the values the bindings give the
         variables of this match's pattern, leaving the pattern itself unchanged.
@@ -580,27 +585,108 @@ class Match(
 
         :param bindings: The values of the pattern's variables, keyed by the identifier
             of the variable assigned to each attribute.
+        :param constructed_instances: Receives the instance constructed for this match
+            and for every match nested in it, keyed by the identifier of the match.
         :return: The constructed instance.
         :raises UnboundPatternVariable: If the bindings do not bind a variable that
             states no value of its own.
         """
         self.resolve()
-        return self._factory_(
+        instance = self._factory_(
             **{
                 keyword: self._construct_argument_from_bindings_(
-                    keyword=keyword, bindings=bindings
+                    keyword=keyword,
+                    bindings=bindings,
+                    constructed_instances=constructed_instances,
                 )
                 for keyword in self._factory_keyword_arguments_
             }
         )
+        if constructed_instances is not None:
+            constructed_instances[self._id_] = instance
+        return instance
+
+    def _instances_constructed_from_bindings_(
+        self, *, bindings: Bindings
+    ) -> Iterator[T]:
+        """
+        :param bindings: See :meth:`_construct_instance_from_bindings_`.
+        :return: The instance constructed from `bindings`, unless the instance
+            constructed for a match nested in this one violates that match's ``where``
+            conditions, in which case nothing.
+        """
+        constructed_instances: dict[uuid.UUID, Any] = {}
+        instance = self._construct_instance_from_bindings_(
+            bindings=bindings, constructed_instances=constructed_instances
+        )
+        if self._nested_matches_hold_for_(constructed_instances=constructed_instances):
+            yield instance
+
+    def _nested_matches_hold_for_(
+        self, *, constructed_instances: dict[uuid.UUID, Any]
+    ) -> bool:
+        """
+        :param constructed_instances: The instances constructed for this match and the
+            matches nested in it, see :meth:`_construct_instance_from_bindings_`.
+        :return: Whether the instance constructed for every match nested in this one
+            satisfies that match's ``where`` conditions.
+        """
+        return all(
+            list(
+                nested._select_satisfying_(
+                    instances=[constructed_instances[nested._id_]]
+                )._evaluate_natively_()
+            )
+            != []
+            for nested in self._nested_matches_with_where_conditions_
+        )
+
+    @property
+    def _variables_read_(self) -> list[Variable]:
+        """
+        :return: The variables of this match's pattern and the variables its attributes
+            take their values from, anywhere in the pattern, each once.
+        """
+        variables = {}
+        for attribute_match in self._matches_with_variables_:
+            variables[attribute_match.assigned_variable._id_] = (
+                attribute_match.assigned_variable
+            )
+            value = attribute_match.assigned_value
+            if not isinstance(value, SymbolicExpression):
+                continue
+            for expression in (value, *value._descendants_):
+                if isinstance(expression, Variable):
+                    variables[expression._id_] = expression
+        return list(variables.values())
+
+    @property
+    def _nested_matches_with_where_conditions_(self) -> list[Match]:
+        """
+        :return: The matches nested anywhere in this match's pattern that have ``where``
+            conditions of their own.
+        """
+        self.resolve()
+        return [
+            expression.assigned_value
+            for expression in self._descendants_
+            if isinstance(expression, AttributeMatch)
+            and isinstance(expression.assigned_value, Match)
+            and expression.assigned_value._where_conditions_
+        ]
 
     def _construct_argument_from_bindings_(
-        self, *, keyword: str, bindings: Bindings
+        self,
+        *,
+        keyword: str,
+        bindings: Bindings,
+        constructed_instances: dict[uuid.UUID, Any] | None,
     ) -> Any:
         """
         :param keyword: A keyword argument of the pattern that is passed to the factory.
         :param bindings: The values of the pattern's variables, keyed by the identifier
             of the variable assigned to each attribute.
+        :param constructed_instances: See :meth:`_construct_instance_from_bindings_`.
         :return: The value the keyword's attribute takes under the bindings; a list-like
             value whose elements are matched one by one is rebuilt from its elements.
         """
@@ -610,9 +696,13 @@ class Match(
             if attribute_match.attribute_name == keyword
         ]
         if attribute_matches[0].index_access is None:
-            return attribute_matches[0].construct_value_from_bindings(bindings=bindings)
+            return attribute_matches[0].construct_value_from_bindings(
+                bindings=bindings, constructed_instances=constructed_instances
+            )
         return type(self._kwargs_[keyword])(
-            attribute_match.construct_value_from_bindings(bindings=bindings)
+            attribute_match.construct_value_from_bindings(
+                bindings=bindings, constructed_instances=constructed_instances
+            )
             for attribute_match in attribute_matches
         )
 
@@ -997,10 +1087,17 @@ class AttributeMatch(AbstractMatchExpression[T]):
     def __str__(self):
         return self._name_
 
-    def construct_value_from_bindings(self, *, bindings: Bindings) -> Any:
+    def construct_value_from_bindings(
+        self,
+        *,
+        bindings: Bindings,
+        constructed_instances: dict[uuid.UUID, Any] | None = None,
+    ) -> Any:
         """
         :param bindings: The values of the pattern's variables, keyed by the identifier
             of the variable assigned to each attribute.
+        :param constructed_instances: See
+            :meth:`Match._construct_instance_from_bindings_`.
         :return: The value this attribute takes under the bindings: an instance
             constructed from them for a nested match, otherwise the value of the
             assigned variable evaluated under them.
@@ -1009,7 +1106,7 @@ class AttributeMatch(AbstractMatchExpression[T]):
         """
         if isinstance(self.assigned_value, Match):
             return self.assigned_value._construct_instance_from_bindings_(
-                bindings=bindings
+                bindings=bindings, constructed_instances=constructed_instances
             )
         if (
             not isinstance(self.assigned_variable, Literal)

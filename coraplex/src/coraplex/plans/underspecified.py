@@ -9,10 +9,12 @@ import logging
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from typing_extensions import (
     TYPE_CHECKING,
     Any,
+    Mapping,
 )
 
 from coraplex.datastructures.enums import ActionTrialVisualization
@@ -27,11 +29,13 @@ from cramph.visualization import RvizVisualization
 from cramph.context import StatechartContext
 from cramph.composites import (
     ChildChooser,
+    CombinationRequirement,
     CompositeNodeChoosingItsChild,
     ControlStructureNodeRunningItsChildrenInTurn,
     GenericChoosingNode,
     Parallel,
     Sequence,
+    StatementCombination,
     StatementNode,
     StatementsGroundedTogether,
 )
@@ -41,6 +45,15 @@ from cramph.data_types import TransitionKind
 from cramph.node import DerivedConditionVariable, NodeRebuild, StatechartNode
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.monitors.progress_monitors import Stalled
+from krrood.entity_query_language.predicate import Predicate
+from krrood.entity_query_language.verbalization.fragments.base import (
+    VerbalizationFragment,
+)
+from krrood.entity_query_language.verbalization.vocabulary.parts_of_speech import (
+    Noun,
+    Verb,
+    clause,
+)
 
 if TYPE_CHECKING:
     from coraplex.plans.executors import PlanExecutor
@@ -630,6 +643,95 @@ class ActionTrial:
         self._source_versions = None
 
 
+# %% the trial as a condition on the candidates of statements
+
+
+@dataclass(kw_only=True, eq=False)
+class SucceedsItsTrial(Predicate):
+    """
+    Whether a combination of candidates of statements runs to completion in a trial, in
+    what is left to run around the statements, see
+    :meth:`SubtreeRebuild.unfinished_nodes`.
+    """
+
+    combination: StatementCombination
+    """
+    The candidate of each of :attr:`statements`, in their order.
+    """
+
+    statements: list[StatementNode]
+    """
+    The statements the candidates are tried for.
+    """
+
+    root: StatechartNode
+    """
+    The running node of the plan the candidates are tried below.
+    """
+
+    trial: ActionTrial
+    """
+    The trial the candidates are tried in.
+    """
+
+    def __call__(self) -> bool:
+        return self.succeeded
+
+    @cached_property
+    def succeeded(self) -> bool:
+        """
+        :return: Whether the trial of :attr:`combination` succeeded, tried once however
+            often the predicate is asked.
+        """
+        return self.trial.succeeds(
+            rebuild=SubtreeRebuild.unfinished_nodes(
+                root=self.root,
+                proposals=dict(zip(self.statements, self.combination.candidates)),
+            ),
+            tried_statements=frozenset(self.statements),
+        )
+
+    @classmethod
+    def _verbalization_fragment_(
+        cls, *, fields: Mapping[str, VerbalizationFragment]
+    ) -> VerbalizationFragment:
+        return clause(
+            Noun(content=fields["combination"]),
+            Verb(lemma="succeed"),
+            Noun(content=fields["trial"]),
+        )
+
+
+@dataclass(kw_only=True)
+class TrialRequirement(CombinationRequirement):
+    """
+    Requires the candidates of statements to succeed their trial together.
+    """
+
+    statements: list[StatementNode]
+    """
+    The statements grounded together.
+    """
+
+    root: StatechartNode
+    """
+    See :attr:`SucceedsItsTrial.root`.
+    """
+
+    trial: ActionTrial
+    """
+    See :attr:`SucceedsItsTrial.trial`.
+    """
+
+    def condition_on(self, *, combination: StatementCombination) -> SucceedsItsTrial:
+        return SucceedsItsTrial(
+            combination=combination,
+            statements=self.statements,
+            root=self.root,
+            trial=self.trial,
+        )
+
+
 # %% grounding underspecified actions while the statechart runs
 
 
@@ -680,84 +782,71 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             or no combination of them, is left that succeeds its trial.
         """
         grounding = node.context.require_extension(extension_type=StatementGrounding)
-        root = SubtreeRebuild.root_around(node)
         statements = self.statements_grounded_with(node)
-        if len(statements) == 1:
-            return self._candidate_alone(node, root, grounding)
-        return self._candidate_together(node, statements, root, grounding)
-
-    def _candidate_alone(
-        self,
-        node: StatementNode,
-        root: StatechartNode,
-        grounding: StatementGrounding,
-    ) -> StatechartNode | None:
-        """
-        :return: The sequence holding the next candidate of `node` that succeeds its
-            trial, or None once there is none.
-        """
-        candidate = node.next_candidate(
-            query_backend=grounding.query_backend,
-            default_candidate_limit=grounding.candidates_to_try,
+        requirement = TrialRequirement(
+            statements=statements,
+            root=SubtreeRebuild.root_around(node),
+            trial=self.trial,
         )
-        while candidate is not None:
-            if self.trial.succeeds(
-                rebuild=SubtreeRebuild.unfinished_nodes(
-                    root=root, proposals={node: candidate}
-                ),
-                tried_statements=frozenset({node}),
-            ):
-                return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
+        if len(statements) == 1:
             candidate = node.next_candidate(
                 query_backend=grounding.query_backend,
                 default_candidate_limit=grounding.candidates_to_try,
+                requirements=(requirement,),
             )
-        node.stop_grounding()
-        return None
+        else:
+            candidate = self._candidate_together(
+                node=node,
+                statements=statements,
+                grounding=grounding,
+                requirement=requirement,
+            )
+        if candidate is None:
+            node.stop_grounding()
+            return None
+        return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
 
     def _candidate_together(
         self,
+        *,
         node: StatementNode,
         statements: list[StatementNode],
-        root: StatechartNode,
         grounding: StatementGrounding,
+        requirement: TrialRequirement,
     ) -> StatechartNode | None:
         """
         Grounds `statements` anew, into the first combination of their candidates that
         succeeds its trial, and hands every statement but `node` its candidate of it.
-        Once no combination is left, every one of `statements` gives up.
+        Once no combination is left, every one of `statements` but `node` gives up.
 
-        :return: The sequence holding the candidate of `node` of that combination, or
-            None once there is none.
+        :return: The candidate of `node` of that combination, or None once there is
+            none.
         """
         for statement in statements:
             statement.stop_grounding()
-        combinations = StatementsGroundedTogether(
-            statements=statements,
-            query_backend=grounding.query_backend,
-            default_candidate_limit=grounding.candidates_to_try,
+        combination = next(
+            iter(
+                StatementsGroundedTogether(
+                    statements=statements,
+                    query_backend=grounding.query_backend,
+                    default_candidate_limit=grounding.candidates_to_try,
+                    requirements=(requirement,),
+                )
+            ),
+            None,
         )
-        for combination in combinations:
-            if not self.trial.succeeds(
-                rebuild=SubtreeRebuild.unfinished_nodes(
-                    root=root, proposals=combination
-                ),
-                tried_statements=frozenset(combination),
-            ):
-                continue
-            combinations.take(combination=combination)
+        if combination is None:
             for statement in statements:
                 if statement is not node:
-                    statement.choose_child_with(
-                        chooser=CandidateHandOver(candidate=combination[statement])
-                    )
-            candidate = combination[node]
-            return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
+                    statement.give_up()
+            return None
         for statement in statements:
-            statement.stop_grounding()
+            statement.take(answer=combination[statement])
             if statement is not node:
-                statement.give_up()
-        return None
+                statement.choose_child_with(
+                    chooser=CandidateHandOver(candidate=combination[statement].value)
+                )
+        return combination[node].value
 
     @classmethod
     def statements_grounded_with(cls, node: StatementNode) -> list[StatementNode]:

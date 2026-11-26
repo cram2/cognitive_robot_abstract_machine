@@ -252,3 +252,34 @@ def test_a_sequence_taking_and_putting_down_the_same_milk_tries_the_next_milk(
         (TakeMilkAction, detected_milks.placeable_milk_name, True),
         (PutDownMilkAction, detected_milks.placeable_milk_name, True),
     ]
+
+
+def test_a_later_statement_of_a_sequence_takes_the_milk_an_earlier_one_took(
+    apartment_world_pr2_copy_with_context, detected_milks: DetectedMilks
+) -> None:
+    """
+    The earlier statement only takes the milk that can be put down; the later one, which
+    takes any milk, is grounded under the milk the earlier one was grounded with.
+    """
+    world, robot, extensions = apartment_world_pr2_copy_with_context
+    milk = detected_milks.milk
+    taking_the_placeable_milk = a(TakeMilkAction)(milk=milk)
+    taking_the_placeable_milk.where(
+        taking_the_placeable_milk.milk.root.name == detected_milks.placeable_milk_name
+    )
+    plan = Sequence(
+        nodes=[
+            FunctionCall(function=detected_milks.detection.add_detected_milks),
+            taking_the_placeable_milk,
+            a(TakeMilkAction)(milk=milk),
+        ]
+    )
+
+    run_plan(plan, extensions)
+
+    assert plan.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert [
+        statement.grounded_nodes[0].milk.root.name
+        for statement in plan.nodes
+        if isinstance(statement, StatementNode)
+    ] == [detected_milks.placeable_milk_name, detected_milks.placeable_milk_name]
