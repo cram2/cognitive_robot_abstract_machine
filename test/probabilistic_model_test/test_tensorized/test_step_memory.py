@@ -13,15 +13,22 @@ from array_api_compat import array_namespace
 
 from krrood_compute_resources.memory import HostMemory
 
-from probabilistic_model.learning.step_memory import ProbeMeasurement, StepMemory
-from probabilistic_model.learning.exceptions import (
+from probabilistic_model.learning.parameters.step_memory import (
+    ProbeMeasurement,
+    StepMemory,
+)
+from probabilistic_model.learning.parameters.exceptions import (
     NotEnoughMemoryError,
     UnmeasurableHostStepMemoryError,
     UnmeasurableStepMemoryError,
 )
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
-from probabilistic_model.learning.training_schedule import MiniBatches
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 
 from ...krrood_compute_resources_test.dataset.memory import FixedFreeMemory
 # %% memory of a step
@@ -90,7 +97,9 @@ def test_a_jax_circuit_on_the_cpu_is_trained_in_host_memory(mixture_of_products_
         circuit = mixture_of_products_case.circuit(np).to_namespace(
             jnp, device=jax.devices("cpu")[0]
         )
-        trainer = JaxGradientDescent(circuit.root, AverageNegativeLogLikelihood())
+        trainer = JaxGradientDescent(
+            layer=circuit.root, loss=AverageNegativeLogLikelihood()
+        )
 
     assert isinstance(trainer.device_memory(), HostMemory)
 
@@ -105,7 +114,7 @@ def test_a_compiled_jax_step_needs_memory_for_every_row(mixture_of_products_case
     with jax.enable_x64(True):
         circuit = case.circuit(np).to_namespace(jnp)
         step_memory = JaxGradientDescent(
-            circuit.root, AverageNegativeLogLikelihood()
+            layer=circuit.root, loss=AverageNegativeLogLikelihood()
         ).step_memory(jnp.asarray(data))
 
     assert step_memory.bytes_per_row > 0
@@ -119,21 +128,24 @@ def torch_trainer(mixture_of_products_case, request):
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
+    )
+    torch_circuit_parameter_learning = pytest.importorskip(
+        "probabilistic_model.learning.parameters.torch_circuit_parameter_learning"
     )
     device = torch.device(request.param)
     if (
         device.type
-        == torch_gradient_descent.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+        == torch_circuit_parameter_learning.TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+        and not torch.cuda.is_available()
     ):
-        if not torch.cuda.is_available():
-            pytest.skip("no CUDA device")
+        pytest.skip("no CUDA device")
     case = mixture_of_products_case
     np.random.seed(0)
     namespace = array_namespace(torch.zeros(0))
     circuit = case.circuit(np).to_namespace(namespace, device=device)
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood()
+        layer=circuit.root, loss=AverageNegativeLogLikelihood()
     )
     return trainer, namespace.asarray(case.circuit(np).sample(20000), device=device)
 

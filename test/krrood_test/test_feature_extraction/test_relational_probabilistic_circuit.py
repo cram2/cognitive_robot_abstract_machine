@@ -34,7 +34,7 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     UndeterminedLatentsNotPartitionedError,
     UnknownExchangeablePartsError,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
     GroundingMode,

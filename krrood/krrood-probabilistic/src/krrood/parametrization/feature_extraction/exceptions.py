@@ -1,3 +1,8 @@
+"""
+Exceptions of extracting the features of relational instances and of the circuits
+learned over them.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -88,7 +93,7 @@ class OutOfDomainValueError(ProbabilisticModelException):
 class UnsupportedFeatureTypeError(ProbabilisticModelException):
     """
     Raised when a feature column has a type that cannot be preprocessed for a
-    :class:`~probabilistic_model.learning.jpt.jpt.JointProbabilityTree`.
+    :class:`~probabilistic_model.learning.structure.jpt.jpt.JointProbabilityTree`.
     """
 
     feature_type: type

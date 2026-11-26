@@ -15,7 +15,7 @@ from krrood.parametrization.model_registries import (
     RelationalCircuitRegistry,
     UniformPriorRegistry,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )

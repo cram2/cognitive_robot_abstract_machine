@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy.sparse import csc_array, csr_array, vstack
-from typing_extensions import Generic, Self, TypeVar
+from typing_extensions import TYPE_CHECKING, Generic, Self, TypeVar
 
 import krrood.adapters.sparse_array_json_serializer  # noqa: F401 registers the serializer of the stored csr_array
 from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
@@ -37,6 +37,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matri
 from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
     HasParameterArrays,
 )
+
 
 StoredLogProbabilities = TypeVar("StoredLogProbabilities")
 """
@@ -339,6 +340,16 @@ class DenseProbabilityTable(ProbabilityTable[NodeStateValues]):
                 log_probabilities,
             )
         ]
+
+    @property
+    def normalized_probabilities(self) -> NodeStateValues:
+        """
+        :return: The probability of every state for every node, normalized per node.
+        """
+        (normalized,) = self.projected_parameters(parameters=[self.log_probabilities])
+        return self.namespace.where(
+            self.namespace.isfinite(normalized), self.namespace.exp(normalized), 0.0
+        )
 
     @classmethod
     def from_entries(
