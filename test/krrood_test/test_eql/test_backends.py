@@ -152,8 +152,8 @@ def test_the_collections_of_objects_the_database_backend_returns_stay_readable(
     session, database
 ):
     """
-    The data access objects that the database backend returns have the collections
-    their mapping loads eagerly loaded, though the backend's session is gone once the
+    The data access objects that the database backend returns have the collections their
+    mapping loads eagerly loaded, though the backend's session is gone once the
     evaluation ends.
     """
     positions = KRROODPositions(

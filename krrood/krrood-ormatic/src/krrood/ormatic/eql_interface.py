@@ -974,7 +974,9 @@ class EQLTranslator:
             raise UnsupportedQuantifierError(quantifier_type=self.quantifier_type)
         if self.result_loading.loads_selected_rows:
             bound_query = self.session.scalars(
-                self.sql_query.options(*self._build_loader_options_of_selected_classes())
+                self.sql_query.options(
+                    *self._build_loader_options_of_selected_classes()
+                )
             )
             if issubclass(self.quantifier_type, The):
                 return self._object_daos(results=[bound_query.one()])
@@ -1007,12 +1009,12 @@ class EQLTranslator:
             every object instead of the object.
         """
         selected_entity = self.sql_query.column_descriptions[0]["entity"]
-        ordering_columns = [] if self.ordering_column is None else [self.ordering_column]
+        ordering_columns = (
+            [] if self.ordering_column is None else [self.ordering_column]
+        )
         return self.sql_query.with_only_columns(
             selected_entity.database_id.label(StoredObjectColumn.DATABASE_ID),
-            selected_entity.polymorphic_type.label(
-                StoredObjectColumn.POLYMORPHIC_TYPE
-            ),
+            selected_entity.polymorphic_type.label(StoredObjectColumn.POLYMORPHIC_TYPE),
             *ordering_columns,
             maintain_column_froms=True,
         )
@@ -1564,7 +1566,9 @@ class EQLTranslator:
 
             if hasattr(current_dao, name):
                 return getattr(current_dao, name)
-            return self._join_subclass_columns(dao_class=current_dao, attribute_name=name)
+            return self._join_subclass_columns(
+                dao_class=current_dao, attribute_name=name
+            )
 
         raise EmptyAttributeChainError(dao_class=current_dao, attribute_names=names)
 
@@ -1581,7 +1585,9 @@ class EQLTranslator:
         """
         columns = {
             column.table: column
-            for mapper in sqlalchemy.inspection.inspect(dao_class).mapper.self_and_descendants
+            for mapper in sqlalchemy.inspection.inspect(
+                dao_class
+            ).mapper.self_and_descendants
             if isinstance(mapper.attrs.get(attribute_name), ColumnProperty)
             for column in mapper.attrs[attribute_name].columns
         }

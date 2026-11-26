@@ -526,7 +526,9 @@ def test_relationships_load_on_access_also_where_a_subclass_declares_them(
     [dao] = eql_to_sql(
         an(entity(item)),
         session,
-        result_loading=ResultLoading(relationship_loading=RelationshipLoading.ON_ACCESS),
+        result_loading=ResultLoading(
+            relationship_loading=RelationshipLoading.ON_ACCESS
+        ),
     ).evaluate()
 
     assert "hinges" in inspect(dao).unloaded

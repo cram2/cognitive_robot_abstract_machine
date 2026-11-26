@@ -274,8 +274,8 @@ class PartOfDetachedObjectNotLoadedError(DataclassException, LookupError):
 @dataclass(kw_only=True)
 class UnsupportedResultLoadingError(DataclassException, ValueError):
     """
-    Raised when a :func:`~krrood.entity_query_language.factories.set_of` query is asked to load its rows otherwise than as it
-    selects them.
+    Raised when a :func:`~krrood.entity_query_language.factories.set_of` query is asked
+    to load its rows otherwise than as it selects them.
     """
 
     result_loading: ResultLoading

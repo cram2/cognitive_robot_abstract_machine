@@ -309,7 +309,8 @@ class ResultLoading:
             return
         selected = selection.subquery()
         yield statement.join(
-            selected, selected.c[StoredObjectColumn.DATABASE_ID] == dao_class.database_id
+            selected,
+            selected.c[StoredObjectColumn.DATABASE_ID] == dao_class.database_id,
         ).where(
             selected.c[StoredObjectColumn.POLYMORPHIC_TYPE] == dao_class.__tablename__
         )
