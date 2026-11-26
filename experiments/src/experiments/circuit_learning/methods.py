@@ -14,6 +14,7 @@ from enum import StrEnum
 
 import jax
 import numpy as np
+import numpy.typing as npt
 import optax
 import pandas as pd
 from krrood_compute_resources.devices import Device
@@ -24,7 +25,6 @@ from experiments.circuit_learning.datasets import BenchmarkDataset
 from experiments.circuit_learning.settings import (
     ArrayLibrary,
     ComputationSetting,
-    EdgeRepresentation,
 )
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
 from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
@@ -142,21 +142,17 @@ class TrainingContext:
         *,
         circuit: LayeredProbabilisticCircuit,
         setting: ComputationSetting,
-        rows: np.ndarray,
+        rows: npt.NDArray[np.float64],
     ) -> int:
         """
         :param circuit: The circuit, with host parameters.
         :param setting: The setting that trains.
         :param rows: The encoded training rows.
         :return: The most rows whose log-likelihood gradient fits in the memory budget,
-            as XLA measures it for the circuit in jax with dense edges on the same
-            device, at most all rows.
+            as XLA measures it for the circuit in jax on the setting's device with the
+            setting's edges, at most all rows.
         """
-        jax_setting = dataclasses.replace(
-            setting,
-            array_library=ArrayLibrary.JAX,
-            edge_representation=EdgeRepresentation.DENSE,
-        )
+        jax_setting = dataclasses.replace(setting, array_library=ArrayLibrary.JAX)
         placed = jax_setting.placed(circuit=circuit)
         step_memory = JaxGradientDescent(
             layer=placed.root, loss=AverageNegativeLogLikelihood()
