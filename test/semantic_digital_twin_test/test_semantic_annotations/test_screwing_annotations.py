@@ -6,15 +6,24 @@ from __future__ import annotations
 
 import numpy as np
 
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose,
     RotationMatrix,
     Vector3,
 )
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.semantic_annotations.part_whole import (
+    IsPartWholeRelationship,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bolt,
+    BoltHead,
+    BoltShaft,
     Screwdriver,
 )
 from semantic_digital_twin.world import World
@@ -41,35 +50,30 @@ def _build_world_with_body(*, name: str) -> tuple[World, Body]:
     return world, body
 
 
-# %% Bolt tests
-
-
-def test_bolt_default_grasp_candidates_rotate_about_axis_at_head_offset() -> None:
+def _assert_axial_top_down_candidates(
+    *,
+    candidates: list,
+    expected_graspable,
+    expected_frame: Body,
+    expected_count: int,
+) -> None:
     """
-    Verify :meth:`Bolt.default_grasp_candidates` returns rotated top-down grasps at
-    :attr:`Bolt.head_offset` along local +X.
+    Assert that ``candidates`` are evenly rotated top-down grasps along local ``-X`` at
+    ``expected_frame``'s origin.
+
+    :param candidates: Generated grasp candidates to inspect.
+    :param expected_graspable: Annotation expected on every candidate.
+    :param expected_frame: Reference frame expected on every candidate pose.
+    :param expected_count: Number of expected candidates.
     """
-    world, body = _build_world_with_body(name="bolt")
-    default_bolt = Bolt(root=body)
-    assert default_bolt.head_offset == 0.025
-
-    custom_offset = 0.04
-    bolt = Bolt(root=body, head_offset=custom_offset)
-    with world.modify_world():
-        world.add_semantic_annotations([bolt])
-
-    candidates = bolt.default_grasp_candidates()
-    assert len(candidates) == bolt.grasp_candidate_count
-
-    expected_angles = np.linspace(
-        0.0, 2.0 * np.pi, bolt.grasp_candidate_count, endpoint=False
-    )
+    assert len(candidates) == expected_count
+    expected_angles = np.linspace(0.0, 2.0 * np.pi, expected_count, endpoint=False)
     for candidate, angle in zip(candidates, expected_angles):
-        assert candidate.graspable is bolt
-        assert candidate.grasp_pose.reference_frame is body
+        assert candidate.graspable is expected_graspable
+        assert candidate.grasp_pose.reference_frame is expected_frame
         np.testing.assert_allclose(
             candidate.grasp_pose.position.to_np()[:3],
-            [custom_offset, 0.0, 0.0],
+            [0.0, 0.0, 0.0],
             atol=1e-9,
         )
         rotation_matrix = candidate.grasp_pose.rotation_matrix.to_np()
@@ -85,29 +89,145 @@ def test_bolt_default_grasp_candidates_rotate_about_axis_at_head_offset() -> Non
         )
 
 
-def test_bolt_default_grasp_candidates_follow_grasp_candidate_count() -> None:
+# %% Bolt tests
+
+
+def test_bolt_models_head_and_shaft_as_part_whole_relationships() -> None:
     """
-    Verify :meth:`Bolt.default_grasp_candidates` respects
-    :attr:`Bolt.grasp_candidate_count`.
+    Verify :class:`Bolt` models :class:`BoltHead` and :class:`BoltShaft` as part-whole
+    relationships and mounts both parts under its root body.
+    """
+    assert IsPartWholeRelationship.of_field(clazz=Bolt, field_name="head") is not None
+    assert IsPartWholeRelationship.of_field(clazz=Bolt, field_name="shaft") is not None
+
+    world, bolt_body = _build_world_with_body(name="bolt")
+    head_body = Body(name=PrefixedName(name="bolt_head"))
+    shaft_body = Body(name=PrefixedName(name="bolt_shaft"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(head_body)
+        world.add_kinematic_structure_entity(shaft_body)
+        world.add_connection(
+            FixedConnection(
+                parent=bolt_body,
+                child=head_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.025, reference_frame=bolt_body
+                ),
+            )
+        )
+        world.add_connection(FixedConnection(parent=bolt_body, child=shaft_body))
+        bolt = Bolt(root=bolt_body)
+        head = BoltHead(root=head_body)
+        shaft = BoltShaft(root=shaft_body)
+        world.add_semantic_annotations([bolt, head, shaft])
+        bolt.add(head)
+        bolt.add(shaft)
+
+    assert bolt.head is head
+    assert bolt.shaft is shaft
+    assert bolt.parts == [head, shaft]
+    assert head.root.parent_kinematic_structure_entity is bolt.root
+    assert shaft.root.parent_kinematic_structure_entity is bolt.root
+
+
+def test_bolt_grasp_candidates_delegate_to_bolt_head() -> None:
+    """
+    Verify :meth:`Bolt.grasp_candidates` delegates to :attr:`Bolt.head` when set.
+    """
+    world, bolt_body = _build_world_with_body(name="bolt")
+    head_body = Body(name=PrefixedName(name="bolt_head"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(head_body)
+        world.add_connection(
+            FixedConnection(
+                parent=bolt_body,
+                child=head_body,
+                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=0.025, reference_frame=bolt_body
+                ),
+            )
+        )
+        bolt = Bolt(root=bolt_body)
+        head = BoltHead(root=head_body)
+        world.add_semantic_annotations([bolt, head])
+        bolt.add(head)
+
+    assert bolt.grasped_part() is head
+    _assert_axial_top_down_candidates(
+        candidates=bolt.grasp_candidates(),
+        expected_graspable=head,
+        expected_frame=head_body,
+        expected_count=head.grasp_candidate_count,
+    )
+
+
+def test_bolt_head_default_grasp_candidates_follow_grasp_candidate_count() -> None:
+    """
+    Verify :meth:`BoltHead.default_grasp_candidates` respects
+    :attr:`BoltHead.grasp_candidate_count`.
+    """
+    world, head_body = _build_world_with_body(name="bolt_head")
+    head = BoltHead(root=head_body, grasp_candidate_count=6)
+    with world.modify_world():
+        world.add_semantic_annotations([head])
+
+    _assert_axial_top_down_candidates(
+        candidates=head.default_grasp_candidates(),
+        expected_graspable=head,
+        expected_frame=head_body,
+        expected_count=6,
+    )
+
+
+def test_bolt_falls_back_to_own_root_when_head_is_missing() -> None:
+    """
+    Verify :meth:`Bolt.grasp_candidates` falls back to ``bolt.root`` when no
+    :attr:`Bolt.head` is attached.
     """
     world, body = _build_world_with_body(name="bolt")
     bolt = Bolt(root=body, grasp_candidate_count=6)
     with world.modify_world():
         world.add_semantic_annotations([bolt])
 
-    candidates = bolt.default_grasp_candidates()
-    assert len(candidates) == 6
-    expected_angles = np.linspace(0.0, 2.0 * np.pi, 6, endpoint=False)
-    for candidate, angle in zip(candidates, expected_angles):
-        expected_orientation = RotationMatrix.from_vectors(
-            x=Vector3(-1, 0, 0),
-            y=Vector3(0.0, float(np.cos(angle)), float(np.sin(angle))),
-        )
-        np.testing.assert_allclose(
-            candidate.grasp_pose.rotation_matrix.to_np(),
-            expected_orientation.to_np(),
-            atol=1e-9,
-        )
+    assert bolt.grasped_part() is bolt
+    _assert_axial_top_down_candidates(
+        candidates=bolt.grasp_candidates(),
+        expected_graspable=bolt,
+        expected_frame=body,
+        expected_count=6,
+    )
+
+
+def test_bolt_with_head_and_shaft_survives_json_round_trip() -> None:
+    """
+    Verify a :class:`Bolt` with :class:`BoltHead` and :class:`BoltShaft` parts survives
+    world modification JSON serialization.
+    """
+    world, bolt_body = _build_world_with_body(name="bolt")
+    head_body = Body(name=PrefixedName(name="bolt_head"))
+    shaft_body = Body(name=PrefixedName(name="bolt_shaft"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(head_body)
+        world.add_kinematic_structure_entity(shaft_body)
+        world.add_connection(FixedConnection(parent=bolt_body, child=head_body))
+        world.add_connection(FixedConnection(parent=bolt_body, child=shaft_body))
+        bolt = Bolt(root=bolt_body)
+        head = BoltHead(root=head_body)
+        shaft = BoltShaft(root=shaft_body)
+        world.add_semantic_annotations([bolt, head, shaft])
+        bolt.add(head)
+        bolt.add(shaft)
+
+    other_world = World()
+    tracker = WorldEntityWithIDKwargsTracker()
+    for block in world.get_world_model_manager().model_modification_blocks:
+        sent = from_json(to_json(block), **tracker.create_kwargs())
+        with other_world.modify_world():
+            sent.apply(other_world)
+
+    [arrived_bolt] = other_world.get_semantic_annotations_by_type(Bolt)
+    assert isinstance(arrived_bolt.head, BoltHead)
+    assert isinstance(arrived_bolt.shaft, BoltShaft)
 
 
 # %% Screwdriver tests

@@ -55,6 +55,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasGraspCandidates,
     HasRim,
     HasDrawnGraspsByDefault,
+    PartWholeRelationship,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (
@@ -1577,42 +1578,99 @@ class BottleCap(HasMovableJoint):
         return HomogeneousTransformationMatrix()
 
 
-@dataclass(eq=False, kw_only=True)
-class Bolt(HasGraspCandidates):
+def _axial_top_down_grasp_candidates(
+    graspable: HasGraspCandidates,
+) -> list[GraspCandidate]:
     """
-    A threaded bolt offering top-down grasps along its axis.
-    """
+    Generate evenly rotated top-down grasps along local ``-X`` at ``graspable.root``'s
+    origin.
 
-    head_offset: float = 0.025
+    :param graspable: The annotation offering the grasp candidates.
+    :return: The generated grasp candidates in ``graspable.root``'s frame.
     """
-    Distance in metres along local +X to the bolt head where a gripper takes hold.
+    return [
+        GraspCandidate(
+            graspable=graspable,
+            grasp_pose=Pose(
+                position=Point3(0.0, 0.0, 0.0, reference_frame=graspable.root),
+                orientation=RotationMatrix.from_vectors(
+                    x=Vector3(-1, 0, 0),
+                    y=Vector3(0.0, float(np.cos(angle)), float(np.sin(angle))),
+                ).quaternion,
+                reference_frame=graspable.root,
+            ),
+        )
+        for angle in np.linspace(
+            0.0, 2.0 * np.pi, graspable.grasp_candidate_count, endpoint=False
+        )
+    ]
+
+
+@dataclass(eq=False, kw_only=True)
+class BoltHead(HasGraspCandidates):
+    """
+    The head of a threaded bolt, offering top-down grasps along its axis.
     """
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
         Differs from
         :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.default_grasp_candidates`
-        by returning top-down grasps at :attr:`head_offset` along local +X, evenly
-        rotated about the bolt axis.
+        by returning top-down grasps at the head's origin, evenly rotated about local
+        ``+X``.
         """
-        return [
-            GraspCandidate(
-                graspable=self,
-                grasp_pose=Pose(
-                    position=Point3(
-                        self.head_offset, 0.0, 0.0, reference_frame=self.root
-                    ),
-                    orientation=RotationMatrix.from_vectors(
-                        x=Vector3(-1, 0, 0),
-                        y=Vector3(0.0, float(np.cos(angle)), float(np.sin(angle))),
-                    ).quaternion,
-                    reference_frame=self.root,
-                ),
-            )
-            for angle in np.linspace(
-                0.0, 2.0 * np.pi, self.grasp_candidate_count, endpoint=False
-            )
-        ]
+        return _axial_top_down_grasp_candidates(self)
+
+
+@dataclass(eq=False, kw_only=True)
+class BoltShaft(HasRootBody):
+    """
+    The threaded shaft of a bolt.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Bolt(HasGraspCandidates, PartWholeRelationship):
+    """
+    A threaded bolt composed of a :class:`BoltHead` and a :class:`BoltShaft`, grasped at
+    its head when present.
+    """
+
+    head: BoltHead | None = field(
+        default=None,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The head of the bolt.
+    """
+
+    shaft: BoltShaft | None = field(
+        default=None,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The threaded shaft of the bolt.
+    """
+
+    def grasped_part(self) -> HasGraspCandidates:
+        """
+        :return: The bolt head; without a head, the part the bolt is grasped at
+            otherwise.
+        """
+        if self.head is None:
+            return super().grasped_part()
+        return self.head
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        Differs from
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.default_grasp_candidates`
+        by returning top-down grasps at the bolt's origin when no :attr:`head` is set,
+        evenly rotated about local ``+X``.
+        """
+        return _axial_top_down_grasp_candidates(self)
 
 
 @dataclass(eq=False)
