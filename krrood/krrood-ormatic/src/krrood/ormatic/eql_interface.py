@@ -1021,14 +1021,15 @@ class EQLTranslator:
 
     def _build_loader_options_of_selected_classes(self) -> tuple[Any, ...]:
         """
-        :return: The loader options of :attr:`result_loading` for the classes the
-            translated query selects.
+        :return: The loader options of :attr:`result_loading` for the objects the
+            translated query selects as a whole.
         """
         return self.result_loading.build_loader_options(
             loaded_classes=[
                 description["entity"]
                 for description in self.sql_query.column_descriptions
                 if description["entity"] is not None
+                and description["expr"] is description["entity"]
             ]
         )
 
