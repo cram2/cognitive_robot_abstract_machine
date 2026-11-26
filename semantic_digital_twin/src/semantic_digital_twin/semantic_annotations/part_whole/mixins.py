@@ -33,14 +33,22 @@ if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Aperture,
         Cabinet,
+        Core,
         CounterTop,
         Door,
         Drawer,
+        Flesh,
         Handle,
         Leg,
+        Peel,
+        Pit,
+        Pith,
         Rim,
+        Seed,
+        SeedChamber,
         ShelfLayer,
         Sink,
+        Stem,
     )
 
 # %% Parts of furniture and containers
@@ -260,4 +268,135 @@ class HasCounterTop(HasParts, Mixin):
     )
     """
     The counter top of the semantic annotation.
+    """
+
+
+# %% Parts of fruits
+
+
+@dataclass(eq=False, kw_only=True)
+class HasPeel(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have a peel.
+    """
+
+    peel: Peel | None = field(
+        default=None,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The peel of the semantic annotation.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasFlesh(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have flesh.
+    """
+
+    flesh: Flesh | None = field(
+        default=None,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The flesh of the semantic annotation.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasCore(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have a core.
+    """
+
+    core: Core | None = field(
+        default=None,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The core of the semantic annotation.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasSeeds(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have separate seeds.
+    """
+
+    seeds: list[Seed] = field(
+        default_factory=list,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The seeds of the semantic annotation.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasStem(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have a stem.
+    """
+
+    stem: Stem | None = field(
+        default=None,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The stem of the semantic annotation.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasPit(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have a pit.
+    """
+
+    pit: Pit | None = field(
+        default=None,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The pit of the semantic annotation.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasSeedChamber(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have a seed chamber.
+    """
+
+    seed_chamber: SeedChamber | None = field(
+        default=None,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The seed chamber of the semantic annotation.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasPith(HasParts, Mixin):
+    """
+    A mixin class for semantic annotations that have a pith.
+    """
+
+    pith: Pith | None = field(
+        default=None,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The pith of the semantic annotation.
     """

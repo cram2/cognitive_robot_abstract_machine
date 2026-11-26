@@ -11,7 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from krrood.ormatic.data_access_objects.helper import to_dao
-from semantic_digital_twin.semantic_annotations.qualities import Ripe, Ripeness
+from semantic_digital_twin.semantic_annotations.qualities.quality import (
+    Ripeness,
+    RipenessStage,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
     Peel,
@@ -49,7 +52,7 @@ def test_apple_keeps_its_ripeness_stage(
     world = World.create_with_root_body("root")
     with world.modify_world():
         apple = Apple.create_with_new_body_in_world(name="apple", world=world)
-        apple.set_quality(quality=Ripeness.from_stage(stage=Ripe()))
+        apple.set_quality(quality=Ripeness.from_stage(stage=RipenessStage.RIPE))
 
     loaded_apple = stored_and_loaded_apple(world, in_memory_session_maker)
 
@@ -67,8 +70,8 @@ def test_apple_keeps_its_parts(
         apple = Apple.create_with_new_body_in_world(name="apple", world=world)
         peel = Peel.create_with_new_body_in_world(name="peel", world=world)
         seed = Seed.create_with_new_body_in_world(name="seed", world=world)
-        apple.add(peel)
-        apple.add(seed)
+        apple.add(part=peel)
+        apple.add(part=seed)
 
     loaded_apple = stored_and_loaded_apple(world, in_memory_session_maker)
 

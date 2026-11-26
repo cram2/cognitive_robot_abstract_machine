@@ -56,7 +56,16 @@ from semantic_digital_twin.semantic_annotations.part_whole.mixins import (
     HasSink,
     HasShelfLayers,
     HasRim,
+    HasCore,
+    HasFlesh,
+    HasPeel,
+    HasPit,
+    HasPith,
+    HasSeedChamber,
+    HasSeeds,
+    HasStem,
 )
+from semantic_digital_twin.semantic_annotations.qualities.mixins import HasRipeness
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (
     GraspABar,
@@ -1196,10 +1205,88 @@ class Produce(Food):
     pass
 
 
-@dataclass(eq=False)
-class Fruit(Produce):
+@dataclass(eq=False, kw_only=True)
+class Fruit(Produce, HasRipeness):
     """
     Fruit.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class FruitPart(HasRootBody):
+    """
+    An anatomical part of a fruit, such as its peel or a seed.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Peel(FruitPart):
+    """
+    The outer layer of a fruit, its skin or rind (botanically the exocarp, Plant
+    Ontology PO:0009085).
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Flesh(FruitPart):
+    """
+    The soft tissue between the peel and the inside of a fruit, which is usually eaten
+    (botanically mostly the mesocarp, Plant Ontology PO:0009087).
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class CitrusSegment(Flesh):
+    """
+    One of the wedge-shaped portions the flesh of a citrus fruit divides into, each
+    filled with juice sacs inside a thin membrane (botanically a fruit locule, Plant
+    Ontology PO:0025270).
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Core(FruitPart):
+    """
+    The tough centre of a fruit such as an apple that holds its seeds (botanically the
+    endocarp, Plant Ontology PO:0009086).
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Seed(FruitPart):
+    """
+    A single seed that lies loose in a fruit's flesh or core (Plant Ontology
+    PO:0009010).
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Stem(FruitPart):
+    """
+    The stalk a fruit hung from on its plant.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Pit(FruitPart):
+    """
+    The single large, hard seed or stone at the centre of a fruit such as an avocado or
+    a peach.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class SeedChamber(FruitPart):
+    """
+    The soft central tissue of a fruit such as a cucumber in which its small seeds are
+    embedded.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Pith(FruitPart):
+    """
+    The pale, firmer centre of a fruit such as a strawberry.
     """
 
 
@@ -1231,24 +1318,76 @@ class Carrot(Vegetable):
     """
 
 
-@dataclass(eq=False)
-class Apple(Fruit):
+@dataclass(eq=False, kw_only=True)
+class Apple(Fruit, HasPeel, HasFlesh, HasCore, HasSeeds, HasStem):
     """
     An apple.
     """
 
 
-@dataclass(eq=False)
-class Banana(Fruit):
+@dataclass(eq=False, kw_only=True)
+class Avocado(Fruit, HasPeel, HasFlesh, HasPit):
+    """
+    An avocado.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Banana(Fruit, HasPeel, HasFlesh):
     """
     A banana.
     """
 
 
-@dataclass(eq=False)
-class Orange(Fruit):
+@dataclass(eq=False, kw_only=True)
+class Cucumber(Fruit, HasPeel, HasFlesh, HasSeedChamber):
+    """
+    A cucumber, a fruit in the botanical sense.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class CitrusFruit(Fruit, HasPeel):
+    """
+    A citrus fruit, such as an orange or a lemon, whose flesh is divided into segments
+    (botanically a hesperidium, Plant Ontology PO:0030109).
+    """
+
+    citrus_segments: list[CitrusSegment] = field(
+        default_factory=list,
+        hash=False,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The segments the flesh of the citrus fruit is divided into.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Orange(CitrusFruit):
     """
     An orange.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Peach(Fruit, HasPeel, HasFlesh, HasPit, HasStem):
+    """
+    A peach.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Strawberry(Fruit, HasPeel, HasFlesh, HasPith):
+    """
+    A strawberry.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Watermelon(Fruit, HasPeel, HasFlesh, HasSeeds):
+    """
+    A watermelon.
     """
 
 

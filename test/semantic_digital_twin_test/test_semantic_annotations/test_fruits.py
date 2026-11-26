@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from semantic_digital_twin.exceptions import CannotBeAPartOf
+from semantic_digital_twin.exceptions import NoFieldAcceptsEntity
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
     Avocado,
@@ -75,7 +75,7 @@ def test_fruit_takes_each_part_of_its_anatomy(
             for part_type in part_types
         ]
         for part in parts:
-            fruit.add(part)
+            fruit.add(part=part)
 
     assert set(fruit.parts) == set(parts)
 
@@ -96,7 +96,7 @@ def test_parts_of_an_apple_land_in_their_fields(world: World) -> None:
         first_seed = Seed.create_with_new_body_in_world(name="seed_1", world=world)
         second_seed = Seed.create_with_new_body_in_world(name="seed_2", world=world)
         for part in (peel, flesh, core, stem, first_seed, second_seed):
-            apple.add(part)
+            apple.add(part=part)
 
     assert apple.peel is peel
     assert apple.flesh is flesh
@@ -118,7 +118,7 @@ def test_citrus_segments_of_an_orange_land_in_their_field(world: World) -> None:
             for number in range(3)
         ]
         for segment in segments:
-            orange.add(segment)
+            orange.add(part=segment)
 
     assert orange.citrus_segments == segments
 
@@ -130,7 +130,7 @@ def test_part_hangs_from_its_fruit(world: World) -> None:
     with world.modify_world():
         peach = Peach.create_with_new_body_in_world(name="peach", world=world)
         pit = Pit.create_with_new_body_in_world(name="pit", world=world)
-        peach.add(pit)
+        peach.add(part=pit)
 
     assert pit.root.parent_kinematic_structure_entity == peach.root
 
@@ -151,5 +151,5 @@ def test_fruit_rejects_a_part_outside_its_anatomy(
     with world.modify_world():
         fruit = fruit_type.create_with_new_body_in_world(name="fruit", world=world)
         part = part_type.create_with_new_body_in_world(name="part", world=world)
-        with pytest.raises(CannotBeAPartOf):
-            fruit.add(part)
+        with pytest.raises(NoFieldAcceptsEntity):
+            fruit.add(part=part)

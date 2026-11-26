@@ -9,16 +9,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from krrood.patterns.mixin import Mixin
-from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
-    AmbiguousQuality,
-    CannotHaveQuality,
-)
 from semantic_digital_twin.semantic_annotations.qualities.metadata import (
     IsQualityRelationship,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import Quality
 from semantic_digital_twin.semantic_annotations.semantic_relationship import (
-    SemanticRelationship,
+    HasSemanticRelationships,
 )
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
@@ -28,46 +24,42 @@ from semantic_digital_twin.world_description.world_modification import (
 
 
 @dataclass(eq=False, kw_only=True)
-class QualityRelationship(SemanticRelationship, Mixin):
+class HasQualities(HasSemanticRelationships, Mixin):
     """
     Base for annotations that have qualities (the quality relation).
 
     Each quality mixin (such as
     :class:`~semantic_digital_twin.semantic_annotations.qualities.mixins.HasRipeness`)
-    declares one field holding a :class:`Quality`, marked with
+    declares a field holding a :class:`Quality`, marked with
     :class:`IsQualityRelationship`. :meth:`set_quality` routes a quality to the field
     whose type matches it.
     """
 
     @synchronized_attribute_modification
-    def set_quality(self, *, quality: Quality) -> None:
+    def set_quality(self, *, quality: Quality, field_name: str = "") -> None:
         """
-        Set ``quality`` as this annotation's quality of its type, replacing the one it
-        had, and record the change in the world.
+        Set ``quality`` as a quality of this annotation, routing it to the matching
+        quality field by type, and record the change in the world. A single-valued field
+        has its quality replaced; a list field gets it appended.
 
         :param quality: The quality to set.
-        :raises CannotHaveQuality: If no quality field of this annotation accepts
+        :param field_name: The name of the quality field to set the quality in, which
+            resolves the ambiguity when several fields accept ``type(quality)``. When
+            empty, the field is chosen by type alone.
+        :raises UnknownSemanticRelationshipField: If ``field_name`` names no quality field
+            of this annotation.
+        :raises NoFieldAcceptsEntity: If no quality field accepts ``type(quality)``.
+        :raises SeveralFieldsAcceptEntity: If several quality fields accept
             ``type(quality)``.
-        :raises AmbiguousQuality: If several quality fields accept ``type(quality)``.
         """
-        matches = self.fields_accepting(
-            entity=quality, relationship_type=IsQualityRelationship
+        wrapped_field = self._field_accepting(
+            entity=quality, relationship_type=IsQualityRelationship, field_name=field_name
         )
-        if not matches:
-            raise CannotHaveQuality(annotation=self, quality=quality)
-        if len(matches) > 1:
-            raise AmbiguousQuality(
-                annotation=self,
-                quality=quality,
-                field_names=[match.field.name for match in matches],
-            )
-        [match] = matches
-        setattr(self, match.field.name, quality)
+        self._store_in_field(entity=quality, wrapped_field=wrapped_field)
 
     @property
     def qualities(self) -> list[Quality]:
         """
-        :return: The qualities of this annotation, from all of its quality fields that
-            are set.
+        :return: The qualities of this annotation, from all of its quality fields.
         """
         return self.related_entities(relationship_type=IsQualityRelationship)

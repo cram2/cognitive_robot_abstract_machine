@@ -14,14 +14,14 @@ from semantic_digital_twin.semantic_annotations.qualities.metadata import (
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import Ripeness
 from semantic_digital_twin.semantic_annotations.qualities.relationship import (
-    QualityRelationship,
+    HasQualities,
 )
 
 # %% Qualities of food
 
 
 @dataclass(eq=False, kw_only=True)
-class HasRipeness(QualityRelationship, Mixin):
+class HasRipeness(HasQualities, Mixin):
     """
     A mixin class for semantic annotations that ripen.
     """
