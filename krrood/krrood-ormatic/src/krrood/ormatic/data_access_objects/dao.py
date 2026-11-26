@@ -32,11 +32,11 @@ from krrood.entity_query_language.core.base_expressions import SymbolicExpressio
 from krrood.entity_query_language.core.mapped_variable import Attribute, IndexByValue
 from krrood.entity_query_language.query.match import AbstractMatchExpression
 from krrood.entity_query_language._monitoring import monitored
+from krrood.class_diagrams.collection_kind import AnyCollection
 from krrood.ormatic.base import Base
 from krrood.ormatic.collection_shape import (
     AssociationLeafAttribute,
     CollectionLevel,
-    Container,
     CollectionShape,
     LevelColumnNames,
     MappingLevel,
@@ -1338,7 +1338,7 @@ class DataAccessObject(HasGeneric[T]):
     def _association_rows(
         self,
         *,
-        container: Container,
+        container: AnyCollection,
         relationship: CollectionRelationship,
         positions: tuple[AssociationRowPosition, ...],
         state: ToDataAccessObjectState,

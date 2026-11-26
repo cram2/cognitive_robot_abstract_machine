@@ -9,7 +9,7 @@ from enum import Enum, auto
 from inspect import isclass
 
 from sortedcontainers import SortedSet
-from typing_extensions import Any, get_args, get_origin
+from typing_extensions import Any, TypeAlias, Union, get_args, get_origin
 
 from krrood.class_diagrams.utils import common_base_class
 
@@ -73,6 +73,11 @@ class CollectionKind(Enum):
             for collection_class in collection_kind.value
         )
 
+
+AnyCollection: TypeAlias = Union[CollectionKind.all_classes()]
+"""
+A collection of any :class:`CollectionKind`.
+"""
 
 # %% declared value kinds
 

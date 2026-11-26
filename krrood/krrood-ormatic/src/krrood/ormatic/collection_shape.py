@@ -11,26 +11,18 @@ from dataclasses import dataclass
 from enum import StrEnum
 from types import NoneType, UnionType
 
-from sortedcontainers import SortedSet
 from typing_extensions import (
     Any,
     Iterable,
-    TypeAlias,
     TypeVar,
     Union,
     get_args,
     get_origin,
 )
 
-from krrood.class_diagrams.collection_kind import CollectionKind
+from krrood.class_diagrams.collection_kind import AnyCollection, CollectionKind
 from krrood.class_diagrams.utils import common_base_class
 
-# %% containers
-
-Container: TypeAlias = list | tuple | set | frozenset | SortedSet | dict
-"""
-The classes of the containers a collection field can hold.
-"""
 
 # %% column names
 
@@ -93,7 +85,7 @@ class CollectionLevel(ABC):
     :meth:`finish_loaded_container`.
     """
 
-    container_type: type[Container]
+    container_type: type[AnyCollection]
     """
     The class a container of this level is restored as.
     """
@@ -120,7 +112,7 @@ class CollectionLevel(ABC):
         """
 
     @abstractmethod
-    def entries(self, *, container: Container) -> Iterable[tuple[Any, Any]]:
+    def entries(self, *, container: AnyCollection) -> Iterable[tuple[Any, Any]]:
         """
         :param container: A container of this level.
         :return: The key of every element, None for an unkeyed container, with the
@@ -172,7 +164,7 @@ class SequenceLevel(CollectionLevel):
     def finished_type(self) -> type:
         return list
 
-    def entries(self, *, container: Container) -> Iterable[tuple[Any, Any]]:
+    def entries(self, *, container: AnyCollection) -> Iterable[tuple[Any, Any]]:
         return ((None, element) for element in container)
 
     def add_loaded_element(self, *, container: list, key: Any, element: Any) -> int:
@@ -209,7 +201,7 @@ class MappingLevel(CollectionLevel):
     def finished_type(self) -> type:
         return dict
 
-    def entries(self, *, container: Container) -> Iterable[tuple[Any, Any]]:
+    def entries(self, *, container: AnyCollection) -> Iterable[tuple[Any, Any]]:
         return container.items()
 
     def add_loaded_element(self, *, container: list, key: Any, element: Any) -> int:
