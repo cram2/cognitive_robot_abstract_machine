@@ -7,40 +7,58 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math.symbolic_math import Scalar
 
+from semantic_digital_twin.physics.equations.projectile_motion import ProjectileMotion
 from semantic_digital_twin.physics.exceptions import (
     NonPositiveContainerGeometryError,
 )
+from semantic_digital_twin.world_description.geometry import Scale
 
 # %% pouring equation
 
 
 @dataclass(kw_only=True)
 class PouringEquation:
-    """
+    r"""
     Drain of a rectangular container that tilts about its vertical centre axis and
-    pours over the lip of its wall::
+    pours over the lip of its wall:
 
-        dry_height     = container_height · (1 − fill)
-        lip_distance   = √(dry_height² + lip_offset²)
-        onset_tilt     = atan2(dry_height, lip_offset) + repose_angle
-        head_above_lip = max(0, lip_distance · sin(tilt − onset_tilt))
-        fill_velocity  = −outflow_rate_constant · head_above_lip / container_height
+    .. math::
 
-    ``fill`` is the normalized fill level in ``[0, 1]`` and ``tilt`` the angle of the
-    container's up axis from the vertical, in radians.
+        d &= H (1 - f) \\
+        r &= \sqrt{d^2 + l^2} \\
+        \theta_0 &= \operatorname{atan2}(d, l) + \theta_\mathrm{r} \\
+        h &= \max\bigl(0, r \sin(\theta - \theta_0)\bigr) \\
+        \dot{f} &= -k \, h / H
+
+    where
+
+    :math:`f` : normalized fill level in :math:`[0, 1]`
+
+    :math:`\theta` : tilt of the container's up axis from the vertical
+
+    :math:`H` : inner height of the container
+
+    :math:`l` : :attr:`lip_offset`, the lip's horizontal distance from the tilt axis
+
+    :math:`\theta_\mathrm{r}` : :attr:`repose_angle`
+
+    :math:`k` : :attr:`outflow_rate_constant`
+
+    :math:`d` : height of the container left dry above the contents
+
+    :math:`r` : distance from the contents' surface centre to the lip
+
+    :math:`\theta_0` : :meth:`onset_tilt`, the tilt at which the pour starts
+
+    :math:`h` : :meth:`head_above_lip`
     """
 
-    container_height: float
+    container_scale: Scale
     """
-    Inner height of the container, in metres.
-    """
-
-    container_width: float
-    """
-    Inner width of the container, in metres.
+    Inner extents of the container, in metres: ``y`` across the pouring lip and ``z``
+    its height; ``x``, along the lip, does not change the normalized drain.
     """
 
     outflow_rate_constant: float = 1.0
@@ -69,21 +87,13 @@ class PouringEquation:
 
     def __post_init__(self) -> None:
         """
-        :raises NonPositiveContainerGeometryError: If the height or width is not
-            positive.
+        :raises NonPositiveContainerGeometryError: If the width across the lip or the
+            height is not positive.
         """
-        if self.container_height <= 0.0 or self.container_width <= 0.0:
+        if self.container_scale.y <= 0.0 or self.container_scale.z <= 0.0:
             raise NonPositiveContainerGeometryError(
-                container_height=self.container_height,
-                container_width=self.container_width,
+                container_scale=self.container_scale
             )
-
-    @classproperty
-    def standard_gravity(cls) -> float:
-        """
-        Gravitational acceleration liquid falls with, in metres per second squared.
-        """
-        return 9.81
 
     @property
     def lip_offset(self) -> float:
@@ -91,7 +101,7 @@ class PouringEquation:
         Horizontal distance of the pouring lip, the container's wall, from the tilt
         axis, in metres.
         """
-        return self.container_width / 2
+        return self.container_scale.y / 2
 
     def onset_tilt(self, *, fill: sm.ScalarData) -> Scalar:
         """
@@ -99,7 +109,7 @@ class PouringEquation:
         :return: Symbolic tilt at which a container this full starts to pour, in
             radians; later by the repose angle for heaped contents.
         """
-        dry_height = self.container_height * (1 - fill)
+        dry_height = self.container_scale.z * (1 - fill)
         return sm.atan2(dry_height, self.lip_offset) + self.repose_angle
 
     def head_above_lip(self, *, tilt: sm.ScalarData, fill: sm.ScalarData) -> Scalar:
@@ -109,7 +119,7 @@ class PouringEquation:
         :return: Symbolic height of the contents' surface above the lip, in metres; zero
             while the container does not pour.
         """
-        dry_height = self.container_height * (1 - fill)
+        dry_height = self.container_scale.z * (1 - fill)
         lip_distance = sm.sqrt(dry_height**2 + self.lip_offset**2)
         return sm.max(
             sm.Scalar(0.0),
@@ -117,16 +127,19 @@ class PouringEquation:
         )
 
     def exit_speed(self, *, tilt: sm.ScalarData, fill: sm.ScalarData) -> Scalar:
-        """
+        r"""
         :param tilt: Tilt of the container from the vertical, in radians.
         :param fill: Normalized fill level in ``[0, 1]``.
-        :return: Symbolic speed of the stream leaving the lip, ``C_d · √(2 g h)``, in
-            metres per second, with the head ``h`` at least :attr:`minimum_head`.
+        :return: Symbolic speed of the stream leaving the lip,
+            :math:`C_\mathrm{d} \sqrt{2 g h}` by Torricelli's law, in metres per second,
+            with the head :math:`h` at least :attr:`minimum_head`.
         """
         head = sm.max(
             sm.Scalar(self.minimum_head), self.head_above_lip(tilt=tilt, fill=fill)
         )
-        return self.discharge_coefficient * sm.sqrt(2 * self.standard_gravity * head)
+        return self.discharge_coefficient * ProjectileMotion.speed_after_drop(
+            height=head
+        )
 
     def fill_velocity(self, *, tilt: sm.ScalarData, fill: sm.ScalarData) -> Scalar:
         """
@@ -137,5 +150,5 @@ class PouringEquation:
         return (
             -self.outflow_rate_constant
             * self.head_above_lip(tilt=tilt, fill=fill)
-            / self.container_height
+            / self.container_scale.z
         )

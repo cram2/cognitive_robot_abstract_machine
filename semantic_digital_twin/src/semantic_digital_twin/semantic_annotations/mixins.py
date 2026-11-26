@@ -105,6 +105,7 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.physics.equations.pouring_equations import PouringEquation
+from semantic_digital_twin.semantic_annotations.pouring_stream import PouringStream
 from semantic_digital_twin.semantic_annotations.exceptions import (
     FillLevelAlreadyInitializedError,
     MissingFillEquationError,
@@ -1594,17 +1595,146 @@ class HasCounterTop(PartWholeRelationship, Mixin):
     """
 
 
+# %% open container
+
+
+@dataclass(eq=False, kw_only=True)
+class HasOpening(HasRootBody, Mixin):
+    """
+    Mixin for a container open at the top of its collision bounding box, which liquid
+    enters through and leaves over the lip of its wall.
+    """
+
+    @classproperty
+    def upright_softening(cls) -> float:
+        """
+        Horizontal tilt magnitude, as the length of the horizontal part of the up axis,
+        below which the pour side fades out smoothly instead of kinking at the upright
+        pose.
+        """
+        return 1e-2
+
+    @property
+    def tilt(self) -> sm.Scalar:
+        """
+        Symbolic angle between this container's up axis and the vertical, in radians.
+        """
+        return sm.safe_acos(self.opening_direction().z)
+
+    @property
+    def opening_radius(self) -> float:
+        """
+        Radius of this container's opening, in metres.
+        """
+        return self.root.collision.scale.y / 2
+
+    def opening_direction(self) -> Vector3:
+        """
+        :return: Symbolic world-frame direction the opening faces, the container's up
+            axis.
+        """
+        world_R_container = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.root
+        ).rotation_matrix
+        return world_R_container @ Vector3.Z()
+
+    def opening_point(self) -> Point3:
+        """
+        :return: Symbolic world-frame centre of this container's opening, where liquid
+            enters and leaves.
+        """
+        world_T_container = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.root
+        )
+        world_P_opening = world_T_container @ self.rim_point()
+        world_P_opening.reference_frame = self._world.root
+        return world_P_opening
+
+    def rim_point(self) -> Point3:
+        """
+        :return: The centre of this container's opening in its own frame, at the
+            horizontal centre and top of the collision bounding box.
+        """
+        lower = self.root.collision.min_point
+        upper = self.root.collision.max_point
+        return Point3(
+            x=(lower.x + upper.x) / 2,
+            y=(lower.y + upper.y) / 2,
+            z=upper.z,
+            reference_frame=self.root,
+        )
+
+    def liquid_exit_point(self) -> Point3:
+        """
+        :return: Symbolic world-frame point on the rim over which liquid pours: the rim
+            centre while upright, the rim edge on the pour side once tilted.
+        """
+        world_T_container = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.root
+        )
+        world_P_rim_exit = world_T_container @ self._rim_exit_point()
+        world_P_rim_exit.reference_frame = self._world.root
+        return world_P_rim_exit
+
+    def _rim_exit_point(self) -> Point3:
+        """
+        :return: Symbolic rim exit point in the container frame: the rim edge opposite
+            the horizontal part of the world's up axis seen from the container, reached
+            smoothly from the rim centre as the container tilts.
+        """
+        collision = self.root.collision
+        lower = collision.min_point
+        upper = collision.max_point
+        container_R_world = self._world.compose_forward_kinematics_expression(
+            self.root, self._world.root
+        ).rotation_matrix
+        container_V_up = container_R_world @ Vector3.Z()
+        tilt_magnitude_squared = (
+            container_V_up.x * container_V_up.x + container_V_up.y * container_V_up.y
+        )
+        normalization = sm.sqrt(tilt_magnitude_squared + self.upright_softening**2)
+        half_extent_x = (upper.x - lower.x) / 2
+        half_extent_y = (upper.y - lower.y) / 2
+        return Point3(
+            x=(lower.x + upper.x) / 2
+            - container_V_up.x / normalization * half_extent_x,
+            y=(lower.y + upper.y) / 2
+            - container_V_up.y / normalization * half_extent_y,
+            z=upper.z,
+            reference_frame=self.root,
+        )
+
+    def liquid_exit_velocity(self, *, exit_speed: sm.ScalarData) -> Vector3:
+        """
+        Liquid leaving over a rim slides off without a vertical launch, so the exit
+        speed acts along the horizontal part of the opening direction only: the stream
+        is the faster the further the opening leans from vertical.
+
+        :param exit_speed: Speed of the liquid leaving the container, in metres per
+            second.
+        :return: Symbolic world-frame velocity the departing liquid travels with.
+        """
+        world_V_opening = self.opening_direction()
+        return Vector3(
+            x=exit_speed * world_V_opening.x,
+            y=exit_speed * world_V_opening.y,
+            z=sm.Scalar(0.0),
+            reference_frame=self._world.root,
+        )
+
+
 # %% fill-level container
 
 
 @dataclass(eq=False, kw_only=True)
-class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
+class HasFillLevel(HasOpening, FillLevelSource, Mixin):
     """
     Mixin that gives a container a fill level in ``[0, 1]``, the position of a virtual
     :class:`FillLevelConnection` below its root created by :meth:`initialize_fill_level`.
 
     The container drains by :attr:`fill_equation` as it tilts, and pours into
-    :attr:`pours_into` only while the stream lands in that container's opening.
+    :attr:`pours_into` only while the :class:`PouringStream` lands in that container's
+    opening.
     """
 
     fill_equation: PouringEquation | None = None
@@ -1624,18 +1754,9 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
     """
 
     @classproperty
-    def upright_softening(cls) -> float:
-        """
-        Horizontal tilt magnitude, as the length of the horizontal part of the up axis,
-        below which the pour side fades out smoothly instead of kinking at the upright
-        pose.
-        """
-        return 1e-2
-
-    @classproperty
     def height_gate_sharpness(cls) -> float:
         """
-        Logistic steepness of the gate closing as the source's lip sinks to this
+        Logistic steepness of the gate closing as a source's lip sinks to this
         container's opening, per container height of clearance.
         """
         return 80.0
@@ -1643,7 +1764,7 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
     @classproperty
     def overlap_gate_sharpness(cls) -> float:
         """
-        Logistic steepness of the gate closing as the stream lands away from this
+        Logistic steepness of the gate closing as a stream lands away from this
         container's opening, per opening radius of distance.
         """
         return 80.0
@@ -1677,13 +1798,6 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
         return self.fill_connection.fill_dof.variables.position
 
     @property
-    def tilt(self) -> sm.Scalar:
-        """
-        Symbolic angle between this container's up axis and the vertical, in radians.
-        """
-        return sm.safe_acos(self.opening_direction().z)
-
-    @property
     def capacity(self) -> float:
         """
         Volume this container holds at full fill, in cubic metres: the measured capacity
@@ -1691,8 +1805,7 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
         """
         if self.measured_capacity is not None:
             return self.measured_capacity
-        extents = self.root.collision.scale
-        return extents.x * extents.y * extents.z
+        return self.root.collision.scale.volume
 
     @synchronized_attribute_modification
     def set_fill_equation(self, *, fill_equation: PouringEquation) -> None:
@@ -1716,8 +1829,7 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
         repose_angle: float,
     ) -> PouringEquation:
         """
-        The liquid stands across the collision geometry's width and pours over its top
-        corner once it reaches the collision geometry's height.
+        The contents fill the collision geometry's box and pour over its top edge.
 
         :param outflow_rate_constant: Outflow rate constant of the drain.
         :param discharge_coefficient: Scales the Torricelli exit speed.
@@ -1725,10 +1837,8 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
             radians.
         :return: The drain of this container.
         """
-        extents = self.root.collision.scale
         return PouringEquation(
-            container_width=extents.y,
-            container_height=extents.z,
+            container_scale=self.root.collision.scale,
             outflow_rate_constant=outflow_rate_constant,
             discharge_coefficient=discharge_coefficient,
             repose_angle=repose_angle,
@@ -1817,33 +1927,38 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
                 return container
         return None
 
+    def outgoing_stream(self) -> PouringStream | None:
+        """
+        :return: The stream from this container into :attr:`pours_into`, or ``None``.
+        """
+        if self.pours_into is None:
+            return None
+        return PouringStream(source=self, receiver=self.pours_into)
+
+    def incoming_stream(self) -> PouringStream | None:
+        """
+        :return: The stream from the container pouring into this one, or ``None``.
+        """
+        source = self.poured_from()
+        if source is None:
+            return None
+        return PouringStream(source=source, receiver=self)
+
     def fill_velocity(self) -> sm.Scalar:
         """
         :return: Symbolic rate of the normalized fill level: the drain, gated by the
-            container this one pours into, plus the gated volume the source of this one
-            loses, converted by this container's capacity.
+            outgoing stream, plus the inflow of the incoming stream.
         """
         velocity = self.fill_equation.fill_velocity(
             tilt=self.tilt, fill=self.fill_position
         )
-        if self.pours_into is not None:
-            velocity = self.pours_into.transfer_gate(source=self) * velocity
-        source = self.poured_from()
-        if source is None:
+        outgoing_stream = self.outgoing_stream()
+        if outgoing_stream is not None:
+            velocity = outgoing_stream.gate() * velocity
+        incoming_stream = self.incoming_stream()
+        if incoming_stream is None:
             return velocity
-        return velocity + self.inflow_velocity(source=source)
-
-    def inflow_velocity(self, *, source: HasFillLevel) -> sm.Scalar:
-        """
-        :param source: The container pouring into this one.
-        :return: Symbolic rate of the normalized fill level from ``source``'s outflow,
-            gated by where its stream lands.
-        """
-        return (
-            self.transfer_gate(source=source)
-            * source.outflow_volume_rate()
-            / self.capacity
-        )
+        return velocity + incoming_stream.inflow_velocity()
 
     def outflow_volume_rate(self) -> sm.Scalar:
         """
@@ -1861,190 +1976,3 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
             metres per second.
         """
         return self.fill_equation.exit_speed(tilt=self.tilt, fill=self.fill_position)
-
-    # %% transfer gate
-
-    def transfer_gate(self, *, source: HasFillLevel) -> sm.Scalar:
-        """
-        :param source: The container pouring into this one.
-        :return: Symbolic gate in ``[0, 1]``, open while ``source``'s lip is above this
-            container's opening and its stream lands within the opening.
-        """
-        return self.height_gate(source=source) * self.overlap_gate(source=source)
-
-    def height_gate(self, *, source: HasFillLevel) -> sm.Scalar:
-        """
-        :param source: The container pouring into this one.
-        :return: Symbolic factor of the gate closing as ``source``'s lip sinks to this
-            container's opening, measured in this container's heights.
-        """
-        clearance = source.liquid_exit_point().z - self.opening_point().z
-        return self._logistic(
-            value=clearance / self.root.collision.scale.z,
-            sharpness=self.height_gate_sharpness,
-        )
-
-    def overlap_gate(self, *, source: HasFillLevel) -> sm.Scalar:
-        """
-        :param source: The container pouring into this one.
-        :return: Symbolic factor of the gate closing as ``source``'s stream lands
-            further from this container's opening, measured in opening radii.
-        """
-        landing_point = self.projectile_landing_point(
-            source=source, exit_speed=source.exit_speed()
-        )
-        opening = self.opening_point()
-        landing_distance = sm.sqrt(
-            (landing_point.x - opening.x) ** 2 + (landing_point.y - opening.y) ** 2
-        )
-        return self._logistic(
-            value=(self.opening_radius - landing_distance) / self.opening_radius,
-            sharpness=self.overlap_gate_sharpness,
-        )
-
-    @staticmethod
-    def _logistic(*, value: sm.Scalar, sharpness: float) -> sm.Scalar:
-        """
-        :param value: The symbolic margin being gated.
-        :param sharpness: Steepness of the transition around ``value == 0``.
-        :return: Smooth step in ``[0, 1]`` approaching ``1`` as ``value`` grows
-            positive.
-        """
-        return sm.Scalar(1.0) / (sm.Scalar(1.0) + sm.exp(-sharpness * value))
-
-    # %% stream geometry
-
-    def opening_direction(self) -> Vector3:
-        """
-        :return: Symbolic world-frame direction the opening faces, the container's up
-            axis.
-        """
-        world_R_container = self._world.compose_forward_kinematics_expression(
-            self._world.root, self.root
-        ).rotation_matrix
-        return world_R_container @ Vector3.Z()
-
-    def liquid_exit_point(self) -> Point3:
-        """
-        :return: Symbolic world-frame point on the rim over which liquid pours: the rim
-            centre while upright, the rim edge on the pour side once tilted.
-        """
-        world_T_container = self._world.compose_forward_kinematics_expression(
-            self._world.root, self.root
-        )
-        world_P_rim_exit = world_T_container @ self._rim_exit_point()
-        world_P_rim_exit.reference_frame = self._world.root
-        return world_P_rim_exit
-
-    def _rim_exit_point(self) -> Point3:
-        """
-        :return: Symbolic rim exit point in the container frame: the rim edge opposite
-            the horizontal part of the world's up axis seen from the container, reached
-            smoothly from the rim centre as the container tilts.
-        """
-        collision = self.root.collision
-        lower = collision.min_point
-        upper = collision.max_point
-        container_R_world = self._world.compose_forward_kinematics_expression(
-            self.root, self._world.root
-        ).rotation_matrix
-        container_V_up = container_R_world @ Vector3.Z()
-        tilt_magnitude_squared = (
-            container_V_up.x * container_V_up.x + container_V_up.y * container_V_up.y
-        )
-        normalization = sm.sqrt(tilt_magnitude_squared + self.upright_softening**2)
-        half_extent_x = (upper.x - lower.x) / 2
-        half_extent_y = (upper.y - lower.y) / 2
-        return Point3(
-            x=(lower.x + upper.x) / 2
-            - container_V_up.x / normalization * half_extent_x,
-            y=(lower.y + upper.y) / 2
-            - container_V_up.y / normalization * half_extent_y,
-            z=upper.z,
-            reference_frame=self.root,
-        )
-
-    def liquid_exit_velocity(self, *, exit_speed: sm.ScalarData) -> Vector3:
-        """
-        Liquid leaving over a rim slides off without a vertical launch, so the exit
-        speed acts along the horizontal part of the opening direction only: the stream
-        is the faster the further the opening leans from vertical.
-
-        :param exit_speed: Speed of the liquid leaving the container, in metres per
-            second.
-        :return: Symbolic world-frame velocity the departing liquid travels with.
-        """
-        world_V_opening = self.opening_direction()
-        return Vector3(
-            x=exit_speed * world_V_opening.x,
-            y=exit_speed * world_V_opening.y,
-            z=sm.Scalar(0.0),
-            reference_frame=self._world.root,
-        )
-
-    def projectile_landing_point(
-        self,
-        *,
-        source: HasFillLevel,
-        exit_speed: sm.ScalarData,
-        minimum_drop_height: float = 0.01,
-    ) -> Point3:
-        """
-        Where the stream, leaving the source's exit point with its exit velocity and
-        falling under gravity, crosses this container's opening plane.
-
-        :param source: The pouring container.
-        :param exit_speed: Speed of the liquid leaving the source, in metres per second.
-        :param minimum_drop_height: Drop the flight time is computed from at least, in
-            metres, which keeps its gradient bounded near the opening plane.
-        :return: Symbolic world-frame landing point on this container's opening plane.
-        """
-        gravity = PouringEquation.standard_gravity
-        exit_point = source.liquid_exit_point()
-        exit_velocity = source.liquid_exit_velocity(exit_speed=exit_speed)
-        plane_height = self.opening_point().z
-        drop_height = sm.max(
-            sm.Scalar(minimum_drop_height), exit_point.z - plane_height
-        )
-        flight_time = (
-            exit_velocity.z + sm.sqrt(exit_velocity.z**2 + 2 * gravity * drop_height)
-        ) / gravity
-        return Point3(
-            x=exit_point.x + exit_velocity.x * flight_time,
-            y=exit_point.y + exit_velocity.y * flight_time,
-            z=plane_height,
-            reference_frame=self._world.root,
-        )
-
-    @property
-    def opening_radius(self) -> float:
-        """
-        Radius of this container's opening, in metres.
-        """
-        return self.root.collision.scale.y / 2
-
-    def opening_point(self) -> Point3:
-        """
-        :return: Symbolic world-frame centre of this container's opening, where liquid
-            enters and leaves.
-        """
-        world_T_container = self._world.compose_forward_kinematics_expression(
-            self._world.root, self.root
-        )
-        world_P_opening = world_T_container @ self.rim_point()
-        world_P_opening.reference_frame = self._world.root
-        return world_P_opening
-
-    def rim_point(self) -> Point3:
-        """
-        :return: The centre of this container's opening in its own frame, at the
-            horizontal centre and top of the collision bounding box.
-        """
-        lower = self.root.collision.min_point
-        upper = self.root.collision.max_point
-        return Point3(
-            x=(lower.x + upper.x) / 2,
-            y=(lower.y + upper.y) / 2,
-            z=upper.z,
-            reference_frame=self.root,
-        )

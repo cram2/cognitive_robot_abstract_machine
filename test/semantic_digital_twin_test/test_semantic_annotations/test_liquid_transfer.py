@@ -243,7 +243,7 @@ class TestFillVelocity:
         The volume the source loses is the volume the receiver gains.
         """
         _, source, receiver = _partly_open_transfer()
-        gate = receiver.transfer_gate(source=source).evaluate()[0]
+        gate = receiver.incoming_stream().gate().evaluate()[0]
         assert 0.01 < gate < 0.99, "the setup must hold the gate partly open"
 
         assert receiver.fill_velocity().evaluate()[
@@ -274,7 +274,7 @@ class TestTransferGate:
         )
         sharpness = receiver.height_gate_sharpness
 
-        assert receiver.height_gate(source=source).evaluate()[0] == pytest.approx(
+        assert receiver.incoming_stream().height_gate().evaluate()[0] == pytest.approx(
             1 / (1 + math.exp(-sharpness * clearance / receiver.root.collision.scale.z))
         )
 
@@ -285,18 +285,14 @@ class TestTransferGate:
         The overlap factor is the logistic of the landing point's margin inside the
         opening, measured in opening radii.
         """
-        _, source, receiver = _partly_open_transfer()
-        landing = (
-            receiver.projectile_landing_point(
-                source=source, exit_speed=source.exit_speed()
-            )
-        ).evaluate()[:3]
+        _, _, receiver = _partly_open_transfer()
+        landing = receiver.incoming_stream().landing_point().evaluate()[:3]
         opening = receiver.opening_point().evaluate()[:3]
         landing_distance = np.linalg.norm(landing[:2] - opening[:2])
         margin = (receiver.opening_radius - landing_distance) / receiver.opening_radius
         sharpness = receiver.overlap_gate_sharpness
 
-        assert receiver.overlap_gate(source=source).evaluate()[0] == pytest.approx(
+        assert receiver.incoming_stream().overlap_gate().evaluate()[0] == pytest.approx(
             1 / (1 + math.exp(-sharpness * margin))
         )
 
@@ -348,12 +344,12 @@ class TestLiquidExitPoint:
         assert offset[:2] @ pour_direction[:2] > 0
 
 
-# %% projectile landing point
+# %% liquid exit velocity
 
 
-class TestProjectileLandingPoint:
+class TestLiquidExitVelocity:
     """
-    The projectile model locates where poured liquid lands.
+    Liquid leaves over the rim with the horizontal share of the exit speed.
     """
 
     def test_a_rim_source_launches_at_the_horizontal_share_of_the_exit_speed(
@@ -374,31 +370,6 @@ class TestProjectileLandingPoint:
         assert exit_velocity[:2] == pytest.approx(
             exit_speed * source.opening_direction().evaluate()[:2]
         )
-
-    def test_throw_distance_follows_the_fall_to_the_opening(self) -> None:
-        """
-        The stream lands at the receiver's opening, thrown horizontally by the exit
-        velocity over the time the liquid takes to fall from the source's lip to it.
-        """
-        exit_speed = 0.2
-        world, source, receiver = _build_world()
-        _tilt(world, source, 0.6)
-
-        landing = receiver.projectile_landing_point(
-            source=source, exit_speed=exit_speed
-        )
-
-        exit_point = source.liquid_exit_point().evaluate()[:3]
-        exit_velocity = source.liquid_exit_velocity(exit_speed=exit_speed).evaluate()[
-            :3
-        ]
-        opening_height = receiver.opening_point().z.evaluate()[0]
-        fall_height = exit_point[2] - opening_height
-        flight_time = math.sqrt(2 * fall_height / PouringEquation.standard_gravity)
-        assert landing.x.evaluate()[0] == pytest.approx(
-            exit_point[0] + exit_velocity[0] * flight_time, abs=1e-9
-        )
-        assert landing.z.evaluate()[0] == pytest.approx(opening_height, abs=1e-9)
 
 
 # %% synchronized worlds
@@ -439,8 +410,7 @@ class TestSynchronizedTransfer:
         copied_source = _counterpart(source, world=copy)
         _step_passive_state(copy, 0.05)
         faster_drain = PouringEquation(
-            container_height=source.fill_equation.container_height,
-            container_width=source.fill_equation.container_width,
+            container_scale=source.fill_equation.container_scale,
             outflow_rate_constant=2 * source.fill_equation.outflow_rate_constant,
         )
 

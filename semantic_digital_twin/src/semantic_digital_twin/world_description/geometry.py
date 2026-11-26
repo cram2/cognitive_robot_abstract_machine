@@ -43,8 +43,10 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world_description.exceptions import (
+    BoundingBoxCornerFramesDifferError,
     InvalidColorChannelCount,
     MeshFileNotPlaceableByAPose,
+    TooFewRegionPointsError,
 )
 from semantic_digital_twin.world_description.mesh_file_storage import (
     MeshFileSources,
@@ -475,6 +477,13 @@ class Scale:
         self.x = float(self.x)
         self.y = float(self.y)
         self.z = float(self.z)
+
+    @property
+    def volume(self) -> float:
+        """
+        Volume of the box these extents span.
+        """
+        return self.x * self.y * self.z
 
     def to_simple_event(
         self,
@@ -1196,9 +1205,11 @@ class Mesh(Shape):
         """
         points = np.asarray([point.to_np()[:3] for point in points_3d], dtype=float)
         points = np.unique(points, axis=0)
-        assert len(points) >= 3, (
-            "At least 4 unique points are required to define a 3D region."
-        )
+        minimum_point_count = 3
+        if len(points) < minimum_point_count:
+            raise TooFewRegionPointsError(
+                unique_point_count=len(points), minimum_point_count=minimum_point_count
+            )
 
         centered_points = points - points.mean(axis=0, keepdims=True)
         assert np.any(centered_points), "Points must not be all identical."
@@ -1946,9 +1957,11 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         :param min_point: The minimum point
         :param max_point: The maximum point
         """
-        assert min_point.reference_frame == max_point.reference_frame, (
-            "The reference frames of the minimum and maximum points must be the same."
-        )
+        if min_point.reference_frame != max_point.reference_frame:
+            raise BoundingBoxCornerFramesDifferError(
+                min_point_frame=min_point.reference_frame,
+                max_point_frame=max_point.reference_frame,
+            )
         return cls(*min_point.to_np()[:3], *max_point.to_np()[:3], origin=origin)
 
     def as_shape(self) -> Box:
