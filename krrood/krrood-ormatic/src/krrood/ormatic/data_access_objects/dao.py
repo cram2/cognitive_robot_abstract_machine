@@ -1648,6 +1648,23 @@ class DataAccessObject(HasGeneric[T]):
             _repr_thread_local.seen.remove(id(self))
 
 
+class StoredObjectColumn(StrEnum):
+    """
+    The columns of the table of every stored object that a selection of the ids and
+    types of stored objects gives, under the names of the attributes of its rows.
+    """
+
+    DATABASE_ID = "database_id"
+    """
+    The id of the object, the same in the table of every class it has rows in.
+    """
+
+    POLYMORPHIC_TYPE = "polymorphic_type"
+    """
+    The name of the table of the class the object is loaded as.
+    """
+
+
 class StoredObjectRow:
     """
     The row every stored object has, whatever its class.
@@ -1709,7 +1726,7 @@ class StoredObjectRow:
         )
 
     @classmethod
-    def objects_loaded_by_class(
+    def load_objects_by_class(
         cls,
         *,
         stored_objects: Sequence[StoredObjectRow | sqlalchemy.Row],
@@ -1718,10 +1735,12 @@ class StoredObjectRow:
         ],
     ) -> list[Any]:
         """
-        :param stored_objects: Rows of this table, or rows with the ``database_id`` and
-            ``polymorphic_type`` of stored objects.
+        :param stored_objects: Rows of this table, or rows with the
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id` and
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.polymorphic_type` of stored objects.
         :param load_objects_of_class: Loads the objects of one DAO class from their ids,
-            each of them with its ``database_id``.
+            each of them with its
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id`.
         :return: What was loaded for every stored object, in the same order.
         """
         ids_by_class: dict[type[DataAccessObject], list[int]] = {}
@@ -1746,19 +1765,19 @@ class StoredObjectRow:
         session: sqlalchemy.orm.Session,
         stored_objects: Sequence[StoredObjectRow | sqlalchemy.Row],
         loader_options: tuple[ExecutableOption, ...] = (),
-        ids_per_statement: int = 10_000,
+        ids_per_statement: int,
     ) -> list[DataAccessObject]:
         """
         :param session: The session the rows were loaded with.
-        :param stored_objects: Rows of this table, or rows with the ``database_id`` and
-            ``polymorphic_type`` of stored objects.
+        :param stored_objects: Rows of this table, or rows with the
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id` and
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.polymorphic_type` of stored objects.
         :param loader_options: The options of the statements that load the DAOs.
-        :param ids_per_statement: The most ids one statement binds, below the parameter
-            limits of SQLite and PostgreSQL.
+        :param ids_per_statement: The most ids one statement binds.
         :return: The DAOs of the rows' objects, in the same order, loaded with one query
             per DAO class and batch of ids.
         """
-        return cls.objects_loaded_by_class(
+        return cls.load_objects_by_class(
             stored_objects=stored_objects,
             load_objects_of_class=lambda dao_class, ids: (
                 dao

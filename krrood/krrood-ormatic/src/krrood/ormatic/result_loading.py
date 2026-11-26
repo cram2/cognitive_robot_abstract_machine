@@ -19,7 +19,11 @@ from typing_extensions import Any, Iterable, Iterator, Sequence, get_origin
 
 from krrood.entity_query_language.core.base_expressions import HasExpression
 from krrood.entity_query_language.query.query import Entity
-from krrood.ormatic.data_access_objects.dao import DataAccessObject, StoredObjectRow
+from krrood.ormatic.data_access_objects.dao import (
+    DataAccessObject,
+    StoredObjectColumn,
+    StoredObjectRow,
+)
 from krrood.ormatic.data_access_objects.helper import (
     get_mapping_data_access_object_class,
     get_part_class,
@@ -176,8 +180,7 @@ class ResultLoading:
 
     ids_per_statement: int = 10_000
     """
-    The most ids one statement binds, below the parameter limits of SQLite and
-    PostgreSQL.
+    The most ids one statement binds.
     """
 
     @classmethod
@@ -249,7 +252,7 @@ class ResultLoading:
         )
         return (lazyload("*"), *map(lazyload, subclass_relationships))
 
-    def evaluation_context(self) -> AbstractContextManager:
+    def create_evaluation_context(self) -> AbstractContextManager:
         """
         :return: The context an evaluation with this result loading runs in.
         """
@@ -267,23 +270,24 @@ class ResultLoading:
         """
         :param session: The session to load with.
         :param selection: The statement that selected the objects.
-        :param selected_objects: The ``database_id`` and ``polymorphic_type`` of every
+        :param selected_objects: The :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id` and
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.polymorphic_type` of every
             selected object, as *selection* gave them.
         :return: The data access object or the row of every selected object, in the
             order of *selected_objects*.
         """
-        return StoredObjectRow.objects_loaded_by_class(
+        return StoredObjectRow.load_objects_by_class(
             stored_objects=selected_objects,
             load_objects_of_class=lambda dao_class, ids: (
                 loaded
-                for statement in self._statements_loading(
+                for statement in self._build_loading_statements(
                     dao_class=dao_class, ids=ids, selection=selection
                 )
                 for loaded in self._execute(session=session, statement=statement)
             ),
         )
 
-    def _statements_loading(
+    def _build_loading_statements(
         self, *, dao_class: type[DataAccessObject], ids: list[int], selection: Select
     ) -> Iterator[Select]:
         """
@@ -305,13 +309,15 @@ class ResultLoading:
             return
         selected = selection.subquery()
         yield statement.join(
-            selected, selected.c.database_id == dao_class.database_id
-        ).where(selected.c.polymorphic_type == dao_class.__tablename__)
+            selected, selected.c[StoredObjectColumn.DATABASE_ID] == dao_class.database_id
+        ).where(
+            selected.c[StoredObjectColumn.POLYMORPHIC_TYPE] == dao_class.__tablename__
+        )
 
     def _execute(self, *, session: Session, statement: Select) -> Iterator[Any]:
         """
         :param session: The session to execute with.
-        :param statement: A statement :meth:`_statements_loading` made.
+        :param statement: A statement :meth:`_build_loading_statements` made.
         :return: What the statement loads: data access objects or rows.
         """
         if self.result_content == ResultContent.COLUMNS:

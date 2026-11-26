@@ -58,6 +58,7 @@ from krrood.entity_query_language.operators.conditionals import CaseWhen
 from krrood.exceptions import DataclassException
 from krrood.ormatic.data_access_objects.dao import (
     RelationshipInformationKey,
+    StoredObjectColumn,
     get_dao_schema,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
@@ -959,7 +960,7 @@ class EQLTranslator:
 
         :return: Query results
         """
-        with self.result_loading.evaluation_context():
+        with self.result_loading.create_evaluation_context():
             if isinstance(self.select_like, SetOf):
                 return self._evaluate_set_of()
             return self._evaluate_entity()
@@ -973,12 +974,12 @@ class EQLTranslator:
             raise UnsupportedQuantifierError(quantifier_type=self.quantifier_type)
         if self.result_loading.loads_selected_rows:
             bound_query = self.session.scalars(
-                self.sql_query.options(*self._loader_options_of_selected_classes())
+                self.sql_query.options(*self._build_loader_options_of_selected_classes())
             )
             if issubclass(self.quantifier_type, The):
                 return self._object_daos(results=[bound_query.one()])
             return self._object_daos(results=bound_query.all())
-        selection = self._selection_of_ids_and_types()
+        selection = self._select_ids_and_types()
         rows = self.session.execute(selection)
         if issubclass(self.quantifier_type, The):
             selected_objects = [rows.one()]
@@ -998,21 +999,25 @@ class EQLTranslator:
             selected_objects=selected_objects,
         )
 
-    def _selection_of_ids_and_types(self) -> Select:
+    def _select_ids_and_types(self) -> Select:
         """
-        :return: The translated query, selecting the ``database_id`` and
-            ``polymorphic_type`` of every object instead of the object.
+        :return: The translated query, selecting the
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id` and
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.polymorphic_type` of
+            every object instead of the object.
         """
         selected_entity = self.sql_query.column_descriptions[0]["entity"]
         ordering_columns = [] if self.ordering_column is None else [self.ordering_column]
         return self.sql_query.with_only_columns(
-            selected_entity.database_id.label("database_id"),
-            selected_entity.polymorphic_type.label("polymorphic_type"),
+            selected_entity.database_id.label(StoredObjectColumn.DATABASE_ID),
+            selected_entity.polymorphic_type.label(
+                StoredObjectColumn.POLYMORPHIC_TYPE
+            ),
             *ordering_columns,
             maintain_column_froms=True,
         )
 
-    def _loader_options_of_selected_classes(self) -> tuple[Any, ...]:
+    def _build_loader_options_of_selected_classes(self) -> tuple[Any, ...]:
         """
         :return: The loader options of :attr:`result_loading` for the classes the
             translated query selects.
@@ -1070,7 +1075,7 @@ class EQLTranslator:
         if not self.result_loading.loads_selected_rows:
             raise UnsupportedResultLoadingError(result_loading=self.result_loading)
         rows = self.session.execute(
-            self.sql_query.options(*self._loader_options_of_selected_classes())
+            self.sql_query.options(*self._build_loader_options_of_selected_classes())
         ).all()
 
         if all_variables:
