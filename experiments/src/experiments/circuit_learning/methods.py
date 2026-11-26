@@ -52,6 +52,10 @@ from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu
     HiddenChowLiuTree,
 )
 from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.mutual_information import (
+    BinnedMutualInformation,
+    MutualInformationEstimator,
+)
 from probabilistic_model.learning.structure.jpt.variables import (
     infer_variables_from_dataframe,
 )
@@ -641,6 +645,13 @@ class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
     The number of states of every latent variable.
     """
 
+    mutual_information: MutualInformationEstimator = field(
+        default_factory=BinnedMutualInformation
+    )
+    """
+    The estimator of the mutual information the tree is spanned over.
+    """
+
     phases: list[ExpectationMaximizationPhase] = field(
         default_factory=lambda: [
             ExpectationMaximizationPhase.mini_batch(),
@@ -671,6 +682,7 @@ class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
         host = HiddenChowLiuTree(
             variables=dataset.variables,
             hidden_states=self.hidden_states,
+            mutual_information=self.mutual_information,
             seed=self.seed,
         ).build_circuit(data=rows)
         circuit = setting.placed(circuit=host)

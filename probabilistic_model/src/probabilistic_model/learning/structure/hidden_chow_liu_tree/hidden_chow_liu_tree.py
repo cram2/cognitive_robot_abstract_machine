@@ -19,7 +19,8 @@ from probabilistic_model.learning.structure.exceptions import (
     UnsupportedStructureVariableError,
 )
 from probabilistic_model.learning.structure.mutual_information import (
-    PairwiseMutualInformation,
+    BinnedMutualInformation,
+    MutualInformationEstimator,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     DenseEdgeValues,
@@ -200,10 +201,11 @@ class HiddenChowLiuTree:
     The number of states of every latent variable.
     """
 
-    number_of_bins: int = 10
+    mutual_information: MutualInformationEstimator = field(
+        default_factory=BinnedMutualInformation
+    )
     """
-    The number of quantile bins a continuous variable with many values is cut into for
-    the mutual information.
+    The estimator of the mutual information the tree is spanned over.
     """
 
     seed: int = 0
@@ -219,9 +221,9 @@ class HiddenChowLiuTree:
         :return: The hidden Chow-Liu tree circuit with random initial numpy parameters.
         """
         tree = ChowLiuTree.from_mutual_information(
-            mutual_information=PairwiseMutualInformation.from_rows(
-                variables=self.variables, data=data, number_of_bins=self.number_of_bins
-            ).compute()
+            mutual_information=self.mutual_information.estimate(
+                variables=self.variables, data=data
+            )
         )
         parameters = RandomInitialParameters(
             variables=self.variables,

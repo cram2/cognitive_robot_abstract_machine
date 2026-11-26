@@ -19,7 +19,10 @@ from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu
     HiddenChowLiuTree,
 )
 from probabilistic_model.learning.structure.mutual_information import (
-    PairwiseMutualInformation,
+    BinnedMutualInformation,
+    GaussianMutualInformation,
+    MutualInformationEstimator,
+    NearestNeighbourMutualInformation,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
@@ -38,13 +41,19 @@ def bits() -> DependentBits:
 # %% Chow-Liu tree
 
 
-def test_chow_liu_tree_joins_the_most_dependent_pairs(bits):
+@pytest.mark.parametrize(
+    "estimator",
+    [BinnedMutualInformation(), NearestNeighbourMutualInformation()],
+    ids=lambda estimator: type(estimator).__name__,
+)
+def test_chow_liu_tree_joins_the_most_dependent_pairs(
+    estimator: MutualInformationEstimator, bits
+):
     """
-    The Chow-Liu tree connects the pairs of variables that copy each other.
+    The Chow-Liu tree connects the pairs of variables that copy each other, whichever
+    estimator of the mutual information supports symbolic variables.
     """
-    mutual_information = PairwiseMutualInformation.from_rows(
-        variables=bits.variables, data=bits.rows(), number_of_bins=10
-    ).compute()
+    mutual_information = estimator.estimate(variables=bits.variables, data=bits.rows())
 
     tree = ChowLiuTree.from_mutual_information(mutual_information=mutual_information)
 
@@ -108,9 +117,21 @@ def test_hidden_chow_liu_tree_has_one_mixture_of_the_hidden_states_at_its_root(b
     assert circuit.root.edges.number_of_edges == hidden_states
 
 
-def test_hidden_chow_liu_tree_over_continuous_variables_has_finite_likelihoods():
+@pytest.mark.parametrize(
+    "estimator",
+    [
+        BinnedMutualInformation(),
+        GaussianMutualInformation(),
+        NearestNeighbourMutualInformation(),
+    ],
+    ids=lambda estimator: type(estimator).__name__,
+)
+def test_hidden_chow_liu_tree_over_continuous_variables_has_finite_likelihoods(
+    estimator: MutualInformationEstimator,
+):
     """
-    Continuous variables hang below their latent variables as Gaussians.
+    Continuous variables hang below their latent variables as Gaussians, the tree
+    spanned over the mutual information of the estimator.
     """
     generator = np.random.default_rng(0)
     first = generator.normal(size=300)
@@ -124,9 +145,9 @@ def test_hidden_chow_liu_tree_over_continuous_variables_has_finite_likelihoods()
     )
     variables = SortedSet([Continuous("a"), Continuous("b"), Continuous("c")])
 
-    circuit = HiddenChowLiuTree(variables=variables, hidden_states=4).build_circuit(
-        data=rows
-    )
+    circuit = HiddenChowLiuTree(
+        variables=variables, hidden_states=4, mutual_information=estimator
+    ).build_circuit(data=rows)
 
     assert circuit.is_decomposable()
     assert np.isfinite(circuit.log_likelihood(events=rows)).all()

@@ -24,6 +24,12 @@ from experiments.circuit_learning.settings import (
     FloatingPointType,
 )
 from probabilistic_model.learning.parameters.training_schedule import Convergence
+from probabilistic_model.learning.structure.exceptions import (
+    UnsupportedMutualInformationVariableError,
+)
+from probabilistic_model.learning.structure.mutual_information import (
+    GaussianMutualInformation,
+)
 from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu_tree import (
     HiddenChowLiuTree,
 )
@@ -106,3 +112,22 @@ def test_every_phase_trains_and_raises_the_training_log_likelihood(
         short_training.convergence.maximum_epochs * len(method.phases)
     )
     assert log_likelihoods.mean() > untrained.log_likelihood(events=rows).mean()
+
+
+def test_the_tree_is_spanned_over_the_mutual_information_of_the_method(
+    dataset, short_training
+):
+    """
+    The method estimates the mutual information with its own estimator, here one that
+    refuses the symbolic column of the dataset.
+    """
+    method = HiddenChowLiuTreeByExpectationMaximization(
+        mutual_information=GaussianMutualInformation()
+    )
+
+    with pytest.raises(UnsupportedMutualInformationVariableError):
+        method.learn(
+            dataset=dataset,
+            setting=central_processor_setting(array_library=ArrayLibrary.JAX),
+            context=short_training,
+        )
