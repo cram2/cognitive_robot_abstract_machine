@@ -8,7 +8,8 @@ from __future__ import annotations
 import gc
 
 import pytest
-from sqlalchemy import func, inspect, select
+from sqlalchemy import event, func, inspect, select, update
+from sqlalchemy.orm import ORMExecuteState
 
 from krrood.entity_query_language.factories import an, entity, set_of, variable
 from krrood.ormatic.data_access_objects.dao import StoredObjectRow
@@ -25,7 +26,10 @@ from krrood.ormatic.result_loading import (
     SubclassLoading,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
-from krrood.ormatic.data_access_objects.helper import to_dao
+from krrood.ormatic.data_access_objects.helper import (
+    get_mapping_data_access_object_class,
+    to_dao,
+)
 from krrood.ormatic.eql_interface import eql_to_sql
 from ..dataset.multiple_inheritance import (
     FramedFurnishing,
@@ -505,6 +509,84 @@ def test_relationships_load_on_access_only_when_asked_to(
     ).evaluate()
 
     assert ("hinges" in inspect(dao).unloaded) == hinges_unloaded
+
+
+def test_relationships_load_on_access_also_where_a_subclass_declares_them(
+    session, database
+):
+    """
+    Loading relationships on access also leaves unloaded the relationships that a
+    subclass of the selected class declares.
+    """
+    session.add(to_dao(HasHinges(label="gate", hinges=[Hinge(stiffness=1.0)])))
+    session.commit()
+    session.expunge_all()
+    item = variable(InventoryItem, domain=None)
+
+    [dao] = eql_to_sql(
+        an(entity(item)),
+        session,
+        result_loading=ResultLoading(relationship_loading=RelationshipLoading.ON_ACCESS),
+    ).evaluate()
+
+    assert "hinges" in inspect(dao).unloaded
+
+
+def test_a_distinct_query_for_a_hierarchy_keeps_its_order(session, database):
+    """
+    A distinct query that orders the objects of a class with subclasses gives them in
+    its order.
+    """
+    items = store_items_of_one_hierarchy(session)
+    item = variable(InventoryItem, domain=None)
+    query = an(entity(item).ordered_by(variable=item.label).distinct())
+
+    result = eql_to_sql(query, session).evaluate()
+
+    assert [dao.label for dao in result] == [stored.label for stored in items]
+
+
+def test_a_limited_query_loads_the_objects_it_selected_when_joining_its_selection(
+    session, database
+):
+    """
+    Loading by joining the selection still loads the objects a limited query selected,
+    though running the selection again would select others.
+    """
+    store_items_of_one_hierarchy(session)
+    item = variable(InventoryItem, domain=None)
+    query = an(entity(item).ordered_by(variable=item.label)).limit(n=1)
+    item_dao_class = get_mapping_data_access_object_class(InventoryItem)
+    statements = []
+
+    def rename_the_first_item_after_the_selection(state: ORMExecuteState) -> None:
+        if not state.is_select:
+            return
+        statements.append(state.statement)
+        if len(statements) == 2:
+            state.session.execute(
+                update(item_dao_class)
+                .where(item_dao_class.label == "bedroom")
+                .values(label="zzz")
+                .execution_options(synchronize_session=False)
+            )
+
+    event.listen(session, "do_orm_execute", rename_the_first_item_after_the_selection)
+    try:
+        [dao] = eql_to_sql(
+            query,
+            session,
+            result_loading=ResultLoading(
+                subclass_loading=SubclassLoading.ONE_QUERY_PER_CLASS,
+                selected_object_restriction=SelectedObjectRestriction.SELECTION_JOIN,
+            ),
+        ).evaluate()
+    finally:
+        event.remove(
+            session, "do_orm_execute", rename_the_first_item_after_the_selection
+        )
+
+    assert isinstance(dao.from_dao(), Closet)
 
 
 def test_a_set_of_query_refuses_to_load_its_rows_by_class(session, database):

@@ -2,6 +2,7 @@
 Answering entity queries with each backend.
 """
 
+import gc
 from datetime import datetime
 from types import EllipsisType
 
@@ -145,6 +146,29 @@ def test_selective_query_multiple_backends(session, database):
 
     result = list(q.evaluate(backend=SQLAlchemyBackend(session_maker=session_maker)))
     assert len(result) == 1
+
+
+def test_the_relationships_of_objects_the_database_backend_returns_stay_readable(
+    session, database
+):
+    """
+    The data access objects that the database backend returns have their relationships
+    loaded, though the backend's session is gone once the evaluation ends.
+    """
+    pose = KRROODPose(
+        position=KRROODPosition(x=1, y=0, z=0),
+        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
+    )
+    session.add(to_dao(pose))
+    session.commit()
+    pose_variable = variable(KRROODPose, domain=None)
+
+    [dao] = an(entity(pose_variable)).evaluate(
+        backend=SQLAlchemyBackend(session_maker=sessionmaker(session.bind))
+    )
+    gc.collect()
+
+    assert dao.position.x == pose.position.x
 
 
 def test_probabilistic_backend_with_symbolic_expression():
