@@ -17,6 +17,7 @@ from probabilistic_model.learning.structure.exceptions import (
 from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu_tree import (
     ChowLiuTree,
     HiddenChowLiuTree,
+    UniformWeightRange,
 )
 from probabilistic_model.learning.structure.mutual_information import (
     BinnedMutualInformation,
@@ -168,6 +169,22 @@ def test_same_seed_gives_the_same_circuit_and_another_seed_another(bits):
 
     np.testing.assert_array_equal(log_likelihoods(0), log_likelihoods(0))
     assert not np.allclose(log_likelihoods(0), log_likelihoods(1))
+
+
+def test_equal_initial_weights_start_from_the_uniform_distribution(bits):
+    """
+    Initial weights drawn from a single value make every assignment equally likely.
+    """
+    circuit = HiddenChowLiuTree(
+        variables=bits.variables,
+        hidden_states=3,
+        initial_weight_range=UniformWeightRange(lowest=0.5, highest=0.5),
+    ).build_circuit(data=bits.rows())
+
+    np.testing.assert_allclose(
+        circuit.log_likelihood(events=bits.every_assignment()),
+        -bits.number_of_variables * np.log(2.0),
+    )
 
 
 def test_variable_without_input_distribution_is_refused():

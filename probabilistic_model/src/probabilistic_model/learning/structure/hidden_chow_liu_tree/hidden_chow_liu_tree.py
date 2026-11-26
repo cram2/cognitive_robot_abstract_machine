@@ -96,11 +96,39 @@ class ChowLiuTree:
 
 
 @dataclass(kw_only=True)
+class UniformWeightRange:
+    """
+    The interval unnormalized initial weights are drawn uniformly from.
+    """
+
+    lowest: float = 0.1
+    """
+    The lowest weight, above zero so that no state or transition starts impossible.
+    """
+
+    highest: float = 1.0
+    """
+    The highest weight.
+    """
+
+    def sample(
+        self, *, random_number_generator: np.random.Generator, shape: tuple[int, ...]
+    ) -> npt.NDArray[np.float64]:
+        """
+        :param random_number_generator: The source of the weights.
+        :param shape: The shape of the weights.
+        :return: Weights drawn uniformly from the interval.
+        """
+        return random_number_generator.uniform(self.lowest, self.highest, size=shape)
+
+
+@dataclass(kw_only=True)
 class RandomInitialParameters:
     """
     Random initial parameters of a hidden Chow-Liu tree circuit: categorical
-    probabilities and transition weights drawn from [0.1, 1] and normalized, Gaussians
-    centered at random values of their column with the column's standard deviation.
+    probabilities and transition weights drawn from :attr:`weight_range` and normalized,
+    Gaussians centered at random values of their column with the column's standard
+    deviation.
     """
 
     variables: SortedSet
@@ -121,6 +149,11 @@ class RandomInitialParameters:
     seed: int
     """
     The seed of the parameters.
+    """
+
+    weight_range: UniformWeightRange = field(default_factory=UniformWeightRange)
+    """
+    The interval the categorical probabilities and transition weights are drawn from.
     """
 
     random_number_generator: np.random.Generator = field(init=False, repr=False)
@@ -145,8 +178,9 @@ class RandomInitialParameters:
         variable: Variable = self.variables[variable_index]
         if isinstance(variable, Symbolic):
             number_of_states = len(variable.domain.simple_sets)
-            probabilities = self.random_number_generator.uniform(
-                0.1, 1.0, size=(self.hidden_states, number_of_states)
+            probabilities = self.weight_range.sample(
+                random_number_generator=self.random_number_generator,
+                shape=(self.hidden_states, number_of_states),
             )
             probabilities /= probabilities.sum(axis=1, keepdims=True)
             return SymbolicLayer(
@@ -174,8 +208,9 @@ class RandomInitialParameters:
             #hidden states).
         """
         rows = 1 if parent is None else self.hidden_states
-        return self.random_number_generator.uniform(
-            0.1, 1.0, size=(rows, self.hidden_states)
+        return self.weight_range.sample(
+            random_number_generator=self.random_number_generator,
+            shape=(rows, self.hidden_states),
         )
 
 
@@ -213,6 +248,12 @@ class HiddenChowLiuTree:
     The seed of the random initial parameters.
     """
 
+    initial_weight_range: UniformWeightRange = field(default_factory=UniformWeightRange)
+    """
+    The interval the initial categorical probabilities and transition weights are drawn
+    from.
+    """
+
     def build_circuit(
         self, *, data: npt.NDArray[np.float64]
     ) -> LayeredProbabilisticCircuit:
@@ -230,41 +271,33 @@ class HiddenChowLiuTree:
             data=data,
             hidden_states=self.hidden_states,
             seed=self.seed,
+            weight_range=self.initial_weight_range,
         )
-        units: dict[int, Layer] = {}
+        # the mixture of every variable's units under each state of its parent's latent
+        # variable, or under the single state above the root
+        mixtures: dict[int, SumLayer] = {}
         for variable_index in tree.order[::-1].tolist():
             factors = [parameters.input_layer(variable_index=variable_index)]
             factors.extend(
-                self.mixture_layer(
-                    child_layer=units.pop(child),
-                    weights=parameters.transition_weights(parent=variable_index),
-                )
+                mixtures.pop(child)
                 for child in np.flatnonzero(tree.parents == variable_index).tolist()
             )
-            units[variable_index] = (
+            units = (
                 factors[0]
                 if len(factors) == 1
                 else ProductLayer.node_wise_product_of(factors)
             )
-        root_variable = int(tree.order[0])
-        root = self.mixture_layer(
-            child_layer=units[root_variable],
-            weights=parameters.transition_weights(parent=None),
-        )
-        return LayeredProbabilisticCircuit(SortedSet(self.variables), root)
-
-    @staticmethod
-    def mixture_layer(*, child_layer: Layer, weights: DenseEdgeValues) -> SumLayer:
-        """
-        :param child_layer: The layer whose units are mixed.
-        :param weights: The unnormalized weight of every unit of the child layer in
-            every mixture, shape (#mixtures, #child units).
-        :return: The layer of the mixtures.
-        """
-        rows, columns = np.nonzero(np.ones_like(weights))
-        return SumLayer.from_entries(
-            [child_layer],
-            SparseEntries(np.log(weights[rows, columns]), rows, columns),
-            weights.shape[0],
-            DenseEdgeMatrix,
+            parent = int(tree.parents[variable_index])
+            weights = parameters.transition_weights(
+                parent=None if parent < 0 else parent
+            )
+            rows, columns = np.nonzero(np.ones_like(weights))
+            mixtures[variable_index] = SumLayer.from_entries(
+                [units],
+                SparseEntries(np.log(weights[rows, columns]), rows, columns),
+                weights.shape[0],
+                DenseEdgeMatrix,
+            )
+        return LayeredProbabilisticCircuit(
+            SortedSet(self.variables), mixtures[int(tree.order[0])]
         )
