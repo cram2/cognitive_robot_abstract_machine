@@ -12,10 +12,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
+from itertools import batched
 
 import sqlalchemy.inspection
 import sqlalchemy.orm
 from sqlalchemy import event
+from sqlalchemy.sql.base import ExecutableOption
 from sqlalchemy.orm import (
     MANYTOONE,
     MANYTOMANY,
@@ -24,7 +26,7 @@ from sqlalchemy.orm import (
     make_transient_to_detached,
     selectinload,
 )
-from typing_extensions import get_origin, Any, TypeVar
+from typing_extensions import get_origin, Any, Callable, Sequence, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.core.mapped_variable import Attribute, IndexByValue
@@ -1646,6 +1648,23 @@ class DataAccessObject(HasGeneric[T]):
             _repr_thread_local.seen.remove(id(self))
 
 
+class StoredObjectColumn(StrEnum):
+    """
+    The columns of the table of every stored object that a selection of the ids and
+    types of stored objects gives, under the names of the attributes of its rows.
+    """
+
+    DATABASE_ID = "database_id"
+    """
+    The id of the object, the same in the table of every class it has rows in.
+    """
+
+    POLYMORPHIC_TYPE = "polymorphic_type"
+    """
+    The name of the table of the class the object is loaded as.
+    """
+
+
 class StoredObjectRow:
     """
     The row every stored object has, whatever its class.
@@ -1707,30 +1726,69 @@ class StoredObjectRow:
         )
 
     @classmethod
+    def load_objects_by_class(
+        cls,
+        *,
+        stored_objects: Sequence[StoredObjectRow | sqlalchemy.Row],
+        load_objects_of_class: Callable[
+            [type[DataAccessObject], list[int]], Iterable[Any]
+        ],
+    ) -> list[Any]:
+        """
+        :param stored_objects: Rows of this table, or rows with the
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id` and
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.polymorphic_type` of stored objects.
+        :param load_objects_of_class: Loads the objects of one DAO class from their ids,
+            each of them with its
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id`.
+        :return: What was loaded for every stored object, in the same order.
+        """
+        ids_by_class: dict[type[DataAccessObject], list[int]] = {}
+        for stored_object in stored_objects:
+            dao_class = cls.dao_class_of_table(
+                table_name=stored_object.polymorphic_type
+            )
+            ids_by_class.setdefault(dao_class, []).append(stored_object.database_id)
+        loaded_by_id = {
+            loaded.database_id: loaded
+            for dao_class, ids in ids_by_class.items()
+            for loaded in load_objects_of_class(dao_class, ids)
+        }
+        return [
+            loaded_by_id[stored_object.database_id] for stored_object in stored_objects
+        ]
+
+    @classmethod
     def object_daos(
-        cls, *, session: sqlalchemy.orm.Session, stored_objects: list[StoredObjectRow]
+        cls,
+        *,
+        session: sqlalchemy.orm.Session,
+        stored_objects: Sequence[StoredObjectRow | sqlalchemy.Row],
+        loader_options: tuple[ExecutableOption, ...] = (),
+        ids_per_statement: int,
     ) -> list[DataAccessObject]:
         """
         :param session: The session the rows were loaded with.
-        :param stored_objects: Rows of this table.
+        :param stored_objects: Rows of this table, or rows with the
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.database_id` and
+            :attr:`~krrood.ormatic.stored_object.StoredObjectDAO.polymorphic_type` of stored objects.
+        :param loader_options: The options of the statements that load the DAOs.
+        :param ids_per_statement: The most ids one statement binds.
         :return: The DAOs of the rows' objects, in the same order, loaded with one query
-            per DAO class.
+            per DAO class and batch of ids.
         """
-        ids_by_table: dict[str, list[int]] = {}
-        for stored_object in stored_objects:
-            ids_by_table.setdefault(stored_object.polymorphic_type, []).append(
-                stored_object.database_id
-            )
-        daos_by_id = {}
-        for table_name, ids in ids_by_table.items():
-            dao_class = cls.dao_class_of_table(table_name=table_name)
-            for dao in session.scalars(
-                sqlalchemy.select(dao_class).where(dao_class.database_id.in_(ids))
-            ):
-                daos_by_id[dao.database_id] = dao
-        return [
-            daos_by_id[stored_object.database_id] for stored_object in stored_objects
-        ]
+        return cls.load_objects_by_class(
+            stored_objects=stored_objects,
+            load_objects_of_class=lambda dao_class, ids: (
+                dao
+                for batch in batched(ids, ids_per_statement)
+                for dao in session.scalars(
+                    sqlalchemy.select(dao_class)
+                    .where(dao_class.database_id.in_(batch))
+                    .options(*loader_options)
+                )
+            ),
+        )
 
     def from_dao(self, *, state: FromDataAccessObjectState | None = None) -> Any:
         """

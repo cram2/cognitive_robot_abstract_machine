@@ -52,7 +52,7 @@ dependencies = [
     "pymysql",
     "pyglet==1.5.31",
     "pycollada",
-    "psycopg",
+    "psycopg[binary]",
     "plyfile",
     "huggingface-hub",
     "vhacdx",
