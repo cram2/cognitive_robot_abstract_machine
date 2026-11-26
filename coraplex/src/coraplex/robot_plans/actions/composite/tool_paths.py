@@ -61,7 +61,7 @@ class ToolPathSegment:
     """
 
     def sample(
-        self, frame_np: np.ndarray, dt: float, t0: float = 0.0
+        self, *, frame_np: np.ndarray, dt: float, t0: float = 0.0
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Sample the segment's curve in the given frame.
@@ -107,7 +107,11 @@ class ToolPath:
         return float(sum(segment.duration for segment in self.segments))
 
     def sample(
-        self, frame: HomogeneousTransformationMatrix, dt: float = 0.01, t0: float = 0.0
+        self,
+        *,
+        frame: HomogeneousTransformationMatrix,
+        dt: float = 0.01,
+        t0: float = 0.0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Sample all segments into one concatenated path.
@@ -122,7 +126,7 @@ class ToolPath:
         t = float(t0)
 
         for segment_index, segment in enumerate(self.segments):
-            times, points = segment.sample(frame.to_np(), dt=dt, t0=t)
+            times, points = segment.sample(frame_np=frame.to_np(), dt=dt, t0=t)
             if all_times:
                 times = times[1:]
                 points = points[1:]
@@ -734,13 +738,13 @@ class SliceAnchorPlacement:
             interval end.
         """
         usable_length = max(0.0, self.interval_end - self.interval_start)
-        thickness, count = self._resolve_parameters(usable_length)
+        thickness, count = self._resolve_parameters(usable_length=usable_length)
         return [
             self.interval_start + cut_index * thickness
             for cut_index in range(1, count + 1)
         ]
 
-    def _resolve_parameters(self, usable_length: float) -> tuple[float, int]:
+    def _resolve_parameters(self, *, usable_length: float) -> tuple[float, int]:
         """
         :param usable_length: Length of the usable cutting interval in meters.
         :return: The feasible ``(slice_thickness, number_of_cuts)`` pair after filling

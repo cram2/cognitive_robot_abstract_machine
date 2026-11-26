@@ -154,7 +154,7 @@ class PlaceSettingObject:
     Which way the object faces once it has been laid down.
     """
 
-    def spawn(self, world: World) -> None:
+    def spawn(self, *, world: World) -> None:
         """
         Put the object where it starts and name it among the world's annotations.
 
@@ -175,7 +175,7 @@ class PlaceSettingObject:
             parent_T_self=self.start,
         )
 
-    def annotation_in(self, world: World) -> HasRootKinematicStructureEntity:
+    def annotation_in(self, *, world: World) -> HasRootKinematicStructureEntity:
         """
         :param world: The world the object was spawned into.
         :return: The annotation naming the object, as the plan refers to it.
@@ -191,7 +191,7 @@ class PlaceSettingObject:
             ).evaluate()
         )
 
-    def target_location(self, world: World) -> Pose:
+    def target_location(self, *, world: World) -> Pose:
         """
         :param world: The world the table stands in.
         :return: Where on the table the object is laid.
@@ -290,21 +290,21 @@ class BulletWorldDemonstration(RobotDemonstration):
             semantic_annotation_type=self.used_robot, localization_pose=self.robot_start
         )
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(ApartmentBody.ROOT)
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         """
         Put the place setting where it starts out, and let the world reasoner annotate
         the apartment's furniture, including the drawer the spoon lies in.
         """
         for placed_object in self.place_setting:
-            placed_object.spawn(world)
+            placed_object.spawn(world=world)
 
         with world.modify_world():
             WorldReasoner(world).reason()
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
                 robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
@@ -313,7 +313,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             PlanRewriting(transformations=[OpenDrawerBeforeMoveAndPickUp()]),
         ]
 
-    def segment_events(self, world: World) -> AbstractContextManager:
+    def segment_events(self, *, world: World) -> AbstractContextManager:
         """
         Detect the place setting being grasped, picked up, placed and contained.
         """
@@ -331,7 +331,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             ),
         )
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Carry each object to its place on the table.
         """
@@ -345,22 +345,22 @@ class BulletWorldDemonstration(RobotDemonstration):
                     ParkArmsAction(arms=robot.all_arms),
                     MoveTorsoAction(torso_state=TorsoState.HIGH),
                     TransportAction.from_graspable_by_closest_grasps(
-                        self.milk.annotation_in(world),
-                        self.milk.target_location(world),
-                        left_arm,
-                        context,
+                        graspable=self.milk.annotation_in(world=world),
+                        goal_pose=self.milk.target_location(world=world),
+                        arm=left_arm,
+                        context=context,
                     ),
                     TransportAction.from_graspable_by_closest_grasps(
-                        self.bowl.annotation_in(world),
-                        self.bowl.target_location(world),
-                        left_arm,
-                        context,
+                        graspable=self.bowl.annotation_in(world=world),
+                        goal_pose=self.bowl.target_location(world=world),
+                        arm=left_arm,
+                        context=context,
                     ),
                     TransportAction.from_graspable_by_closest_grasps(
-                        self.spoon.annotation_in(world),
-                        self.spoon.target_location(world),
-                        left_arm,
-                        context,
+                        graspable=self.spoon.annotation_in(world=world),
+                        goal_pose=self.spoon.target_location(world=world),
+                        arm=left_arm,
+                        context=context,
                     ),
                 ]
             )

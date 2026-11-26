@@ -92,10 +92,10 @@ class TransformationCountingItsApplications(PlanTransformation[MoveTorsoAction])
     How often it was applied.
     """
 
-    def is_applicable(self, plan_node: MoveTorsoAction) -> bool:
+    def is_applicable(self, *, plan_node: MoveTorsoAction) -> bool:
         return True
 
-    def apply(self, plan_node: MoveTorsoAction) -> None:
+    def apply(self, *, plan_node: MoveTorsoAction) -> None:
         self.applications += 1
 
 
@@ -111,9 +111,9 @@ def test_a_copied_plan_rewriting_offers_the_nodes_offered_already_again(
     rewriting = PlanRewriting(transformations=[counting])
     torso = MoveTorsoAction(torso_state=TorsoState.HIGH)
     statechart_of(simulated_executor(extensions), torso)
-    rewriting.rewrite(torso)
+    rewriting.rewrite(root=torso)
 
-    world.rebind_world_entities(rewriting).rewrite(torso)
+    world.rebind_world_entities(rewriting).rewrite(root=torso)
 
     assert counting.applications == 2
 

@@ -88,7 +88,9 @@ def test_garmi_opens_its_gripper_through_the_franka_driver(garmi_extensions) -> 
     [task] = plan.nodes
     assert type(task) is GripperMoveTask
     assert (task.action_topic, task.width, task.speed) == (
-        transformation.action_name(gripper, FrankaGripperActionName.MOVE),
+        transformation.action_name(
+            gripper=gripper, action=FrankaGripperActionName.MOVE
+        ),
         gripper.separation_when_open,
         transformation.finger_speed,
     )
@@ -104,7 +106,7 @@ def test_garmi_shuts_its_gripper_with_a_grasp_of_the_franka_driver_while_doing_m
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
         GarmiLeftGripper
     )[0]
-    expected = DriveGarmiGripperStatesWithTheirFrankaDriver().grasp(gripper)
+    expected = DriveGarmiGripperStatesWithTheirFrankaDriver().grasp(gripper=gripper)
 
     plan = prepared(
         Sequence(
@@ -135,9 +137,9 @@ def test_the_right_gripper_of_garmi_is_driven_in_its_own_namespace(
     )[0]
     transformation = DriveGarmiGripperStatesWithTheirFrankaDriver()
 
-    assert transformation.action_name(gripper, FrankaGripperActionName.MOVE) == (
-        f"{transformation.right_gripper_namespace}/{FrankaGripperActionName.MOVE}"
-    )
+    assert transformation.action_name(
+        gripper=gripper, action=FrankaGripperActionName.MOVE
+    ) == (f"{transformation.right_gripper_namespace}/{FrankaGripperActionName.MOVE}")
 
 
 def test_garmi_closes_its_fingers_to_a_width_with_a_grasp_of_the_franka_driver(
@@ -149,7 +151,7 @@ def test_garmi_closes_its_fingers_to_a_width_with_a_grasp_of_the_franka_driver(
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
         GarmiLeftGripper
     )[0]
-    expected = CloseGarmiFingersToWidthWithTheirFrankaDriver().grasp(gripper)
+    expected = CloseGarmiFingersToWidthWithTheirFrankaDriver().grasp(gripper=gripper)
 
     plan = prepared(
         Sequence(

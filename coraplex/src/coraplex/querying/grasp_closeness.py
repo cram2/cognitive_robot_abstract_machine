@@ -45,6 +45,7 @@ class GraspCloseness:
     @classmethod
     def from_grasp(
         cls,
+        *,
         grasp: GraspCandidate,
         world_T_object: NDArray[np.float64],
         world_P_standing: NDArray[np.float64],
@@ -105,7 +106,9 @@ class GraspsByCloseness(SymbolicFunction):
         grasps_by_closeness = sorted(
             self.graspable.grasp_candidates(),
             key=lambda grasp: GraspCloseness.from_grasp(
-                grasp, world_T_object, world_P_standing
+                grasp=grasp,
+                world_T_object=world_T_object,
+                world_P_standing=world_P_standing,
             ),
         )
         return grasps_by_closeness[: self.number_of_grasps]

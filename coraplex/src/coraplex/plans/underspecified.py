@@ -67,7 +67,7 @@ class PlanChildChooser(ChildChooser[GenericChoosingNode], ABC):
         """
         rewriting = node.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
-            rewriting.rewrite(child)
+            rewriting.rewrite(root=child)
 
     def failure_monitors_for(
         self,
@@ -119,7 +119,7 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
         super().prepare_chosen_child(node=node, child=child)
         rewriting = node.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
-            rewriting.treat_as_offered(node)
+            rewriting.treat_as_offered(node=node)
 
 
 # %% rebuilding part of a plan onto a world
@@ -174,7 +174,7 @@ class SubtreeRebuild(NodeRebuild):
     """
 
     @staticmethod
-    def root_around(node: StatechartNode) -> StatechartNode:
+    def root_around(*, node: StatechartNode) -> StatechartNode:
         """
         :param node: A node of a running plan.
         :return: The node holding everything that runs beside `node`: the outermost
@@ -193,7 +193,7 @@ class SubtreeRebuild(NodeRebuild):
 
     @classmethod
     def unfinished_nodes(
-        cls, root: StatechartNode, proposals: dict[StatementNode, Action]
+        cls, *, root: StatechartNode, proposals: dict[StatementNode, Action]
     ) -> SubtreeRebuild:
         """
         :param root: A running node of a plan.
@@ -220,7 +220,7 @@ class SubtreeRebuild(NodeRebuild):
             },
         )
 
-    def build_for_trial(self, world: World) -> StatechartNode:
+    def build_for_trial(self, *, world: World) -> StatechartNode:
         """
         :param world: The copy the rebuilt nodes are tried in.
         :return: :attr:`root` rebuilt onto `world` to be tried: a statement runs its
@@ -265,24 +265,24 @@ class SubtreeRebuild(NodeRebuild):
             branch is cut at it, or if it cannot be rebuilt without what is left out.
         """
         if node not in self._rebuilt:
-            self._rebuilt[node] = self._rebuild_anew(node)
+            self._rebuilt[node] = self._rebuild_anew(node=node)
         return self._rebuilt[node]
 
-    def _rebuild_anew(self, node: StatechartNode) -> StatechartNode | None:
+    def _rebuild_anew(self, *, node: StatechartNode) -> StatechartNode | None:
         """
         :return: `node` rebuilt onto :attr:`_world`, see :meth:`rebuilt`.
         """
         if node in self.left_out:
             return None
         if isinstance(node, StatementNode):
-            return self._rebuild_statement(node)
+            return self._rebuild_statement(statement=node)
         if isinstance(node, CompositeNodeChoosingItsChild):
-            return self._rebuild_running_child(node)
+            return self._rebuild_running_child(node=node)
         if isinstance(node, Action):
-            return node.rebound_to(self._world)
+            return node.rebound_to(world=self._world)
         return node.rebuilt_by(rebuild=self)
 
-    def _rebuild_statement(self, statement: StatementNode) -> StatechartNode | None:
+    def _rebuild_statement(self, *, statement: StatementNode) -> StatechartNode | None:
         """
         :return: The candidate of `statement` from :attr:`candidates`, or None if it
             has none, which cuts the branch.
@@ -291,10 +291,10 @@ class SubtreeRebuild(NodeRebuild):
         if candidate is None:
             self._cut = True
             return None
-        return candidate.rebound_to(self._world)
+        return candidate.rebound_to(world=self._world)
 
     def _rebuild_running_child(
-        self, node: CompositeNodeChoosingItsChild
+        self, *, node: CompositeNodeChoosingItsChild
     ) -> StatechartNode | None:
         """
         :return: The child `node` runs now, rebuilt, or None if it runs none, which cuts
@@ -419,7 +419,7 @@ class ActionTrial:
         """
         return self.executor.context.world
 
-    def succeeds(self, rebuild: SubtreeRebuild) -> bool:
+    def succeeds(self, *, rebuild: SubtreeRebuild) -> bool:
         """
         Run what `rebuild` builds for a trial against the copy, see
         :meth:`SubtreeRebuild.build_for_trial`, and restore the copy afterwards.
@@ -439,11 +439,11 @@ class ActionTrial:
 
         with world.reset_state_context():
             try:
-                executor = self._trial_executor(world)
+                executor = self._trial_executor(world=world)
                 statechart = Statechart(context=executor.context)
                 # A parallel is ended by what holds it.
                 statechart.add_node(
-                    node=Sequence(nodes=[rebuild.build_for_trial(world)])
+                    node=Sequence(nodes=[rebuild.build_for_trial(world=world)])
                 )
                 rebuild.carry_over_conditions()
                 executor.compile(statechart=statechart)
@@ -457,7 +457,7 @@ class ActionTrial:
                 # state, which needs the degrees of freedom it was snapshotted with.
                 world.rollback_to_version(version)
 
-    def _trial_executor(self, world: World) -> PlanExecutor:
+    def _trial_executor(self, *, world: World) -> PlanExecutor:
         """
         :param world: The copy a candidate is tried in.
         :return: An executor running a candidate in `world`, configured like
@@ -598,14 +598,17 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             or no combination of them, is left that succeeds its trial.
         """
         grounding = node.context.require_extension(extension_type=StatementGrounding)
-        root = SubtreeRebuild.root_around(node)
-        statements = self.statements_grounded_with(node)
+        root = SubtreeRebuild.root_around(node=node)
+        statements = self.statements_grounded_with(node=node)
         if len(statements) == 1:
-            return self._candidate_alone(node, root, grounding)
-        return self._candidate_together(node, statements, root, grounding)
+            return self._candidate_alone(node=node, root=root, grounding=grounding)
+        return self._candidate_together(
+            node=node, statements=statements, root=root, grounding=grounding
+        )
 
     def _candidate_alone(
         self,
+        *,
         node: StatementNode,
         root: StatechartNode,
         grounding: StatementGrounding,
@@ -620,7 +623,9 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         )
         while candidate is not None:
             if self.trial.succeeds(
-                SubtreeRebuild.unfinished_nodes(root, {node: candidate})
+                rebuild=SubtreeRebuild.unfinished_nodes(
+                    root=root, proposals={node: candidate}
+                )
             ):
                 return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
             candidate = node.next_candidate(
@@ -632,6 +637,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
 
     def _candidate_together(
         self,
+        *,
         node: StatementNode,
         statements: list[StatementNode],
         root: StatechartNode,
@@ -654,7 +660,9 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         )
         for combination in combinations:
             if not self.trial.succeeds(
-                SubtreeRebuild.unfinished_nodes(root, combination)
+                rebuild=SubtreeRebuild.unfinished_nodes(
+                    root=root, proposals=combination
+                )
             ):
                 continue
             combinations.take(combination=combination)
@@ -672,7 +680,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         return None
 
     @classmethod
-    def statements_grounded_with(cls, node: StatementNode) -> list[StatementNode]:
+    def statements_grounded_with(cls, *, node: StatementNode) -> list[StatementNode]:
         """
         :param node: A statement asking for its next child.
         :return: The statements that start with the outermost parallel `node` starts
@@ -685,16 +693,16 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
                 ancestor
                 for ancestor in reversed(node.path)
                 if isinstance(ancestor, Parallel)
-                and node in cls.statements_starting_with(ancestor)
+                and node in cls.statements_starting_with(node=ancestor)
             ),
             None,
         )
         if parallel is None:
             return [node]
-        return cls.statements_starting_with(parallel)
+        return cls.statements_starting_with(node=parallel)
 
     @classmethod
-    def statements_starting_with(cls, node: StatechartNode) -> list[StatementNode]:
+    def statements_starting_with(cls, *, node: StatechartNode) -> list[StatementNode]:
         """
         :return: The statements that start when `node` starts and have chosen no child
             since their latest reset: `node` itself, or those of every child of a
@@ -714,7 +722,7 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         return [
             statement
             for child in children
-            for statement in cls.statements_starting_with(child)
+            for statement in cls.statements_starting_with(node=child)
         ]
 
     def cleanup(self) -> None:

@@ -160,7 +160,7 @@ class HoleShapeClassifier:
     A box-shaped outline more elongated than this is a rectangle rather than a square.
     """
 
-    def shape_of(self, outline: HoleOutline) -> HoleShape:
+    def shape_of(self, *, outline: HoleOutline) -> HoleShape:
         """
         :param outline: The outline of a hole.
         :return: What the hole is shaped like.
@@ -237,6 +237,7 @@ class BoardGeometry:
     @classmethod
     def from_mesh(
         cls,
+        *,
         path: Path = BoardResource.MESH.value,
         classifier: HoleShapeClassifier = HoleShapeClassifier(),
     ) -> BoardGeometry:
@@ -252,14 +253,14 @@ class BoardGeometry:
         return cls(
             lid_top=float(lid.bounds[1][2]),
             bottom=float(min(part.bounds[0][2] for part in parts)),
-            holes=cls.holes_through(lid, classifier),
+            holes=cls.holes_through(lid=lid, classifier=classifier),
             solid_parts=[part for part in parts if part is not lid],
             lid=lid,
         )
 
     @staticmethod
     def holes_through(
-        lid: trimesh.Trimesh, classifier: HoleShapeClassifier
+        *, lid: trimesh.Trimesh, classifier: HoleShapeClassifier
     ) -> list[BoardHole]:
         """
         Slice the lid half way through its thickness and read every inner loop as a hole.
@@ -281,7 +282,7 @@ class BoardGeometry:
         )
         holes = [
             BoardHole(
-                shape=classifier.shape_of(outline),
+                shape=classifier.shape_of(outline=outline),
                 center=outline.centroid,
                 bounds=outline.bounds,
             )
@@ -318,7 +319,7 @@ class BoardGeometry:
         """
         return max(self.solid_parts, key=lambda part: part.extents[0] * part.extents[1])
 
-    def hole_of_shape(self, shape: HoleShape) -> BoardHole:
+    def hole_of_shape(self, *, shape: HoleShape) -> BoardHole:
         """
         :param shape: The shape asked for.
         :return: The first hole of ``shape``, in the order the holes are read off the
@@ -402,7 +403,7 @@ class ShapeSortingBoard:
     hole edges almost coincide.
     """
 
-    def body(self, name: PrefixedName) -> Body:
+    def body(self, *, name: PrefixedName) -> Body:
         """
         :param name: What the body is called.
         :return: The board's body.
@@ -416,13 +417,13 @@ class ShapeSortingBoard:
                 + self.handles()
             ),
             collision=ShapeCollection(
-                [self.box_around(part) for part in self.geometry.solid_parts]
+                [self.box_around(part=part) for part in self.geometry.solid_parts]
                 + self.lid_around_its_holes()
-                + [self.copy_of(front) for front in drawer_fronts]
+                + [self.copy_of(box=front) for front in drawer_fronts]
             ),
         )
 
-    def box_around(self, part: trimesh.Trimesh) -> Box:
+    def box_around(self, *, part: trimesh.Trimesh) -> Box:
         """
         :param part: A part of the mesh that is a box.
         :return: That box.
@@ -526,7 +527,7 @@ class ShapeSortingBoard:
         ]
 
     @staticmethod
-    def copy_of(box: Box) -> Box:
+    def copy_of(*, box: Box) -> Box:
         """
         :param box: A box of the board's visual geometry.
         :return: A second box like ``box``, so the visual and the collision geometry do

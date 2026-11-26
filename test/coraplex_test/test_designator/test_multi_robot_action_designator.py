@@ -343,7 +343,7 @@ def multiple_robot_apartment_context(
     the test.
     """
     world, view = setup_multi_robot_apartment
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     full_body_controlled = (
         view.mobile_base.full_body_controlled
         if isinstance(view, HasMobileBase)
@@ -735,8 +735,8 @@ def test_open(multiple_robot_apartment_context):
                 )
             ),
             OpenAction.from_handle(
-                _handle_annotation(world, "handle_cab10_m"),
-                left_or_only_arm(robot),
+                handle=_handle_annotation(world, "handle_cab10_m"),
+                arm=left_or_only_arm(robot),
             ),
         ]
     )
@@ -773,7 +773,7 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
                     )
                 )
             ),
-            CloseAction.from_handle(handle, left_or_only_arm(robot)),
+            CloseAction.from_handle(handle=handle, arm=left_or_only_arm(robot)),
         ]
     )
     run_plan(plan, extensions)
@@ -810,14 +810,14 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
     world, robot, extensions = multiple_robot_apartment_context
 
     description = TransportAction.from_graspable_by_closest_grasps(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Pose(
+        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+        goal_pose=Pose(
             Point3.from_iterable([3.1, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
             reference_frame=world.root,
         ),
-        right_or_only_arm(robot),
-        context_of(extensions),
+        arm=right_or_only_arm(robot),
+        context=context_of(extensions),
     )
     plan = Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH), description])
     run_plan(plan, extensions)
@@ -861,10 +861,10 @@ def test_transport_open_container(multiple_robot_apartment_context, rclpy_node):
     )
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     description = TransportAction.from_graspable_by_closest_grasps(
-        world.get_semantic_annotations_by_type(Spoon)[0],
-        target_pose,
-        right_or_only_arm(robot),
-        context_of(extensions),
+        graspable=world.get_semantic_annotations_by_type(Spoon)[0],
+        goal_pose=target_pose,
+        arm=right_or_only_arm(robot),
+        context=context_of(extensions),
     )
     plan = Sequence(
         nodes=[
@@ -1070,7 +1070,7 @@ def test_elevator_navigation_needs_doors_that_can_open():
     navigation = ElevatorNavigation(elevator=elevator, target_floor=ground_floor)
 
     with pytest.raises(MissingMovableJointError):
-        navigation._elevator_open_at_floor(ground_floor)
+        navigation._elevator_open_at_floor(target_floor=ground_floor)
 
 
 def test_elevator_navigation_needs_a_cabin_that_can_move():
@@ -1096,7 +1096,7 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
     navigation = ElevatorNavigation(elevator=elevator, target_floor=ground_floor)
 
     with pytest.raises(MissingMovableJointError):
-        navigation._elevator_open_at_floor(ground_floor)
+        navigation._elevator_open_at_floor(target_floor=ground_floor)
 
 
 def test_elevator_navigation(multiple_robot_apartment_context, rclpy_node):
@@ -1162,7 +1162,9 @@ def test_search_action(multiple_robot_apartment_context) -> None:
         6, -2, 1.2, reference_frame=world.root
     )
     search = SearchAction.looking_around(
-        milk_body.global_pose, Milk, context_of(extensions)
+        target_location=milk_body.global_pose,
+        object_semantic_annotation=Milk,
+        context=context_of(extensions),
     )
 
     run_plan(search, extensions)
@@ -1186,7 +1188,10 @@ def test_a_search_looks_at_the_target_then_at_the_ends_of_a_cross_around_it(
     arm = 0.3
 
     search = SearchAction.looking_around(
-        target, Milk, context_of(extensions), cross_arm_length=arm
+        target_location=target,
+        object_semantic_annotation=Milk,
+        context=context_of(extensions),
+        cross_arm_length=arm,
     )
 
     x, y, z = target.position.to_np()[:3]
@@ -1213,9 +1218,9 @@ def test_a_search_detects_within_its_cross_and_the_detection_margin(
     margin = 0.2
 
     search = SearchAction.looking_around(
-        target,
-        Milk,
-        context_of(extensions),
+        target_location=target,
+        object_semantic_annotation=Milk,
+        context=context_of(extensions),
         cross_arm_length=arm,
         detection_margin=margin,
     )
@@ -1246,7 +1251,9 @@ def test_a_search_leaves_the_world_as_it_found_it(multiple_robot_apartment_conte
 
     run_plan(
         SearchAction.looking_around(
-            milk_body.global_pose, Milk, context_of(extensions)
+            target_location=milk_body.global_pose,
+            object_semantic_annotation=Milk,
+            context=context_of(extensions),
         ),
         extensions,
     )
@@ -2223,7 +2230,7 @@ def test_a_carry_runs_where_the_statechart_was_received(
     )
     sender = simulated_executor(extensions)
     sent = statechart_of(sender, carry)
-    sender.prepare(sent)
+    sender.prepare(statechart=sent)
     receiver = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )

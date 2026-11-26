@@ -174,7 +174,7 @@ def stationary_block_context(robot_setup):
     extensions of its plans, returned to its initial model and state after the test.
     """
     block_world, robot_class = robot_setup
-    snapshot = WorldSnapshot.capture(block_world)
+    snapshot = WorldSnapshot.capture(world=block_world)
     view = block_world.get_semantic_annotations_by_type(robot_class)[0]
     yield block_world, view, robot_extensions(view)
     snapshot.restore()
@@ -564,13 +564,13 @@ class FailTheFirstLift(SequentialInsertion[PickUpAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: PickUpAction) -> bool:
+    def is_applicable(self, *, plan_node: PickUpAction) -> bool:
         return not self.failed_once
 
-    def anchor(self, plan_node: PickUpAction) -> StatechartNode:
+    def anchor(self, *, plan_node: PickUpAction) -> StatechartNode:
         return plan_node.nodes[-1]
 
-    def nodes_to_insert(self, plan_node: PickUpAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: PickUpAction) -> list[StatechartNode]:
         self.failed_once = True
         return [FunctionCall(function=_fail_the_lift, failure_types=(PlanFailure,))]
 

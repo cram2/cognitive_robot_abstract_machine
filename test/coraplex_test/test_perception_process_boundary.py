@@ -107,7 +107,7 @@ def test_detection_crosses_a_process_boundary(
         semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
     )
 
-    detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
+    detection = RoboKudoPerception(ros_node=rclpy_node).detect(query=query)
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(
@@ -133,7 +133,7 @@ def test_absent_perception_source_is_reported(
     with pytest.raises(PerceptionSourceUnavailable):
         RoboKudoPerception(
             ros_node=rclpy_node, server_timeout=MISSING_SOURCE_TIMEOUT
-        ).detect(query)
+        ).detect(query=query)
 
 
 def test_untyped_detection_crosses_a_process_boundary(
@@ -149,7 +149,7 @@ def test_untyped_detection_crosses_a_process_boundary(
         semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
     )
 
-    detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
+    detection = RoboKudoPerception(ros_node=rclpy_node).detect(query=query)
 
     assert detection.semantic_annotation is Milk
     np.testing.assert_allclose(

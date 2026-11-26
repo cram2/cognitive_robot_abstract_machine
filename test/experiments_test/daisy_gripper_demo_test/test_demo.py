@@ -64,9 +64,9 @@ def plan(
     """
     context = StatechartContext.with_extensions(
         world=demonstration_world,
-        extensions=demonstration.build_context_extensions(demonstration_world),
+        extensions=demonstration.build_context_extensions(world=demonstration_world),
     )
-    [plan] = demonstration.build_statechart(context).top_level_nodes
+    [plan] = demonstration.build_statechart(context=context).top_level_nodes
     return plan
 
 
@@ -99,7 +99,7 @@ def test_the_simulated_world_holds_daisy(demonstration_world: World) -> None:
 def test_the_scene_needs_no_population(
     demonstration: DAiSyGripperDemonstration, demonstration_world: World
 ) -> None:
-    assert demonstration.is_scene_populated(demonstration_world)
+    assert demonstration.is_scene_populated(world=demonstration_world)
 
 
 # %% where it runs

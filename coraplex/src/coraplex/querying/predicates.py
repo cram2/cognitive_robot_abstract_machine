@@ -26,7 +26,7 @@ class GripperOccupancy:
     """
 
     def check_manipulator_occupancy(
-        self, condition: Callable[list[Body], bool]
+        self, *, condition: Callable[list[Body], bool]
     ) -> bool:
         """
         Checks the occupancy of the gripper against a condition.
@@ -62,7 +62,9 @@ class GripperHolds(GripperOccupancy, Predicate):
     """
 
     def __call__(self) -> bool:
-        return self.check_manipulator_occupancy(lambda bodies: self.body in bodies)
+        return self.check_manipulator_occupancy(
+            condition=lambda bodies: self.body in bodies
+        )
 
     @classmethod
     def _verbalization_fragment_(

@@ -182,8 +182,8 @@ def test_a_ring_from_the_arm_reach_distance_stands_off_by_the_reach_fraction(
     )
 
     ring = RingCostmap.from_arm_reach_distance(
-        arm,
-        target,
+        arm=arm,
+        origin=target,
         reach_fraction=REACH_FRACTION,
         resolution=location.map_resolution,
         cells=location.map_cells,
@@ -227,8 +227,8 @@ def test_a_reachability_location_stands_around_the_reach_fraction_of_the_arm(
         reach_fraction=REACH_FRACTION,
     )
     ring = RingCostmap.from_arm_reach_distance(
-        arm,
-        target,
+        arm=arm,
+        origin=target,
         reach_fraction=REACH_FRACTION,
         resolution=location.map_resolution,
         cells=location.map_cells,

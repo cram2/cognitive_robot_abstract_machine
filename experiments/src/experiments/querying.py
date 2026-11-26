@@ -235,26 +235,30 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
                 nodes=[
                     FunctionCall(function=_failing_step, failure_types=(PlanFailure,)),
                     TransportAction.from_graspable_by_closest_grasps(
-                        world.get_semantic_annotations_by_type(Milk)[0],
-                        Pose.from_xyz_rpy(
+                        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+                        goal_pose=Pose.from_xyz_rpy(
                             4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root
                         ),
-                        pr2.left_arm,
-                        executor.context,
+                        arm=pr2.left_arm,
+                        context=executor.context,
                     ),
                 ]
             ),
             TransportAction.from_graspable_by_closest_grasps(
-                world.get_semantic_annotations_by_type(Bowl)[0],
-                Pose.from_xyz_rpy(5.0, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
-                pr2.left_arm,
-                executor.context,
+                graspable=world.get_semantic_annotations_by_type(Bowl)[0],
+                goal_pose=Pose.from_xyz_rpy(
+                    5.0, 3.3, 0.75, yaw=1.57, reference_frame=world.root
+                ),
+                arm=pr2.left_arm,
+                context=executor.context,
             ),
             TransportAction.from_graspable_by_closest_grasps(
-                world.get_semantic_annotations_by_type(Spoon)[0],
-                Pose.from_xyz_rpy(5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root),
-                pr2.left_arm,
-                executor.context,
+                graspable=world.get_semantic_annotations_by_type(Spoon)[0],
+                goal_pose=Pose.from_xyz_rpy(
+                    5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root
+                ),
+                arm=pr2.left_arm,
+                context=executor.context,
             ),
         ]
     )

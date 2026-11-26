@@ -33,7 +33,7 @@ class WorldSnapshot:
     """
 
     @classmethod
-    def capture(cls, world: World) -> Self:
+    def capture(cls, *, world: World) -> Self:
         """
         :param world: The world to capture.
         :return: A snapshot of the current model version and state of ``world``.

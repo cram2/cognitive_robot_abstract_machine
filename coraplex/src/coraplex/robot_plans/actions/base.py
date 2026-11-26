@@ -93,7 +93,7 @@ class Action(CompositeNode, ABC):
             if discovered.field.init and discovered.field.name not in statechart_fields
         }
 
-    def rebound_to(self, world: World) -> Self:
+    def rebound_to(self, *, world: World) -> Self:
         """
         :param world: The world the new action refers to, such as a copy of the one this
             action refers to.
@@ -104,7 +104,7 @@ class Action(CompositeNode, ABC):
         return type(self)(
             **{
                 name: (
-                    value.rebound_to(world)
+                    value.rebound_to(world=world)
                     if isinstance(value, Action)
                     else world.rebind_world_entities(value)
                 )
@@ -159,7 +159,7 @@ class Action(CompositeNode, ABC):
         """
         rewriting = self.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
-            rewriting.configure(self)
+            rewriting.configure(node=self)
         self.temporary_collision_rules = self.create_temporary_collision_rules()
         self._create_children()
 

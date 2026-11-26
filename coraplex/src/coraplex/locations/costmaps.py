@@ -104,7 +104,7 @@ class Costmap(Location):
             self.world.remove_visual_object(visualization_id)
         self.visualization_ids = []
 
-    def merge(self, other: Costmap) -> Costmap:
+    def merge(self, *, other: Costmap) -> Costmap:
         """
         Merges the values of two locations and returns a new locations that has for
         every cell the merged values of both inputs. To merge two locations they
@@ -168,14 +168,14 @@ class Costmap(Location):
         :return: A new Costmap that contains the merged values from this Costmap and the other Costmap
         """
         if isinstance(other, Costmap):
-            return self.merge(other)
+            return self.merge(other=other)
         else:
             raise ValueError(
                 f"Can only combine two locations other type was {type(other)}"
             )
 
     def __and__(self, other):
-        return self.merge(other)
+        return self.merge(other=other)
 
     def candidates(self) -> Iterator[Pose2D]:
         return self.sample(number_of_samples=self.number_of_samples, seed=self.seed)
@@ -200,11 +200,11 @@ class Costmap(Location):
         # An entry is only ever offered once, so the whole map is all there is to
         # sample.
         return self._sample(
-            min(number_of_samples, self.map.size),
-            np.random.default_rng(seed),
+            number_of_samples=min(number_of_samples, self.map.size),
+            random_generator=np.random.default_rng(seed),
         )
 
-    def _orientation_facing_origin(self, position: Point3) -> Quaternion:
+    def _orientation_facing_origin(self, *, position: Point3) -> Quaternion:
         """
         The orientation a candidate sampled at the given position is offered with.
 
@@ -224,7 +224,7 @@ class Costmap(Location):
         return RotationMatrix.from_rpy(0, 0, angle).quaternion
 
     def _budget_per_segment(
-        self, segments: list[np.ndarray], number_of_samples: int
+        self, *, segments: list[np.ndarray], number_of_samples: int
     ) -> list[int]:
         """
         Split a sample budget over this map's segments in proportion to their summed
@@ -253,6 +253,7 @@ class Costmap(Location):
 
     def _pick_entries(
         self,
+        *,
         ratings: NDArray[np.float64],
         count: int,
         random_generator: np.random.Generator,
@@ -275,6 +276,7 @@ class Costmap(Location):
 
     def _sample(
         self,
+        *,
         number_of_samples: int,
         random_generator: np.random.Generator,
     ) -> Iterator[Pose2D]:
@@ -287,10 +289,14 @@ class Costmap(Location):
         :Yield: A candidate pose.
         """
         segmented_maps = self.segment_map()
-        budgets = self._budget_per_segment(segmented_maps, number_of_samples)
+        budgets = self._budget_per_segment(
+            segments=segmented_maps, number_of_samples=number_of_samples
+        )
         for segmented_map, budget in zip(segmented_maps, budgets):
             indices = self._pick_entries(
-                segmented_map.flatten(), budget, random_generator
+                ratings=segmented_map.flatten(),
+                count=budget,
+                random_generator=random_generator,
             )
             indices = np.column_stack(np.unravel_index(indices, segmented_map.shape))
 
@@ -306,7 +312,7 @@ class Costmap(Location):
                 yield Pose2D.from_pose(
                     Pose(
                         position,
-                        self._orientation_facing_origin(position),
+                        self._orientation_facing_origin(position=position),
                         self.world.root,
                     )
                 )
@@ -436,7 +442,7 @@ class OccupancyCostmap(Costmap):
             floor.root for floor in self.world.get_semantic_annotations_by_type(Floor)
         }
 
-    def inflate_obstacles(self, free_space: np.ndarray) -> np.ndarray:
+    def inflate_obstacles(self, *, free_space: np.ndarray) -> np.ndarray:
         """
         Inflates found obstacles in the environment by the distance_to_obstacle factor.
 
@@ -467,7 +473,7 @@ class OccupancyCostmap(Costmap):
             ),
         )
 
-        map = self.inflate_obstacles(map)
+        map = self.inflate_obstacles(free_space=map)
         # The map loses some size due to the strides and because I dont want to
         # deal with indices outside of the index range
         offset = self.width - map.shape[0]
@@ -479,9 +485,9 @@ class OccupancyCostmap(Costmap):
     @classmethod
     def default_map(
         cls,
+        *,
         robot: AbstractRobot,
         target: Pose,
-        *,
         resolution: float = 0.02,
         cells: int = 200,
     ) -> OccupancyCostmap:
@@ -759,7 +765,7 @@ class GaussianCostmap(Costmap):
 
     def __post_init__(self) -> None:
         self.gaussian_window: np.ndarray = self._create_gaussian_window(
-            self.mean, self.sigma
+            mean=self.mean, standard_deviation=self.sigma
         )
         self.map: np.ndarray = np.outer(self.gaussian_window, self.gaussian_window)
         cut_distance = int(0.05 * self.mean)
@@ -775,7 +781,7 @@ class GaussianCostmap(Costmap):
         self.height = int(self.size)
 
     def _create_gaussian_window(
-        self, mean: int, standard_deviation: float
+        self, *, mean: int, standard_deviation: float
     ) -> np.ndarray:
         """
         Creates a window of values with a gaussian distribution of the given size
@@ -811,10 +817,10 @@ class RingCostmap(Costmap):
     @classmethod
     def from_arm_reach_distance(
         cls,
+        *,
         arm: Arm,
         origin: Pose,
         reach_fraction: float,
-        *,
         resolution: float = 0.02,
         cells: int = 200,
         standard_deviation: int = 15,

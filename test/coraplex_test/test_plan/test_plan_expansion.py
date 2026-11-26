@@ -62,7 +62,7 @@ def _compile(plan: StatechartNode, extensions: list[ContextExtension]) -> Statec
     """
     executor = simulated_executor(extensions)
     statechart = statechart_of(executor, plan)
-    executor.prepare(statechart)
+    executor.prepare(statechart=statechart)
     statechart.compiler.compile()
     return statechart
 
@@ -314,10 +314,12 @@ def test_a_transport_runs_with_its_underspecified_steps(
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(arms=view.all_arms),
             TransportAction.from_graspable_by_closest_grasps(
-                world.get_semantic_annotations_by_type(Milk)[0],
-                Pose.from_xyz_rpy(2.37, 2.5, 1.05, reference_frame=world.root),
-                view.right_arm,
-                context_of(extensions),
+                graspable=world.get_semantic_annotations_by_type(Milk)[0],
+                goal_pose=Pose.from_xyz_rpy(
+                    2.37, 2.5, 1.05, reference_frame=world.root
+                ),
+                arm=view.right_arm,
+                context=context_of(extensions),
             ),
         ]
     )

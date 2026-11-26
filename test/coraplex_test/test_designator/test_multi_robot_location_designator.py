@@ -112,7 +112,7 @@ def multiple_robot_simple_apartment_context(
     extensions of its plans, returned to its initial model and state after the test.
     """
     world, view = setup_multi_robot_simple_apartment
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     yield world, view, robot_extensions(view)
     snapshot.restore()
 

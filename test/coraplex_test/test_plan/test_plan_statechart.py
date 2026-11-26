@@ -273,7 +273,7 @@ class GiskardRecordingTheGoal:
     Whether the connection was closed.
     """
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         self.compiled = statechart
 
     def execute(self) -> None:
@@ -312,7 +312,7 @@ def test_a_sent_plan_compiles_without_what_its_actions_read_to_expand(
             ]
         ),
     )
-    client.prepare(sent)
+    client.prepare(statechart=sent)
     receiver = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
@@ -454,7 +454,7 @@ class GiskardTickingTheGoalUntilItEnded:
     The statechart handed over last.
     """
 
-    def compile(self, statechart: Statechart) -> None:
+    def compile(self, *, statechart: Statechart) -> None:
         self.compiled = statechart
 
     def execute(self) -> None:

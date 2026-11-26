@@ -56,7 +56,9 @@ class RvizRunner(DemoRunner):
             ros_node=node,
         )
         executor.compile(
-            statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+            statechart=ShapeSortingPlan(scene=self.scene).build(
+                context=executor.context
+            )
         )
         executor.execute()
         executor.close()

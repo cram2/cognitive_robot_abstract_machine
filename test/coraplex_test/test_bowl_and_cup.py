@@ -234,7 +234,7 @@ def transport_plan(
             # The arms start stretched out, which would reach into the counter.
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(planar_goal_pose=in_front_of_the_closed_drawer),
-            OpenAction.from_handle(kitchen.drawer_handle, robot.left_arm),
+            OpenAction.from_handle(handle=kitchen.drawer_handle, arm=robot.left_arm),
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(planar_goal_pose=in_front_of_the_open_drawer),
             Parallel(

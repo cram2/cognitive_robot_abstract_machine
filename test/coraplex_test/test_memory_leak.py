@@ -71,10 +71,12 @@ def test_ref_chain_after_copy_with_execute_complex_plan(pr2_apartment_context):
 
     milk = copy_world.get_semantic_annotations_by_type(Milk)[0]
     description = TransportAction.from_graspable_by_closest_grasps(
-        milk,
-        Pose.from_xyz_quaternion(3.1, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root),
-        copy_robot.right_arm,
-        context_of(copy_extensions),
+        graspable=milk,
+        goal_pose=Pose.from_xyz_quaternion(
+            3.1, 2.2, 0.95, 0.0, 0.0, 1.0, 0.0, world.root
+        ),
+        arm=copy_robot.right_arm,
+        context=context_of(copy_extensions),
     )
     plan = Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH), description])
     run_plan(plan, copy_extensions)

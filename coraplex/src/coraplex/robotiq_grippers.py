@@ -34,11 +34,11 @@ class DriveRobotiqGrippersThroughTheirActionServers(
     DAiSy, are left as they are.
     """
 
-    def is_applicable(self, plan_node: OperatesGripper) -> bool:
+    def is_applicable(self, *, plan_node: OperatesGripper) -> bool:
         return any(
             isinstance(end_effector, HasParallelGripperCommandServer)
             for end_effector in plan_node.robot.all_end_effectors
         )
 
-    def apply(self, plan_node: OperatesGripper) -> None:
+    def apply(self, *, plan_node: OperatesGripper) -> None:
         plan_node.gripper_goal_type = RobotiqGripperActionServerTask
