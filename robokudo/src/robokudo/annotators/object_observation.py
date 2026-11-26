@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 # %% Observations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorAndDepthFrame:
     """
     A color and a depth image of the same resolution, taken by one camera.
@@ -61,7 +61,7 @@ class ColorAndDepthFrame:
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectObservation:
     """
     One object in a frame, marked by a mask.

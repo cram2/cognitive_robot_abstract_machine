@@ -82,7 +82,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with parallel processing
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         seq = Pipeline("RWPipeline")
         parallel = Parallel(

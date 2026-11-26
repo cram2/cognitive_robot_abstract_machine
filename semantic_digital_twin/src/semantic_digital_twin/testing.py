@@ -1,9 +1,13 @@
+"""
+Fixtures and helpers that the tests of semantic_digital_twin share.
+"""
+
+from __future__ import annotations
+
 import os
 
 import pytest
 from dataclasses import dataclass, field
-from importlib.resources import files
-from pathlib import Path
 from typing_extensions import Optional, Tuple
 
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -14,8 +18,7 @@ from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
     FixedConnection,
     OmniDrive,
 )
@@ -73,6 +76,11 @@ def world_setup() -> tuple[
     Body,
     Body,
 ]:
+    """
+    :return: A world whose root carries a free-floating base, from which two branches
+        hang: ``l1`` with ``l2`` on a slider, and ``r1`` with ``r2`` on a hinge; and
+        the bodies ``l1``, ``l2``, the base, ``r1`` and ``r2``.
+    """
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     l1 = Body(name=PrefixedName("l1"))
@@ -89,11 +97,21 @@ def world_setup() -> tuple[
         )
         world.add_degree_of_freedom(dof)
 
-        c_l1_l2 = PrismaticConnection(
-            parent=l1, child=l2, raw_dof=dof, axis=Vector3.X(reference_frame=l1)
+        c_l1_l2 = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X(reference_frame=l1)
+            ),
+            parent=l1,
+            child=l2,
+            raw_dof=dof,
         )
-        c_r1_r2 = RevoluteConnection(
-            parent=r1, child=r2, raw_dof=dof, axis=Vector3.Z(reference_frame=r1)
+        c_r1_r2 = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.Z(reference_frame=r1)
+            ),
+            parent=r1,
+            child=r2,
+            raw_dof=dof,
         )
         bf_root_l1 = FixedConnection(parent=bf, child=l1)
         bf_root_r1 = FixedConnection(parent=bf, child=r1)
@@ -109,6 +127,10 @@ def world_setup() -> tuple[
 
 @pytest.fixture
 def world_setup_simple():
+    """
+    :return: A world with a box, a cylinder, a sphere, a mesh and a compound body, each
+        on a 6 DoF connection to the root, followed by these five bodies.
+    """
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     body1 = Body(
@@ -147,12 +169,7 @@ def world_setup_simple():
             [
                 Mesh(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
-                    filename=os.path.join(
-                        Path(files("semantic_digital_twin")).parent.parent,
-                        "resources",
-                        "stl",
-                        "jeroen_cup.stl",
-                    ),
+                    filename="package://iai_objects/objects/jeroen_cup.stl",
                     scale=Scale(10, 10, 10),
                 )
             ]
@@ -273,10 +290,10 @@ def ray_test_world():
 
 @pytest.fixture
 def two_arm_robot_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
-    )
-    robot = os.path.join(urdf_dir, "simple_two_arm_robot.urdf")
+    """
+    :return: A world with the simple two arm robot on an omnidirectional drive.
+    """
+    robot = "package://iai_objects/urdf/simple_two_arm_robot.urdf"
     world = World()
     with world.modify_world():
         localization_body = Body(name=PrefixedName("odom_combined"))

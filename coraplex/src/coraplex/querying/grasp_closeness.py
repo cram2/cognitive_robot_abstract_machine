@@ -23,7 +23,7 @@ from krrood_spatial_math.spatial_types import Pose2D
 # %% how close a grasp is to where the robot stands
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, order=True, kw_only=True)
 class GraspCloseness:
     """
     How close a grasp is to where the robot stands: a grasp nearer by horizontal
@@ -45,6 +45,7 @@ class GraspCloseness:
     @classmethod
     def from_grasp(
         cls,
+        *,
         grasp: GraspCandidate,
         world_T_object: NDArray[np.float64],
         world_P_standing: NDArray[np.float64],
@@ -62,15 +63,18 @@ class GraspCloseness:
         distance = np.linalg.norm(world_V_standing_to_grasp)
         if distance == 0:
             # Standing exactly at the grasp leaves no direction to approach it from.
-            return cls(horizontal_distance, 0.0)
+            return cls(horizontal_distance=horizontal_distance, approach_angle=0.0)
         cosine = world_T_grasp[:, 0] @ world_V_standing_to_grasp / distance
-        return cls(horizontal_distance, float(np.arccos(np.clip(cosine, -1.0, 1.0))))
+        return cls(
+            horizontal_distance=horizontal_distance,
+            approach_angle=float(np.arccos(np.clip(cosine, -1.0, 1.0))),
+        )
 
 
 # %% the grasps of an object by their closeness to a standing position
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GraspsByCloseness(SymbolicFunction):
     """
     The grasps an object offers, ordered by their :class:`GraspCloseness` to a standing
@@ -102,7 +106,9 @@ class GraspsByCloseness(SymbolicFunction):
         grasps_by_closeness = sorted(
             self.graspable.grasp_candidates(),
             key=lambda grasp: GraspCloseness.from_grasp(
-                grasp, world_T_object, world_P_standing
+                grasp=grasp,
+                world_T_object=world_T_object,
+                world_P_standing=world_P_standing,
             ),
         )
         return grasps_by_closeness[: self.number_of_grasps]

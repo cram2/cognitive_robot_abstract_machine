@@ -1,3 +1,7 @@
+"""
+Worlds, visualizations and processes shared by the coraplex tests and demos.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -89,35 +93,21 @@ def attach_tool(world: World, arm: Arm, tool_world: World, mount: dict) -> Body:
 
 
 def setup_world() -> World:
+    """
+    The apartment with a PR2 on an omnidirectional drive and a milk carton and a cereal box
+    on a counter.
+    """
     logger.setLevel(logging.DEBUG)
 
     pr2_sem_world = URDFParser.from_file(
         "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     ).create_world()
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__), "..", "..", "resources", "objects", "milk.stl"
-        )
-    ).create_world()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     cereal_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "resources",
-            "objects",
-            "breakfast_cereal.stl",
-        )
+        "package://iai_objects/objects/breakfast_cereal.stl"
     ).create_world()
     # apartment_world.merge_world(pr2_sem_world)
     apartment_world.merge_world(milk_world)
@@ -252,7 +242,7 @@ READY_TIMEOUT = 180.0
 SHUTDOWN_TIMEOUT = 60.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StandaloneProcess:
     """
     A component launched as its own process and stopped again when the test is done.

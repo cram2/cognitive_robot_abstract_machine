@@ -41,8 +41,15 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "semdt_raytracer_query_demo"
 
     def implementation(self) -> Pipeline:
+        """
+        :return: A pipeline that waits for a query, renders the tabletop world, segments
+            the
+            objects on the table plane, estimates their color and pose, puts them into
+            the
+            world and answers the query with the matching ones.
+        """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            RayTracingCameraConfiguration.registry_name,
+            camera=RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
                 descriptor_name="world_semdt_raytracer_tabletop"
             ),

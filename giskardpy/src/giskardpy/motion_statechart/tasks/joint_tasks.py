@@ -19,7 +19,7 @@ from giskardpy.motion_statechart.mixins import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
 )
 
@@ -58,9 +58,9 @@ class JointPositionList(
             current = connection.dof.variables.position
             target = self.apply_limits_to_target(target=target, connection=connection)
             if (
-                isinstance(connection, RevoluteConnection)
-                and not connection.dof.has_position_limits()
-            ):
+                isinstance(connection, ScrewAxisConnection)
+                and connection.behaves_like_a_revolute_connection
+            ) and not connection.dof.has_position_limits():
                 error = sm.shortest_angular_distance(current, target)
             else:
                 error = target - current

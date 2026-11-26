@@ -22,7 +22,9 @@ def load_world_descriptor(annotator: BaseAnnotator) -> BaseWorldDescriptor:
     module_name = annotator.descriptor.parameters.world_descriptor_name
     loader = module_loader.ModuleLoader()
     try:
-        return loader.load_world_descriptor(ros_package, module_name)
+        return loader.load_world_descriptor(
+            ros_pkg_name=ros_package, module_name=module_name
+        )
     except Exception as error:
         raise WorldDescriptorLoadError(
             ros_package=ros_package,

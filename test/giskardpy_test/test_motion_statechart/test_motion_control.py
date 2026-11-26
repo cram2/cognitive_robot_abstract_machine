@@ -29,7 +29,7 @@ from giskardpy.qp.exceptions import EmptyProblemException
 from semantic_digital_twin.datastructures.joint_state import JointState
 from krrood_spatial_math.spatial_types import Point3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
@@ -183,7 +183,7 @@ def run_one_joint_goal_after_another(
     world: World,
     first: JointPositionList,
     second: JointPositionList,
-    recorded: PrismaticConnection,
+    recorded: ScrewAxisConnection,
     while_running: JointPositionList,
 ) -> StateRecordedWhileNodeRuns:
     """

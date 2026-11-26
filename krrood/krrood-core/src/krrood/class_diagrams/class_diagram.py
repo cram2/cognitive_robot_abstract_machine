@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import inspect
 import os
 from abc import ABC
 from copy import copy
@@ -910,9 +911,9 @@ class ClassDiagram:
         for clazz in self.wrapped_classes:
             # Handle GenericAlias which doesn't have __bases__
             origin = get_origin(clazz.clazz)
-            if origin is not None and not isinstance(clazz.clazz, type):
+            if origin is not None and not inspect.isclass(clazz.clazz):
                 bases = origin.__bases__
-            elif isinstance(clazz.clazz, type):
+            elif inspect.isclass(clazz.clazz):
                 bases = [
                     self._resolve_wrapped_base(base=base)
                     for base in get_original_bases(clazz.clazz)

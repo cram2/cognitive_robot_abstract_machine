@@ -1,3 +1,8 @@
+"""
+The QP controller, which turns the constraints of a motion into a QP and solves it once
+every control cycle.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -19,6 +24,7 @@ from giskardpy.qp.qp_data import QPData, QPDataExplicit
 from giskardpy.qp.qp_data_symbolic import QPDataSymbolic
 from giskardpy.qp.qp_debugger import QuadraticProgramDebugger
 from giskardpy.qp.solvers.qp_solver import QPSolver
+from giskardpy.qp.submatrix_cache import SubmatrixCache
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
 logger = logging.getLogger(__name__)
@@ -43,10 +49,33 @@ class QPController:
     life_cycle_variables: list[sm.FloatVariable]
     float_variables: list[sm.FloatVariable]
 
-    qp_data_factory: QPDataFactory = field(default=None, init=False)
-    qp_solver: QPSolver = field(default=None, init=False)
-    debugger: QuadraticProgramDebugger = field(default=None, init=False)
-    dof_filter: np.ndarray = field(default=None, init=False)
+    qp_data_factory: QPDataFactory = field(init=False)
+    """
+    Evaluates the compiled QP for the current world state, in the problem format the
+    solver expects.
+    """
+
+    qp_solver: QPSolver = field(init=False)
+    """
+    Solves the QP once every control cycle.
+    """
+
+    debugger: QuadraticProgramDebugger = field(init=False)
+    """
+    Labels the rows and columns of the QP with the names of its constraints and degrees
+    of freedom, for debugging.
+    """
+
+    active_world_state_indices: NDArray[np.intp] = field(init=False)
+    """
+    Positions in :attr:`world_state_symbols` of the variables the constraints depend on.
+    """
+
+    submatrix_cache: SubmatrixCache = field(default_factory=SubmatrixCache, init=False)
+    """
+    Remembers the constraint matrices filtered in earlier control cycles, whose sparsity
+    pattern the compiled QP keeps from one cycle to the next.
+    """
 
     def __post_init__(self, degrees_of_freedom: list[DegreeOfFreedom]) -> None:
         """
@@ -62,7 +91,7 @@ class QPController:
                 f'prediction horizon: "{self.config.prediction_horizon}"\n'
                 f'QP solver: "{self.config.qp_solver_class.__name__}"'
             )
-        self._set_active_dofs(degrees_of_freedom=degrees_of_freedom)
+        self._set_active_degrees_of_freedom(degrees_of_freedom=degrees_of_freedom)
         if self.has_not_free_variables():
             raise EmptyProblemException()
         generic_qp_data_symbolic = QPDataSymbolic(
@@ -84,40 +113,37 @@ class QPController:
             qp_data_symbolic=self.qp_data_factory.qp_data
         )
 
-    def _set_active_dofs(self, *, degrees_of_freedom: list[DegreeOfFreedom]) -> None:
-        all_active_float_variables = set().union(
-            *[
-                {
-                    dof.variables.position.name,
-                    dof.variables.velocity.name,
-                    dof.variables.acceleration.name,
-                    dof.variables.jerk.name,
-                }
-                for dof in degrees_of_freedom
-            ]
-        )
+    def _set_active_degrees_of_freedom(
+        self, *, degrees_of_freedom: list[DegreeOfFreedom]
+    ) -> None:
+        """
+        Sets :attr:`active_degrees_of_freedom` and :attr:`active_world_state_indices` to
+        the degrees of freedom and world state variables the constraints depend on.
+
+        :param degrees_of_freedom: The degrees of freedom the QP may move.
+        """
         float_variable_names = self.constraint_collection.get_all_float_variable_names()
-        active_float_variables = all_active_float_variables & float_variable_names
-
-        def dof_used(dof: DegreeOfFreedom) -> bool:
-            vars_ = dof.variables
-            return (
-                vars_.position.name in float_variable_names
-                or vars_.velocity.name in float_variable_names
-                or vars_.acceleration.name in float_variable_names
-                or vars_.jerk.name in float_variable_names
-            )
-
-        self.dof_filter = np.array(
+        self.active_degrees_of_freedom = []
+        active_float_variable_names = set()
+        for degree_of_freedom in degrees_of_freedom:
+            variables = degree_of_freedom.variables
+            used_variable_names = float_variable_names & {
+                variables.position.name,
+                variables.velocity.name,
+                variables.acceleration.name,
+                variables.jerk.name,
+            }
+            if used_variable_names:
+                self.active_degrees_of_freedom.append(degree_of_freedom)
+                active_float_variable_names |= used_variable_names
+        self.active_world_state_indices = np.array(
             [
-                i
-                for i, v in enumerate(self.world_state_symbols)
-                if v.name in active_float_variables
-            ]
+                index
+                for index, variable in enumerate(self.world_state_symbols)
+                if variable.name in active_float_variable_names
+            ],
+            dtype=np.intp,
         )
-        self.active_degrees_of_freedom = [
-            dof for dof in degrees_of_freedom if dof_used(dof)
-        ]
 
     def has_not_free_variables(self) -> bool:
         return len(self.active_degrees_of_freedom) == 0
@@ -137,7 +163,9 @@ class QPController:
             life_cycle_state=life_cycle_state,
             float_variables=float_variables,
         )
-        qp_data_filtered = qp_data_raw.apply_filters()
+        qp_data_filtered = qp_data_raw.apply_filters(
+            submatrix_cache=self.submatrix_cache
+        )
         stopped = self._unconstrained_degrees_of_freedom_able_to_stop(
             qp_data=qp_data_filtered
         )
@@ -174,7 +202,10 @@ class QPController:
         )
         if not removed_variables.all():
             solution[~removed_variables] = self._solve(
-                qp_data=qp_data.without_variables(removed_variables=removed_variables)
+                qp_data=qp_data.without_variables(
+                    removed_variables=removed_variables,
+                    submatrix_cache=self.submatrix_cache,
+                )
             )
         return solution
 
@@ -299,5 +330,5 @@ class QPController:
         )
         # divide by 4 because the world state has pos/vel/acc/jerk variables
         full_control_commands = np.zeros(len(self.world_state_symbols) // 4)
-        full_control_commands[self.dof_filter] = control_commands
+        full_control_commands[self.active_world_state_indices] = control_commands
         return full_control_commands

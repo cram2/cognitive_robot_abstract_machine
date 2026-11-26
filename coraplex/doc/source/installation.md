@@ -113,7 +113,8 @@ your development environment by following the link {ref}`here <setup_env>`.
 If you already have a ROS setup you are probably already aware how to install and build ROS packages. In that case
 you need install and build these two ROS packages:
 
-* https://github.com/code-iai/iai_maps
+* https://github.com/code-iai/iai_maps (its `iai_objects` package holds the object meshes, such as
+  `package://iai_objects/objects/milk.stl`)
 * https://github.com/code-iai/iai_pr2
 
 **Make sure to select the correct branch for ros-jazzy**

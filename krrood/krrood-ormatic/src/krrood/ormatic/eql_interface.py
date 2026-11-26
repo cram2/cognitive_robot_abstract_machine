@@ -888,7 +888,7 @@ class EQLTranslator:
             dao = get_mapping_data_access_object_class(expression._type_)
             if dao is not None:
                 return dao
-        for child_attr in (
+        for child_attribute in (
             "_child_",
             "left",
             "right",
@@ -896,7 +896,7 @@ class EQLTranslator:
             "then_value",
             "else_value",
         ):
-            child = getattr(expression, child_attr, None)
+            child = getattr(expression, child_attribute, None)
             if child is not None:
                 result = self._find_dao_in_expression(expression=child)
                 if result is not None:
@@ -936,13 +936,18 @@ class EQLTranslator:
         if self.eql_query._ordered_by_builder_ is not None:
             ordered_by_variable = self.eql_query._ordered_by_builder_.variable
             if isinstance(ordered_by_variable, Attribute):
-                col = self.translate_attribute(query=ordered_by_variable)
+                self.ordering_column = self.translate_attribute(
+                    query=ordered_by_variable
+                )
             else:
-                col = self._translate_comparator_operand(operand=ordered_by_variable)
-            self.ordering_column = col
-            if self.eql_query._ordered_by_builder_.descending:
-                col = col.desc()
-            self.sql_query = self.sql_query.order_by(col)
+                self.ordering_column = self._translate_comparator_operand(
+                    operand=ordered_by_variable
+                )
+            self.sql_query = self.sql_query.order_by(
+                self.ordering_column.desc()
+                if self.eql_query._ordered_by_builder_.descending
+                else self.ordering_column
+            )
 
         if self.eql_query._limit_ is not None:
             self.sql_query = self.sql_query.limit(self.eql_query._limit_)

@@ -1,5 +1,10 @@
+"""
+Tests of the Open3D helper utilities.
+"""
+
 # %% Imports
 
+from __future__ import annotations
 import numpy as np
 import open3d
 import pytest
@@ -28,6 +33,10 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 
 # %% Point cloud geometry
 class TestUtilsO3DHelper(object):
+    """
+    Tests of the Open3D helpers for bounding boxes, masks and point clouds.
+    """
+
     @pytest.fixture
     def cas(self, kinect_intrinsics: open3d.camera.PinholeCameraIntrinsic) -> CAS:
         cas = robokudo.cas.CAS()
@@ -41,7 +50,7 @@ class TestUtilsO3DHelper(object):
             focal_length_y=intrinsic_matrix[1, 1],
             principal_point=Point2(x=intrinsic_matrix[0, 2], y=intrinsic_matrix[1, 2]),
         )
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, ColorToDepthRatio())
+        cas.set(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ColorToDepthRatio())
         return cas
 
     @pytest.fixture
@@ -273,8 +282,8 @@ class TestUtilsO3DHelper(object):
 
     def test_get_2d_corner_points_from_3d_bb_with_scaling(self, cas: CAS):
         cas.set(
-            robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
-            ColorToDepthRatio(horizontal=2.0, vertical=2.0),
+            view_name=robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
+            value=ColorToDepthRatio(horizontal=2.0, vertical=2.0),
         )
 
         oriented_bounding_box = open3d.geometry.OrientedBoundingBox(

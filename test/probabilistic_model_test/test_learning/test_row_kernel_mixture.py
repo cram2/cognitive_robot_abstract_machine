@@ -11,9 +11,11 @@ import pytest
 
 from probabilistic_model.distributions.binomial import BinomialDistribution
 from probabilistic_model.distributions.distributions import SymbolicDistribution
-from probabilistic_model.learning.exceptions import NoRowsToFitError
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.row_kernel_mixture import RowKernelMixture
+from probabilistic_model.learning.structure.exceptions import NoRowsToFitError
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.structure.row_kernel_mixture import RowKernelMixture
 
 # %% fixtures
 

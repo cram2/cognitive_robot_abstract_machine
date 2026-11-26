@@ -259,8 +259,8 @@ def test_one_visualization_shows_every_repetition_of_a_demonstration(
     shown: list[VisualizationRecordingItsRuns] = []
     create_executor = RecordingDemonstration.create_executor
 
-    def recording_executor(demonstration, world):
-        executor = create_executor(demonstration, world)
+    def recording_executor(demonstration, *, world):
+        executor = create_executor(demonstration, world=world)
         shown.extend(
             extension
             for extension in executor.extensions
@@ -303,7 +303,7 @@ def test_a_debugging_action_trial_is_shown_apart_from_the_world_it_copies(
     )
     trials = executor.child_chooser.trial
 
-    trial_executor = trials._trial_executor(trials._copy())
+    trial_executor = trials._trial_executor(world=trials._copy())
 
     [shown] = [
         extension

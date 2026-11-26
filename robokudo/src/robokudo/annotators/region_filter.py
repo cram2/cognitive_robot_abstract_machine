@@ -92,11 +92,11 @@ class RegionFilter(ThreadedAnnotator):
         :raises Exception: If queried region not found in map
         """
         start_timer = default_timer()
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
 
         query = None
-        if self.get_cas().contains(CASViews.QUERY):
-            query = self.get_cas().get(CASViews.QUERY)
+        if self.get_cas().contains(view_name=CASViews.QUERY):
+            query = self.get_cas().get(view_name=CASViews.QUERY)
 
         regions = self.world.get_kinematic_structure_entity_by_type(Region)
         all_regions = {str(region.name): region for region in regions}
@@ -162,7 +162,7 @@ class RegionFilter(ThreadedAnnotator):
 
         # Place the filtered PointCloud into the CAS, overwriting the previous one
         filtered_cloud = cloud.select_by_index(list(filtered_indices))
-        self.get_cas().set(CASViews.CLOUD, filtered_cloud)
+        self.get_cas().set(view_name=CASViews.CLOUD, value=filtered_cloud)
 
         visualized_geometries.append(
             {"name": "filtered cloud", "geometry": filtered_cloud}
@@ -175,7 +175,9 @@ class RegionFilter(ThreadedAnnotator):
                 "geometry": world_frame.transform(world_to_camera_transform),
             }
         )
-        self.get_annotator_output_struct().set_geometries(visualized_geometries)
+        self.get_annotator_output_struct().set_geometries(
+            geometries=visualized_geometries
+        )
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

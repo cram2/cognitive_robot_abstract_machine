@@ -45,7 +45,7 @@ Timestamp text extracted from a recorded frame's filename.
 # %% File playback
 
 
-@dataclass(init=False, eq=False)
+@dataclass(init=False, eq=False, kw_only=True)
 class FileReaderInterface(CameraInterface):
     """
     A camera interface for reading stored data from the local filesystem.
@@ -227,7 +227,7 @@ class FileReaderInterface(CameraInterface):
 # %% RGB-D playback
 
 
-@dataclass(init=False, eq=False)
+@dataclass(init=False, eq=False, kw_only=True)
 class RGBDFileReaderInterface(FileReaderInterface):
     """
     Specialized file reader interface for RGB-D camera data.
@@ -252,11 +252,14 @@ class RGBDFileReaderInterface(FileReaderInterface):
         if data is None:
             return
 
-        cas.set(CASViews.COLOR_IMAGE, data[CASViews.COLOR_IMAGE])
-        cas.set(CASViews.DEPTH_IMAGE, data[CASViews.DEPTH_IMAGE])
+        cas.set(view_name=CASViews.COLOR_IMAGE, value=data[CASViews.COLOR_IMAGE])
+        cas.set(view_name=CASViews.DEPTH_IMAGE, value=data[CASViews.DEPTH_IMAGE])
 
         recorded_observation = data[CASViews.CAMERA_OBSERVATION]
-        cas.set(CASViews.COLOR_TO_DEPTH_RATIO, self.camera_config.color_to_depth_ratio)
+        cas.set(
+            view_name=CASViews.COLOR_TO_DEPTH_RATIO,
+            value=self.camera_config.color_to_depth_ratio,
+        )
         camera_frame = recorded_observation["camera_frame"]
         world_T_camera = self.static_world_T_camera_if_configured(
             world=world, camera_frame=camera_frame
