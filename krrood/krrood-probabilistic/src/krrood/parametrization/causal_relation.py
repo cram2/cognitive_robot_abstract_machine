@@ -12,6 +12,7 @@ from probabilistic_model.causal_structure.exceptions import UnknownGraphNode
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
     EdgeMark,
+    EdgeMarkedGraph,
     GraphEdge,
     GraphNode,
 )
@@ -149,6 +150,12 @@ class CausalRelation(ClassRelation):
     What the relation shows at :attr:`second`.
     """
 
+    scope: str | None = None
+    """
+    The name of the collection whose table the relation was learned from, for a
+    structure learned one graph per collection; ``None`` for the class table.
+    """
+
     def edge_among(self, *, node_of: dict[str, GraphNode]) -> GraphEdge:
         """
         :param node_of: The node of every variable, by the variable's name.
@@ -213,13 +220,27 @@ class CausalRelationsOfClass:
         for relation in relations:
             self.class_diagram.add_relation(relation=relation)
 
-    def causal_graph(self, *, nodes: list[GraphNode]) -> CausalGraph:
+    def causal_graph(
+        self,
+        *,
+        nodes: list[GraphNode],
+        graph_class: type[EdgeMarkedGraph] = CausalGraph,
+        scope: str | None = None,
+    ) -> EdgeMarkedGraph:
         """
         :param nodes: A node for each variable the relations connect, and any others.
-        :return: The graph over the nodes, with one edge per relation.
+        :param graph_class: The kind of graph the relations are read as.
+        :param scope: The scope whose relations to read, as :attr:`CausalRelation.scope`
+            names it.
+        :return: The graph over the nodes, with one edge per relation of the scope.
         :raises UnknownGraphNode: If a relation connects a variable no node stands for.
         """
         node_of = {node.name: node for node in nodes}
-        return CausalGraph.from_edges(
-            nodes, [relation.edge_among(node_of=node_of) for relation in self.relations]
+        return graph_class.from_edges(
+            nodes=nodes,
+            edges=[
+                relation.edge_among(node_of=node_of)
+                for relation in self.relations
+                if relation.scope == scope
+            ],
         )

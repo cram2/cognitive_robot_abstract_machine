@@ -11,10 +11,13 @@ This module provides an annotator for:
    The pipeline will remain in RUNNING state until triggered.
 """
 
+import logging
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineTrigger(BaseAnnotator):
@@ -50,7 +53,7 @@ class PipelineTrigger(BaseAnnotator):
 
         :return: SUCCESS if triggered, RUNNING otherwise
         """
-        self.rk_logger.debug("%s.update()" % (self.__class__.__name__))
+        logger.debug("%s.update()" % (self.__class__.__name__))
         blackboard = Blackboard()
         pipeline_trigger = blackboard.get("pipeline_trigger")
 

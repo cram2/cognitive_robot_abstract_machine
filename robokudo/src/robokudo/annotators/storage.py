@@ -21,6 +21,7 @@ The module is used for:
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 import json
 from timeit import default_timer
@@ -31,6 +32,8 @@ from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.storage import Storage, StorageDocumentField
+
+logger = logging.getLogger(__name__)
 
 
 class StorageWriter(BaseAnnotator):
@@ -77,7 +80,7 @@ class StorageWriter(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self.storage = Storage(self.descriptor.parameters.db_name)
         self.storage_preparation_completed: bool = False
         """
@@ -139,7 +142,9 @@ class StorageWriter(BaseAnnotator):
         del flat_cas["views"]
         result = self.storage.store_cas_dict(flat_cas)
         if not result.acknowledged:
-            self.rk_logger.error(f"mongo db error when trying to store cas")
+            logger.error(
+                "MongoDB error when trying to store the common analysis structure"
+            )
             return Status.FAILURE
 
         end_timer = default_timer()

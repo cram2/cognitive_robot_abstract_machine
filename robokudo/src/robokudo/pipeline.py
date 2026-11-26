@@ -6,6 +6,8 @@ visualizes the outputs of its annotators and can be nested.
 
 from __future__ import annotations
 
+# %% Imports
+
 import logging
 import timeit
 
@@ -19,8 +21,12 @@ from typing_extensions import Any
 import robokudo.annotators.core
 import robokudo.annotators.outputs
 import robokudo.cas as cas
-import robokudo.defs as defs
 import robokudo.utils.tree
+
+logger = logging.getLogger(__name__)
+
+
+# %% Pipeline lifecycle
 
 
 class Pipeline(Sequence):
@@ -63,20 +69,16 @@ class Pipeline(Sequence):
         Reading of :func:`timeit.default_timer`, in seconds, when processing of the
         current CAS started; the processing duration that is logged is measured from it.
         """
-        self.rk_logger = logging.getLogger(defs.PACKAGE_NAME)
-        """
-        Logger instance for this pipeline.
-        """
         self.create_new_cas()
 
-    def create_new_cas(self) -> None:
+    def create_new_cas(self, *, acquired_cas: cas.CAS | None = None) -> None:
         """
-        Create a new Common Analysis Structure (CAS) for this pipeline.
+        Begin a processing cycle with a fresh or successfully acquired CAS.
 
         Also restarts the measurement of the processing duration.
         """
         self._cas_counter += 1
-        self.cas = cas.CAS()
+        self.cas = acquired_cas if acquired_cas is not None else cas.CAS()
         self.cas.cas_id = self._cas_counter
         self.processing_start_time = timeit.default_timer()
 
@@ -164,9 +166,9 @@ class Pipeline(Sequence):
         Handles pipeline execution status and triggers GUI updates on failure.
         """
         super().update()
-        self.rk_logger.debug("%s.update()" % self.__class__.__name__)
+        logger.debug("%s.update()" % self.__class__.__name__)
         if self.status == Status.FAILURE:
-            self.rk_logger.debug(
+            logger.debug(
                 "%s: Previous execution was a failure. Update GUI." % self.status
             )
             blackboard = Blackboard()
@@ -184,7 +186,7 @@ class Pipeline(Sequence):
 
         :param new_status: New execution status
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.terminate()[%s->%s]"
             % (self.__class__.__name__, self.status, new_status)
         )
@@ -198,7 +200,7 @@ class Pipeline(Sequence):
 
         if new_status == Status.SUCCESS or new_status == Status.FAILURE:
             self.feedback_message = f"Processing took {(timeit.default_timer() - self.processing_start_time):.4f}s"
-            self.rk_logger.debug(
+            logger.debug(
                 f"Pipeline Processing took in total {(timeit.default_timer() - self.processing_start_time):.4f}s"
             )
             self.processing_start_time = timeit.default_timer()

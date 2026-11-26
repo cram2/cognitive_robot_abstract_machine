@@ -90,8 +90,8 @@ class EveryPairJoinedLearner(CausalStructureLearner):
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalGraph:
         return CausalGraph.from_edges(
-            nodes,
-            [
+            nodes=nodes,
+            edges=[
                 GraphEdge.undirected_edge(first, second)
                 for first, second in itertools.combinations(nodes, 2)
             ],

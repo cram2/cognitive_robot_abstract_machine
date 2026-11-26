@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 # %% Imports
+import logging
 from dataclasses import dataclass, field
 from enum import StrEnum
 from timeit import default_timer
@@ -24,6 +25,8 @@ from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 # %% Color range bounds
@@ -178,8 +181,14 @@ class ImageClusterExtractor(BaseAnnotator):
         name: str = "ImageClusterExtractor",
         descriptor: ImageClusterExtractor.Descriptor | None = None,
     ) -> None:
+        """
+        Create the extractor without input images, showing masked objects.
+
+        :param name: Name of the annotator instance
+        :param descriptor: Configuration descriptor
+        """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self.color: npt.NDArray | None = None
         self.depth: npt.NDArray | None = None
         self.query = None
