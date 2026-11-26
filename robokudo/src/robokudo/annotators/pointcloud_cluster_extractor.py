@@ -88,7 +88,9 @@ def generate_roi_with_mask_from_points(
     x = (uvd[:, 0] / uvd[:, 2]).astype(int)
     y = (uvd[:, 1] / uvd[:, 2]).astype(int)
 
-    x_scaled, y_scaled = color_to_depth_ratio.color_pixels(np.stack((x, y), axis=1)).T
+    x_scaled, y_scaled = color_to_depth_ratio.color_pixels(
+        depth_pixels=np.stack((x, y), axis=1)
+    ).T
 
     full_mask = np.zeros((image_height, image_width), np.uint8)
     full_mask[y_scaled, x_scaled] = 255
@@ -208,6 +210,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
 
     def points_and_indices_from_plane(
         self,
+        *,
         plane_model: Plane,
         cloud: open3d.geometry.PointCloud,
     ) -> tuple[
@@ -330,14 +333,14 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         """
         start_timer = default_timer()
         logger.info("Point cloud cluster extraction start")
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         color_to_depth_ratio = self.get_cas().color_to_depth_ratio
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
 
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         height, width, d = color.shape
         vis_mask = np.zeros((height, width), np.uint8)
-        plane_models = self.get_cas().filter_annotations_by_type(Plane)
+        plane_models = self.get_cas().filter_annotations_by_type(type_to_include=Plane)
         if plane_models is None or plane_models == []:
             self.feedback_message = "No plane model in CAS. Aborting."
             raise PlaneModelMissing(context="point cloud clustering")
@@ -441,7 +444,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             {"name": "Cloud", "geometry": cloud},
         ]
 
-        self.get_annotator_output_struct().set_geometries(x)
+        self.get_annotator_output_struct().set_geometries(geometries=x)
 
         vis_mask = cv2.dilate(vis_mask, DILATION_KERNEL, iterations=1)
         # make mask a 3 channel mask in order to make it work with addWeighted
@@ -457,7 +460,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             ),
         )
 
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
@@ -537,11 +540,11 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         :raises EmptyPointCloud: If the input cloud is empty
         """
         start_timer = default_timer()
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         color_to_depth_ratio = self.get_cas().color_to_depth_ratio
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
 
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         height, width, d = color.shape
         vis_mask = np.zeros((height, width), np.uint8)
 
@@ -621,7 +624,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             {"name": "Visualization cloud PCE", "geometry": visualization_cloud},
         ]
 
-        self.get_annotator_output_struct().set_geometries(x)
+        self.get_annotator_output_struct().set_geometries(geometries=x)
 
         vis_mask = cv2.dilate(vis_mask, DILATION_KERNEL, iterations=1)
         # make mask a 3-channel mask in order to make it work with addWeighted
@@ -637,7 +640,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             ),
         )
 
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

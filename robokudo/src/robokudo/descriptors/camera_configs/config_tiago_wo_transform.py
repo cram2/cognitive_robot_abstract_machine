@@ -1,3 +1,10 @@
+"""
+Camera configuration of the Xtion camera on the TIAGo robot without a TF pose lookup,
+registered as ``tiago_wo_tf``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar
@@ -5,7 +12,7 @@ from typing_extensions import ClassVar
 from robokudo.descriptors.camera_configs.config_tiago import TiagoCameraConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class TiagoWoTfCameraConfig(TiagoCameraConfig):
     """
     Configuration class for the TIAGo robot's Xtion camera without transform lookup.

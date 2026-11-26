@@ -29,9 +29,6 @@ You will:
 ```{code-cell} ipython3
 :tags: [remove-input]
 import logging
-import os
-from importlib.resources import files
-from pathlib import Path
 
 from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
@@ -52,8 +49,7 @@ from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
 logging.disable(logging.CRITICAL)
-root_path = Path(files("semantic_digital_twin")).parent.parent
-table_urdf = os.path.join(root_path, "resources", "urdf", "table.urdf")
+table_urdf = "package://iai_objects/urdf/table.urdf"
 ```
 
 ## 1. Spawn a table from one reusable leg specification

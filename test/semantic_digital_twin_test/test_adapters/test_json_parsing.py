@@ -1,5 +1,10 @@
+"""
+Tests of the JSON serialization of world entities, their references and shapes.
+"""
+
+from __future__ import annotations
+
 import json
-import os
 from copy import deepcopy
 
 import numpy as np
@@ -399,22 +404,10 @@ def test_screw_connection_json_serialization_with_world():
 
 
 def test_json_serialization_with_mesh():
-    body: Body = (
-        STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "..",
-                "semantic_digital_twin",
-                "resources",
-                "stl",
-                "milk.stl",
-            )
-        )
-        .create_world()
-        .root
-    )
+    """
+    A body with a mesh keeps its geometry through a JSON round-trip.
+    """
+    body: Body = STLParser("package://iai_objects/objects/milk.stl").create_world().root
 
     json_data = to_json(body)
     body2 = from_json(json_data)

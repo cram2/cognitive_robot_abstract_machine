@@ -55,7 +55,7 @@ def test_camera_placement_registers_supplied_annotation_and_root(
     """
     root = camera_placement.camera.root
     camera = BaseWorldDescriptor(world=table_world).build_camera(
-        table_world.root, camera_placement
+        parent=table_world.root, placement=camera_placement
     )
     assert camera is camera_placement.camera
     assert camera.root is root
@@ -73,7 +73,7 @@ def test_camera_placement_uses_parent_relative_optical_pose(
     The supplied placement directly defines the camera's optical pose.
     """
     camera = BaseWorldDescriptor(world=table_world).build_camera(
-        table_world.root, camera_placement
+        parent=table_world.root, placement=camera_placement
     )
     np.testing.assert_allclose(
         camera.root.global_transform.to_np(),
@@ -98,7 +98,7 @@ def test_camera_placement_follows_parent_motion(
         )
         table_world.add_connection(connection)
     camera = BaseWorldDescriptor(world=table_world).build_camera(
-        parent, camera_placement
+        parent=parent, placement=camera_placement
     )
     with table_world.modify_world():
         connection.origin = HomogeneousTransformationMatrix(

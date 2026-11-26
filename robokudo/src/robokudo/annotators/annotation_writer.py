@@ -131,7 +131,7 @@ class AnnotationPublisherWriter(BaseAnnotator):
         self.pub: Publisher | None = None
         """ROS publisher for annotations"""
 
-    def setup(self, timeout: float) -> None:
+    def setup(self, *, timeout: float) -> None:
         """Set up the ROS2 publisher for annotation messages.
 
         :param timeout: Maximum time to wait for setup completion

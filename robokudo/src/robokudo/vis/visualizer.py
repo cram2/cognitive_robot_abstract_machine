@@ -47,17 +47,17 @@ class Visualizer(object):
             """Initialize the observable object."""
             self._observers: list[Visualizer.Observer] = []
 
-        def register_observer(self, observer: Visualizer.Observer) -> None:
+        def register_observer(self, *, observer: Visualizer.Observer) -> None:
             """Register an observer to receive notifications.
 
             :param observer: The observer to register
             """
             self._observers.append(observer)
 
-        def notify_observers(self, *args: Any, **kwargs: Any) -> None:
+        def notify_observers(self, **kwargs: Any) -> None:
             """Notify all registered observers."""
             for obs in self._observers:
-                obs.notify(self, *args, **kwargs)
+                obs.notify(observable=self, **kwargs)
 
     class Observer:
         """Base class for objects that observe state changes.
@@ -65,15 +65,12 @@ class Visualizer(object):
         This class implements the Observer part of the Observer pattern.
         """
 
-        def notify(
-            self, observable: Visualizer.Observable, *args: Any, **kwargs: Any
-        ) -> None:
+        def notify(self, *, observable: Visualizer.Observable, **kwargs: Any) -> None:
             """Handle notification of state changes.
 
             :param observable: The object that sent the notification
             :raises Exception: If not implemented by subclass
             """
-            print("Got", args, kwargs, "From", observable)
             # Show the passed data, but terminate. Make this an ABC in the future.
             raise Exception(
                 "You need to implement the notify method in your Visualizer to catch update requests."
@@ -181,6 +178,7 @@ class Visualizer(object):
     @classmethod
     def new_visualizer_instance(
         cls,
+        *,
         pipeline: Pipeline,
         shared_visualizer_state: Visualizer.SharedState | None = None,
     ) -> Visualizer:

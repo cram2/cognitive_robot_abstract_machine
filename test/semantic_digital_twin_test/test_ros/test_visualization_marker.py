@@ -1,4 +1,9 @@
-import os
+"""
+Tests of the publication of worlds as ROS 2 visualization markers.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from time import sleep
 
@@ -217,18 +222,10 @@ def test_visualization_marker_regions_are_transparent(rclpy_node, cylinder_bot_w
 
 
 def test_trimesh(rclpy_node):
-    world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "..",
-            "semantic_digital_twin",
-            "resources",
-            "stl",
-            "milk.stl",
-        )
-    ).create_world()
+    """
+    The frame of a body added to a world parsed from an STL file is published.
+    """
+    world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     visual: Mesh = world.root.visual.shapes[0]
     world.root.visual.shapes[0] = visual
     with world.modify_world():

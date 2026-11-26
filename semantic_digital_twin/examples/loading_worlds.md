@@ -21,13 +21,10 @@ First, we need to compose the path to your world file.
 
 ```{code-cell} ipython3
 import logging
-import os
 
-from importlib.resources import files
-from pathlib import Path
 
 logging.disable(logging.CRITICAL)
-apartment = os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "apartment.urdf")
+apartment = "package://iai_apartment/urdf/apartment.urdf"
 
 ```
 

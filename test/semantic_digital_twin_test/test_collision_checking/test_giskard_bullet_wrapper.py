@@ -12,7 +12,6 @@ from dataclasses import dataclass, field, replace
 import giskardpy_bullet_bindings as pb
 import pytest
 import trimesh
-from importlib.resources import files
 from pathlib import Path
 
 from semantic_digital_twin.adapters.mesh import STLParser
@@ -57,12 +56,10 @@ def clean_cache(cache_dir):
 
 @pytest.fixture
 def non_convex_mesh():
-    stl_path = os.path.join(
-        Path(files("semantic_digital_twin")).parent.parent,
-        "resources",
-        "stl",
-        "jeroen_cup.stl",
-    )
+    """
+    :return: The collision mesh of the jeroen cup.
+    """
+    stl_path = "package://iai_objects/objects/jeroen_cup.stl"
     world_with_stl = STLParser(stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from robokudo.types.core import Type
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Header(Type):
     """ROS message header type.
 
@@ -41,7 +41,7 @@ class Header(Type):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionOfInterest(Type):
     """ROS region of interest message type.
 
@@ -74,7 +74,7 @@ class RegionOfInterest(Type):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraInfo(Type):
     """ROS camera calibration and metadata message type.
 

@@ -26,13 +26,10 @@ structures change.
 Hand the reasoner a world and ask it what it can work out:
 
 ```{code-cell} ipython3
-from importlib.resources import files
-from pathlib import Path
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-kitchen_urdf = Path(files("semantic_digital_twin")).parent.parent / "resources" / "urdf" / "kitchen-small.urdf"
-kitchen_world = URDFParser.from_file(file_path=str(kitchen_urdf)).create_world()
+kitchen_world = URDFParser.from_file("package://iai_kitchen/urdf_obj/kitchen-small.urdf").create_world()
 reasoner = WorldReasoner(kitchen_world)
 
 # The annotations this run inferred.

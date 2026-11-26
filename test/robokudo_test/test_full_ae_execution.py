@@ -58,7 +58,7 @@ class TestFullAEExecution(object):
         # node = Node(robokudo.defs.TEST_ROS_NODE_NAME)
 
         cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "file_reader",
+            camera="file_reader",
             loop=False,
             target_dir=cup_on_counter_directory,
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
@@ -99,7 +99,7 @@ class TestFullAEExecution(object):
         self, node, cup_on_counter_directory: Path
     ) -> None:
         cr_fr_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "file_reader",
+            camera="file_reader",
             loop=False,
             target_dir=cup_on_counter_directory,
             color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
@@ -140,7 +140,7 @@ class TestFullAEExecution(object):
             into the world.
             """
             object_hypotheses = cas.filter_annotations_by_type(
-                robokudo.types.scene.ObjectHypothesis
+                type_to_include=robokudo.types.scene.ObjectHypothesis
             )
             assert len(object_hypotheses) == 1, (
                 "Each successful CAS should already contain the object hypothesis to be synchronized."
@@ -182,12 +182,12 @@ class TestFullAEExecution(object):
 
         first_cas, second_cas = successful_cas_instances
         same_color_image = np.array_equal(
-            first_cas.get(robokudo.cas.CASViews.COLOR_IMAGE),
-            second_cas.get(robokudo.cas.CASViews.COLOR_IMAGE),
+            first_cas.get(view_name=robokudo.cas.CASViews.COLOR_IMAGE),
+            second_cas.get(view_name=robokudo.cas.CASViews.COLOR_IMAGE),
         )
         same_depth_image = np.array_equal(
-            first_cas.get(robokudo.cas.CASViews.DEPTH_IMAGE),
-            second_cas.get(robokudo.cas.CASViews.DEPTH_IMAGE),
+            first_cas.get(view_name=robokudo.cas.CASViews.DEPTH_IMAGE),
+            second_cas.get(view_name=robokudo.cas.CASViews.DEPTH_IMAGE),
         )
         assert not (same_color_image and same_depth_image), (
             "The two successful CAS instances should come from distinct RGB-D percepts."
@@ -206,18 +206,18 @@ class TestFullAEExecution(object):
             )
 
             object_hypotheses = cas.filter_annotations_by_type(
-                robokudo.types.scene.ObjectHypothesis
+                type_to_include=robokudo.types.scene.ObjectHypothesis
             )
             object_hypothesis = object_hypotheses[0]
             all_hypotheses.append(object_hypothesis)
 
             pose_annotations = cas.filter_by_type(
-                robokudo.types.annotation.PoseAnnotation,
-                object_hypothesis.annotations,
+                type_to_include=robokudo.types.annotation.PoseAnnotation,
+                input_list=object_hypothesis.annotations,
             )
             bbox_annotations = cas.filter_by_type(
-                robokudo.types.annotation.BoundingBox3DAnnotation,
-                object_hypothesis.annotations,
+                type_to_include=robokudo.types.annotation.BoundingBox3DAnnotation,
+                input_list=object_hypothesis.annotations,
             )
             assert len(pose_annotations) == 1
             assert len(bbox_annotations) == 1
@@ -234,7 +234,7 @@ class TestFullAEExecution(object):
 
     def test_run_semdt_raytracer_ae_successfully(self, node) -> None:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            RayTracingCameraConfiguration.registry_name,
+            camera=RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
                 descriptor_name="world_semdt_raytracer_cylinders"
             ),
@@ -292,15 +292,15 @@ class TestFullAEExecution(object):
         assert types_of_annotations.count(robokudo.types.scene.ObjectHypothesis) == 2
 
         object_hypotheses = seq.cas.filter_annotations_by_type(
-            robokudo.types.scene.ObjectHypothesis
+            type_to_include=robokudo.types.scene.ObjectHypothesis
         )
         dominant_colors = {
             colors[0].color
             for object_hypothesis in object_hypotheses
             if (
                 colors := seq.cas.filter_by_type(
-                    robokudo.types.annotation.SemanticColor,
-                    object_hypothesis.annotations,
+                    type_to_include=robokudo.types.annotation.SemanticColor,
+                    input_list=object_hypothesis.annotations,
                 )
             )
         }
@@ -308,8 +308,8 @@ class TestFullAEExecution(object):
 
         object_shapes = [
             seq.cas.filter_by_type(
-                robokudo.types.annotation.Shape,
-                object_hypothesis.annotations,
+                type_to_include=robokudo.types.annotation.Shape,
+                input_list=object_hypothesis.annotations,
             )
             for object_hypothesis in object_hypotheses
         ]
@@ -324,7 +324,7 @@ class TestFullAEExecution(object):
         self, node
     ) -> None:
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            RayTracingCameraConfiguration.registry_name,
+            camera=RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
                 descriptor_name="world_semdt_raytracer_tabletop"
             ),

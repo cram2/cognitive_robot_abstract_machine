@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.connections import Connection6DoF
 # %% Resolved camera context
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RayTracingContext:
     """
     Pair the semantic world with the camera used to render it.
@@ -48,7 +48,7 @@ class RayTracingContext:
 # %% Context resolution
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RayTracingContextResolver:
     """
     Resolve and cache a ray-tracing context from a configured world source.
@@ -85,18 +85,21 @@ class RayTracingContextResolver:
 
         source = self.camera_config.source
         if isinstance(source, WorldDescriptorSource):
-            world = self._load_descriptor_world(source)
-            camera = self._select_descriptor_camera(world, source)
+            world = self._load_descriptor_world(source=source)
+            camera = self._select_descriptor_camera(world=world, source=source)
             if source.camera_pose is not None:
-                self._apply_camera_pose(world, camera, source.camera_pose)
+                self._apply_camera_pose(
+                    world=world, camera=camera, camera_pose=source.camera_pose
+                )
         else:
             world = perception_world
-            camera = self._select_runtime_robot_camera(world, source)
+            camera = self._select_runtime_robot_camera(world=world, source=source)
         self._context = RayTracingContext(world=world, camera=camera)
         return self._context
 
     @staticmethod
     def _apply_camera_pose(
+        *,
         world: World,
         camera: Camera,
         camera_pose: HomogeneousTransformationMatrix,
@@ -131,6 +134,7 @@ class RayTracingContextResolver:
 
     @staticmethod
     def _select_descriptor_camera(
+        *,
         world: World,
         source: WorldDescriptorSource,
     ) -> Camera:
@@ -163,7 +167,7 @@ class RayTracingContextResolver:
             )
         raise CameraAnnotationMissing()
 
-    def _load_descriptor_world(self, source: WorldDescriptorSource) -> World:
+    def _load_descriptor_world(self, *, source: WorldDescriptorSource) -> World:
         """
         Load the standalone world described by ``source``.
 
@@ -178,6 +182,7 @@ class RayTracingContextResolver:
 
     @staticmethod
     def _select_runtime_robot_camera(
+        *,
         world: World,
         source: RuntimeRobotWorldSource,
     ) -> Camera:

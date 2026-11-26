@@ -22,6 +22,7 @@ from rosidl_runtime_py.convert import message_to_ordereddict
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 from robokudo_msgs.action import Query
+from krrood.patterns.called_positionally import called_positionally
 
 
 if TYPE_CHECKING:
@@ -38,6 +39,7 @@ class ResultQueue(Protocol):
     Queue-like object receiving the action client's final result dictionary.
     """
 
+    @called_positionally
     def put(self, item: dict[str, Any]) -> None:
         """
         Store one result dictionary.
@@ -58,12 +60,19 @@ class ReadinessSignal(Protocol):
 
 
 class PrettyResultPrinter:
-    def pretty_print_result(self, result: Query_Result) -> str:
+    """
+    Formats a query result for the console.
+    """
+
+    def pretty_print_result(self, *, result: Query_Result) -> str:
+        """
+        :return: *result* as indented JSON.
+        """
         result_dict = message_to_ordereddict(result)
         return json.dumps(result_dict, indent=2)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RoboKudoActionClient:
     """
     Send dynamic goals to the RoboKudo query action server.
@@ -125,9 +134,11 @@ class RoboKudoActionClient:
         """
         Create the ROS action client associated with the supplied node.
         """
-        self._action_client = ActionClient(self.node, Query, "/robokudo/query")
+        self._action_client = ActionClient(
+            node=self.node, action_type=Query, action_name="/robokudo/query"
+        )
 
-    def send_goal(self, goal_type: str) -> None:
+    def send_goal(self, *, goal_type: str) -> None:
         """
         Waits for the action server and sends a dynamic goal.
 
@@ -150,6 +161,7 @@ class RoboKudoActionClient:
         )
         send_goal_future.add_done_callback(self.goal_response_callback)
 
+    @called_positionally
     def goal_response_callback(self, future: Future) -> None:
         """
         Handles the response from the action server regarding goal acceptance.
@@ -175,6 +187,7 @@ class RoboKudoActionClient:
         result_future = self._goal_handle.get_result_async()
         result_future.add_done_callback(self.result_callback)
 
+    @called_positionally
     def feedback_callback(self, feedback_msg: Query_FeedbackMessage) -> None:
         """
         Processes feedback messages from the action server.
@@ -201,6 +214,7 @@ class RoboKudoActionClient:
         if self._cancel_timer:
             self._cancel_timer.cancel()
 
+    @called_positionally
     def cancel_done_callback(self, future: Future) -> None:
         """
         Handles the response from the action server regarding goal cancellation.
@@ -215,6 +229,7 @@ class RoboKudoActionClient:
         else:
             logger.warning("Goal cancellation was not successful.")
 
+    @called_positionally
     def result_callback(self, future: Future) -> None:
         """
         Processes the result from the action server.
@@ -228,7 +243,7 @@ class RoboKudoActionClient:
             result = result_future.result
 
             prp = PrettyResultPrinter()
-            pretty_result_str = prp.pretty_print_result(result)
+            pretty_result_str = prp.pretty_print_result(result=result)
 
             self.goal_status = status
             self.goal_result = result
