@@ -1,3 +1,8 @@
+"""
+The diagram of a set of classes: the classes, their fields, and the inheritance and
+association relations between them.
+"""
+
 from __future__ import annotations
 
 import dataclasses
