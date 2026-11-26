@@ -730,8 +730,7 @@ def test_a_robot_is_spawned_from_the_description_it_reads_itself(empty_world):
 
 def test_world_specification_from_urdf_with_robot():
     """
-    A robot specification places the PR2 on an omnidirectional drive below the world
-    root.
+    A robot specification places the PR2 on an omnidirectional drive below the world root.
     """
     try:
         world = WorldSpecification.from_urdf(

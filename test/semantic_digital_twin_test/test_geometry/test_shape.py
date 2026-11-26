@@ -690,8 +690,7 @@ def test_a_package_mesh_turned_within_its_file_keeps_its_vertices_through_serial
     installed_mesh_file,
 ):
     """
-    A JSON round trip by package URI keeps the vertices of a mesh turned within its
-    file.
+    A JSON round trip by package URI keeps the vertices of a mesh turned within its file.
     """
     mesh = Mesh(
         filename=str(installed_mesh_file),

@@ -45,7 +45,6 @@ def _off_the_origin(rotation: np.ndarray) -> tuple[float, ...]:
     """
     return _tuple(-np.cross(rotation, POINT_OFF_THE_ORIGIN))
 
-
 # %% the parts of a screw axis
 
 
@@ -365,11 +364,7 @@ def test_checking_whether_a_symbolic_screw_axis_turns_the_body_raises():
         ((0.0, 0.0, 2.0), (0.4, 0.0, 0.5), 0.25),
         ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), 0.0),
         ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), np.inf),
-        (
-            _tuple(2 * TILTED),
-            _tuple(np.add(_off_the_origin(2 * TILTED), 0.5 * TILTED)),
-            0.25,
-        ),
+        (_tuple(2 * TILTED), _tuple(np.add(_off_the_origin(2 * TILTED), 0.5 * TILTED)), 0.25),
         (_tuple(TILTED), _off_the_origin(TILTED), 0.0),
         ((0.0, 0.0, 0.0), _tuple(TILTED), np.inf),
     ],

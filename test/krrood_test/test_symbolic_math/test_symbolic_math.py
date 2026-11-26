@@ -1770,7 +1770,9 @@ class TestMatrix:
         assert isinstance(m[:2, :2], sm.Matrix)
 
     @pytest.mark.parametrize("shape", [(1, 5), (3, 1), (2, 3)])
-    def test_a_constant_matrix_evaluates_as_its_compiled_function_does(self, *, shape):
+    def test_a_constant_matrix_evaluates_as_its_compiled_function_does(
+        self, *, shape
+    ):
         matrix = sm.Matrix(np.arange(shape[0] * shape[1], dtype=float).reshape(shape))
         compiled = matrix.compile(
             parameters=VariableParameters.from_lists([]), sparse=False
