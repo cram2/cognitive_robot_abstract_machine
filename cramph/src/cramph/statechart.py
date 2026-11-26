@@ -291,6 +291,13 @@ class Statechart(SubclassJSONSerializer):
     keeps :meth:`tick` cheap.
     """
 
+    _nodes_by_id: dict[str, StatechartNode] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The nodes of :attr:`_nodes` by their :attr:`~cramph.node.StatechartNode._node_id`.
+    """
+
     _choosing_nodes: list[CompositeNodeChoosingItsChild] = field(
         default_factory=list, init=False, repr=False
     )
@@ -569,6 +576,7 @@ class Statechart(SubclassJSONSerializer):
         self.observation_state.append_default_value()
         self.last_observation_state.append_default_value()
         self._nodes.append(node)
+        self._nodes_by_id[node._node_id] = node
         self.compiler.changed_since_compile = True
         if isinstance(node, CancelStatechart):
             self._cancel_nodes.append(node)
@@ -743,6 +751,7 @@ class Statechart(SubclassJSONSerializer):
         for node in nodes:
             node.index = self.rx_graph.add_node(node)
         self._nodes = nodes
+        self._nodes_by_id = {node._node_id: node for node in nodes}
         self._cancel_nodes = [
             cancel_node
             for cancel_node in nodes
@@ -781,10 +790,10 @@ class Statechart(SubclassJSONSerializer):
         :return: The node with the given id.
         :raises NodeWithIdNotFoundError: If this statechart holds no node with that id.
         """
-        for node in self.nodes:
-            if node._node_id == node_id:
-                return node
-        raise NodeWithIdNotFoundError(node_id=node_id)
+        node = self._nodes_by_id.get(node_id)
+        if node is None:
+            raise NodeWithIdNotFoundError(node_id=node_id)
+        return node
 
     def check_context_holds(
         self,
