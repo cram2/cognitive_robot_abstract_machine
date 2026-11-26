@@ -540,13 +540,37 @@ def test_apply_control_commands(world_setup):
     connection: ScrewAxisConnection = world.get_connection(r1, r2)
     cmd = np.array([100.0, 0, 0, 0, 0, 0, 0, 0])
     dt = 0.1
-    world.apply_control_commands(cmd, dt, Derivatives.jerk)
+    world.apply_control_commands(commands=cmd, dt=dt, derivative=Derivatives.jerk)
     assert world.state[connection.dof.id].jerk == 100.0
     assert world.state[connection.dof.id].acceleration == 100.0 * dt
     assert world.state[connection.dof.id].velocity == 100.0 * dt * dt
     assert world.state[connection.dof.id].position == 100.0 * dt * dt * dt
     # the state should reuse the same memory
     assert state_memory_id == id(world.state._data)
+
+
+def test_a_measured_degree_of_freedom_keeps_its_position_under_commands(world_setup):
+    """
+    Only the position stays: the commanded velocity is still integrated, as the
+    controller's prediction of how the degree of freedom moves.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    measured = world.get_connection(r1, r2).dof
+    commanded = bf.parent_connection.x
+    measured_position = world.state[measured.id].position
+    commands = np.full(len(world.state), 100.0)
+    dt = 0.1
+
+    world.apply_control_commands(
+        commands=commands,
+        dt=dt,
+        derivative=Derivatives.jerk,
+        measured_degrees_of_freedom=[measured],
+    )
+
+    assert world.state[measured.id].position == measured_position
+    assert world.state[measured.id].velocity == 100.0 * dt * dt
+    assert world.state[commanded.id].position == 100.0 * dt * dt * dt
 
 
 def test_compute_relative_pose(world_setup):
@@ -2002,7 +2026,7 @@ def test_world_state_trajectory(world_setup, tmp_path):
 
     for i in range(10):
         time += dt
-        world.apply_control_commands(cmd, dt, Derivatives.jerk)
+        world.apply_control_commands(commands=cmd, dt=dt, derivative=Derivatives.jerk)
         traj.append(world.state, time)
 
     # Verify final trajectory structure

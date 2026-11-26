@@ -32,6 +32,7 @@ from typing_extensions import (
     Any,
     Iterable,
     Iterator,
+    Sequence,
     TYPE_CHECKING,
 )
 from typing_extensions import List
@@ -2918,7 +2919,12 @@ class World(HasSimulatorProperties):
         return RayTracer(self)
 
     def apply_control_commands(
-        self, commands: np.ndarray, dt: float, derivative: Derivatives
+        self,
+        *,
+        commands: np.ndarray,
+        dt: float,
+        derivative: Derivatives,
+        measured_degrees_of_freedom: Sequence[DegreeOfFreedom] = (),
     ) -> None:
         """
         Updates the state of a system by applying control commands at a specified
@@ -2930,8 +2936,15 @@ class World(HasSimulatorProperties):
         :param dt: Time step used for the integration of lower derivatives.
         :param derivative: The derivative level to which the control commands are
             applied.
+        :param measured_degrees_of_freedom: The degrees of freedom whose position is
+            measured rather than commanded, so the commands leave it where it is.
         """
-        self.state._apply_control_commands(commands, dt, derivative)
+        self.state._apply_control_commands(
+            commands=commands,
+            dt=dt,
+            derivative=derivative,
+            measured_degrees_of_freedom=measured_degrees_of_freedom,
+        )
         for connection in self.connections:
             match connection:
                 case HasUpdateState():

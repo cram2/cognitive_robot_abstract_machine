@@ -91,7 +91,9 @@ def _record_trajectory(
     time = start_time
     for _ in range(step_count):
         time += time_step
-        world.apply_control_commands(command, time_step, Derivatives.jerk)
+        world.apply_control_commands(
+            commands=command, dt=time_step, derivative=Derivatives.jerk
+        )
         trajectory.append(world.state, time)
 
     return trajectory
@@ -134,7 +136,9 @@ def _record_a_few_of_many_joints_moving(
         command[trajectory._index[degree_of_freedom.id]] = 1.0
     time_step = 0.1
     for step in range(1, 11):
-        world.apply_control_commands(command, time_step, Derivatives.jerk)
+        world.apply_control_commands(
+            commands=command, dt=time_step, derivative=Derivatives.jerk
+        )
         trajectory.append(world.state, step * time_step)
     return trajectory
 

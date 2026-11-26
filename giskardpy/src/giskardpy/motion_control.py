@@ -11,7 +11,11 @@ import numpy as np
 
 from cramph.context import StatechartContext
 from cramph.data_types import LifeCycleValue
-from cramph.executor import StatechartExecutor, TickingExecutorExtension
+from cramph.executor import (
+    StatechartExecutor,
+    SteppedSimulationPacer,
+    TickingExecutorExtension,
+)
 from giskardpy.motion_statechart.context import MotionControlContext
 from giskardpy.motion_statechart.exceptions import WorldStateArrayReplacedError
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
@@ -19,6 +23,7 @@ from giskardpy.qp.constraint_collection import ConstraintCollection
 from giskardpy.qp.qp_controller import QPController
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_state_trajectory_plotter import (
     WorldStateTrajectoryPlotter,
 )
@@ -58,6 +63,15 @@ class MotionControl(TickingExecutorExtension):
     node of it and the controller brings the robot to rest.
     """
 
+    _measured_degrees_of_freedom: list[DegreeOfFreedom] = field(
+        default_factory=list, init=False
+    )
+    """
+    The degrees of freedom whose position the commands leave where it is: while a
+    physics steps the world, every one outside the robots, such as a door hinge, which
+    moves only as far as a robot pushes it, not to where the controller predicts it.
+    """
+
     _compiled_world_state_data: np.ndarray | None = field(default=None, init=False)
     """
     The world state array the motion statechart was compiled against.
@@ -94,9 +108,22 @@ class MotionControl(TickingExecutorExtension):
         )
 
     def after_compile(self, *, executor: StatechartExecutor) -> None:
+        """
+        Compile :attr:`qp_controller` and decide which degrees of freedom the commands
+        leave to the physics.
+        """
         self._holding_still = False
         world = executor.context.world
         self._compiled_world_state_data = world.state._data
+        self._measured_degrees_of_freedom = []
+        if isinstance(executor.pacer, SteppedSimulationPacer):
+            robot_bodies = world.robot_body_to_robot_mapping
+            self._measured_degrees_of_freedom = [
+                degree_of_freedom
+                for connection in world.connections
+                if connection.child not in robot_bodies
+                for degree_of_freedom in connection.active_dofs
+            ]
         self._compile_qp_controller(executor=executor)
         world.collision_manager.update_collision_matrix()
 
@@ -109,6 +136,9 @@ class MotionControl(TickingExecutorExtension):
             executor.context.world.collision_manager.compute_collisions()
 
     def after_tick(self, *, executor: StatechartExecutor) -> None:
+        """
+        Apply the command :attr:`qp_controller` computes for the state the tick left.
+        """
         if self.qp_controller is None:
             return
         world = executor.context.world
@@ -118,9 +148,10 @@ class MotionControl(TickingExecutorExtension):
             float_variables=executor.context.float_variable_data.data,
         )
         world.apply_control_commands(
-            next_command,
-            self.qp_controller.config.control_time_step.total_seconds(),
-            self.qp_controller.config.max_derivative,
+            commands=next_command,
+            dt=self.qp_controller.config.control_time_step.total_seconds(),
+            derivative=self.qp_controller.config.max_derivative,
+            measured_degrees_of_freedom=self._measured_degrees_of_freedom,
         )
 
     def _life_cycle_state_followed(self, *, executor: StatechartExecutor) -> np.ndarray:

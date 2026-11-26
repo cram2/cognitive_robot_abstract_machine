@@ -1,9 +1,14 @@
+"""
+The position, velocity, acceleration and jerk of every degree of freedom of a world, and
+trajectories of them over time.
+"""
+
 from __future__ import annotations
 
 import threading
 import uuid
 from dataclasses import dataclass, field
-from typing_extensions import MutableMapping, Self, TYPE_CHECKING, Iterator
+from typing_extensions import MutableMapping, Self, TYPE_CHECKING, Iterator, Sequence
 from uuid import UUID
 
 
@@ -404,8 +409,13 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         return [v.variables.position for v in self._world.degrees_of_freedom]
 
     def _apply_control_commands(
-        self, commands: np.ndarray, dt: float, derivative: Derivatives
-    ):
+        self,
+        *,
+        commands: np.ndarray,
+        dt: float,
+        derivative: Derivatives,
+        measured_degrees_of_freedom: Sequence[DegreeOfFreedom],
+    ) -> None:
         """
         Apply control commands to the specified derivative level, and integrate down to
         lower derivatives.
@@ -416,7 +426,10 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
         :param dt: Time step used for the integration of lower derivatives.
         :param derivative: The derivative level to which the control commands are
             applied.
-        :return:
+        :param measured_degrees_of_freedom: The degrees of freedom whose position is
+            measured rather than commanded, so it is not integrated.
+        :raises MismatchingCommandLengthError: If there is not one command per degree of
+            freedom.
         """
         with self.world_lock:
             if len(commands) != len(self._ids):
@@ -424,13 +437,16 @@ class WorldState(MutableMapping[UUID, WorldStateEntryView]):
                     expected_length=len(self._ids),
                     actual_length=len(commands),
                 )
+            measured_columns = self.column_indices(list(measured_degrees_of_freedom))
 
             self.set_derivative(derivative, commands)
 
-            for i in range(derivative - 1, -1, -1):
+            for lower_derivative in range(derivative - 1, -1, -1):
+                step = self.get_derivative(lower_derivative + 1) * dt
+                if lower_derivative == Derivatives.position:
+                    step[measured_columns] = 0.0
                 self.set_derivative(
-                    i,
-                    self.get_derivative(i) + self.get_derivative(i + 1) * dt,
+                    lower_derivative, self.get_derivative(lower_derivative) + step
                 )
 
     def merge_state(self, other: WorldState):
