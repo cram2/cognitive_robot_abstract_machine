@@ -284,7 +284,7 @@ def nodes_of_type(
 # %% a physically simulated world without the physics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulationThatCountsItsSteps:
     """
     Stands in for a started simulation, counting the physics steps asked of it.

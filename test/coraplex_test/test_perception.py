@@ -81,7 +81,7 @@ move fails the assertions.
 # %% a body described by more than one annotation
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SpecializedMilk(Milk):
     """
     A milk annotation narrower than :class:`Milk` itself.
@@ -302,7 +302,9 @@ def test_world_perception_reports_the_pose_the_world_holds(
     milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         *PERCEIVED_MILK_POSITION, reference_frame=world.root
     )
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     detection = WorldPerception().detect(query)
 
@@ -325,7 +327,9 @@ def test_a_body_carrying_several_annotations_is_reported_once(
     milk_body = world.get_body_by_name("milk.stl")
     with world.modify_world():
         world.add_semantic_annotation(SpecializedMilk(root=milk_body))
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     assert query.from_world() == [milk_body]
 
@@ -343,7 +347,9 @@ def test_world_perception_follows_the_robots_head(
     """
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     assert query.from_world() == [milk_body]
 
@@ -361,12 +367,14 @@ def test_world_perception_reports_nothing_outside_the_queried_region(
     The region is part of the question, so a body outside it is not an answer.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, empty_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=empty_region, robot=view, world=world
+    )
 
     assert WorldPerception().detect(query) is None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerceptionReportingCandidates(PerceptionInterface):
     """
     A source that sees the same candidates whatever it is asked.
@@ -389,14 +397,16 @@ def test_ambiguity_is_reported_with_the_number_of_candidates(
     number the failure carries, whatever else the world holds.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     candidates = [
         Detection(semantic_annotation=Milk, pose=world.root.global_pose),
         Detection(semantic_annotation=Milk, pose=world.root.global_pose),
     ]
 
     with pytest.raises(UnidentifiedDetections) as raised:
-        PerceptionReportingCandidates(candidates).detect(
+        PerceptionReportingCandidates(candidates=candidates).detect(
             query, accept_first_if_multiple=False
         )
 
@@ -411,7 +421,9 @@ def test_accepting_the_first_candidate_answers_with_one_detection(
     instead of the ambiguity failure.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     first = Detection(semantic_annotation=Milk, pose=world.root.global_pose)
     candidates = [
         first,
@@ -419,7 +431,7 @@ def test_accepting_the_first_candidate_answers_with_one_detection(
     ]
 
     assert (
-        PerceptionReportingCandidates(candidates).detect(
+        PerceptionReportingCandidates(candidates=candidates).detect(
             query, accept_first_if_multiple=True
         )
         is first
@@ -486,7 +498,7 @@ def test_detection_corrects_a_grasp_planned_before_it(pr2_apartment_context):
 # %% reading detections off the robokudo action
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReportedObject:
     """
     One object a stand-in perception pipeline claims to have seen.
@@ -569,7 +581,7 @@ def robokudo_query_server(rclpy_node):
     server = RecordedQueryServer(
         node_name="robokudo_stand_in",
         action_name="robokudo/query",
-        reports=[ReportedObject("Milk", PERCEIVED_MILK_POSITION)],
+        reports=[ReportedObject(class_label="Milk", position=PERCEIVED_MILK_POSITION)],
     )
     yield server
     server.stop()
@@ -605,7 +617,9 @@ def test_robokudo_detection_is_named_and_placed_by_the_pipeline(
     everything downstream treats its detection the same as a simulated one.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
 
@@ -626,7 +640,9 @@ def test_robokudo_detection_moves_the_body_in_the_world(
     holding, which is what the grasp is later planned against.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     RoboKudoPerception(ros_node=rclpy_node).detect(query).apply_to(world)
 
@@ -648,8 +664,12 @@ def test_untyped_detection_is_identified_from_the_query(
     it is, so the annotation comes from what was asked for.
     """
     world, view, extensions = pr2_apartment_context
-    query_server_reporting([ReportedObject("", PERCEIVED_MILK_POSITION)])
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query_server_reporting(
+        [ReportedObject(class_label="", position=PERCEIVED_MILK_POSITION)]
+    )
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
 
@@ -670,7 +690,9 @@ def test_pipeline_reporting_nothing_answers_without_a_detection(
     """
     world, view, extensions = pr2_apartment_context
     query_server_reporting([])
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     assert RoboKudoPerception(ros_node=rclpy_node).detect(query) is None
 
@@ -685,11 +707,13 @@ def test_several_untyped_candidates_are_not_guessed_between(
     world, view, extensions = pr2_apartment_context
     query_server_reporting(
         [
-            ReportedObject("", PERCEIVED_MILK_POSITION),
-            ReportedObject("", (1.0, 1.0, 1.0)),
+            ReportedObject(class_label="", position=PERCEIVED_MILK_POSITION),
+            ReportedObject(class_label="", position=(1.0, 1.0, 1.0)),
         ]
     )
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     with pytest.raises(UnidentifiedDetections):
         RoboKudoPerception(ros_node=rclpy_node).detect(query)
@@ -705,11 +729,13 @@ def test_a_caller_that_accepts_any_candidate_gets_one_of_them(
     world, view, extensions = pr2_apartment_context
     query_server_reporting(
         [
-            ReportedObject("", PERCEIVED_MILK_POSITION),
-            ReportedObject("", (1.0, 1.0, 1.0)),
+            ReportedObject(class_label="", position=PERCEIVED_MILK_POSITION),
+            ReportedObject(class_label="", position=(1.0, 1.0, 1.0)),
         ]
     )
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(
         query, accept_first_if_multiple=True
@@ -733,11 +759,13 @@ def test_labelled_candidates_are_narrowed_to_the_requested_type(
     world, view, extensions = pr2_apartment_context
     query_server_reporting(
         [
-            ReportedObject("Milk", PERCEIVED_MILK_POSITION),
-            ReportedObject("Spoon", (1.0, 1.0, 1.0)),
+            ReportedObject(class_label="Milk", position=PERCEIVED_MILK_POSITION),
+            ReportedObject(class_label="Spoon", position=(1.0, 1.0, 1.0)),
         ]
     )
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
 
@@ -785,7 +813,9 @@ def test_perception_task_is_a_plain_statechart_node(
     motion control to be built.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     task = PerceptionTask(query=query, answered_by=PerceptionSource.WORLD_MODEL)
 
@@ -796,7 +826,9 @@ def test_perception_task_needs_ros_access(
     pr2_apartment_context, whole_scene_region
 ) -> None:
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     statechart = Statechart(context=StatechartContext(world=world))
     statechart.add_node(
         node=(
@@ -820,7 +852,9 @@ def test_perception_task_moves_the_detected_body(
     charts: the body ends up where the pipeline saw it.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     task = PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
 
     build_perception_task(task, world, rclpy_node)
@@ -843,7 +877,9 @@ def test_a_source_that_sees_nothing_leaves_the_task_observing_false(
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
     spawned_pose = milk_body.global_pose.to_np()
-    query = PerceptionQuery(Milk, empty_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=empty_region, robot=view, world=world
+    )
     task = PerceptionTask(query=query, answered_by=PerceptionSource.WORLD_MODEL)
     build_perception_task(task, world, rclpy_node)
 
@@ -853,7 +889,7 @@ def test_a_source_that_sees_nothing_leaves_the_task_observing_false(
     np.testing.assert_allclose(milk_body.global_pose.to_np(), spawned_pose, atol=1e-9)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnanswerablePerception(PerceptionInterface):
     """
     Source that cannot answer, standing in for any reason a query fails.
@@ -882,11 +918,13 @@ def test_perception_task_reports_a_failed_query_as_itself(
     :class:`~cramph.node.CancelStatechart` aborts a chart.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     task = PerceptionTask(query=query, answered_by=PerceptionSource.WORLD_MODEL)
     build_perception_task(task, world, rclpy_node)
     task.perception_source = UnanswerablePerception(
-        PerceptionSourceUnavailable(ROBOKUDO_QUERY_ACTION_NAME)
+        failure=PerceptionSourceUnavailable(action_name=ROBOKUDO_QUERY_ACTION_NAME)
     )
 
     with pytest.raises(PerceptionSourceUnavailable):
@@ -901,7 +939,9 @@ def test_perception_task_answers_its_query_only_once(
     what it already found instead of asking the pipeline a second time.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     task = PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
     build_perception_task(task, world, rclpy_node)
 
@@ -936,7 +976,9 @@ def test_perception_task_survives_a_json_round_trip(
     """
     world, view, extensions = pr2_apartment_context
     receiving_world = deepcopy(world)
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     task = PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
 
     restored = from_json(to_json(task), **receiving_world_kwargs(receiving_world))
@@ -1014,7 +1056,9 @@ def test_perception_task_survives_a_chart_round_trip(
     """
     world, view, extensions = pr2_apartment_context
     receiving_world = deepcopy(world)
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     chart = Statechart(context=StatechartContext(world=world))
     chart.add_node(
         node=(
@@ -1050,7 +1094,9 @@ def test_detection_in_a_chart_corrects_a_reach_planned_before_it(
     """
     world, view, extensions = pr2_apartment_context
     milk_body = world.get_body_by_name("milk.stl")
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
     detection = PerceptionTask(query=query, answered_by=PerceptionSource.ROBOKUDO)
     reach = CartesianPosition(
         kinematic_chain=KinematicChain(

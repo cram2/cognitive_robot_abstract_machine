@@ -9,7 +9,7 @@ from typing_extensions import Self
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldSnapshot:
     """
     The model version and degree of freedom states of a world at one point in time, to

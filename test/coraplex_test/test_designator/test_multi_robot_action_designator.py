@@ -519,7 +519,7 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
     else:
         target_pose = pose
 
-    waypoints = PoseTrajectory([target_pose])
+    waypoints = PoseTrajectory(poses=[target_pose])
     plan = Sequence(
         nodes=[
             MoveTorsoAction(torso_state=TorsoState.HIGH),
@@ -1013,7 +1013,7 @@ def test_gcs_navigation_needs_a_floor_below_the_robot(
 # %% riding an elevator
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ElevatorOperator(ModelChangeCallback):
     """
     Drives an elevator to a floor as soon as a robot boards it, standing in for whatever
@@ -1419,7 +1419,7 @@ def test_following_a_path_runs_one_goal_per_waypoint(
     _, robot, extensions = multiple_robot_apartment_context
     waypoints = [Pose(), Pose(), Pose()]
     action = FollowToolCenterPointPathAction(
-        target_locations=PoseTrajectory(waypoints), arm=left_or_only_arm(robot)
+        target_locations=PoseTrajectory(poses=waypoints), arm=left_or_only_arm(robot)
     )
 
     expand(action, extensions)
@@ -1661,7 +1661,7 @@ def arm_and_look_actions(robot: AbstractRobot) -> list[Action]:
             allow_gripper_collision=False,
         ),
         FollowToolCenterPointPathAction(
-            target_locations=PoseTrajectory([Pose()]), arm=arm
+            target_locations=PoseTrajectory(poses=[Pose()]), arm=arm
         ),
         LookAtAction(look_target=Pose()),
     ]
@@ -2270,7 +2270,7 @@ def test_a_placing_carries_its_object_to_where_it_stands(
 # %% both arms handling objects at once
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CupForEachArm:
     """
     A two-armed robot whose base moves with its arms, with one cup for each arm to pick

@@ -58,7 +58,7 @@ Name of the action RoboKudo answers perception queries on.
 # %% queries
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerceptionQuery(SubclassJSONSerializer):
     """
     What to look for and where.
@@ -146,7 +146,7 @@ class PerceptionQuery(SubclassJSONSerializer):
 # %% detections
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Detection:
     """
     One object reported by a perception source.
@@ -246,10 +246,14 @@ class Detection:
         """
         candidates = world.get_semantic_annotations_by_type(self.semantic_annotation)
         if not candidates:
-            raise PerceivedObjectNotInWorld(self.semantic_annotation)
+            raise PerceivedObjectNotInWorld(
+                semantic_annotation=self.semantic_annotation
+            )
         bodies = {annotation.root for annotation in candidates}
         if len(bodies) > 1:
-            raise AmbiguousDetection(self.semantic_annotation, len(bodies))
+            raise AmbiguousDetection(
+                semantic_annotation=self.semantic_annotation, body_count=len(bodies)
+            )
         return candidates
 
 
@@ -289,7 +293,10 @@ class PerceptionInterface(ABC):
         if not detections:
             return None
         if len(detections) > 1 and not accept_first_if_multiple:
-            raise UnidentifiedDetections(query.semantic_annotation, len(detections))
+            raise UnidentifiedDetections(
+                semantic_annotation=query.semantic_annotation,
+                candidate_count=len(detections),
+            )
         return detections[0]
 
     @staticmethod
@@ -308,7 +315,7 @@ class PerceptionInterface(ABC):
                 return RoboKudoPerception(ros_node=ros_node)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldPerception(PerceptionInterface):
     """
     Source that reads the objects straight out of the world model.
@@ -334,7 +341,7 @@ class WorldPerception(PerceptionInterface):
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboKudoPerception(PerceptionInterface):
     """
     Source that asks a running RoboKudo pipeline over its query action.
@@ -364,7 +371,7 @@ class RoboKudoPerception(PerceptionInterface):
 
         client = ActionClient(self.ros_node, Query, self.action_name)
         if not client.wait_for_server(timeout_sec=self.server_timeout.total_seconds()):
-            raise PerceptionSourceUnavailable(self.action_name)
+            raise PerceptionSourceUnavailable(action_name=self.action_name)
 
         goal = Query.Goal(
             obj=ObjectDesignator(type=query.semantic_annotation.__name__.lower())

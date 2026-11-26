@@ -99,7 +99,7 @@ How often running this module as a script transports the cereal there and back a
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StretchApartmentDemonstration(RobotDemonstration):
     """
     Stretch transports a cereal box between a shelf and a bedside table in the apartment.

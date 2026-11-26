@@ -44,7 +44,7 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 # %% keeping the torso upright while using a tool
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
     """
     Keeps Justin's torso upright while it moves a tool, which no other robot needs: its
@@ -64,7 +64,7 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
         for node in plan_node.descendants:
             if isinstance(node, CartesianPositionTrajectory):
                 return node
-        raise ToolPathNotFound(plan_node)
+        raise ToolPathNotFound(plan_node=plan_node)
 
     def nodes_to_insert(self, plan_node: ToolMotionAction) -> list[StatechartNode]:
         root = plan_node.controlled_root
@@ -82,7 +82,7 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
 # %% driving a differential drive
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveWithTheDifferentialDrive(ConfigurationTransformation[DrivesBase]):
     """
     Moves the base of a robot driven by a differential drive with a goal for that drive,
@@ -102,7 +102,7 @@ class DriveWithTheDifferentialDrive(ConfigurationTransformation[DrivesBase]):
 # %% keeping the base from turning while moving the tool
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeepStretchFromTurningWhileMovingItsTool(ParallelInsertion[MovesToolCenterPoint]):
     """
     Holds the orientation of a Stretch's base while its tool moves, so that the base
@@ -157,7 +157,7 @@ class KeepStretchFromTurningWhileMovingItsTool(ParallelInsertion[MovesToolCenter
 # %% moving the tool center point in a straight line
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose]):
     """
     Moves the tool center point of a Stretch to each of its targets along a straight
@@ -206,7 +206,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
 # %% closing a container
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
     """
     Keeps a kinematically simulated Stretch standing in front of the container it closes
@@ -228,7 +228,7 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
         for node in plan_node.descendants:
             if isinstance(node, ArticulateGraspedMechanism):
                 return node
-        raise ClosingGoalNotFound(plan_node)
+        raise ClosingGoalNotFound(plan_node=plan_node)
 
     def apply(self, plan_node: CloseAction) -> None:
         closing_goal = self.closing_goal(plan_node)

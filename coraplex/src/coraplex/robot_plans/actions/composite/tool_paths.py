@@ -33,7 +33,7 @@ def _local_bounding_box(body: Body, use_visual: bool = False) -> VolumetricBound
     return geometry.as_bounding_box_collection_in_frame(body).bounding_box()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ToolPathSegment:
     """
     A local curve of one geometric pattern over a fixed duration.
@@ -88,7 +88,7 @@ class ToolPathSegment:
         return times, points
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ToolPath:
     """
     An ordered list of tool path segments forming one continuous path.
@@ -203,7 +203,7 @@ def planar_raster_xy(tau: float, width: float, height: float, lanes: int) -> np.
     return np.array([x, y, 0.0], dtype=float)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ShearProfile:
     """
     Parameters for an oscillatory shear motion with a monotone depth profile.
@@ -230,7 +230,7 @@ class ShearProfile:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ShearXYProfile:
     """
     Parameters for an oscillatory shear motion in the XY plane.
@@ -528,7 +528,7 @@ def build_container_path(
 
     if pattern is MixingPattern.SPIRAL:
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SPIRAL,
                     duration=2.0 * duration_scale,
@@ -550,7 +550,7 @@ def build_container_path(
     stir_loops = max(1, int(np.ceil(total_duration / stir_base_duration)))
 
     return ToolPath(
-        [
+        segments=[
             ToolPathSegment(
                 kind=ToolPathSegmentKind.STIR,
                 duration=total_duration,
@@ -626,7 +626,7 @@ def build_surface_path(
 
     if technique is WipingTechnique.WIPE:
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SPIRAL,
                     duration=2.0 * duration_scale,
@@ -640,7 +640,7 @@ def build_surface_path(
         )
     if technique is WipingTechnique.SHEAR:
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SHEAR,
                     duration=1.5 * duration_scale,
@@ -657,7 +657,7 @@ def build_surface_path(
             ]
         )
     return ToolPath(
-        [
+        segments=[
             ToolPathSegment(
                 kind=ToolPathSegmentKind.RASTER,
                 duration=2.0 * duration_scale,
@@ -674,7 +674,7 @@ def build_surface_path(
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SliceAnchorPlacement:
     """
     Places cut anchors along an axis interval from a requested slice thickness and
@@ -915,4 +915,4 @@ def build_cutting_path(
             segments.append(_descend_segment(cut_index, x_value))
         segments.append(_retract_segment(cut_index, x_value))
 
-    return ToolPath(segments)
+    return ToolPath(segments=segments)

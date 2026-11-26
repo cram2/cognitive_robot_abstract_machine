@@ -147,7 +147,7 @@ class ToolMotionAction(
             for point in points
         ][::stride]
         if not waypoints:
-            raise MissingWaypoints(self)
+            raise MissingWaypoints(instance=self)
         return waypoints
 
     @property
@@ -346,14 +346,14 @@ class WipingAction(ToolMotionAction, TryAllAction):
         """
         super().__post_init__()
         if self.surface is None and self.target_pose is None:
-            raise WipingTargetMissing(self)
+            raise WipingTargetMissing(instance=self)
 
     def _build_tool_path(self) -> ToolPath:
         if self.surface is not None:
             return build_surface_path(self.surface, technique=self.technique)
         if self.technique is WipingTechnique.SPREAD:
             return ToolPath(
-                [
+                segments=[
                     ToolPathSegment(
                         kind=ToolPathSegmentKind.SWEEP,
                         duration=2.0,
@@ -366,7 +366,7 @@ class WipingAction(ToolMotionAction, TryAllAction):
                 ]
             )
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SPIRAL,
                     duration=2.0,

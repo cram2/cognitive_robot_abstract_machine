@@ -45,7 +45,7 @@ class PlanDeliberatelyFailed(Exception):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingRobotSpecification(RobotSpecification):
     """
     A robot that records the worlds it is put into instead of being put into them.

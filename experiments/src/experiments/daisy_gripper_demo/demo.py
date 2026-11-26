@@ -98,7 +98,7 @@ class ExecutionChoice(StrEnum):
 # %% demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DAiSyGripperDemonstration(RobotDemonstration):
     """
     DAiSy opens and closes its grippers through the full preset/flex and alone/together

@@ -62,7 +62,7 @@ exception. Joining it here ensures it has actually left that code first.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotDemonstrationRosSession:
     """
     A ROS node whose executor is spun on a background thread.
@@ -142,7 +142,7 @@ class RobotDemonstrationRosSession:
 # %% demonstrations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotDemonstration(ABC):
     """
     A robot demonstration that runs either in simulation or against a real controller.

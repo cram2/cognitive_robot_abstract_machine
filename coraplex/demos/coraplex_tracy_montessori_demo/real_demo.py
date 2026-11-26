@@ -46,7 +46,7 @@ from semantic_digital_twin.world import World
 # %% running the demo
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RunningRobot:
     """
     The real Tracy's stack, up and reachable: its world and the node the demo talks
@@ -64,7 +64,7 @@ class RunningRobot:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealRunner(DemoRunner):
     """
     Carries the sorting plan out on the real robot, bringing its controllers up first.

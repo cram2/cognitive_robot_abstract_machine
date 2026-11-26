@@ -344,7 +344,7 @@ class SubtreeRebuild(NodeRebuild):
         return f"{candidates} in {self.root.name}"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionTrial:
     """
     Tries grounded actions against a copy of the world, to check that a candidate can

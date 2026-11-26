@@ -70,7 +70,7 @@ from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 # %% mimics for testing candidate trials without depending on real motion physics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TrialCall:
     """
     One recorded attempt of a :class:`RecordingAction`.

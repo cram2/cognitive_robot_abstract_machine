@@ -93,8 +93,8 @@ def _pick_up_the_milk(
             planar_goal_pose=variable(
                 Pose2D,
                 domain=ReachabilityLocation(
-                    Pose(reference_frame=milk.root),
-                    robot.right_arm,
+                    target_pose=Pose(reference_frame=milk.root),
+                    arm=robot.right_arm,
                     context=context_of(extensions),
                 ),
             )
@@ -123,8 +123,8 @@ def _place_at(
                 planar_goal_pose=variable(
                     Pose2D,
                     domain=ReachabilityLocation(
-                        target,
-                        robot.right_arm,
+                        target_pose=target,
+                        arm=robot.right_arm,
                         context=context_of(extensions),
                     ),
                 )

@@ -39,7 +39,7 @@ logger = logging.getLogger("coraplex")
 
 
 # %% Costmaps
-@dataclass
+@dataclass(kw_only=True)
 class Costmap(Location):
     """
     The base class of all Costmaps.
@@ -340,7 +340,7 @@ class Costmap(Location):
         return result_maps
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OccupancyCostmap(Costmap):
     """
     The occupancy Costmap represents a map of the environment where obstacles or
@@ -509,7 +509,7 @@ class OccupancyCostmap(Costmap):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisibilityCostmap(Costmap):
     """
     A locations that represents the visibility of a specific point for every position around
@@ -734,7 +734,7 @@ class VisibilityCostmap(Costmap):
         self.map = inverted_map
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GaussianCostmap(Costmap):
     """
     Gaussian Costmaps are 2D gaussian distributions around the origin with the given mean and sigma
@@ -788,7 +788,7 @@ class GaussianCostmap(Costmap):
         return np.exp(-(offsets**2) / twice_variance)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RingCostmap(Costmap):
     """
     Creates a ring locations, similar to the gaussian locations but this looks more like a donut. Can be used to create poses

@@ -103,7 +103,9 @@ def test_detection_crosses_a_process_boundary(
     middleware alone, and what it reports arrives intact.
     """
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
 
@@ -124,7 +126,9 @@ def test_absent_perception_source_is_reported(
     """
     pytest.importorskip("robokudo_msgs")
     world, view, extensions = pr2_apartment_context
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     with pytest.raises(PerceptionSourceUnavailable):
         RoboKudoPerception(
@@ -141,7 +145,9 @@ def test_untyped_detection_crosses_a_process_boundary(
     """
     world, view, extensions = pr2_apartment_context
     pipeline_process_reporting("")
-    query = PerceptionQuery(Milk, whole_scene_region, view, world)
+    query = PerceptionQuery(
+        semantic_annotation=Milk, region=whole_scene_region, robot=view, world=world
+    )
 
     detection = RoboKudoPerception(ros_node=rclpy_node).detect(query)
 

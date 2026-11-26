@@ -37,7 +37,7 @@ class FrankaGripperActionName(StrEnum):
     GRASP = "grasp"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveGarmiGrippersWithTheirFrankaDriver(
     PlanTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -100,7 +100,7 @@ class DriveGarmiGrippersWithTheirFrankaDriver(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveGarmiGripperStatesWithTheirFrankaDriver(
     DriveGarmiGrippersWithTheirFrankaDriver[MoveGripper]
 ):
@@ -133,7 +133,7 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CloseGarmiFingersToWidthWithTheirFrankaDriver(
     DriveGarmiGrippersWithTheirFrankaDriver[MoveFingersToWidthAction]
 ):

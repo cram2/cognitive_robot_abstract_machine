@@ -27,7 +27,7 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.robots.tracy import Tracy
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoRunner(DemoRunner):
     """
     Carries the sorting plan out against MuJoCo physics.

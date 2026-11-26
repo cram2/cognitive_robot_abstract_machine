@@ -60,7 +60,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% the pieces
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeSortingPieceSet:
     """
     The loose pieces of the set, with the sizes and colours measured off the real set.
@@ -131,7 +131,7 @@ class ShapeSortingPieceSet:
 # %% solid bodies
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SolidContact:
     """
     How the solid bodies of the scene push back once something touches them.
@@ -173,7 +173,7 @@ class SolidContact:
 # %% gripping a piece
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PieceGrip:
     """
     How low on a piece the sorting gripper takes hold of it.
@@ -212,7 +212,7 @@ class PieceGrip:
 # %% the scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MontessoriScene:
     """
     Tracy's table, with the shape-sorting board standing on it and a row of loose pieces
@@ -420,7 +420,7 @@ class MontessoriScene:
 # %% the plan
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeSortingPlan:
     """
     The plan that picks every piece of a scene up in turn and lets it go over the hole
@@ -489,7 +489,7 @@ class ShapeSortingPlan:
 # %% running it
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DemoRunner(ABC):
     """
     Carries the sorting plan out in one way: physically simulated, kinematically

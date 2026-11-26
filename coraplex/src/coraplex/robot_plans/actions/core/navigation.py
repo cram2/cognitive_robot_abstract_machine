@@ -202,7 +202,7 @@ class PathPlanningNavigateAction(
             if self._stands_on(floor)
         ]
         if not floors_below:
-            raise NoFloorBelowRobot(self.robot)
+            raise NoFloorBelowRobot(robot=self.robot)
         return max(floors_below, key=lambda floor: self._extent_of(floor).max_z)
 
     def _extent_of(self, floor: Floor) -> VolumetricBoundingBox:
@@ -336,9 +336,13 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
             > 0.9
         ]
         if len(current_floor) == 0:
-            raise NotOnASingleLevelException("Robot is not on any recognized floor.")
+            raise NotOnASingleLevelException(
+                message="Robot is not on any recognized floor."
+            )
         if len(current_floor) > 1:
-            raise NotOnASingleLevelException("Robot is on multiple floors at once.")
+            raise NotOnASingleLevelException(
+                message="Robot is on multiple floors at once."
+            )
         return current_floor[0]
 
     @property

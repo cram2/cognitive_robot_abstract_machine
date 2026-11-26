@@ -55,7 +55,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 TrainedAction = TypeVar("TrainedAction", bound=Action)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TrainingEpisode:
     """
     The underspecified action one episode of training executes, and the executor
@@ -73,7 +73,7 @@ class TrainingEpisode:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
     """
     A training environment for generating data for the parameterization of the actions
@@ -169,7 +169,7 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         return number_of_executed_variants
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
     """
     Training environment for MoveToReach actions in an empty world using the PR2.

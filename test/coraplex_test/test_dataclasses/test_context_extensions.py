@@ -81,7 +81,7 @@ def test_the_robot_of_a_copied_world_is_its_own_copy(pr2_apartment_context) -> N
     assert copied_access.robot is copy.get_semantic_annotation_by_id(robot.id)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationCountingItsApplications(PlanTransformation[MoveTorsoAction]):
     """
     Rewrites nothing, and counts how often it was applied.

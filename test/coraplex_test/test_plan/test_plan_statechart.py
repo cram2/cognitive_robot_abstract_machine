@@ -69,7 +69,7 @@ def _pose_in_front_of_the_robot(world, robot) -> Pose2D:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingLocationInFrontOfTheRobot(Location):
     """
     A location in front of the robot that records, each time it is sampled, whether the
@@ -247,7 +247,7 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
 # %% running on the robot
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardRecordingTheGoal:
     """
     Stands in for the connection to Giskard, recording what it is asked to execute.
@@ -437,7 +437,7 @@ def test_an_executor_that_never_ran_a_plan_connects_to_nothing(
     assert connections == []
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GiskardTickingTheGoalUntilItEnded:
     """
     Stands in for Giskard, ticking what it is asked to execute until the statechart

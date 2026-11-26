@@ -177,7 +177,7 @@ class HandDistance(float, Enum):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ScenePlacement:
     """
     A position and an orientation, given as a heading about the vertical and a tilt.
@@ -225,7 +225,7 @@ class ScenePose(Enum):
     Where GARMI and the milk start, and where they go.
     """
 
-    GARMI_START = ScenePlacement(-4.8, 1.5, 0, yaw=math.pi)
+    GARMI_START = ScenePlacement(x=-4.8, y=1.5, z=0, yaw=math.pi)
     """
     Where GARMI starts, in its ``odom`` frame: facing the kitchen from the room.
 
@@ -233,23 +233,23 @@ class ScenePose(Enum):
     in, not the apartment's own frame the other placements are relative to.
     """
 
-    GARMI_AT_COUNTER = ScenePlacement(-4.5, 1.75, 0, yaw=math.pi)
+    GARMI_AT_COUNTER = ScenePlacement(x=-4.5, y=1.75, z=0, yaw=math.pi)
     """
     Where GARMI returns to once the milk is in the drawer, in its ``odom`` frame.
     """
 
-    GARMI_AT_DRAWER = ScenePlacement(-5.0, 2.15, 0, yaw=math.pi + math.pi / 4)
+    GARMI_AT_DRAWER = ScenePlacement(x=-5.0, y=2.15, z=0, yaw=math.pi + math.pi / 4)
     """
     Where GARMI stands while it picks up the milk and opens and closes the drawer, in its
     ``odom`` frame: within reach of both.
     """
 
-    MILK_START = ScenePlacement(-6, 1.87, 1.028)
+    MILK_START = ScenePlacement(x=-6, y=1.87, z=1.028)
     """
     Where the milk starts, on the kitchen counter, in the world's root frame.
     """
 
-    MILK_IN_DRAWER = ScenePlacement(-0.545, 6.885, 0.79, pitch=-math.pi / 2)
+    MILK_IN_DRAWER = ScenePlacement(x=-0.545, y=6.885, z=0.79, pitch=-math.pi / 2)
     """
     Where the milk is put into the drawer once that is open, relative to the apartment:
     lying on its side just above the drawer's bottom plate, so the fingertips, which
@@ -284,7 +284,7 @@ class GraspSelection(Enum):
 # %% the demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GarmiCleanUpDemonstration(RobotDemonstration):
     """
     GARMI puts a milk carton from the kitchen counter into a drawer.

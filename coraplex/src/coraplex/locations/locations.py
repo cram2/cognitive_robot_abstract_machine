@@ -25,7 +25,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CostmapLocation(Location, ABC):
     """
     A location whose candidates are sampled from a costmap of the world as it is when
@@ -87,7 +87,7 @@ class CostmapLocation(Location, ABC):
         return world.transform(pose, world.root)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReachabilityLocation(CostmapLocation):
     """
     Where the robot can stand to reach a target with one arm.
@@ -151,7 +151,7 @@ class ReachabilityLocation(CostmapLocation):
                 yield candidate
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisibilityLocation(CostmapLocation):
     """
     Where the robot can stand to see a target with its camera.

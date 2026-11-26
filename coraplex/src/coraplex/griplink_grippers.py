@@ -18,7 +18,7 @@ from semantic_digital_twin.robots.griplink_gripper import GriplinkGripper
 # %% driving griplink grippers through their action servers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveGriplinkGrippersThroughTheirActionServers(
     ConfigurationTransformation[OperatesGripper]
 ):

@@ -100,7 +100,7 @@ class ApartmentBody(StrEnum):
     SPOON_DRAWER = "cabinet10_drawer_top"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlaceSettingObject:
     """
     One object of the place setting: what it is, where it starts, and where it is laid.
@@ -208,7 +208,7 @@ class PlaceSettingObject:
 # %% the demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BulletWorldDemonstration(RobotDemonstration):
     """
     The PR2 transports the milk, a bowl and a spoon onto the table in the apartment.
@@ -229,9 +229,9 @@ class BulletWorldDemonstration(RobotDemonstration):
 
     milk: PlaceSettingObject = field(
         default_factory=lambda: PlaceSettingObject(
-            Milk,
-            SceneFile.MILK,
-            HomogeneousTransformationMatrix.from_xyz_rpy(2.37, 2, 1.0345),
+            semantic_annotation_type=Milk,
+            mesh=SceneFile.MILK,
+            start=HomogeneousTransformationMatrix.from_xyz_rpy(2.37, 2, 1.0345),
             along_table=4.8,
             height=0.81,
         )
@@ -242,9 +242,9 @@ class BulletWorldDemonstration(RobotDemonstration):
 
     bowl: PlaceSettingObject = field(
         default_factory=lambda: PlaceSettingObject(
-            Bowl,
-            SceneFile.BOWL,
-            HomogeneousTransformationMatrix.from_xyz_rpy(2.4, 2.2, 0.98),
+            semantic_annotation_type=Bowl,
+            mesh=SceneFile.BOWL,
+            start=HomogeneousTransformationMatrix.from_xyz_rpy(2.4, 2.2, 0.98),
             along_table=5.0,
             height=0.76,
         )
@@ -255,9 +255,9 @@ class BulletWorldDemonstration(RobotDemonstration):
 
     spoon: PlaceSettingObject = field(
         default_factory=lambda: PlaceSettingObject(
-            Spoon,
-            SceneFile.SPOON,
-            HomogeneousTransformationMatrix.from_xyz_rpy(-0.05, -0.05, -0.01),
+            semantic_annotation_type=Spoon,
+            mesh=SceneFile.SPOON,
+            start=HomogeneousTransformationMatrix.from_xyz_rpy(-0.05, -0.05, -0.01),
             along_table=5.2,
             height=0.73,
             across_table=3.25,

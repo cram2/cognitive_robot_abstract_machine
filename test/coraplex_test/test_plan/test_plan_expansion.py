@@ -337,8 +337,8 @@ def test_perceiving_runs_between_the_motions_around_it(pr2_apartment_context) ->
     """
     world, view, extensions = pr2_apartment_context
     query = PerceptionQuery(
-        Milk,
-        VolumetricBoundingBox(
+        semantic_annotation=Milk,
+        region=VolumetricBoundingBox(
             origin=HomogeneousTransformationMatrix(reference_frame=world.root),
             min_x=-10,
             min_y=-10,
@@ -347,8 +347,8 @@ def test_perceiving_runs_between_the_motions_around_it(pr2_apartment_context) ->
             max_y=10,
             max_z=10,
         ),
-        view,
-        world,
+        robot=view,
+        world=world,
     )
 
     root = expand(

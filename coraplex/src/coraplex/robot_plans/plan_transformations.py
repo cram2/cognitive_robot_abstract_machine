@@ -81,7 +81,7 @@ if TYPE_CHECKING:
 # %% perceiving before a grasp
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
     """
     Looks at the object and detects it before a reach makes its final approach, so that
@@ -112,7 +112,7 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
         for step in reversed(steps):
             if self._moves_the_tool_center_point(step, plan_node.arm):
                 return step
-        raise ReachHasNoFinalApproach(plan_node)
+        raise ReachHasNoFinalApproach(plan_node=plan_node)
 
     @staticmethod
     def _moves_the_tool_center_point(step: StatechartNode, arm: Arm) -> bool:
@@ -148,7 +148,7 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
 # %% opening what the object lies in
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DrawerOpening(
     SequentialInsertion[MatchedType],
     Generic[MatchedType],
@@ -209,7 +209,7 @@ class DrawerOpening(
         return plan_node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
     """
     Opens the drawers an object lies in before the robot picks it up, so that it reaches
@@ -238,8 +238,8 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
                 # A location samples its poses only once the drive is grounded, by
                 # which time the drawers this rewrite opens stand open.
                 domain=ReachabilityLocation(
-                    Pose(reference_frame=graspable.root),
-                    plan_node.arm,
+                    target_pose=Pose(reference_frame=graspable.root),
+                    arm=plan_node.arm,
                     context=plan_node.context,
                 ),
             ),
@@ -253,7 +253,7 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
         return nodes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PickUpTarget:
     """
     The object a pick-up takes hold of, and the arm it takes hold with.
@@ -270,7 +270,7 @@ class PickUpTarget:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
     """
     Opens the drawers an object lies in before the robot moves to it and picks it up.
@@ -365,7 +365,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
 # %% parking around a pick-and-place
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsAroundPickAndPlaceSteps(PlanTransformation[PickAndPlaceAction]):
     """
     Parks the robot's arms before the pick-up of a pick-and-place, between it and the
@@ -390,7 +390,7 @@ class ParkArmsAroundPickAndPlaceSteps(PlanTransformation[PickAndPlaceAction]):
 # %% parking before anything else
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
     """
     Parks the robot's arms in front of the first action of a plan.
@@ -447,7 +447,7 @@ class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
 # %% holding an object at its own width
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
     """
     Closes a grasp onto the width of the object it takes hold of, instead of shutting
@@ -500,13 +500,13 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
         for step in reversed(plan_node.nodes):
             if any(isinstance(node, MoveFingers) for node in [step, *step.descendants]):
                 return step
-        raise GraspHasNoClosingGoal(plan_node)
+        raise GraspHasNoClosingGoal(plan_node=plan_node)
 
 
 # %% putting the base at a pose where nothing has to drive it there
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WriteTheOdometryInsteadOfDriving(ConfigurationTransformation[DrivesBase]):
     """
     Puts the base at the poses it drives to by writing the odometry, however it would be
@@ -520,7 +520,7 @@ class WriteTheOdometryInsteadOfDriving(ConfigurationTransformation[DrivesBase]):
         plan_node.base_goal_type = SetOdometry
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WriteTheOdometryInsteadOfCommandingAPose(WriteTheOdometryInsteadOfDriving):
     """
     Puts the base at the poses it drives to by writing the odometry where the controller
@@ -535,7 +535,7 @@ class WriteTheOdometryInsteadOfCommandingAPose(WriteTheOdometryInsteadOfDriving)
 # %% detecting with the real robot's perception
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DetectWithRoboKudo(ConfigurationTransformation[DetectAction]):
     """
     Answers a detection with RoboKudo instead of the world model, where the world model
@@ -552,7 +552,7 @@ class DetectWithRoboKudo(ConfigurationTransformation[DetectAction]):
 # %% letting contact carry a body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LetContactCarryTheBodies(ConfigurationTransformation[ReattachesBranches]):
     """
     Leaves the world model alone where an action would move a body under a new parent,

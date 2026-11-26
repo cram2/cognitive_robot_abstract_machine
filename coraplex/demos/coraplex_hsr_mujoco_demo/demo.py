@@ -80,7 +80,7 @@ class SceneBody(StrEnum):
 # %% the demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MilkTransportDemonstration(RobotDemonstration):
     """
     The HSR carries the milk from the counter in front of it to the table behind it.

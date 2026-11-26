@@ -14,7 +14,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GripperOccupancy:
     """
     Base class for predicates that check the gripper occupancy.
@@ -47,7 +47,7 @@ class GripperOccupancy:
         return condition(bodies_below_tool_frame)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GripperHolds(GripperOccupancy, Predicate):
     """
     Checks if the gripper holds a particular body.

@@ -392,7 +392,7 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
         reference_frame=world.root,
     )
     target_pose = (anchor_T @ offset_T).pose
-    waypoints = PoseTrajectory(_make_sine_scan_poses(target_pose, lane_axis="z"))
+    waypoints = PoseTrajectory(poses=_make_sine_scan_poses(target_pose, lane_axis="z"))
 
     plan = FollowToolCenterPointPathAction(
         target_locations=waypoints, arm=right_or_only_arm(view)
@@ -548,7 +548,7 @@ def _fail_the_lift() -> None:
     raise PlanFailure()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FailTheFirstLift(SequentialInsertion[PickUpAction]):
     """
     Fails the first pick-up it is offered once its object hangs off the gripper, right

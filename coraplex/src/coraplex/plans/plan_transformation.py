@@ -22,7 +22,7 @@ MatchedType = TypeVar("MatchedType", bound=StatechartNode)
 # %% transformations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
     """
     Rewrites the part of a plan around a node, before the statechart running the plan is
@@ -47,7 +47,9 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
         :raises CannotMatchOnType: If the bound type is not a statechart node type
         """
         if not issubclass(self.matched_type, StatechartNode):
-            raise CannotMatchOnType(type(self), self.matched_type)
+            raise CannotMatchOnType(
+                transformation=type(self), matched_type=self.matched_type
+            )
         return isinstance(plan_node, self.matched_type)
 
     @abstractmethod
@@ -74,7 +76,7 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
 # %% configuring a node before it expands
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConfigurationTransformation(
     PlanTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -90,7 +92,7 @@ class ConfigurationTransformation(
 # %% inserting
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InsertionTransformation(
     PlanTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -132,7 +134,7 @@ class InsertionTransformation(
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SequentialInsertion(
     InsertionTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -162,7 +164,7 @@ class SequentialInsertion(
                 return node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParallelInsertion(
     InsertionTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):

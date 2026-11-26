@@ -51,7 +51,7 @@ from ..plan_running import robot_extensions, run_plan
 # %% a kitchen with a bowl and a cup in a drawer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KitchenWithFilledDrawer:
     """
     A PR2 in the kitchen, whose closed drawer holds a bowl and a cup.

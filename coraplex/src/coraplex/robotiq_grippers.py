@@ -21,7 +21,7 @@ from semantic_digital_twin.robots.robotiq_85_gripper import (
 # %% driving grippers through their parallel gripper command servers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveRobotiqGrippersThroughTheirActionServers(
     ConfigurationTransformation[OperatesGripper]
 ):

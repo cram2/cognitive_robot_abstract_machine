@@ -192,7 +192,7 @@ def joint_goal_of(torso_move: MoveTorsoAction) -> JointPositionList:
 # %% transformations under test
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGrippersBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
     """
     Puts two distinguishable gripper goals in front of the goal a torso move expands
@@ -216,7 +216,7 @@ class MoveGrippersBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGrippersAfterTorsoMotion(MoveGrippersBeforeTorsoMotion):
     """
     Puts the same gripper goals behind that goal instead.
@@ -227,7 +227,7 @@ class MoveGrippersAfterTorsoMotion(MoveGrippersBeforeTorsoMotion):
         return InsertionPosition.AFTER
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
     """
     Puts an action, which expands in turn, in front of the goal a torso move expands
@@ -248,7 +248,7 @@ class ParkArmsBeforeTorsoMotion(SequentialInsertion[MoveTorsoAction]):
         return [ParkArmsAction(arms=plan_node.robot.all_arms)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGripperLastInTheReachBody(SequentialInsertion[ReachAction]):
     """
     Puts a gripper goal at the end of the sequence a reach expands into.
@@ -292,7 +292,7 @@ def detect_actions_of(plan: StatechartNode) -> list[DetectAction]:
 # %% what makes a transformation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutRewrite(PlanTransformation[MoveTorsoAction]):
     """
     Says which nodes it applies to without saying how to rewrite the plan around them.
@@ -302,7 +302,7 @@ class TransformationWithoutRewrite(PlanTransformation[MoveTorsoAction]):
         return True
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutApplicability(PlanTransformation[MoveTorsoAction]):
     """
     Rewrites the plan without saying whether the case at hand needs it.
@@ -312,7 +312,7 @@ class TransformationWithoutApplicability(PlanTransformation[MoveTorsoAction]):
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGripperBeforeEveryAction(SequentialInsertion[Action]):
     """
     Puts a gripper goal in front of every action, whatever its type.
@@ -334,7 +334,7 @@ class MoveGripperBeforeEveryAction(SequentialInsertion[Action]):
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutPosition(SequentialInsertion[MoveTorsoAction]):
     """
     Inserts nodes without saying where they go.
@@ -347,7 +347,7 @@ class TransformationWithoutPosition(SequentialInsertion[MoveTorsoAction]):
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationWithoutMatchedType(PlanTransformation):
     """
     Rewrites nothing and binds no type, to be asked what it matches.
@@ -360,7 +360,7 @@ class TransformationWithoutMatchedType(PlanTransformation):
         pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TransformationOnAnUnmatchableType(PlanTransformation[GraspCandidate]):
     """
     Binds a type that is no statechart node.
@@ -420,7 +420,7 @@ def test_a_transformation_that_says_no_position_cannot_be_built():
         TransformationWithoutPosition()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveGripperBeforeHighTorso(SequentialInsertion[MoveTorsoAction]):
     """
     Puts a gripper goal in front of a torso move, but only when the torso goes up.
@@ -1360,7 +1360,7 @@ def test_the_arms_are_parked_around_every_step_of_a_pick_and_place(
 # %% inserting where no fitting control structure node runs the anchor
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveLeftGripperAfterTorso(SequentialInsertion[MoveTorsoAction]):
     """
     Puts a left gripper goal behind a torso move.
@@ -1380,7 +1380,7 @@ class MoveLeftGripperAfterTorso(SequentialInsertion[MoveTorsoAction]):
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsAfterTorso(MoveLeftGripperAfterTorso):
     """
     Puts an action behind a torso move instead.
@@ -1390,7 +1390,7 @@ class ParkArmsAfterTorso(MoveLeftGripperAfterTorso):
         return [ParkArmsAction(arms=plan_node.robot.all_arms)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveLeftGripperAlongsideTorso(ParallelInsertion[MoveTorsoAction]):
     """
     Moves the left gripper while the torso moves.
@@ -1491,7 +1491,7 @@ def test_a_node_inserted_alongside_one_running_in_parallel_joins_that_parallel(
 # %% transformations that collide on one node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveLeftGripperBeforeTorso(SequentialInsertion[MoveTorsoAction]):
     """
     Puts a left gripper goal in front of a torso move.
@@ -1511,7 +1511,7 @@ class MoveLeftGripperBeforeTorso(SequentialInsertion[MoveTorsoAction]):
         return [gripper_goal(plan_node.robot.left_arm.end_effector, GripperState.OPEN)]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveRightGripperBeforeTorso(MoveLeftGripperBeforeTorso):
     """
     Puts a right gripper goal there instead.

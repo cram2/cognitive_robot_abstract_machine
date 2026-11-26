@@ -63,7 +63,7 @@ class HoleShape(StrEnum):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class HoleOutline:
     """
     The closed outline of a hole where the lid is sliced through, in the board's own
@@ -130,7 +130,7 @@ class HoleOutline:
         return max(self.bounds.dimensions) / min(self.bounds.dimensions)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class HoleShapeClassifier:
     """
     Tells a hole's shape from how its outline was tessellated, how much of its bounding
@@ -176,7 +176,7 @@ class HoleShapeClassifier:
         return HoleShape.SQUARE
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class BoardHole:
     """
     One hole cut through the board's lid, in the board's own frame.
@@ -202,7 +202,7 @@ class BoardHole:
 # %% the board's geometry
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class BoardGeometry:
     """
     Everything the board's mesh says about the board.
@@ -272,7 +272,9 @@ class BoardGeometry:
         section = lid.section(
             plane_origin=[0.0, 0.0, middle], plane_normal=[0.0, 0.0, 1.0]
         )
-        outlines = [HoleOutline(np.asarray(loop)[:, :2]) for loop in section.discrete]
+        outlines = [
+            HoleOutline(points=np.asarray(loop)[:, :2]) for loop in section.discrete
+        ]
         rim = max(
             outlines,
             key=lambda outline: outline.bounds.area,
@@ -345,7 +347,7 @@ class BoardGeometry:
 # %% the board as a body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeSortingBoard:
     """
     The board as a body: its mesh to look at, and boxes to collide with.
