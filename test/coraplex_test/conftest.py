@@ -122,7 +122,7 @@ def pr2_apartment_context(pr2_apartment_world):
     The shared PR2 apartment world, its robot and the context extensions of its plans,
     returned to its initial model and state after the test.
     """
-    snapshot = WorldSnapshot.capture(pr2_apartment_world)
+    snapshot = WorldSnapshot.capture(world=pr2_apartment_world)
     pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
     yield pr2_apartment_world, pr2, robot_extensions(pr2)
     snapshot.restore()
@@ -135,7 +135,7 @@ def simple_pr2_context(simple_pr2_world_setup):
     of its plans, returned to its initial model and state after the test.
     """
     world, robot_view, extensions = simple_pr2_world_setup
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     yield world, robot_view, extensions
     snapshot.restore()
 
@@ -146,7 +146,7 @@ def stretch_apartment_context(stretch_apartment_world):
     The shared Stretch apartment world, its robot and the context extensions of its
     plans, returned to its initial model and state after the test.
     """
-    snapshot = WorldSnapshot.capture(stretch_apartment_world)
+    snapshot = WorldSnapshot.capture(world=stretch_apartment_world)
     robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
     yield stretch_apartment_world, robot, robot_extensions(robot)
     snapshot.restore()
@@ -159,7 +159,7 @@ def hsr_apartment_context(hsr_apartment_world):
     returned to its initial model and state after the test.
     """
     world, _, _ = hsr_apartment_world
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     robot = world.get_semantic_annotations_by_type(HSRB)[0]
     yield world, robot, robot_extensions(robot)
     snapshot.restore()
@@ -289,7 +289,7 @@ def nodes_of_type(
 # %% a physically simulated world without the physics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulationThatCountsItsSteps:
     """
     Stands in for a started simulation, counting the physics steps asked of it.

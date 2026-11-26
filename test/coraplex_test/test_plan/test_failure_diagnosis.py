@@ -114,13 +114,13 @@ class OpenTheGripperTheCheckReads(SequentialInsertion[GripperOpenCheck]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: GripperOpenCheck) -> bool:
+    def is_applicable(self, *, plan_node: GripperOpenCheck) -> bool:
         return True
 
-    def anchor(self, plan_node: GripperOpenCheck) -> StatechartNode:
+    def anchor(self, *, plan_node: GripperOpenCheck) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: GripperOpenCheck) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: GripperOpenCheck) -> list[StatechartNode]:
         return [set_gripper(self.end_effector, GripperState.OPEN)]
 
 

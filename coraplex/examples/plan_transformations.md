@@ -68,7 +68,7 @@ executing it lets the transformations rewrite it. A few lines are enough to prin
 ```python
 def expand(plan):
     executor, statechart = statechart_for(plan)
-    executor.prepare(statechart)
+    executor.prepare(statechart=statechart)
     return plan
 
 

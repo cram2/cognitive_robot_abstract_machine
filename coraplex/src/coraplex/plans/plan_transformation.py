@@ -1,3 +1,8 @@
+"""
+Plan transformations, which configure a node before it expands, insert nodes next to it
+or recover from its failure, and the context extension rewriting a plan with them.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -22,7 +27,7 @@ MatchedType = TypeVar("MatchedType", bound=StatechartNode)
 # %% transformations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
     """
     Rewrites the part of a plan around a node, before the statechart running the plan is
@@ -40,18 +45,20 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
         """
         return type(self).get_type_of_generic_parameter(parameter=MatchedType)
 
-    def matches_node(self, plan_node: StatechartNode) -> bool:
+    def matches_node(self, *, plan_node: StatechartNode) -> bool:
         """
         :param plan_node: The node that was just expanded
         :return: Whether the given node is one this rewrites.
         :raises CannotMatchOnType: If the bound type is not a statechart node type
         """
         if not issubclass(self.matched_type, StatechartNode):
-            raise CannotMatchOnType(type(self), self.matched_type)
+            raise CannotMatchOnType(
+                transformation=type(self), matched_type=self.matched_type
+            )
         return isinstance(plan_node, self.matched_type)
 
     @abstractmethod
-    def is_applicable(self, plan_node: MatchedType) -> bool:
+    def is_applicable(self, *, plan_node: MatchedType) -> bool:
         """
         Reports whether the case the node describes needs this transformation.
 
@@ -63,7 +70,7 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
         """
 
     @abstractmethod
-    def apply(self, plan_node: MatchedType) -> None:
+    def apply(self, *, plan_node: MatchedType) -> None:
         """
         Rewrites the plan around the given node.
 
@@ -74,7 +81,7 @@ class PlanTransformation(Generic[MatchedType], SubClassSafeGeneric, ABC):
 # %% configuring a node before it expands
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConfigurationTransformation(
     PlanTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -90,7 +97,7 @@ class ConfigurationTransformation(
 # %% inserting
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InsertionTransformation(
     PlanTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -102,26 +109,28 @@ class InsertionTransformation(
     """
 
     @abstractmethod
-    def anchor(self, plan_node: MatchedType) -> StatechartNode:
+    def anchor(self, *, plan_node: MatchedType) -> StatechartNode:
         """
         :param plan_node: The node this transformation is applied to
         :return: The node the new nodes are inserted next to.
         """
 
     @abstractmethod
-    def nodes_to_insert(self, plan_node: MatchedType) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: MatchedType) -> list[StatechartNode]:
         """
         :param plan_node: The node this transformation is applied to
         :return: The nodes to insert, in the order they take.
         """
 
-    def apply(self, plan_node: MatchedType) -> None:
-        anchor = self.anchor(plan_node)
-        for node in self.nodes_to_insert(plan_node):
-            anchor = self._insert(anchor, node)
+    def apply(self, *, plan_node: MatchedType) -> None:
+        anchor = self.anchor(plan_node=plan_node)
+        for node in self.nodes_to_insert(plan_node=plan_node):
+            anchor = self._insert(anchor=anchor, node=node)
 
     @abstractmethod
-    def _insert(self, anchor: StatechartNode, node: StatechartNode) -> StatechartNode:
+    def _insert(
+        self, *, anchor: StatechartNode, node: StatechartNode
+    ) -> StatechartNode:
         """
         Inserts a node next to the anchor node.
 
@@ -132,7 +141,7 @@ class InsertionTransformation(
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SequentialInsertion(
     InsertionTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -149,7 +158,9 @@ class SequentialInsertion(
         :return: Whether the inserted nodes run before or after the anchor node.
         """
 
-    def _insert(self, anchor: StatechartNode, node: StatechartNode) -> StatechartNode:
+    def _insert(
+        self, *, anchor: StatechartNode, node: StatechartNode
+    ) -> StatechartNode:
         step = ControlStructureNode.step_holding(node=anchor)
         if not isinstance(step.parent_node, Sequence):
             step.statechart.replace(node=step, replacement=Sequence(nodes=[step]))
@@ -162,7 +173,7 @@ class SequentialInsertion(
                 return node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParallelInsertion(
     InsertionTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -172,7 +183,9 @@ class ParallelInsertion(
     step holding the anchor.
     """
 
-    def _insert(self, anchor: StatechartNode, node: StatechartNode) -> StatechartNode:
+    def _insert(
+        self, *, anchor: StatechartNode, node: StatechartNode
+    ) -> StatechartNode:
         step = ControlStructureNode.step_holding(node=anchor)
         if not isinstance(step.parent_node, Parallel):
             step.statechart.replace(node=step, replacement=Parallel(nodes=[step]))
@@ -215,7 +228,7 @@ class PlanRewriting(ContextExtension):
         return PlanRewriting(transformations=list(self.transformations))
 
     def copy_with_preceding_transformations(
-        self, transformations: list[PlanTransformation]
+        self, *, transformations: list[PlanTransformation]
     ) -> PlanRewriting:
         """
         :param transformations: The transformations to offer every node to first.
@@ -224,7 +237,7 @@ class PlanRewriting(ContextExtension):
         """
         return PlanRewriting(transformations=[*transformations, *self.transformations])
 
-    def configure(self, node: StatechartNode) -> None:
+    def configure(self, *, node: StatechartNode) -> None:
         """
         Applies every :class:`ConfigurationTransformation` that matches and applies to
         `node`, which has not expanded yet.
@@ -234,12 +247,12 @@ class PlanRewriting(ContextExtension):
         for transformation in self.transformations:
             if (
                 isinstance(transformation, ConfigurationTransformation)
-                and transformation.matches_node(node)
-                and transformation.is_applicable(node)
+                and transformation.matches_node(plan_node=node)
+                and transformation.is_applicable(plan_node=node)
             ):
-                transformation.apply(node)
+                transformation.apply(plan_node=node)
 
-    def rewrite(self, root: StatechartNode) -> StatechartNode:
+    def rewrite(self, *, root: StatechartNode) -> StatechartNode:
         """
         Applies every transformation to every node below and including `root` that it
         matches and applies to, and to every node a transformation puts around `root`.
@@ -252,14 +265,14 @@ class PlanRewriting(ContextExtension):
             return root
         former_parent = root.parent_node
         rewritten = root
-        while (node := self._next_node_to_offer(rewritten)) is not None:
+        while (node := self._next_node_to_offer(root=rewritten)) is not None:
             self._offered.add(node)
-            self._apply_to(node)
+            self._apply_to(node=node)
             while rewritten.parent_node is not former_parent:
                 rewritten = rewritten.parent_node
         return rewritten
 
-    def treat_as_offered(self, node: StatechartNode) -> None:
+    def treat_as_offered(self, *, node: StatechartNode) -> None:
         """
         Keep the transformations from rewriting `node`, although the nodes below it are
         still offered to them.
@@ -268,7 +281,7 @@ class PlanRewriting(ContextExtension):
         """
         self._offered.add(node)
 
-    def _next_node_to_offer(self, root: StatechartNode) -> StatechartNode | None:
+    def _next_node_to_offer(self, *, root: StatechartNode) -> StatechartNode | None:
         """
         :param root: The part of the plan being rewritten.
         :return: The first node of `root` in the order the plan runs its nodes that has
@@ -279,7 +292,7 @@ class PlanRewriting(ContextExtension):
                 return node
         return None
 
-    def _apply_to(self, node: StatechartNode) -> None:
+    def _apply_to(self, *, node: StatechartNode) -> None:
         """
         Rewrites the plan with every transformation that applies to `node`.
 
@@ -292,8 +305,8 @@ class PlanRewriting(ContextExtension):
             transformation
             for transformation in self.transformations
             if not isinstance(transformation, ConfigurationTransformation)
-            and transformation.matches_node(node)
-            and transformation.is_applicable(node)
+            and transformation.matches_node(plan_node=node)
+            and transformation.is_applicable(plan_node=node)
         ]
         if len(transformations) > 1:
             logger.warning(
@@ -301,7 +314,7 @@ class PlanRewriting(ContextExtension):
                 f"{transformations}"
             )
         for transformation in transformations:
-            transformation.apply(node)
+            transformation.apply(plan_node=node)
 
 
 # %% recovering from a failure
@@ -334,12 +347,12 @@ class RecoveryByInsertion(LimitedRecovery):
 
     def recover(self, *, failed_node: StatechartNode) -> None:
         if not self.transformation.matches_node(
-            failed_node
-        ) or not self.transformation.is_applicable(failed_node):
+            plan_node=failed_node
+        ) or not self.transformation.is_applicable(plan_node=failed_node):
             return
         step = ControlStructureNode.step_holding(node=failed_node)
-        self.transformation.apply(failed_node)
+        self.transformation.apply(plan_node=failed_node)
         rewriting = failed_node.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
-            rewriting.rewrite(step.parent_node)
+            rewriting.rewrite(root=step.parent_node)
         failed_node.statechart.request_reset(node=step)

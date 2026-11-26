@@ -157,10 +157,10 @@ def test_transporting_a_bowl_grasps_it_at_its_rim(pr2_and_bowl):
     """
     world, robot, bowl = pr2_and_bowl
     transport = TransportAction.from_graspable_by_closest_grasps(
-        bowl,
-        Pose.from_xyz_rpy(5.0, 3.3, 0.75, reference_frame=world.root),
-        robot.left_arm,
-        context_of(robot_extensions(robot)),
+        graspable=bowl,
+        goal_pose=Pose.from_xyz_rpy(5.0, 3.3, 0.75, reference_frame=world.root),
+        arm=robot.left_arm,
+        context=context_of(robot_extensions(robot)),
     )
 
     Sequence(nodes=[transport])

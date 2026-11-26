@@ -28,7 +28,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 from semantic_digital_twin.robots.tracy import Tracy
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RvizRunner(DemoRunner):
     """
     Draws the scene in RViz and carries the sorting plan out kinematically.
@@ -56,7 +56,9 @@ class RvizRunner(DemoRunner):
             ros_node=node,
         )
         executor.compile(
-            statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+            statechart=ShapeSortingPlan(scene=self.scene).build(
+                context=executor.context
+            )
         )
         executor.execute()
         executor.close()

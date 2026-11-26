@@ -195,6 +195,15 @@ class PlanExecutor(Executor, ABC):
     """
 
     def __post_init__(self) -> None:
+        """
+        Extends :meth:`~cramph.executor.Executor.__post_init__` by giving the context
+        :attr:`child_chooser`, and by putting :attr:`adaptations` before the
+        transformations of the context's own
+        :class:`~coraplex.plans.plan_transformation.PlanRewriting`.
+
+        :raises DebuggingWithoutRosNode: If :attr:`debug` is set without a
+            :attr:`ros_node`.
+        """
         if self.debug and self.ros_node is None:
             raise DebuggingWithoutRosNode()
         self.supplied_context_extensions = list(self.context.extensions.values())
@@ -208,7 +217,9 @@ class PlanExecutor(Executor, ABC):
         rewriting = self.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
             self.context.extensions[type(rewriting)] = (
-                rewriting.copy_with_preceding_transformations(self.adaptations)
+                rewriting.copy_with_preceding_transformations(
+                    transformations=self.adaptations
+                )
             )
         super().__post_init__()
 
@@ -229,7 +240,7 @@ class PlanExecutor(Executor, ABC):
     def default_executor_extensions(self) -> list[ExecutorExtension]:
         return []
 
-    def prepare(self, statechart: Statechart) -> None:
+    def prepare(self, *, statechart: Statechart) -> None:
         """
         Add what the plan in `statechart` runs with, and rewrite it with the plan
         transformations, without compiling it.
@@ -245,17 +256,17 @@ class PlanExecutor(Executor, ABC):
             raise EmptyStatechartError()
         rewriting = self.context.require_extension(extension_type=PlanRewriting)
         for plan_node in plan_nodes:
-            rewriting.rewrite(plan_node)
+            rewriting.rewrite(root=plan_node)
         # a transformation may have put a plan node below a node holding it
         self.plan_nodes = list(statechart.top_level_nodes)
         if self.collision_avoidance:
             robot = self.context.require_extension(extension_type=RobotAccess).robot
             statechart.add_node(node=ExternalCollisionAvoidance(robot=robot))
             statechart.add_node(node=SelfCollisionAvoidance(robot=robot))
-        self._add_end_of_plan(statechart)
-        self._add_stall_detection(statechart)
+        self._add_end_of_plan(statechart=statechart)
+        self._add_stall_detection(statechart=statechart)
 
-    def _add_end_of_plan(self, statechart: Statechart) -> None:
+    def _add_end_of_plan(self, *, statechart: Statechart) -> None:
         """
         End the statechart once every plan node succeeded, or one of them ended without
         succeeding, so the plan no longer can.
@@ -269,7 +280,7 @@ class PlanExecutor(Executor, ABC):
         )
         statechart.add_node(node=end_of_plan)
 
-    def _add_stall_detection(self, statechart: Statechart) -> None:
+    def _add_stall_detection(self, *, statechart: Statechart) -> None:
         """
         Cancel the statechart once a plan node stops approaching its goal.
 
@@ -297,7 +308,7 @@ class PlanExecutor(Executor, ABC):
 
         :param statechart: The statechart holding the plan, built in :attr:`context`.
         """
-        self.prepare(statechart)
+        self.prepare(statechart=statechart)
         super().compile(statechart=statechart)
 
     def execute(self) -> None:

@@ -242,7 +242,7 @@ READY_TIMEOUT = 180.0
 SHUTDOWN_TIMEOUT = 60.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StandaloneProcess:
     """
     A component launched as its own process and stopped again when the test is done.
