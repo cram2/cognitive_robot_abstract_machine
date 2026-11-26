@@ -95,7 +95,9 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     HasRootRegion,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.mixins import HasApertures
+from semantic_digital_twin.semantic_annotations.part_whole.furniture_parts import (
+    HasApertures,
+)
 from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )

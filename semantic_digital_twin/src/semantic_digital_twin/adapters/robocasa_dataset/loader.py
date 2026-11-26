@@ -33,7 +33,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
     RoboCasaObjectResolver,
 )
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.semantic_annotations.part_whole.mixins import (
+from semantic_digital_twin.semantic_annotations.part_whole.furniture_parts import (
     HasDoors,
     HasDrawers,
     HasHandle,

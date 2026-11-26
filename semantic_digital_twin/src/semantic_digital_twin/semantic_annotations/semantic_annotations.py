@@ -44,7 +44,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     IsGraspable,
     HasDrawnGraspsByDefault,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.mixins import (
+from semantic_digital_twin.semantic_annotations.part_whole.furniture_parts import (
     HasCounterTop,
     HasCabinets,
     HasDrawers,
@@ -56,6 +56,8 @@ from semantic_digital_twin.semantic_annotations.part_whole.mixins import (
     HasSink,
     HasShelfLayers,
     HasRim,
+)
+from semantic_digital_twin.semantic_annotations.part_whole.fruit_parts import (
     HasCore,
     HasFlesh,
     HasPeel,
