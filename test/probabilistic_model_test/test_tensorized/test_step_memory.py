@@ -5,6 +5,8 @@ step allocates, and the batch size that fits.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -118,6 +120,74 @@ def test_a_compiled_jax_step_needs_memory_for_every_row(mixture_of_products_case
         ).step_memory(jnp.asarray(data))
 
     assert step_memory.bytes_per_row > 0
+
+
+@dataclass(kw_only=True)
+class StepBytesGivenPerBatchSize(JaxGradientDescent):
+    """
+    A jax trainer whose steps report given bytes per batch size instead of compiling,
+    recording the batch sizes it was probed on.
+    """
+
+    step_bytes_by_rows: dict[int, int]
+    """
+    The bytes a step on each number of rows reports.
+    """
+
+    probed_rows: list[int] = field(default_factory=list)
+    """
+    The number of rows of every batch probed, in order.
+    """
+
+    def probe_step_bytes(self, *, batch: tuple[jax.Array, ...]) -> int:
+        rows = batch[0].shape[0]
+        self.probed_rows.append(rows)
+        return self.step_bytes_by_rows[rows]
+
+
+def test_memory_that_shrinks_from_the_smallest_batches_is_probed_on_larger_ones(
+    mixture_of_products_case,
+):
+    """
+    When the step on twice the rows reports no more memory, the next probe doubles the
+    rows again, and the memory is the line through the first pair that grows.
+    """
+    step_bytes_by_rows = {64: 512728, 128: 462296, 256: 859608}
+    with jax.enable_x64(True):
+        circuit = mixture_of_products_case.circuit(np).to_namespace(jnp)
+        trainer = StepBytesGivenPerBatchSize(
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            step_bytes_by_rows=step_bytes_by_rows,
+        )
+        step_memory = trainer.step_memory(jnp.zeros((1000, 2)))
+
+    assert trainer.probed_rows == [64, 128, 256]
+    assert step_memory == StepMemory.from_two_probes(
+        smaller=ProbeMeasurement(rows=128, step_bytes=step_bytes_by_rows[128]),
+        larger=ProbeMeasurement(rows=256, step_bytes=step_bytes_by_rows[256]),
+    )
+
+
+def test_memory_that_never_grows_up_to_all_rows_is_unmeasurable(
+    mixture_of_products_case,
+):
+    """
+    A step that reports no more memory for more rows, however many rows there are, gives
+    no memory per row.
+    """
+    with jax.enable_x64(True):
+        circuit = mixture_of_products_case.circuit(np).to_namespace(jnp)
+        trainer = StepBytesGivenPerBatchSize(
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            step_bytes_by_rows={64: 500, 128: 500, 256: 400},
+        )
+
+        with pytest.raises(UnmeasurableStepMemoryError):
+            trainer.step_memory(jnp.zeros((300, 2)))
+
+    assert trainer.probed_rows == [64, 128, 256]
 
 
 @pytest.fixture
