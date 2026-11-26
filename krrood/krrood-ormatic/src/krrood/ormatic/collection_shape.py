@@ -6,9 +6,11 @@ and the type of the values at the bottom.
 from __future__ import annotations
 
 import collections.abc
+import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import reduce
 from types import NoneType, UnionType
 
 from typing_extensions import (
@@ -322,8 +324,8 @@ class CollectionShape:
         if len(element_types) == 1:
             element_type = element_types[0]
         else:
-            element_type = (
-                common_base_class(element_types) or Union[tuple(element_types)]
+            element_type = common_base_class(element_types) or reduce(
+                operator.or_, element_types
             )
         return SequenceLevel(container_type=container_type, depth=depth), element_type
 
@@ -343,7 +345,7 @@ class CollectionShape:
             ]
             if len(members) == 1:
                 return members[0]
-            return common_base_class(members) or Union[tuple(members)]
+            return common_base_class(members) or reduce(operator.or_, members)
         return annotation
 
     @property

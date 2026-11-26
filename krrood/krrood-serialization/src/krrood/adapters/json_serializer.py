@@ -757,7 +757,11 @@ class DictJSONSerializer(ExternalClassJSONSerializer[dict]):
     """
 
     @classmethod
-    def to_json(cls, *, instance: dict, **kwargs) -> dict[str, Any]:
+    def to_json(cls, *, instance: dict, **kwargs: Any) -> dict[str, Any]:
+        """
+        :meth:`ExternalClassJSONSerializer.to_json` for a dictionary, whose keys and
+        values are written as two lists in its order.
+        """
         return {
             JSONField.TYPE: get_full_class_name(type(instance)),
             JSONField.KEYS: [to_json(key, **kwargs) for key in instance.keys()],
@@ -765,7 +769,13 @@ class DictJSONSerializer(ExternalClassJSONSerializer[dict]):
         }
 
     @classmethod
-    def from_json(cls, *, data: dict[str, Any], clazz: type[dict], **kwargs) -> dict:
+    def from_json(
+        cls, *, data: dict[str, Any], clazz: type[dict], **kwargs: Any
+    ) -> dict:
+        """
+        :meth:`ExternalClassJSONSerializer.from_json` for a dictionary written by
+        :meth:`to_json`.
+        """
         result = clazz()
         result.update(
             zip(
@@ -985,7 +995,12 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
         return is_dataclass(clazz)
 
     @classmethod
-    def from_json(cls, *, data: dict[str, Any], clazz: type, **kwargs) -> Self:
+    def from_json(cls, *, data: dict[str, Any], clazz: type, **kwargs: Any) -> Self:
+        """
+        :meth:`ExternalClassJSONSerializer.from_json` for a dataclass: a list-like field
+        restores its recorded collection class, and a dictionary field is read by
+        :class:`DictJSONSerializer`.
+        """
         introspector = DataclassOnlyIntrospector()
         discovered_attributes = {
             attr.field.name: attr.field

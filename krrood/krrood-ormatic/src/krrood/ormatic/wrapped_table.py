@@ -162,12 +162,10 @@ class AssociationReference:
 @dataclass(kw_only=True)
 class AssociationObject:
     """
-    An association table with a row per value of a collection, that can be rendered with
-    jinja.
+    An association table with a row per value of a collection, rendered with jinja.
 
-    A row holds the position of its value in each level of the collection, the key of
-    each keyed level, and the value. A row without a value marks an empty container at
-    the position its last level column gives.
+    A row holds its value's position and key in each level, and the value; a row without
+    a value marks an empty container.
     """
 
     name: str

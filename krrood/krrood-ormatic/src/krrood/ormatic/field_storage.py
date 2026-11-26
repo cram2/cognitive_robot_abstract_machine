@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from inspect import isclass
 from types import NoneType
 
-from typing_extensions import TYPE_CHECKING, ClassVar, Type, get_origin
+from typing_extensions import TYPE_CHECKING, ClassVar, get_origin
 
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
@@ -347,7 +347,7 @@ class JSONValueRule(ValueStorageRule):
             and not value_to_store.has_column_type
             and (
                 behaves_like_a_built_in_type(value_type)
-                or value_type in (type, Type)
+                or value_type is type
                 or get_origin(value_type) is type
                 or value_to_store.field_to_store.has_json_serializer(clazz=value_type)
             )

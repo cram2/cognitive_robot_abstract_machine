@@ -5,11 +5,13 @@ The kinds of collections krrood recognises, for values and for field annotations
 from __future__ import annotations
 
 import collections.abc
+import operator
 from enum import Enum, auto
+from functools import reduce
 from inspect import isclass
 
 from sortedcontainers import SortedSet
-from typing_extensions import Any, TypeAlias, Union, get_args, get_origin
+from typing_extensions import Any, TypeAlias, get_args, get_origin
 
 from krrood.class_diagrams.utils import common_base_class
 
@@ -74,10 +76,11 @@ class CollectionKind(Enum):
         )
 
 
-AnyCollection: TypeAlias = Union[CollectionKind.all_classes()]
+AnyCollection: TypeAlias = reduce(operator.or_, CollectionKind.all_classes())
 """
 A collection of any :class:`CollectionKind`.
 """
+
 
 # %% declared value kinds
 
