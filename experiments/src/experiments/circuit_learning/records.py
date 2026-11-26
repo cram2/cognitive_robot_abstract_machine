@@ -1,6 +1,6 @@
 """
 The records of the circuit learning benchmark besides its measured rows: the runs it
-consists of, how each run ended, and the circuit each training run learned.
+consists of and how each run ended.
 """
 
 from __future__ import annotations
@@ -13,9 +13,6 @@ from enum import StrEnum
 from experiments.circuit_learning.datasets import DatasetName
 from experiments.circuit_learning.methods import BenchmarkMethods, LearningMethod
 from experiments.circuit_learning.settings import ComputationSetting
-from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
-    LayeredProbabilisticCircuit,
-)
 
 # %% names
 
@@ -116,21 +113,4 @@ class RunRecord:
     log_tail: str | None = None
     """
     The end of the output of a run that did not finish, ``None`` for one that did.
-    """
-
-
-@dataclass(kw_only=True)
-class TrainedCircuit:
-    """
-    The circuit a training run learned, kept for the runs that measure its queries.
-    """
-
-    training_run: BenchmarkRun
-    """
-    The training run that learned it.
-    """
-
-    circuit: LayeredProbabilisticCircuit
-    """
-    The learned circuit, with host parameters.
     """
