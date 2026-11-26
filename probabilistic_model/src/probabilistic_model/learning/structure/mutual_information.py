@@ -163,18 +163,42 @@ class NearestNeighbourMutualInformation(MutualInformationEstimator):
 
     seed: int = 0
     """
-    The seed of the noise added to continuous values to break ties.
+    The seed of the rows sampled and of the noise added to continuous values to break
+    ties.
     """
+
+    maximum_rows: int | None = 10000
+    """
+    The most rows the estimate is computed on, sampled without replacement from more;
+    every row if ``None``.
+    """
+
+    def rows_to_estimate_on(
+        self, *, data: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
+        """
+        :param data: The rows.
+        :return: The rows themselves if there are at most :attr:`maximum_rows`, else
+            that many of them drawn without replacement.
+        """
+        if self.maximum_rows is None or len(data) <= self.maximum_rows:
+            return data
+        return data[
+            np.random.default_rng(self.seed).choice(
+                len(data), size=self.maximum_rows, replace=False
+            )
+        ]
 
     def estimate(
         self, *, variables: SortedSet, data: npt.NDArray[np.float64]
     ) -> npt.NDArray[np.float64]:
+        rows = self.rows_to_estimate_on(data=data)
         symbolic = np.array(
             [not isinstance(variable, Continuous) for variable in variables]
         )
-        columns = data.copy()
+        columns = rows.copy()
         for index in np.flatnonzero(symbolic).tolist():
-            columns[:, index] = np.unique(data[:, index], return_inverse=True)[1]
+            columns[:, index] = np.unique(rows[:, index], return_inverse=True)[1]
         directed = np.stack(
             [
                 (mutual_info_classif if symbolic[index] else mutual_info_regression)(

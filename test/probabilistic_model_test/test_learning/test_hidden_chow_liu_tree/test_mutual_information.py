@@ -188,12 +188,57 @@ def test_nearest_neighbour_mutual_information_of_a_symbolic_copy_is_its_entropy(
     variables = DependentBits(number_of_variables=4).variables
     hashes = DependentBits.hashes_of_bits(bits=rows.astype(int))
 
-    mutual_information = NearestNeighbourMutualInformation().estimate(
+    mutual_information = NearestNeighbourMutualInformation(maximum_rows=None).estimate(
         variables=SortedSet(list(variables)[:3]), data=hashes
     )
 
     assert mutual_information[0, 1] == pytest.approx(entropy)
     assert mutual_information[0, 2] < 1e-3
+
+
+def test_nearest_neighbours_are_estimated_on_at_most_the_maximum_number_of_rows():
+    """
+    More rows than the maximum are cut down to that many distinct rows of the data.
+    """
+    data = np.arange(3000.0).reshape(1000, 3)
+
+    rows = NearestNeighbourMutualInformation(maximum_rows=100).rows_to_estimate_on(
+        data=data
+    )
+
+    assert rows.shape == (100, 3)
+    assert len(np.unique(rows[:, 0])) == 100
+    assert np.isin(rows[:, 0], data[:, 0]).all()
+
+
+def test_nearest_neighbours_are_estimated_on_every_row_up_to_the_maximum():
+    """
+    Data of at most the maximum number of rows is estimated on as it is.
+    """
+    data = np.arange(300.0).reshape(100, 3)
+
+    rows = NearestNeighbourMutualInformation(maximum_rows=100).rows_to_estimate_on(
+        data=data
+    )
+
+    np.testing.assert_array_equal(rows, data)
+
+
+def test_nearest_neighbour_mutual_information_is_that_of_the_rows_estimated_on(
+    correlated_gaussians,
+):
+    """
+    The estimate of more rows than the maximum is the estimate of the rows kept.
+    """
+    variables, rows, _ = correlated_gaussians
+    estimator = NearestNeighbourMutualInformation(maximum_rows=500)
+
+    np.testing.assert_allclose(
+        estimator.estimate(variables=variables, data=rows),
+        NearestNeighbourMutualInformation(maximum_rows=None).estimate(
+            variables=variables, data=estimator.rows_to_estimate_on(data=rows)
+        ),
+    )
 
 
 # %% every estimator
