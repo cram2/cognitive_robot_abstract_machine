@@ -5,8 +5,7 @@ which statements.
 
 from __future__ import annotations
 
-import gc
-from contextlib import AbstractContextManager, ExitStack, contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import batched
@@ -25,6 +24,7 @@ from krrood.ormatic.data_access_objects.dao import (
     StoredObjectRow,
     selectin_loading,
 )
+from krrood.symbol_graph.symbol_graph import GarbageCollectionPause
 from krrood.ormatic.data_access_objects.helper import (
     get_mapping_data_access_object_class,
     get_part_class,
@@ -119,33 +119,6 @@ class ResultContent(StrEnum):
     The id of the object, without loading any of its rows. Use it to count the
     objects, or to load them later in parts.
     """
-
-
-# %% pausing the garbage collector
-
-
-@dataclass(kw_only=True)
-class GarbageCollectionPause(AbstractContextManager):
-    """
-    Keeps Python's cyclic garbage collector from running inside a ``with`` block.
-    """
-
-    collector_was_running: bool = False
-    """
-    Whether the collector ran when the block was entered, so it runs again after it.
-    """
-
-    def __enter__(self) -> GarbageCollectionPause:
-        """
-        Pauses the collector, unlike :meth:`contextlib.AbstractContextManager.__enter__`.
-        """
-        self.collector_was_running = gc.isenabled()
-        gc.disable()
-        return self
-
-    def __exit__(self, *exception_information: Any) -> None:
-        if self.collector_was_running:
-            gc.enable()
 
 
 # %% configuration

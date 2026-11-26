@@ -18,7 +18,6 @@ from krrood.ormatic.exceptions import (
     UnsupportedResultLoadingError,
 )
 from krrood.ormatic.result_loading import (
-    GarbageCollectionPause,
     RelationshipLoading,
     ResultContent,
     ResultLoading,
@@ -26,6 +25,7 @@ from krrood.ormatic.result_loading import (
     SubclassLoading,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
+from krrood.symbol_graph.symbol_graph import GarbageCollectionPause
 from krrood.ormatic.data_access_objects.helper import (
     get_mapping_data_access_object_class,
     to_dao,
