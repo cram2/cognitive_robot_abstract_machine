@@ -7,14 +7,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-import numpy as np
 from typing_extensions import TYPE_CHECKING, Self
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.patterns.called_positionally import called_positionally
 from krrood.symbolic_math.symbolic_math import (
     CompiledFunction,
-    FloatVariable,
     Scalar,
     VariableParameters,
 )
@@ -34,7 +32,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.world import World
+    from semantic_digital_twin.world import ModelRevision, World
 
 # %% fill-level source
 
@@ -59,40 +57,6 @@ class FillLevelSource(ABC):
         """
 
 
-# %% compiled fill velocity
-
-
-@dataclass(kw_only=True)
-class CompiledFillVelocity:
-    """
-    The fill velocity of a fill-level connection compiled for one world model version.
-    """
-
-    model_version: int
-    """
-    The world model version the function was compiled at.
-    """
-
-    variables: list[FloatVariable]
-    """
-    The free variables the function reads, in the order it takes them.
-    """
-
-    function: CompiledFunction
-    """
-    The compiled fill velocity.
-    """
-
-    def evaluate(self) -> float:
-        """
-        :return: The fill velocity at the current values of the variables.
-        """
-        values = np.array(
-            [variable.resolve() for variable in self.variables], dtype=np.float64
-        )
-        return float(self.function(values)[0])
-
-
 # %% fill-level connection
 
 
@@ -110,12 +74,19 @@ class FillLevelConnection(Connection, HasUpdateState):
     The normalized fill level, limited to ``[0, 1]``.
     """
 
-    compiled_fill_velocity: CompiledFillVelocity | None = field(
+    compiled_fill_velocity: CompiledFunction | None = field(
         default=None, init=False, repr=False, compare=False
     )
     """
-    The fill velocity compiled for :meth:`update_state`, recompiled whenever the world
-    model changes.
+    The fill velocity compiled over the world's positions for :meth:`update_state`,
+    reading them in place.
+    """
+
+    compiled_revision: ModelRevision | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    """
+    The world model revision :attr:`compiled_fill_velocity` was compiled against.
     """
 
     @classmethod
@@ -192,25 +163,24 @@ class FillLevelConnection(Connection, HasUpdateState):
                 return container.fill_velocity()
         return sm.Scalar(0.0)
 
-    def current_compiled_fill_velocity(self) -> CompiledFillVelocity:
+    def current_fill_velocity(self) -> float:
         """
-        :return: The fill velocity compiled for the current world model, compiling it
-            only when the model changed since the last call.
+        :return: The fill velocity at the world's current positions, compiling it only
+            when the world model changed since the last call.
         """
-        model_version = self._world._model_manager.version
-        cached = self.compiled_fill_velocity
-        if cached is not None and cached.model_version == model_version:
-            return cached
-        velocity = self.symbolic_fill_velocity()
-        variables = velocity.free_variables()
-        self.compiled_fill_velocity = CompiledFillVelocity(
-            model_version=model_version,
-            variables=variables,
-            function=velocity.compile(
-                parameters=VariableParameters.from_lists(variables)
-            ),
-        )
-        return self.compiled_fill_velocity
+        revision = self._world.get_world_model_manager().revision
+        if self.compiled_revision != revision:
+            self.compiled_fill_velocity = self.symbolic_fill_velocity().compile(
+                parameters=VariableParameters.from_lists(
+                    self._world.state.position_float_variables
+                ),
+                sparse=False,
+            )
+            self.compiled_fill_velocity.bind_args_to_memory_view(
+                arg_idx=0, numpy_array=self._world.state.positions
+            )
+            self.compiled_revision = revision
+        return float(self.compiled_fill_velocity.evaluate()[0])
 
     @called_positionally
     def update_state(self, dt: float) -> None:
@@ -226,7 +196,7 @@ class FillLevelConnection(Connection, HasUpdateState):
         if limits.lower.position is None or limits.upper.position is None:
             raise MissingFillLevelLimitsError(connection_name=self.name)
         state = self._world.state
-        velocity = self.current_compiled_fill_velocity().evaluate()
+        velocity = self.current_fill_velocity()
         integrated_position = state[self.fill_dof.id].position + velocity * dt
         state[self.fill_dof.id].position = min(
             max(integrated_position, limits.lower.position), limits.upper.position

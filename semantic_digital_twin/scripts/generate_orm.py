@@ -1,7 +1,3 @@
-"""
-Generates the ORM interface of the semantic digital twin.
-"""
-
 # ----------------------------------------------------------------------------------------------------------------------
 # This script generates the ORM classes for the semantic_digital_twin package.
 # Dataclasses can be mapped automatically to the ORM model
@@ -31,9 +27,6 @@ from krrood.ormatic.ormatic import ORMatic
 from krrood.utils import recursive_subclasses
 import semantic_digital_twin.reasoning.predicates
 import semantic_digital_twin.reasoning.world_rdr.rules
-from semantic_digital_twin.world_description.fill_level_connection import (
-    CompiledFillVelocity,
-)
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
     SemanticDirection,
 )
@@ -67,8 +60,6 @@ ignore_classes = {
     USDComponent,
     USDJointedLinks,
     USDSceneContent,
-    # A fill-level connection's compiled fill velocity is a process-local cache.
-    CompiledFillVelocity,
     # A symbolic operation is a step of a query, not something a world stores, so none of
     # them is mapped. The modules defining them are imported above so that they are all
     # declared by the time this is read.

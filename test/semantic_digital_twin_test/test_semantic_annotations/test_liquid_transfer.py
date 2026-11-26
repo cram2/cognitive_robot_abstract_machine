@@ -451,8 +451,7 @@ class TestSynchronizedTransfer:
         )
 
         assert copied_source.fill_equation == faster_drain
-        compiled = copied_source.fill_connection.current_compiled_fill_velocity()
-        assert compiled.evaluate() == pytest.approx(
+        assert copied_source.fill_connection.current_fill_velocity() == pytest.approx(
             copied_source.fill_velocity().evaluate()[0]
         )
 
