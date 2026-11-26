@@ -187,8 +187,11 @@ class ProbabilisticBackend(GenerativeBackend):
     def _evaluate(self, *, expression: Match[T]) -> Iterable[T]:
         # Reject instances contradicting a value the model does not cover.
         instances = (
-            expression._construct_instance_from_bindings_(bindings=row.bindings)
+            instance
             for row in self.sample_bindings(expression=expression)
+            for instance in expression._instances_constructed_from_bindings_(
+                bindings=row.bindings
+            )
         )
         yield from expression._select_satisfying_(
             instances=instances

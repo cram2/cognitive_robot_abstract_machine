@@ -3,20 +3,25 @@ The backends that answer entity queries: by evaluating them in this process or b
 generating the instances they describe.
 """
 
+from __future__ import annotations
+
 import enum
 import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from typing_extensions import ClassVar, Iterable, Iterator, TypeVar
+from typing_extensions import Any, ClassVar, Iterable, Iterator, Self, TypeVar
 
 import logging
 from krrood.entity_query_language.verbalization.vocabulary.english import Directive
 
 from krrood.entity_query_language.core.base_expressions import (
     Bindings,
+    OperationResult,
     Selectable,
     SymbolicExpression,
 )
+from krrood.entity_query_language.core.variable import Variable
+from krrood.entity_query_language.enums import CombinationOrder
 from krrood.entity_query_language.operators.causal import (
     Cause,
 )
@@ -29,6 +34,7 @@ from krrood.entity_query_language.exceptions import (
 )
 from krrood.entity_query_language.factories import set_of, variable
 from krrood.entity_query_language.query.match import Match, AttributeMatch
+from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.classproperty import classproperty
 
 logger = logging.getLogger(__name__)
@@ -136,14 +142,66 @@ class GenerativeBackend(QueryBackend, ABC):
     """
 
     def evaluate(self, *, expression: Evaluable) -> Iterable[T]:
+        self._require_match(expression=expression)
+        yield from self._evaluate(expression=expression)
+
+    @staticmethod
+    def _require_match(*, expression: Evaluable) -> None:
+        """
+        :param expression: An expression handed to this backend.
+        :raises GenerativeBackendQueryIsNotUnderspecifiedVariable: If `expression` is not
+            a match, the only expression instances can be generated from.
+        """
         if not isinstance(expression, Match):
             raise GenerativeBackendQueryIsNotUnderspecifiedVariable(
                 expression=expression
             )
-        yield from self._evaluate(expression=expression)
 
     @abstractmethod
     def _evaluate(self, *, expression: Match[T]) -> Iterable[T]: ...
+
+
+# %% answering a match under values given for some of its variables
+
+
+@dataclass(kw_only=True)
+class Answer:
+    """
+    An instance generated for a match, with the values its variables took for it.
+    """
+
+    value: Any
+    """
+    The generated instance.
+    """
+
+    variable_values: Bindings
+    """
+    The value each variable of the match took for :attr:`value`, the variables of its
+    pattern among them, keyed by the identifier of the variable.
+    """
+
+
+@dataclass(kw_only=True)
+class EvaluatesUnderBindings(ABC):
+    """
+    A backend that answers a match under values given for some of its variables, the way
+    a correlated subquery is answered under the bindings of the query around it, and
+    reports the values the variables took for every answer.
+    """
+
+    @abstractmethod
+    def evaluate_under(
+        self, *, expression: Evaluable, variable_values: Bindings
+    ) -> Iterator[Answer]:
+        """
+        :param expression: The match to answer.
+        :param variable_values: The value of each variable of `expression` that is
+            fixed already, keyed by the identifier of the variable; every other variable
+            ranges over its domain.
+        :return: The answers, in the order :meth:`QueryBackend.evaluate` yields their
+            values.
+        """
 
 
 @dataclass(kw_only=True)
@@ -167,13 +225,18 @@ class EntityQueryLanguageBackend(SelectiveBackend):
 
 
 @dataclass(kw_only=True)
-class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
+class EntityQueryLanguageGenerativeBackend(GenerativeBackend, EvaluatesUnderBindings):
     """
     A generative backend that constructs new instances deterministically: it treats a
     match's unspecified leaves as variables, enumerates every combination over their
     (discrete) domains, constructs an instance per combination via the type's
     constructor, and keeps those that satisfy the match: the values its pattern states
     and its ``where`` conditions.
+    """
+
+    combination_order: CombinationOrder = CombinationOrder.NESTED
+    """
+    The order the combinations of the values of the match's variables are enumerated in.
     """
 
     @classproperty
@@ -185,6 +248,24 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
         return True
 
     def _evaluate(self, *, expression: Match[T]) -> Iterable[T]:
+        for answer in self._answers(expression=expression, variable_values={}):
+            yield answer.value
+
+    def evaluate_under(
+        self, *, expression: Evaluable, variable_values: Bindings
+    ) -> Iterator[Answer]:
+        self._require_match(expression=expression)
+        yield from self._answers(expression=expression, variable_values=variable_values)
+
+    def _answers(
+        self, *, expression: Match[T], variable_values: Bindings
+    ) -> Iterator[Answer]:
+        """
+        :param expression: The match to answer.
+        :param variable_values: See :meth:`EvaluatesUnderBindings.evaluate_under`.
+        :return: The instances constructed for the combinations of the values of the
+            variables of `expression` that satisfy it, with those values.
+        """
         self._warn_or_raise_on_unresolved_cause_(expression=expression)
         enumerated_variables: dict[uuid.UUID, Selectable] = {}
         for attribute_match in expression._matches_with_variables_:
@@ -197,16 +278,30 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
                 )
             )
 
-        instances = (
-            expression._construct_instance_from_bindings_(bindings=bindings)
-            for bindings in self._enumerate_bindings(
-                enumerated_variables=enumerated_variables
-            )
-        )
-        satisfying = expression._select_satisfying_(instances=instances)
-        yield from satisfying._quantify_(
+        values_of_instance: dict[int, Bindings] = {}
+
+        def constructed_instances() -> Iterator[T]:
+            """
+            :return: An instance per combination whose nested matches hold for it,
+                whose values are kept in `values_of_instance` until it is selected.
+            """
+            for combination in self._enumerate_combinations(
+                enumerated_variables=enumerated_variables,
+                variable_values=variable_values,
+            ):
+                for instance in expression._instances_constructed_from_bindings_(
+                    bindings=combination.pattern_bindings
+                ):
+                    values_of_instance[id(instance)] = (
+                        combination.pattern_bindings | combination.variable_values
+                    )
+                    yield instance
+
+        satisfying = expression._select_satisfying_(instances=constructed_instances())
+        for value in satisfying._quantify_(
             quantifier_type=expression._quantifier_type_
-        )._evaluate_natively_()
+        )._evaluate_natively_():
+            yield Answer(value=value, variable_values=values_of_instance.pop(id(value)))
 
     @staticmethod
     def _check_attribute_match_is_suitable_for_generation(
@@ -255,19 +350,158 @@ class EntityQueryLanguageGenerativeBackend(GenerativeBackend):
             [attribute_match.assigned_value],
         )
 
-    @staticmethod
-    def _enumerate_bindings(
+    def _enumerate_combinations(
+        self,
         *,
         enumerated_variables: dict[uuid.UUID, Selectable],
-    ) -> Iterator[Bindings]:
+        variable_values: Bindings,
+    ) -> Iterator[EnumeratedCombination]:
         """
         :param enumerated_variables: The variable whose values each pattern variable
             takes, keyed by the identifier of that pattern variable.
-        :return: The bindings of the pattern variables, one per combination of the
-            enumerated values.
+        :param variable_values: See :meth:`EvaluatesUnderBindings.evaluate_under`.
+        :return: The combinations of the enumerated values, in
+            :attr:`combination_order`.
         """
-        for combination in set_of(*enumerated_variables.values())._evaluate_natively_():
-            yield {
-                pattern_variable_id: combination[enumerated_variable]
-                for pattern_variable_id, enumerated_variable in enumerated_variables.items()
-            }
+        if self.combination_order == CombinationOrder.NESTED:
+            yield from VariablesEnumeratedTogether.from_expressions(
+                expressions=enumerated_variables
+            ).combinations(variable_values=variable_values)
+            return
+        groups = VariablesEnumeratedTogether.groups_sharing_variables(
+            expressions=enumerated_variables
+        )
+        for parts in CartesianProductByRankSum(
+            factors=[
+                group.combinations(variable_values=variable_values) for group in groups
+            ]
+        ):
+            yield EnumeratedCombination.merged(parts=parts)
+
+
+# %% enumerating the values of the variables of a match
+
+
+@dataclass(kw_only=True)
+class EnumeratedCombination:
+    """
+    One combination of the values of the variables a generative backend enumerates.
+    """
+
+    pattern_bindings: Bindings
+    """
+    The value of each pattern variable, keyed by the identifier of the pattern variable,
+    which the instance is constructed from.
+    """
+
+    variable_values: Bindings
+    """
+    The value each variable the pattern variables are read from took, keyed by the
+    identifier of the variable.
+    """
+
+    @classmethod
+    def merged(cls, *, parts: Iterable[EnumeratedCombination]) -> Self:
+        """
+        :param parts: Combinations of disjoint sets of variables.
+        :return: The combination holding the values of all of `parts`.
+        """
+        merged = cls(pattern_bindings={}, variable_values={})
+        for part in parts:
+            merged.pattern_bindings |= part.pattern_bindings
+            merged.variable_values |= part.variable_values
+        return merged
+
+
+@dataclass(kw_only=True)
+class VariablesEnumeratedTogether:
+    """
+    Expressions whose values are enumerated in one nested product, since they share
+    variables that have to take one value in each combination.
+    """
+
+    expressions: dict[uuid.UUID, Selectable]
+    """
+    The expression each pattern variable takes its values from, keyed by the identifier
+    of the pattern variable.
+    """
+
+    variables: dict[uuid.UUID, Variable]
+    """
+    The variables :attr:`expressions` read, keyed by their identifier.
+    """
+
+    @classmethod
+    def from_expressions(cls, *, expressions: dict[uuid.UUID, Selectable]) -> Self:
+        """
+        :param expressions: The expression each pattern variable takes its values from.
+        :return: The expressions enumerated together, with the variables they read.
+        """
+        return cls(
+            expressions=dict(expressions),
+            variables={
+                variable_._id_: variable_
+                for expression in expressions.values()
+                for variable_ in (expression, *expression._descendants_)
+                if isinstance(variable_, Variable)
+            },
+        )
+
+    @classmethod
+    def groups_sharing_variables(
+        cls, *, expressions: dict[uuid.UUID, Selectable]
+    ) -> list[Self]:
+        """
+        :param expressions: The expression each pattern variable takes its values from.
+        :return: The fewest groups of `expressions` such that no two groups read the
+            same variable, in the order their first expression comes in.
+        """
+        groups: list[Self] = []
+        for pattern_variable_id, expression in expressions.items():
+            group = cls.from_expressions(expressions={pattern_variable_id: expression})
+            sharing = [
+                index
+                for index, other in enumerate(groups)
+                if other.variables.keys() & group.variables.keys()
+            ]
+            for index in reversed(sharing):
+                group = groups.pop(index).merged_with(other=group)
+            groups.insert(sharing[0] if sharing else len(groups), group)
+        return groups
+
+    def merged_with(self, *, other: VariablesEnumeratedTogether) -> Self:
+        """
+        :param other: Expressions sharing a variable with these.
+        :return: These expressions followed by those of `other`.
+        """
+        return type(self)(
+            expressions=self.expressions | other.expressions,
+            variables=self.variables | other.variables,
+        )
+
+    def combinations(
+        self, *, variable_values: Bindings
+    ) -> Iterator[EnumeratedCombination]:
+        """
+        :param variable_values: See :meth:`EvaluatesUnderBindings.evaluate_under`.
+        :return: The combinations of the values of :attr:`expressions`, in nested
+            order, each variable in `variable_values` taking the value given for it.
+        """
+        selected = {
+            expression._id_: expression for expression in self.expressions.values()
+        } | self.variables
+        selection = set_of(*selected.values())
+        for result in selection._create_new_context_and_evaluate_(
+            sources=OperationResult(bindings=dict(variable_values))
+        ):
+            row = selection._process_result_(result=result)
+            yield EnumeratedCombination(
+                pattern_bindings={
+                    pattern_variable_id: row[expression]
+                    for pattern_variable_id, expression in self.expressions.items()
+                },
+                variable_values={
+                    variable_id: row[variable_]
+                    for variable_id, variable_ in self.variables.items()
+                },
+            )

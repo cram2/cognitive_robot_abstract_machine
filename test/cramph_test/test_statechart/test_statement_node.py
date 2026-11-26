@@ -1,3 +1,9 @@
+"""
+Tests the node running what a statement grounds to: how it takes its place among the
+children of a control structure, the candidates it yields, and the candidate each chosen
+child holds.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -43,6 +49,20 @@ class ChooserRunningEveryCandidate(ChildChooser[StatementNode]):
             query_backend=EntityQueryLanguageGenerativeBackend(),
             default_candidate_limit=self.default_candidate_limit,
         )
+
+
+@dataclass(kw_only=True)
+class ChooserRunningEachCandidateInASequence(ChooserRunningEveryCandidate):
+    """
+    Runs the next candidate of a statement node's statement in a sequence of its own,
+    which holds it as its only node.
+    """
+
+    def choose_child(self, *, node: StatementNode) -> StatechartNode | None:
+        candidate = super().choose_child(node=node)
+        if candidate is None:
+            return None
+        return Sequence(nodes=[candidate])
 
 
 # %% helpers
@@ -166,6 +186,54 @@ def test_a_sequence_runs_the_node_its_statement_grounds_to(
     assert isinstance(grounded, NodeSucceedingOnObservingTrue)
     assert grounded.life_cycle_state == LifeCycleValue.SUCCEEDED
     assert sequence.life_cycle_state == LifeCycleValue.SUCCEEDED
+
+
+def test_a_statement_of_a_sequence_grounds_to_the_sequence_its_chosen_child_holds(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    A chosen child that holds the candidate in a node of the statement's type grounds
+    the statement to the candidate, not to what holds it.
+    """
+    step = StatementNode(statement=a(Sequence)(nodes=[_succeeding_statement("inner")]))
+    sequence = Sequence(nodes=[step])
+
+    _run(statechart_executor, ChooserRunningEachCandidateInASequence(), sequence)
+
+    [holding] = step.chosen_children
+    [candidate] = holding.nodes
+    assert step.grounded_nodes == [candidate]
+
+
+# %% statements sharing a variable
+
+
+def test_a_later_statement_takes_the_value_an_earlier_one_was_grounded_with(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    """
+    The earlier statement only admits the second name, so the later one, which admits
+    both, takes the second name as well.
+    """
+    name = variable(str, domain=["first", "second"])
+    earlier_statement = a(NodeSucceedingOnObservingTrue)(
+        name=name, observation=ObservationStateValue.TRUE
+    )
+    earlier_statement.where(earlier_statement.name == "second")
+    earlier = StatementNode(statement=earlier_statement)
+    later = StatementNode(
+        statement=a(NodeSucceedingOnObservingTrue)(
+            name=name, observation=ObservationStateValue.TRUE
+        )
+    )
+    sequence = Sequence(nodes=[earlier, later])
+
+    _run(statechart_executor, ChooserRunningEveryCandidate(), sequence)
+
+    assert [step.grounded_nodes[0].name for step in (earlier, later)] == [
+        "second",
+        "second",
+    ]
 
 
 # %% the candidates of a statement

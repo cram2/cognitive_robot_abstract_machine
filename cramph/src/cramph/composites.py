@@ -7,16 +7,21 @@ from __future__ import annotations, division
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import partial
 from itertools import combinations, takewhile
+from weakref import WeakSet
 
-from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
+from typing_extensions import Any, Generic, Iterator, Self, TypeVar
 
 from krrood.adapters.json_serializer import JSONField
-from krrood.entity_query_language.backends import QueryBackend
+from krrood.entity_query_language.backends import (
+    Answer,
+    EvaluatesUnderBindings,
+    QueryBackend,
+)
+from krrood.entity_query_language.core.base_expressions import Bindings
+from krrood.entity_query_language.factories import a, entity, variable
 from krrood.entity_query_language.query.match import Match
 from krrood.patterns.classproperty import classproperty
-from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
@@ -29,6 +34,7 @@ from cramph.data_types import (
     ObservationStateValue,
 )
 from cramph.exceptions import (
+    BackendCannotGroundUnderValuesError,
     NoChildChooserForNodeError,
     SeveralChildChoosersForNodeError,
     NoControlStructureNodeAboveError,
@@ -1353,9 +1359,9 @@ class StatementNode(CompositeNodeChoosingItsChild):
     """
     Runs a node described by an underspecified `a(...)` / `an(...)` statement.
 
-    The statement is grounded only when this node starts, against the world the nodes
-    before it left behind; the chooser of the context decides which of its candidates
-    run. A control structure node handed a statement takes such a node as its child.
+    The statement is grounded when this node starts, against the world as it is then,
+    see :class:`StatementsGroundedTogether`; the chooser of the context decides which
+    candidates run. A control structure node handed a statement takes such a node.
     """
 
     statement: Match = field(metadata=JSONMetadata(serialize=False).as_dict())
@@ -1366,91 +1372,118 @@ class StatementNode(CompositeNodeChoosingItsChild):
     children rather than grounding them itself.
     """
 
-    candidate_limit: int | None = field(default=None, init=False, repr=False)
-    """
-    How many candidates the current run through the statement yields at most, None
-    before the first run.
-    """
-
-    _candidates: Generator[Any, None, None] | None = field(
+    _grounding: StatementsGroundedTogether | None = field(
         default=None, init=False, repr=False
     )
     """
-    The candidates of the statement, open from the first pull until they are exhausted
-    or released by :meth:`stop_grounding`.
+    The latest run through the statement on its own, None before the first.
     """
 
-    _candidates_pulled: int = field(default=0, init=False, repr=False)
+    _combinations: Iterator[dict[StatementNode, Answer]] | None = field(
+        default=None, init=False, repr=False
+    )
     """
-    How many candidates the current run through the statement has yielded.
+    The combinations of :attr:`_grounding`, open from the first pull until they are
+    exhausted or released by :meth:`stop_grounding`.
     """
+
+    latest_variable_values: Bindings = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The values the variables of the statement took for the candidate taken last, keyed
+    by the identifier of each variable; empty before the first.
+    """
+
+    _values_taken_in_this_run: list[Bindings] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """
+    The values the variables of the statement took for each candidate taken since the
+    latest run through the statement ended, which a run starting anew leaves out.
+    """
+
+    _yielded_candidates: WeakSet[StatechartNode] = field(
+        default_factory=WeakSet, init=False, repr=False
+    )
+    """
+    The candidates taken that are still in use, which tell the candidate a chosen child
+    holds apart from the nodes holding it.
+    """
+
+    @property
+    def candidate_limit(self) -> int | None:
+        """
+        :return: How many candidates the latest run through the statement on its own
+            tries at most, None before the first.
+        """
+        if self._grounding is None:
+            return None
+        return self._grounding.candidate_limit
 
     @property
     def reached_candidate_limit(self) -> bool:
         """
-        :return: Whether the last run through the statement stopped because it yielded
-            :attr:`candidate_limit` candidates, which a statement that never ran through
-            its statement did not.
+        :return: Whether the latest run through the statement on its own stopped
+            because it tried :attr:`candidate_limit` candidates, which a statement that
+            never ran through its statement did not.
         """
-        if self.candidate_limit is None:
+        if self._grounding is None:
             return False
-        return self._candidates_pulled >= self.candidate_limit
+        return self._grounding.reached_candidate_limit
 
     def next_candidate(
-        self, *, query_backend: QueryBackend, default_candidate_limit: int
+        self,
+        *,
+        query_backend: QueryBackend,
+        default_candidate_limit: int,
+        requirements: tuple[CombinationRequirement, ...] = (),
     ) -> Any | None:
         """
-        Grounds the statement into its next candidate, against the world as it is now.
+        Grounds the statement on its own into its next candidate that meets
+        `requirements`, against the world as it is now, and takes it.
 
-        The statement is left suspended in between, so the next call resumes where this
-        one stopped.
+        The next call resumes where this one stopped. A run starting anew leaves out the
+        candidates taken since the latest run ended.
 
         :param query_backend: The backend answering the statement.
         :param default_candidate_limit: How many candidates a run through a statement
-            without a limit of its own yields.
+            without a limit of its own tries.
+        :param requirements: What a candidate has to meet, for a run starting anew.
         :return: The next candidate, or None once the statement is exhausted or
-            :attr:`candidate_limit` candidates were yielded.
+            :attr:`candidate_limit` candidates were tried.
         """
-        if self._candidates is None:
-            self._candidates_pulled = 0
-            self.candidate_limit = self.statement._limit_ or default_candidate_limit
-            self._candidates = query_backend.evaluate(expression=self.statement)
-        if self.reached_candidate_limit:
-            self.stop_grounding()
+        if self._combinations is None:
+            self._grounding = StatementsGroundedTogether(
+                statements=[self],
+                query_backend=query_backend,
+                default_candidate_limit=default_candidate_limit,
+                requirements=requirements,
+                excluded_variable_values=list(self._values_taken_in_this_run),
+            )
+            self._combinations = iter(self._grounding)
+        combination = next(self._combinations, None)
+        if combination is None:
+            self._end_run()
             return None
-        candidate = next(self._candidates, None)
-        if candidate is None:
-            self._candidates = None
-            return None
-        self._candidates_pulled += 1
-        return candidate
+        self.take(answer=combination[self])
+        return combination[self].value
 
-    def go_on_after(self, *, read: list[Any], taken: Any) -> None:
+    def take(self, *, answer: Answer) -> None:
         """
-        Lets the next candidates be the others of `read`, in their order, then those
-        beyond them, as if only `taken` had been yielded so far.
+        Remember `answer` as the candidate this node runs next.
 
-        :param read: Candidates the statement yielded last, in their order, `taken`
-            among them.
-        :param taken: The candidate of `read` this node runs.
+        :param answer: A candidate of the statement, with the values its variables took,
+            some of which may belong to the variables of other statements.
         """
-        others = [candidate for candidate in read if candidate is not taken]
-        self._candidates_pulled -= len(others)
-        self._candidates = self._chained(first=others, rest=self._candidates)
-
-    @staticmethod
-    def _chained(
-        *, first: list[Any], rest: Generator[Any, None, None] | None
-    ) -> Generator[Any, None, None]:
-        """
-        :param first: The candidates yielded first.
-        :param rest: The candidates yielded after `first`, none if None.
-        :return: `first`, then `rest`, as a generator, which :meth:`stop_grounding`
-            closes, `rest` with it.
-        """
-        yield from first
-        if rest is not None:
-            yield from rest
+        variable_ids = {variable_._id_ for variable_ in self.statement._variables_read_}
+        self.latest_variable_values = {
+            variable_id: value
+            for variable_id, value in answer.variable_values.items()
+            if variable_id in variable_ids
+        }
+        self._values_taken_in_this_run.append(self.latest_variable_values)
+        self._yielded_candidates.add(answer.value)
 
     def stop_grounding(self) -> None:
         """
@@ -1461,10 +1494,17 @@ class StatementNode(CompositeNodeChoosingItsChild):
         frees whatever the statement only holds to ground candidates with. The next
         :meth:`next_candidate` grounds the statement anew.
         """
-        if self._candidates is None:
-            return
-        self._candidates.close()
-        self._candidates = None
+        if self._combinations is not None:
+            self._combinations.close()
+        self._end_run()
+
+    def _end_run(self) -> None:
+        """
+        Forget the run through the statement, so the next one starts from its first
+        candidate.
+        """
+        self._combinations = None
+        self._values_taken_in_this_run = []
 
     def cleanup(self) -> None:
         self.stop_grounding()
@@ -1472,14 +1512,14 @@ class StatementNode(CompositeNodeChoosingItsChild):
     @property
     def grounded_nodes(self) -> list[StatechartNode]:
         """
-        :return: The node of the statement's type each child chosen so far holds, in
-            the order they were chosen, each found below whatever holds it.
+        :return: The candidate each child chosen so far is or holds, in the order they
+            were chosen, each found below whatever holds it.
         """
         return [
             next(
                 node
                 for node in [child, *child.descendants]
-                if isinstance(node, self.statement._type_)
+                if node in self._yielded_candidates
             )
             for child in self.chosen_children
         ]
@@ -1502,11 +1542,38 @@ class StatementNode(CompositeNodeChoosingItsChild):
 
 
 @dataclass(kw_only=True)
+class StatementCombination:
+    """
+    One candidate of each of several statements grounded together.
+    """
+
+    candidates: list[Any]
+    """
+    The candidate of each statement, in the order of the statements.
+    """
+
+
+@dataclass(kw_only=True)
+class CombinationRequirement(ABC):
+    """
+    What a combination of candidates has to meet besides the statements themselves.
+    """
+
+    @abstractmethod
+    def condition_on(self, *, combination: StatementCombination) -> Any:
+        """
+        :param combination: The variable ranging over the combinations of the candidates
+            of the statements.
+        :return: The condition a combination has to satisfy.
+        """
+
+
+@dataclass(kw_only=True)
 class StatementsGroundedTogether:
     """
-    Grounds several statements into combinations of their candidates, one candidate of
-    each, the combinations of the candidates every statement ranks first coming first,
-    see :class:`~krrood.patterns.cartesian_product.CartesianProductByRankSum`.
+    Grounds several statements as one statement, into combinations of one candidate of
+    each, so a variable several of them use takes one value in each combination, under
+    the values the other statements of their statechart were grounded with last.
     """
 
     statements: list[StatementNode]
@@ -1521,45 +1588,175 @@ class StatementsGroundedTogether:
 
     default_candidate_limit: int
     """
-    How many candidates a statement without a limit of its own yields.
+    How many combinations are tried when no statement has a limit of its own.
     """
 
-    _product: CartesianProductByRankSum = field(init=False, repr=False)
+    requirements: tuple[CombinationRequirement, ...] = ()
     """
-    The cartesian product of the candidates of :attr:`statements`.
+    What every combination has to meet.
     """
 
-    def __post_init__(self) -> None:
-        self._product = CartesianProductByRankSum(
-            factors=[
-                iter(
-                    partial(
-                        statement.next_candidate,
-                        query_backend=self.query_backend,
-                        default_candidate_limit=self.default_candidate_limit,
-                    ),
-                    None,
-                )
-                for statement in self.statements
-            ]
+    excluded_variable_values: list[Bindings] = field(default_factory=list)
+    """
+    Values of the variables of the statements that no combination may take all of again;
+    one holding no value excludes nothing.
+    """
+
+    combinations_tried: int = field(default=0, init=False)
+    """
+    How many combinations were checked against :attr:`requirements` so far.
+    """
+
+    @property
+    def candidate_limit(self) -> int:
+        """
+        :return: How many combinations are tried at most: the most any of the
+            statements tries.
+        """
+        return max(
+            statement.statement._limit_ or self.default_candidate_limit
+            for statement in self.statements
         )
 
-    def __iter__(self) -> Iterator[dict[StatementNode, Any]]:
+    @property
+    def reached_candidate_limit(self) -> bool:
         """
-        :return: The combinations, each holding one candidate of every statement, each
-            statement grounded against the world as it is when a combination first
-            reaches a candidate of it.
+        :return: Whether :attr:`candidate_limit` combinations were tried.
         """
-        for combination in self._product:
-            yield dict(zip(self.statements, combination))
+        return self.combinations_tried >= self.candidate_limit
 
-    def take(self, *, combination: dict[StatementNode, Any]) -> None:
+    def __iter__(self) -> Iterator[dict[StatementNode, Answer]]:
         """
-        Lets every statement go on from the candidates read for the combinations so far
-        that `combination` does not hold, once its candidate of `combination` failed,
-        see :meth:`StatementNode.go_on_after`.
+        :return: The combinations that meet :attr:`requirements`, each holding the
+            answer of every statement, statements whose variables are shared answered
+            alike.
+        """
+        answer_of_combination: dict[int, Answer] = {}
+        combination = variable(
+            StatementCombination,
+            domain=self._answered_combinations(
+                answer_of_combination=answer_of_combination
+            ),
+        )
+        selection = entity(combination)
+        conditions = [
+            requirement.condition_on(combination=combination)
+            for requirement in self.requirements
+        ]
+        if conditions:
+            selection = selection.where(*conditions)
+        for value in selection.evaluate():
+            answer = answer_of_combination.pop(id(value))
+            yield {
+                statement: Answer(
+                    value=candidate, variable_values=answer.variable_values
+                )
+                for statement, candidate in zip(self.statements, value.candidates)
+            }
 
-        :param combination: The combination the statements run.
+    def _answered_combinations(
+        self, *, answer_of_combination: dict[int, Answer]
+    ) -> Iterator[StatementCombination]:
         """
-        for statement, read in zip(self.statements, self._product.read):
-            statement.go_on_after(read=read, taken=combination[statement])
+        :param answer_of_combination: Receives the answer of every combination yielded,
+            keyed by the identity of the combination.
+        :return: The combinations of the candidates of the statements, up to
+            :attr:`candidate_limit` of them, leaving out those
+            :attr:`excluded_variable_values` holds.
+        """
+        for answer in self._answers_of_joint_statement():
+            if self.reached_candidate_limit:
+                return
+            if self._is_excluded(answer=answer):
+                continue
+            self.combinations_tried += 1
+            answer_of_combination[id(answer.value)] = answer
+            yield answer.value
+
+    def _answers_of_joint_statement(self) -> Iterator[Answer]:
+        """
+        :return: The answers of the statement combining :attr:`statements`, under the
+            values the other statements fix; without the values the variables took if
+            :attr:`query_backend` cannot report them, since then no statement fixes any.
+        :raises BackendCannotGroundUnderValuesError: If other statements fix values that
+            :attr:`query_backend` cannot answer under.
+        """
+        variable_values = self._values_fixed_by_other_statements()
+        if isinstance(self.query_backend, EvaluatesUnderBindings):
+            answers = self.query_backend.evaluate_under(
+                expression=self._joint_statement, variable_values=variable_values
+            )
+        elif variable_values:
+            raise BackendCannotGroundUnderValuesError(backend=self.query_backend)
+        else:
+            answers = (
+                Answer(value=value, variable_values={})
+                for value in self.query_backend.evaluate(
+                    expression=self._joint_statement
+                )
+            )
+        if len(self.statements) > 1:
+            return answers
+        return (
+            Answer(
+                value=StatementCombination(candidates=[answer.value]),
+                variable_values=answer.variable_values,
+            )
+            for answer in answers
+        )
+
+    @property
+    def _joint_statement(self) -> Match:
+        """
+        :return: The statement combining :attr:`statements`, or the one statement
+            itself, which a backend answers without having to construct a combination.
+        """
+        if len(self.statements) == 1:
+            return self.statements[0].statement
+        return a(StatementCombination)(
+            candidates=[statement.statement for statement in self.statements]
+        )
+
+    def _is_excluded(self, *, answer: Answer) -> bool:
+        """
+        :param answer: An answer of the joint statement.
+        :return: Whether the variables of the statements took values for `answer` that
+            :attr:`excluded_variable_values` holds already.
+        """
+        return any(
+            excluded
+            and all(
+                variable_id in answer.variable_values
+                and answer.variable_values[variable_id] == value
+                for variable_id, value in excluded.items()
+            )
+            for excluded in self.excluded_variable_values
+        )
+
+    def _values_fixed_by_other_statements(self) -> Bindings:
+        """
+        :return: The values the statements of the statechart outside
+            :attr:`statements` were grounded with last, for the variables
+            :attr:`statements` use, from each statement that chose a child since its
+            latest reset and whose child did not fail.
+        """
+        variable_ids = {
+            variable_._id_
+            for statement in self.statements
+            for variable_ in statement.statement._variables_read_
+        }
+        others = [
+            node
+            for statement in self.statements
+            if statement.belongs_to_statechart()
+            for node in statement.statechart.get_nodes_by_type(node_type=StatementNode)
+            if node not in self.statements
+            and node.latest_child is not None
+            and node.latest_child.life_cycle_state != LifeCycleValue.FAILED
+        ]
+        return {
+            variable_id: value
+            for other in others
+            for variable_id, value in other.latest_variable_values.items()
+            if variable_id in variable_ids
+        }

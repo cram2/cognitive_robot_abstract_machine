@@ -1,3 +1,7 @@
+"""
+The fixed sets of values the Entity Query Language is configured with.
+"""
+
 from __future__ import annotations
 
 import importlib.util
@@ -73,3 +77,20 @@ class ProbabilisticLibrary(StrEnum):
         return tuple(
             library for library in cls if importlib.util.find_spec(library) is None
         )
+
+
+class CombinationOrder(Enum):
+    """
+    The order a generative backend combines the values of the variables of a match in.
+    """
+
+    NESTED = auto()
+    """
+    Each variable takes every value of its domain before the variable enumerated before
+    it moves on to its next value.
+    """
+    RANK_SUM = auto()
+    """
+    The combinations whose values come early in the order of their own variables come
+    first, so no variable takes a late value before every variable took its early ones.
+    """

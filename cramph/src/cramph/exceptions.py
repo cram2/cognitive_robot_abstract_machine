@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from cramph.context import ContextExtension
     from cramph.data_types import TransitionKind
     from cramph.node import NodeStateVariable, StatechartNode, TransitionCondition
+    from krrood.entity_query_language.backends import QueryBackend
 
 
 @dataclass(kw_only=True)
@@ -1068,4 +1069,32 @@ class RvizUnavailableError(DataclassException):
     def suggest_correction(self) -> str:
         return (
             "Source a ROS installation, or show the world with another visualization."
+        )
+
+
+# %% grounding statements
+
+
+@dataclass(kw_only=True)
+class BackendCannotGroundUnderValuesError(StatechartError):
+    """
+    Raised when statements are to be grounded by a backend that cannot answer a
+    statement under values given for some of its variables.
+    """
+
+    backend: QueryBackend
+    """
+    The backend the statements were to be grounded by.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.backend).__name__} cannot ground statements under the values "
+            f"other statements were grounded with."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Ground the statements with a backend that evaluates under bindings, such as "
+            "the EntityQueryLanguageGenerativeBackend."
         )

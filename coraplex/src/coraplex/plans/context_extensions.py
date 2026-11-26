@@ -1,9 +1,15 @@
+"""
+The context extensions a plan runs with: the robot performing it and how its statements
+are grounded.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 
 from cramph.context import ContextExtension
+from krrood.entity_query_language.enums import CombinationOrder
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
     QueryBackend,
@@ -51,13 +57,16 @@ class StatementGrounding(ContextExtension):
     """
 
     query_backend: QueryBackend = field(
-        default_factory=EntityQueryLanguageGenerativeBackend
+        default_factory=lambda: EntityQueryLanguageGenerativeBackend(
+            combination_order=CombinationOrder.RANK_SUM
+        )
     )
     """
     The backend answering the underspecified statements.
 
     Defaults to the deterministic generative backend, since underspecified actions are
-    constructed (generated).
+    constructed (generated), combining the values of their variables by rank sum, so
+    statements grounded together each try their early candidates first.
     """
 
     candidates_to_try: int = 50
