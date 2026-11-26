@@ -16,6 +16,7 @@ import jax
 import numpy as np
 import optax
 import pandas as pd
+from typing_extensions import Self
 from krrood_compute_resources.devices import Device
 from krrood_compute_resources.jax_memory import JaxDeviceMemory
 from krrood_compute_resources.memory import BudgetedMemory, DeviceMemory, HostMemory
@@ -31,9 +32,11 @@ from probabilistic_model.learning.parameters.expectation_maximization.expectatio
     ExpectationMaximization,
     ExpectationMaximizationTraining,
     LearnableUnits,
+    MaximizationRegularization,
 )
 from probabilistic_model.learning.parameters.circuit_parameter_learning import (
     CircuitParameterLearning,
+    TrainingRun,
 )
 from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
     AverageNegativeLogLikelihood,
@@ -43,6 +46,9 @@ from probabilistic_model.learning.parameters.expectation_maximization.jax_expect
 )
 from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
     JaxGradientDescent,
+)
+from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu_tree import (
+    HiddenChowLiuTree,
 )
 from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.structure.jpt.variables import (
@@ -87,6 +93,7 @@ class LearningMethod(StrEnum):
         "RAT-SPN, online expectation maximization"
     )
     JOINT_PROBABILITY_TREE = "joint probability tree"
+    HIDDEN_CHOW_LIU_TREE = "hidden Chow-Liu tree"
 
 
 # %% training context
@@ -165,6 +172,100 @@ class TrainingContext:
             memory=self.device_memory(setting=setting), step_memory=step_memory
         ).batch_size
         return min(batch_size, len(rows))
+
+    def train_until_converged(
+        self,
+        *,
+        learner: CircuitParameterLearning,
+        circuit: LayeredProbabilisticCircuit,
+        setting: ComputationSetting,
+        rows: np.ndarray,
+        most_rows_per_step: int,
+        seed: int,
+    ) -> TrainingRun:
+        """
+        :param learner: The learner of the circuit's root.
+        :param circuit: The circuit placed as the setting says.
+        :param setting: The setting that trains.
+        :param rows: The training rows, as the datasets encode them.
+        :param most_rows_per_step: The most rows a step may train on.
+        :param seed: The seed of the order of the rows.
+        :return: The run of shuffled mini-batches until :attr:`convergence` stops it.
+        """
+        mini_batches = MiniBatches(
+            batch_size=learner.largest_even_batch_size(rows=most_rows_per_step),
+            seed=seed,
+        )
+        return learner.minimize_until_converged(
+            setting.asarray(rows=circuit.encoded(rows)),
+            convergence=self.convergence,
+            mini_batches=mini_batches,
+        )
+
+
+# %% expectation maximization phases
+
+
+@dataclass(kw_only=True)
+class ExpectationMaximizationPhase:
+    """
+    Tensorized expectation maximization with one schedule of updates, trained until the
+    training context's convergence stops it.
+    """
+
+    batch_size: int | None = None
+    """
+    The most rows per step, fewer if they do not fit in memory; as many as fit if
+    ``None``.
+    """
+
+    batches_per_update: int | None = None
+    """
+    The batches after which the parameters are updated, once per epoch if ``None``.
+    """
+
+    step_size: float = 1.0
+    """
+    The share of the way to the maximizing parameters that an update moves.
+    """
+
+    regularization: MaximizationRegularization = field(
+        default_factory=MaximizationRegularization
+    )
+    """
+    The regularization of the maximizing parameters.
+    """
+
+    @classmethod
+    def mini_batch(cls) -> Self:
+        """
+        :return: The mini-batch expectation maximization of :cite:`peharz2020einsum`: a
+            step of a tenth of the way after every batch of 512 rows.
+        """
+        return cls(batch_size=512, batches_per_update=1, step_size=0.1)
+
+    def learner(
+        self, *, root: Layer, setting: ComputationSetting
+    ) -> CircuitParameterLearning:
+        """
+        :param root: The root of the circuit placed as the setting says.
+        :param setting: The setting that trains, with jax or torch arrays.
+        :return: The expectation maximization of the setting's array library.
+        """
+        if setting.array_library is ArrayLibrary.TORCH:
+            return TorchExpectationMaximization(
+                layer=root,
+                batches_per_update=self.batches_per_update,
+                step_size=self.step_size,
+                regularization=self.regularization,
+                records_cuda_graphs=True,
+            )
+        return JaxExpectationMaximization(
+            layer=root,
+            batches_per_update=self.batches_per_update,
+            step_size=self.step_size,
+            regularization=self.regularization,
+        )
 
 
 # %% methods
@@ -298,20 +399,16 @@ class RandomTensorizedSumProductNetworkByMiniBatches(
         host = self.random_circuit(dataset=dataset)
         rows = dataset.encoded(frame=dataset.train)
         circuit = setting.placed(circuit=host)
-        learner = self.learner(root=circuit.root, setting=setting)
-        mini_batches = MiniBatches(
-            batch_size=learner.largest_even_batch_size(
-                rows=min(
-                    self.batch_size,
-                    context.rows_per_step(circuit=host, setting=setting, rows=rows),
-                )
+        run = context.train_until_converged(
+            learner=self.learner(root=circuit.root, setting=setting),
+            circuit=circuit,
+            setting=setting,
+            rows=rows,
+            most_rows_per_step=min(
+                self.batch_size,
+                context.rows_per_step(circuit=host, setting=setting, rows=rows),
             ),
             seed=self.seed,
-        )
-        run = learner.minimize_until_converged(
-            setting.asarray(rows=circuit.encoded(rows)),
-            convergence=context.convergence,
-            mini_batches=mini_batches,
         )
         circuit.root = run.trained_root
         return LearnedCircuit(circuit=circuit, history=run.history)
@@ -409,20 +506,11 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
     def learner(
         self, *, root: Layer, setting: ComputationSetting
     ) -> CircuitParameterLearning:
-        if setting.array_library is ArrayLibrary.TORCH:
-            return TorchExpectationMaximization(
-                layer=root,
-                batches_per_update=self.batches_per_update,
-                step_size=self.step_size,
-                regularization=self.expectation_maximization.regularization,
-                records_cuda_graphs=True,
-            )
-        return JaxExpectationMaximization(
-            layer=root,
+        return ExpectationMaximizationPhase(
             batches_per_update=self.batches_per_update,
             step_size=self.step_size,
             regularization=self.expectation_maximization.regularization,
-        )
+        ).learner(root=root, setting=setting)
 
     def learn(
         self,
@@ -539,6 +627,71 @@ class JointProbabilityTreeBaseline(BenchmarkMethod):
         )
 
 
+@dataclass(kw_only=True)
+class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
+    """
+    A hidden Chow-Liu tree circuit :cite:`liu2021tractable` trained by mini-batch and
+    then full-batch expectation maximization, each phase until the training loss
+    converges.
+    """
+
+    hidden_states: int = 12
+    """
+    The number of states of every latent variable.
+    """
+
+    phases: list[ExpectationMaximizationPhase] = field(
+        default_factory=lambda: [
+            ExpectationMaximizationPhase.mini_batch(),
+            ExpectationMaximizationPhase(),
+        ]
+    )
+    """
+    The phases of training, in order.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.HIDDEN_CHOW_LIU_TREE
+
+    def settings(self) -> list[ComputationSetting]:
+        return ComputationSetting.grid(
+            array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
+        )
+
+    def learn(
+        self,
+        *,
+        dataset: BenchmarkDataset,
+        setting: ComputationSetting,
+        context: TrainingContext,
+    ) -> LearnedCircuit:
+        rows = dataset.encoded(frame=dataset.train)
+        host = HiddenChowLiuTree(
+            variables=dataset.variables,
+            hidden_states=self.hidden_states,
+            seed=self.seed,
+        ).build_circuit(data=rows)
+        circuit = setting.placed(circuit=host)
+        rows_per_step = context.rows_per_step(circuit=host, setting=setting, rows=rows)
+        histories = []
+        for phase in self.phases:
+            run = context.train_until_converged(
+                learner=phase.learner(root=circuit.root, setting=setting),
+                circuit=circuit,
+                setting=setting,
+                rows=rows,
+                most_rows_per_step=min(phase.batch_size or len(rows), rows_per_step),
+                seed=self.seed,
+            )
+            circuit.root = run.trained_root
+            histories.append(run.history)
+        return LearnedCircuit(
+            circuit=circuit,
+            history=ConvergenceHistory.from_consecutive(histories=histories),
+        )
+
+
 # %% all methods
 
 
@@ -554,6 +707,7 @@ class BenchmarkMethods:
             RandomTensorizedSumProductNetworkByExpectationMaximization(),
             RandomTensorizedSumProductNetworkByOnlineExpectationMaximization(),
             JointProbabilityTreeBaseline(),
+            HiddenChowLiuTreeByExpectationMaximization(),
         ]
     )
     """
