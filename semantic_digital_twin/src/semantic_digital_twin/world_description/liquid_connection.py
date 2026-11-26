@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+from typing_extensions import TYPE_CHECKING, Self
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.patterns.called_positionally import called_positionally
@@ -17,16 +18,23 @@ from krrood.symbolic_math.symbolic_math import (
     Scalar,
     VariableParameters,
 )
-from semantic_digital_twin.world_description.connections import (
-    HasUpdateState,
-    PrismaticConnection,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.world_description.connections import HasUpdateState
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
+    DegreeOfFreedomLimits,
 )
 from semantic_digital_twin.world_description.exceptions import (
     MissingFillLevelLimitsError,
 )
+from semantic_digital_twin.world_description.world_entity import (
+    Connection,
+    KinematicStructureEntity,
+)
+
+if TYPE_CHECKING:
+    from semantic_digital_twin.world import World
 
 # %% fill-level source
 
@@ -89,11 +97,17 @@ class CompiledFillVelocity:
 
 
 @dataclass(eq=False, kw_only=True)
-class LiquidConnection(PrismaticConnection, HasUpdateState):
+class LiquidConnection(Connection, HasUpdateState):
     """
-    Prismatic connection whose passive degree of freedom is a container's normalized
-    fill level, integrated each physics step from the fill velocity of the
-    :class:`FillLevelSource` it belongs to; the QP never commands it.
+    Connection whose passive degree of freedom is a container's normalized fill level,
+    integrated each physics step from the fill velocity of the
+    :class:`FillLevelSource` it belongs to; the QP never commands it and it does not
+    move its child.
+    """
+
+    fill_dof: DegreeOfFreedom
+    """
+    The normalized fill level, limited to ``[0, 1]``.
     """
 
     compiled_fill_velocity: CompiledFillVelocity | None = field(
@@ -104,20 +118,68 @@ class LiquidConnection(PrismaticConnection, HasUpdateState):
     model changes.
     """
 
-    @property
-    def active_dofs(self) -> list[DegreeOfFreedom]:
+    @classmethod
+    def create_with_dofs(
+        cls,
+        *,
+        world: World,
+        parent: KinematicStructureEntity,
+        child: KinematicStructureEntity,
+        name: PrefixedName | None = None,
+        parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+        connection_T_child_expression: HomogeneousTransformationMatrix | None = None,
+        dof_limits: DegreeOfFreedomLimits,
+    ) -> Self:
         """
-        :return: Empty list, so the QP solver cannot command the fill velocity directly.
+        Creates a liquid connection with its fill degree of freedom added to ``world``.
+
+        :param world: The world in which to add the degree of freedom.
+        :param parent: The container's root.
+        :param child: The body standing for the liquid.
+        :param name: Name of the connection; generated from parent and child if
+            ``None``.
+        :param parent_T_connection_expression: Constant pose of the connection relative
+            to its parent.
+        :param connection_T_child_expression: Constant pose of the child relative to the
+            connection.
+        :param dof_limits: Limits of the fill degree of freedom.
         """
-        return []
+        name = name or cls._generate_default_name(parent=parent, child=child)
+        fill_dof = DegreeOfFreedom(
+            name=PrefixedName("fill_level", str(name)), limits=dof_limits
+        )
+        world.add_degree_of_freedom(fill_dof)
+        return cls(
+            name=name,
+            parent=parent,
+            child=child,
+            parent_T_connection_expression=parent_T_connection_expression,
+            connection_T_child_expression=connection_T_child_expression,
+            fill_dof=fill_dof,
+        )
 
     @property
     def passive_dofs(self) -> list[DegreeOfFreedom]:
         """
-        :return: The fill-level degree of freedom, which stays in the world state and
-            forward kinematics without being a QP variable.
+        :return: The fill degree of freedom, which stays in the world state without
+            being a QP variable.
         """
-        return [self.raw_dof]
+        return [self.fill_dof]
+
+    @property
+    def fill_level(self) -> float:
+        """
+        The current normalized fill level.
+        """
+        return self._world.state[self.fill_dof.id].position
+
+    @fill_level.setter
+    def fill_level(self, value: float) -> None:
+        """
+        :param value: The normalized fill level to set.
+        """
+        self._world.state[self.fill_dof.id].position = value
+        self._world.notify_state_change()
 
     def symbolic_fill_velocity(self) -> Scalar:
         """
@@ -159,12 +221,12 @@ class LiquidConnection(PrismaticConnection, HasUpdateState):
         :raises MissingFillLevelLimitsError: If the fill degree of freedom has no
             position limits to clamp to.
         """
-        limits = self.raw_dof.limits
+        limits = self.fill_dof.limits
         if limits.lower.position is None or limits.upper.position is None:
             raise MissingFillLevelLimitsError(connection_name=self.name)
         state = self._world.state
         velocity = self.current_compiled_fill_velocity().evaluate()
-        integrated_position = state[self.raw_dof.id].position + velocity * dt
-        state[self.raw_dof.id].position = min(
+        integrated_position = state[self.fill_dof.id].position + velocity * dt
+        state[self.fill_dof.id].position = min(
             max(integrated_position, limits.lower.position), limits.upper.position
         )

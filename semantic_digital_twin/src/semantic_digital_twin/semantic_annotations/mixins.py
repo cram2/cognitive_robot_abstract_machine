@@ -104,7 +104,6 @@ from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
 import krrood.symbolic_math.symbolic_math as sm
-from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.physics.equations.pouring_equations import PouringEquation
 from semantic_digital_twin.semantic_annotations.exceptions import (
     FillLevelAlreadyInitializedError,
@@ -1667,7 +1666,7 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
         """
         Current fill level in ``[0, 1]``.
         """
-        return float(self.fill_connection.position)
+        return float(self.fill_connection.fill_level)
 
     @property
     def fill_position(self) -> sm.Scalar:
@@ -1675,7 +1674,7 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
         Symbolic normalized fill level, the position of the fill-level degree of
         freedom.
         """
-        return self.fill_connection.dof.variables.position
+        return self.fill_connection.fill_dof.variables.position
 
     @property
     def tilt(self) -> sm.Scalar:
@@ -1768,7 +1767,6 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
                 world=world,
                 parent=self.root,
                 child=fill_level_body,
-                axis=Vector3.Z(),
                 dof_limits=DegreeOfFreedomLimits(
                     lower=DerivativeMap(position=0.0, velocity=-1.0),
                     upper=DerivativeMap(position=1.0, velocity=1.0),
@@ -1782,8 +1780,7 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
                     repose_angle=repose_angle,
                 )
             )
-        with world.modify_world():
-            JointState.from_mapping({connection: initial_fill}).apply_to(world)
+        connection.fill_level = initial_fill
 
     # %% liquid transfer
 

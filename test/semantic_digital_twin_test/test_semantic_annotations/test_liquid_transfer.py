@@ -27,9 +27,10 @@ from semantic_digital_twin.physics.equations.pouring_equations import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -108,8 +109,8 @@ def _add_container(
             name=name,
             world=world,
             world_root_T_self=world_root_T_self,
-            parent_connection_specification=RevoluteConnectionSpecification(
-                axis=axis,
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=axis),
                 dof_limits=DegreeOfFreedomLimits(
                     lower=DerivativeMap(position=-2.0, velocity=-1.0),
                     upper=DerivativeMap(position=2.0, velocity=1.0),
