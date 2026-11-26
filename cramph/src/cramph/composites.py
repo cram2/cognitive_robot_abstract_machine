@@ -12,7 +12,6 @@ from itertools import combinations, takewhile
 
 from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
 
-from krrood.adapters.json_serializer import JSONField
 from krrood.entity_query_language.backends import QueryBackend
 from krrood.entity_query_language.query.match import Match
 from krrood.patterns.classproperty import classproperty
@@ -20,7 +19,6 @@ from krrood.patterns.cartesian_product import CartesianProductByRankSum
 from krrood.patterns.field_metadata import JSONMetadata
 from krrood.patterns.specificity_ranking import mro_depth, sole_maximum
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
-from krrood.utils import get_full_class_name
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue, FailsOnObservingFalse
 from cramph.context import ContextExtension
 from cramph.data_types import (
@@ -1476,15 +1474,13 @@ class StatementNode(CompositeNodeChoosingItsChild):
             for child in self.chosen_children
         ]
 
-    def to_json(self, **kwargs: Any) -> dict[str, Any]:
+    @classproperty
+    def deserialized_type(cls) -> type[CompositeNodeChoosingItsChild]:
         """
-        :return: The JSON representation of the node choosing its child that this is,
-            since the statement is not sent.
+        :return: The node choosing its child that this is, since the statement is not
+            sent, see :meth:`~cramph.node.StatechartNode.deserialized_type`.
         """
-        return {
-            **super().to_json(**kwargs),
-            JSONField.TYPE: get_full_class_name(CompositeNodeChoosingItsChild),
-        }
+        return CompositeNodeChoosingItsChild
 
     def __repr__(self) -> str:
         return f"{self.statement._type_.__name__}"

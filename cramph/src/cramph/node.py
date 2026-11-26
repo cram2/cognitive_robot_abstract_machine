@@ -56,6 +56,7 @@ from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracke
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
+    JSONField,
     SubclassJSONSerializer,
     from_json,
 )
@@ -68,6 +69,7 @@ from krrood.symbolic_math.symbolic_math import (
     GenericSymbolicType,
     Scalar,
 )
+from krrood.utils import get_full_class_name
 from cramph.structure_change_recorder import (
     StructureChangeRecorder,
     StructureChangeRecorderOutsideStatechart,
@@ -1224,12 +1226,14 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         }
         document = {
             **DataclassJSONSerializer.to_json(instance=self, **kwargs),
+            JSONField.TYPE: get_full_class_name(self.deserialized_type),
             **identification,
         }
         if self.ticking_framework is None:
             return document
         stand_in = self.stand_in_type(name=self.name)
         stand_in.plot_specifications = deepcopy(self.plot_specifications)
+        stand_in.parent_node_index = self.parent_node_index
         return {
             **DataclassJSONSerializer.to_json(instance=stand_in, **kwargs),
             **identification,
@@ -1629,6 +1633,13 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
             that holds them all.
         """
         return ()
+
+    @classproperty
+    def deserialized_type(cls) -> type[StatechartNode]:
+        """
+        :return: The class a reader builds from the document of a node of this class.
+        """
+        return cls
 
     @classproperty
     def stand_in_type(cls) -> type[StatechartNode]:

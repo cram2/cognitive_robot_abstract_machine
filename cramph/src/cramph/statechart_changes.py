@@ -385,12 +385,9 @@ class ChildrenChange(ChangeNamingChildren):
 @dataclass(kw_only=True)
 class ChosenChildrenChange(ChangeNamingChildren):
     """
-    A node choosing its child has chosen :attr:`children`, in that order.
-    """
-
-    node: CompositeNodeChoosingItsChild
-    """
-    The node whose chosen children changed.
+    A node choosing its child has chosen :attr:`children`, in that order. A framework
+    reading a stand-in for that node, see :class:`~cramph.node.ReadingFramework`,
+    leaves the stand-in as it is, since a stand-in chooses nothing.
     """
 
     @classproperty
@@ -405,6 +402,8 @@ class ChosenChildrenChange(ChangeNamingChildren):
         return False
 
     def apply(self, *, statechart: Statechart) -> None:
+        if not isinstance(self.node, CompositeNodeChoosingItsChild):
+            return
         self.node.restore_chosen_children(children=self.children)
 
 

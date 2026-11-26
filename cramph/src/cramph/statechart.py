@@ -1175,7 +1175,11 @@ class Statechart(SubclassJSONSerializer):
         for node_index, child_indices in data[
             StatechartJSONKey.CHOSEN_CHILDREN
         ].items():
-            self.get_node_by_index(index=int(node_index)).restore_chosen_children(
+            choosing_node = self.get_node_by_index(index=int(node_index))
+            # a stand-in for a node another framework ticks chooses nothing
+            if not isinstance(choosing_node, CompositeNodeChoosingItsChild):
+                continue
+            choosing_node.restore_chosen_children(
                 children=[
                     self.get_node_by_index(index=child_index)
                     for child_index in child_indices

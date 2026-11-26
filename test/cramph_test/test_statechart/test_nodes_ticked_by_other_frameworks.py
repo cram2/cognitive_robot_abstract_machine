@@ -10,6 +10,7 @@ from enum import StrEnum
 
 from typing_extensions import Any
 
+from cramph.composites import CompositeNodeChoosingItsChild, StatementNode
 from cramph.context import StatechartContext
 from cramph.data_types import ObservationStateValue, TransitionKind
 from cramph.node import (
@@ -21,12 +22,15 @@ from cramph.node import (
 )
 from cramph.nodes_for_testing import (
     CompositeNodeWithChainedChildren,
+    ConstTrueNode,
     NodeObservingTheOppositeOfAnObservationPredicate,
     NodeSucceedingOnObservingTrue,
 )
 from cramph.statechart import Statechart
 from krrood.adapters.json_field import JSONField
 from krrood.adapters.json_serializer import from_json, to_json
+from krrood.entity_query_language.factories import a, variable
+from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.world import World
 
 # %% mimics
@@ -102,6 +106,41 @@ def empty_statechart() -> Statechart:
     :return: A statechart without nodes, in a context of its own.
     """
     return Statechart(context=StatechartContext(world=World()))
+
+
+def read_statechart(*, statechart: Statechart, framework: Framework) -> Statechart:
+    """
+    :return: `statechart` as `framework` reads it from another process.
+    """
+    return Statechart.from_json(
+        data=through_json_string(document=statechart.to_json()),
+        context=StatechartContext(world=World()),
+        **reading_kwargs(framework=framework),
+    )
+
+
+def statechart_with_a_perception_node_that_chose_its_child() -> Statechart:
+    """
+    :return: A statechart holding a node the perception framework ticks, which chose
+        one child.
+    """
+    statechart = empty_statechart()
+    choosing = CompositeNodeChoosingItsChild(
+        name="choose a view", ticking_framework=Framework.PERCEPTION
+    )
+    statechart.add_node(node=choosing)
+    with statechart.modify():
+        choosing.adopt_chosen_child(child=ConstTrueNode(name="look left"))
+    return statechart
+
+
+def statement_of_one_node() -> Match[NodeSucceedingOnObservingTrue]:
+    """
+    :return: A statement with a single candidate.
+    """
+    return a(NodeSucceedingOnObservingTrue)(
+        name=variable(str, domain=["look"]), observation=ObservationStateValue.TRUE
+    )
 
 
 # %% a single node
@@ -201,6 +240,20 @@ def test_a_reader_naming_no_framework_reads_a_stand_in() -> None:
     assert type(read) is StructureCopyNode
 
 
+def test_a_stand_in_child_keeps_its_parent() -> None:
+    """
+    A stand-in is a child of the node its node is a child of, not a top level node.
+    """
+    statechart = empty_statechart()
+    parent = CompositeNodeWithChainedChildren(name="search the shelf")
+    statechart.add_node(node=parent)
+    parent.children[0].ticking_framework = Framework.PERCEPTION
+    read_parent, read_stand_in, _ = read_statechart(
+        statechart=statechart, framework=Framework.MOTION
+    ).nodes
+    assert read_stand_in.parent_node is read_parent
+
+
 # %% a statechart
 
 
@@ -271,3 +324,78 @@ def test_a_node_referring_to_a_node_another_framework_ticks_refers_to_its_stand_
     )
     read_watching, read_looking = read.nodes
     assert read_watching.watched_node is read_looking
+
+
+# %% a node choosing its child
+
+
+def test_a_node_choosing_its_child_another_framework_ticks_is_read_as_a_stand_in() -> (
+    None
+):
+    """
+    The chosen children of a node another framework ticks are not restored on its
+    stand-in, which chooses nothing.
+    """
+    read = read_statechart(
+        statechart=statechart_with_a_perception_node_that_chose_its_child(),
+        framework=Framework.MOTION,
+    )
+    assert [type(node) for node in read.nodes] == [
+        StructureCopyCompositeNode,
+        ConstTrueNode,
+    ]
+
+
+def test_a_node_choosing_its_child_joins_through_a_change_block_as_a_stand_in() -> None:
+    """
+    Change blocks naming the chosen children of a stand-in apply too.
+    """
+    sender = statechart_with_a_perception_node_that_chose_its_child()
+    receiver = empty_statechart()
+    for block in sender.structure_change_recorder.change_blocks:
+        receiver.apply_change_block_from_json(
+            data=through_json_string(document=block.to_json()),
+            **reading_kwargs(framework=Framework.MOTION),
+        )
+    assert [type(node) for node in receiver.nodes] == [
+        StructureCopyCompositeNode,
+        ConstTrueNode,
+    ]
+
+
+def test_a_node_choosing_its_child_the_reading_framework_ticks_keeps_its_choice() -> (
+    None
+):
+    """
+    The framework ticking a node choosing its child gets the children it chose.
+    """
+    read_choosing, read_child = read_statechart(
+        statechart=statechart_with_a_perception_node_that_chose_its_child(),
+        framework=Framework.PERCEPTION,
+    ).nodes
+    assert read_choosing.chosen_children == [read_child]
+
+
+def test_a_statement_another_framework_ticks_is_read_as_a_stand_in() -> None:
+    """
+    A framework not ticking a statement neither grounds it nor chooses its children.
+    """
+    node = StatementNode(
+        statement=statement_of_one_node(), ticking_framework=Framework.PERCEPTION
+    )
+    read = read_node(node=node, framework=Framework.MOTION)
+    assert type(read) is StructureCopyCompositeNode
+
+
+def test_a_statement_the_reading_framework_ticks_is_read_as_a_node_choosing_its_child() -> (
+    None
+):
+    """
+    The framework ticking a statement receives the children it chose rather than the
+    statement, as it does for a statement no framework ticks.
+    """
+    node = StatementNode(
+        statement=statement_of_one_node(), ticking_framework=Framework.PERCEPTION
+    )
+    read = read_node(node=node, framework=Framework.PERCEPTION)
+    assert type(read) is CompositeNodeChoosingItsChild
