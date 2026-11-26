@@ -69,7 +69,10 @@ All of this is asked as a query over the joints, so a rule reads as the shape it
 ```{code-cell} ipython3
 from krrood.entity_query_language.factories import entity, inference, variable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
-from semantic_digital_twin.world_description.connections import ActiveConnection, FixedConnection
+from semantic_digital_twin.world_description.connections import (
+    ActiveConnection,
+    FixedConnection,
+)
 
 # A handle is a body fixed to a part that an active joint moves.
 mount = variable(FixedConnection, kitchen_world.connections)
@@ -102,7 +105,7 @@ every annotation of that type. To change what the reasoner infers, edit that fun
 from krrood.entity_query_language.factories import entity, inference, variable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from typing_extensions import List
 
 
@@ -110,10 +113,13 @@ def drawers(world: World) -> List[Drawer]:
     """
     Every body a slider pulls straight out of a container.
     """
-    slider = variable(PrismaticConnection, world.connections)
+    slider = variable(ScrewAxisConnection, world.connections)
     return (
         entity(inference(Drawer)(root=slider.child))
-        .where(slider.child.has_collision())
+        .where(
+            slider.behaves_like_a_prismatic_connection,
+            slider.child.has_collision(),
+        )
         .tolist()
     )
 ```

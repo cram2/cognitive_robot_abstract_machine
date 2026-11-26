@@ -69,7 +69,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 
 world = World.create_with_root_body()
@@ -278,21 +278,19 @@ parameters that family needs:
 |---|---|---|
 | `FixedConnectionSpecification` | `FixedConnection` | A constant relative pose (the default) |
 | `Connection6DoFSpecification` | `Connection6DoF` | A free-floating object that may move and rotate freely |
-| `PrismaticConnectionSpecification` | `PrismaticConnection` | One translational DoF (a sliding drawer) |
-| `RevoluteConnectionSpecification` | `RevoluteConnection` | One rotational DoF (a swinging door) |
-| `ScrewConnectionSpecification` | `ScrewConnection` | One DoF coupling rotation and translation (a bottle cap on its thread) |
+| `ScrewAxisConnectionSpecification` | `ScrewAxisConnection` | One DoF that rotates about and/or translates along an axis: a swinging door, a sliding drawer, or a bottle cap on its thread |
 
 Every entity specification carries an optional `connection_specification`; when it is left unset,
 `spawn` attaches the entity with a fixed connection. Set it to give the entity a degree of freedom.
-The active families (`Prismatic`/`Revolute`/`Screw`) require a movement `axis`, and optionally accept a
-`multiplier`, an `offset`, and `dof_limits`. A `ScrewConnectionSpecification` additionally requires a
-`screw_pitch`: the distance between adjacent threads along the axis, which is what couples its
-rotation to its translation.
+A `ScrewAxisConnectionSpecification` requires a `screw_axis`, and optionally accepts a `multiplier`, an
+`offset`, and `dof_limits`. The `screw_axis` is a `ScrewAxis`: how far the child rotates and translates
+per unit of position. `ScrewAxisConnection.create_revolute_screw_axis(axis=axis)` builds the screw axis of a
+revolute connection, `create_prismatic_screw_axis(axis=axis)` that of a prismatic connection, and
+`create_helical_screw_axis(axis=axis, pitch=pitch)` that of a helical one, such as a thread.
+[Screw axis connections](screw_axis_connections.md) explains the screw axis and these connections.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-)
+from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from krrood_spatial_math.spatial_types import Vector3
 
 world = World.create_with_root_body()
@@ -300,17 +298,18 @@ world = World.create_with_root_body()
 drawer = BodySpecification.box(
     name="drawer",
     scale=Scale(0.4, 0.5, 0.2),
-    connection_specification=PrismaticConnectionSpecification(axis=Vector3.Z()),
+    connection_specification=ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.Z())
+    ),
 ).spawn(world)
 
-assert isinstance(drawer.parent_connection, PrismaticConnection)
+assert drawer.parent_connection.behaves_like_a_prismatic_connection
 print("Drawer is attached by a", type(drawer.parent_connection).__name__)
 ```
 
 ```{warning}
-An active connection without an axis is rejected at spawn time. Spawning a
-`PrismaticConnectionSpecification()` (no axis) raises `MissingConnectionAxisError`, because the
-connection cannot generate its degree of freedom without one.
+An active connection has no meaningful default motion, so a `ScrewAxisConnectionSpecification` without a
+`screw_axis` cannot be constructed.
 ```
 
 (connecting-existing-entities)=
@@ -325,9 +324,7 @@ This pairs naturally with `to_domain_object`, which materializes a free-standing
 attaching it anywhere.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.specifications.connections import (
-    FixedConnectionSpecification,
-)
+from semantic_digital_twin.specifications.connections import FixedConnectionSpecification
 
 world = World.create_with_root_body()
 
@@ -403,12 +400,14 @@ drawer = SemanticAnnotationWithRootSpecification(
     root_specification=BodySpecification.box(
         "drawer",
         Scale(0.4, 0.5, 0.2),
-        connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
+        connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X())
+        ),
     ),
 ).spawn(world)
 
 assert drawer.movable_joint is drawer.root.parent_connection
-assert isinstance(drawer.movable_joint, PrismaticConnection)
+assert drawer.movable_joint.behaves_like_a_prismatic_connection
 print("The drawer slides on a", type(drawer.movable_joint).__name__)
 ```
 
@@ -571,11 +570,9 @@ the door hangs on a single revolute connection without a body for the hinge. `pa
 stays the pose of the door itself while the hinge is at its zero position.
 
 ```{code-cell} ipython3
-from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
-)
+from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Door
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 
 world = World.create_with_root_body()
 
@@ -583,11 +580,12 @@ hinge_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
 door = Door.get_annotation_specification(
     "door",
     Door.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.03, 1, 2)),
-    parent_connection_specification=RevoluteConnectionSpecification(
-        axis=Vector3.Z(), connection_T_child=hinge_T_door
+    parent_connection_specification=ScrewAxisConnectionSpecification(
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        connection_T_child=hinge_T_door,
     ),
 ).spawn(world)
-assert isinstance(door.movable_joint, RevoluteConnection)
+assert door.movable_joint.behaves_like_a_revolute_connection
 
 door.movable_joint.position = np.pi / 2
 world.notify_state_change()

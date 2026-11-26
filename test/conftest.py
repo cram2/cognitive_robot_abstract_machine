@@ -16,7 +16,7 @@ import pytest
 from semantic_digital_twin.specifications.connections import (
     ConnectionSpecification,
     ActiveConnection1DOFSpecification,
-    PrismaticConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from semantic_digital_twin.callbacks.callback import Callback
@@ -124,7 +124,7 @@ from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     FixedConnection,
     Connection6DoF,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.geometry import (
     Box,
@@ -276,8 +276,11 @@ def mini_world() -> World:
     with world.modify_world():
         body = Body(name=PrefixedName("root"))
         body2 = Body(name=PrefixedName("tip"))
-        connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=body, child=body2, axis=Vector3.Z()
+        connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=body,
+            child=body2,
         )
         world.add_connection(connection)
     return world
@@ -390,10 +393,12 @@ def self_collision_bot_world():
         )
 
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=robot,
                 child=l_shoulder,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2, y=0.2
                 ),
@@ -401,10 +406,12 @@ def self_collision_bot_world():
             )
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=l_shoulder,
                 child=l_tip,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2
                 ),
@@ -422,10 +429,12 @@ def self_collision_bot_world():
         )
 
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=robot,
                 child=r_shoulder,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2,
                     y=-0.2,
@@ -434,10 +443,12 @@ def self_collision_bot_world():
             )
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=r_shoulder,
                 child=r_tip,
-                axis=Vector3.Z(),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.2
                 ),
@@ -730,8 +741,10 @@ def _elevator_world_setup():
             Elevator.get_default_root_kinematic_structure_entity_specification(
                 scale=Scale(2, 2, 2), wall_thickness=0.05
             ),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.Z(),
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1.0
                 ),
@@ -748,8 +761,10 @@ def _elevator_world_setup():
                     Point3(-scale.x / 2, door_y, 0),
                     reference_frame=world.root,
                 ),
-                parent_connection_specification=PrismaticConnectionSpecification(
-                    axis=(Vector3.Y() * ((-1) ** (i + 1))),
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.Y() * ((-1) ** (i + 1))
+                    ),
                     dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                         lower_position=0.0, upper_position=door_travel
                     ),

@@ -33,12 +33,15 @@ from krrood.symbolic_math.symbolic_math import logic_and
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    Vector3,
+    HomogeneousTransformationMatrix,
+)
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -317,8 +320,13 @@ def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
             dof = DegreeOfFreedom(limits=limits, has_hardware_interface=True)
             world.add_degree_of_freedom(dof)
             world.add_connection(
-                PrismaticConnection(
-                    parent=map_body, child=child, raw_dof=dof, axis=Vector3.Z()
+                ScrewAxisConnection(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.Z()
+                    ),
+                    parent=map_body,
+                    child=child,
+                    raw_dof=dof,
                 )
             )
     MinimalRobot.from_world(world)

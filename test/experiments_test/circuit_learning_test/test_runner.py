@@ -22,7 +22,7 @@ from experiments.circuit_learning.methods import LearningMethod
 from experiments.circuit_learning.records import BenchmarkRun, RunKind
 from experiments.circuit_learning.runner import BenchmarkRunner
 from experiments.circuit_learning.settings import ComputationSetting
-from probabilistic_model.learning.jax_gradient_descent import (
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
     CompilerOption,
     CompilerVariable,
 )
