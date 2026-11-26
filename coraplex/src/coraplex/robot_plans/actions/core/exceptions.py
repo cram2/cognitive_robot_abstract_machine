@@ -1,3 +1,7 @@
+"""
+The exceptions raised by the core actions.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

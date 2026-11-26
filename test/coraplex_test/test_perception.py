@@ -109,7 +109,7 @@ def test_each_kind_of_perception_source_answers_through_its_own_interface(
     The plan does not change between sim and real; the kind of source alone decides
     where detections come from.
     """
-    source = PerceptionInterface.for_source(source=source_kind, ros_node=None)
+    source = PerceptionInterface.from_source(source=source_kind, ros_node=None)
 
     assert type(source) is expected_source
 

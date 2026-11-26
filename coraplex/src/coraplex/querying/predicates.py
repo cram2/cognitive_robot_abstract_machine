@@ -1,3 +1,9 @@
+"""
+Predicates about what the gripper of an end effector holds.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import Callable

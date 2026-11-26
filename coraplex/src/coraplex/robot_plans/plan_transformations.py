@@ -289,6 +289,11 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
     """
 
     def matches_node(self, *, plan_node: StatechartNode) -> bool:
+        """
+        Extends :meth:`~coraplex.plans.plan_transformation.PlanTransformation.matches_node`
+        to a statement that is still to be grounded into a
+        :class:`MoveAndPickUpAction`.
+        """
         if isinstance(plan_node, StatementNode):
             return issubclass(plan_node.statement._type_, MoveAndPickUpAction)
         return super().matches_node(plan_node=plan_node)
@@ -544,6 +549,10 @@ class WriteTheOdometryInsteadOfCommandingAPose(WriteTheOdometryInsteadOfDriving)
     """
 
     def is_applicable(self, *, plan_node: DrivesBase) -> bool:
+        """
+        Unlike :meth:`WriteTheOdometryInsteadOfDriving.is_applicable`, applies only
+        where the base would be sent to its pose by a :class:`HolonomicBaseGoal`.
+        """
         return issubclass(plan_node.base_goal_type, HolonomicBaseGoal)
 
 

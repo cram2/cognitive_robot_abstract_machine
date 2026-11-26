@@ -1,3 +1,8 @@
+"""
+Helpers for tests and examples: setting up a world, attaching a tool, choosing
+visualizations and running a component as a process of its own.
+"""
+
 from __future__ import annotations
 
 import logging

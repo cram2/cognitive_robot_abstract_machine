@@ -174,7 +174,10 @@ class Costmap(Location):
                 f"Can only combine two locations other type was {type(other)}"
             )
 
-    def __and__(self, other):
+    def __and__(self, other: Costmap) -> Costmap:
+        """
+        :return: This map and *other* combined, as :meth:`merge` combines them.
+        """
         return self.merge(other=other)
 
     def candidates(self) -> Iterator[Pose2D]:
@@ -465,7 +468,7 @@ class OccupancyCostmap(Costmap):
 
         ray_mask = self.create_ray_mask_around_origin()
 
-        map = np.pad(
+        occupancy = np.pad(
             ray_mask,
             (
                 int(self._distance_to_obstacle_index / 2),
@@ -473,14 +476,14 @@ class OccupancyCostmap(Costmap):
             ),
         )
 
-        map = self.inflate_obstacles(free_space=map)
+        occupancy = self.inflate_obstacles(free_space=occupancy)
         # The map loses some size due to the strides and because I dont want to
         # deal with indices outside of the index range
-        offset = self.width - map.shape[0]
+        offset = self.width - occupancy.shape[0]
         odd = 0 if offset % 2 == 0 else 1
-        map = np.pad(map, (offset // 2, offset // 2 + odd))
+        occupancy = np.pad(occupancy, (offset // 2, offset // 2 + odd))
 
-        return np.flip(map)
+        return np.flip(occupancy)
 
     @classmethod
     def default_map(
@@ -764,6 +767,11 @@ class GaussianCostmap(Costmap):
     """
 
     def __post_init__(self) -> None:
+        """
+        Fills :attr:`map` with a square 2D Gaussian of :attr:`mean` cells per side and
+        standard deviation :attr:`sigma`, zeroed around its centre so that no candidate
+        stands right at the origin.
+        """
         self.gaussian_window: np.ndarray = self._create_gaussian_window(
             mean=self.mean, standard_deviation=self.sigma
         )

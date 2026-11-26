@@ -1,3 +1,8 @@
+"""
+Paths for the tool center point of a held tool, such as the cutting, container and
+surface paths of the tool-based actions.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

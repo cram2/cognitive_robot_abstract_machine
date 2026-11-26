@@ -1,3 +1,8 @@
+"""
+Executors that run a plan in a kinematic or physics simulation or on the real robot, and
+the outcome of a run.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -191,6 +196,15 @@ class PlanExecutor(Executor, ABC):
     """
 
     def __post_init__(self) -> None:
+        """
+        Extends :meth:`~cramph.executor.Executor.__post_init__` by giving the context
+        :attr:`child_chooser`, and by putting :attr:`adaptations` before the
+        transformations of the context's own
+        :class:`~coraplex.plans.plan_transformation.PlanRewriting`.
+
+        :raises DebuggingWithoutRosNode: If :attr:`debug` is set without a
+            :attr:`ros_node`.
+        """
         if self.debug and self.ros_node is None:
             raise DebuggingWithoutRosNode()
         self.supplied_context_extensions = list(self.context.extensions.values())

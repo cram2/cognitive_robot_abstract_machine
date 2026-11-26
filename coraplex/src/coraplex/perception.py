@@ -185,7 +185,7 @@ class Detection:
 
         # Foundation Pose may return a upside down pose. this detects and fixes it by rotation around x by 180 degree
         detected_global_pose = world.transform(self.pose, world.root).homogeneous_matrix
-        detected_global_pose = self._with_z_up_and_x_towards(
+        detected_global_pose = self._frame_with_z_up_and_x_towards(
             root_T_frame=detected_global_pose,
             root_P_target=robot.root.global_transform.position,
         )
@@ -207,7 +207,7 @@ class Detection:
         return matching_annotations
 
     @staticmethod
-    def _with_z_up_and_x_towards(
+    def _frame_with_z_up_and_x_towards(
         *, root_T_frame: HomogeneousTransformationMatrix, root_P_target: Point3
     ) -> HomogeneousTransformationMatrix:
         """
@@ -300,7 +300,7 @@ class PerceptionInterface(ABC):
         return detections[0]
 
     @staticmethod
-    def for_source(
+    def from_source(
         *, source: PerceptionSource, ros_node: Node | None = None
     ) -> PerceptionInterface:
         """
@@ -498,8 +498,12 @@ class PerceptionTask(EndedByOwner, FailsOnObservingFalse, StatechartNode):
         return super().required_context_extensions + (RosContextExtension,)
 
     def set_up(self) -> None:
+        """
+        Extends :meth:`~cramph.node.StatechartNode.set_up` by choosing the
+        :attr:`perception_source` that answers for :attr:`answered_by`.
+        """
         super().set_up()
-        self.perception_source = PerceptionInterface.for_source(
+        self.perception_source = PerceptionInterface.from_source(
             source=self.answered_by,
             ros_node=self.context.require_extension(
                 extension_type=RosContextExtension

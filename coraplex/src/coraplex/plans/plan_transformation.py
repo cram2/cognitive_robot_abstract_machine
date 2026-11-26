@@ -1,3 +1,8 @@
+"""
+Plan transformations, which configure a node before it expands, insert nodes next to it
+or recover from its failure, and the context extension rewriting a plan with them.
+"""
+
 from __future__ import annotations
 
 import logging

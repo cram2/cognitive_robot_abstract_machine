@@ -1,3 +1,7 @@
+"""
+Sequences of poses that a motion passes through in order.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

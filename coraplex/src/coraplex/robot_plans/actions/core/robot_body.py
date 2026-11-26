@@ -5,9 +5,7 @@ Actions that move the robot's own body: its torso, grippers, fingers and arms.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 
-from typing_extensions import Any
 
 from semantic_digital_twin.collision_checking.collision_matrix import CollisionRule
 from semantic_digital_twin.collision_checking.collision_rules import (
@@ -210,14 +208,6 @@ class FollowToolCenterPointPathAction(
             position_threshold=self.position_threshold,
             orientation_threshold=self.orientation_threshold,
         )
-
-    def validate(
-        self,
-        *,
-        result: Any | None = None,
-        max_wait_time: timedelta = timedelta(seconds=2),
-    ):
-        pass
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

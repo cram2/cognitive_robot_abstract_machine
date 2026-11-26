@@ -1,3 +1,8 @@
+"""
+The exceptions raised across coraplex: by plan execution, by the actions building their
+motions, by perception and by navigation between floors.
+"""
+
 from __future__ import annotations
 
 from abc import ABC

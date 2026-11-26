@@ -118,7 +118,7 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         :return: The action and the executor executing it.
         """
 
-    def generate_episodes(self, *, number_of_actions: int = 10):
+    def generate_episodes(self, *, number_of_actions: int = 10) -> None:
         """
         Generate episodes until `number_of_actions` have been executed.
 
@@ -282,7 +282,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             model_registry=DictRegistry(models={self.action_type: distribution})
         )
 
-    def setup_backend_from_path(self, *, underspecified_action: Match):
+    def setup_backend_from_path(
+        self, *, underspecified_action: Match
+    ) -> ProbabilisticBackend:
         """
         Setup a backend from a model file.
 

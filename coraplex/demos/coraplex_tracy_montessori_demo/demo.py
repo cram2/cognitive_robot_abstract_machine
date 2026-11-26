@@ -160,7 +160,7 @@ class SolidContact:
     How little the solid bodies give way under load: nearly not at all.
     """
 
-    def with_friction(self, *, friction: ContactFriction) -> ContactParameters:
+    def contact_parameters(self, *, friction: ContactFriction) -> ContactParameters:
         """
         :param friction: The friction the surface offers.
         :return: The contact of a solid surface offering ``friction``.
@@ -317,7 +317,7 @@ class MontessoriScene:
         """
         world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
         tracy = Tracy.from_world(world)
-        self.solid_contact.with_friction(friction=ContactFriction()).apply_to(
+        self.solid_contact.contact_parameters(friction=ContactFriction()).apply_to(
             world.bodies_with_collision
         )
         for arm in tracy.all_arms:
@@ -359,7 +359,7 @@ class MontessoriScene:
         self.board = self.shape_sorting_board.body(
             name=PrefixedName("shape_sorting_board")
         )
-        self.solid_contact.with_friction(friction=ContactFriction()).apply_to(
+        self.solid_contact.contact_parameters(friction=ContactFriction()).apply_to(
             [self.board]
         )
         world.add_kinematic_structure_entity(self.board)
@@ -416,7 +416,7 @@ class MontessoriScene:
                 ),
             )
         )
-        self.solid_contact.with_friction(
+        self.solid_contact.contact_parameters(
             friction=ContactParameters.create_for_grasped_object().friction
         ).apply_to([body])
         piece = ShapeSortingPiece(root=body, grasp_height=grasp_height)

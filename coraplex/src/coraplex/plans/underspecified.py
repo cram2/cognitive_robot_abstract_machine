@@ -1,3 +1,8 @@
+"""
+Grounding the underspecified actions of a plan while it runs: choosing, trying and
+handing over candidates, and rebuilding parts of the plan onto a world.
+"""
+
 from __future__ import annotations
 
 import logging
