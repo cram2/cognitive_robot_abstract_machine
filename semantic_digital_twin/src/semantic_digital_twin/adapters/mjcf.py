@@ -125,8 +125,11 @@ class MJCFParser(WorldModelParser):
             self.prefix = os.path.basename(self.file_path).split(".")[0]
         self.spec: mujoco.MjSpec = mujoco.MjSpec.from_file(self.file_path)
         for mesh in self.spec.meshes:
-            if package_uri_resolver.supports(mesh.file):
-                mesh.file = package_uri_resolver.resolve(mesh.file)
+            # MuJoCo 4 shortens the ``//`` of a ``package://`` URI in a file path to ``/``.
+            if mesh.file.startswith("package:/"):
+                mesh.file = package_uri_resolver.resolve(
+                    "package://" + mesh.file.removeprefix("package:").lstrip("/")
+                )
 
     @cached_property
     def resolved_document(self) -> ET.Element:
