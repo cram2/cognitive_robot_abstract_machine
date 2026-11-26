@@ -898,9 +898,9 @@ class ClassDiagram:
         """
         Creates inheritance relations between wrapped classes.
 
-        Every wrapped class inherits each of its wrapped base classes. A class that names
-        a parametrized generic among its bases inherits the parametrization where the
-        diagram holds it, and the generic class otherwise.
+        Every wrapped class inherits each of its wrapped base classes. A class that
+        names a parametrized generic among its bases inherits the parametrization where
+        the diagram holds it, and the generic class otherwise.
         """
         for clazz in self.wrapped_classes:
             # Handle GenericAlias which doesn't have __bases__
