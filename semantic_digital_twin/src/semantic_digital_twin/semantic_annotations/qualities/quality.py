@@ -1,6 +1,6 @@
 """
 Qualities of semantic annotations: aspects of a single bearer, such as the ripeness of a
-fruit, whose value lies on a scale and can change while the bearer stays the same.
+fruit or the density of its flesh, that can change while the bearer stays the same.
 
 Follows DUL and SOMA: a quality has a value in a region of its quality space, and named
 regions of that space, such as :attr:`RipenessStage.RIPE`, classify the value.
@@ -19,7 +19,7 @@ from typing_extensions import Self
 from krrood.patterns.classproperty import classproperty
 from random_events.interval import Bound, SimpleInterval
 from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
-    RipenessOutsideScale,
+    QualityOutsideScale,
     RipenessSpansSeveralStages,
 )
 
@@ -35,6 +35,17 @@ class Quality(ABC):
     .. note:: Dispositions, such as being graspable, are not qualities here; they are
         mixins of the annotations that have them.
     """
+
+    def _reject_value_outside_scale(
+        self, *, value: SimpleInterval, scale: SimpleInterval
+    ) -> None:
+        """
+        :param value: A value of this quality.
+        :param scale: The scale ``value`` has to lie within.
+        :raises QualityOutsideScale: If ``value`` reaches beyond ``scale``.
+        """
+        if scale.intersection_with(value) != value:
+            raise QualityOutsideScale(quality=self, value=value, scale=scale)
 
 
 # %% Ripeness
@@ -81,10 +92,9 @@ class Ripeness(Quality):
 
     def __post_init__(self) -> None:
         """
-        :raises RipenessOutsideScale: If the value reaches beyond :attr:`scale`.
+        :raises QualityOutsideScale: If the value reaches beyond :attr:`scale`.
         """
-        if self.scale.intersection_with(self.value) != self.value:
-            raise RipenessOutsideScale(ripeness=self)
+        self._reject_value_outside_scale(value=self.value, scale=self.scale)
 
     @classproperty
     def scale(cls) -> SimpleInterval:
@@ -111,3 +121,100 @@ class Ripeness(Quality):
             if stage.value.intersection_with(self.value) == self.value:
                 return stage
         raise RipenessSpansSeveralStages(ripeness=self)
+
+
+# %% Material
+
+
+@dataclass(kw_only=True)
+class Density(Quality):
+    """
+    The mass per volume of its bearer's material, in kilograms per cubic metre.
+
+    .. seealso:: `Density <https://en.wikipedia.org/wiki/Density>`_ (Wikipedia)
+    """
+
+    value: SimpleInterval
+    """
+    The density on :attr:`scale`: a single point when it was measured, or the range its
+    measurements spread over.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        :raises QualityOutsideScale: If the value reaches beyond :attr:`scale`.
+        """
+        self._reject_value_outside_scale(value=self.value, scale=self.scale)
+
+    @classproperty
+    def scale(cls) -> SimpleInterval:
+        """
+        :return: The density scale: every positive density.
+        """
+        return SimpleInterval.from_data(0.0, float("inf"), Bound.OPEN, Bound.OPEN)
+
+
+@dataclass(kw_only=True)
+class Elasticity(Quality):
+    """
+    How its bearer's material deforms under load and springs back, given by the two
+    constants that describe an isotropic linear elastic material.
+
+    .. note:: Plant tissue is neither isotropic nor linear; the constants approximate it.
+
+    .. seealso::
+        - `Linear elasticity <https://en.wikipedia.org/wiki/Linear_elasticity>`_
+          (Wikipedia)
+        - N. N. Mohsenin, `Physical Properties of Plant and Animal Materials, vol. 1
+          <https://www.routledge.com/Physical-Properties-of-Plant-and-Animal-Materials-v-1-Physical-Characteristics-and-Mechanical-Properties/Mohsenin/p/book/9780677023007>`_,
+          ISBN 978-0-677-02300-7: §4.5 on ideal elastic behaviour, §4.9 on
+          viscoelasticity, §5.4 on Poisson's ratio
+    """
+
+    youngs_modulus: SimpleInterval
+    """
+    The stiffness of the material when stretched or compressed along one axis, in pascals,
+    on :attr:`youngs_modulus_scale`: a single point when measured, or a range.
+
+    .. seealso:: `Young's modulus <https://en.wikipedia.org/wiki/Young%27s_modulus>`_
+        (Wikipedia)
+    """
+
+    poissons_ratio: SimpleInterval
+    """
+    How much the material narrows across a stretch relative to how much it lengthens, on
+    :attr:`poissons_ratio_scale`: a single point when measured, or a range.
+
+    .. seealso:: `Poisson's ratio <https://en.wikipedia.org/wiki/Poisson%27s_ratio>`_
+        (Wikipedia)
+    """
+
+    def __post_init__(self) -> None:
+        """
+        :raises QualityOutsideScale: If a constant reaches beyond its scale.
+        """
+        self._reject_value_outside_scale(
+            value=self.youngs_modulus, scale=self.youngs_modulus_scale
+        )
+        self._reject_value_outside_scale(
+            value=self.poissons_ratio, scale=self.poissons_ratio_scale
+        )
+
+    @classproperty
+    def youngs_modulus_scale(cls) -> SimpleInterval:
+        """
+        :return: The scale of Young's modulus: every positive stiffness.
+        """
+        return SimpleInterval.from_data(0.0, float("inf"), Bound.OPEN, Bound.OPEN)
+
+    @classproperty
+    def poissons_ratio_scale(cls) -> SimpleInterval:
+        """
+        :return: The scale of Poisson's ratio: the range, from -1 to 1/2, in which an
+            isotropic linear elastic material is stable.
+
+        .. seealso:: P. H. Mott and C. M. Roland, `Limits to Poisson's ratio in isotropic
+            materials <https://doi.org/10.1103/PhysRevB.80.132104>`_, Physical Review B
+            80, 132104
+        """
+        return SimpleInterval.from_data(-1.0, 0.5, Bound.OPEN, Bound.OPEN)

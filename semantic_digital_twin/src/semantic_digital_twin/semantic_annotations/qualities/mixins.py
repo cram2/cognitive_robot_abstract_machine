@@ -1,5 +1,6 @@
 """
-Mixins for each kind of quality an annotation can have, such as the ripeness of a fruit.
+Mixins for each kind of quality an annotation can have, such as the ripeness of a fruit
+or the density of its flesh.
 """
 
 from __future__ import annotations
@@ -12,7 +13,11 @@ from krrood.patterns.mixin import Mixin
 from semantic_digital_twin.semantic_annotations.qualities.metadata import (
     IsQualityRelationship,
 )
-from semantic_digital_twin.semantic_annotations.qualities.quality import Ripeness
+from semantic_digital_twin.semantic_annotations.qualities.quality import (
+    Density,
+    Elasticity,
+    Ripeness,
+)
 from semantic_digital_twin.semantic_annotations.qualities.relationship import (
     HasQualities,
 )
@@ -33,4 +38,41 @@ class HasRipeness(HasQualities, Mixin):
     )
     """
     How far the semantic annotation has ripened, or ``None`` when that is unknown.
+    """
+
+
+# %% Material qualities
+
+
+@dataclass(eq=False, kw_only=True)
+class HasDensity(HasQualities, Mixin):
+    """
+    A mixin class for semantic annotations made of a material with a density.
+    """
+
+    density: Density | None = field(
+        default=None,
+        hash=False,
+        metadata=IsQualityRelationship().as_dict(),
+    )
+    """
+    The density of the semantic annotation's material, or ``None`` when that is unknown.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class HasElasticity(HasDensity, Mixin):
+    """
+    A mixin class for semantic annotations made of an elastic material, which, being
+    matter, also has a density.
+    """
+
+    elasticity: Elasticity | None = field(
+        default=None,
+        hash=False,
+        metadata=IsQualityRelationship().as_dict(),
+    )
+    """
+    The elasticity of the semantic annotation's material, or ``None`` when that is
+    unknown.
     """
