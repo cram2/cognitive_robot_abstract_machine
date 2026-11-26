@@ -33,6 +33,9 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 
 @pytest.fixture
 def wall_door_handle_world():
+    """
+    A world with a wall whose entry way holds a door with a handle.
+    """
     world = World.create_with_root_body("map")
 
     with world.modify_world():
@@ -52,7 +55,7 @@ def wall_door_handle_world():
         door.root.visual.dye_shapes(Color.from_rgba(red=0.55, green=0.27, blue=0.07))
 
     with world.modify_world():
-        wall.add(door.entry_way)
+        wall.add(part=door.entry_way)
 
     with world.modify_world():
         handle = Handle.create_with_new_body_in_world(
@@ -67,7 +70,7 @@ def wall_door_handle_world():
             scale=Scale(0.05, 0.02, 0.2),
         )
         handle.root.visual.dye_shapes(Color.from_rgba(red=0.8, green=0.8, blue=0.1))
-        door.add(handle)
+        door.add(part=handle)
 
     door.mount_on_movable_joint(
         RevoluteConnectionSpecification(

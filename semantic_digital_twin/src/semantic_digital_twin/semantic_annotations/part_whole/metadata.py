@@ -8,15 +8,19 @@ it without depending on each other.
 
 from __future__ import annotations
 
+# %% Imports
+
 from dataclasses import dataclass
 
-from krrood.patterns.field_metadata import FieldMetadata
+from semantic_digital_twin.semantic_annotations.semantic_relationship import (
+    IsSemanticRelationship,
+)
 
 # %% relation metadata
 
 
-@dataclass
-class IsPartWholeRelationship(FieldMetadata):
+@dataclass(kw_only=True)
+class IsPartWholeRelationship(IsSemanticRelationship):
     """
     Marks a field as holding a structural *part* of its owner (the part-whole relation).
 

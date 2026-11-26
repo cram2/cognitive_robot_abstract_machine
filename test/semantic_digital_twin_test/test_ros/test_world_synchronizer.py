@@ -811,6 +811,10 @@ def test_semantic_annotation_modifications(rclpy_node):
 
 
 def test_semantic_annotation_modifications_merge_world(rclpy_node):
+    """
+    Merging a world holding a door and its handle into a world reaches the world
+    synchronized with it.
+    """
     w0 = World(name="w0")
     root = Body(name=PrefixedName("root"))
     with w0.modify_world():
@@ -825,7 +829,7 @@ def test_semantic_annotation_modifications_merge_world(rclpy_node):
             name="handle",
             world=w0,
         )
-        door.add(handle)
+        door.add(part=handle)
 
     w1 = World(name="w1")
     w2 = World(name="w2")
@@ -851,6 +855,10 @@ def test_semantic_annotation_modifications_merge_world(rclpy_node):
 def test_semantic_annotation_change_parameter_during_same_modification_block(
     rclpy_node,
 ):
+    """
+    Adding a handle as a part of a drawer in the block that adds both annotations
+    reaches the synchronized world.
+    """
     w1 = World(name="w1")
     w2 = World(name="w2")
 
@@ -880,7 +888,7 @@ def test_semantic_annotation_change_parameter_during_same_modification_block(
     with w1.modify_world():
         w1.add_semantic_annotation(drawer)
         w1.add_semantic_annotation(handle)
-        drawer.add(handle)
+        drawer.add(part=handle)
 
     time.sleep(1)
     assert [hash(sa) for sa in w1.semantic_annotations] == [
@@ -961,6 +969,9 @@ def test_compute_state_changes_nan_handling(rclpy_node):
 
 
 def test_attribute_updates(rclpy_node):
+    """
+    New annotations, and adding one as a part of another, reach the synchronized world.
+    """
     world1 = World(name="w1")
     world2 = World(name="w2")
     world1._id = uuid.UUID(int=1)
@@ -997,7 +1008,7 @@ def test_attribute_updates(rclpy_node):
     )
 
     with world1.modify_world():
-        fridge.add(door)
+        fridge.add(part=door)
 
     time.sleep(1)
     assert [hash(sa) for sa in world1.semantic_annotations] == [

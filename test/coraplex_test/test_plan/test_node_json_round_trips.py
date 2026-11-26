@@ -240,6 +240,9 @@ def _move_and_place(world: World) -> MoveAndPlaceAction:
 
 
 def _elevator_navigation(world: World) -> list[StatechartNode]:
+    """
+    :return: The statechart nodes of navigating an elevator with an opening door to a floor.
+    """
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
             name="elevator",
@@ -263,7 +266,7 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
                 ),
             ),
         )
-        elevator.add(door)
+        elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
             name="ground_floor", world=world, scale=Scale(40, 40, 6)
         )

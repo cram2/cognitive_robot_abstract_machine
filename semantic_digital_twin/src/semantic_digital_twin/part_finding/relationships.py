@@ -7,19 +7,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.entity_query_language.utils import camel_case_to_words
 
 from semantic_digital_twin.exceptions import (
     NoSinglePartWholeRelationshipField,
-    UnknownPartWholeRelationshipField,
+    UnknownSemanticRelationshipField,
 )
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasRootBody,
-    PartWholeRelationship,
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
 )
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
     IsPartWholeRelationship,
 )
 
@@ -41,7 +40,7 @@ class PartRelationshipInspector:
 
     @classmethod
     def all_of_type(
-        cls, whole_type: type[PartWholeRelationship]
+        cls, *, whole_type: type[HasParts]
     ) -> list[PartRelationshipInspector]:
         """
         :param whole_type: A type of annotation.
@@ -50,33 +49,37 @@ class PartRelationshipInspector:
         """
         return [
             cls(relationship_field=wrapped_field)
-            for wrapped_field in WrappedClass(clazz=whole_type).fields_with_metadata(
-                metadata_type=IsPartWholeRelationship
+            for wrapped_field in whole_type.semantic_relationship_fields(
+                relationship_type=IsPartWholeRelationship
             )
             if issubclass(wrapped_field.type_endpoint, HasRootBody)
         ]
 
     @classmethod
     def named(
-        cls, whole_type: type[PartWholeRelationship], name: str
+        cls, *, whole_type: type[HasParts], name: str
     ) -> PartRelationshipInspector:
         """
         :param whole_type: A type of annotation.
         :param name: The name of one of its part-whole relationship fields.
         :return: That relationship.
         """
-        relationships = cls.all_of_type(whole_type)
+        relationships = cls.all_of_type(whole_type=whole_type)
         for relationship in relationships:
             if relationship.name == name:
                 return relationship
-        raise UnknownPartWholeRelationshipField(
-            whole_type, name, [relationship.name for relationship in relationships]
+        raise UnknownSemanticRelationshipField(
+            annotation=whole_type,
+            field_name=name,
+            relationship_type=IsPartWholeRelationship,
+            available_fields=[relationship.name for relationship in relationships],
         )
 
     @classmethod
-    def for_part(
+    def accepting_part_type(
         cls,
-        whole_type: type[PartWholeRelationship],
+        *,
+        whole_type: type[HasParts],
         part_type: type[HasRootBody],
         name: str = "",
     ) -> PartRelationshipInspector:
@@ -90,10 +93,10 @@ class PartRelationshipInspector:
             one relationship holds parts of that type.
         """
         if name:
-            return cls.named(whole_type, name)
+            return cls.named(whole_type=whole_type, name=name)
         matching = [
             relationship
-            for relationship in cls.all_of_type(whole_type)
+            for relationship in cls.all_of_type(whole_type=whole_type)
             if issubclass(part_type, relationship.part_type)
         ]
         if len(matching) != 1:
@@ -138,7 +141,7 @@ class PartRelationshipInspector:
         """
         return self.relationship_field.is_optional or self.holds_many
 
-    def parts_of(self, whole: PartWholeRelationship) -> list[HasRootBody]:
+    def held_parts(self, *, whole: HasParts) -> list[HasRootBody]:
         """
         :param whole: An annotation of the type this relationship belongs to.
         :return: The parts the annotation has in this relationship.
@@ -148,9 +151,9 @@ class PartRelationshipInspector:
             return list(value)
         return [] if value is None else [value]
 
-    def is_filled_in(self, whole: PartWholeRelationship) -> bool:
+    def is_filled_in(self, *, whole: HasParts) -> bool:
         """
         :param whole: An annotation of the type this relationship belongs to.
         :return: Whether the annotation has a part in this relationship already.
         """
-        return bool(self.parts_of(whole))
+        return bool(self.held_parts(whole=whole))

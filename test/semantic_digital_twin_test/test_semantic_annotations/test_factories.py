@@ -11,9 +11,9 @@ import pytest
 from random_events.product_algebra import Event
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
-    CannotBeAPartOf,
-    AmbiguousPart,
-    UnknownPartWholeRelationshipField,
+    NoFieldAcceptsEntity,
+    SeveralFieldsAcceptEntity,
+    UnknownSemanticRelationshipField,
 )
 from semantic_digital_twin.exceptions import (
     InvalidPlaneDimensions,
@@ -23,14 +23,14 @@ from semantic_digital_twin.exceptions import (
     MissingSemanticAnnotationError,
     MismatchingWorld,
 )
-from semantic_digital_twin.semantic_annotations.mixins import (
-    PartWholeRelationship,
-    HasRootBody,
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasCaseAsRootBody,
 )
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -93,6 +93,10 @@ from semantic_digital_twin.specifications.semantic_annotations import (
 
 
 class TestFactories(unittest.TestCase):
+    """
+    Creating each kind of annotation together with its bodies and connections.
+    """
+
     def test_handle_factory(self):
         world = World.create_with_root_body("root")
         with world.modify_world():
@@ -241,7 +245,7 @@ class TestFactories(unittest.TestCase):
 
         assert root == handle.root.parent_kinematic_structure_entity
         with world.modify_world():
-            door.add(handle)
+            door.add(part=handle)
 
         assert door.root == handle.root.parent_kinematic_structure_entity
         assert door.handle == handle
@@ -310,7 +314,7 @@ class TestFactories(unittest.TestCase):
                 scale=Scale(1, 1, 2.0),
             )
             drawer = Drawer.create_with_new_body_in_world(name="drawer", world=world)
-            fridge.add(drawer)
+            fridge.add(part=drawer)
 
         semantic_drawer_annotations = world.get_semantic_annotations_by_type(Drawer)
         self.assertEqual(len(semantic_drawer_annotations), 1)
@@ -328,7 +332,7 @@ class TestFactories(unittest.TestCase):
                 name="left_door",
                 world=world,
             )
-            fridge.add(door)
+            fridge.add(part=door)
 
         semantic_door_annotations = world.get_semantic_annotations_by_type(Door)
         self.assertEqual(len(semantic_door_annotations), 1)
@@ -409,7 +413,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 body=door.root,
             )
-            wall.add(aperture)
+            wall.add(part=aperture)
 
         assert wall.apertures[0] == aperture
         assert aperture.root.parent_kinematic_structure_entity == wall.root
@@ -436,7 +440,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
             )
-            door.add(handle)
+            door.add(part=handle)
 
         # Test Z-axis rotation (vertical hinge)
         # handle is at y=0.4, door width is 1.0. Hinge should be at opposite side: y=-0.5
@@ -454,7 +458,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.4),
             )
-            door.add(handle)
+            door.add(part=handle)
 
         door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Z())
         np.testing.assert_allclose(
@@ -470,7 +474,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
             )
-            door.add(handle)
+            door.add(part=handle)
 
         np.testing.assert_allclose(
             door.calculate_self_T_movable_joint(Vector3.NEGATIVE_Z()).to_np(),
@@ -485,7 +489,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
             )
-            door.add(handle)
+            door.add(part=handle)
         world_T_door = door.root.global_transform
         world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Z())
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
@@ -529,7 +533,7 @@ class TestFactories(unittest.TestCase):
                     y=0.4, z=0.0
                 ),
             )
-            door.add(handle)
+            door.add(part=handle)
 
         # Test Y-axis rotation (horizontal hinge)
         # handle z=0. Hinge should be at z=1.0 (opposite of default sign 1 if z=0)
@@ -549,7 +553,7 @@ class TestFactories(unittest.TestCase):
                     y=0.5, z=0.0
                 ),
             )
-            door.add(handle)
+            door.add(part=handle)
 
         # handle at z=0.5. Hinge should be at z=-1.0
         handle.root.parent_connection.parent_T_connection_expression = (
@@ -568,7 +572,7 @@ class TestFactories(unittest.TestCase):
                 name="handle",
                 world=world,
             )
-            door.add(handle)
+            door.add(part=handle)
         with self.assertRaises(InvalidHingeActiveAxis):
             door.calculate_self_T_movable_joint(Vector3(1, 1, 0))
 
@@ -904,7 +908,7 @@ class TestFactories(unittest.TestCase):
             aperture = Aperture.create_with_new_region_in_world(
                 name="aperture", scale=Scale(0.1, 1, 1), world=world
             )
-            wall.add(aperture)
+            wall.add(part=aperture)
         self.assertIn(aperture, wall.apertures)
         self.assertTrue(len(wall.root.collision) > initial_shapes_count)
 
@@ -1160,7 +1164,7 @@ class TestFactories(unittest.TestCase):
                 scale=Scale(0.03, 0.3, 0.3),
                 world=world,
             )
-            microwave.add(door)
+            microwave.add(part=door)
 
         semantic_microwave_annotations = world.get_semantic_annotations_by_type(
             Microwave
@@ -1188,9 +1192,7 @@ class TestFactories(unittest.TestCase):
 
 
 @dataclass(eq=False)
-class _AnnotationWithOverlappingPartWholeRelationshipFields(
-    HasRootBody, PartWholeRelationship
-):
+class _AnnotationWithOverlappingPartWholeRelationshipFields(HasRootBody, HasParts):
     """
     Throwaway whole whose two part-whole relationship fields have overlapping element
     types (``DoorWithType`` is a subclass of ``Door``), so a ``DoorWithType`` matches
@@ -1222,7 +1224,7 @@ def test_add_routes_handle_as_child():
             name="door", scale=Scale(0.03, 1, 2), world=world
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
-        door.add(handle)
+        door.add(part=handle)
 
     assert door.handle == handle
     assert door.root == handle.root.parent_kinematic_structure_entity
@@ -1242,8 +1244,8 @@ def test_add_routes_plural_drawer_and_door():
         door = Door.create_with_new_body_in_world(
             name="door", scale=Scale(0.03, 1, 2), world=world
         )
-        fridge.add(drawer)
-        fridge.add(door)
+        fridge.add(part=drawer)
+        fridge.add(part=door)
 
     assert drawer in fridge.drawers
     assert door in fridge.doors
@@ -1267,7 +1269,7 @@ def test_add_routes_aperture_with_cut():
         aperture = Aperture.create_with_new_region_in_world_from_body(
             name="aperture", world=world, body=door.root
         )
-        wall.add(aperture)
+        wall.add(part=aperture)
 
     assert wall.apertures[0] == aperture
     assert aperture.root.parent_kinematic_structure_entity == wall.root
@@ -1309,8 +1311,8 @@ def test_add_does_not_route_occupants():
         milk = Milk.create_with_new_body_in_world(
             name="milk", world=world, scale=Scale(0.03, 0.03, 0.1)
         )
-        with pytest.raises(CannotBeAPartOf):
-            fridge.add(milk)
+        with pytest.raises(NoFieldAcceptsEntity):
+            fridge.add(part=milk)
         fridge.add_object(milk)
 
     assert milk in fridge.objects
@@ -1319,7 +1321,7 @@ def test_add_does_not_route_occupants():
 def test_add_rejects_unsupported_part_type():
     """
     Add() of a part type the annotation has no part-whole relationship field for raises
-    CannotBeAPartOf.
+    NoFieldAcceptsEntity.
     """
     world = _world_with_root()
     with world.modify_world():
@@ -1328,14 +1330,14 @@ def test_add_rejects_unsupported_part_type():
         )
         drawer = Drawer.create_with_new_body_in_world(name="drawer", world=world)
         # A Door has handle/entry way part-whole relationship fields but no drawer field.
-        with pytest.raises(CannotBeAPartOf):
-            door.add(drawer)
+        with pytest.raises(NoFieldAcceptsEntity):
+            door.add(part=drawer)
 
 
 def test_add_raises_on_ambiguous_part():
     """
     Add() of a part matching more than one part-whole relationship field raises
-    AmbiguousPart.
+    SeveralFieldsAcceptEntity.
     """
     world = _world_with_root()
     with world.modify_world():
@@ -1346,8 +1348,8 @@ def test_add_raises_on_ambiguous_part():
             name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
         # A DoorWithType is both a Door (door field) and a DoorWithType (typed_door field).
-        with pytest.raises(AmbiguousPart):
-            whole.add(typed_door)
+        with pytest.raises(SeveralFieldsAcceptEntity):
+            whole.add(part=typed_door)
 
 
 def test_add_field_name_resolves_ambiguity_to_base_field():
@@ -1363,7 +1365,7 @@ def test_add_field_name_resolves_ambiguity_to_base_field():
         typed_door = DoorWithType.create_with_new_body_in_world(
             name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
-        whole.add(typed_door, field_name="door")
+        whole.add(part=typed_door, field_name="door")
     assert whole.door is typed_door
     assert whole.typed_door is None
 
@@ -1380,7 +1382,7 @@ def test_add_field_name_resolves_ambiguity_to_specific_field():
         typed_door = DoorWithType.create_with_new_body_in_world(
             name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
-        whole.add(typed_door, field_name="typed_door")
+        whole.add(part=typed_door, field_name="typed_door")
     assert whole.typed_door is typed_door
     assert whole.door is None
 
@@ -1397,8 +1399,8 @@ def test_add_unknown_field_name_raises():
         typed_door = DoorWithType.create_with_new_body_in_world(
             name="typed_door", scale=Scale(0.03, 1, 2), world=world
         )
-        with pytest.raises(UnknownPartWholeRelationshipField):
-            whole.add(typed_door, field_name="not_a_field")
+        with pytest.raises(UnknownSemanticRelationshipField):
+            whole.add(part=typed_door, field_name="not_a_field")
 
 
 def test_add_field_name_with_mismatching_type_raises():
@@ -1412,8 +1414,8 @@ def test_add_field_name_with_mismatching_type_raises():
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
         # 'entry_way' is a real part-whole field of Door, but a Handle is not an EntryWay.
-        with pytest.raises(CannotBeAPartOf):
-            door.add(handle, field_name="entry_way")
+        with pytest.raises(NoFieldAcceptsEntity):
+            door.add(part=handle, field_name="entry_way")
 
 
 def test_containment_only_annotation_has_no_add():
@@ -1517,6 +1519,9 @@ def test_a_door_on_its_hinge_reports_how_far_it_stands_open():
 
 @pytest.mark.parametrize("operate_doors", [Elevator.open, Elevator.close])
 def test_elevator_doors_without_a_movable_joint_cannot_be_operated(operate_doors):
+    """
+    Opening or closing an elevator whose door has no movable joint raises.
+    """
     world = _world_with_root()
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
@@ -1525,7 +1530,7 @@ def test_elevator_doors_without_a_movable_joint_cannot_be_operated(operate_doors
         door = Door.create_with_new_body_in_world(
             name="door", world=world, scale=Scale(0.05, 1, 2)
         )
-        elevator.add(door)
+        elevator.add(part=door)
 
     with pytest.raises(MissingMovableJointError):
         operate_doors(elevator)

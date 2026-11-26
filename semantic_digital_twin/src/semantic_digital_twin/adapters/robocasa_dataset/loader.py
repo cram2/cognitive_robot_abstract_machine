@@ -1,3 +1,8 @@
+"""
+Loads objects, kitchen appliances, whole kitchen scenes and manipulation tasks from the
+RoboCasa dataset into a world.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -28,7 +33,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
     RoboCasaObjectResolver,
 )
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.semantic_annotations.mixins import (
+from semantic_digital_twin.semantic_annotations.part_whole.mixins import (
     HasDoors,
     HasDrawers,
     HasHandle,
@@ -711,24 +716,13 @@ class RoboCasaDatasetLoader:
         self, world: World, parent_annotation: SemanticAnnotation, parent_body: Body
     ) -> None:
         """
-        Detect handle/door/drawer bodies already present under a kitchen appliance's
-        root body (RoboCasa appliances like cabinets ship these as real articulated sub-
-        bodies in their own MJCF, not something this adapter synthesizes) and attach
-        them as parts of the nearest enclosing SemanticAnnotation by their RoboCasa
-        body-naming convention (mirroring the naming-convention detection
-        ``adapters/procthor/procthor_pipelines.py`` already uses for ProcTHOR dressers).
-
-        Each match is attached via :meth:`~semantic_digital_twin.semantic_annotations.mixins.PartWholeRelationship.add`,
-        the framework's normal part-whole mechanism, recursing into each direct child so that, for
-        example, a handle nested inside a door is attached to the door's annotation rather than the
-        enclosing cabinet's. This is safe: a sub-body is only ever offered to its own direct
-        kinematic parent, so ``World.move_branch`` (invoked by ``add()``'s default mount strategy) is
-        a no-op re-parent that leaves the body's real connection type and degree of freedom
-        untouched.
+        Attach the handle, door and drawer bodies under ``parent_body``, recognised by
+        RoboCasa's body-naming convention, as parts of the nearest enclosing annotation,
+        so that a handle inside a door becomes a part of the door, not of the cabinet.
 
         :param world: The world ``parent_body`` belongs to.
-        :param parent_annotation: The SemanticAnnotation of ``parent_body`` to attach newly found
-            direct sub-parts to.
+        :param parent_annotation: The SemanticAnnotation of ``parent_body`` to attach
+            newly found direct sub-parts to.
         :param parent_body: The body to search direct children of for sub-part bodies.
         """
         for child_body in parent_body.child_kinematic_structure_entities:
@@ -744,15 +738,15 @@ class RoboCasaDatasetLoader:
             ):
                 child_annotation = Handle(root=child_body)
                 world.add_semantic_annotation(child_annotation)
-                parent_annotation.add(child_annotation)
+                parent_annotation.add(part=child_annotation)
             elif "door" in child_name and isinstance(parent_annotation, HasDoors):
                 child_annotation = Door(root=child_body)
                 world.add_semantic_annotation(child_annotation)
-                parent_annotation.add(child_annotation)
+                parent_annotation.add(part=child_annotation)
             elif "drawer" in child_name and isinstance(parent_annotation, HasDrawers):
                 child_annotation = Drawer(root=child_body)
                 world.add_semantic_annotation(child_annotation)
-                parent_annotation.add(child_annotation)
+                parent_annotation.add(part=child_annotation)
 
             self._attach_sub_part_annotations(world, child_annotation, child_body)
 

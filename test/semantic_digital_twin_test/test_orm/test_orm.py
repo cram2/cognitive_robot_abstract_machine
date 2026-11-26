@@ -44,7 +44,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     EntryWay,
     Handle,
 )
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
     IsPartWholeRelationship,
 )
 from krrood.class_diagrams.class_diagram import WrappedClass
@@ -230,6 +230,10 @@ def _is_part_whole_relationship(annotation_type, field_name):
 
 
 def test_part_whole_relationship_field_survives_deepcopy():
+    """
+    A part-whole relationship field keeps its marker and its part when the world is
+    copied.
+    """
     copy_functions = [copy, deepcopy]
     for copy_function in copy_functions:
         world = World.create_with_root_body("root")
@@ -238,7 +242,7 @@ def test_part_whole_relationship_field_survives_deepcopy():
                 name="door", scale=Scale(0.03, 1, 2), world=world
             )
             handle = Handle.create_with_new_body_in_world(name="handle", world=world)
-            door.add(handle)
+            door.add(part=handle)
 
         # The marker is present on the source class before persisting.
         assert _is_part_whole_relationship(Door, "handle")
@@ -318,7 +322,7 @@ def test_part_whole_relationship_field_metadata_survives_orm_round_trip(session)
             name="door", scale=Scale(0.03, 1, 2), world=world
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
-        door.add(handle)
+        door.add(part=handle)
 
     # The marker is present on the source class before persisting.
     assert _is_part_whole_relationship(Door, "handle")

@@ -60,7 +60,7 @@ from semantic_digital_twin.exceptions import (
     ParsingError,
     PartWholeCardinalityError,
     PartWholeFieldInAnnotationKwargs,
-    UnknownPartWholeRelationshipField,
+    UnknownSemanticRelationshipField,
     UselessConceptError,
 )
 from semantic_digital_twin.robots.exceptions import (
@@ -92,11 +92,11 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
-    HasApertures,
     HasRootBody,
     HasRootRegion,
 )
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.mixins import HasApertures
+from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.world import World
@@ -258,7 +258,11 @@ def test_active_connection_specification_requires_axis():
 def test_nested_annotation_on_non_part_whole_field_raises():
     # Milk has no part-whole field, so a nested annotation spec cannot be mounted onto it.
     # Part bindings are validated at construction.
-    with pytest.raises(UnknownPartWholeRelationshipField):
+    """
+    A nested part specification for a field that is not a part-whole relationship field
+    raises.
+    """
+    with pytest.raises(UnknownSemanticRelationshipField):
         Milk.get_annotation_specification(
             "milk",
             BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
@@ -1981,7 +1985,10 @@ def test_part_whole_field_in_annotation_kwargs_raises():
 def test_non_part_whole_field_in_part_specifications_raises():
     # supporting_surface is not a part-whole relationship, so it cannot hold a nested part spec.
     # part_specifications are validated at construction.
-    with pytest.raises(UnknownPartWholeRelationshipField):
+    """
+    A part specification for a supporting surface, which is not a part, raises.
+    """
+    with pytest.raises(UnknownSemanticRelationshipField):
         Table.get_annotation_specification(
             "table",
             Table.get_default_root_kinematic_structure_entity_specification(
@@ -1997,7 +2004,11 @@ def test_non_part_whole_field_in_part_specifications_raises():
 
 def test_storage_objects_in_part_specifications_raises():
     # IsStorageSpace.objects is not a part-whole relationship, so spec-based occupants are unsupported.
-    with pytest.raises(UnknownPartWholeRelationshipField):
+    """
+    A part specification for the objects of a storage space, which are not parts,
+    raises.
+    """
+    with pytest.raises(UnknownSemanticRelationshipField):
         Table.get_annotation_specification(
             "table",
             Table.get_default_root_kinematic_structure_entity_specification(
@@ -2068,6 +2079,10 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
 
 
 def test_nested_composite_matches_manual_construction(empty_world):
+    """
+    A drawer with its handle built from nested specifications matches one built part by
+    part.
+    """
     scale = Scale(0.4, 0.5, 0.6)
     handle_scale = Scale(0.1, 0.05, 0.05)
 
@@ -2106,7 +2121,7 @@ def test_nested_composite_matches_manual_construction(empty_world):
             world=manual_world,
             scale=handle_scale,
         )
-        manual_drawer.add(manual_handle)
+        manual_drawer.add(part=manual_handle)
 
     _assert_same_geometry(drawer.root.collision, manual_drawer.root.collision)
     _assert_same_geometry(drawer.handle.root.collision, manual_handle.root.collision)
@@ -2226,6 +2241,9 @@ def test_door_keeps_geometry_when_entry_way_is_mounted(empty_world):
 
 
 def test_entry_way_still_cuts_a_wall(empty_world):
+    """
+    Adding a door entry way to a wall as a part still cuts the wall geometry.
+    """
     with empty_world.modify_world():
         wall = Wall.create_with_new_body_in_world(
             name="wall", world=empty_world, scale=Scale(0.1, 4, 3)
@@ -2236,7 +2254,7 @@ def test_entry_way_still_cuts_a_wall(empty_world):
     shape_count_before = len(wall.root.collision.shapes)
 
     with empty_world.modify_world():
-        wall.add(door.entry_way)
+        wall.add(part=door.entry_way)
 
     assert door.entry_way in wall.apertures
     assert len(wall.root.collision.shapes) != shape_count_before

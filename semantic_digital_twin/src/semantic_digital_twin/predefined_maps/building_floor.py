@@ -1,3 +1,7 @@
+"""
+A predefined building floor: a floor slab carrying a room whose walls have a door.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -45,7 +49,7 @@ class SingleDoorRoom:
 
     door_color: Color = field(default_factory=lambda: Color.RED())
     """
-    Color of the door to to visually distinguish it from the wall
+    Color of the door to to visually distinguish it from the wall.
     """
 
     def spawn(
@@ -122,7 +126,7 @@ class SingleDoorRoom:
         )
         door.root.collision.shapes[0].color = self.door_color
         with world.modify_world():
-            wall.add(door.entry_way)
+            wall.add(part=door.entry_way)
 
         return floor
 
@@ -157,8 +161,8 @@ class BuildingFloor:
 
         :param world: The world the building floor is added to.
         :param name: Prefix for the names of every entity this building floor creates.
-        :param parent: The entity the floor slab attaches to. If None, ``world.root``
-            is used.
+        :param parent: The entity the floor slab attaches to. If None, ``world.root`` is
+            used.
         :param parent_T_self: Placement of the floor slab in ``parent``'s frame.
             Identity if None.
         :return: The floor slab's annotation.

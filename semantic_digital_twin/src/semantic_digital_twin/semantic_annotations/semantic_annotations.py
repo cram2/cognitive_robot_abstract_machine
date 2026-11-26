@@ -30,30 +30,32 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.robots.exceptions import MissingMobileBaseError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
-    HasCounterTop,
-    HasCabinets,
     HasSupportingSurface,
     HasRootRegion,
+    HasCaseAsRootBody,
+    HasMovableJoint,
+    IsPerceivable,
+    HasRootBody,
+    IsStorageSpace,
+    IsGraspable,
+    HasDrawnGraspsByDefault,
+)
+from semantic_digital_twin.semantic_annotations.part_whole.mixins import (
+    HasCounterTop,
+    HasCabinets,
     HasDrawers,
     HasDoors,
     HasHandle,
     HasHandles,
-    HasCaseAsRootBody,
-    HasMovableJoint,
     HasApertures,
-    IsPerceivable,
-    HasRootBody,
-    IsStorageSpace,
     HasLegs,
     HasSink,
     HasShelfLayers,
-    IsGraspable,
     HasRim,
-    HasDrawnGraspsByDefault,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (

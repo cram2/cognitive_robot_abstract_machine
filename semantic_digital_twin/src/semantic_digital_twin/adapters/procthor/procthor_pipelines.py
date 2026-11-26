@@ -1,3 +1,10 @@
+"""
+Turns ProcTHOR bodies that follow ProcTHOR's naming convention into drawer, door and
+dresser annotations with their handles and parts.
+"""
+
+from __future__ import annotations
+
 import re
 
 import numpy as np
@@ -49,7 +56,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
             world=world,
             world_root_T_self=world_T_handle,
         )
-        drawer.add(handle)
+        drawer.add(part=handle)
 
     return drawer
 
@@ -91,7 +98,7 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
             world=world,
             world_root_T_self=world_T_handle,
         )
-        door.add(handle)
+        door.add(part=handle)
     door.mount_on_movable_joint(RevoluteConnectionSpecification(axis=Vector3.Z()))
 
     return door
@@ -120,9 +127,9 @@ def dresser_from_body_in_world(dresser: Body, world: World) -> Dresser:
             child: Body
             if bool(drawer_pattern.fullmatch(child.name.name)):
                 drawer = drawer_from_body_in_world(child, world)
-                dresser.add(drawer)
+                dresser.add(part=drawer)
             elif bool(door_pattern.fullmatch(child.name.name)):
                 door = door_from_body_in_world(child, world)
-                dresser.add(door)
+                dresser.add(part=door)
 
     return dresser
