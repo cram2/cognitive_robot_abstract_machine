@@ -31,7 +31,7 @@ class HasParts(HasRootKinematicStructureEntity, HasSemanticRelationships, Mixin)
     Base for annotations that have structural *parts* (the part-whole relation).
 
     Each part mixin (such as
-    :class:`~semantic_digital_twin.semantic_annotations.part_whole.mixins.HasDoors`)
+    :class:`~semantic_digital_twin.semantic_annotations.part_whole.furniture_parts.HasDoors`)
     declares a part-whole relationship field marked with :class:`IsPartWholeRelationship`.
     :meth:`add` routes a part to the field whose element type matches it and lets the
     part mount itself (:meth:`HasRootKinematicStructureEntity._mount_strategy`).
