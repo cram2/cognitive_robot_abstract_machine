@@ -790,10 +790,17 @@ class Statechart(SubclassJSONSerializer):
         :return: The node with the given id.
         :raises NodeWithIdNotFoundError: If this statechart holds no node with that id.
         """
-        node = self._nodes_by_id.get(node_id)
+        node = self.find_node_by_id(node_id=node_id)
         if node is None:
             raise NodeWithIdNotFoundError(node_id=node_id)
         return node
+
+    def find_node_by_id(self, *, node_id: str) -> StatechartNode | None:
+        """
+        :param node_id: The :attr:`~StatechartNode._node_id` of the node to look up.
+        :return: The node with the given id, or None if this statechart holds none.
+        """
+        return self._nodes_by_id.get(node_id)
 
     def check_context_holds(
         self,

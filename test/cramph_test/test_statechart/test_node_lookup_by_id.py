@@ -1,6 +1,7 @@
 """
 Tests for looking a node of a statechart up by its id, see
-:meth:`~cramph.statechart.Statechart.get_node_by_id`.
+:meth:`~cramph.statechart.Statechart.get_node_by_id` and
+:meth:`~cramph.statechart.Statechart.find_node_by_id`.
 """
 
 from __future__ import annotations
@@ -8,10 +9,12 @@ from __future__ import annotations
 import json
 
 import pytest
+from krrood.adapters.exceptions import UntrackedObjectError
 
 from cramph.composites import Sequence
 from cramph.exceptions import NodeWithIdNotFoundError
 from cramph.executor import StatechartExecutor
+from cramph.node import DeserializedNodeTracker
 from cramph.nodes_for_testing import ConstTrueNode
 from cramph.statechart import Statechart
 
@@ -116,3 +119,54 @@ def test_a_node_of_another_statechart_is_not_found_by_its_id(
 
     with pytest.raises(NodeWithIdNotFoundError):
         statechart.get_node_by_id(node_id=elsewhere._node_id)
+
+
+# %% looking a node up without raising
+
+
+def test_finding_a_node_by_its_id_answers_the_node(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    statechart.add_nodes(nodes=[ConstTrueNode(), added := ConstTrueNode()])
+
+    assert statechart.find_node_by_id(node_id=added._node_id) is added
+
+
+def test_finding_a_removed_node_by_its_id_answers_none(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    statechart.add_nodes(nodes=[ConstTrueNode(), removed := ConstTrueNode()])
+
+    statechart.remove_node(node=removed)
+
+    assert statechart.find_node_by_id(node_id=removed._node_id) is None
+
+
+# %% the tracker of a document read against a statechart
+
+
+def test_a_tracker_finds_a_node_of_its_statechart_by_its_id(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    statechart.add_node(node=(existing := ConstTrueNode()))
+    tracker = DeserializedNodeTracker.from_statechart(statechart=statechart)
+
+    assert tracker.has(key=existing._node_id)
+    assert tracker.get(key=existing._node_id) is existing
+
+
+def test_a_tracker_does_not_find_a_node_removed_from_its_statechart(
+    statechart_executor: StatechartExecutor,
+) -> None:
+    statechart = Statechart(context=statechart_executor.context)
+    statechart.add_nodes(nodes=[ConstTrueNode(), removed := ConstTrueNode()])
+    tracker = DeserializedNodeTracker.from_statechart(statechart=statechart)
+
+    statechart.remove_node(node=removed)
+
+    assert not tracker.has(key=removed._node_id)
+    with pytest.raises(UntrackedObjectError):
+        tracker.get(key=removed._node_id)
