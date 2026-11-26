@@ -9,7 +9,7 @@ from dataclasses import dataclass, is_dataclass
 from dataclasses import field
 from functools import cached_property
 from typing import _GenericAlias
-from typing_extensions import get_args, get_origin, Any
+from typing_extensions import get_args, get_origin, get_original_bases, Any
 
 import rustworkx as rx
 
@@ -898,22 +898,22 @@ class ClassDiagram:
         """
         Creates inheritance relations between wrapped classes.
 
-        This method identifies superclass relationships among the wrapped classes and
-        establishes inheritance connections. For each class in the `wrapped_classes`
-        collection, it iterates through its base classes (`__bases__`). If the base
-        class exists in the wrapped classes, an inheritance relation is created and
-        added to the relations list.
+        Every wrapped class inherits each of its wrapped base classes. A class that names
+        a parametrized generic among its bases inherits the parametrization where the
+        diagram holds it, and the generic class otherwise.
         """
         for clazz in self.wrapped_classes:
             # Handle GenericAlias which doesn't have __bases__
             origin = get_origin(clazz.clazz)
             if origin is not None and not isinstance(clazz.clazz, type):
                 bases = origin.__bases__
+            elif isinstance(clazz.clazz, type):
+                bases = [
+                    self._resolve_wrapped_base(base=base)
+                    for base in get_original_bases(clazz.clazz)
+                ]
             else:
-                try:
-                    bases = clazz.clazz.__bases__
-                except AttributeError:
-                    continue
+                continue
 
             for superclass in bases:
                 try:
@@ -926,6 +926,18 @@ class ClassDiagram:
                         target=clazz,
                     )
                     self.add_relation(relation=relation)
+
+    def _resolve_wrapped_base(self, *, base: Any) -> Any:
+        """
+        :param base: A base as a class statement names it, possibly a parametrized
+            generic.
+        :return: The parametrization if the diagram holds it, and the class it
+            parametrizes otherwise.
+        """
+        origin = get_origin(base)
+        if origin is None or base in self._cls_wrapped_cls_map:
+            return base
+        return origin
 
     def _create_association_relations(self):
         """
