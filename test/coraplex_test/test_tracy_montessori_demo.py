@@ -54,7 +54,7 @@ def test_the_closed_pads_stay_clear_of_the_table_at_every_pieces_grasp(demo):
     scene = demo.MontessoriScene()
     world = scene.build_world()
     [tracy] = world.get_semantic_annotations_by_type(Tracy)
-    gripper = scene.sorting_arm(tracy).end_effector
+    gripper = scene.sorting_arm(tracy=tracy).end_effector
     approach_axis = gripper.approach_axis.to_np()[:3]
     with world.reset_state_context():
         gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)

@@ -58,17 +58,14 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Toaster,
     CoffeeMachine,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Point3,
+)
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
-)
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
-    ScrewConnection,
-)
+from semantic_digital_twin.world_description.connections import FixedConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -83,9 +80,7 @@ from semantic_digital_twin.world_description.shape_collection import (
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
-    ScrewConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.specifications.semantic_annotations import (
     SemanticAnnotationWithRootSpecification,
@@ -126,25 +121,29 @@ class TestFactories(unittest.TestCase):
             returned_door = Door.create_with_new_body_in_world(
                 name="door",
                 world=world,
-                parent_connection_specification=RevoluteConnectionSpecification(
-                    axis=Vector3.Z()
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
                 ),
             )
             returned_drawer = Drawer.create_with_new_body_in_world(
                 name="drawer",
                 world=world,
-                parent_connection_specification=PrismaticConnectionSpecification(
-                    axis=Vector3.X()
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.X()
+                    ),
                 ),
             )
         [queried_door] = world.get_semantic_annotations_by_type(Door)
         self.assertEqual(returned_door, queried_door)
         self.assertEqual(world.root, queried_door.movable_joint.parent)
-        self.assertIsInstance(queried_door.movable_joint, RevoluteConnection)
+        assert queried_door.movable_joint.behaves_like_a_revolute_connection
         [queried_drawer] = world.get_semantic_annotations_by_type(Drawer)
         self.assertEqual(returned_drawer, queried_drawer)
         self.assertEqual(world.root, queried_drawer.movable_joint.parent)
-        self.assertIsInstance(queried_drawer.movable_joint, PrismaticConnection)
+        assert queried_drawer.movable_joint.behaves_like_a_prismatic_connection
 
     def test_door_factory(self):
         world = World.create_with_root_body("root")
@@ -199,8 +198,10 @@ class TestFactories(unittest.TestCase):
                 name="door",
                 scale=Scale(0.03, 1, 2),
                 world=world,
-                parent_connection_specification=RevoluteConnectionSpecification(
-                    axis=Vector3.Z()
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
                 ),
             )
         assert set(world.kinematic_structure_entities) == {
@@ -208,7 +209,7 @@ class TestFactories(unittest.TestCase):
             door.root,
             door.entry_way.root,
         }
-        assert isinstance(door.movable_joint, RevoluteConnection)
+        assert door.movable_joint.behaves_like_a_revolute_connection
         assert door.movable_joint.parent == world.root
 
     def test_bottle_cap_on_screw_factory(self):
@@ -219,12 +220,18 @@ class TestFactories(unittest.TestCase):
                 name="bottle_cap",
                 world=world,
                 scale=Scale(0.03, 0.03, 0.02),
-                parent_connection_specification=ScrewConnectionSpecification(
-                    axis=Vector3.Z(), screw_pitch=screw_pitch
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                        axis=Vector3.Z(), pitch=screw_pitch
+                    ),
                 ),
             )
-        assert isinstance(bottle_cap.movable_joint, ScrewConnection)
-        assert bottle_cap.movable_joint.screw_pitch == screw_pitch
+        assert bottle_cap.movable_joint.behaves_like_a_helical_connection
+        assert np.allclose(
+            bottle_cap.movable_joint.screw_axis.translation_per_unit_position,
+            bottle_cap.movable_joint.screw_axis.rotation_per_unit_position
+            * (screw_pitch / (2 * np.pi)),
+        )
         assert bottle_cap.movable_joint.parent == world.root
 
     def test_has_handle_factory(self):
@@ -297,12 +304,14 @@ class TestFactories(unittest.TestCase):
                 name="drawer",
                 scale=Scale(0.2, 0.3, 0.2),
                 world=world,
-                parent_connection_specification=PrismaticConnectionSpecification(
-                    axis=Vector3.X()
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.X()
+                    ),
                 ),
             )
         assert set(world.kinematic_structure_entities) == {world.root, drawer.root}
-        assert isinstance(drawer.movable_joint, PrismaticConnection)
+        assert drawer.movable_joint.behaves_like_a_prismatic_connection
         assert drawer.movable_joint.parent == world.root
 
     def test_has_drawer_factory(self):
@@ -496,14 +505,15 @@ class TestFactories(unittest.TestCase):
             lower_position=0.0, upper_position=np.pi / 2
         )
 
-        specification = RevoluteConnectionSpecification(
-            axis=Vector3.Z(), dof_limits=limits
+        specification = ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            dof_limits=limits,
         )
 
         joint = door.mount_on_movable_joint(specification)
 
         assert joint is door.movable_joint
-        assert isinstance(joint, RevoluteConnection)
+        assert joint.behaves_like_a_revolute_connection
         assert joint.dof.limits.upper.position == limits.upper.position
         assert specification.connection_T_child is None
         np.testing.assert_allclose(
@@ -925,8 +935,11 @@ class TestFactories(unittest.TestCase):
             Door.create_with_new_body_in_world(
                 name="door",
                 world=world,
-                parent_connection_specification=RevoluteConnectionSpecification(
-                    dof_limits=limits, axis=Vector3.Z()
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
+                    dof_limits=limits,
                 ),
             )
 
@@ -944,8 +957,11 @@ class TestFactories(unittest.TestCase):
             Door.create_with_new_body_in_world(
                 name="door",
                 world=world,
-                parent_connection_specification=RevoluteConnectionSpecification(
-                    dof_limits=limits, axis=Vector3.Z()
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
+                    dof_limits=limits,
                 ),
             )
 
@@ -1469,13 +1485,173 @@ def test_drawer_mounts_on_its_movable_joint_where_it_stands():
     world_T_drawer = drawer.root.global_transform
 
     joint = drawer.mount_on_movable_joint(
-        PrismaticConnectionSpecification(axis=Vector3.X())
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
+        )
     )
 
     assert joint is drawer.movable_joint
-    assert isinstance(joint, PrismaticConnection)
+    assert joint.behaves_like_a_prismatic_connection
     np.testing.assert_allclose(
         drawer.root.global_transform.to_np(), world_T_drawer.to_np(), atol=1e-12
+    )
+
+
+def door_with_handle_at(*, y: float, z: float) -> tuple[World, Door]:
+    """
+    :return: A world with a door away from the origin, turned about z, and its handle at
+        ``y`` and ``z`` in the door's frame.
+    """
+    world = _world_with_root()
+    world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+        x=2.0, y=-1.0, z=1.0, yaw=0.4
+    )
+    with world.modify_world():
+        door = Door.create_with_new_body_in_world(
+            name="door",
+            scale=Scale(0.03, 1.0, 2.0),
+            world=world,
+            world_root_T_self=world_T_door,
+        )
+        handle = Handle.create_with_new_body_in_world(
+            name="handle",
+            world=world,
+            world_root_T_self=world_T_door
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=y, z=z),
+        )
+        door.add(handle)
+    return world, door
+
+
+def test_a_door_on_a_horizontal_hinge_swings_about_the_edge_opposite_its_handle():
+    """
+    Mounted on a hinge along its y axis, a door stays where it was and swings about its
+    top edge, opposite the handle, as the hinge turns.
+    """
+    world, door = door_with_handle_at(y=0.4, z=0.0)
+    world_T_door = door.root.global_transform
+    world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Y())
+
+    joint = door.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
+        )
+    )
+
+    np.testing.assert_allclose(
+        door.root.global_transform.to_np(), world_T_door.to_np(), atol=1e-12
+    )
+    joint.position = 0.5
+    world.notify_state_change()
+    np.testing.assert_allclose(
+        door.root.global_transform.to_np(),
+        (
+            world_T_hinge
+            @ HomogeneousTransformationMatrix.from_xyz_rpy(pitch=0.5)
+            @ world_T_hinge.inverse()
+            @ world_T_door
+        ).to_np(),
+        atol=1e-12,
+    )
+
+
+def test_a_mounted_drawer_slides_along_its_axis():
+    """
+    A drawer mounted on a slide along its x axis moves along that axis by the joint's
+    position.
+    """
+    world = _world_with_root()
+    with world.modify_world():
+        drawer = Drawer.create_with_new_body_in_world(
+            name="drawer",
+            world=world,
+            scale=Scale(0.4, 0.5, 0.6),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=1.0, yaw=0.3
+            ),
+        )
+    world_T_drawer = drawer.root.global_transform
+
+    joint = drawer.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X())
+        )
+    )
+    joint.position = 0.2
+    world.notify_state_change()
+
+    np.testing.assert_allclose(
+        drawer.root.global_transform.to_np(),
+        (world_T_drawer @ HomogeneousTransformationMatrix.from_xyz_rpy(x=0.2)).to_np(),
+        atol=1e-12,
+    )
+
+
+def test_a_mounted_bottle_cap_advances_by_its_pitch_per_turn():
+    """
+    A bottle cap mounted on a thread of 4 millimeters advances that far along its axis,
+    and comes back to its orientation, after one full turn.
+    """
+    world = _world_with_root()
+    with world.modify_world():
+        cap = BottleCap.create_with_new_body_in_world(
+            name="cap",
+            world=world,
+            scale=Scale(0.03, 0.03, 0.02),
+            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.5, z=0.8, roll=0.2
+            ),
+        )
+    world_T_cap = cap.root.global_transform
+
+    joint = cap.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=0.004
+            )
+        )
+    )
+    joint.position = 2 * np.pi
+    world.notify_state_change()
+
+    np.testing.assert_allclose(
+        cap.root.global_transform.to_np(),
+        (world_T_cap @ HomogeneousTransformationMatrix.from_xyz_rpy(z=0.004)).to_np(),
+        atol=1e-12,
+    )
+
+
+def test_mounting_a_door_again_replaces_its_joint_and_keeps_it_in_place():
+    """
+    Mounting a door that already hangs on a joint replaces that joint, leaving the world
+    with as many connections and the door where it was.
+    """
+    world, door = door_with_handle_at(y=0.4, z=0.0)
+    world_T_door = door.root.global_transform
+    first = door.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z())
+        )
+    )
+    connection_count = len(world.connections)
+
+    second = door.mount_on_movable_joint(
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
+        )
+    )
+
+    assert second is not first
+    assert door.root.parent_connection is second
+    assert door.movable_joint is second
+    assert len(world.connections) == connection_count
+    np.testing.assert_allclose(
+        second.screw_axis.unit_direction.to_np()[:3], [0.0, 1.0, 0.0]
+    )
+    np.testing.assert_allclose(
+        door.root.global_transform.to_np(), world_T_door.to_np(), atol=1e-12
     )
 
 
@@ -1501,8 +1677,10 @@ def test_a_door_on_its_hinge_reports_how_far_it_stands_open():
             name="door",
             world=world,
             scale=Scale(0.03, 1, 2),
-            parent_connection_specification=RevoluteConnectionSpecification(
-                axis=Vector3.Z(),
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.5, maximum_speed=1.0
                 ),

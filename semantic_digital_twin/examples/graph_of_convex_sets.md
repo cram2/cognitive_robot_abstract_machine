@@ -101,13 +101,10 @@ print("A potential path is", [(point.x, point.y) for point in path])
 This minimal example demonstrates a concept that can be applied to the entire belief state of the robot. Let's load a more complex environment and look at the connectivity of it.
 
 ```{code-cell} ipython3
-import os
-from importlib.resources import files
-from pathlib import Path
 import semantic_digital_twin
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment = os.path.realpath(os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "kitchen.urdf"))
+apartment = "package://iai_kitchen/urdf_obj/kitchen_with_walls.urdf"
 
 apartment_parser = URDFParser.from_file(apartment)
 world = apartment_parser.create_world()

@@ -29,9 +29,6 @@ First, let's load a world from a URDF file.
 
 ```{code-cell} ipython3
 import logging
-import os
-from importlib.resources import files
-from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -51,8 +48,7 @@ session = Session(engine)
 Base.metadata.create_all(bind=session.bind)
 
 # load the table world from urdf
-urdf_dir = os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf")
-table = os.path.join(urdf_dir, "table.urdf")
+table = "package://iai_objects/urdf/table.urdf"
 world = URDFParser.from_file(table).create_world()
 ```
 

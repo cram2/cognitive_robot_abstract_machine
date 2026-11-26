@@ -20,13 +20,16 @@ from semantic_digital_twin.adapters.multi_sim import (
     SimulatorElementNames,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import ServoGains
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -73,12 +76,12 @@ class Pendulum:
     The body the servoed hinge moves.
     """
 
-    hinge: RevoluteConnection
+    hinge: ScrewAxisConnection
     """
     The servoed hinge.
     """
 
-    mirrored_hinge: RevoluteConnection
+    mirrored_hinge: ScrewAxisConnection
     """
     The hinge following :attr:`hinge` with a negative multiplier.
     """
@@ -140,19 +143,23 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
             )
         )
         world.add_degree_of_freedom(degree_of_freedom)
-        hinge = RevoluteConnection(
+        hinge = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.Z(reference_frame=arm)
+            ),
             name=PrefixedName("hinge"),
             parent=base,
             child=arm,
-            axis=Vector3.Z(reference_frame=arm),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(hinge)
-        mirrored_hinge = RevoluteConnection(
+        mirrored_hinge = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.Z(reference_frame=mirrored_arm)
+            ),
             name=PrefixedName("mirrored_hinge"),
             parent=base,
             child=mirrored_arm,
-            axis=Vector3.Z(reference_frame=mirrored_arm),
             raw_dof=degree_of_freedom,
             multiplier=-1.0,
         )

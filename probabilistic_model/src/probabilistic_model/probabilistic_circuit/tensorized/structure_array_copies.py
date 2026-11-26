@@ -1,7 +1,7 @@
 """
 Copies of the numpy arrays of the structure of a circuit on the devices of the torch
 tensors they are used with, so that a step of training copies nothing from the host, as
-recording it as a CUDA graph requires.
+recording it as a CUDA graph requires, and the values at the positions they hold.
 """
 
 from __future__ import annotations
@@ -94,3 +94,19 @@ class StructureArrayCopies:
                 ),
             )
         return self.copies[placement].device_array
+
+    def values_at_positions(
+        self, *, values: BackendArray, positions: np.ndarray
+    ) -> BackendArray:
+        """
+        :param values: Values along the last axis.
+        :param positions: Positions in the last axis, an array of the structure.
+        :return: The values at the positions, flattened in their order, along the last
+            axis.
+        """
+        if not is_torch_array(values):
+            return array_namespace(values).take(values, positions.reshape(-1), axis=-1)
+        flat_positions = self.placed(array=positions, values=values).reshape(-1)
+        return values.gather(
+            -1, flat_positions.expand(*values.shape[:-1], flat_positions.shape[0])
+        )

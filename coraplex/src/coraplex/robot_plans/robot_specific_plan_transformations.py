@@ -44,17 +44,17 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 # %% keeping the torso upright while using a tool
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
     """
     Keeps Justin's torso upright while it moves a tool, which no other robot needs: its
     torso would otherwise lean into the motion.
     """
 
-    def is_applicable(self, plan_node: ToolMotionAction) -> bool:
+    def is_applicable(self, *, plan_node: ToolMotionAction) -> bool:
         return isinstance(plan_node.robot, Justin)
 
-    def anchor(self, plan_node: ToolMotionAction) -> StatechartNode:
+    def anchor(self, *, plan_node: ToolMotionAction) -> StatechartNode:
         """
         :return: The goal moving the tool along its path, alongside which the torso is
             held.
@@ -64,9 +64,9 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
         for node in plan_node.descendants:
             if isinstance(node, CartesianPositionTrajectory):
                 return node
-        raise ToolPathNotFound(plan_node)
+        raise ToolPathNotFound(plan_node=plan_node)
 
-    def nodes_to_insert(self, plan_node: ToolMotionAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: ToolMotionAction) -> list[StatechartNode]:
         root = plan_node.controlled_root
         torso_tip = plan_node.robot.mobile_base.torso.tip
         return [
@@ -82,7 +82,7 @@ class KeepTheTorsoUprightWhileUsingATool(ParallelInsertion[ToolMotionAction]):
 # %% driving a differential drive
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveWithTheDifferentialDrive(ConfigurationTransformation[DrivesBase]):
     """
     Moves the base of a robot driven by a differential drive with a goal for that drive,
@@ -92,17 +92,17 @@ class DriveWithTheDifferentialDrive(ConfigurationTransformation[DrivesBase]):
     Applies simulated or not.
     """
 
-    def is_applicable(self, plan_node: DrivesBase) -> bool:
+    def is_applicable(self, *, plan_node: DrivesBase) -> bool:
         return isinstance(plan_node.robot.drive, DifferentialDrive)
 
-    def apply(self, plan_node: DrivesBase) -> None:
+    def apply(self, *, plan_node: DrivesBase) -> None:
         plan_node.base_goal_type = DifferentialDriveBaseGoal
 
 
 # %% keeping the base from turning while moving the tool
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeepStretchFromTurningWhileMovingItsTool(ParallelInsertion[MovesToolCenterPoint]):
     """
     Holds the orientation of a Stretch's base while its tool moves, so that the base
@@ -114,7 +114,7 @@ class KeepStretchFromTurningWhileMovingItsTool(ParallelInsertion[MovesToolCenter
     handle, and actions below one that holds the base already.
     """
 
-    def is_applicable(self, plan_node: MovesToolCenterPoint) -> bool:
+    def is_applicable(self, *, plan_node: MovesToolCenterPoint) -> bool:
         robot = plan_node.robot
         return (
             isinstance(robot, Stretch)
@@ -125,14 +125,17 @@ class KeepStretchFromTurningWhileMovingItsTool(ParallelInsertion[MovesToolCenter
             )
             and not any(isinstance(node, DrivesBase) for node in plan_node.descendants)
             and not any(
-                self._holds_the_base(ancestor, robot) for ancestor in plan_node.path
+                self._holds_the_base(node=ancestor, robot=robot)
+                for ancestor in plan_node.path
             )
         )
 
-    def anchor(self, plan_node: MovesToolCenterPoint) -> StatechartNode:
+    def anchor(self, *, plan_node: MovesToolCenterPoint) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: MovesToolCenterPoint) -> list[StatechartNode]:
+    def nodes_to_insert(
+        self, *, plan_node: MovesToolCenterPoint
+    ) -> list[StatechartNode]:
         return [
             HoldOrientation(
                 kinematic_chain=KinematicChain(
@@ -142,7 +145,7 @@ class KeepStretchFromTurningWhileMovingItsTool(ParallelInsertion[MovesToolCenter
         ]
 
     @staticmethod
-    def _holds_the_base(node: StatechartNode, robot: Stretch) -> bool:
+    def _holds_the_base(*, node: StatechartNode, robot: Stretch) -> bool:
         """
         :return: Whether `node` holds the orientation of the base of `robot` beside its
             other children, as this transformation makes an action do. A hold further
@@ -157,7 +160,7 @@ class KeepStretchFromTurningWhileMovingItsTool(ParallelInsertion[MovesToolCenter
 # %% moving the tool center point in a straight line
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose]):
     """
     Moves the tool center point of a Stretch to each of its targets along a straight
@@ -167,7 +170,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
     reaching the same pose. Pose goals inside another goal are left as they are.
     """
 
-    def is_applicable(self, plan_node: CartesianPose) -> bool:
+    def is_applicable(self, *, plan_node: CartesianPose) -> bool:
         if type(plan_node) is not CartesianPose:
             return False
         parent = plan_node.parent_node
@@ -187,7 +190,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
             and plan_node.kinematic_chain.root is owner.controlled_root
         )
 
-    def apply(self, plan_node: CartesianPose) -> None:
+    def apply(self, *, plan_node: CartesianPose) -> None:
         straight = CartesianPoseStraight(
             name=plan_node.name,
             kinematic_chain=plan_node.kinematic_chain,
@@ -206,7 +209,7 @@ class MoveStretchToolCenterPointInAStraightLine(PlanTransformation[CartesianPose
 # %% closing a container
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
     """
     Keeps a kinematically simulated Stretch standing in front of the container it closes
@@ -214,11 +217,11 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
     forward.
     """
 
-    def is_applicable(self, plan_node: CloseAction) -> bool:
+    def is_applicable(self, *, plan_node: CloseAction) -> bool:
         return isinstance(plan_node.robot, Stretch)
 
     @staticmethod
-    def closing_goal(plan_node: CloseAction) -> ArticulateGraspedMechanism:
+    def closing_goal(*, plan_node: CloseAction) -> ArticulateGraspedMechanism:
         """
         :param plan_node: The close action.
         :return: The goal closing the container.
@@ -228,10 +231,10 @@ class KeepStretchInFrontOfTheContainerItCloses(PlanTransformation[CloseAction]):
         for node in plan_node.descendants:
             if isinstance(node, ArticulateGraspedMechanism):
                 return node
-        raise ClosingGoalNotFound(plan_node)
+        raise ClosingGoalNotFound(plan_node=plan_node)
 
-    def apply(self, plan_node: CloseAction) -> None:
-        closing_goal = self.closing_goal(plan_node)
+    def apply(self, *, plan_node: CloseAction) -> None:
+        closing_goal = self.closing_goal(plan_node=plan_node)
         handle = closing_goal.environment_link
         tool_frame = closing_goal.tip_link
         robot_root = plan_node.robot.root

@@ -20,11 +20,11 @@ from scipy.special import logsumexp
 from sortedcontainers import SortedSet
 
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from probabilistic_model.learning.region_graph.exceptions import (
+from probabilistic_model.learning.structure.region_graph.exceptions import (
     MultipleRootsError,
     UnsupportedRegionVariableError,
 )
-from probabilistic_model.learning.region_graph.region_graph import (
+from probabilistic_model.learning.structure.region_graph.region_graph import (
     Partition,
     Region,
     RegionGraph,

@@ -30,8 +30,10 @@ from probabilistic_model.causal_structure.learning import (
     LearnedCausalStructure,
     RelationalCausalStructureLearner,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,

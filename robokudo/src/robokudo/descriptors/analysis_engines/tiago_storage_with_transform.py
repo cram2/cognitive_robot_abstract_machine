@@ -76,7 +76,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for data recording
         """
-        tiago_config = CollectionReaderDescriptorFactory.create_descriptor("tiago")
+        tiago_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="tiago"
+        )
 
         seq = Pipeline()
         seq.add_children(

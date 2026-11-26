@@ -40,7 +40,7 @@ def test_bytes_codec_roundtrip():
     registry = CASViewCodecRegistry()
     input_payload = b"\x00\x01\x02\x03"
 
-    encoded = registry.encode_view("blob", input_payload)
+    encoded = registry.encode_view(view_name="blob", value=input_payload)
     assert encoded is not None
     assert encoded["serializer_id"] == "bytes_v1"
 
@@ -56,7 +56,7 @@ def test_ros_message_codec_roundtrip():
     registry = CASViewCodecRegistry()
     msg = String(data="hello")
 
-    encoded = registry.encode_view("msg", msg)
+    encoded = registry.encode_view(view_name="msg", value=msg)
     assert encoded is not None
     assert encoded["serializer_id"] == "ros_message_v1"
 
@@ -80,7 +80,7 @@ def test_stamped_transform_codec_roundtrip():
     transform.timestamp.sec = 123
     transform.timestamp.nanosec = 456
 
-    encoded = registry.encode_view("tf", transform)
+    encoded = registry.encode_view(view_name="tf", value=transform)
     assert encoded is not None
     assert encoded["serializer_id"] == "robokudo_stamped_transform_v1"
 
@@ -131,7 +131,7 @@ def test_camera_observation_codec_resolves_camera_and_preserves_pose_state(
     )
     registry = CASViewCodecRegistry()
 
-    encoded = registry.encode_view("camera_observation", observation)
+    encoded = registry.encode_view(view_name="camera_observation", value=observation)
     decoded_name, decoded_observation = registry.decode_view(
         document=encoded, **tracker.create_kwargs()
     )
@@ -158,7 +158,7 @@ def test_color_to_depth_ratio_roundtrip():
     registry = CASViewCodecRegistry()
     ratio = ColorToDepthRatio(horizontal=0.5, vertical=0.25)
 
-    encoded = registry.encode_view(CASViews.COLOR_TO_DEPTH_RATIO, ratio)
+    encoded = registry.encode_view(view_name=CASViews.COLOR_TO_DEPTH_RATIO, value=ratio)
 
     assert registry.decode_view(document=encoded) == (
         CASViews.COLOR_TO_DEPTH_RATIO,
@@ -216,7 +216,7 @@ def test_krrood_codec_resolves_world_entities_against_the_given_world() -> None:
     codec = KrroodCodec()
 
     decoded = codec.decode(
-        payload=codec.encode(transform),
+        payload=codec.encode(value=transform),
         **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
     )
 

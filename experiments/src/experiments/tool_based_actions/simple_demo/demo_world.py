@@ -4,10 +4,7 @@ wiping).
 """
 
 import math
-import os
 
-
-import coraplex
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Arm
@@ -17,10 +14,6 @@ from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Color, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
-
-OBJECTS_DIRECTORY = os.path.join(
-    os.path.dirname(coraplex.__file__), "..", "..", "resources", "objects"
-)
 
 TARGET_POSITION_XYZ = (2.4, 2.2, 1.0)
 """
@@ -75,13 +68,13 @@ Yellowish color for the sponge.
 
 def parse_object(stl_file_name: str, color: Color | None = None) -> World:
     """
-    :param stl_file_name: Name of the mesh file in the demo resources.
+    :param stl_file_name: Name of the mesh file in the ``iai_objects`` package.
     :param color: Color to dye the mesh's visual shapes with. Keeps the mesh's own
         appearance if None.
-    :return: A world containing the mesh from the demo resources.
+    :return: A world containing the mesh.
     """
     object_world = STLParser(
-        os.path.join(OBJECTS_DIRECTORY, stl_file_name)
+        f"package://iai_objects/objects/{stl_file_name}"
     ).create_world()
     if color is not None:
         object_world.root.visual.dye_shapes(color)

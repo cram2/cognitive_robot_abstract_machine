@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.connection_properties import (
     JointDynamics,
     ServoGains,
 )
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body, PositionServo
 
@@ -32,7 +32,7 @@ from semantic_digital_twin.world_description.world_entity import Body, PositionS
 
 
 @pytest.fixture
-def described_joint() -> RevoluteConnection:
+def described_joint() -> ScrewAxisConnection:
     """
     A joint whose description states its armature, damping and dry friction.
     """
@@ -42,8 +42,11 @@ def described_joint() -> RevoluteConnection:
         child = Body(name=PrefixedName("child"))
         world.add_kinematic_structure_entity(parent)
         world.add_kinematic_structure_entity(child)
-        joint = RevoluteConnection.create_with_dofs(
-            world=world, parent=parent, child=child, axis=Vector3.Z()
+        joint = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=parent,
+            child=child,
         )
         world.add_connection(joint)
     joint.dynamics = JointDynamics(armature=0.2, damping=3.0, dry_friction=0.5)

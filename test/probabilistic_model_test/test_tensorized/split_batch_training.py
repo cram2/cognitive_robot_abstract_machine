@@ -20,12 +20,16 @@ import optax
 from krrood.adapters.json_serializer import to_json
 from random_events.variable import Continuous
 
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import (
-    JaxGradientDescent,
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
     JaxPlatform,
 )
-from probabilistic_model.learning.training_schedule import MiniBatches
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
+from probabilistic_model.learning.parameters.training_schedule import MiniBatches
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
 )
@@ -48,7 +52,9 @@ def train_on_split_batches() -> SplitBatchTrainingResult:
     circuit = host.to_namespace(jnp)
     data = jnp.asarray(host.sample(450))
     gradient_descent = JaxGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(5e-2),
     )
     training = gradient_descent.start_training(
         arguments=(data,), mini_batches=MiniBatches(batch_size=100, seed=0)

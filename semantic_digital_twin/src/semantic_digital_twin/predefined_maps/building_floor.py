@@ -1,15 +1,16 @@
 """
-A predefined building floor: a floor slab carrying a room whose walls have a door.
+A predefined floor of a building: rooms, each with a single door.
 """
 
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
@@ -17,7 +18,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Wall,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
 from semantic_digital_twin.world_description.world_entity import (
@@ -108,8 +112,10 @@ class SingleDoorRoom:
             f"{name}_door",
             Door.get_default_root_kinematic_structure_entity_specification(
                 scale=self.door_scale,
-                connection_specification=RevoluteConnectionSpecification(
-                    axis=Vector3.Z()
+                connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
                 ),
             ),
             part_specifications={

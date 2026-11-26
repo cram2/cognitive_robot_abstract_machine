@@ -21,15 +21,12 @@ Let's load a world first to get started.
 
 ```{code-cell} ipython3
 import logging
-import os
 
-from importlib.resources import files
-from pathlib import Path
 
 from semantic_digital_twin.adapters.urdf import URDFParser 
 
 logging.disable(logging.CRITICAL)
-apartment = os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "apartment.urdf")
+apartment = "package://iai_apartment/urdf/apartment.urdf"
 world = URDFParser.from_file(apartment).create_world()
 
 ```

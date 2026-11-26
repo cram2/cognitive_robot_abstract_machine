@@ -1,3 +1,9 @@
+"""
+Tests of the region utilities.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pytest
 
@@ -13,6 +19,10 @@ from semantic_digital_twin.world_description.world_entity import Region
 
 
 class TestUtilsRegion:
+    """
+    Tests of the oriented bounding box and pose of a world descriptor region.
+    """
+
     @pytest.fixture
     def world_and_region(self):
         world_descriptor = BaseWorldDescriptor()
@@ -31,12 +41,12 @@ class TestUtilsRegion:
                 reference_frame=root,
             ),
         )
-        world_descriptor.build_regions(root, [spec])
+        world_descriptor.build_regions(root=root, specs=[spec])
         regions = world_descriptor.world.get_kinematic_structure_entity_by_type(Region)
         assert len(regions) == 1
         return world_descriptor.world, regions[0]
 
-    def test_region_obb(self, world_and_region):
+    def test_region_obb(self, *, world_and_region):
         world, region = world_and_region
         obb = region_obb(region, world=world)
 
@@ -44,7 +54,7 @@ class TestUtilsRegion:
         assert np.allclose(np.asarray(obb.center).reshape(-1)[:3], [3.0, 2.0, 1.0])
         assert np.allclose(obb.R, [[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
 
-    def test_region_obb_in_camera_coordinates(self, world_and_region):
+    def test_region_obb_in_camera_coordinates(self, *, world_and_region):
         world, region = world_and_region
         world_to_camera = np.array(
             [
@@ -63,7 +73,7 @@ class TestUtilsRegion:
         assert np.allclose(np.asarray(obb.center).reshape(-1)[:3], [2.0, -1.0, 1.0])
         assert np.allclose(obb.R, [[0.0, 1.0, 0.0], [0.0, 0.0, -1.0], [-1.0, 0.0, 0.0]])
 
-    def test_region_pose_annotation(self, world_and_region):
+    def test_region_pose_annotation(self, *, world_and_region):
         _, region = world_and_region
         pose_annotation = region_pose_annotation(region)
 

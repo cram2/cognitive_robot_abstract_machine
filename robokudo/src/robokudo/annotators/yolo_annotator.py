@@ -54,7 +54,7 @@ if TYPE_CHECKING:
 # %% detections
 
 
-@dataclass
+@dataclass(kw_only=True)
 class YoloDetection:
     """
     An object the YOLO model detected in the detection image.
@@ -71,7 +71,7 @@ class YoloDetection:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnnotatedDetection:
     """
     A detection together with the object hypothesis it annotates.
@@ -112,8 +112,12 @@ class YoloAnnotator(ThreadedAnnotator):
             """
 
             def __init__(self) -> None:
+                """
+                Default parameters: no model is configured; set either
+                :attr:`pretrained_model` or the custom weights in a ROS package.
+                """
                 self.models_directory: Path = (
-                    ModuleLoader.get_module_path(PACKAGE_NAME) / "models"
+                    ModuleLoader.get_module_path(module_name=PACKAGE_NAME) / "models"
                 )
                 """
                 Directory the pretrained models are loaded from, and downloaded into on
@@ -191,7 +195,7 @@ class YoloAnnotator(ThreadedAnnotator):
                 hypothesis to classify it.
                 """
 
-            def model_location(self, annotator_name: str) -> str:
+            def model_location(self, *, annotator_name: str) -> str:
                 """
                 :param annotator_name: Name of the annotator loading the model, for the
                     error.
@@ -203,9 +207,9 @@ class YoloAnnotator(ThreadedAnnotator):
                     return str(self.models_directory / self.pretrained_model)
                 if self.ros_package_name is None or self.weights_path is None:
                     raise DetectionModelNotConfigured(annotator_name=annotator_name)
-                return str(self.file_in_ros_package(self.weights_path))
+                return str(self.file_in_ros_package(relative_path=self.weights_path))
 
-            def file_in_ros_package(self, relative_path: str) -> Path:
+            def file_in_ros_package(self, *, relative_path: str) -> Path:
                 """
                 :param relative_path: Path of a file, relative to the configured ROS
                     package.
@@ -227,9 +231,20 @@ class YoloAnnotator(ThreadedAnnotator):
         name: str = "YoloAnnotator",
         descriptor: YoloAnnotator.Descriptor | None = None,
     ) -> None:
+        """
+        Resolve where the detection model is loaded from; :meth:`setup` loads the
+        models.
+
+        :param name: Name of the annotator.
+        :param descriptor: Descriptor configuring the annotator; the default one if
+            omitted.
+        :raises DetectionModelNotConfigured: If the descriptor configures no model.
+        """
         super().__init__(name, descriptor)
 
-        self.model_location: str = self.descriptor.parameters.model_location(self.name)
+        self.model_location: str = self.descriptor.parameters.model_location(
+            annotator_name=self.name
+        )
         """
         Where the YOLO model is loaded from.
         """
@@ -276,7 +291,9 @@ class YoloAnnotator(ThreadedAnnotator):
         parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
         if parameters.pretrained_model is not None:
             return dict(self.model.names)
-        class_names_file = parameters.file_in_ros_package(parameters.class_names_path)
+        class_names_file = parameters.file_in_ros_package(
+            relative_path=parameters.class_names_path
+        )
         with open(class_names_file, "r", encoding="utf-8") as file:
             return {int(class_id): name for class_id, name in json.load(file).items()}
 
@@ -298,14 +315,18 @@ class YoloAnnotator(ThreadedAnnotator):
 
         detection_image = self._detection_image()
         existing_hypotheses = (
-            self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+            self.get_cas().filter_annotations_by_type(type_to_include=ObjectHypothesis)
             if parameters.classify_existing_hypotheses
             else []
         )
 
         annotated_detections = [
-            self._classify(detection, detection_image, existing_hypotheses)
-            for detection in self._detect(detection_image)
+            self._classify(
+                detection=detection,
+                detection_image=detection_image,
+                existing_hypotheses=existing_hypotheses,
+            )
+            for detection in self._detect(detection_image=detection_image)
             if detection.classification.classname.strip()
             not in self._ignored_class_names()
         ]
@@ -316,7 +337,7 @@ class YoloAnnotator(ThreadedAnnotator):
         )
 
         if parameters.global_with_visualization:
-            self._visualize(annotated_detections)
+            self._visualize(annotated_detections=annotated_detections)
         return Status.SUCCESS
 
     def _detection_image(self) -> npt.NDArray[np.uint8]:
@@ -324,12 +345,12 @@ class YoloAnnotator(ThreadedAnnotator):
         :return: The color image, scaled to the depth image resolution when depth is
             used.
         """
-        color_image = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
+        color_image = self.get_cas().get_copy(view_name=CASViews.COLOR_IMAGE)
         if not self.descriptor.parameters.global_with_depth:
             return color_image
         return get_scaled_color_image_for_depth_image(self.get_cas(), color_image)
 
-    def _detect(self, detection_image: npt.NDArray[np.uint8]) -> list[YoloDetection]:
+    def _detect(self, *, detection_image: npt.NDArray[np.uint8]) -> list[YoloDetection]:
         """
         :return: The objects the model detects in the image with sufficient confidence.
         """
@@ -340,21 +361,25 @@ class YoloAnnotator(ThreadedAnnotator):
         detections = []
         for result in results:
             boxes = result.boxes.cpu().numpy()
-            for corners, confidence, class_id in zip(boxes.xyxy, boxes.conf, boxes.cls):
+            for (x1, y1, x2, y2), confidence, class_id in zip(
+                boxes.xyxy, boxes.conf, boxes.cls
+            ):
                 detections.append(
                     YoloDetection(
                         classification=Classification(
                             source=self.name,
-                            classname=self._classname(int(class_id)),
+                            classname=self._classname(class_id=int(class_id)),
                             confidence=float(confidence),
                             class_id=int(class_id),
                         ),
-                        bounding_box=Rect.from_corner_points(*corners),
+                        bounding_box=Rect.from_corner_points(
+                            x1=x1, y1=y1, x2=x2, y2=y2
+                        ),
                     )
                 )
         return detections
 
-    def _classname(self, class_id: int) -> str:
+    def _classname(self, *, class_id: int) -> str:
         """
         :return: The name of the class with the given id.
         """
@@ -371,6 +396,7 @@ class YoloAnnotator(ThreadedAnnotator):
 
     def _classify(
         self,
+        *,
         detection: YoloDetection,
         detection_image: npt.NDArray[np.uint8],
         existing_hypotheses: list[ObjectHypothesis],
@@ -378,13 +404,15 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         Classify the existing hypothesis the detection overlaps, or else a new one.
         """
-        region = self._color_image_region(detection)
+        region = self._color_image_region(detection=detection)
         overlapped_hypothesis = self._most_overlapped_hypothesis(
-            region, existing_hypotheses
+            region=region, hypotheses=existing_hypotheses
         )
         is_new = overlapped_hypothesis is None
         hypothesis = (
-            self._create_hypothesis(detection, detection_image, region)
+            self._create_hypothesis(
+                detection=detection, detection_image=detection_image, region=region
+            )
             if is_new
             else overlapped_hypothesis
         )
@@ -393,7 +421,7 @@ class YoloAnnotator(ThreadedAnnotator):
             detection=detection, hypothesis=hypothesis, is_new=is_new
         )
 
-    def _color_image_region(self, detection: YoloDetection) -> Rect:
+    def _color_image_region(self, *, detection: YoloDetection) -> Rect:
         """
         :return: The bounding box of the detection, in color image pixels.
         """
@@ -409,7 +437,7 @@ class YoloAnnotator(ThreadedAnnotator):
         )
 
     def _most_overlapped_hypothesis(
-        self, region: Rect, hypotheses: list[ObjectHypothesis]
+        self, *, region: Rect, hypotheses: list[ObjectHypothesis]
     ) -> ObjectHypothesis | None:
         """
         :return: The hypothesis overlapping the region the most, if it overlaps by more
@@ -420,11 +448,11 @@ class YoloAnnotator(ThreadedAnnotator):
         most_overlapped = max(
             hypotheses,
             key=lambda hypothesis: self.roi_comparator.compute_similarity(
-                hypothesis.roi.roi, region
+                query_value=hypothesis.roi.roi, obj_value=region
             ),
         )
         overlap = self.roi_comparator.compute_similarity(
-            most_overlapped.roi.roi, region
+            query_value=most_overlapped.roi.roi, obj_value=region
         )
         if overlap <= self.descriptor.parameters.minimum_hypothesis_overlap:
             return None
@@ -432,6 +460,7 @@ class YoloAnnotator(ThreadedAnnotator):
 
     def _create_hypothesis(
         self,
+        *,
         detection: YoloDetection,
         detection_image: npt.NDArray[np.uint8],
         region: Rect,
@@ -449,9 +478,13 @@ class YoloAnnotator(ThreadedAnnotator):
         hypothesis.source = self.name
         hypothesis.roi.roi = region
 
-        detection_mask = self._detection_mask(detection, detection_image)
+        detection_mask = self._detection_mask(
+            detection=detection, detection_image=detection_image
+        )
         if self.descriptor.parameters.global_with_depth:
-            hypothesis.points = self._point_cloud(detection_mask, detection_image)
+            hypothesis.points = self._point_cloud(
+                detection_mask=detection_mask, detection_image=detection_image
+            )
         hypothesis.roi.mask = crop_image(
             resize_mask(self, detection_mask),
             (region.pos.x, region.pos.y),
@@ -460,7 +493,7 @@ class YoloAnnotator(ThreadedAnnotator):
         return hypothesis
 
     def _detection_mask(
-        self, detection: YoloDetection, detection_image: npt.NDArray[np.uint8]
+        self, *, detection: YoloDetection, detection_image: npt.NDArray[np.uint8]
     ) -> npt.NDArray[np.uint8]:
         """
         :return: The mask of the detected object on the detection image.
@@ -489,6 +522,7 @@ class YoloAnnotator(ThreadedAnnotator):
 
     def _point_cloud(
         self,
+        *,
         detection_mask: npt.NDArray[np.uint8],
         detection_image: npt.NDArray[np.uint8],
     ) -> open3d.geometry.PointCloud:
@@ -497,20 +531,20 @@ class YoloAnnotator(ThreadedAnnotator):
         """
         return get_cloud_from_rgb_depth_and_mask(
             rgb_image=cv2.cvtColor(detection_image, cv2.COLOR_BGR2RGB),
-            depth_image=self.get_cas().get(CASViews.DEPTH_IMAGE),
+            depth_image=self.get_cas().get(view_name=CASViews.DEPTH_IMAGE),
             mask=detection_mask,
             camera_model=self.camera_model,
             depth_truncate=self.descriptor.parameters.depth_truncate,
             mask_true_value=self.mask_foreground,
         )
 
-    def _visualize(self, annotated_detections: list[AnnotatedDetection]) -> None:
+    def _visualize(self, *, annotated_detections: list[AnnotatedDetection]) -> None:
         """
         Draw the annotated hypotheses into the color image, together with their masks in
         precision mode, and output the point clouds of the new hypotheses.
         """
         parameters: YoloAnnotator.Descriptor.Parameters = self.descriptor.parameters
-        visualization_image = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
+        visualization_image = self.get_cas().get_copy(view_name=CASViews.COLOR_IMAGE)
         for index, annotated in enumerate(annotated_detections):
             if parameters.precision_mode and annotated.is_new:
                 x1, y1, _, _ = annotated.hypothesis.roi.roi.get_corner_points()
@@ -527,10 +561,10 @@ class YoloAnnotator(ThreadedAnnotator):
                     f"{classification.classname}, {classification.confidence:.2f}"
                 ),
             )
-        self.get_annotator_output_struct().set_image(visualization_image)
+        self.get_annotator_output_struct().set_image(img=visualization_image)
         if parameters.global_with_depth:
             self.get_annotator_output_struct().set_geometries(
-                [
+                geometries=[
                     annotated.hypothesis.points
                     for annotated in annotated_detections
                     if annotated.is_new

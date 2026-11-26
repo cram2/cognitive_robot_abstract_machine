@@ -15,6 +15,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from krrood.utils import get_full_class_name
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.adapters.ros.exceptions import (
     CannotConvertRos2ToSemDTError,
     CannotConvertSemDTToRos2Error,
@@ -324,11 +325,11 @@ def test_convert_sphere_shape(cylinder_bot_world):
 
 
 def test_convert_mesh_shape(cylinder_bot_world):
-    stl_file = os.path.join(
-        Path(files("semantic_digital_twin")).parent.parent,
-        "resources",
-        "stl",
-        "jeroen_cup.stl",
+    """
+    A mesh survives the round-trip through a ROS 2 marker.
+    """
+    stl_file = PackageUriResolver().resolve(
+        "package://iai_objects/objects/jeroen_cup.stl"
     )
     mesh = Mesh(
         filename=stl_file,
@@ -396,28 +397,6 @@ def map_origin(world) -> HomogeneousTransformationMatrix:
     )
 
 
-@pytest.fixture
-def installed_mesh_file(tmp_path, monkeypatch) -> Path:
-    """
-    :return: A mesh file in the share directory of the package ``mesh_package``, which
-        is registered in an ament prefix.
-    """
-    share = tmp_path / "share"
-    (share / "ament_index" / "resource_index" / "packages").mkdir(parents=True)
-    (share / "ament_index" / "resource_index" / "packages" / "mesh_package").touch()
-    mesh_file = share / "mesh_package" / "meshes" / "jeroen_cup.stl"
-    mesh_file.parent.mkdir(parents=True)
-    shutil.copy(
-        Path(files("semantic_digital_twin")).parent.parent
-        / "resources"
-        / "stl"
-        / "jeroen_cup.stl",
-        mesh_file,
-    )
-    monkeypatch.setenv("AMENT_PREFIX_PATH", str(tmp_path))
-    return mesh_file
-
-
 def test_a_mesh_in_a_package_is_published_by_package_uri(
     cylinder_bot_world, installed_mesh_file
 ):
@@ -433,12 +412,12 @@ def test_a_mesh_in_a_package_is_published_by_package_uri(
 def test_a_mesh_outside_any_package_is_published_by_file_uri(
     cylinder_bot_world, tmp_path
 ):
+    """
+    A mesh whose file lies in no package is published with a ``file://`` URI.
+    """
     mesh_file = tmp_path / "jeroen_cup.stl"
     shutil.copy(
-        Path(files("semantic_digital_twin")).parent.parent
-        / "resources"
-        / "stl"
-        / "jeroen_cup.stl",
+        PackageUriResolver().resolve("package://iai_objects/objects/jeroen_cup.stl"),
         mesh_file,
     )
     mesh = Mesh(filename=str(mesh_file), origin=map_origin(cylinder_bot_world))
@@ -460,6 +439,23 @@ def test_a_package_uri_mesh_is_found_in_the_local_install(
     assert mesh.filename == str(installed_mesh_file)
 
 
+def test_a_package_mesh_received_as_json_is_published_by_package_uri(
+    cylinder_bot_world, installed_mesh_file
+):
+    """
+    A visualizer on another machine can open a received mesh only through the package it
+    lies in, never through a file the receiving process wrote.
+    """
+    sent = Mesh(filename=str(installed_mesh_file))
+    received = Mesh.from_json(data=sent.to_json())
+    for mesh in (sent, received):
+        mesh.origin.reference_frame = cylinder_bot_world.get_body_by_name("map")
+
+    marker = SemDTToRos2Converter.convert(received)
+
+    assert marker.mesh_resource == SemDTToRos2Converter.convert(sent).mesh_resource
+
+
 # %% meshes turned within their file
 
 
@@ -471,10 +467,7 @@ def test_a_mesh_turned_within_its_file_is_drawn_from_its_file_origin(
     """
     mesh_file = tmp_path / "jeroen_cup.stl"
     shutil.copy(
-        Path(files("semantic_digital_twin")).parent.parent
-        / "resources"
-        / "stl"
-        / "jeroen_cup.stl",
+        PackageUriResolver().resolve("package://iai_objects/objects/jeroen_cup.stl"),
         mesh_file,
     )
     mesh = Mesh(

@@ -9,7 +9,7 @@ from typing_extensions import Self
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldSnapshot:
     """
     The model version and degree of freedom states of a world at one point in time, to
@@ -33,7 +33,7 @@ class WorldSnapshot:
     """
 
     @classmethod
-    def capture(cls, world: World) -> Self:
+    def capture(cls, *, world: World) -> Self:
         """
         :param world: The world to capture.
         :return: A snapshot of the current model version and state of ``world``.

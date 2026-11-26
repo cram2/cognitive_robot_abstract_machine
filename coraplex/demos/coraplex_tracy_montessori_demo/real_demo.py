@@ -46,7 +46,7 @@ from semantic_digital_twin.world import World
 # %% running the demo
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RunningRobot:
     """
     The real Tracy's stack, up and reachable: its world and the node the demo talks
@@ -64,7 +64,7 @@ class RunningRobot:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealRunner(DemoRunner):
     """
     Carries the sorting plan out on the real robot, bringing its controllers up first.
@@ -93,7 +93,7 @@ class RealRunner(DemoRunner):
 
     def run(self) -> None:
         with self.running_robot() as robot:
-            self.scene.populate(robot.world)
+            self.scene.populate(world=robot.world)
             [tracy] = robot.world.get_semantic_annotations_by_type(Tracy)
             executor = RealRobotPlanExecutor(
                 context=StatechartContext.with_extensions(
@@ -104,7 +104,9 @@ class RealRunner(DemoRunner):
                 plan_adaptations=self.plan_adaptations(),
             )
             executor.compile(
-                statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+                statechart=ShapeSortingPlan(scene=self.scene).build(
+                    context=executor.context
+                )
             )
             executor.execute()
             executor.close()

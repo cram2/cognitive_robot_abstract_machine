@@ -49,10 +49,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from typing_extensions import List
 
 
@@ -77,11 +74,21 @@ def conclusion_111115858654502671279494400838612635168(case) -> List[Handle]:
 
 
 def conditions_248676565933633239858802311504377126882(case) -> bool:
+    """
+    :return: Whether anything in the world slides, which is what a drawer needs.
+    """
+
     def world_holds_sliders(case: World) -> bool:
         """
         Whether anything in the world slides, which is what a drawer needs.
         """
-        return any(isinstance(c, PrismaticConnection) for c in case.connections)
+        return any(
+            (
+                isinstance(c, ScrewAxisConnection)
+                and c.behaves_like_a_prismatic_connection
+            )
+            for c in case.connections
+        )
 
     return world_holds_sliders(case)
 
@@ -97,11 +104,21 @@ def conclusion_248676565933633239858802311504377126882(case) -> List[Drawer]:
 
 
 def conditions_317079062995625045064213599855869838805(case) -> bool:
+    """
+    :return: Whether anything in the world swings, which is what a door needs.
+    """
+
     def world_holds_hinges(case: World) -> bool:
         """
         Whether anything in the world swings, which is what a door needs.
         """
-        return any(isinstance(c, RevoluteConnection) for c in case.connections)
+        return any(
+            (
+                isinstance(c, ScrewAxisConnection)
+                and c.behaves_like_a_revolute_connection
+            )
+            for c in case.connections
+        )
 
     return world_holds_hinges(case)
 

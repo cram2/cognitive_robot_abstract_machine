@@ -148,7 +148,7 @@ class PlaneAnnotator(ThreadedAnnotator):
         """
         logger.info("Plane compute start")
         start_timer = default_timer()
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         # print(f"Loaded cloud with {len(cloud.points)} points")
 
         random_seed = self.descriptor.parameters.random_seed
@@ -195,7 +195,9 @@ class PlaneAnnotator(ThreadedAnnotator):
             visualized_geometries.append(
                 {"name": "plane_model", "geometry": plane_model_mesh}
             )
-            self.get_annotator_output_struct().set_geometries(visualized_geometries)
+            self.get_annotator_output_struct().set_geometries(
+                geometries=visualized_geometries
+            )
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

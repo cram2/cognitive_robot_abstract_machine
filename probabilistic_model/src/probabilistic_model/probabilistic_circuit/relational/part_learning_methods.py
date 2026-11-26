@@ -13,7 +13,7 @@ from typing_extensions import Any, Self
 from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
 from krrood.entity_query_language.core.mapped_variable import Attribute
 from krrood.entity_query_language.core.variable import Variable
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LearningMethod
 from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     MissingPartLearningMethodError,
