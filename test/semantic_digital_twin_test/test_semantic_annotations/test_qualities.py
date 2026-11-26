@@ -18,11 +18,11 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
     RipenessOutsideScale,
-    RipenessSpansSeveralStages,
+    RipenessInNoSingleStage,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.qualities.mixins import HasRipeness
-from semantic_digital_twin.semantic_annotations.qualities.metadata import (
+from semantic_digital_twin.semantic_annotations.qualities.relationship_marker import (
     IsQualityRelationship,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
@@ -93,7 +93,7 @@ def test_ripeness_straddling_two_stages_has_no_single_stage() -> None:
         )
     )
 
-    with pytest.raises(RipenessSpansSeveralStages):
+    with pytest.raises(RipenessInNoSingleStage):
         ripeness.stage
 
 

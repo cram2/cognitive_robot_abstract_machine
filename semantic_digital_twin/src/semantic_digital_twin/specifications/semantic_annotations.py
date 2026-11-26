@@ -15,7 +15,7 @@ from semantic_digital_twin.exceptions import (
     PartWholeFieldInAnnotationKwargs,
     UnknownSemanticRelationshipField,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix

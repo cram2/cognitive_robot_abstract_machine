@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from krrood.patterns.mixin import Mixin
-from semantic_digital_twin.semantic_annotations.qualities.metadata import (
+from semantic_digital_twin.semantic_annotations.qualities.relationship_marker import (
     IsQualityRelationship,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import Ripeness

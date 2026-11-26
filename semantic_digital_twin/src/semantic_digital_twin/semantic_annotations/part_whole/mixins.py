@@ -22,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
     IsGraspable,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.semantic_annotations.part_whole.relationship import (

@@ -43,10 +43,10 @@ class RipenessOutsideScale(DataclassException):
 
 
 @dataclass(kw_only=True)
-class RipenessSpansSeveralStages(DataclassException):
+class RipenessInNoSingleStage(DataclassException):
     """
-    Raised when the stage of a ripeness is asked for, but its value reaches into more
-    than one ripeness stage.
+    Raised when the stage of a ripeness is asked for, but no single stage holds its
+    whole value, because the value reaches into several stages.
     """
 
     ripeness: Ripeness
@@ -63,5 +63,5 @@ class RipenessSpansSeveralStages(DataclassException):
     def suggest_correction(self) -> str:
         return (
             "Narrow the ripeness value to lie within one stage, or compare it with the "
-            "ripeness_interval of each stage directly."
+            "interval of each stage directly."
         )

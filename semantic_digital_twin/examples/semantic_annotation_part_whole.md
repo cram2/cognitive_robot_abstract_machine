@@ -122,7 +122,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.part_whole.metadata import IsPartWholeRelationship
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import IsPartWholeRelationship
 from semantic_digital_twin.semantic_annotations.part_whole.mixins import HasHandle
 
 @dataclass(eq=False)

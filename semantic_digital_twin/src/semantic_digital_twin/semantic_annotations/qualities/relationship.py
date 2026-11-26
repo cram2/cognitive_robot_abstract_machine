@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from krrood.patterns.mixin import Mixin
-from semantic_digital_twin.semantic_annotations.qualities.metadata import (
+from semantic_digital_twin.semantic_annotations.qualities.relationship_marker import (
     IsQualityRelationship,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import Quality
@@ -46,8 +46,8 @@ class HasQualities(HasSemanticRelationships, Mixin):
         :param field_name: The name of the quality field to set the quality in, which
             resolves the ambiguity when several fields accept ``type(quality)``. When
             empty, the field is chosen by type alone.
-        :raises UnknownSemanticRelationshipField: If ``field_name`` names no quality field
-            of this annotation.
+        :raises UnknownSemanticRelationshipField: If ``field_name`` names no quality
+            field of this annotation.
         :raises NoFieldAcceptsEntity: If no quality field accepts ``type(quality)``.
         :raises SeveralFieldsAcceptEntity: If several quality fields accept
             ``type(quality)``.

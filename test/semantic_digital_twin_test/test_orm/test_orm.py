@@ -44,7 +44,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     EntryWay,
     Handle,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from krrood.class_diagrams.class_diagram import WrappedClass

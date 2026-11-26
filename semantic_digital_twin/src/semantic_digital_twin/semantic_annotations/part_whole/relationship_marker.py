@@ -1,9 +1,5 @@
 """
-Metadata for the part-whole relation between semantic annotations.
-
-This module holds only the vocabulary of the relation, so both the annotation mixins
-that declare part-whole fields and the specification API that fills them can depend on
-it without depending on each other.
+The marker of the fields of a whole that hold its parts.
 """
 
 from __future__ import annotations
@@ -16,7 +12,7 @@ from semantic_digital_twin.semantic_annotations.semantic_relationship import (
     IsSemanticRelationship,
 )
 
-# %% relation metadata
+# %% Relationship marker
 
 
 @dataclass(kw_only=True)
