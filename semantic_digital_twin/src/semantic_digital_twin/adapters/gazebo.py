@@ -27,21 +27,24 @@ from semantic_digital_twin.exceptions import (
     PathResolutionError,
     ParsingError,
 )
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.specifications.connections import (
     ActiveConnection1DOFSpecification,
     ConnectionSpecification,
     FixedConnectionSpecification,
     ConnectionSpecificationWithEndpoints,
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point3,
     Vector3,
+    ScrewAxis,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+)
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
@@ -84,11 +87,20 @@ class SdfJointType(StrEnum):
         :return: The specification of the connection this joint type becomes.
         """
         return {
-            SdfJointType.REVOLUTE: RevoluteConnectionSpecification,
-            SdfJointType.CONTINUOUS: RevoluteConnectionSpecification,
-            SdfJointType.PRISMATIC: PrismaticConnectionSpecification,
+            SdfJointType.REVOLUTE: ScrewAxisConnectionSpecification,
+            SdfJointType.CONTINUOUS: ScrewAxisConnectionSpecification,
+            SdfJointType.PRISMATIC: ScrewAxisConnectionSpecification,
             SdfJointType.FIXED: FixedConnectionSpecification,
         }[self]
+
+    def create_screw_axis(self, *, direction: Vector3) -> ScrewAxis:
+        """
+        :param direction: The unit vector this movable joint moves along or about.
+        :return: The screw axis of the connection this movable joint type becomes.
+        """
+        if self is SdfJointType.PRISMATIC:
+            return ScrewAxisConnection.create_prismatic_screw_axis(axis=direction)
+        return ScrewAxisConnection.create_revolute_screw_axis(axis=direction)
 
 
 @dataclass
@@ -759,7 +771,9 @@ class GazeboParser(WorldModelParser):
             specification = specification_type(
                 name=joint_name,
                 connection_T_child=child_T_connection.inverse(),
-                axis=self.parse_axis(element, joint_name, bodies[parent_name]),
+                screw_axis=joint_type.create_screw_axis(
+                    direction=self.parse_axis(element, joint_name, bodies[parent_name])
+                ),
                 dof_limits=self.parse_limits(element, joint_type, joint_name),
                 dynamics=self.parse_dynamics(element.find("axis/dynamics")),
             )
@@ -786,7 +800,8 @@ class GazeboParser(WorldModelParser):
         :param element: The ``joint`` element to parse.
         :param joint_name: The name of the joint, used to report an unsupported frame.
         :param parent_body: The parent of the joint, used as the reference frame.
-        :return: The axis the joint moves along.
+        :return: The axis the joint moves along, scaled to unit length as SDF defines
+            it.
         :raises UnsupportedAxisReference: If the axis is expressed in another frame.
         """
         axis_element = element.find("axis")
@@ -809,9 +824,11 @@ class GazeboParser(WorldModelParser):
                 joint_name=joint_name, reference=expressed_in
             )
 
-        return Vector3(
+        axis = Vector3(
             *self.parse_vector(xyz_element.text), reference_frame=parent_body
         )
+        axis.scale(a=1)
+        return axis
 
     def parse_limits(
         self, element: ElementTree.Element, joint_type: SdfJointType, joint_name: str

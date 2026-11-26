@@ -8,6 +8,7 @@ sends the nodes it chose instead.
 
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, replace
 
 import pytest
@@ -84,7 +85,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -245,8 +246,10 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             name="elevator",
             world=world,
             scale=Scale(2, 2, 2),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.Z(),
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1.0
                 ),
@@ -256,8 +259,10 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             name="door",
             world=world,
             scale=Scale(0.05, 1, 2),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.Y(),
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.0
                 ),

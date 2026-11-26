@@ -44,8 +44,7 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World, Body
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     FixedConnection,
     Connection6DoF,
 )
@@ -651,11 +650,10 @@ class MJCFParser(WorldModelParser):
             else:
                 joint_to_child_body_transform = child_body_to_joint_transform.inverse()
                 joint_axis = Vector3(
-                    mujoco_joint.axis[0],
-                    mujoco_joint.axis[1],
-                    mujoco_joint.axis[2],
-                    reference_frame=parent_body,
+                    mujoco_joint.axis[0], mujoco_joint.axis[1], mujoco_joint.axis[2]
                 )
+                # MuJoCo scales the axis to unit length when it compiles the model.
+                joint_axis.scale(a=1)
                 dof = self.parse_dof(mujoco_joint=mujoco_joint)
                 joint_dynamics = JointDynamics(
                     armature=mujoco_joint.armature,
@@ -667,31 +665,27 @@ class MJCFParser(WorldModelParser):
                     ),
                 )
                 if mujoco_joint.type == mujoco.mjtJoint.mjJNT_HINGE:
-                    connection = RevoluteConnection(
-                        name=PrefixedName(mujoco_joint.name),
-                        parent=parent_body,
-                        child=child_body,
-                        parent_T_connection_expression=parent_body_to_joint_transform,
-                        connection_T_child_expression=joint_to_child_body_transform,
-                        axis=joint_axis,
-                        raw_dof=dof,
-                        dynamics=joint_dynamics,
+                    screw_axis = ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=joint_axis
                     )
                 elif mujoco_joint.type == mujoco.mjtJoint.mjJNT_SLIDE:
-                    connection = PrismaticConnection(
-                        name=PrefixedName(mujoco_joint.name),
-                        parent=parent_body,
-                        child=child_body,
-                        parent_T_connection_expression=parent_body_to_joint_transform,
-                        connection_T_child_expression=joint_to_child_body_transform,
-                        axis=joint_axis,
-                        raw_dof=dof,
-                        dynamics=joint_dynamics,
+                    screw_axis = ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=joint_axis
                     )
                 else:
                     raise NotImplementedError(
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
+                connection = ScrewAxisConnection(
+                    name=PrefixedName(mujoco_joint.name),
+                    parent=parent_body,
+                    child=child_body,
+                    parent_T_connection_expression=parent_body_to_joint_transform,
+                    connection_T_child_expression=joint_to_child_body_transform,
+                    raw_dof=dof,
+                    dynamics=joint_dynamics,
+                    screw_axis=screw_axis,
+                )
                 connection.add_simulator_property(
                     MujocoJoint(
                         stiffness=(
