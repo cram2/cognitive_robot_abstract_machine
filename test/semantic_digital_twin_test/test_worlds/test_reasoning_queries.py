@@ -166,7 +166,7 @@ def test_goal_surface_of_object(kitchen_environment_fixture):
     assert goal_surface_of_object(lettuce, [table1, table3]) == table3
     assert goal_surface_of_object(table1, [table1, table2, table3]) == table3
     # trying with a new threshold
-    assert goal_surface_of_object(orange, [table2, table3], 2) == table2
+    assert goal_surface_of_object(orange, [table2, table3], 3) == table2
     # returning None if there is no empty table or no tables
     assert goal_surface_of_object(apple, [table2]) == None
     assert goal_surface_of_object(orange, []) == None

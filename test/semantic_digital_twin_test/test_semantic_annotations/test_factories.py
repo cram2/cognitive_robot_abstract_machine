@@ -1521,7 +1521,7 @@ def door_with_handle_at(*, y: float, z: float) -> tuple[World, Door]:
             world_root_T_self=world_T_door
             @ HomogeneousTransformationMatrix.from_xyz_rpy(y=y, z=z),
         )
-        door.add(handle)
+        door.add(part=handle)
     return world, door
 
 
