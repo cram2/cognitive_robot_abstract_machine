@@ -30,7 +30,7 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.robots.exceptions import MissingMobileBaseError
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
-from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (

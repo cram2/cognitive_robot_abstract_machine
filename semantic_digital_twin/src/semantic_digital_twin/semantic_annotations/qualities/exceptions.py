@@ -61,10 +61,10 @@ class QualityOutsideScale(DataclassException):
 
 
 @dataclass(kw_only=True)
-class RipenessSpansSeveralStages(DataclassException):
+class RipenessInNoSingleStage(DataclassException):
     """
-    Raised when the stage of a ripeness is asked for, but its value reaches into more
-    than one ripeness stage.
+    Raised when the stage of a ripeness is asked for, but no single stage holds its
+    whole value, because the value reaches into several stages.
     """
 
     ripeness: Ripeness

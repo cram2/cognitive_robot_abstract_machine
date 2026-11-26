@@ -1,8 +1,5 @@
 """
-Metadata for the quality relation between semantic annotations and their qualities.
-
-Holds only the vocabulary of the relation, so code that reads or fills quality fields
-can depend on it without depending on the annotation mixins.
+The marker of the fields of an annotation that hold its qualities.
 """
 
 from __future__ import annotations
@@ -15,7 +12,7 @@ from semantic_digital_twin.semantic_annotations.semantic_relationship import (
     IsSemanticRelationship,
 )
 
-# %% Relation metadata
+# %% Relationship marker
 
 
 @dataclass(kw_only=True)

@@ -30,7 +30,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasCaseAsRootBody,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (

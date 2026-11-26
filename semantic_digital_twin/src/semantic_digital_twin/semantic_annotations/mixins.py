@@ -61,7 +61,7 @@ from semantic_digital_twin.grasping.grasp_strategies import (
 )
 from semantic_digital_twin.grasping.object_relative_grasp import draw_grasps
 from semantic_digital_twin.reasoning.predicates import SupportedBy
-from semantic_digital_twin.semantic_annotations.part_whole.metadata import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from krrood_spatial_math.spatial_types import (

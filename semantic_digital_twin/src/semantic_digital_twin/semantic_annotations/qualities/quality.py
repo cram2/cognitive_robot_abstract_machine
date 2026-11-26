@@ -20,7 +20,7 @@ from krrood.patterns.classproperty import classproperty
 from random_events.interval import Bound, SimpleInterval
 from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
     QualityOutsideScale,
-    RipenessSpansSeveralStages,
+    RipenessInNoSingleStage,
 )
 
 # %% Qualities
@@ -115,12 +115,12 @@ class Ripeness(Quality):
     def stage(self) -> RipenessStage:
         """
         :return: The stage whose interval holds the whole value.
-        :raises RipenessSpansSeveralStages: If the value reaches into several stages.
+        :raises RipenessInNoSingleStage: If no single stage holds the whole value.
         """
         for stage in RipenessStage:
             if stage.value.intersection_with(self.value) == self.value:
                 return stage
-        raise RipenessSpansSeveralStages(ripeness=self)
+        raise RipenessInNoSingleStage(ripeness=self)
 
 
 # %% Material
