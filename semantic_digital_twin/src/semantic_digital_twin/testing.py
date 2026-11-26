@@ -8,8 +8,6 @@ import os
 
 import pytest
 from dataclasses import dataclass, field
-from importlib.resources import files
-from pathlib import Path
 from typing_extensions import Optional, Tuple
 
 from semantic_digital_twin.adapters.urdf import URDFParser
@@ -129,6 +127,10 @@ def world_setup() -> tuple[
 
 @pytest.fixture
 def world_setup_simple():
+    """
+    :return: A world with a box, a cylinder, a sphere, a mesh and a compound body, each
+        on a 6 DoF connection to the root, followed by these five bodies.
+    """
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     body1 = Body(
@@ -167,12 +169,7 @@ def world_setup_simple():
             [
                 Mesh(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
-                    filename=os.path.join(
-                        Path(files("semantic_digital_twin")).parent.parent,
-                        "resources",
-                        "stl",
-                        "jeroen_cup.stl",
-                    ),
+                    filename="package://iai_objects/objects/jeroen_cup.stl",
                     scale=Scale(10, 10, 10),
                 )
             ]
@@ -293,10 +290,10 @@ def ray_test_world():
 
 @pytest.fixture
 def two_arm_robot_world():
-    urdf_dir = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "..", "resources", "urdf"
-    )
-    robot = os.path.join(urdf_dir, "simple_two_arm_robot.urdf")
+    """
+    :return: A world with the simple two arm robot on an omnidirectional drive.
+    """
+    robot = "package://iai_objects/urdf/simple_two_arm_robot.urdf"
     world = World()
     with world.modify_world():
         localization_body = Body(name=PrefixedName("odom_combined"))

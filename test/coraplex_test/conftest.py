@@ -33,6 +33,11 @@ from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from krrood_spatial_math.spatial_types import Pose
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+from semantic_digital_twin.adapters.multi_sim import MujocoSim  # noqa: E402
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName  # noqa: E402
+from semantic_digital_twin.specifications.robots import RobotSpecification  # noqa: E402
+from semantic_digital_twin.world_description.world_entity import Body  # noqa: E402
+from typing_extensions import Iterator  # noqa: E402
 
 try:
     import rclpy
@@ -348,3 +353,21 @@ def register_orm_mappers() -> None:
     interfaces it builds on for every test.
     """
     import coraplex.orm.ormatic_interface  # noqa: F401
+
+
+# %% a robot in physics
+
+
+@pytest.fixture
+def simulated_hsrb() -> Iterator[tuple[HSRB, MujocoSim]]:
+    """
+    An HSRB on an empty floor, performing in a stepped MuJoCo simulation.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
+    hsrb = RobotSpecification(HSRB).spawn(world)
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    yield hsrb, simulation
+    simulation.stop_simulation()

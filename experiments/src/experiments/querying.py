@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing_extensions import Any
 
-import coraplex as _coraplex_pkg
 import krrood.entity_query_language.factories as eql
 from cramph.data_types import LifeCycleValue
 from coraplex.plans.failures import PlanFailure
@@ -70,7 +69,6 @@ from cramph.context import StatechartContext
 from coraplex.plans.executors import KinematicallySimulatedPlanExecutor
 from cramph.statechart import Statechart
 
-_CORAPLEX_RESOURCES = Path(_coraplex_pkg.__file__).parent.parent.parent / "resources"
 _DATABASE_PATH = Path(__file__).parent / "querying.db"
 
 
@@ -154,8 +152,8 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     """
     world = setup_world()
 
-    spoon = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "spoon.stl")).create_world()
-    bowl = STLParser(str(_CORAPLEX_RESOURCES / "objects" / "bowl.stl")).create_world()
+    spoon = STLParser("package://iai_objects/objects/spoon.stl").create_world()
+    bowl = STLParser("package://iai_objects/objects/bowl.stl").create_world()
 
     with world.modify_world():
         world.merge_world_at_pose(

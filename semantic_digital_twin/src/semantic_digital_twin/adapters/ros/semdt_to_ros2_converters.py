@@ -215,13 +215,10 @@ class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
             directory, so the receiving machine resolves it in its own install;
             otherwise a ``file://`` URI.
         """
-        if mesh.filename.startswith("package://"):
-            return mesh.filename
-        parts = mesh.local_file.parts
-        if "share" not in parts[:-2]:
+        package_uri = mesh.package_uri
+        if package_uri is None:
             return "file://" + str(mesh.local_file)
-        share_index = len(parts) - 1 - parts[::-1].index("share")
-        return "package://" + "/".join(parts[share_index + 1 :])
+        return package_uri
 
     @classmethod
     def convert(cls, data: Mesh) -> Marker:

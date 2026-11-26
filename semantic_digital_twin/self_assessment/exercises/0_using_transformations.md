@@ -35,11 +35,8 @@ Imports the required classes and sets up the environment used in this exercise. 
 
 import logging
 import math
-import os
 
 
-from importlib.resources import files
-from pathlib import Path
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
@@ -50,8 +47,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
-root = Path(files("semantic_digital_twin")).parent.parent
-urdf_path = os.path.join(root, "resources", "urdf", "table.urdf")
+urdf_path = "package://iai_objects/urdf/table.urdf"
 table_world = URDFParser.from_file(urdf_path).create_world()
 
 root_C_left_leg = table_world.get_body_by_name("left_front_leg").parent_connection

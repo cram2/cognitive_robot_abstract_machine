@@ -1,6 +1,5 @@
 """
-Executors that run a plan in a kinematic or physics simulation or on the real robot, and
-the outcome of a run.
+The executors that run a plan's statechart, and the outcome a run ends with.
 """
 
 from __future__ import annotations
@@ -348,7 +347,9 @@ class PlanExecutor(Executor, ABC):
             )
         except CollisionViolatedError as violation:
             return PlanOutcome.failed_by(
-                failure=MotionViolatedCollisionAvoidance(violation=violation),
+                failure=MotionViolatedCollisionAvoidance.from_violation_in_world(
+                    violation=violation, world=self.context.world
+                ),
                 cause=violation,
             )
         except InfeasibleException as infeasibility:

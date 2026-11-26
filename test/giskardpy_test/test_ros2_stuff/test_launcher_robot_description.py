@@ -5,7 +5,7 @@ Coverage for where the launcher scripts of the robots take the robot description
 from __future__ import annotations
 
 import inspect
-from importlib.resources import files
+from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -31,6 +31,7 @@ from giskardpy.middleware.ros2.scripts.iai_robots.tracy import (
     tracy_standalone,
     tracy_velocity,
 )
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.adapters.ros import background_node
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.robots.daisy import DAiSy
@@ -74,11 +75,11 @@ def published_robot_description(init_background_node) -> Iterator[str]:
     .. note:: The description is of none of the robots that have a launcher, so it cannot
         be confused with the one a robot class declares.
     """
-    description = (
-        files("semantic_digital_twin")
-        .parent.parent.joinpath("resources", "urdf", "simple_two_arm_robot.urdf")
-        .read_text()
-    )
+    description = Path(
+        PackageUriResolver().resolve(
+            "package://iai_objects/urdf/simple_two_arm_robot.urdf"
+        )
+    ).read_text()
     topic = inspect.signature(RosGraph.robot_description).parameters["topic"].default
     publisher = background_node.get_node().create_publisher(
         String,

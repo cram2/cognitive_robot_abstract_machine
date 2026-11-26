@@ -22,11 +22,9 @@ directories.
 from __future__ import annotations
 
 import math
-import os
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 
-from ament_index_python.packages import get_package_share_directory
 
 from coraplex.demonstrations import RobotDemonstration
 from coraplex.plans.context_extensions import RobotAccess
@@ -92,35 +90,18 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 
 class SceneFile(StrEnum):
     """
-    The files the demonstration builds its scene from.
+    The files the demonstration builds its scene from, as ``package://`` URIs.
     """
 
-    APARTMENT = os.path.join("mjcf", "scene-bodies.xml")
+    APARTMENT = "package://iai_garmi_apartment/mjcf/scene-bodies.xml"
     """
-    The apartment scene GARMI acts in, in the ``iai_garmi_apartment`` package.
-    """
-
-    MILK = os.path.join("objects", "milk.stl")
-    """
-    The milk's mesh, under the coraplex resources.
+    The apartment scene GARMI acts in.
     """
 
-    @property
-    def path(self) -> str:
-        """
-        :return: Where the file is read from.
-        """
-        if self is SceneFile.APARTMENT:
-            return os.path.join(
-                get_package_share_directory("iai_garmi_apartment"), self.value
-            )
-        return os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "..",
-            "resources",
-            self.value,
-        )
+    MILK = "package://iai_objects/objects/milk.stl"
+    """
+    The milk's mesh.
+    """
 
 
 class SceneBody(StrEnum):
@@ -305,7 +286,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         geom has to stand in for it.
         """
         return WorldSpecification.from_mjcf(
-            SceneFile.APARTMENT.path, use_visual_as_collision_backup=True
+            SceneFile.APARTMENT, use_visual_as_collision_backup=True
         )
 
     def robot_specification(self) -> RobotSpecification:
@@ -341,7 +322,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             SceneBody.MILK.value,
             BodySpecification.mesh(
                 SceneBody.MILK.value,
-                SceneFile.MILK.path,
+                SceneFile.MILK,
                 parent_T_self=ScenePose.MILK_START.value.transform,
             ),
             parent_connection_specification=Connection6DoFSpecification(),

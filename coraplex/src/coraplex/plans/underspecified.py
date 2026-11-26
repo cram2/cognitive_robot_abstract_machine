@@ -1,6 +1,6 @@
 """
-Grounding the underspecified actions of a plan while it runs: choosing, trying and
-handing over candidates, and rebuilding parts of the plan onto a world.
+Trying the candidates of underspecified statements of a plan in a copy of the world,
+before the plan commits to one.
 """
 
 from __future__ import annotations
@@ -127,11 +127,66 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
             rewriting.treat_as_offered(node=node)
 
 
+# %% what a trial tries
+
+
+class TrialBuilder(ABC):
+    """
+    Builds what an :class:`ActionTrial` tries in its copy of the world.
+    """
+
+    @abstractmethod
+    def build_for_trial(self, *, world: World) -> StatechartNode:
+        """
+        :param world: The copy the built nodes are tried in.
+        :return: The node to try, built onto `world`.
+        """
+
+    @abstractmethod
+    def carry_over_conditions(self) -> None:
+        """
+        Gives the nodes built by the latest :meth:`build_for_trial` the transition
+        conditions they need, once they joined a statechart.
+        """
+
+
+@dataclass(kw_only=True)
+class FailedTrial:
+    """
+    A trial that failed, kept so the failure can be explained afterwards.
+    """
+
+    builder: TrialBuilder
+    """
+    What built the nodes that were tried.
+    """
+
+    statechart: Statechart
+    """
+    The statechart the trial ran, with its history.
+    """
+
+    failure: ExecutionFailure
+    """
+    What the trial failed with.
+    """
+
+    tried_statements: frozenset[StatementNode]
+    """
+    The statements whose candidates the trial tried.
+    """
+
+    tick_in_plan: int
+    """
+    The tick of the plan's statechart the trial ran at.
+    """
+
+
 # %% rebuilding part of a plan onto a world
 
 
 @dataclass(kw_only=True)
-class SubtreeRebuild(NodeRebuild):
+class SubtreeRebuild(NodeRebuild, TrialBuilder):
     """
     Rebuilds a node of a plan and everything below it onto a world to be tried, putting
     candidates in for its statements.
@@ -417,6 +472,11 @@ class ActionTrial:
     How many of the modification blocks of the executor's world the copy already holds.
     """
 
+    failed_trials: list[FailedTrial] = field(default_factory=list, init=False)
+    """
+    Every trial of a statement's candidates that failed, in the order they ran.
+    """
+
     @property
     def world(self) -> World:
         """
@@ -424,10 +484,16 @@ class ActionTrial:
         """
         return self.executor.context.world
 
-    def succeeds(self, *, rebuild: SubtreeRebuild) -> bool:
+    def succeeds(
+        self,
+        *,
+        rebuild: TrialBuilder,
+        tried_statements: frozenset[StatementNode] = frozenset(),
+    ) -> bool:
         """
         Run what `rebuild` builds for a trial against the copy, see
-        :meth:`SubtreeRebuild.build_for_trial`, and restore the copy afterwards.
+        :meth:`TrialBuilder.build_for_trial`, and restore the copy afterwards. A trial
+        that tries candidates of statements and fails is kept in :attr:`failed_trials`.
 
         It is rebuilt onto the copy because an action that modifies the model (attaching
         a grasped body, say) requires the entities it is given to belong to the world
@@ -436,6 +502,7 @@ class ActionTrial:
         each attempt undoes only its own modifications.
 
         :param rebuild: Builds what is tried.
+        :param tried_statements: The statements whose candidates `rebuild` tries.
         :return: True if what `rebuild` builds runs to completion without raising an
             :class:`~cramph.exceptions.ExecutionFailure`.
         """
@@ -443,9 +510,9 @@ class ActionTrial:
         version = world.get_world_model_manager().version
 
         with world.reset_state_context():
+            executor = self._trial_executor(world=world)
+            statechart = Statechart(context=executor.context)
             try:
-                executor = self._trial_executor(world=world)
-                statechart = Statechart(context=executor.context)
                 # A parallel is ended by what holds it.
                 statechart.add_node(
                     node=Sequence(nodes=[rebuild.build_for_trial(world=world)])
@@ -456,6 +523,16 @@ class ActionTrial:
                 return True
             except ExecutionFailure as failure:
                 logger.info(f"{rebuild} failed its trial: {failure}")
+                if tried_statements:
+                    self.failed_trials.append(
+                        FailedTrial(
+                            builder=rebuild,
+                            statechart=statechart,
+                            failure=failure,
+                            tried_statements=tried_statements,
+                            tick_in_plan=self.executor.context.tick_count,
+                        )
+                    )
                 return False
             finally:
                 # Undo the model changes before leaving the reset context restores the
@@ -630,7 +707,8 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             if self.trial.succeeds(
                 rebuild=SubtreeRebuild.unfinished_nodes(
                     root=root, proposals={node: candidate}
-                )
+                ),
+                tried_statements=frozenset({node}),
             ):
                 return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
             candidate = node.next_candidate(
@@ -667,7 +745,8 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
             if not self.trial.succeeds(
                 rebuild=SubtreeRebuild.unfinished_nodes(
                     root=root, proposals=combination
-                )
+                ),
+                tried_statements=frozenset(combination),
             ):
                 continue
             combinations.take(combination=combination)
