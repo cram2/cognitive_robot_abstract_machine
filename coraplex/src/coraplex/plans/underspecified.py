@@ -102,7 +102,7 @@ class CandidateHandOver(PlanChildChooser[StatementNode]):
     statements leave it alone.
     """
 
-    candidate: Action
+    candidate: StatechartNode
     """
     The candidate the statement runs.
     """
@@ -203,7 +203,7 @@ class SubtreeRebuild(NodeRebuild, TrialBuilder):
     The node rebuilt with everything below it.
     """
 
-    candidates: dict[StatementNode, Action]
+    candidates: dict[StatementNode, StatechartNode]
     """
     The candidate each statement of :attr:`root` runs once rebuilt; the branch of a
     statement without one ends before it.
@@ -253,7 +253,7 @@ class SubtreeRebuild(NodeRebuild, TrialBuilder):
 
     @classmethod
     def unfinished_nodes(
-        cls, root: StatechartNode, proposals: dict[StatementNode, Action]
+        cls, *, root: StatechartNode, proposals: dict[StatementNode, StatechartNode]
     ) -> SubtreeRebuild:
         """
         :param root: A running node of a plan.
@@ -325,33 +325,33 @@ class SubtreeRebuild(NodeRebuild, TrialBuilder):
             branch is cut at it, or if it cannot be rebuilt without what is left out.
         """
         if node not in self._rebuilt:
-            self._rebuilt[node] = self._rebuild_anew(node)
+            self._rebuilt[node] = self._rebuild_anew(node=node)
         return self._rebuilt[node]
 
-    def _rebuild_anew(self, node: StatechartNode) -> StatechartNode | None:
+    def _rebuild_anew(self, *, node: StatechartNode) -> StatechartNode | None:
         """
         :return: `node` rebuilt onto :attr:`_world`, see :meth:`rebuilt`.
         """
         if node in self.left_out:
             return None
         if isinstance(node, StatementNode):
-            return self._rebuild_statement(node)
+            return self._rebuild_statement(statement=node)
         if isinstance(node, CompositeNodeChoosingItsChild):
             return self._rebuild_running_child(node)
         if isinstance(node, Action):
             return node.rebound_to(self._world)
         return node.rebuilt_by(rebuild=self)
 
-    def _rebuild_statement(self, statement: StatementNode) -> StatechartNode | None:
+    def _rebuild_statement(self, *, statement: StatementNode) -> StatechartNode | None:
         """
-        :return: The candidate of `statement` from :attr:`candidates`, or None if it
-            has none, which cuts the branch.
+        :return: The candidate of `statement` from :attr:`candidates`, rebuilt like any
+            other node, or None if it has none, which cuts the branch.
         """
         candidate = self.candidates.get(statement)
         if candidate is None:
             self._cut = True
             return None
-        return candidate.rebound_to(self._world)
+        return self.rebuilt(node=candidate)
 
     def _rebuild_running_child(
         self, node: CompositeNodeChoosingItsChild
@@ -702,7 +702,9 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         )
         while candidate is not None:
             if self.trial.succeeds(
-                rebuild=SubtreeRebuild.unfinished_nodes(root, {node: candidate}),
+                rebuild=SubtreeRebuild.unfinished_nodes(
+                    root=root, proposals={node: candidate}
+                ),
                 tried_statements=frozenset({node}),
             ):
                 return Sequence(name=f"{candidate.name}/steps", nodes=[candidate])
@@ -737,7 +739,9 @@ class UnderspecifiedChildChooser(PlanChildChooser[StatementNode]):
         )
         for combination in combinations:
             if not self.trial.succeeds(
-                rebuild=SubtreeRebuild.unfinished_nodes(root, combination),
+                rebuild=SubtreeRebuild.unfinished_nodes(
+                    root=root, proposals=combination
+                ),
                 tried_statements=frozenset(combination),
             ):
                 continue
