@@ -85,3 +85,39 @@ class UnsupportedMutualInformationVariableError(ProbabilisticModelException, Typ
             "Use an estimator that supports every kind of variable, such as the "
             "binned or the nearest neighbour one."
         )
+
+
+@dataclass(kw_only=True)
+class LatentStatesMismatchError(ProbabilisticModelException, ValueError):
+    """
+    Exception raised when the latent states to count initial parameters from do not hold
+    one state below the number of hidden states per row and variable.
+    """
+
+    shape: tuple[int, ...]
+    """
+    The shape of the latent states.
+    """
+
+    expected_shape: tuple[int, int]
+    """
+    The number of rows and variables.
+    """
+
+    hidden_states: int
+    """
+    The number of states of every latent variable.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"Latent states of shape {self.shape} do not hold a state from 0 to "
+            f"{self.hidden_states - 1} for each of the {self.expected_shape[0]} rows "
+            f"and {self.expected_shape[1]} variables."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Give one latent state per row and variable, below the number of hidden "
+            "states."
+        )
