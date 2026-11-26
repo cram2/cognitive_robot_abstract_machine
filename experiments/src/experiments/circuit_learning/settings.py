@@ -194,10 +194,16 @@ class ComputationSetting:
         if self.array_library is ArrayLibrary.JAX:
             return jax.devices(self.device)[0]
         if self.array_library is ArrayLibrary.TORCH:
-            return torch.device(
-                "cuda" if self.device is Device.GRAPHICS_PROCESSOR else "cpu"
-            )
+            return self.torch_device
         return None
+
+    @property
+    def torch_device(self) -> torch.device:
+        """
+        :return: The device as torch names it, whichever library the setting trains
+            with.
+        """
+        return torch.device("cuda" if self.uses_graphics_processor else "cpu")
 
     @property
     def dtype(self) -> Any:
