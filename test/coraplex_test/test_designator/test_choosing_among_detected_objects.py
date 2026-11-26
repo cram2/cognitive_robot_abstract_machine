@@ -221,11 +221,6 @@ def test_one_action_taking_and_putting_down_the_same_milk_tries_the_next_milk(
     ]
 
 
-@pytest.mark.xfail(
-    raises=AttributeError,
-    strict=True,
-    reason="a trial rebuilds a candidate with rebound_to, which only actions have",
-)
 def test_a_sequence_taking_and_putting_down_the_same_milk_tries_the_next_milk(
     apartment_world_pr2_copy_with_context, detected_milks: DetectedMilks
 ) -> None:

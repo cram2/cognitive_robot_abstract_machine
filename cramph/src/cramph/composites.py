@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from functools import partial
 from itertools import combinations, takewhile
+from weakref import WeakSet
 
 from typing_extensions import Any, Generator, Generic, Iterator, Self, TypeVar
 
@@ -1361,6 +1362,14 @@ class StatementNode(CompositeNodeChoosingItsChild):
     How many candidates the current run through the statement has yielded.
     """
 
+    _yielded_candidates: WeakSet[StatechartNode] = field(
+        default_factory=WeakSet, init=False, repr=False
+    )
+    """
+    The candidates the statement yielded that are still in use, which tell the candidate
+    a chosen child holds apart from the nodes holding it.
+    """
+
     @property
     def reached_candidate_limit(self) -> bool:
         """
@@ -1399,6 +1408,7 @@ class StatementNode(CompositeNodeChoosingItsChild):
             self._candidates = None
             return None
         self._candidates_pulled += 1
+        self._yielded_candidates.add(candidate)
         return candidate
 
     def go_on_after(self, *, read: list[Any], taken: Any) -> None:
@@ -1448,14 +1458,14 @@ class StatementNode(CompositeNodeChoosingItsChild):
     @property
     def grounded_nodes(self) -> list[StatechartNode]:
         """
-        :return: The node of the statement's type each child chosen so far holds, in
-            the order they were chosen, each found below whatever holds it.
+        :return: The candidate each child chosen so far is or holds, in the order they
+            were chosen, each found below whatever holds it.
         """
         return [
             next(
                 node
                 for node in [child, *child.descendants]
-                if isinstance(node, self.statement._type_)
+                if node in self._yielded_candidates
             )
             for child in self.chosen_children
         ]
