@@ -1599,7 +1599,7 @@ class HasCounterTop(PartWholeRelationship, Mixin):
 
 
 @dataclass(eq=False, kw_only=True)
-class HasOpening(HasRootBody, Mixin):
+class HasContainerOpening(HasRootBody, Mixin):
     """
     Mixin for a container open at the top of its collision bounding box, which liquid
     enters through and leaves over the lip of its wall.
@@ -1641,28 +1641,23 @@ class HasOpening(HasRootBody, Mixin):
     def opening_point(self) -> Point3:
         """
         :return: Symbolic world-frame centre of this container's opening, where liquid
-            enters and leaves.
-        """
-        world_T_container = self._world.compose_forward_kinematics_expression(
-            self._world.root, self.root
-        )
-        world_P_opening = world_T_container @ self.rim_point()
-        world_P_opening.reference_frame = self._world.root
-        return world_P_opening
-
-    def rim_point(self) -> Point3:
-        """
-        :return: The centre of this container's opening in its own frame, at the
-            horizontal centre and top of the collision bounding box.
+            enters and leaves: the horizontal centre of the collision bounding box's top
+            face.
         """
         lower = self.root.collision.min_point
         upper = self.root.collision.max_point
-        return Point3(
+        container_P_opening = Point3(
             x=(lower.x + upper.x) / 2,
             y=(lower.y + upper.y) / 2,
             z=upper.z,
             reference_frame=self.root,
         )
+        world_T_container = self._world.compose_forward_kinematics_expression(
+            self._world.root, self.root
+        )
+        world_P_opening = world_T_container @ container_P_opening
+        world_P_opening.reference_frame = self._world.root
+        return world_P_opening
 
     def liquid_exit_point(self) -> Point3:
         """
@@ -1727,7 +1722,7 @@ class HasOpening(HasRootBody, Mixin):
 
 
 @dataclass(eq=False, kw_only=True)
-class HasFillLevel(HasOpening, FillLevelSource, Mixin):
+class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
     """
     Mixin that gives a container a fill level in ``[0, 1]``, the position of a virtual
     :class:`FillLevelConnection` below its root created by :meth:`initialize_fill_level`.
