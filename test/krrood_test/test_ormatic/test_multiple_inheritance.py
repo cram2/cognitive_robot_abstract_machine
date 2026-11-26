@@ -197,6 +197,29 @@ def test_the_row_of_every_stored_object_loads_the_object(session, database):
     assert reconstructed == closet
 
 
+def test_the_rows_of_stored_objects_load_their_daos_in_batches_and_in_order(
+    session, database
+):
+    """
+    The DAOs of stored objects' rows come back in the rows' order, also when every
+    statement binds a single id.
+    """
+    items = store_items_of_one_hierarchy(session)
+    session.expunge_all()
+    rows = session.scalars(
+        select(StoredObjectDAO).order_by(StoredObjectDAO.database_id.desc())
+    ).all()
+
+    daos = StoredObjectDAO.object_daos(
+        session=session, stored_objects=rows, ids_per_statement=1
+    )
+
+    assert [dao.database_id for dao in daos] == [row.database_id for row in rows]
+    assert sorted(dao.from_dao().label for dao in daos) == sorted(
+        item.label for item in items
+    )
+
+
 def test_only_one_row_is_kept_per_object_of_the_root_table(session, database):
     """
     Storing an inventory stores one root row per object, however many fields refer to

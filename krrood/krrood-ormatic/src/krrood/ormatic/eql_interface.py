@@ -1008,6 +1008,7 @@ class EQLTranslator:
                 session=self.session,
                 stored_objects=stored_objects,
                 loader_options=self.result_loading.loader_options,
+                ids_per_statement=self.result_loading.ids_per_statement,
             )
         )
         return [

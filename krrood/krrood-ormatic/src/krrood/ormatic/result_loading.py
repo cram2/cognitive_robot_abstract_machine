@@ -35,12 +35,14 @@ class RelationshipLoading(StrEnum):
 
     AS_MAPPED = "as_mapped"
     """
-    Each relationship loads as its mapping declares, eagerly where it says so.
+    Each relationship loads as its mapping declares, eagerly where it says so. Use it
+    when the relationships are read after the session closed.
     """
 
     ON_ACCESS = "on_access"
     """
-    Every relationship loads when it is first read.
+    Every relationship loads when it is first read. Use it when few of the loaded
+    objects' relationships are read, since every eager relationship costs statements.
     """
 
 
@@ -52,12 +54,14 @@ class SubclassLoading(StrEnum):
 
     AS_MAPPED = "as_mapped"
     """
-    As the mappers declare: one further statement per subclass and batch of ids.
+    As the mappers declare: one further statement per subclass and batch of ids. Use
+    it when the selected class has no mapped subclasses, so the selection holds all.
     """
 
     ONE_QUERY_PER_CLASS = "one_query_per_class"
     """
-    One statement per class of the selected objects, loading every column of it.
+    One statement per class of the selected objects, loading every column of it. Use
+    it when the selected objects may be of many classes, such as for a secondary base.
     """
 
 
@@ -68,12 +72,14 @@ class SelectedObjectRestriction(StrEnum):
 
     BOUND_IDS = "bound_ids"
     """
-    It binds the ids of the selected objects, in batches.
+    It binds the ids of the selected objects, in batches. Use it when the selection is
+    costly to evaluate again.
     """
 
     SELECTION_JOIN = "selection_join"
     """
-    It joins the query's selection, which the database evaluates again for it.
+    It joins the query's selection, which the database evaluates again for it. Use it
+    when the selection is cheap and selects very many objects.
     """
 
 
@@ -84,18 +90,21 @@ class ResultContent(StrEnum):
 
     DATA_ACCESS_OBJECTS = "data_access_objects"
     """
-    The data access object, loaded as the class of the object.
+    The data access object, loaded as the class of the object. Use it when the objects
+    are converted to domain objects or their relationships are read.
     """
 
     COLUMNS = "columns"
     """
     A row with the value of every column of the object's own class, without building
-    its data access object.
+    its data access object. Use it when only the column values of many objects are
+    read, such as for a table or a statistic.
     """
 
     DATABASE_IDS = "database_ids"
     """
-    The id of the object, without loading any of its rows.
+    The id of the object, without loading any of its rows. Use it to count the
+    objects, or to load them later in parts.
     """
 
 
@@ -160,7 +169,8 @@ class ResultLoading:
     pauses_garbage_collection: bool = False
     """
     Whether Python's cyclic garbage collector is kept from running during the
-    evaluation.
+    evaluation. Use it for large results while no other thread allocates much, since
+    the collector finds next to nothing among the objects a load creates.
     """
 
     ids_per_statement: int = 10_000
@@ -243,23 +253,16 @@ class ResultLoading:
         :return: The data access object or the row of every selected object, in the
             order of *selected_objects*.
         """
-        ids_by_class: dict[type[DataAccessObject], list[int]] = {}
-        for selected_object in selected_objects:
-            dao_class = StoredObjectRow.dao_class_of_table(
-                table_name=selected_object.polymorphic_type
-            )
-            ids_by_class.setdefault(dao_class, []).append(selected_object.database_id)
-        loaded_by_id = {}
-        for dao_class, ids in ids_by_class.items():
-            for statement in self._statements_loading(
-                dao_class=dao_class, ids=ids, selection=selection
-            ):
-                for loaded in self._execute(session=session, statement=statement):
-                    loaded_by_id[loaded.database_id] = loaded
-        return [
-            loaded_by_id[selected_object.database_id]
-            for selected_object in selected_objects
-        ]
+        return StoredObjectRow.objects_loaded_by_class(
+            stored_objects=selected_objects,
+            load_objects_of_class=lambda dao_class, ids: (
+                loaded
+                for statement in self._statements_loading(
+                    dao_class=dao_class, ids=ids, selection=selection
+                )
+                for loaded in self._execute(session=session, statement=statement)
+            ),
+        )
 
     def _statements_loading(
         self, *, dao_class: type[DataAccessObject], ids: list[int], selection: Select
