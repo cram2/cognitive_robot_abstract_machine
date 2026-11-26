@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "fruit": "apple",
+  "seed": 2026,
+  "index": 0,
+  "stage": "reference",
+  "texture": "original",
+  "stage_note": "One appearance class from the source asset. No maturity trend inferred.",
+  "profile_sha256": "bc4a3df68f41ece31e9b83cca35e7681f32efb2382d30bdbb74101614757d0ee",
+  "units": "metre, kilogram, second; E_MPa in MPa",
+  "frame": "USD Z-up",
+  "material_order": [
+    "Peel",
+    "Pulp",
+    "Core",
+    "Seeds",
+    "Stem"
+  ],
+  "materials": {
+    "Peel": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 850.0,
+      "E_MPa": 11.6,
+      "nu": 0.33
+    },
+    "Pulp": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 850.0,
+      "E_MPa": 4.155284582180219,
+      "nu": 0.33
+    },
+    "Core": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 850.0,
+      "E_MPa": 6.5,
+      "nu": 0.33
+    },
+    "Seeds": {
+      "mode": "dynamic_rigid",
+      "density_kg_m3": 850.0
+    },
+    "Stem": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 850.0,
+      "E_MPa": 141.37,
+      "nu": 0.33
+    }
+  },
+  "rigid_bodies": [
+    {
+      "material": "Seeds",
+      "path": "/World/CulinaryCut/Fruit/Seeds/Seed_001",
+      "mode": "dynamic_rigid"
+    },
+    {
+      "material": "Seeds",
+      "path": "/World/CulinaryCut/Fruit/Seeds/Seed_002",
+      "mode": "dynamic_rigid"
+    }
+  ]
+}

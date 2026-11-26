@@ -1,0 +1,93 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def Xform "CulinaryCut"
+    {
+        def Xform "Fruit"
+        {
+            double3 xformOp:translate = (0.1, 0.2, 0.05)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+
+            def Mesh "Peel"
+            {
+                int[] faceVertexCounts = [3, 3, 3, 3]
+                int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
+                point3f[] points = [(0, 0, 0), (0.04, 0, 0), (0, 0.04, 0), (0, 0, 0.04)]
+                int[] primvars:tissueId = [1, 1, 1, 1] (
+                    interpolation = "uniform"
+                )
+            }
+
+            def Mesh "Pulp"
+            {
+                int[] faceVertexCounts = [3, 3, 3, 3]
+                int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
+                point3f[] points = [(0, 0, 0), (0.03, 0, 0), (0, 0.03, 0), (0, 0, 0.03)]
+                int[] primvars:tissueId = [2, 2, 2, 2] (
+                    interpolation = "uniform"
+                )
+            }
+
+            def Mesh "Core"
+            {
+                int[] faceVertexCounts = [3, 3, 3, 3]
+                int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
+                point3f[] points = [(0, 0, 0), (0.01, 0, 0), (0, 0.01, 0), (0, 0, 0.01)]
+                int[] primvars:tissueId = [3, 3, 3, 3] (
+                    interpolation = "uniform"
+                )
+            }
+
+            def Mesh "Stem"
+            {
+                int[] faceVertexCounts = [3, 3, 3, 3]
+                int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
+                point3f[] points = [(0, 0, 0.04), (0.002, 0, 0.04), (0, 0.002, 0.04), (0, 0, 0.06)]
+                int[] primvars:tissueId = [5, 5, 5, 5] (
+                    interpolation = "uniform"
+                )
+            }
+
+            def Xform "Seeds"
+            {
+                def Xform "Seed_001" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                )
+                {
+                    float physics:density = 850
+                    double3 xformOp:translate = (0.005, 0.005, 0.005)
+                    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                    def Mesh "Geometry"
+                    {
+                        int[] faceVertexCounts = [3, 3, 3, 3]
+                        int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
+                        point3f[] points = [(0, 0, 0), (0.003, 0, 0), (0, 0.003, 0), (0, 0, 0.003)]
+                    }
+                }
+
+                def Xform "Seed_002" (
+                    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+                )
+                {
+                    float physics:density = 850
+                    double3 xformOp:translate = (-0.005, 0.005, 0.005)
+                    uniform token[] xformOpOrder = ["xformOp:translate"]
+
+                    def Mesh "Geometry"
+                    {
+                        int[] faceVertexCounts = [3, 3, 3, 3]
+                        int[] faceVertexIndices = [0, 1, 2, 0, 1, 3, 0, 2, 3, 1, 2, 3]
+                        point3f[] points = [(0, 0, 0), (0.003, 0, 0), (0, 0.003, 0), (0, 0, 0.003)]
+                    }
+                }
+            }
+        }
+    }
+}
