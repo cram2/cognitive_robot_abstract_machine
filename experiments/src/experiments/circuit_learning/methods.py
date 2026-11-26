@@ -239,8 +239,8 @@ class ExpectationMaximizationPhase:
     @classmethod
     def mini_batch(cls) -> Self:
         """
-        :return: The mini-batch expectation maximization of :cite:`peharz2020einsum`: a
-            step of a tenth of the way after every batch of 512 rows.
+        :return: Mini-batch expectation maximization that moves a tenth of the way to
+            the maximizing parameters after every batch of 512 rows.
         """
         return cls(batch_size=512, batches_per_update=1, step_size=0.1)
 
@@ -630,7 +630,7 @@ class JointProbabilityTreeBaseline(BenchmarkMethod):
 @dataclass(kw_only=True)
 class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
     """
-    A hidden Chow-Liu tree circuit :cite:`liu2021tractable` trained by mini-batch and
+    One hidden Chow-Liu tree circuit :cite:`liu2021tractable` trained by mini-batch and
     then full-batch expectation maximization, each phase until the training loss
     converges.
     """
