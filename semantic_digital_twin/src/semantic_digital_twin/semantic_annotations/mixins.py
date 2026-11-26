@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import dataclasses
 from dataclasses import dataclass, field
-from typing_extensions import TYPE_CHECKING, Callable, Generic, Self, TypeVar
+from typing_extensions import TYPE_CHECKING, Callable, ClassVar, Generic, Self, TypeVar
 
 import numpy as np
 import trimesh
@@ -1605,14 +1605,12 @@ class HasContainerOpening(HasRootBody, Mixin):
     enters through and leaves over the lip of its wall.
     """
 
-    @classproperty
-    def upright_softening(cls) -> float:
-        """
-        Horizontal tilt magnitude, as the length of the horizontal part of the up axis,
-        below which the pour side fades out smoothly instead of kinking at the upright
-        pose.
-        """
-        return 1e-2
+    upright_softening: ClassVar[float] = 1e-2
+    """
+    Length of the horizontal part of the up axis below which the exit point moves
+    smoothly from the rim centre to the rim edge, since the pour side is undefined at
+    the upright pose.
+    """
 
     @property
     def tilt(self) -> sm.Scalar:

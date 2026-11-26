@@ -35,6 +35,7 @@ from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import MalformedHexColor
 from semantic_digital_twin.mixin import HasSimulatorProperties
+from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Point,
@@ -43,7 +44,6 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world_description.exceptions import (
-    BoundingBoxCornerFramesDifferError,
     InvalidColorChannelCount,
     MeshFileNotPlaceableByAPose,
     TooFewRegionPointsError,
@@ -1958,9 +1958,10 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         :param max_point: The maximum point
         """
         if min_point.reference_frame != max_point.reference_frame:
-            raise BoundingBoxCornerFramesDifferError(
-                min_point_frame=min_point.reference_frame,
-                max_point_frame=max_point.reference_frame,
+            raise ReferenceFrameMismatchError(
+                expected_frame=min_point.reference_frame,
+                actual_frame=max_point.reference_frame,
+                context="the maximum corner",
             )
         return cls(*min_point.to_np()[:3], *max_point.to_np()[:3], origin=origin)
 

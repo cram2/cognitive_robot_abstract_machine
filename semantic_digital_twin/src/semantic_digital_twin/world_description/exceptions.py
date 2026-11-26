@@ -8,19 +8,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from typing_extensions import TYPE_CHECKING
-
 import numpy as np
 from numpy.typing import NDArray
 
 from krrood.exceptions import DataclassException
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import UsageError
-
-if TYPE_CHECKING:
-    from semantic_digital_twin.world_description.world_entity import (
-        KinematicStructureEntity,
-    )
 
 # %% Color channels
 
@@ -127,29 +120,6 @@ class TooFewRegionPointsError(UsageError):
 
     def suggest_correction(self) -> str:
         return f"Give at least {self.minimum_point_count} distinct points."
-
-
-@dataclass(kw_only=True)
-class BoundingBoxCornerFramesDifferError(UsageError):
-    """
-    Raised when the corners of a bounding box are expressed in different frames.
-    """
-
-    min_point_frame: KinematicStructureEntity | None
-    """
-    The frame of the minimum corner.
-    """
-
-    max_point_frame: KinematicStructureEntity | None
-    """
-    The frame of the maximum corner.
-    """
-
-    def error_message(self) -> str:
-        return f"The minimum corner is in {self.min_point_frame}, the maximum corner in {self.max_point_frame}."
-
-    def suggest_correction(self) -> str:
-        return "Express both corners in the same frame."
 
 
 # %% Fill levels

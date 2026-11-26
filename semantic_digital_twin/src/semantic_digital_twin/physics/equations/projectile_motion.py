@@ -40,9 +40,9 @@ class ProjectileMotion:
     @classproperty
     def standard_gravity(cls) -> float:
         """
-        Gravitational acceleration, in metres per second squared.
+        Standard gravitational acceleration, in metres per second squared.
         """
-        return 9.81
+        return 9.80665
 
     @classmethod
     def speed_after_drop(cls, *, height: sm.ScalarData) -> Scalar:
