@@ -746,6 +746,36 @@ class SliceJSONSerializer(ExternalClassJSONSerializer[slice]):
         )
 
 
+@dataclass(kw_only=True)
+class DictJSONSerializer(ExternalClassJSONSerializer[dict]):
+    """
+    External JSON serializer for dictionaries.
+
+    Keys and values are serialized with :func:`to_json` as two lists in the
+    dictionary's order, so keys that a JSON object cannot hold, such as integers or
+    enum members, read back with their own type.
+    """
+
+    @classmethod
+    def to_json(cls, *, instance: dict, **kwargs) -> dict[str, Any]:
+        return {
+            JSONField.TYPE: get_full_class_name(type(instance)),
+            JSONField.KEYS: [to_json(key, **kwargs) for key in instance.keys()],
+            JSONField.VALUES: [to_json(value, **kwargs) for value in instance.values()],
+        }
+
+    @classmethod
+    def from_json(cls, *, data: dict[str, Any], clazz: type[dict], **kwargs) -> dict:
+        result = clazz()
+        result.update(
+            zip(
+                [from_json(key, **kwargs) for key in data[JSONField.KEYS]],
+                [from_json(value, **kwargs) for value in data[JSONField.VALUES]],
+            )
+        )
+        return result
+
+
 class PatternJSONKey(enum.StrEnum):
     """
     The keys of the JSON a compiled regular expression is serialized to.
@@ -945,10 +975,6 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
                     JSONField.COLLECTION_TYPE: get_full_class_name(type(value)),
                     JSONField.ITEMS: [to_json(item, **kwargs) for item in value],
                 }
-            elif isinstance(value, dict):
-                keys = [to_json(k, **kwargs) for k in value.keys()]
-                values = [to_json(v, **kwargs) for v in value.values()]
-                current_result = {JSONField.KEYS: keys, JSONField.VALUES: values}
             else:
                 current_result = to_json(value, **kwargs)
             result[field_.public_name] = current_result
@@ -992,13 +1018,9 @@ class DataclassJSONSerializer(ExternalClassJSONSerializer[None]):
                 and JSONField.KEYS in current_data.keys()
                 and JSONField.VALUES in current_data.keys()
             ):
-                keys = [
-                    from_json(item, **kwargs) for item in current_data[JSONField.KEYS]
-                ]
-                values = [
-                    from_json(item, **kwargs) for item in current_data[JSONField.VALUES]
-                ]
-                current_result = dict(zip(keys, values))
+                current_result = DictJSONSerializer.from_json(
+                    data=current_data, clazz=dict, **kwargs
+                )
             else:
                 current_result = from_json(current_data, **kwargs)
 

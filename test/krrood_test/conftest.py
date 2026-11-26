@@ -44,6 +44,7 @@ from .dataset import (
     identity_hashed_values_created_on_access,
     interface_typed_fields,
     multiple_inheritance,
+    ordered_collections,
     single_value_classes,
 )
 from .dataset.throwing_trials import (
@@ -108,6 +109,7 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(identity_hashed_values_created_on_access))
     all_classes |= set(classes_of_module(interface_typed_fields))
     all_classes |= set(classes_of_module(multiple_inheritance))
+    all_classes |= set(classes_of_module(ordered_collections))
     all_classes |= {Symbol, Role}
     all_classes |= {Court, ReleasePoint, Throw, ThrowMeasurements, ThrowParameters}
 
