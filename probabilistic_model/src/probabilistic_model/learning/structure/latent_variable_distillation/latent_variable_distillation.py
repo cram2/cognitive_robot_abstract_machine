@@ -14,9 +14,13 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 import torch
+from krrood_compute_resources.devices import Device
 from random_events.variable import Symbolic
 from sklearn.cluster import KMeans
 
+from probabilistic_model.learning.parameters.torch_circuit_parameter_learning import (
+    TorchDeviceType,
+)
 from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu_tree import (
     HiddenChowLiuTree,
 )
@@ -281,7 +285,7 @@ class LatentVariableDistillation:
     on; every row is assigned to the nearest cluster.
     """
 
-    device: torch.device = field(default_factory=lambda: torch.device("cpu"))
+    device: Device = Device.CENTRAL_PROCESSOR
     """
     The device the autoencoder trains and embeds on.
     """
@@ -326,7 +330,11 @@ class LatentVariableDistillation:
                 values[:, index] = (column - column.mean()) / max(
                     float(column.std()), GaussianLayer.minimum_scale
                 )
-        return torch.as_tensor(values, dtype=torch.float32, device=self.device)
+        return torch.as_tensor(
+            values,
+            dtype=torch.float32,
+            device=torch.device(TorchDeviceType.from_device(device=self.device)),
+        )
 
     def latent_states(self, *, data: npt.NDArray[np.float64]) -> npt.NDArray[np.int64]:
         """

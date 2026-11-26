@@ -773,12 +773,12 @@ class LatentVariableDistillationByExpectationMaximization(
         :param dataset: The dataset.
         :param setting: The setting the circuit is fine-tuned in.
         :return: The distillation into the hidden Chow-Liu tree of the dataset, on the
-            torch device of the setting.
+            device of the setting.
         """
         return LatentVariableDistillation(
             structure=self.structure(dataset=dataset),
             autoencoder=self.autoencoder,
-            device=setting.torch_device,
+            device=setting.device,
         )
 
     def initial_circuit(

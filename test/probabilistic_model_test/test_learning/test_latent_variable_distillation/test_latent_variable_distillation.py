@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import torch
+from krrood_compute_resources.devices import Device
 from random_events.variable import Continuous
 from scipy.special import logsumexp
 from sortedcontainers import SortedSet
@@ -20,6 +21,9 @@ from probabilistic_model.learning.structure.latent_variable_distillation.latent_
     LatentVariableDistillation,
     MaskedAutoencoderTraining,
     TabularMaskedAutoencoder,
+)
+from probabilistic_model.learning.parameters.torch_circuit_parameter_learning import (
+    TorchDeviceType,
 )
 from ..test_hidden_chow_liu_tree.dependent_bits import DependentBits
 
@@ -98,6 +102,34 @@ def test_training_lowers_the_reconstruction_loss(bits, short_training):
     with torch.no_grad():
         trained_loss = trained.reconstruction_loss(values=values, masked=masked).item()
     assert trained_loss < untrained_loss
+
+
+# %% devices
+
+
+@pytest.mark.parametrize("device", list(Device), ids=lambda device: device.name)
+def test_every_device_has_the_torch_device_type_of_its_kind(device: Device):
+    """
+    The central processor is torch's cpu and the graphics processor its CUDA device.
+    """
+    expected = {
+        Device.CENTRAL_PROCESSOR: TorchDeviceType.CENTRAL_PROCESSOR,
+        Device.GRAPHICS_PROCESSOR: TorchDeviceType.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE,
+    }
+
+    assert TorchDeviceType.from_device(device=device) is expected[device]
+
+
+def test_autoencoder_inputs_are_on_the_torch_device_of_the_distillation(bits):
+    """
+    The rows the autoencoder reads are placed on the torch device of the distillation's
+    device.
+    """
+    distillation = distillation_of(bits=bits, training=MaskedAutoencoderTraining())
+
+    values = distillation.autoencoder_inputs(data=bits.rows())
+
+    assert values.device.type == TorchDeviceType.from_device(device=distillation.device)
 
 
 # %% inputs of the autoencoder

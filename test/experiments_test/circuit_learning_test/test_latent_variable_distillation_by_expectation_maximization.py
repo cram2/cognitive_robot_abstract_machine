@@ -124,10 +124,10 @@ def test_fine_tuning_raises_the_training_log_likelihood_of_the_distilled_circuit
 
 def test_the_autoencoder_trains_on_the_device_of_the_setting(dataset, small_method):
     """
-    The distillation runs on the torch device of the setting's device.
+    The distillation runs on the device of the setting.
     """
     setting = central_processor_setting(array_library=ArrayLibrary.JAX)
 
     distillation = small_method.distillation(dataset=dataset, setting=setting)
 
-    assert distillation.device == setting.torch_device
+    assert distillation.device is setting.device
