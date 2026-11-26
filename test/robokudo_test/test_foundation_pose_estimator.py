@@ -1,3 +1,8 @@
+"""
+Tests of the FoundationPose estimator on a rendered plate; skipped without its GPU
+build.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -23,7 +28,7 @@ from robokudo.annotators.object_observation import (  # noqa: E402
 # %% Scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlateOnPlane:
     """
     A thin square plate lying on the plane of the warm-up observation, covering its
@@ -89,8 +94,8 @@ def plate(estimator: FoundationPoseEstimator, tmp_path: Path) -> PlateOnPlane:
     A plate whose mesh the estimator has loaded and selected.
     """
     plate = PlateOnPlane(mesh_file=tmp_path / "plate.obj")
-    estimator.load_meshes([plate.mesh_file])
-    estimator.select_mesh(plate.mesh_file)
+    estimator.load_meshes(mesh_files=[plate.mesh_file])
+    estimator.select_mesh(mesh_file=plate.mesh_file)
     return plate
 
 
@@ -100,7 +105,10 @@ def plate(estimator: FoundationPoseEstimator, tmp_path: Path) -> PlateOnPlane:
 def test_plate_is_posed_on_the_plane_at_its_mask(
     estimator: FoundationPoseEstimator, plate: PlateOnPlane
 ):
-    pose = estimator.estimate_pose(plate.object_observation)
+    """
+    The plate is estimated on the plane under its mask, raised by half its thickness.
+    """
+    pose = estimator.estimate_pose(object_observation=plate.object_observation)
 
     numpy.testing.assert_allclose(
         pose.position.to_np()[:3],
@@ -112,9 +120,14 @@ def test_plate_is_posed_on_the_plane_at_its_mask(
 def test_tracking_an_unmoved_plate_keeps_its_position(
     estimator: FoundationPoseEstimator, plate: PlateOnPlane
 ):
-    pose = estimator.estimate_pose(plate.object_observation)
+    """
+    Tracking the plate in the frame it was estimated in keeps its position.
+    """
+    pose = estimator.estimate_pose(object_observation=plate.object_observation)
 
-    tracked_pose = estimator.track_pose(plate.object_observation, pose)
+    tracked_pose = estimator.track_pose(
+        object_observation=plate.object_observation, previous_pose=pose
+    )
 
     numpy.testing.assert_allclose(
         tracked_pose.position.to_np(), pose.position.to_np(), atol=0.005

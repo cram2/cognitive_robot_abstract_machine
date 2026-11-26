@@ -21,7 +21,7 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2, PR2RightArm
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -37,7 +37,7 @@ from semantic_digital_twin.world_description.inertial_properties import (
 from semantic_digital_twin.adapters.multi_sim import MujocoCamera
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
@@ -87,7 +87,11 @@ def test_table_world(session, table_world):
         WorldMappingDAO,
     )
 
-    revolute_connection = table_world.get_connections_by_type(RevoluteConnection)[0]
+    revolute_connection = [
+        connection
+        for connection in table_world.get_connections_by_type(ScrewAxisConnection)
+        if connection.behaves_like_a_revolute_connection
+    ][0]
     revolute_connection.position = 1
     revolute_connection.velocity = 23
     revolute_connection.acceleration = 42
@@ -110,9 +114,11 @@ def test_table_world(session, table_world):
         root=revolute_connection.parent, tip=revolute_connection.child
     )
     assert np.allclose(fk, fk2)
-    reconstructed_connection = reconstructed.get_connections_by_type(
-        RevoluteConnection
-    )[0]
+    reconstructed_connection = [
+        connection
+        for connection in reconstructed.get_connections_by_type(ScrewAxisConnection)
+        if connection.behaves_like_a_revolute_connection
+    ][0]
     assert reconstructed_connection.position == revolute_connection.position
     assert reconstructed_connection.velocity == revolute_connection.velocity
     assert reconstructed_connection.acceleration == revolute_connection.acceleration
@@ -177,7 +183,7 @@ def test_pr2_world(pr2_world_state_reset, session):
     are stored as rows.
     """
     from semantic_digital_twin.orm.ormatic_interface import (
-        RevoluteConnectionDAO,
+        ScrewAxisConnectionDAO,
         WorldMappingDAO,
     )
 
@@ -193,7 +199,7 @@ def test_pr2_world(pr2_world_state_reset, session):
     # confirm the modification history
     deepcopy(reconstructed)
 
-    q = select(RevoluteConnectionDAO)
+    q = select(ScrewAxisConnectionDAO)
     r = session.scalars(q).all()
     assert len(r) > 0
 
@@ -364,8 +370,11 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
             name="door",
             scale=Scale(0.03, 1, 2),
             world=world,
-            parent_connection_specification=RevoluteConnectionSpecification(
-                axis=Vector3.Z(), connection_T_child=hinge_T_door
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
+                connection_T_child=hinge_T_door,
             ),
         )
 
@@ -377,6 +386,47 @@ def test_door_swings_about_its_hinge_after_orm_round_trip(session):
     np.testing.assert_allclose(
         reconstructed_door.movable_joint.connection_T_child_expression.to_np(),
         hinge_T_door.to_np(),
+    )
+
+
+# %% screw axis connection
+
+
+def test_screw_axis_connection_survives_an_orm_round_trip(
+    session, world_with_two_bodies
+):
+    """
+    The screw axis and the child's pose survive storing the world and reading it back.
+    """
+    from semantic_digital_twin.orm.ormatic_interface import WorldMappingDAO
+
+    world, parent, child = world_with_two_bodies
+    with world.modify_world():
+        connection = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=parent,
+            child=child,
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Y(), pitch=0.25
+            ),
+        )
+        world.add_connection(connection)
+    connection.position = 2.5
+    parent_T_child = world.compute_forward_kinematics_np(root=parent, tip=child)
+
+    session.add(to_dao(world))
+    session.commit()
+    reconstructed: World = session.scalar(select(WorldMappingDAO)).from_dao()
+
+    reconstructed_connection = reconstructed.get_connections_by_type(
+        ScrewAxisConnection
+    )[0]
+    assert np.allclose(reconstructed_connection.screw_axis, connection.screw_axis)
+    assert np.allclose(
+        reconstructed.compute_forward_kinematics_np(
+            root=reconstructed_connection.parent, tip=reconstructed_connection.child
+        ),
+        parent_T_child,
     )
 
 
@@ -483,11 +533,11 @@ def test_an_actuator_keeps_the_degree_of_freedom_it_drives_through_a_round_trip(
     actuator = Actuator(name=PrefixedName("servo"))
     with world_with_box.modify_world():
         world_with_box.add_kinematic_structure_entity(arm)
-        joint = RevoluteConnection.create_with_dofs(
+        joint = ScrewAxisConnection.create_with_dofs(
             world=world_with_box,
             parent=box,
             child=arm,
-            axis=Vector3.Z(reference_frame=box),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
         )
         world_with_box.add_connection(joint)
         actuator.add_dof(joint.dof)

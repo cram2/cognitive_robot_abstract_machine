@@ -17,8 +17,9 @@ import open3d as o3d  # this import creates a SIGINT during unit test execution.
 from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
-from robokudo.defs import PACKAGE_NAME
 from robokudo.vis.visualizer import Visualizer
+
+logger = logging.getLogger(__name__)
 
 
 class O3DVisualizer(Visualizer, Visualizer.Observer):
@@ -48,12 +49,12 @@ class O3DVisualizer(Visualizer, Visualizer.Observer):
         """
         Open3D viewer instance.
         """
-        self.shared_visualizer_state.register_observer(self)
+        self.shared_visualizer_state.register_observer(observer=self)
 
     def notify(
         self,
+        *,
         observable: Visualizer.Observable,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
         """
@@ -100,7 +101,7 @@ class O3DVisualizer(Visualizer, Visualizer.Observer):
                     active_annotator_instance.name
                 ].geometries
 
-            self.viewer3d.update_cloud(geometries)
+            self.viewer3d.update_cloud(geometries=geometries)
 
         tick_result = (
             self.viewer3d.tick()
@@ -142,10 +143,6 @@ class Viewer3D(object):
         """
         Name identifier for the point cloud.
         """
-        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """
-        Logger instance.
-        """
         app: o3d.visualization.gui.Application = (
             o3d.visualization.gui.Application.instance
         )
@@ -154,7 +151,7 @@ class Viewer3D(object):
         """
         app.initialize()
 
-        self.rk_logger.info(
+        logger.info(
             "Starting O3DVisualizer. 3D output might be broken if no success message follows. "
             "Try rebooting the machine if running local or check GPU passthrough in Docker."
         )
@@ -165,7 +162,7 @@ class Viewer3D(object):
         """
         Open3D visualizer instance.
         """
-        self.rk_logger.info("Starting O3DVisualizer was successful")
+        logger.info("Starting O3DVisualizer was successful")
 
         app.add_window(self.main_vis)
 
@@ -187,7 +184,7 @@ class Viewer3D(object):
         return tick_return
 
     def update_cloud(
-        self, geometries: o3d.geometry.Geometry | dict | list | None
+        self, *, geometries: o3d.geometry.Geometry | dict | list | None
     ) -> None:
         """
         Update the displayed geometries.

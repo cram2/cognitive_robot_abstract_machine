@@ -51,9 +51,7 @@ from giskardpy.middleware.ros2.exceptions import (
 from krrood.symbolic_math import symbolic_math as sm
 from semantic_digital_twin.robots.pr2 import PR2Joint
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -168,9 +166,9 @@ class TestJointGoals:
             connection = giskard.api.world.get_connection_by_name(joint)
             actual = giskard.api.world.state[connection.dof.id].position
             if (
-                isinstance(connection, RevoluteConnection)
-                and not connection.dof.has_position_limits()
-            ):
+                isinstance(connection, ScrewAxisConnection)
+                and connection.behaves_like_a_revolute_connection
+            ) and not connection.dof.has_position_limits():
                 assert sm.shortest_angular_distance(actual, goal).to_np()[0] < 0.01
             else:
                 assert np.isclose(

@@ -72,4 +72,4 @@ Common operations with the kinematic model include:
 - Using the differentiable nature of the expressions for control or optimization
 
 ## Citation
-The world model is also explain in chapter 5 of {cite:p}`stelter25giskard`.
+The world model is also explained in chapter 4 of {cite:t}`stelter25giskard`.

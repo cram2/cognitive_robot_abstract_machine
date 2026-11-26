@@ -5,12 +5,15 @@ This module provides an annotator for visualizing camera viewpoints and referenc
 in 3D space using Open3D.
 """
 
+import logging
 import open3d as o3d
 from py_trees.common import Status
 
 import robokudo.utils.annotator_helper
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.cas import CASViews
+
+logger = logging.getLogger(__name__)
 
 
 class CameraViewpointVisualizer(BaseAnnotator):
@@ -32,7 +35,7 @@ class CameraViewpointVisualizer(BaseAnnotator):
         :param name: Name of the annotator instance
         """
         super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """
@@ -53,10 +56,12 @@ class CameraViewpointVisualizer(BaseAnnotator):
                 )
             )
         except KeyError as err:
-            self.rk_logger.warning(f"Couldn't find viewpoint in the CAS: {err}")
+            logger.warning(
+                f"Couldn't find viewpoint in the common analysis structure: {err}"
+            )
             return Status.FAILURE
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         world_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.2)
         world_frame.transform(world_to_camera_transform)
 
@@ -64,6 +69,6 @@ class CameraViewpointVisualizer(BaseAnnotator):
             {"name": "World frame", "geometry": world_frame},
             {"name": "Cloud", "geometry": cloud},
         ]
-        self.get_annotator_output_struct().set_geometries(geometries)
+        self.get_annotator_output_struct().set_geometries(geometries=geometries)
 
         return Status.SUCCESS

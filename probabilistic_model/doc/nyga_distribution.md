@@ -180,7 +180,7 @@ programming {cite}`jackson2005algorithm` with the pruning of {cite}`killick2012o
 It is slower on large datasets, so the induction searches for the best partition only up to
 `maximum_unique_values_for_optimal_partition` unique values and splits greedily above that.
 
-This algorithm is implemented in the [NygaInduction](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/autoapi/probabilistic_model/learning/nyga_induction/index.html#probabilistic_model.learning.nyga_induction.NygaInduction).
+This algorithm is implemented in the [NygaInduction](https://cram2.github.io/cognitive_robot_abstract_machine/probabilistic_model/autoapi/probabilistic_model/learning/structure/nyga_induction/index.html#probabilistic_model.learning.structure.nyga_induction.NygaInduction).
 
 # Theory Example
 
@@ -267,7 +267,7 @@ Finally, if we apply the algorithm to the dataset, we get the following result.
 We can see that it looks very similar to the gaussian mixture we sampled from.
 
 ```{code-cell} ipython3
-from probabilistic_model.learning.nyga_induction import NygaInduction
+from probabilistic_model.learning.structure.nyga_induction import NygaInduction
 from random_events.variable import Continuous
 
 import plotly

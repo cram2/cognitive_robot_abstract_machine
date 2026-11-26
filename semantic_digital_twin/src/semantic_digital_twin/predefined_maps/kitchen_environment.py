@@ -1,6 +1,11 @@
+"""
+A predefined kitchen environment and the parts it is built from, such as its window walls and sofa.
+"""
+
 from __future__ import annotations
 
 # %% Imports
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, field
 from pathlib import Path
 from enum import StrEnum
@@ -39,8 +44,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     KitchenIsland,
 )
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
@@ -56,9 +60,7 @@ from krrood_spatial_math.spatial_types import (
 )
 from semantic_digital_twin.utils import create_cache_dir
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
-)
+from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -778,11 +780,12 @@ class KitchenEnvironment(WorldSource):
 
     @staticmethod
     def _door_hinge_specification(
+        *,
         axis: Vector3,
         hinge_T_door: HomogeneousTransformationMatrix,
         lower_angle: float = 0.0,
         upper_angle: float = np.pi / 2,
-    ) -> RevoluteConnectionSpecification:
+    ) -> ScrewAxisConnectionSpecification:
         """
         Specify a hinge that swings a door about the axis between the two angles.
 
@@ -791,8 +794,8 @@ class KitchenEnvironment(WorldSource):
         :param lower_angle: The angle the door can close to, in rad.
         :param upper_angle: The angle the door can open to, in rad.
         """
-        return RevoluteConnectionSpecification(
-            axis=axis,
+        return ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=axis),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=lower_angle,
                 upper_position=upper_angle,
@@ -802,14 +805,18 @@ class KitchenEnvironment(WorldSource):
         )
 
     @staticmethod
-    def _drawer_slide_specification(travel: float) -> PrismaticConnectionSpecification:
+    def _drawer_slide_specification(
+        *, travel: float
+    ) -> ScrewAxisConnectionSpecification:
         """
         Specify a slide that pulls a drawer out of the front of its cabinet.
 
         :param travel: How far the drawer can be pulled out, in m.
         """
-        return PrismaticConnectionSpecification(
-            axis=Vector3.NEGATIVE_X(),
+        return ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.NEGATIVE_X()
+            ),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=0.0,
                 upper_position=travel,

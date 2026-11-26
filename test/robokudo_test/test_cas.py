@@ -1,9 +1,19 @@
+"""
+Tests of the CAS's annotations.
+"""
+
+from __future__ import annotations
+
 import robokudo.cas
 import robokudo.types.annotation
 import robokudo.types.scene
 
 
 class TestCASObject(object):
+    """
+    Tests of storing and filtering annotations in a :class:`CAS`.
+    """
+
     cls = robokudo.cas.CAS
 
     def test_annotations(self):
@@ -22,10 +32,12 @@ class TestCASObject(object):
         rs_obj.annotations.append(color2)
 
         classification_list = cas.filter_by_type(
-            robokudo.types.annotation.Classification, rs_obj.annotations
+            type_to_include=robokudo.types.annotation.Classification,
+            input_list=rs_obj.annotations,
         )
         color_list = cas.filter_by_type(
-            robokudo.types.annotation.SemanticColor, rs_obj.annotations
+            type_to_include=robokudo.types.annotation.SemanticColor,
+            input_list=rs_obj.annotations,
         )
 
         assert len(classification_list) == 1
@@ -51,31 +63,31 @@ class TestCASObject(object):
         rs_obj2 = robokudo.types.scene.ObjectHypothesis()
 
         cl = cas.filter_by_type_and_criteria(
-            robokudo.types.annotation.Classification,
-            rs_obj.annotations,
-            {"classname": ("==", "Spoon")},
+            type_to_include=robokudo.types.annotation.Classification,
+            input_list=rs_obj.annotations,
+            criteria={"classname": ("==", "Spoon")},
         )
         assert len(cl) == 1
 
         # Attribute checking is case-sensitive!
         cl = cas.filter_by_type_and_criteria(
-            robokudo.types.annotation.Classification,
-            rs_obj2.annotations,
-            {"classname": ("==", "spoon")},
+            type_to_include=robokudo.types.annotation.Classification,
+            input_list=rs_obj2.annotations,
+            criteria={"classname": ("==", "spoon")},
         )
         assert len(cl) == 0
 
         # Other Object without annotations
         cl = cas.filter_by_type_and_criteria(
-            robokudo.types.annotation.Classification,
-            rs_obj2.annotations,
-            {"classname": ("==", "Spoon")},
+            type_to_include=robokudo.types.annotation.Classification,
+            input_list=rs_obj2.annotations,
+            criteria={"classname": ("==", "Spoon")},
         )
         assert len(cl) == 0
 
         cl = cas.filter_by_type_and_criteria(
-            robokudo.types.annotation.SemanticColor,
-            rs_obj.annotations,
-            {"color": ("==", "red")},
+            type_to_include=robokudo.types.annotation.SemanticColor,
+            input_list=rs_obj.annotations,
+            criteria={"color": ("==", "red")},
         )
         assert len(cl) == 1

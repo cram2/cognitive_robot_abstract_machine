@@ -1,3 +1,9 @@
+"""
+Tests of shapes, their meshes and their serialization.
+"""
+
+from __future__ import annotations
+
 import gc
 import math
 import os
@@ -13,6 +19,9 @@ from trimesh.visual import TextureVisuals
 from trimesh.visual.material import SimpleMaterial
 
 from krrood.adapters.json_serializer import from_json, to_json
+from semantic_digital_twin.world_description.exceptions import (
+    MeshFileNotPlaceableByAPose,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from semantic_digital_twin.world import World
@@ -755,3 +764,85 @@ def test_telling_a_file_textured_does_not_merge_the_textures_of_its_parts(
     tracemalloc.stop()
 
     assert checking_peak < merging_peak / 2
+
+
+# %% meshes turned within their file
+
+CYLINDER_FILE = (
+    Path(files("semantic_digital_twin")).parent.parent
+    / "resources"
+    / "obj"
+    / "cylinder.obj"
+)
+"""
+A mesh file whose vertices are not symmetric under a quarter turn about the x axis.
+"""
+
+
+def turned_cylinder(scale: Scale) -> Mesh:
+    """
+    :param scale: The scale of the mesh.
+    :return: The cylinder, whose own frame lies shifted and a quarter turn about the x
+        axis within its file, placed off the origin of its body.
+    """
+    return Mesh(
+        filename=str(CYLINDER_FILE),
+        scale=scale,
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.3, y=-0.2, z=1.0, yaw=0.4
+        ),
+        file_T_mesh=HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pos_x=0.01,
+            pos_y=0.02,
+            pos_z=0.03,
+            quat_w=math.sqrt(0.5),
+            quat_x=math.sqrt(0.5),
+        ),
+    )
+
+
+def bounds_in_the_body(vertices: np.ndarray, body_T_vertices: np.ndarray) -> np.ndarray:
+    """
+    :return: The lower and upper corner of the vertices, given in a frame placed by
+        ``body_T_vertices``, in the body's frame.
+    """
+    in_body = vertices @ body_T_vertices[:3, :3].T + body_T_vertices[:3, 3]
+    return np.stack([in_body.min(axis=0), in_body.max(axis=0)])
+
+
+def test_a_mesh_turned_within_its_file_keeps_its_vertices_through_serialization():
+    """
+    A JSON round trip keeps the vertices of a mesh turned within its file.
+    """
+    mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
+
+    deserialized = from_json(to_json(mesh))
+
+    assert np.sort(deserialized.mesh.vertices, axis=0) == pytest.approx(
+        np.sort(mesh.mesh.vertices, axis=0)
+    )
+
+
+def test_the_scaled_file_placed_at_its_file_origin_lies_where_the_mesh_does():
+    """
+    The file's scaled vertices, placed at the file origin, cover the mesh's bounds.
+    """
+    mesh = turned_cylinder(scale=Scale(0.5, 0.5, 0.5))
+
+    placed_file = bounds_in_the_body(
+        mesh.stored_mesh.vertices * mesh.scale.to_np(), mesh.file_origin.to_np()
+    )
+
+    assert placed_file == pytest.approx(
+        bounds_in_the_body(mesh.mesh.vertices, mesh.origin.to_np())
+    )
+
+
+def test_an_unevenly_scaled_mesh_turned_within_its_file_has_no_file_origin():
+    """
+    No pose places the file of a mesh that is turned within it and scaled unevenly.
+    """
+    mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
+
+    with pytest.raises(MeshFileNotPlaceableByAPose):
+        mesh.file_origin

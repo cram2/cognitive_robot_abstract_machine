@@ -134,7 +134,7 @@ def get_2d_corner_points_from_3d_bb(
     corner_points_in_2d_x = (uvd[:, 0] / uvd[:, 2]).astype(int)
     corner_points_in_2d_y = (uvd[:, 1] / uvd[:, 2]).astype(int)
     return cas.color_to_depth_ratio.color_pixels(
-        np.stack((corner_points_in_2d_x, corner_points_in_2d_y), axis=1)
+        depth_pixels=np.stack((corner_points_in_2d_x, corner_points_in_2d_y), axis=1)
     )
 
 
@@ -159,7 +159,9 @@ def project_points_to_image(
     v = (uvd[valid, 1] / z[valid]).astype(int)
 
     color_to_depth_ratio = cas.color_to_depth_ratio
-    return color_to_depth_ratio.color_pixels(np.stack([u, v], axis=1)), valid
+    return color_to_depth_ratio.color_pixels(
+        depth_pixels=np.stack([u, v], axis=1)
+    ), valid
 
 
 def draw_mesh_wireframe_on_image(
@@ -352,7 +354,7 @@ def get_cloud_from_rgb_depth_and_mask(
     )
 
     return open3d.geometry.PointCloud.create_from_rgbd_image(
-        rgbd_image, Open3DCameraModelAdapter.to_intrinsic(camera_model)
+        rgbd_image, Open3DCameraModelAdapter.to_intrinsic(camera_model=camera_model)
     )
 
 

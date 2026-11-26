@@ -19,13 +19,14 @@ from py_trees.common import Status
 from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 
-from robokudo.defs import PACKAGE_NAME
 from robokudo.identifier import BBIdentifier
 from robokudo.utils.error_handling import (
     catch_and_raise_to_blackboard,
     has_blackboard_exception,
     get_blackboard_exception,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ActionServerActive(Behaviour):
@@ -259,11 +260,6 @@ class ActionServerPresentAndDone(Behaviour):
         """
         super().__init__(name=name)
 
-        self.rk_logger: logging.Logger = logging.getLogger(PACKAGE_NAME)
-        """
-        Logger for this behaviour.
-        """
-
     def update(self) -> Status:
         blackboard = Blackboard()
         if not blackboard.exists(BBIdentifier.QUERY_SERVER):
@@ -276,18 +272,18 @@ class ActionServerPresentAndDone(Behaviour):
 
         action_server = blackboard.get(BBIdentifier.QUERY_SERVER)
 
-        self.rk_logger.debug("ActionServer in pipeline!")
+        logger.debug("ActionServer in pipeline!")
 
         # The Action Server has to pick up the exception and deliver it to the client. Wait until that happened.
         if has_blackboard_exception() and get_blackboard_exception() is not None:
-            self.rk_logger.info("ActionServer needs to deliver exception")
+            logger.info("ActionServer needs to deliver exception")
             return Status.RUNNING
 
         # If the Action Server is still processing the current goal, wait.
         # It's the responsibility of the rest of the tree to send the goal or re-iterate without
         # calling *this* Behavior again.
         if action_server.is_active():
-            self.rk_logger.info("ActionServer needs to finish current goal.")
+            logger.info("ActionServer needs to finish current goal.")
             return Status.RUNNING
 
         return Status.SUCCESS

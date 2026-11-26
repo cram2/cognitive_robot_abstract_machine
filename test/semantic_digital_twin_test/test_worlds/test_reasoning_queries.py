@@ -16,10 +16,6 @@ from semantic_digital_twin.reasoning.reasoner import CaseReasoner
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-)
 from semantic_digital_twin.world_description.geometry import Color
 
 
@@ -288,8 +284,8 @@ def test_world_reasoner_leaves_urdf_doors_and_drawers_on_their_own_joints():
     doors = world.get_semantic_annotations_by_type(Door)
     assert doors
     for door in doors:
-        assert isinstance(door.movable_joint, RevoluteConnection)
+        assert door.movable_joint.behaves_like_a_revolute_connection
     drawers = world.get_semantic_annotations_by_type(Drawer)
     assert drawers
     for drawer in drawers:
-        assert isinstance(drawer.movable_joint, PrismaticConnection)
+        assert drawer.movable_joint.behaves_like_a_prismatic_connection

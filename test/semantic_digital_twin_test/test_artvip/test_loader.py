@@ -12,8 +12,7 @@ from semantic_digital_twin.adapters.artvip_dataset.schema import (
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 
 try:
@@ -70,7 +69,11 @@ def test_door_cabinet_builds_a_tree_with_one_hinge(door_object):
     assert len(world.connections) == 2
     assert world.root is not None
 
-    [hinge] = [c for c in world.connections if isinstance(c, RevoluteConnection)]
+    [hinge] = [
+        c
+        for c in world.connections
+        if (isinstance(c, ScrewAxisConnection) and c.behaves_like_a_revolute_connection)
+    ]
     assert hinge.raw_dof.limits.lower.position == pytest.approx(-1.5707963267948966)
     assert hinge.raw_dof.limits.upper.position == pytest.approx(0.0)
 
@@ -84,7 +87,13 @@ def test_drawer_cabinet_builds_a_tree_with_two_slides(drawers_object):
     assert len(world.connections) == 3
     assert world.root is not None
 
-    slides = [c for c in world.connections if isinstance(c, PrismaticConnection)]
+    slides = [
+        c
+        for c in world.connections
+        if (
+            isinstance(c, ScrewAxisConnection) and c.behaves_like_a_prismatic_connection
+        )
+    ]
     assert len(slides) == 2
     for slide in slides:
         assert slide.raw_dof.limits.lower.position < slide.raw_dof.limits.upper.position
@@ -102,10 +111,14 @@ def test_hinged_door_is_reachable_as_an_active_connection_from_its_body(door_obj
     # giskardpy's ArticulateGraspedMechanism goal (motion_statechart/goals/grasped_mechanism.py) drives any
     # mechanism whose grasped part "hangs below an ActiveConnection1DOF" by calling
     # exactly this lookup on the grasped Body - this is the actual shape a manipulation
-    # plan would query, not just that the World happens to contain a RevoluteConnection
+    # plan would query, not just that the World happens to contain a revolute connection
     # somewhere.
     world = door_object.world
-    [hinge] = [c for c in world.connections if isinstance(c, RevoluteConnection)]
+    [hinge] = [
+        c
+        for c in world.connections
+        if (isinstance(c, ScrewAxisConnection) and c.behaves_like_a_revolute_connection)
+    ]
 
     assert (
         hinge.child.get_first_parent_connection_of_type(ActiveConnection1DOF) is hinge

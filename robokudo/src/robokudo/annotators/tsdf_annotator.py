@@ -1,6 +1,11 @@
+"""
+Per-object TSDF volume integration.
+"""
+
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 from dataclasses import dataclass
 from enum import Enum
@@ -26,9 +31,11 @@ if TYPE_CHECKING:
 
     from robokudo.types.cv import ColorToDepthRatio
 
+logger = logging.getLogger(__name__)
+
 
 # %% Volume integration inputs
-@dataclass
+@dataclass(kw_only=True)
 class VolumeIntegrationInput:
     """An object's pose and image region for volume integration."""
 
@@ -126,7 +133,7 @@ class TSDFAnnotator(ThreadedAnnotator):
         """
 
     def find_tracked_object(
-        self, pose: PoseAnnotation, threshold: float = 0.75
+        self, *, pose: PoseAnnotation, threshold: float = 0.75
     ) -> dict[str, Any] | None:
         """
         Check whether the given bounding box is similar to one that has been seen before.
@@ -139,7 +146,8 @@ class TSDFAnnotator(ThreadedAnnotator):
         best_object: dict[str, Any] | None = None
         for tracked_object in self.tracked_objects:
             sim = self.translation_comparator.compute_similarity(
-                pose.translation, tracked_object["pose"].translation
+                query_value=pose.translation,
+                obj_value=tracked_object["pose"].translation,
             )
             if sim > best_sim:
                 best_object = tracked_object
@@ -157,7 +165,7 @@ class TSDFAnnotator(ThreadedAnnotator):
             return Status.FAILURE
 
         object_hypotheses: list[ObjectHypothesis] = cas.filter_annotations_by_type(
-            ObjectHypothesis
+            type_to_include=ObjectHypothesis
         )
         if len(object_hypotheses) == 0:
             return Status.FAILURE
@@ -166,15 +174,17 @@ class TSDFAnnotator(ThreadedAnnotator):
 
         volume_integration_inputs: list[VolumeIntegrationInput] = []
         for object_hypothesis in object_hypotheses:
-            poses = cas.filter_by_type(PoseAnnotation, object_hypothesis.annotations)
+            poses = cas.filter_by_type(
+                type_to_include=PoseAnnotation, input_list=object_hypothesis.annotations
+            )
             if len(poses) == 0:
-                self.rk_logger.debug(
+                logger.debug(
                     f"No pose found for object {object_hypothesis.id}, skipping..."
                 )
                 continue
 
             depth_image_region = color_to_depth_ratio.depth_region(
-                object_hypothesis.roi.roi
+                region=object_hypothesis.roi.roi
             )
             volume_integration_inputs.append(
                 VolumeIntegrationInput(
@@ -188,16 +198,16 @@ class TSDFAnnotator(ThreadedAnnotator):
             return Status.FAILURE
 
         camera_intrinsic = Open3DCameraModelAdapter.to_intrinsic(
-            cas.require_camera_observation().effective_camera_model.scaled(
+            camera_model=cas.require_camera_observation().effective_camera_model.scaled(
                 scale_x=color_to_depth_ratio.horizontal,
                 scale_y=color_to_depth_ratio.vertical,
             )
         )
         color_image: npt.NDArray[np.uint8] = get_scaled_color_image_for_depth_image(
-            cas, copy.deepcopy(self.get_cas().get(CASViews.COLOR_IMAGE))
+            cas, copy.deepcopy(self.get_cas().get(view_name=CASViews.COLOR_IMAGE))
         )
         depth_image: npt.NDArray[np.float32] = copy.deepcopy(
-            self.get_cas().get(CASViews.DEPTH_IMAGE)
+            self.get_cas().get(view_name=CASViews.DEPTH_IMAGE)
         )
 
         geometries: list[open3d.geometry.Geometry] = []
@@ -210,7 +220,7 @@ class TSDFAnnotator(ThreadedAnnotator):
             )
             mask: npt.NDArray[np.uint8] = object_hypothesis.roi.mask
             if mask is None:
-                self.rk_logger.debug(
+                logger.debug(
                     f"No mask found for object {object_hypothesis.id}, skipping..."
                 )
                 continue
@@ -255,7 +265,7 @@ class TSDFAnnotator(ThreadedAnnotator):
                 pose.rotation, pose.translation
             )
 
-            tracked_object = self.find_tracked_object(pose)
+            tracked_object = self.find_tracked_object(pose=pose)
             if tracked_object is not None:
                 volume = tracked_object["volume"]
                 tracked_object["pose"] = pose
@@ -286,25 +296,26 @@ class TSDFAnnotator(ThreadedAnnotator):
 
             vis_mode = self.descriptor.parameters.geometry_visualization_mode
             if vis_mode != TSDFAnnotatorVisualizationModes.NONE:
-                vis_geom = self.get_visualization_geometries(volume_annotation)
+                vis_geom = self.get_visualization_geometries(volume=volume_annotation)
                 geometries.extend(vis_geom)
 
         vis_image = self.get_visualization_image(
-            color_image, volume_integration_inputs, masks
+            image=color_image,
+            volume_integration_inputs=volume_integration_inputs,
+            masks=masks,
         )
-        self.get_annotator_output_struct().set_image(vis_image)
+        self.get_annotator_output_struct().set_image(img=vis_image)
 
         vis_mode = self.descriptor.parameters.geometry_visualization_mode
         if vis_mode != TSDFAnnotatorVisualizationModes.NONE:
-            self.rk_logger.debug(
-                f"Visualizing geometry for {len(geometries) // 3} objects"
-            )
-            self.get_annotator_output_struct().set_geometries(geometries)
+            logger.debug(f"Visualizing geometry for {len(geometries) // 3} objects")
+            self.get_annotator_output_struct().set_geometries(geometries=geometries)
 
         return Status.SUCCESS
 
     def get_visualization_image(
         self,
+        *,
         image: npt.NDArray[np.uint8],
         volume_integration_inputs: list[VolumeIntegrationInput],
         masks: list[npt.NDArray[np.uint8]],
@@ -317,9 +328,7 @@ class TSDFAnnotator(ThreadedAnnotator):
         :param masks: The masks to visualize.
         :return: The image with the visualizations.
         """
-        self.rk_logger.debug(
-            f"Visualizing image for {len(volume_integration_inputs)} objects"
-        )
+        logger.debug(f"Visualizing image for {len(volume_integration_inputs)} objects")
 
         overlay = np.zeros_like(image, dtype=np.uint8)
         combined_mask = np.zeros(image.shape[:2], dtype=np.uint8)  # 0-1
@@ -346,7 +355,7 @@ class TSDFAnnotator(ThreadedAnnotator):
         return image
 
     def get_visualization_geometries(
-        self, volume: TSDFAnnotation
+        self, *, volume: TSDFAnnotation
     ) -> list[open3d.geometry.Geometry]:
         """
         Get visualization geometries for the TSDF volume depending on the visualization mode.
@@ -362,5 +371,5 @@ class TSDFAnnotator(ThreadedAnnotator):
         elif vis_mode == TSDFAnnotatorVisualizationModes.MESH:
             return [volume.get_mesh(), volume.get_coordinate_frame()]
         else:
-            self.rk_logger.warning(f"Visualization mode '{vis_mode}' not supported!")
+            logger.warning(f"Visualization mode '{vis_mode}' not supported!")
             return []

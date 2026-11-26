@@ -19,6 +19,7 @@ The module uses:
    Requires at least 10 points per object hypothesis.
 """
 
+import logging
 import copy
 from timeit import default_timer
 
@@ -35,6 +36,8 @@ from robokudo.utils.transform import (
     get_transform_matrix,
     get_quaternion_from_rotation_matrix,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ClusterPosePCAAnnotator(BaseAnnotator):
@@ -60,7 +63,7 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
         :param name: Name of this annotator instance
         """
         super().__init__(name)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """
@@ -80,7 +83,7 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         annotations = self.get_cas().annotations
         geometries_to_visualize = []
 
@@ -148,7 +151,7 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
         ]
         vis_geometries.extend(geometries_to_visualize)
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
