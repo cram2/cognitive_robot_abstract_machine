@@ -114,6 +114,9 @@ class GarbageCollectionPause(AbstractContextManager):
     """
 
     def __enter__(self) -> GarbageCollectionPause:
+        """
+        Pauses the collector, unlike :meth:`contextlib.AbstractContextManager.__enter__`.
+        """
         self.collector_was_running = gc.isenabled()
         gc.disable()
         return self

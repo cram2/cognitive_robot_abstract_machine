@@ -1,3 +1,7 @@
+"""
+Mimics of generic classes, their parametrizations and the subclasses that bind them.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
