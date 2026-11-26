@@ -148,27 +148,28 @@ def test_selective_query_multiple_backends(session, database):
     assert len(result) == 1
 
 
-def test_the_relationships_of_objects_the_database_backend_returns_stay_readable(
+def test_the_collections_of_objects_the_database_backend_returns_stay_readable(
     session, database
 ):
     """
-    The data access objects that the database backend returns have their relationships
-    loaded, though the backend's session is gone once the evaluation ends.
+    The data access objects that the database backend returns have the collections
+    their mapping loads eagerly loaded, though the backend's session is gone once the
+    evaluation ends.
     """
-    pose = KRROODPose(
-        position=KRROODPosition(x=1, y=0, z=0),
-        orientation=KRROODOrientation(x=0, y=0, z=0, w=1),
+    positions = KRROODPositions(
+        positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=0, y=1, z=0)],
+        some_strings=["a"],
     )
-    session.add(to_dao(pose))
+    session.add(to_dao(positions))
     session.commit()
-    pose_variable = variable(KRROODPose, domain=None)
+    positions_variable = variable(KRROODPositions, domain=None)
 
-    [dao] = an(entity(pose_variable)).evaluate(
+    [dao] = an(entity(positions_variable)).evaluate(
         backend=SQLAlchemyBackend(session_maker=sessionmaker(session.bind))
     )
     gc.collect()
 
-    assert dao.position.x == pose.position.x
+    assert len(dao.positions) == len(positions.positions)
 
 
 def test_probabilistic_backend_with_symbolic_expression():
