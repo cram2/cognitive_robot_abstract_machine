@@ -76,7 +76,7 @@ class PartRelationshipInspector:
         )
 
     @classmethod
-    def accepting_part_type(
+    def from_part_type(
         cls,
         *,
         whole_type: type[HasParts],

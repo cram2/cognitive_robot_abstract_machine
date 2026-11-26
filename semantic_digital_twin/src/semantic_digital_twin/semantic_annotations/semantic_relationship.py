@@ -84,7 +84,7 @@ class HasSemanticRelationships(SemanticAnnotation, Mixin):
                 entities.append(value)
         return entities
 
-    def _field_accepting(
+    def _choose_field_for_entity(
         self,
         *,
         entity: Any,

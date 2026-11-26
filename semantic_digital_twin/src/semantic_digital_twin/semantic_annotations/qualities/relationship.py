@@ -52,8 +52,10 @@ class HasQualities(HasSemanticRelationships, Mixin):
         :raises SeveralFieldsAcceptEntity: If several quality fields accept
             ``type(quality)``.
         """
-        wrapped_field = self._field_accepting(
-            entity=quality, relationship_type=IsQualityRelationship, field_name=field_name
+        wrapped_field = self._choose_field_for_entity(
+            entity=quality,
+            relationship_type=IsQualityRelationship,
+            field_name=field_name,
         )
         self._store_in_field(entity=quality, wrapped_field=wrapped_field)
 

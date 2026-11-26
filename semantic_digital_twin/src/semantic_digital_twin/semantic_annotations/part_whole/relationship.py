@@ -56,8 +56,10 @@ class HasParts(HasRootKinematicStructureEntity, HasSemanticRelationships, Mixin)
         :raises SeveralFieldsAcceptEntity: If several part-whole relationship fields
             accept ``type(part)``.
         """
-        wrapped_field = self._field_accepting(
-            entity=part, relationship_type=IsPartWholeRelationship, field_name=field_name
+        wrapped_field = self._choose_field_for_entity(
+            entity=part,
+            relationship_type=IsPartWholeRelationship,
+            field_name=field_name,
         )
         part._mount_strategy(
             self, IsPartWholeRelationship.of_wrapped_field(wrapped_field=wrapped_field)

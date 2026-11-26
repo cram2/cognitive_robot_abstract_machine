@@ -153,7 +153,7 @@ class PartSplitter:
             :attr:`part_type`, if any; otherwise the part split off its shape, ``None``
             if there is none to split off.
         """
-        relationship = PartRelationshipInspector.accepting_part_type(
+        relationship = PartRelationshipInspector.from_part_type(
             whole_type=type(whole), part_type=self.part_type
         )
         existing = relationship.held_parts(whole=whole)
@@ -173,7 +173,7 @@ class PartSplitter:
         :return: The part, added to the annotation and its world; ``None`` if the field
             is set already, the finder finds none or the root body has no shape.
         """
-        relationship = PartRelationshipInspector.accepting_part_type(
+        relationship = PartRelationshipInspector.from_part_type(
             whole_type=type(whole), part_type=self.part_type, name=field_name
         )
         if relationship.is_filled_in(whole=whole) and not relationship.holds_many:
