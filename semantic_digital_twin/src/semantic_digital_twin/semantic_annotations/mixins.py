@@ -81,9 +81,9 @@ from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     ScrewAxisConnection,
 )
-from semantic_digital_twin.world_description.liquid_connection import (
+from semantic_digital_twin.world_description.fill_level_connection import (
     FillLevelSource,
-    LiquidConnection,
+    FillLevelConnection,
 )
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -1601,7 +1601,7 @@ class HasCounterTop(PartWholeRelationship, Mixin):
 class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
     """
     Mixin that gives a container a fill level in ``[0, 1]``, the position of a virtual
-    :class:`LiquidConnection` below its root created by :meth:`initialize_fill_level`.
+    :class:`FillLevelConnection` below its root created by :meth:`initialize_fill_level`.
 
     The container drains by :attr:`fill_equation` as it tilts, and pours into
     :attr:`pours_into` only while the stream lands in that container's opening.
@@ -1651,13 +1651,13 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
     # %% fill level
 
     @property
-    def fill_connection(self) -> LiquidConnection | None:
+    def fill_connection(self) -> FillLevelConnection | None:
         """
         The connection below the root whose position is the fill level; ``None`` until
         :meth:`initialize_fill_level` created it.
         """
         for child in self.root.child_kinematic_structure_entities:
-            if isinstance(child.parent_connection, LiquidConnection):
+            if isinstance(child.parent_connection, FillLevelConnection):
                 return child.parent_connection
         return None
 
@@ -1763,7 +1763,7 @@ class HasFillLevel(HasRootBody, FillLevelSource, Mixin):
         )
         with world.modify_world():
             world.add_body(fill_level_body)
-            connection = LiquidConnection.create_with_dofs(
+            connection = FillLevelConnection.create_with_dofs(
                 world=world,
                 parent=self.root,
                 child=fill_level_body,

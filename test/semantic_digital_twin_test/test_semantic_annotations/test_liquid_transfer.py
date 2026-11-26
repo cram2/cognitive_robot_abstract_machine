@@ -1,5 +1,6 @@
 """
-Tests of the fill-level containers, the transfer between them and the liquid connection.
+Tests of the fill-level containers, the transfer between them and the fill-level
+connection.
 """
 
 # %% imports

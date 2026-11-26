@@ -41,13 +41,13 @@ if TYPE_CHECKING:
 
 class FillLevelSource(ABC):
     """
-    What a liquid connection reads its fill velocity from: the semantic annotation of
-    the container whose fill level it holds.
+    What a fill-level connection reads its fill velocity from: the semantic annotation
+    of the container whose fill level it holds.
     """
 
     @property
     @abstractmethod
-    def fill_connection(self) -> LiquidConnection | None:
+    def fill_connection(self) -> FillLevelConnection | None:
         """
         The connection holding this container's fill level.
         """
@@ -65,7 +65,7 @@ class FillLevelSource(ABC):
 @dataclass(kw_only=True)
 class CompiledFillVelocity:
     """
-    The fill velocity of a liquid connection compiled for one world model version.
+    The fill velocity of a fill-level connection compiled for one world model version.
     """
 
     model_version: int
@@ -93,11 +93,11 @@ class CompiledFillVelocity:
         return float(self.function(values)[0])
 
 
-# %% liquid connection
+# %% fill-level connection
 
 
 @dataclass(eq=False, kw_only=True)
-class LiquidConnection(Connection, HasUpdateState):
+class FillLevelConnection(Connection, HasUpdateState):
     """
     Connection whose passive degree of freedom is a container's normalized fill level,
     integrated each physics step from the fill velocity of the
@@ -131,11 +131,12 @@ class LiquidConnection(Connection, HasUpdateState):
         dof_limits: DegreeOfFreedomLimits,
     ) -> Self:
         """
-        Creates a liquid connection with its fill degree of freedom added to ``world``.
+        Creates a fill-level connection with its fill degree of freedom added to
+        ``world``.
 
         :param world: The world in which to add the degree of freedom.
         :param parent: The container's root.
-        :param child: The body standing for the liquid.
+        :param child: The body standing for the contents.
         :param name: Name of the connection; generated from parent and child if
             ``None``.
         :param parent_T_connection_expression: Constant pose of the connection relative

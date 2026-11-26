@@ -102,13 +102,13 @@ class AsymmetricInertiaTensorError(DataclassException, ValueError):
 @dataclass(kw_only=True)
 class MissingFillLevelLimitsError(UsageError):
     """
-    Raised when a liquid connection's fill degree of freedom has no position limits, so
-    the integrated fill level cannot be clamped.
+    Raised when a fill-level connection's fill degree of freedom has no position limits,
+    so the integrated fill level cannot be clamped.
     """
 
     connection_name: PrefixedName
     """
-    The name of the liquid connection whose fill degree of freedom lacks position
+    The name of the fill-level connection whose fill degree of freedom lacks position
     limits.
     """
 
@@ -117,6 +117,8 @@ class MissingFillLevelLimitsError(UsageError):
 
     def suggest_correction(self) -> str:
         return "create the connection via initialize_fill_level, or give its degree of freedom lower and upper position limits."
+
+
 # %% Mesh files
 
 
