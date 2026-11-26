@@ -36,7 +36,7 @@ from typing_extensions import Any
 # %% Camera definitions
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectSpec:
     """
     Data structure to define typical object properties for predefined objects.
@@ -59,7 +59,7 @@ class ObjectSpec:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionSpec:
     """
     Data structure to define typical properties for predefined regions.
@@ -75,7 +75,7 @@ class RegionSpec:
     color: Color = field(default_factory=Color)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraPlacement:
     """
     Describe a standalone camera and its pose relative to a parent body.
@@ -92,8 +92,12 @@ class CameraPlacement:
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PredefinedObject(SemanticAnnotation):
+    """
+    Marks a body as one of the objects a world descriptor places in the world.
+    """
+
     body: Body = field(default=None)
 
 
@@ -124,7 +128,7 @@ class BaseWorldDescriptor:
                 self.world.add_body(body=root)
 
     @staticmethod
-    def _center_mesh_origin(mesh: Mesh) -> None:
+    def _center_mesh_origin(*, mesh: Mesh) -> None:
         """
         Shift mesh origin to the center of its local bounding box.
         """
@@ -136,7 +140,9 @@ class BaseWorldDescriptor:
             -center_x, -center_y, -center_z, 0, 0, 0
         )
 
-    def build_objects(self, root: Body, specs: list[Any]) -> dict[str, Connection6DoF]:
+    def build_objects(
+        self, *, root: Body, specs: list[Any]
+    ) -> dict[str, Connection6DoF]:
         """
         Create bodies, connections, annotations, and poses from object specs.
         """
@@ -153,7 +159,7 @@ class BaseWorldDescriptor:
                         filename=str(spec.mesh_path),
                     )
                     if spec.center_mesh:
-                        self._center_mesh_origin(mesh)
+                        self._center_mesh_origin(mesh=mesh)
                     box = mesh.local_frame_bounding_box.as_shape()
                     shapes = [box, mesh]
                     collision = ShapeCollection([box])
@@ -196,7 +202,7 @@ class BaseWorldDescriptor:
         return connections
 
     def build_regions(
-        self, root: Body, specs: list[RegionSpec]
+        self, *, root: Body, specs: list[RegionSpec]
     ) -> dict[str, Connection6DoF]:
         """
         Create regions and connections from region specs.
@@ -234,7 +240,7 @@ class BaseWorldDescriptor:
 
         return connections
 
-    def build_camera(self, parent: Body, placement: CameraPlacement) -> Camera:
+    def build_camera(self, *, parent: Body, placement: CameraPlacement) -> Camera:
         """
         Attach and register the supplied camera at its parent-relative optical pose.
 

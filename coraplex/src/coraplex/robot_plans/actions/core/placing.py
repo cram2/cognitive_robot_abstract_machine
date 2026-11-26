@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from cramph.node import StatechartNode
 from coraplex.robot_plans.actions.base import SequentialAction
 from cramph.composites import Parallel
+from cramph.world_access import WorldAccess
 from giskardpy.motion_statechart.mixins import HasGoalPoseParameter
 from coraplex.robot_plans.mixins import (
     GraspPoseSequence,
@@ -134,6 +135,18 @@ class PlaceAction(
     @property
     def variable_poses(self) -> list[Pose]:
         return self._tool_goals.poses
+
+    def compute_world_access(self) -> WorldAccess:
+        """
+        Differs from :meth:`~cramph.node.StatechartNode.compute_world_access` in also
+        reading where :attr:`graspable` is attached, since the grasp it releases is
+        measured there when it starts.
+        """
+        return (
+            super()
+            .compute_world_access()
+            .union_with(other=WorldAccess(read_frames=frozenset({self.graspable.root})))
+        )
 
     def on_start(self) -> None:
         """

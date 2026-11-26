@@ -35,7 +35,7 @@ def test_visualization_places_object_mask_in_its_roi(full_image_mask: bool) -> N
     mask[mask_row, mask_column] = 1
 
     visualization = TSDFAnnotator().get_visualization_image(
-        image, [volume_integration_input], [mask]
+        image=image, volume_integration_inputs=[volume_integration_input], masks=[mask]
     )
 
     np.testing.assert_array_equal(visualization[8, 8], [0, 128, 0])

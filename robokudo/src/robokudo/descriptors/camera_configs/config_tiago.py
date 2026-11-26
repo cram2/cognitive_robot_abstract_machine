@@ -1,3 +1,9 @@
+"""
+Camera configuration of the Xtion camera on the TIAGo robot, registered as ``tiago``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar
@@ -11,7 +17,7 @@ from robokudo.descriptors.camera_configs.components import (
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class TiagoCameraConfig(
     BaseCameraConfig,
     RGBDComponent,

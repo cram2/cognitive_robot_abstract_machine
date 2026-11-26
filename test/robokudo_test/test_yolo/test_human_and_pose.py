@@ -37,14 +37,16 @@ from ._yolo_mock import (
 # %% scene setup
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PersonScene(BlackWallScene):
     """
     The black wall scene, in which the mock pose model detects a person.
     """
 
     person_class_name: str = field(
-        default_factory=lambda: HumanAndPoseAnnotator.Descriptor.Parameters().person_class_name
+        default_factory=lambda: (
+            HumanAndPoseAnnotator.Descriptor.Parameters().person_class_name
+        )
     )
     """
     Name of the class the mock pose model reports persons as.
@@ -112,7 +114,8 @@ class PersonScene(BlackWallScene):
         """
         :return: The box of the person in pixels of the given image.
         """
-        return Rect.from_corner_points(*self.person_box.corners_in(image))
+        x1, y1, x2, y2 = self.person_box.corners_in(image=image)
+        return Rect.from_corner_points(x1=x1, y1=y1, x2=x2, y2=y2)
 
     def person_box_shrunk_by(self, fraction: float) -> Rect:
         """
@@ -160,7 +163,9 @@ class PersonScene(BlackWallScene):
         :return: An annotator whose CAS holds a color image and a matching depth image.
         """
         annotator = HumanAndPoseAnnotator(descriptor=descriptor)
-        self.place_in_pipeline(annotator, color_to_depth_ratio)
+        self.place_in_pipeline(
+            annotator=annotator, color_to_depth_ratio=color_to_depth_ratio
+        )
         return annotator
 
 
@@ -192,7 +197,12 @@ def model_loader(
 
 
 def _only_hypothesis(annotator: HumanAndPoseAnnotator) -> HumanHypothesis:
-    (hypothesis,) = annotator.get_cas().filter_annotations_by_type(HumanHypothesis)
+    """
+    :return: The one human hypothesis the annotator put into its CAS.
+    """
+    (hypothesis,) = annotator.get_cas().filter_annotations_by_type(
+        type_to_include=HumanHypothesis
+    )
     return hypothesis
 
 
@@ -312,19 +322,28 @@ def test_hypothesis_region_is_person_bounding_box(
 def test_each_person_is_identified_by_its_detection_index(
     model_loader: MockModelLoader, scene: PersonScene
 ):
+    """
+    Each detected person's hypothesis takes the index of its detection as its id.
+    """
     second_person_box = NormalizedBox(left=0.0, top=0.0, right=0.2, bottom=0.5)
     model_loader.model.detections.append(scene.person_detection(second_person_box))
     annotator = scene.annotator_in_pipeline(scene.descriptor())
 
     annotator.compute()
 
-    hypotheses = annotator.get_cas().filter_annotations_by_type(HumanHypothesis)
+    hypotheses = annotator.get_cas().filter_annotations_by_type(
+        type_to_include=HumanHypothesis
+    )
     assert [hypothesis.id for hypothesis in hypotheses] == [0, 1]
 
 
 def test_hypothesis_carries_two_dimensional_keypoints_in_pixels(
     model_loader: MockModelLoader, scene: PersonScene
 ):
+    """
+    The image keypoints of a hypothesis are the model's keypoints scaled to image
+    pixels.
+    """
     annotator = scene.annotator_in_pipeline(scene.descriptor())
 
     annotator.compute()
@@ -335,7 +354,7 @@ def test_hypothesis_carries_two_dimensional_keypoints_in_pixels(
     np.testing.assert_allclose(
         [astuple(keypoint) for keypoint in keypoints.keypoints],
         [
-            astuple(keypoint.in_pixels_of(scene.color_image()))
+            astuple(keypoint.in_pixels_of(image=scene.color_image()))
             for keypoint in scene.person_keypoints()
         ],
         rtol=1e-5,
@@ -435,13 +454,17 @@ def test_point_cloud_holds_depth_measured_inside_bounding_box(
 def test_point_cloud_is_built_on_smaller_depth_resolution(
     model_loader: MockModelLoader, scene: PersonScene
 ):
+    """
+    With a depth image at half the color resolution, the person's point cloud has one
+    point per depth pixel of the person's box.
+    """
     annotator = scene.annotator_in_pipeline(
         scene.depth_descriptor(), color_to_depth_ratio=0.5
     )
 
     annotator.compute()
 
-    depth_image = annotator.get_cas().get(CASViews.DEPTH_IMAGE)
+    depth_image = annotator.get_cas().get(view_name=CASViews.DEPTH_IMAGE)
     points = np.asarray(_only_hypothesis(annotator).points.points)
     assert len(points) == _area(scene.person_box_in(depth_image))
 
@@ -481,6 +504,10 @@ def test_shrink_as_annotation_without_shrinking_keeps_box_and_adds_no_cloud(
 def test_keypoint_clouds_cover_disc_around_confident_keypoints_only(
     model_loader: MockModelLoader, scene: PersonScene
 ):
+    """
+    Only a confident keypoint, here the nose, gets a point cloud: the depth pixels
+    within the masking radius around it.
+    """
     descriptor = scene.depth_descriptor()
     descriptor.parameters.generate_clouds_for_keypoints = True
     annotator = scene.annotator_in_pipeline(descriptor)
@@ -494,7 +521,9 @@ def test_keypoint_clouds_cover_disc_around_confident_keypoints_only(
         keypoint: len(keypoint_cloud.points.points)
         for keypoint, keypoint_cloud in zip(PoseKeypoint, keypoints.keypoints)
     }
-    nose = scene.person_keypoints()[PoseKeypoint.NOSE].in_pixels_of(scene.color_image())
+    nose = scene.person_keypoints()[PoseKeypoint.NOSE].in_pixels_of(
+        image=scene.color_image()
+    )
     nose_disc = cv2.circle(
         np.zeros((scene.resolution.height, scene.resolution.width), dtype=np.uint8),
         (int(nose.x), int(nose.y)),

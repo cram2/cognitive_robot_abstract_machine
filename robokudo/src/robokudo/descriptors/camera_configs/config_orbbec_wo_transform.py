@@ -1,3 +1,10 @@
+"""
+Camera configuration of the Orbbec Astra without a TF pose lookup, registered as
+``orbbec_wo_tf``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar
@@ -5,7 +12,7 @@ from typing_extensions import ClassVar
 from robokudo.descriptors.camera_configs.config_orbbec import OrbbecCameraConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class OrbbecCameraConfig(OrbbecCameraConfig):
     """
     Configuration class for the OrbBec Astra camera without transform lookup.

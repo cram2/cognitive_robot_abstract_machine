@@ -33,9 +33,8 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
-from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-)
+from krrood_spatial_math.spatial_types import ScrewAxis
+from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
 )
@@ -48,7 +47,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Milk
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 
@@ -101,7 +100,7 @@ for index in range(4):
 ## 2. Give a body a degree of freedom
 Your goal:
 - Spawn a body named `sliding_drawer` with scale `Scale(0.4, 0.5, 0.2)` whose
-  `connection_specification` is a `PrismaticConnectionSpecification` with axis `Vector3.X()`
+  `connection_specification` is a prismatic `ScrewAxisConnectionSpecification` with axis `Vector3.X()`
 - Store the body in a variable named `sliding_drawer`
 
 ```{code-cell} ipython3
@@ -119,13 +118,13 @@ Your goal:
 sliding_drawer = BodySpecification.box(
     name="sliding_drawer",
     scale=Scale(0.4, 0.5, 0.2),
-    connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
+    connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X())),
 ).spawn(world)
 ```
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if not isinstance(sliding_drawer.parent_connection, PrismaticConnection): raise ExerciseVerificationFailed("The drawer should slide.")
+if not (isinstance(sliding_drawer.parent_connection, ScrewAxisConnection) and sliding_drawer.parent_connection.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("The drawer should slide.")
 ```
 
 ## 3. Build an annotation specification with a nested part

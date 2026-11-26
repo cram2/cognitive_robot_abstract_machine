@@ -1,12 +1,20 @@
+"""
+The results of the queries one pass over the layers of a circuit has evaluated, which
+the memoized queries of the layers read and store.
+"""
+
 from __future__ import annotations
 
+# %% imports
 import functools
 from dataclasses import dataclass, field
 
 from typing_extensions import Any, Callable
 
+# %% cache
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, kw_only=True)
 class QueryCacheKey:
     """
     Which query, evaluated for which layer, an entry of a :class:`QueryCache` is the
@@ -27,8 +35,17 @@ class QueryCacheKey:
     parameters are still two layers with two results.
     """
 
+    @classmethod
+    def from_query(cls, *, query: Callable, layer: Any) -> QueryCacheKey:
+        """
+        :param query: A memoized query of a layer type.
+        :param layer: A layer the query is evaluated for.
+        :return: The key of the result of the query for the layer.
+        """
+        return cls(query=query.__wrapped__, layer_id=id(layer))
 
-@dataclass
+
+@dataclass(kw_only=True)
 class QueryCache:
     """
     The results one pass over the layers has computed so far.
@@ -45,14 +62,26 @@ class QueryCache:
     The result of every query evaluated so far, per layer.
     """
 
-    def result_of(self, query: Callable, layer: Any) -> Any:
+    def result_of(self, *, query: Callable, layer: Any) -> Any:
         """
         :param query: A memoized query of a layer type, such as
             :meth:`~probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_layer.ProductLayer.marginal`.
         :param layer: A layer the query was evaluated for in this pass.
         :return: What the query returned for the layer.
         """
-        return self.results[QueryCacheKey(query.__wrapped__, id(layer))]
+        return self.results[QueryCacheKey.from_query(query=query, layer=layer)]
+
+    def stored_result(self, *, key: QueryCacheKey, result: Any) -> Any:
+        """
+        :param key: Which query, evaluated for which layer, gave the result.
+        :param result: What the query computed.
+        :return: What the pass stores and returns as the result, the result itself; a
+            cache that changes results on their way up the circuit overrides it.
+        """
+        return result
+
+
+# %% memoized queries
 
 
 def memoized(method: Callable) -> Callable:
@@ -64,12 +93,20 @@ def memoized(method: Callable) -> Callable:
     """
 
     @functools.wraps(method)
-    def wrapper(self, *args, cache: QueryCache | None = None, **kwargs):
+    def wrapper(
+        self: Any, *args: Any, cache: QueryCache | None = None, **kwargs: Any
+    ) -> Any:
+        """
+        :return: The result of the query for this layer in the pass of the cache,
+            evaluated once per pass.
+        """
         if cache is None:
             cache = QueryCache()
-        key = QueryCacheKey(method, id(self))
+        key = QueryCacheKey(query=method, layer_id=id(self))
         if key not in cache.results:
-            cache.results[key] = method(self, *args, cache=cache, **kwargs)
+            cache.results[key] = cache.stored_result(
+                key=key, result=method(self, *args, cache=cache, **kwargs)
+            )
         return cache.results[key]
 
     return wrapper

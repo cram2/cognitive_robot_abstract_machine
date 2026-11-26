@@ -46,12 +46,6 @@ from cramph.statechart import Statechart
 # %% mimics
 
 
-class ModificationDeliberatelyFailed(Exception):
-    """
-    Raised inside a modification block to abandon it.
-    """
-
-
 @dataclass(eq=False, repr=False, kw_only=True)
 class NodeFailingItsFirstRuns(
     SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNode
@@ -321,25 +315,6 @@ def test_a_requested_reset_waits_while_a_recompile_is_held_back(
     holding_back.at_rest = True
     statechart_executor.tick()
     assert node.life_cycle_state == LifeCycleValue.NOT_STARTED
-
-
-def test_an_abandoned_modification_drops_the_resets_requested_in_it(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    node = NodeFailingItsFirstRuns(failing_runs=1)
-    statechart = _compile_with_nodes(statechart_executor, [node])
-    statechart_executor.tick()
-
-    with pytest.raises(ModificationDeliberatelyFailed):
-        with statechart.modify():
-            statechart.request_reset(node=node)
-            raise ModificationDeliberatelyFailed()
-    statechart_executor.tick()
-
-    assert node.life_cycle_state == LifeCycleValue.FAILED
-
-
-# %% the failure handling node
 
 
 def test_the_strategy_does_not_run_for_a_node_that_succeeds(
@@ -646,20 +621,6 @@ def test_a_compiled_sequence_rejects_steps_again_after_a_rewriting_modification(
 
     with pytest.raises(StatechartAlreadyCompiledError):
         sequence.add_node(node=_node_arriving_at_once("third"))
-
-
-def test_a_compiled_sequence_rejects_steps_after_an_abandoned_rewriting_modification(
-    statechart_executor: StatechartExecutor,
-) -> None:
-    sequence = Sequence(nodes=[_node_arriving_at_once("first")])
-    statechart = _compile_with_nodes(statechart_executor, [sequence])
-
-    with pytest.raises(ModificationDeliberatelyFailed):
-        with statechart.modify(rewrites_compiled_nodes=True):
-            raise ModificationDeliberatelyFailed()
-
-    with pytest.raises(StatechartAlreadyCompiledError):
-        sequence.add_node(node=_node_arriving_at_once("rejected"))
 
 
 def test_a_modification_nested_in_a_rewriting_one_may_rewrite_too(

@@ -27,7 +27,9 @@ def test_image_rotation_matches_intrinsics(rotation: ImageRotation) -> None:
     )
     interface = object.__new__(ROSCameraWithoutDepthInterface)
     rotated_image, rotated_intrinsics, dimensions = (
-        interface.rotate_image_and_intrinsics(image, intrinsic_matrix, rotation)
+        interface.rotate_image_and_intrinsics(
+            image=image, intrinsic_matrix=intrinsic_matrix, rotation=rotation
+        )
     )
     if rotation == ImageRotation.COUNTERCLOCKWISE_90:
         expected_image = numpy.array([[2, 5], [1, 4], [0, 3]])
@@ -62,7 +64,9 @@ def test_image_rotation_updates_tangential_distortion(rotation: ImageRotation) -
     }
     assert (
         ROSCameraWithoutDepthInterface.rotate_camera_distortion(
-            coefficients, CameraDistortionModel.PLUMB_BOB.value, rotation
+            coefficients=coefficients,
+            distortion_model=CameraDistortionModel.PLUMB_BOB.value,
+            rotation=rotation,
         )
         == expected[rotation]
     )
@@ -76,7 +80,9 @@ def test_intrinsics_reject_unsupported_rotation(rotation: str | None) -> None:
     """
     interface = object.__new__(ROSCameraWithoutDepthInterface)
     with pytest.raises(UnsupportedImageRotation) as error:
-        interface.rotate_camera_intrinsics(numpy.eye(3), (3, 2), rotation)
+        interface.rotate_camera_intrinsics(
+            intrinsic_matrix=numpy.eye(3), image_size=(3, 2), rotation=rotation
+        )
     assert error.value.rotation == rotation
 
 
@@ -88,7 +94,7 @@ def test_image_rejects_unsupported_rotation(rotation: str | None) -> None:
     interface = object.__new__(ROSCameraWithoutDepthInterface)
     with pytest.raises(UnsupportedImageRotation) as error:
         interface.rotate_image_and_intrinsics(
-            numpy.zeros((2, 3)), numpy.eye(3), rotation
+            image=numpy.zeros((2, 3)), intrinsic_matrix=numpy.eye(3), rotation=rotation
         )
     assert error.value.rotation == rotation
 
@@ -104,6 +110,8 @@ def test_distortion_rejects_unsupported_rotation(
     """
     with pytest.raises(UnsupportedImageRotation) as error:
         ROSCameraWithoutDepthInterface.rotate_camera_distortion(
-            (0.1, 0.2, 0.3, 0.4, 0.5), distortion_model.value, rotation
+            coefficients=(0.1, 0.2, 0.3, 0.4, 0.5),
+            distortion_model=distortion_model.value,
+            rotation=rotation,
         )
     assert error.value.rotation == rotation

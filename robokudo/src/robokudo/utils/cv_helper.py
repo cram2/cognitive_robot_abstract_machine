@@ -351,4 +351,6 @@ def project_to_color_pixels(
     :return: The (x, y) color image pixel of each point, one pixel per row.
     """
     projected = points @ camera_model.intrinsic_matrix.T
-    return color_to_depth_ratio.color_pixels(projected[:, :2] / projected[:, 2:])
+    return color_to_depth_ratio.color_pixels(
+        depth_pixels=projected[:, :2] / projected[:, 2:]
+    )

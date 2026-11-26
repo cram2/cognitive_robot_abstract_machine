@@ -18,6 +18,8 @@ The module uses:
 """
 
 from __future__ import annotations
+
+import logging
 from py_trees.common import Status
 
 from robokudo.annotators.core import BaseAnnotator
@@ -38,6 +40,8 @@ from robokudo.types.cv import Rect
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ClusterColorHistogramAnnotator(BaseAnnotator):
@@ -84,7 +88,7 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def update(self) -> Status:
         """Process object hypotheses and calculate color histograms.
@@ -99,10 +103,10 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
 
-        visualization_img = self.create_color_histogram_annotations(color)
+        visualization_img = self.create_color_histogram_annotations(color=color)
 
         if visualization_img is None:  # no plots have been generated?
             visualization_img = copy.deepcopy(color)
@@ -112,15 +116,15 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
             {"name": "Cloud", "geometry": cloud},
         ]
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return Status.SUCCESS
 
     def create_color_histogram_annotations(
-        self, color: npt.NDArray
+        self, *, color: npt.NDArray
     ) -> npt.NDArray | None:
         """Calculate 2D color histograms for object hypotheses.
 
@@ -139,7 +143,9 @@ class ClusterColorHistogramAnnotator(BaseAnnotator):
         # Iterate over everything that is a Object hypothesis and calculate the colors
         cluster_index = 0
 
-        object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+        object_hypotheses = self.get_cas().filter_annotations_by_type(
+            type_to_include=ObjectHypothesis
+        )
 
         if self.descriptor.parameters.generate_plot_output:
             plot_columns = 3

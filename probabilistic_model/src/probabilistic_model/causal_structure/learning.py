@@ -1,11 +1,14 @@
 """
 Learning a causal graph from the rows a model is fitted on, with the Peter-Clark
-algorithm or greedy equivalence search of causal-learn :cite:p:`zheng2024causal`, from a
-flat table or from the tables a relational circuit is fitted on.
+algorithm, greedy equivalence search or fast causal inference of causal-learn
+:cite:p:`zheng2024causal`, from a flat table or from the tables a relational circuit is
+fitted on.
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import IntEnum, StrEnum
@@ -15,6 +18,7 @@ import numpy.typing as npt
 import pandas as pd
 from causallearn.graph.GraphClass import CausalGraph as CausalLearnGraph
 from causallearn.graph.GraphNode import GraphNode as CausalLearnNode
+from causallearn.search.ConstraintBased.FCI import fci as fast_causal_inference
 from causallearn.search.ConstraintBased.PC import pc as peter_clark
 from causallearn.search.ScoreBased.GES import ges as greedy_equivalence_search
 from causallearn.utils.PCUtils.BackgroundKnowledge import (
@@ -24,7 +28,7 @@ from causallearn.utils.PCUtils.BackgroundKnowledgeOrientUtils import (
     orient_by_background_knowledge,
 )
 from causallearn.utils.PCUtils.Meek import meek
-from typing_extensions import Any
+from typing_extensions import Any, Generic
 
 from krrood.parametrization.causal_relation import (
     AttributeEndpoint,
@@ -36,20 +40,28 @@ from krrood.parametrization.causal_relation import (
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.class_diagrams.wrapped_field import WrappedField
 from krrood.patterns.classproperty import classproperty
+from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.parametrization.feature_extraction.feature_extractor import (
     FeatureExtractor,
 )
 
+from probabilistic_model.causal_structure.ancestral_graph import AncestralGraph
 from probabilistic_model.causal_structure.domain_causal_knowledge import (
     DomainCausalKnowledge,
 )
 from probabilistic_model.causal_structure.discretization import Discretizer
-from probabilistic_model.causal_structure.exceptions import TooFewVariablesToScore
+from probabilistic_model.causal_structure.exceptions import (
+    QuerySpansSeveralParts,
+    TooFewVariablesToScore,
+    UnsupportedKnowledgeUnderLatentConfounding,
+)
 from probabilistic_model.causal_structure.graph import (
     CausalGraph,
     EdgeMark,
+    EdgeMarkedGraph,
     GraphEdge,
     GraphNode,
+    MarkedGraphType,
     NodeLevel,
 )
 from probabilistic_model.causal_structure.identification import AdjustmentSelector
@@ -58,6 +70,7 @@ from probabilistic_model.causal_structure.relational_checks import (
     PartAttributeAdjacency,
 )
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
+    PartTrainingTable,
     RelationalProbabilisticCircuit,
     RelationalTrainingTables,
 )
@@ -110,6 +123,11 @@ class AdjacencyMatrixMark(IntEnum):
     An arrow head.
     """
 
+    CIRCLE = 2
+    """
+    A circle.
+    """
+
     @property
     def mark(self) -> EdgeMark:
         """
@@ -118,10 +136,56 @@ class AdjacencyMatrixMark(IntEnum):
         return EdgeMark[self.name]
 
 
+class KnowledgeKind(StrEnum):
+    """
+    The kinds of knowledge about a structure that are given before it is learned.
+    """
+
+    TIERS = "tiers"
+    """
+    Tiers that order the variables, none caused by a later one.
+    """
+
+    FORBIDDEN_EDGES = "forbidden edges"
+    """
+    Pairs of variables of which the first does not directly cause the second.
+    """
+
+    EXAMPLE_TO_PART_CHECK = "an example-to-part check"
+    """
+    A check that joins an instance's attribute to its parts' attributes.
+    """
+
+    @property
+    def correction_under_latent_confounding(self) -> str:
+        """
+        :return: What to do instead when a learner that allows hidden confounders is
+            given this knowledge.
+        """
+        match self:
+            case KnowledgeKind.EXAMPLE_TO_PART_CHECK:
+                return (
+                    "Leave the check out: the learner learns the edges between an "
+                    "instance and its parts from a table of instances and one part each."
+                )
+            case _:
+                return (
+                    "Give only required edges, or learn with the Peter-Clark algorithm, "
+                    "which assumes no hidden confounders."
+                )
+
+
 class CausalStructureLearner(ABC):
     """
     Learns a causal graph from the rows of one table.
     """
+
+    @classproperty
+    def graph_class(cls) -> type[EdgeMarkedGraph]:
+        """
+        :return: The kind of graph the learner learns.
+        """
+        return CausalGraph
 
     @abstractmethod
     def learn(
@@ -129,7 +193,7 @@ class CausalStructureLearner(ABC):
         rows: pd.DataFrame,
         nodes: list[GraphNode],
         domain_knowledge: DomainCausalKnowledge,
-    ) -> CausalGraph:
+    ) -> EdgeMarkedGraph:
         """
         :param rows: The table, one column per node, named by the node.
         :param nodes: The nodes to learn the graph over.
@@ -139,10 +203,21 @@ class CausalStructureLearner(ABC):
 
 
 @dataclass
-class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
+class DiscretizedTableStructureLearner(
+    CausalStructureLearner, Generic[MarkedGraphType], SubClassSafeGeneric, ABC
+):
     """
     Learns a causal graph from the table's columns discretized into a few levels each.
+
+    A subclass binds the kind of graph it learns.
     """
+
+    @classproperty
+    def graph_class(cls) -> type[EdgeMarkedGraph]:
+        """
+        :return: The kind of graph the learner learns, as the subclass binds it.
+        """
+        return cls.get_type_of_generic_parameter(parameter=MarkedGraphType)
 
     discretizer: Discretizer = field(default_factory=Discretizer)
     """
@@ -154,7 +229,7 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
         rows: pd.DataFrame,
         nodes: list[GraphNode],
         domain_knowledge: DomainCausalKnowledge,
-    ) -> CausalGraph:
+    ) -> MarkedGraphType:
         """
         Deterministic copies and columns that never vary are left out of the learning; a
         copy is restored as a child of its source, and a constant column stays without
@@ -170,13 +245,13 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
         ]
         tested_names = [node.name for node in tested]
         levels = self.discretizer.fit_transform(rows[tested_names])
-        return CausalGraph.from_edges(
-            nodes,
-            self.learn_edges(
-                levels.to_numpy(dtype=np.int64),
-                tested,
-                self.to_causal_learn_knowledge(
-                    domain_knowledge.restricted_to(tested_names)
+        return self.graph_class.from_edges(
+            nodes=nodes,
+            edges=self.learn_edges(
+                levels=levels.to_numpy(dtype=np.int64),
+                nodes=tested,
+                domain_knowledge=self.to_causal_learn_knowledge(
+                    domain_knowledge=domain_knowledge.restricted_to(tested_names)
                 ),
             )
             + [
@@ -188,6 +263,7 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
     @abstractmethod
     def learn_edges(
         self,
+        *,
         levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
@@ -201,6 +277,7 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
 
     @staticmethod
     def to_causal_learn_knowledge(
+        *,
         domain_knowledge: DomainCausalKnowledge,
     ) -> CausalLearnKnowledge:
         """
@@ -242,7 +319,7 @@ class DiscretizedTableStructureLearner(CausalStructureLearner, ABC):
 
 
 @dataclass
-class PeterClarkStructureLearner(DiscretizedTableStructureLearner):
+class PeterClarkStructureLearner(DiscretizedTableStructureLearner[CausalGraph]):
     """
     The Peter-Clark algorithm in its order-independent form.
     """
@@ -261,6 +338,7 @@ class PeterClarkStructureLearner(DiscretizedTableStructureLearner):
 
     def learn_edges(
         self,
+        *,
         levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
@@ -278,7 +356,9 @@ class PeterClarkStructureLearner(DiscretizedTableStructureLearner):
 
 
 @dataclass
-class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
+class GreedyEquivalenceSearchStructureLearner(
+    DiscretizedTableStructureLearner[CausalGraph]
+):
     """
     Greedy equivalence search :cite:p:`chickering2002optimal`, which moves between
     equivalence classes while that raises their score.
@@ -303,6 +383,7 @@ class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
 
     def learn_edges(
         self,
+        *,
         levels: npt.NDArray[np.integer],
         nodes: list[GraphNode],
         domain_knowledge: CausalLearnKnowledge,
@@ -320,7 +401,123 @@ class GreedyEquivalenceSearchStructureLearner(DiscretizedTableStructureLearner):
         return self.read_adjacency_matrix(meek(graph, domain_knowledge).G.graph, nodes)
 
 
+@dataclass(kw_only=True)
+class FastCausalInferenceStructureLearner(
+    DiscretizedTableStructureLearner[AncestralGraph]
+):
+    """
+    Fast causal inference :cite:p:`spirtes2000causation`, which learns a partial
+    ancestral graph and so allows hidden variables that cause two or more of the table's
+    columns.
+
+    .. note::
+        Tiers and forbidden edges are rejected: causal-learn turns each into a tail as
+        well as an arrow, which claims a cause the data does not show once a hidden
+        variable may cause both ends. Required edges are kept.
+    """
+
+    significance_level: float = 0.05
+    """
+    The level below which a test's p-value rejects independence.
+    """
+
+    independence_test: ConditionalIndependenceTest = (
+        ConditionalIndependenceTest.G_SQUARED
+    )
+    """
+    The conditional independence test.
+    """
+
+    maximum_conditioning_set_size: int | None = None
+    """
+    How many variables a test may condition on; ``None`` for no limit.
+    """
+
+    maximum_discriminating_path_length: int | None = None
+    """
+    How long a discriminating path may be that orients an edge; ``None`` for no limit.
+    """
+
+    @classproperty
+    def no_limit(cls) -> int:
+        """
+        :return: The value causal-learn reads as no limit on a size or a length.
+        """
+        return -1
+
+    def learn_edges(
+        self,
+        *,
+        levels: npt.NDArray[np.integer],
+        nodes: list[GraphNode],
+        domain_knowledge: CausalLearnKnowledge,
+    ) -> list[GraphEdge]:
+        with contextlib.redirect_stdout(io.StringIO()):
+            graph, _ = fast_causal_inference(
+                levels,
+                independence_test_method=self.independence_test,
+                alpha=self.significance_level,
+                depth=self.limit_of(maximum=self.maximum_conditioning_set_size),
+                max_path_length=self.limit_of(
+                    maximum=self.maximum_discriminating_path_length
+                ),
+                show_progress=False,
+                node_names=[node.name for node in nodes],
+                background_knowledge=domain_knowledge,
+            )
+        return self.read_adjacency_matrix(graph.graph, nodes)
+
+    def limit_of(self, *, maximum: int | None) -> int:
+        """
+        :param maximum: A limit, or ``None`` for none.
+        :return: The limit as causal-learn takes it.
+        """
+        return self.no_limit if maximum is None else maximum
+
+    @staticmethod
+    def to_causal_learn_knowledge(
+        *,
+        domain_knowledge: DomainCausalKnowledge,
+    ) -> CausalLearnKnowledge:
+        """
+        :raises UnsupportedKnowledgeUnderLatentConfounding: If the knowledge has tiers
+            or forbidden edges.
+        """
+        if any(domain_knowledge.tiers):
+            raise UnsupportedKnowledgeUnderLatentConfounding(kind=KnowledgeKind.TIERS)
+        if domain_knowledge.forbidden_edges:
+            raise UnsupportedKnowledgeUnderLatentConfounding(
+                kind=KnowledgeKind.FORBIDDEN_EDGES
+            )
+        return DiscretizedTableStructureLearner.to_causal_learn_knowledge(
+            domain_knowledge=domain_knowledge
+        )
+
+
 # %% what is learned
+
+
+@dataclass(frozen=True, kw_only=True)
+class PartOfCollection:
+    """
+    One part of a collection, as a query's variable names it.
+    """
+
+    collection: str
+    """
+    The name of the collection.
+    """
+
+    index: int
+    """
+    The position of the part in it.
+    """
+
+    def __str__(self) -> str:
+        """
+        :return: The part as ``collection[index]``.
+        """
+        return f"{self.collection}[{self.index}]"
 
 
 @dataclass
@@ -349,12 +546,75 @@ class LearnedCausalStructure:
     nodes are, which rank the valid adjustment sets by their support.
     """
 
+    graph_class: type[EdgeMarkedGraph] = CausalGraph
+    """
+    The kind of graph the causal relations are read as; one not closed under union is
+    learned once per scope, for the class table and for each collection.
+    """
+
     @property
     def selector(self) -> AdjustmentSelector:
         """
-        :return: What chooses an adjustment set from the class's causal relations.
+        :return: What chooses an adjustment set from the class's causal relations, of
+            the class table's graph for a graph learned once per scope.
         """
-        return AdjustmentSelector(self.relations.causal_graph(nodes=self.nodes))
+        return self.selector_of(scope=None)
+
+    def selector_covering(self, *, variable_names: list[str]) -> AdjustmentSelector:
+        """
+        :param variable_names: The names of a query's cause, effect and declared
+            confounders.
+        :return: What chooses an adjustment set among them: :attr:`selector`, or for a
+            graph learned once per scope, that of the collection whose part they reach.
+        :raises QuerySpansSeveralParts: If, for a graph learned once per scope, they
+            reach two collections or two parts of one.
+        """
+        if self.graph_class.is_closed_under_union:
+            return self.selector
+        return self.selector_of(scope=self.scope_of(variable_names=variable_names))
+
+    def selector_of(self, *, scope: str | None) -> AdjustmentSelector:
+        """
+        :param scope: The collection whose table a graph was learned from, or ``None``
+            for the class table.
+        :return: What chooses an adjustment set from the graph of that scope, over its
+            nodes: every node for a graph that is closed under union, else the class
+            table's nodes and those of the collection's parts.
+        """
+        nodes = (
+            self.nodes
+            if self.graph_class.is_closed_under_union
+            else [node for node in self.nodes if node.collection in (None, scope)]
+        )
+        return AdjustmentSelector(
+            self.relations.causal_graph(
+                nodes=nodes, graph_class=self.graph_class, scope=scope
+            )
+        )
+
+    def scope_of(self, *, variable_names: list[str]) -> str | None:
+        """
+        :param variable_names: The names of a query's variables.
+        :return: The collection whose one part the variables reach; ``None`` if they
+            reach no part.
+        :raises QuerySpansSeveralParts: If they reach two collections or two parts of
+            one.
+        """
+        parts = {
+            PartOfCollection(collection=node.collection, index=index)
+            for name in variable_names
+            for node in self.nodes
+            if (index := node.part_index_of(name)) is not None
+        }
+        if not parts:
+            return None
+        if len(parts) > 1:
+            raise QuerySpansSeveralParts(
+                variable_names=variable_names,
+                parts=sorted(str(part) for part in parts),
+            )
+        [part] = parts
+        return part.collection
 
 
 # %% learning from a relational circuit's tables
@@ -398,6 +658,12 @@ class RelationalCausalStructureLearner:
     causal knowledge's tiers place the part attribute first.
     """
 
+    part_draw_seed: int = 0
+    """
+    The seed of the draw of one part per instance, for a learner that learns one graph
+    per scope.
+    """
+
     def learn(
         self,
         circuit: RelationalProbabilisticCircuit,
@@ -429,6 +695,13 @@ class RelationalCausalStructureLearner:
             )
             for variable in circuit.class_probabilistic_circuit.variables
         ]
+        if not self.learner.graph_class.is_closed_under_union:
+            return self.learn_per_scope(
+                circuit=circuit,
+                tables=tables,
+                example_nodes=example_nodes,
+                domain_knowledge=domain_knowledge,
+            )
         example_names = [node.name for node in example_nodes]
         example_graph = self.learner.learn(
             rows=tables.example_rows,
@@ -453,20 +726,107 @@ class RelationalCausalStructureLearner:
                 domain_knowledge,
             )
         return LearnedCausalStructure(
-            relations=self.record_in_class_diagram(circuit, edges),
+            relations=self.record_in_class_diagram(circuit, {None: edges}),
             nodes=nodes,
             training_rows=tables.example_rows,
         )
 
+    def learn_per_scope(
+        self,
+        *,
+        circuit: RelationalProbabilisticCircuit,
+        tables: RelationalTrainingTables,
+        example_nodes: list[GraphNode],
+        domain_knowledge: DomainCausalKnowledge,
+    ) -> LearnedCausalStructure:
+        """
+        :param circuit: A fitted relational circuit.
+        :param tables: Its training tables.
+        :param example_nodes: The nodes of the class table.
+        :param domain_knowledge: What is known about the structure in advance.
+        :return: The structure of one graph learned from the class table, and one per
+            collection from a table that pairs every instance with one of its parts,
+            drawn at random, as a learner whose graphs are not closed under union
+            needs.
+        :raises UnsupportedKnowledgeUnderLatentConfounding: If an
+            :attr:`example_to_part_check` is given.
+        """
+        if self.example_to_part_check is not None:
+            raise UnsupportedKnowledgeUnderLatentConfounding(
+                kind=KnowledgeKind.EXAMPLE_TO_PART_CHECK
+            )
+        example_names = [node.name for node in example_nodes]
+        edges_by_scope = {
+            None: self.learner.learn(
+                rows=tables.example_rows,
+                nodes=example_nodes,
+                domain_knowledge=domain_knowledge.restricted_to(example_names),
+            ).edges()
+        }
+        nodes = list(example_nodes)
+        for part, table in tables.part_tables.items():
+            part_node_of_column = self.part_node_of_column(
+                part, self.create_part_nodes(circuit, part)
+            )
+            part_nodes = list(part_node_of_column.values())
+            scope_nodes = example_nodes + part_nodes
+            edges_by_scope[part] = self.learner.learn(
+                rows=self.collection_rows(
+                    example_rows=tables.example_rows,
+                    table=table.one_part_per_example(seed=self.part_draw_seed),
+                    part_node_of_column=part_node_of_column,
+                ),
+                nodes=scope_nodes,
+                domain_knowledge=domain_knowledge.restricted_to(
+                    [node.name for node in scope_nodes]
+                ),
+            ).edges()
+            nodes += part_nodes
+        return LearnedCausalStructure(
+            relations=self.record_in_class_diagram(circuit, edges_by_scope),
+            nodes=nodes,
+            training_rows=tables.example_rows,
+            graph_class=self.learner.graph_class,
+        )
+
+    @staticmethod
+    def collection_rows(
+        *,
+        example_rows: pd.DataFrame,
+        table: PartTrainingTable,
+        part_node_of_column: dict[str, GraphNode],
+    ) -> pd.DataFrame:
+        """
+        :param example_rows: The class table.
+        :param table: A part table with one row per instance.
+        :param part_node_of_column: The template nodes of the part's attributes, by
+            column.
+        :return: Each instance's row of the class table, followed by its part's
+            attributes, named by their template nodes.
+        """
+        parts = table.rows.drop(columns=table.aggregation_names).rename(
+            columns={column: node.name for column, node in part_node_of_column.items()}
+        )
+        return pd.concat(
+            [
+                example_rows.iloc[table.example_positions].reset_index(drop=True),
+                parts.reset_index(drop=True),
+            ],
+            axis=1,
+        )
+
     def record_in_class_diagram(
-        self, circuit: RelationalProbabilisticCircuit, edges: list[GraphEdge]
+        self,
+        circuit: RelationalProbabilisticCircuit,
+        edges_by_scope: dict[str | None, list[GraphEdge]],
     ) -> CausalRelationsOfClass:
         """
         Replace the causal relations of the circuit's class in :attr:`class_diagram`
         with the learned edges.
 
         :param circuit: A fitted relational circuit.
-        :param edges: The learned edges.
+        :param edges_by_scope: The learned edges of each scope: ``None`` for the class
+            table or for a graph not learned per scope, else the collection's name.
         :return: The causal relations of the class.
         """
         relations = CausalRelationsOfClass(
@@ -489,7 +849,9 @@ class RelationalCausalStructureLearner:
                     second=endpoint_of[edge.second.name],
                     mark_at_first=edge.mark_at_first,
                     mark_at_second=edge.mark_at_second,
+                    scope=scope,
                 )
+                for scope, edges in edges_by_scope.items()
                 for edge in edges
             ]
         )

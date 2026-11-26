@@ -21,6 +21,7 @@ The module is used for:
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 import json
 from timeit import default_timer
@@ -31,6 +32,8 @@ from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.storage import Storage, StorageDocumentField
+
+logger = logging.getLogger(__name__)
 
 
 class StorageWriter(BaseAnnotator):
@@ -77,7 +80,7 @@ class StorageWriter(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self.storage = Storage(self.descriptor.parameters.db_name)
         self.storage_preparation_completed: bool = False
         """
@@ -117,7 +120,7 @@ class StorageWriter(BaseAnnotator):
 
         persist_cas = copy.deepcopy(self.get_cas())
 
-        flat_cas = self.storage.generate_dict_from_real_cas(persist_cas)
+        flat_cas = self.storage.generate_dict_from_real_cas(cas=persist_cas)
         flat_cas["view_ids"] = {}
 
         snapshot = WorldModelSnapshot(
@@ -133,13 +136,15 @@ class StorageWriter(BaseAnnotator):
         flat_cas[StorageDocumentField.WORLD] = json_str
 
         # step 1: persist each view
-        self.storage.store_views_in_mongo(flat_cas)
+        self.storage.store_views_in_mongo(cas_dict=flat_cas)
 
         # step 2: persist cas and pointers to each view
         del flat_cas["views"]
-        result = self.storage.store_cas_dict(flat_cas)
+        result = self.storage.store_cas_dict(cas_dict=flat_cas)
         if not result.acknowledged:
-            self.rk_logger.error(f"mongo db error when trying to store cas")
+            logger.error(
+                "MongoDB error when trying to store the common analysis structure"
+            )
             return Status.FAILURE
 
         end_timer = default_timer()

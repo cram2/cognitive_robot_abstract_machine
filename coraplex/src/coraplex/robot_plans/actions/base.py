@@ -129,6 +129,18 @@ class Action(CompositeNode, ABC):
             extension_type=RobotAccess
         ).controlled_root
 
+    @classmethod
+    def enclosing_action_of(cls, *, node: StatechartNode) -> Action | None:
+        """
+        :param node: A node of a plan.
+        :return: The action nearest above `node` in the plan tree, `node` itself if it
+            is an action; None if no action holds it.
+        """
+        return next(
+            (ancestor for ancestor in [node, *node.path] if isinstance(ancestor, cls)),
+            None,
+        )
+
     def keep_base_still(self) -> list[MotionStatechartNode]:
         """
         :return: The task holding the robot's base where it stands, empty when the robot

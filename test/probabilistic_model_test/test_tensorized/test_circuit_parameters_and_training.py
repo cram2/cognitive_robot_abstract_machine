@@ -16,8 +16,12 @@ from array_api_compat import array_namespace
 from scipy.special import logsumexp
 from typing_extensions import Any
 
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.exceptions import (
     HostOnlyQueryError,
 )
@@ -256,8 +260,10 @@ def test_training_a_jax_circuit_raises_the_log_likelihood_of_its_data(
         circuit = start.copy_with_parameters(parameters=moved).to_namespace(jnp)
         before = float(jnp.mean(circuit.log_likelihood(events=jnp.asarray(data))))
         trained_root = JaxGradientDescent(
-            circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
-        ).minimize(200, jnp.asarray(data))
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adam(5e-2),
+        ).minimize(jnp.asarray(data), epochs=200)
         after = float(
             jnp.mean(
                 trained_root.log_likelihood_of_nodes(events=jnp.asarray(data))[:, 0]
@@ -276,7 +282,7 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
 
     case = mixture_of_products_case
@@ -290,8 +296,8 @@ def test_training_a_torch_circuit_raises_the_log_likelihood_of_its_data(
     events = namespace.asarray(data)
     before = float(circuit.log_likelihood(events=events).mean())
     trained_root = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
-    ).minimize(200, events)
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=5e-2
+    ).minimize(events, epochs=200)
     after = float(trained_root.log_likelihood_of_nodes(events=events)[:, 0].mean())
     assert after > before + minimum_improvement
     assert all(
@@ -315,8 +321,8 @@ def test_training_a_categorical_layer_learns_the_frequencies_of_its_data():
             DenseProbabilityTable(jnp.log(jnp.full((1, 2), 0.5))),
         )
         trained = JaxGradientDescent(
-            layer, AverageNegativeLogLikelihood(), optax.adam(5e-2)
-        ).minimize(300, jnp.asarray(data))
+            layer=layer, loss=AverageNegativeLogLikelihood(), optimizer=optax.adam(5e-2)
+        ).minimize(jnp.asarray(data), epochs=300)
         probabilities = np.exp(np.asarray(trained.table.log_probabilities))
     np.testing.assert_allclose(probabilities, [frequencies], atol=1e-2)
 
@@ -330,8 +336,8 @@ def test_training_a_gaussian_layer_learns_the_spread_of_its_data():
     with jax.enable_x64(True):
         layer = GaussianLayer(np.zeros(1, dtype=np.int64), jnp.zeros(1), jnp.zeros(1))
         trained = JaxGradientDescent(
-            layer, AverageNegativeLogLikelihood(), optax.adam(5e-2)
-        ).minimize(500, jnp.asarray(data))
+            layer=layer, loss=AverageNegativeLogLikelihood(), optimizer=optax.adam(5e-2)
+        ).minimize(jnp.asarray(data), epochs=500)
         scale = np.asarray(trained.scale)
     np.testing.assert_allclose(scale, [data.std()], rtol=2e-2)
 
@@ -357,8 +363,10 @@ def test_training_with_weight_decay_keeps_zero_probability_weights(
     with jax.enable_x64(True):
         circuit = start.copy_with_parameters(parameters=parameters).to_namespace(jnp)
         trained = JaxGradientDescent(
-            circuit.root, AverageNegativeLogLikelihood(), optax.adamw(1e-2)
-        ).minimize(20, jnp.asarray(data))
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adamw(1e-2),
+        ).minimize(jnp.asarray(data), epochs=20)
         root_log_weights, *others = trained.circuit_parameters
     assert float(root_log_weights[0]) == -np.inf
     assert bool(jnp.all(jnp.isfinite(root_log_weights[1:])))

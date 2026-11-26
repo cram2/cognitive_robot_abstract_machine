@@ -15,7 +15,7 @@ from random_events.variable import Variable
 from krrood.patterns.classproperty import classproperty
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
-from typing_extensions import Self
+from typing_extensions import TYPE_CHECKING, Self
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
@@ -103,7 +103,7 @@ class HasLocationAndScale:
         """
         *others, log_scale = parameters
         return others + [
-            self.namespace.maximum(log_scale, math.log(self.minimum_scale))
+            self.namespace.clip(log_scale, min=math.log(self.minimum_scale))
         ]
 
     def validate_own(self):
@@ -163,6 +163,13 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
     @property
     def number_of_own_parameters(self) -> int:
         return 2 * self.number_of_nodes
+
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` for Gaussian layers, which do.
+        """
+        return True
 
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn

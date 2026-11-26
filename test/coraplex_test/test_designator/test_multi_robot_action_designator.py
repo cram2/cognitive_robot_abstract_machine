@@ -2,6 +2,7 @@
 Every action performed by each of the robots the plans are written for.
 """
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -137,7 +138,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Level,
 )
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -1082,8 +1083,10 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
             name="door",
             world=world,
             scale=Scale(0.05, 1, 2),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.Y()
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Y()
+                ),
             ),
         )
         elevator.add(door)

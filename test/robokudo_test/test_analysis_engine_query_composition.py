@@ -75,7 +75,7 @@ def bounded_build_time() -> Iterator[None]:
 # %% camera descriptor test double
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FakeCameraConfig:
     """
     Camera config for composition tests that do not exercise ROS camera I/O.
@@ -85,7 +85,7 @@ class FakeCameraConfig:
     """Camera-interface identifier expected by the collection reader."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FakeCameraInterface:
     """
     Camera interface for composition tests that only inspect pipeline nodes.

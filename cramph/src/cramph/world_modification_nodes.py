@@ -1,3 +1,7 @@
+"""
+Nodes that change the kinematic structure of the world.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,6 +9,7 @@ from dataclasses import dataclass
 import krrood.symbolic_math.symbolic_math as sm
 from cramph.node import SucceedsOnObservingTrue
 from cramph.node import NodeArtifacts, StatechartNode
+from cramph.world_access import WorldAccess
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -37,3 +42,16 @@ class MoveBranch(SucceedsOnObservingTrue, StatechartNode):
 
     def on_start(self) -> None:
         self.context.world.move_branch(self.branch_root, self.new_parent)
+
+    def compute_world_access(self) -> WorldAccess:
+        """
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with :attr:`branch_root` attached to a new parent.
+        """
+        return (
+            super()
+            .compute_world_access()
+            .union_with(
+                other=WorldAccess(reparented_frames=frozenset({self.branch_root}))
+            )
+        )

@@ -16,7 +16,7 @@ from abc import ABC, abstractmethod
 from collections import UserDict
 from contextlib import AbstractContextManager
 from copy import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 from types import EllipsisType
 from uuid import UUID
@@ -40,7 +40,13 @@ from krrood.entity_query_language.evaluation_context import (
     get_evaluation_context,
 )
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
-from krrood.entity_query_language.utils import make_list, T, make_set, is_iterable
+from krrood.entity_query_language.utils import (
+    T,
+    cartesian_product_while_passing_the_bindings_around,
+    is_iterable,
+    make_list,
+    make_set,
+)
 from krrood.patterns.role import Role
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 
@@ -687,18 +693,57 @@ class SymbolicExpression(
                 evaluation_context.on_result_yielded(expression=self, result=result)
                 yield result
             else:
-                for result in map(
-                    lambda current_result: (
-                        self._evaluate_conclusions_and_update_bindings_(
-                            current_result=current_result
+                for current_result in self._evaluate__(sources=sources):
+                    for (
+                        completed_result
+                    ) in self._results_with_conclusion_variables_bound_(
+                        evaluation_context=evaluation_context,
+                        current_result=current_result,
+                    ):
+                        result = self._evaluate_conclusions_and_update_bindings_(
+                            current_result=completed_result
                         )
-                    ),
-                    self._evaluate__(sources=sources),
-                ):
-                    evaluation_context.on_result_yielded(expression=self, result=result)
-                    yield result
+                        evaluation_context.on_result_yielded(
+                            expression=self, result=result
+                        )
+                        yield result
         finally:
             evaluation_context.on_evaluate_exit(expression=self)
+
+    def _results_with_conclusion_variables_bound_(
+        self,
+        *,
+        evaluation_context: EvaluationContext,
+        current_result: OperationResult,
+    ) -> Iterator[OperationResult]:
+        """
+        :param evaluation_context: The context of the evaluation this expression is part
+            of.
+        :param current_result: A result of this expression.
+        :return: The result once per combination of values of the variables in this
+            expression's conclusions that it leaves unbound, so that a conclusion is
+            reached for each of them.
+        """
+        unbound_variables = {
+            variable._id_: variable
+            for conclusion in self._conclusions_
+            for variable in conclusion.variables_in_concluded_value
+            if variable._id_ not in current_result.bindings
+        }
+        if (
+            not unbound_variables
+            or not evaluation_context.active_conditions_root.is_active_root(node=self)
+            or current_result.is_false
+        ):
+            yield current_result
+            return
+        for completed in cartesian_product_while_passing_the_bindings_around(
+            tuple(unbound_variables.values()), current_result
+        ):
+            result = replace(current_result, bindings=completed.bindings)
+            # replace() leaves out the truth value, which is no init field.
+            result._is_false_ = current_result._is_false_
+            yield result
 
     def _evaluate_conclusions_and_update_bindings_(
         self, *, current_result: OperationResult
