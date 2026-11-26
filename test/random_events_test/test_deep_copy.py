@@ -14,12 +14,12 @@ from random_events.variable import Continuous, Symbolic, Integer, Variable
 
 @pytest.fixture
 def horizontal() -> Continuous:
-    return Continuous("horizontal")
+    return Continuous(name="horizontal")
 
 
 @pytest.fixture
 def color() -> Symbolic:
-    return Symbolic("color", domain=Set.from_iterable(["red", "green"]))
+    return Symbolic(name="color", domain=Set.from_iterable(["red", "green"]))
 
 
 @pytest.fixture
@@ -35,9 +35,9 @@ def event(horizontal: Continuous, color: Symbolic) -> Event:
 @pytest.mark.parametrize(
     "variable",
     [
-        Continuous("horizontal"),
-        Integer("count"),
-        Symbolic("color", domain=Set.from_iterable(["red", "green"])),
+        Continuous(name="horizontal"),
+        Integer(name="count"),
+        Symbolic(name="color", domain=Set.from_iterable(["red", "green"])),
     ],
 )
 def test_a_deep_copy_of_a_variable_is_the_variable(variable: Variable):

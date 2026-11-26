@@ -32,7 +32,7 @@ import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
 
-variable = Continuous("x")
+variable = Continuous(name="x")
 distribution = GaussianDistribution(variable=variable, location=0, scale=1)
 fig = go.Figure(distribution.plot())
 fig.update_layout(title="Normal Distribution", xaxis_title=distribution.variable.name)

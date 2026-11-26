@@ -18,7 +18,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 @pytest.fixture
 def variable() -> Continuous:
-    return Continuous("x")
+    return Continuous(name="x")
 
 
 def shallow_uniform_mixture(

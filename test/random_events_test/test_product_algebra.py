@@ -338,7 +338,7 @@ class EventTestCase(unittest.TestCase):
         e = SimpleEvent.from_data(
             {self.x: closed(0, 1) | closed(3, 4)}
         ).as_composite_set()
-        y = Continuous("y")
+        y = Continuous(name="y")
         e.fill_missing_variables((y,))
         self.assertTrue(y in e.variables)
 
@@ -346,7 +346,7 @@ class EventTestCase(unittest.TestCase):
         e = SimpleEvent.from_data(
             {self.x: closed(0, 1) | closed(3, 4)}
         ).as_composite_set()
-        y = Continuous("y")
+        y = Continuous(name="y")
         e = e.fill_missing_variables_pure((y,))
         self.assertTrue(y in e.variables)
 
@@ -356,7 +356,7 @@ class EventTestCase(unittest.TestCase):
             .as_composite_set()
             .complement()
         )
-        y2 = Continuous("y2")
+        y2 = Continuous(name="y2")
         e2 = e.update_variables({self.y: y2})
         self.assertEqual(e2.variables, SortedSet([self.x, y2]))
 
@@ -409,8 +409,8 @@ class EventTestCase(unittest.TestCase):
 
 
 class OperationsWithEmptySetsTestCase(unittest.TestCase):
-    x: Continuous = Continuous("x")
-    y: Continuous = Continuous("y")
+    x: Continuous = Continuous(name="x")
+    y: Continuous = Continuous(name="y")
 
     def test_empty_union(self):
         empty_event = SimpleEvent.from_data(

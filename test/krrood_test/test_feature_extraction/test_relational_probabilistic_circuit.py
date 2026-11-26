@@ -796,7 +796,7 @@ def test_representative_value_returns_a_point_not_a_region():
     Passing the mode region itself into conditioning always fails silently (see
     test_exact_grounding_preserves_correlation_with_the_retained_latent).
     """
-    variable = Integer("value")
+    variable = Integer(name="value")
     circuit = ProbabilisticCircuit()
     branch = _integer_leaf(variable, {2: 0.5, 3: 0.5}, circuit)
 
@@ -816,8 +816,8 @@ def test_node_local_branch_log_probabilities_reflect_each_nodes_own_correlation(
     a different other variable must get different weights over the same global partition
     branches, not one weighting shared across every node.
     """
-    other_variable = Continuous("other_variable")
-    chair_count = Integer("chair_count")
+    other_variable = Continuous(name="other_variable")
+    chair_count = Integer(name="chair_count")
 
     circuit = ProbabilisticCircuit()
     node_favoring_one = ProductUnit(probabilistic_circuit=circuit)
@@ -899,14 +899,14 @@ def test_partition_disjointly_false_for_a_single_branch_of_several_values():
     regardless of which value the latent takes, discarding the correlation between
     them.
     """
-    variable = Integer("value")
+    variable = Integer(name="value")
     circuit = ProbabilisticCircuit()
     _integer_leaf(variable, {1: 0.5, 2: 0.5}, circuit)
     assert not _partitions_disjointly(circuit)
 
 
 def test_partition_disjointly_true_for_a_single_point():
-    variable = Integer("value")
+    variable = Integer(name="value")
     circuit = ProbabilisticCircuit()
     _integer_leaf(variable, {1: 1.0}, circuit)
     assert _partitions_disjointly(circuit)
@@ -917,7 +917,7 @@ def test_branches_with_the_same_region_are_one_branch():
     Leaves that the fitted circuit separates only by other variables have the same
     region over the latents, which does not make the partition overlap.
     """
-    variable = Integer("value")
+    variable = Integer(name="value")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for value in [1, 1, 2]:
@@ -928,7 +928,7 @@ def test_branches_with_the_same_region_are_one_branch():
 
 
 def test_partition_disjointly_true_for_disjoint_branches():
-    variable = Integer("value")
+    variable = Integer(name="value")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     root.add_subcircuit(_integer_leaf(variable, {1: 1.0}, circuit), 0.0)
@@ -938,7 +938,7 @@ def test_partition_disjointly_true_for_disjoint_branches():
 
 
 def test_partition_disjointly_false_for_overlapping_branches():
-    variable = Integer("value")
+    variable = Integer(name="value")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     root.add_subcircuit(_integer_leaf(variable, {1: 0.5, 2: 0.5}, circuit), 0.0)
@@ -1391,7 +1391,7 @@ def test_layered_grounding_leaves_out_branches_a_later_relation_rules_out(
 
 
 def test_instance_mixture_gives_every_distinct_assignment_one_instance():
-    variable = Integer("value")
+    variable = Integer(name="value")
     first, second, third = {variable: 1}, {variable: 2}, {variable: 3}
     mixture = InstanceMixture.of_node_local_assignments(
         [

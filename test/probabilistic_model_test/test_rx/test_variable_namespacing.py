@@ -32,7 +32,7 @@ def _product_circuit(*variables: Continuous) -> ProbabilisticCircuit:
 
 # %% namespacing
 def test_renaming_with_prefix_namespaces_every_variable() -> None:
-    circuit = _product_circuit(Continuous("x"), Continuous("y"))
+    circuit = _product_circuit(Continuous(name="x"), Continuous(name="y"))
 
     circuit.rename_variables_with_prefix("part")
 
@@ -47,7 +47,7 @@ def test_renaming_with_prefix_leaves_variables_already_in_the_namespace() -> Non
     A nested part's variables are namespaced before the part holding them is, so
     namespacing the outer part must not prefix them a second time.
     """
-    circuit = _product_circuit(Continuous("x"), Continuous("part.inner[0].y"))
+    circuit = _product_circuit(Continuous(name="x"), Continuous(name="part.inner[0].y"))
 
     circuit.rename_variables_with_prefix("part")
 
@@ -58,8 +58,8 @@ def test_renaming_with_prefix_leaves_variables_already_in_the_namespace() -> Non
 
 
 def test_renaming_with_prefix_leaves_excluded_variables() -> None:
-    latent = Continuous("count")
-    circuit = _product_circuit(Continuous("x"), latent)
+    latent = Continuous(name="count")
+    circuit = _product_circuit(Continuous(name="x"), latent)
 
     circuit.rename_variables_with_prefix("part", excluded_variables=[latent])
 

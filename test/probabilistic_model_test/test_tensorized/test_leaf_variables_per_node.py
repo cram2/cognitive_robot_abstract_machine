@@ -145,8 +145,8 @@ def mixture() -> MixtureOverFourVariables:
     return MixtureOverFourVariables(
         variables=SortedSet(
             [
-                Continuous("x"),
-                Continuous("y"),
+                Continuous(name="x"),
+                Continuous(name="y"),
                 Symbolic(name="z_letter", domain=Set.from_iterable(["a", "b", "c"])),
                 Symbolic(name="z_mark", domain=Set.from_iterable(["off", "on"])),
             ]

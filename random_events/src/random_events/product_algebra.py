@@ -77,7 +77,7 @@ class VariableMap(VariableMapSuperClassType):
         return self.__class__({variable: value for variable, value in self.items()})
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SimpleEvent(AbstractSimpleSet, VariableMap):
     """
     A simple event is a set of assignments of variables to values.
@@ -300,7 +300,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Event(AbstractCompositeSet):
     """
     An event is a disjoint set of simple events.

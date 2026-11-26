@@ -702,7 +702,7 @@ def circuit_with_symbolic_leaves() -> LayeredProbabilisticCircuit:
             Symbolic(name=f"bit_{index}", domain=Set.from_iterable(Bit))
             for index in range(4)
         ]
-        + [Continuous(f"x_{index}") for index in range(4)]
+        + [Continuous(name=f"x_{index}") for index in range(4)]
     )
     region_graph = RegionGraph(
         variables=variables, depth=2, repetitions=2, seed=0

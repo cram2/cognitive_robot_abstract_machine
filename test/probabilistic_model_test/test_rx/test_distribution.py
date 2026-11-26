@@ -135,7 +135,7 @@ def integer_circuit() -> ProbabilisticCircuit:
     """
     probabilities = MissingDict(float, {0: 0.1, 1: 0.2, 2: 0.7})
     return leaf(
-        IntegerDistribution(variable=Integer("x"), probabilities=probabilities),
+        IntegerDistribution(variable=Integer(name="x"), probabilities=probabilities),
         ProbabilisticCircuit(),
     ).probabilistic_circuit
 

@@ -82,14 +82,14 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import itertools
 
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 ```
 
 ```{code-cell} ipython3
 event_a = SimpleEvent.from_data({x: closed(0, 2), y: closed(0, 2)}).as_composite_set()
 event_b = SimpleEvent.from_data({x: closed(2.5, 3), y: closed(1, 2.5)}).as_composite_set()
-fig = go.Figure(EventPlotter(event_a).plot(color="red") + EventPlotter(event_b).plot(color="blue"), EventPlotter(event_a).plotly_layout())
+fig = go.Figure(EventPlotter(event=event_a).plot(color="red") + EventPlotter(event=event_b).plot(color="blue"), EventPlotter(event=event_a).plotly_layout())
 fig.update_layout(title="Two disjoint events")
 fig.show()
 ```
@@ -99,7 +99,7 @@ both events can be added to get the size of their union (sigma-additivity).
 
 ```{code-cell} ipython3
 event_a.simple_sets[0][x] = closed(2, 2.75)
-fig = go.Figure(EventPlotter(event_a).plot(color="red") + EventPlotter(event_b).plot(color="blue"), EventPlotter(event_a).plotly_layout())
+fig = go.Figure(EventPlotter(event=event_a).plot(color="red") + EventPlotter(event=event_b).plot(color="blue"), EventPlotter(event=event_a).plotly_layout())
 fig.update_layout(title="Two non-disjoint events")
 fig.show()
 ```
@@ -137,8 +137,8 @@ fig = make_subplots(rows=1, cols=2, subplot_titles=["Event A and B", "Event A an
 
 event_a_and_b = event_a & event_b
 event_a_and_not_b = event_a & ~event_b
-fig.add_traces(EventPlotter(event_a_and_b).plot(), rows=1, cols=2)
-fig.add_traces(EventPlotter(event_a_and_not_b).plot(), rows=1, cols=1)
+fig.add_traces(EventPlotter(event=event_a_and_b).plot(), rows=1, cols=2)
+fig.add_traces(EventPlotter(event=event_a_and_not_b).plot(), rows=1, cols=1)
 fig.update_xaxes(range=[2, 2.75], )
 fig.update_yaxes(range=[0, 2], )
 fig.update_layout(title="Visualization of the Sum Rule")
@@ -511,7 +511,7 @@ $x_1 < 1 \wedge x_2 < 2$.
 
 ```{code-cell} ipython3
 from probabilistic_model.distributions.gaussian import GaussianDistribution
-normal = GaussianDistribution(variable=Continuous("x"), location=0, scale=1)
+normal = GaussianDistribution(variable=Continuous(name="x"), location=0, scale=1)
 fig = go.Figure(normal.plot(), normal.plotly_layout())
 fig.for_each_trace(lambda trace: trace.update(visible='legendonly') if trace.name in ["Expectation", "Mode"] else ())
 ```

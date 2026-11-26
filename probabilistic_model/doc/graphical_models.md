@@ -87,8 +87,8 @@ class Mood(IntEnum):
 success = Symbolic(name="Success", domain=Set.from_iterable(Success))
 object_position = Symbolic(name="ObjectPosition", domain=Set.from_iterable(ObjectPosition))
 mood = Symbolic(name="Mood", domain=Set.from_iterable(Mood))
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 
 # construct Bayesian network
 bn = BayesianNetwork()

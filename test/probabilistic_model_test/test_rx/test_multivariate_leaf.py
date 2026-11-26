@@ -30,17 +30,17 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 @pytest.fixture
 def first() -> Continuous:
-    return Continuous("a")
+    return Continuous(name="a")
 
 
 @pytest.fixture
 def second() -> Continuous:
-    return Continuous("b")
+    return Continuous(name="b")
 
 
 @pytest.fixture
 def other() -> Continuous:
-    return Continuous("c")
+    return Continuous(name="c")
 
 
 @pytest.fixture

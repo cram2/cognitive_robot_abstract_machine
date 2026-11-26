@@ -27,7 +27,7 @@ class PlotTestCase(unittest.TestCase):
         a = Symbolic(name="a", domain=Set.from_iterable({"a", "b"}))
         event = SimpleEvent.from_data({a: Set.from_iterable({"a"})})
         with self.assertRaises(EventContainsSymbolicVariableError):
-            SimpleEventPlotter(event).plot()
+            SimpleEventPlotter(event=event).plot()
 
     def test_plot_2d(self):
         event_1 = SimpleEvent.from_data(
@@ -42,7 +42,7 @@ class PlotTestCase(unittest.TestCase):
                 self.y: Interval.from_simple_sets(SimpleInterval.from_data(1, 2)),
             }
         )
-        plotter = EventPlotter(Event.from_simple_sets(event_1, event_2))
+        plotter = EventPlotter(event=Event.from_simple_sets(event_1, event_2))
         fig = go.Figure(plotter.plot(), plotter.plotly_layout())
         self.assertIsNotNone(fig)  # fig.show()
 
@@ -61,7 +61,7 @@ class PlotTestCase(unittest.TestCase):
                 self.z: SimpleInterval.from_data(1, 2),
             }
         )
-        plotter = EventPlotter(Event.from_simple_sets(event_1, event_2))
+        plotter = EventPlotter(event=Event.from_simple_sets(event_1, event_2))
         fig = go.Figure(plotter.plot(), plotter.plotly_layout())
         self.assertIsNotNone(fig)  # fig.show()
 
@@ -77,7 +77,7 @@ class PlotTestCase(unittest.TestCase):
                 self.z: SimpleInterval.from_data(0, 3),
             }
         )
-        corners = SimpleEventPlotter(event).corners_3d()
+        corners = SimpleEventPlotter(event=event).corners_3d()
 
         self.assertEqual(corners.shape, (1, 8, 3))
         self.assertEqual(corners[0].min(axis=0).tolist(), [0.0, 0.0, 0.0])
@@ -103,7 +103,7 @@ class PlotTestCase(unittest.TestCase):
                 self.z: SimpleInterval.from_data(0, 1),
             }
         )
-        plotter = EventPlotter(Event.from_simple_sets(event_1, event_2))
+        plotter = EventPlotter(event=Event.from_simple_sets(event_1, event_2))
 
         mesh = plotter.plot_3d_mesh("#000000", 1.0, "boxes")
         faces = np.stack([mesh.i, mesh.j, mesh.k], axis=-1)
@@ -119,7 +119,7 @@ class PlotTestCase(unittest.TestCase):
         would run from the end of one edge to the start of the next.
         """
         plotter = EventPlotter(
-            Event.from_simple_sets(
+            event=Event.from_simple_sets(
                 SimpleEvent.from_data(
                     {
                         self.x: SimpleInterval.from_data(0, 1),
@@ -144,7 +144,7 @@ class IntegerVariablePlotTestCase(unittest.TestCase):
 
     def test_plot_1d_with_integer_variable(self):
         plotter = SimpleEventPlotter(
-            SimpleEvent.from_data({self.count: SimpleInterval.from_data(0, 5)})
+            event=SimpleEvent.from_data({self.count: SimpleInterval.from_data(0, 5)})
         )
         traces = plotter.plot()
         self.assertIsNotNone(traces)

@@ -165,7 +165,7 @@ def test_a_variable_the_circuit_does_not_model_reports_nothing(
     circuit_type, two_independent_mixtures
 ):
     circuit = as_type(two_independent_mixtures, circuit_type)
-    assert circuit.mixtures_over(SortedSet([Continuous("unmodelled")])) == []
+    assert circuit.mixtures_over(SortedSet([Continuous(name="unmodelled")])) == []
 
 
 def test_overlapping_components_are_reported_with_their_overlap(circuit_type, x):
@@ -225,4 +225,4 @@ def test_restriction_to_a_variable_the_circuit_does_not_model_gives_nothing(
     circuit_type, two_independent_mixtures
 ):
     circuit = as_type(two_independent_mixtures, circuit_type)
-    assert circuit.restrict_to_variables([Continuous("unmodelled")]) is None
+    assert circuit.restrict_to_variables([Continuous(name="unmodelled")]) is None

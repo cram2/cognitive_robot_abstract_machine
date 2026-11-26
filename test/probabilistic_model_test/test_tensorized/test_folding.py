@@ -44,7 +44,7 @@ def variables() -> SortedSet:
     :return: Three continuous variables and two symbolic ones.
     """
     return SortedSet(
-        [Continuous(f"x{index}") for index in range(3)]
+        [Continuous(name=f"x{index}") for index in range(3)]
         + [
             Symbolic(
                 name="y_colour", domain=Set.from_iterable(["red", "green", "blue"])
@@ -75,8 +75,8 @@ def mixture_over_four_variables() -> MixtureOverFourVariables:
     return MixtureOverFourVariables(
         variables=SortedSet(
             [
-                Continuous("x"),
-                Continuous("y"),
+                Continuous(name="x"),
+                Continuous(name="y"),
                 Symbolic(name="z_letter", domain=Set.from_iterable(["a", "b", "c"])),
                 Symbolic(name="z_mark", domain=Set.from_iterable(["off", "on"])),
             ]

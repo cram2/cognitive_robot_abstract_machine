@@ -55,7 +55,7 @@ Next, let's create the inner box approximation of the polytope.
 
 ```{code-cell} ipython3
 inner_event = polytope.inner_box_approximation()
-fig.add_traces(EventPlotter(inner_event).plot("#2ca02c"))
+fig.add_traces(EventPlotter(event=inner_event).plot("#2ca02c"))
 fig.show()
 ```
 
@@ -64,6 +64,6 @@ Let's create the outer box approximation of the polytope.
 ```{code-cell} ipython3
 outer_event = polytope.outer_box_approximation()
 outer_event = outer_event - inner_event
-fig.add_traces(EventPlotter(outer_event).plot("#d62728"))
+fig.add_traces(EventPlotter(event=outer_event).plot("#d62728"))
 fig.show()
 ```

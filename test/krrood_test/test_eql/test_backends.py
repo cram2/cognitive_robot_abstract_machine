@@ -355,8 +355,8 @@ def rectangle_model() -> ProbabilisticCircuit:
         :data:`RECTANGLE_SIDES` with equal probability, and knows nothing about the area
         those sides enclose.
     """
-    width = Continuous("Rectangle.width")
-    height = Continuous("Rectangle.height")
+    width = Continuous(name="Rectangle.width")
+    height = Continuous(name="Rectangle.height")
     model = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=model)
     for rectangle_width, rectangle_height in RECTANGLE_SIDES:

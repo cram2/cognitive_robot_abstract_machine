@@ -14,7 +14,7 @@ HashMap: dict[int, Hashable]
 AllElements: tuple[Hashable]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SetElement(AbstractSimpleSet):
     """
     Represents a SetElement.
@@ -126,7 +126,7 @@ class SetElement(AbstractSimpleSet):
         return SetElement.from_data(self.element, self.all_elements)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Set(AbstractCompositeSet):
     """
     Represents a set.

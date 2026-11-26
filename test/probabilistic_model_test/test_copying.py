@@ -40,17 +40,17 @@ from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 @pytest.fixture
 def horizontal() -> Continuous:
-    return Continuous("horizontal")
+    return Continuous(name="horizontal")
 
 
 @pytest.fixture
 def vertical() -> Continuous:
-    return Continuous("vertical")
+    return Continuous(name="vertical")
 
 
 @pytest.fixture
 def color() -> Symbolic:
-    return Symbolic("color", domain=Set.from_iterable(["red", "green"]))
+    return Symbolic(name="color", domain=Set.from_iterable(["red", "green"]))
 
 
 @pytest.fixture

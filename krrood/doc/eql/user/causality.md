@@ -64,10 +64,10 @@ class DrowningLevel(Enum):
 # Named "SummerStatistics.<field>" up front so this same circuit can later be handed
 # to a DictRegistry keyed on the SummerStatistics class defined below -- DictRegistry
 # looks a query's fields up by this qualified name, unlike CausalCircuitRegistry.
-season = Symbolic("SummerStatistics.season", domain=Set.from_iterable(Season))
-ice_cream_sales = Continuous("SummerStatistics.ice_cream_sales")
+season = Symbolic(name="SummerStatistics.season", domain=Set.from_iterable(Season))
+ice_cream_sales = Continuous(name="SummerStatistics.ice_cream_sales")
 drowning_incidents = Symbolic(
-    "SummerStatistics.drowning_incidents", domain=Set.from_iterable(DrowningLevel)
+    name="SummerStatistics.drowning_incidents", domain=Set.from_iterable(DrowningLevel)
 )
 
 circuit = ProbabilisticCircuit()

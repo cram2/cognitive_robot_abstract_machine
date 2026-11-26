@@ -194,7 +194,7 @@ def test_edge_is_reversed_only_where_the_tiers_say_so(
 ):
     domain_knowledge = DomainCausalKnowledge(tiers=[["A"], ["B", "C"]])
     node_of = {
-        name: GraphNode(variable=Integer(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        name: GraphNode(variable=Integer(name=name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
         for name in (cause, adjacent)
     }
 

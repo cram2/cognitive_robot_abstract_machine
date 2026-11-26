@@ -909,7 +909,7 @@ def test_renaming_that_reorders_the_variables(gaussian_mixture, x, y):
     expected = layered.log_likelihood(events=samples)
 
     # a name that sorts after y moves x to the last column
-    renamed_x = Continuous("z_x")
+    renamed_x = Continuous(name="z_x")
     layered.update_variables(VariableMap({x: renamed_x}))
     assert list(layered.variables) == [y, renamed_x]
     np.testing.assert_allclose(

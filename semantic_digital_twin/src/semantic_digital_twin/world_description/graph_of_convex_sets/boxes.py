@@ -226,7 +226,7 @@ class GraphOfBoundingBoxes(
 
         :return: A list of traces that can be put into a plotly figure.
         """
-        return EventPlotter(self.free_space_event).plot(color="blue")
+        return EventPlotter(event=self.free_space_event).plot(color="blue")
 
     def plot_and_show_free_space(self) -> None:
         import plotly.graph_objects as go
@@ -243,7 +243,7 @@ class GraphOfBoundingBoxes(
             *[node.simple_event for node in self.graph.nodes()]
         )
         occupied_space = ~free_space & self.search_space.event
-        return EventPlotter(occupied_space).plot(color="red")
+        return EventPlotter(event=occupied_space).plot(color="red")
 
     def plot_and_show_occupied_space(self) -> None:
         import plotly.graph_objects as go

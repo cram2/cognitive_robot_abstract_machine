@@ -613,7 +613,9 @@ class ProbabilisticModel(ABC):
         )
         limited_complement_of_support = complement_of_support & limiting_interval
         traces = SimpleEventPlotter(
-            SimpleEvent.from_data({self.variables[0]: limited_complement_of_support})
+            event=SimpleEvent.from_data(
+                {self.variables[0]: limited_complement_of_support}
+            )
         ).plot()
         for trace in traces:
             trace.update(name=PDF_TRACE_NAME, marker=dict(color=PDF_TRACE_COLOR))
@@ -838,7 +840,9 @@ class ProbabilisticModel(ABC):
         :return: traces for the mode of a multivariate model.
         """
         try:
-            mode_traces = EventPlotter(self.mode().event).plot(color=MODE_TRACE_COLOR)
+            mode_traces = EventPlotter(event=self.mode().event).plot(
+                color=MODE_TRACE_COLOR
+            )
             for trace in mode_traces:
                 trace.update(name=MODE_TRACE_NAME, mode="lines+markers")
         except IntractableError:

@@ -19,7 +19,7 @@ compatible_types = (
 )  # types that can be expressed variable
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Variable(CPPWrapper):
     """
     Parent class for all random variables.
@@ -95,7 +95,7 @@ class Variable(CPPWrapper):
         raise NotImplementedError
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class Continuous(Variable):
     """
     Class for continuous random variables.
@@ -114,7 +114,7 @@ class Continuous(Variable):
 
     @classmethod
     def _from_cpp(cls, cpp_object):
-        return cls(cpp_object.name)
+        return cls(name=cpp_object.name)
 
     def make_value(self, value: Any) -> Interval:
         if isinstance(value, (int, float)):
@@ -129,7 +129,7 @@ class Continuous(Variable):
             raise ValueError(f"Value {value} cannot be parsed to an interval.")
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class Symbolic(Variable):
     """
     Class for unordered, finite, discrete random variables.
@@ -161,7 +161,6 @@ class Symbolic(Variable):
 
         # try to match the values to the set elements
         for v in value:
-
             # if the value is already a SetElement, append it
             if isinstance(v, SetElement):
                 parsed_value.append(v)
@@ -196,7 +195,7 @@ class Symbolic(Variable):
         return isinstance(value, (str, SetElement)) or not isinstance(value, Iterable)
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False, repr=False, kw_only=True)
 class Integer(Variable):
     """
     Class for ordered, discrete random variables.
@@ -234,9 +233,9 @@ def variable_from_name_and_type(name: str, type_: type) -> Variable:
     elif issubclass(type_, bool):
         result = Symbolic(name=name, domain=Set.from_iterable([True, False]))
     elif issubclass(type_, int):
-        result = Integer(name)
+        result = Integer(name=name)
     elif issubclass(type_, float):
-        result = Continuous(name)
+        result = Continuous(name=name)
     else:
         assert_never((name, type_))
 

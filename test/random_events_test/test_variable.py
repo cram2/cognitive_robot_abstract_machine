@@ -18,7 +18,7 @@ characters rather than a single one.
 
 
 class ContinuousTestCase(unittest.TestCase):
-    x = Continuous("x")
+    x = Continuous(name="x")
 
     def test_creation(self):
         self.assertEqual(self.x.name, "x")
@@ -30,15 +30,13 @@ class ContinuousTestCase(unittest.TestCase):
 
 
 class IntegerTestCase(unittest.TestCase):
-
     def test_creation(self):
-        x = Integer("x")
+        x = Integer(name="x")
         self.assertEqual(x.name, "x")
         self.assertEqual(x.domain, reals())
 
 
 class SymbolicTestCase(unittest.TestCase):
-
     def test_creation(self):
         a = SetElement.from_data("a", str_set)
         b = SetElement.from_data("b", str_set)
@@ -99,7 +97,7 @@ class SymbolicTestCase(unittest.TestCase):
         self.assertEqual(len(result.domain.simple_sets), 2)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InheritedContinuous(Continuous):
     mean: int
 
@@ -114,7 +112,6 @@ class InheritanceTestCase(unittest.TestCase):
 
 
 class HashableTestClass:
-
     value: int
 
     def __init__(self, value):
@@ -125,7 +122,6 @@ class HashableTestClass:
 
 
 class CustomObjectSetTestCase(unittest.TestCase):
-
     def test_variables(self):
         e1 = HashableTestClass(1)
         e2 = HashableTestClass(2)

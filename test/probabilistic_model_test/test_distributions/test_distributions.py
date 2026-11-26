@@ -47,7 +47,7 @@ def integer_variable() -> Integer:
     """
     An integer variable.
     """
-    return Integer("x")
+    return Integer(name="x")
 
 
 @pytest.fixture
@@ -270,7 +270,7 @@ def test_symbolic_fit(letter_distribution, letter_variable):
 
 
 def test_symbolic_truncation_to_a_singleton():
-    variable = Symbolic("x", domain=Set.from_iterable(["a", "b"]))
+    variable = Symbolic(name="x", domain=Set.from_iterable(["a", "b"]))
     distribution = SymbolicDistribution(
         variable=variable,
         probabilities=MissingDict(float, {hash("a"): 0.4, hash("b"): 0.6}),
@@ -292,7 +292,7 @@ def test_symbolic_likelihood_survives_a_category_whose_hash_exceeds_the_modulus(
         for candidate in (f"category_{index}" for index in range(1000))
         if abs(hash(candidate)) >= modulus
     )
-    variable = Symbolic("category", domain=Set.from_iterable([category, "other"]))
+    variable = Symbolic(name="category", domain=Set.from_iterable([category, "other"]))
     distribution = SymbolicDistribution(
         variable=variable, probabilities=MissingDict(float, {hash(category): 1.0})
     )
@@ -415,7 +415,7 @@ def test_an_event_mixing_singletons_and_intervals_is_incompatible_with_truncatio
 
 
 def test_symbolic_variables_do_not_affect_compatibility_with_truncation(x):
-    y = Symbolic("y", domain=Set.from_iterable(["a", "b"]))
+    y = Symbolic(name="y", domain=Set.from_iterable(["a", "b"]))
     event = SimpleEvent.from_data(
         {x: singleton(1.0) | singleton(2.0), y: ("a", "b")}
     ).as_composite_set()

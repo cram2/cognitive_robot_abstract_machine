@@ -21,7 +21,7 @@ def test_chunked_log_likelihoods_of_a_jax_circuit_are_those_of_its_host_circuit(
     A jax circuit evaluated in chunks, the last one shorter, gives every row the log-
     likelihood its numpy circuit gives it.
     """
-    variables = SortedSet([Continuous(f"x{index}") for index in range(4)])
+    variables = SortedSet([Continuous(name=f"x{index}") for index in range(4)])
     host = (
         RegionGraph(variables=variables, depth=1, repetitions=2)
         .create_random_region_graph()

@@ -348,11 +348,11 @@ from random_events.variable import *
 from random_events.product_algebra import *
 from random_events.interval import *
 import plotly.graph_objects as go
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 
 unit_square = SimpleEvent.from_data({x: closed(0, 1), y: closed(0, 1)}).as_composite_set()
-fig = go.Figure(EventPlotter(unit_square).plot(), EventPlotter(unit_square).plotly_layout())
+fig = go.Figure(EventPlotter(event=unit_square).plot(), EventPlotter(event=unit_square).plotly_layout())
 fig.update_layout(title="Unit Square")
 fig.show()
 ```
@@ -368,7 +368,7 @@ However, this does not influence the line of thinking.
 
 
 not_x_and_R = SimpleEvent.from_data({x: (~closed(0, 1)) & closed(-1, 2), y: closed(-1, 2)}).as_composite_set()
-fig = go.Figure(EventPlotter(not_x_and_R).plot(), EventPlotter(not_x_and_R).plotly_layout())
+fig = go.Figure(EventPlotter(event=not_x_and_R).plot(), EventPlotter(event=not_x_and_R).plotly_layout())
 fig.update_layout(title="Left and right part of the complement of the unit square.")
 fig.show()
 ```
@@ -381,7 +381,7 @@ complement of y and keep x the way it was.
 
 
 not_y_and_x = SimpleEvent.from_data({x: closed(0, 1), y: (~closed(0, 1)) & closed(-1, 2)}).as_composite_set()
-fig.add_traces(EventPlotter(not_y_and_x).plot())
+fig.add_traces(EventPlotter(event=not_y_and_x).plot())
 fig.update_layout(title="All parts of the complement of the unit square.")
 fig.show()
 ```
@@ -426,7 +426,7 @@ left_cabinets = SimpleEvent.from_data({x: closed(0, 0.5), y: closed(0, 6.5)}).as
 center_island = SimpleEvent.from_data({x: closed(2, 4), y: closed(3, 5)}).as_composite_set()
 
 occupied_spaces = refrigerator | top_kitchen_island | left_cabinets | center_island
-fig = go.Figure(EventPlotter(occupied_spaces).plot(), EventPlotter(occupied_spaces).plotly_layout())
+fig = go.Figure(EventPlotter(event=occupied_spaces).plot(), EventPlotter(event=occupied_spaces).plotly_layout())
 fig.show()
 ```
 Now posing the question on where you can stand in your kitchen,
@@ -436,7 +436,7 @@ you can calculate the complement of the occupied space with the kitchen.
 :tags: []
 
 free_space = kitchen.difference_with(occupied_spaces)
-fig = go.Figure(EventPlotter(free_space).plot(), EventPlotter(free_space).plotly_layout())
+fig = go.Figure(EventPlotter(event=free_space).plot(), EventPlotter(event=free_space).plotly_layout())
 fig.show()
 ```
 

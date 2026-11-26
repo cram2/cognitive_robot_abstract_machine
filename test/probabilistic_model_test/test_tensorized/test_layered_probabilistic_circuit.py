@@ -1245,7 +1245,7 @@ def test_renaming_keeps_the_column_order(deterministic_mixture, x, y):
     samples = np.array([[0.5, 0.7], [2.5, 3.0]])
     before = layered.log_likelihood(events=samples)
 
-    layered.update_variables({x: Continuous("z"), y: Continuous("a")})
+    layered.update_variables({x: Continuous(name="z"), y: Continuous(name="a")})
     assert [variable.name for variable in layered.variables] == ["a", "z"]
     np.testing.assert_allclose(layered.log_likelihood(events=samples[:, ::-1]), before)
 

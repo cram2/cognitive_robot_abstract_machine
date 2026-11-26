@@ -151,9 +151,9 @@ Integer and Continuous variables need no specification of their domain.
 :tags: []
 
 a = Symbolic(name="a", domain=Set.from_iterable(Symbol))
-x = Continuous("x")
-y = Continuous("y")
-z = Integer("z")
+x = Continuous(name="x")
+y = Continuous(name="y")
+z = Integer(name="z")
 a, x, y, z
 ```
 
@@ -180,7 +180,7 @@ Events can also be plotted.
 :tags: []
 
 e3 = SimpleEvent.from_data({x: closed(0, 1) | closed(2, 2.5), y: closed(2, 3) | closed(4, 5)}).as_composite_set()
-fig = go.Figure(EventPlotter(e3).plot(), EventPlotter(e3).plotly_layout())
+fig = go.Figure(EventPlotter(event=e3).plot(), EventPlotter(event=e3).plotly_layout())
 fig.show()
 ```
 

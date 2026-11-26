@@ -90,14 +90,14 @@ class Polytope(polytope.Polytope):
         cls, lower: npt.NDArray[np.float64], upper: npt.NDArray[np.float64]
     ) -> Self:
         """
-        Build a box-shaped polytope from already-known per-dimension bounds, and
-        pre-populate its bounding-box and volume caches (`bbox`/`_volume`, read by the
+        Build a box-shaped polytope from already-known per-dimension bounds, and pre-
+        populate its bounding-box and volume caches (`bbox`/`_volume`, read by the
         `bounding_box`/`volume` properties inherited from the `polytope` library).
 
-        Without this, a box built via `from_box` still recomputes its bounding box
-        via `2 * n_dimensions` LP solves and its volume via randomized Monte-Carlo
-        sampling the first time either is accessed, even though both are already known
-        exactly at construction time here.
+        Without this, a box built via `from_box` still recomputes its bounding box via
+        `2 * n_dimensions` LP solves and its volume via randomized Monte-Carlo sampling
+        the first time either is accessed, even though both are already known exactly at
+        construction time here.
 
         :param lower: The lower bound per dimension.
         :param upper: The upper bound per dimension.
@@ -126,12 +126,12 @@ class Polytope(polytope.Polytope):
         """
         Check whether this polytope is exactly its own axis-aligned bounding box.
 
-        The bounding box always contains the polytope, so it is a subset of the
-        polytope too (making the two equal) exactly when every one of the box's
-        2**n_dimensions corners already satisfies this polytope's inequalities. This
-        answers the same question as ``self.as_box_polytope() <= self``, but with a
-        single matrix multiplication instead of polytope's LP-based set-difference
-        machinery, which dominates the runtime of `outer_box_approximation`.
+        The bounding box always contains the polytope, so it is a subset of the polytope
+        too (making the two equal) exactly when every one of the box's 2**n_dimensions
+        corners already satisfies this polytope's inequalities. This answers the same
+        question as ``self.as_box_polytope() <= self``, but with a single matrix
+        multiplication instead of polytope's LP-based set-difference machinery, which
+        dominates the runtime of `outer_box_approximation`.
 
         :param lower: The lower bounds of the polytope's bounding box.
         :param upper: The upper bounds of the polytope's bounding box.
@@ -244,7 +244,9 @@ class Polytope(polytope.Polytope):
             constraint = solver.Constraint(-infinity, float(b))
             for j, coefficient in enumerate(row):
                 if coefficient != 0.0:
-                    constraint.SetCoefficient(dimension_variables[j], float(coefficient))
+                    constraint.SetCoefficient(
+                        dimension_variables[j], float(coefficient)
+                    )
             constraint.SetCoefficient(scale, float(scale_coefficient))
 
     def maximum_inner_box(self) -> Self:
@@ -293,7 +295,9 @@ class Polytope(polytope.Polytope):
             )
 
         # calculate the inner box
-        box_lower = np.array([dimension.solution_value() for dimension in dimension_variables])
+        box_lower = np.array(
+            [dimension.solution_value() for dimension in dimension_variables]
+        )
         box_upper = box_lower + scale_of_box * scale.solution_value()
         return self.__class__._box_polytope_from_bounds(box_lower, box_upper)
 
@@ -306,7 +310,7 @@ class Polytope(polytope.Polytope):
         maxima = maxima.flatten()
         return SimpleEvent.from_data(
             {
-                Continuous(f"x_{i}"): closed_open(minimum, maximum)
+                Continuous(name=f"x_{i}"): closed_open(minimum, maximum)
                 for i, (minimum, maximum) in enumerate(zip(minima, maxima))
             }
         )

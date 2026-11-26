@@ -26,7 +26,7 @@ class Bound(enum.IntEnum):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SimpleInterval(sigma_algebra.AbstractSimpleSet):
     """
     A simple interval.
@@ -196,7 +196,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         return SimpleInterval.from_data(self.lower, self.upper, self.left, self.right)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Interval(sigma_algebra.AbstractCompositeSet):
     """
     Represents an interval.
