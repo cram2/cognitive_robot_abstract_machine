@@ -12,14 +12,14 @@ from typing_extensions import Any
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RoboKudoError(DataclassException, ABC):
     """
     Base class for RoboKudo-specific errors.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorToDepthRatioMissing(RoboKudoError, RuntimeError):
     """
     Raised when an operation needs the color-to-depth ratio, but the CAS holds none.
@@ -42,7 +42,7 @@ class ColorToDepthRatioMissing(RoboKudoError, RuntimeError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownMode(RoboKudoError, ValueError):
     """
     Raised when a configured mode value is not supported.
@@ -61,7 +61,7 @@ class UnknownMode(RoboKudoError, ValueError):
 # %% ROS frame identifiers
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidROSFrameId(RoboKudoError, ValueError):
     """
     Raised when a ROS frame identifier is empty after normalization.
@@ -82,7 +82,7 @@ class InvalidROSFrameId(RoboKudoError, ValueError):
 # %% Camera observations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCameraObservation(RoboKudoError, TypeError):
     """
     Raised when camera metadata contains incompatible values.
@@ -100,7 +100,7 @@ class InvalidCameraObservation(RoboKudoError, TypeError):
         return "use compatible camera, pose-frame, and projection-model data."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraObservationMissing(RoboKudoError):
     """
     Raised when processing requires camera metadata for the current frame.
@@ -119,7 +119,7 @@ class CameraObservationMissing(RoboKudoError):
         return "run a camera interface before camera-dependent annotators."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraPoseMissing(RoboKudoError):
     """
     Raised when camera metadata has no sampled world pose.
@@ -138,7 +138,7 @@ class CameraPoseMissing(RoboKudoError):
         return "configure camera TF or a static camera transform."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraDataMissing(RoboKudoError):
     """
     Raised when a camera callback requires a message that was not provided.
@@ -154,7 +154,7 @@ class CameraDataMissing(RoboKudoError):
         return "check the camera subscriptions and synchronization setup."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeImageConversionError(RoboKudoError, ValueError):
     """
     Raised when image conversion through the cv_bridge workaround fails.
@@ -185,7 +185,7 @@ class CVBridgeImageConversionError(RoboKudoError, ValueError):
         return "request a compatible target encoding or provide an image with matching channels."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeImageShapeError(RoboKudoError, ValueError):
     """
     Raised when an image array shape cannot represent a ROS image.
@@ -211,7 +211,7 @@ class CVBridgeImageShapeError(RoboKudoError, ValueError):
         return "provide a single-channel or multi-channel image array."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeROSImageShapeError(RoboKudoError, ValueError):
     """
     Raised when a ROS image message has invalid dimensions.
@@ -234,7 +234,7 @@ class CVBridgeROSImageShapeError(RoboKudoError, ValueError):
         return "provide a ROS image with positive height and width."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeROSImageStepError(RoboKudoError, ValueError):
     """
     Raised when a ROS image row step cannot contain one pixel row.
@@ -260,7 +260,7 @@ class CVBridgeROSImageStepError(RoboKudoError, ValueError):
         return "provide a ROS image step that can contain one full pixel row."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeROSImagePayloadError(RoboKudoError, ValueError):
     """
     Raised when a ROS image payload is too small for its metadata.
@@ -286,7 +286,7 @@ class CVBridgeROSImagePayloadError(RoboKudoError, ValueError):
         return "provide image data that matches the ROS image height and step."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeUnsupportedImageData(RoboKudoError, ValueError):
     """
     Raised when image data cannot be mapped to a ROS image encoding.
@@ -314,7 +314,7 @@ class CVBridgeUnsupportedImageData(RoboKudoError, ValueError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeUnsupportedEncoding(RoboKudoError, ValueError):
     """
     Raised when the cv_bridge workaround receives an unknown encoding.
@@ -332,7 +332,7 @@ class CVBridgeUnsupportedEncoding(RoboKudoError, ValueError):
         return "use one of the ROS image encodings supported by CVBridgeWorkaround."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CVBridgeUnsupportedTargetEncoding(RoboKudoError, ValueError):
     """
     Raised when the cv_bridge workaround cannot produce an encoding.
@@ -350,14 +350,14 @@ class CVBridgeUnsupportedTargetEncoding(RoboKudoError, ValueError):
         return "request passthrough, bgr8, 32FC1, or add support for the desired conversion."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AnalysisPreconditionError(RoboKudoError, ABC):
     """
     Base class for unmet analysis preconditions.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CASCheckConfigurationError(AnalysisPreconditionError, ValueError):
     """
     Raised when a CAS check annotator is not configured correctly.
@@ -375,7 +375,7 @@ class CASCheckConfigurationError(AnalysisPreconditionError, ValueError):
         return "pass a callable via the 'func' parameter."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CASCheckFailed(AnalysisPreconditionError):
     """
     Raised when a configured CAS check condition fails.
@@ -399,7 +399,7 @@ class PointCloudThresholdRelation(StrEnum):
     ABOVE = "above"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PointCloudThresholdError(AnalysisPreconditionError):
     """
     Raised when point cloud size violates a configured threshold.
@@ -422,7 +422,7 @@ class PointCloudThresholdError(AnalysisPreconditionError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlaneModelMissing(AnalysisPreconditionError):
     """
     Raised when an algorithm requires a plane model in the CAS.
@@ -439,7 +439,7 @@ class PlaneModelMissing(AnalysisPreconditionError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PointCloudCameraModelMissing(AnalysisPreconditionError):
     """
     Raised when the CAS lacks the projection model for its point cloud.
@@ -452,7 +452,7 @@ class PointCloudCameraModelMissing(AnalysisPreconditionError):
         return "provide the camera model used to create the point cloud."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PointCloudTooSmallForClustering(AnalysisPreconditionError):
     """
     Raised when too few points are available for point-cloud clustering.
@@ -472,7 +472,7 @@ class PointCloudTooSmallForClustering(AnalysisPreconditionError):
         return "adjust the clustering setup or provide a denser segmented point cloud."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyPointCloud(AnalysisPreconditionError):
     """
     Raised when an algorithm requires a non-empty point cloud.
@@ -487,7 +487,7 @@ class EmptyPointCloud(AnalysisPreconditionError):
         return "verify that the upstream point cloud producer wrote points to the CAS."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ImageContourMissing(AnalysisPreconditionError):
     """
     Raised when an algorithm requires an image contour but none was found.
@@ -504,14 +504,84 @@ class ImageContourMissing(AnalysisPreconditionError):
         return "check the image input and contour extraction thresholds."
 
 
-@dataclass
+@dataclass(kw_only=True)
+class RoboKudoAlreadyRunningError(RoboKudoError, RuntimeError):
+    """
+    Raised when a RoboKudo starts in a process another RoboKudo already runs in.
+
+    Both would share the one blackboard of the process, so each would read the
+    perception world of the other.
+    """
+
+    def error_message(self) -> str:
+        return "Another RoboKudo is already running in this process."
+
+    def suggest_correction(self) -> str:
+        return "close the running RoboKudo first, or run the second one in its own process."
+
+
+@dataclass(kw_only=True)
+class EngineRootIsNotAPipelineError(RoboKudoError, TypeError):
+    """
+    Raised when RoboKudo starts an analysis engine whose tree is not rooted at a
+    pipeline.
+    """
+
+    analysis_engine_name: str
+    """
+    The name of the analysis engine.
+    """
+
+    root_type: type
+    """
+    The type of the root of the tree the analysis engine builds.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The analysis engine '{self.analysis_engine_name}' builds a tree rooted at "
+            f"a {self.root_type.__name__}, so RoboKudo has no pipeline whose passes it "
+            f"could put into the world."
+        )
+
+    def suggest_correction(self) -> str:
+        return "make a Pipeline the root of the tree the analysis engine builds."
+
+
+@dataclass(kw_only=True)
+class UnknownWorldFrameError(RoboKudoError, LookupError):
+    """
+    Raised when a camera pose is measured against a frame a world with bodies does not
+    hold.
+    """
+
+    world_frame: str
+    """
+    The name of the frame the camera pose was measured against.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The camera pose was measured against the frame '{self.world_frame}', "
+            f"which the perception world does not hold. Perception adds a world frame "
+            f"only to an empty world, since it cannot tell where the frame belongs."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "measure the camera pose against a frame of the perception world, such as "
+            "its root, or make the camera frame a body of that world."
+        )
+
+
+@dataclass(kw_only=True)
 class WorldDescriptorError(RoboKudoError, ABC):
     """
     Base class for world descriptor related errors.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldDescriptorLoadError(WorldDescriptorError, RuntimeError):
     """
     Raised when loading a world descriptor fails.
@@ -522,8 +592,7 @@ class WorldDescriptorLoadError(WorldDescriptorError, RuntimeError):
 
     def error_message(self) -> str:
         return (
-            f"Failed to load world descriptor "
-            f"'{self.ros_package}.{self.module_name}'."
+            f"Failed to load world descriptor '{self.ros_package}.{self.module_name}'."
         )
 
     def suggest_correction(self) -> str:
@@ -533,7 +602,7 @@ class WorldDescriptorLoadError(WorldDescriptorError, RuntimeError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldDescriptorBootstrapError(WorldDescriptorError, RuntimeError):
     """
     Raised when merging or removing world descriptor content fails.
@@ -554,7 +623,7 @@ class WorldDescriptorBootstrapError(WorldDescriptorError, RuntimeError):
 # %% Analysis data contracts
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectGeometryMissing(WorldDescriptorError, ValueError):
     """
     A world object declares no supported geometry.
@@ -572,7 +641,7 @@ class ObjectGeometryMissing(WorldDescriptorError, ValueError):
         return "Configure a mesh path, box dimensions or cylinder dimensions."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RegionParentMissing(WorldDescriptorError, ValueError):
     """
     A world region references a missing parent body.
@@ -596,7 +665,7 @@ class RegionParentMissing(WorldDescriptorError, ValueError):
 
 
 # %% Bounding box projection
-@dataclass
+@dataclass(kw_only=True)
 class BoundingBoxDepthMissing(RoboKudoError, ValueError):
     """
     A bounding box has a corner on the camera plane.
@@ -609,7 +678,7 @@ class BoundingBoxDepthMissing(RoboKudoError, ValueError):
         return "Provide a bounding box whose corners have nonzero optical depth."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DetectionModelNotConfigured(RoboKudoError, ValueError):
     """
     Raised when an annotator is given no model to load.
@@ -633,7 +702,7 @@ class DetectionModelNotConfigured(RoboKudoError, ValueError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParentPipelineMissing(RoboKudoError, RuntimeError):
     """
     Raised when a behaviour that operates on its pipeline is not part of one.

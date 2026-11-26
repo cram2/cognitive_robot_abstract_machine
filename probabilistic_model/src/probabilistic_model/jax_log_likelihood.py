@@ -51,8 +51,8 @@ class CompiledLogLikelihood:
         :return: The log-likelihood of every event under the circuit with these
             parameters.
         """
-        root = self.circuit.root.copy_with_circuit_parameters(parameters)
-        return root.log_likelihood_of_nodes(encoded_events)[:, 0]
+        root = self.circuit.root.copy_with_circuit_parameters(parameters=parameters)
+        return root.log_likelihood_of_nodes(events=encoded_events)[:, 0]
 
     def log_likelihood(self, *, encoded_events: SampleArray) -> jax.Array:
         """

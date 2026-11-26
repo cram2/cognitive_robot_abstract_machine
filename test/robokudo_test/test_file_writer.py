@@ -1,3 +1,7 @@
+"""
+Tests that the file writer records camera observations the file reader reads back.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -99,14 +103,14 @@ def test_file_writer_and_reader_roundtrip_recorded_camera_metadata(
     }
 
     reader = RGBDFileReaderInterface(
-        FileReaderCameraConfig(
+        camera_config=FileReaderCameraConfig(
             target_dir=str(tmp_path),
             loop=False,
             color_to_depth_ratio=ColorToDepthRatio(),
         )
     )
     replayed_cas = CAS()
-    reader.set_data(replayed_cas)
+    reader.set_data(cas=replayed_cas, world=World())
 
     replayed_observation = replayed_cas.require_camera_observation()
     assert replayed_observation.camera.root.name.name == camera_frame.name.name

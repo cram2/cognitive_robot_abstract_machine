@@ -559,7 +559,7 @@ def _rewritten_mixing(world, robot):
         container=container, arm=robot.all_arms[0], tool=Whisk(root=tool_body)
     )
     executor = simulated_executor(robot_extensions(robot))
-    executor.prepare(statechart_of(executor, action))
+    executor.prepare(statechart=statechart_of(executor, action))
     return action
 
 
@@ -587,4 +587,4 @@ def test_a_robot_other_than_justin_keeps_its_torso_as_it_is(tool_action_world) -
     )
     expand(action, extensions)
 
-    assert not KeepTheTorsoUprightWhileUsingATool().is_applicable(action)
+    assert not KeepTheTorsoUprightWhileUsingATool().is_applicable(plan_node=action)

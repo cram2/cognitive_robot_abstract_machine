@@ -1,3 +1,9 @@
+"""
+Tests of relational probabilistic circuits learned from instances and their parts.
+"""
+
+from __future__ import annotations
+
 import functools
 import json
 import operator
@@ -28,7 +34,7 @@ from probabilistic_model.probabilistic_circuit.relational.exceptions import (
     UndeterminedLatentsNotPartitionedError,
     UnknownExchangeablePartsError,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.exchangeable_grounding import (
     ExchangeablePartGrounder,
     GroundingMode,
@@ -439,10 +445,10 @@ def test_deserialized_circuit_preserves_likelihoods(
     samples = relational_probabilistic_circuit.class_probabilistic_circuit.sample(10)
     assert np.allclose(
         relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
-            samples
+            events=samples
         ),
         deserialized_relational_probabilistic_circuit.class_probabilistic_circuit.log_likelihood(
-            samples
+            events=samples
         ),
     )
 

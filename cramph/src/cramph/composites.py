@@ -44,6 +44,7 @@ from cramph.node import (
     NodeRebuild,
     TerminalNode,
 )
+from cramph.structure_change_recorder import StructureChangeRecorder
 from krrood.exceptions import DataclassException
 from krrood.symbolic_math.symbolic_math import (
     Scalar,
@@ -1272,6 +1273,13 @@ class CompositeNodeChoosingItsChild(SucceedsOnObservingTrue, CompositeNode):
         """
         self._chosen_children = list(children)
         self._structure_change_recorder._record_changed_chosen_children(node=self)
+
+    def _record_structure(self, *, recorder: StructureChangeRecorder) -> None:
+        """
+        Also records the chosen children, see :meth:`CompositeNode._record_structure`.
+        """
+        super()._record_structure(recorder=recorder)
+        recorder._record_changed_chosen_children(node=self)
 
     def give_up_on_child_when(
         self, *, child: StatechartNode, failure_monitors: list[StatechartNode]

@@ -49,7 +49,7 @@ class AnnotatorOutputStruct:
         self.render_next_time = True
         """Whether the outputs should be rendered on the next GUI update. Defaults to True for the first run."""
 
-    def set_image(self, img: npt.NDArray[np.uint8]) -> None:
+    def set_image(self, *, img: npt.NDArray[np.uint8]) -> None:
         """Set the image in this AnnotatorOutputStruct and instruct the GUI to render it next time.
 
         :param img: The image to be displayed on the next GUI update.
@@ -57,7 +57,7 @@ class AnnotatorOutputStruct:
         self.image = img
         self.render_next_time = True
 
-    def set_geometries(self, geometries: list[dict[str, Any]]) -> None:
+    def set_geometries(self, *, geometries: list[dict[str, Any]]) -> None:
         """Set the geometries in this AnnotatorOutputStruct and instruct the GUI to render it next time.
 
         :param geometries: This parameter holds the geometries to be drawn. It should behave like o3d.visualization.draw,
@@ -86,7 +86,7 @@ class AnnotatorOutputs:
         self.redraw = True
         """Whether the outputs should be redrawn on the next GUI update."""
 
-    def init_annotator(self, annotator_name: str) -> None:
+    def init_annotator(self, *, annotator_name: str) -> None:
         """Initialize the output structure for an annotator.
 
         :param annotator_name: Name of the annotator
@@ -94,9 +94,12 @@ class AnnotatorOutputs:
         self.outputs[annotator_name] = AnnotatorOutputStruct()
 
     def clear_outputs(self) -> None:
+        """
+        Reset the output of every annotator registered so far, keeping their entries.
+        """
         annotator_names = [key for key in self.outputs]
         for name in annotator_names:
-            self.init_annotator(name)
+            self.init_annotator(annotator_name=name)
 
 
 class AnnotatorOutputPerPipelineMap:

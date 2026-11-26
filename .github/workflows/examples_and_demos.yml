@@ -1,7 +1,7 @@
-name: Examples and Demos  (matrix over libs)
+name: Examples and Demos
 defaults:
   run:
-    shell: bash -euo pipefail {0}
+    shell: bash -ieo pipefail {0}
 
 on:
   push:
@@ -15,9 +15,14 @@ on:
     types: [ completed ]
     branches: [ main ]
 
+# a new push cancels the outdated run
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   to-lowercase:
-    # a draft pull request runs no CI; marking it ready for review starts the run
+    # drafts run no CI
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     outputs:
@@ -27,24 +32,115 @@ jobs:
         run: |
           echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}:jazzy" >> $GITHUB_OUTPUT
 
-  test_each_lib:
+  run_examples_and_demos:
+    # One job for all scripts, so the setup runs once
     needs: [to-lowercase]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - script: coraplex/scripts/test_notebook_examples.sh
-          - script: semantic_digital_twin/scripts/test_notebook_examples.sh
-          - script: semantic_digital_twin/scripts/test_exercises.sh
-          - script: semantic_digital_twin/scripts/test_quizzes.sh
-          - script: coraplex/demos/coraplex_bullet_world_demo/test_demo.py
-          - script: coraplex/demos/coraplex_failure_handling_demo/test_demo.py
-          - script: coraplex/demos/coraplex_garmi_clean_up_demo/test_demo.py
-          - script: coraplex/demos/coraplex_hsr_mujoco_demo/test_demo.py
-          - script: coraplex/demos/coraplex_real_tracy/test_demo.py
-          - script: experiments/src/experiments/real_stretch_apartment_demo/test_demo.py
-          - script: experiments/src/experiments/daisy_gripper_demo/test_demo.py
-    uses: ./.github/workflows/example_demo_reusable.yml
-    with:
-      script: ${{ matrix.script }}
-      repo_lowercase: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+    runs-on: ubuntu-latest
+    # A runner out of disk or memory hangs instead of failing
+    timeout-minutes: 60
+    container:
+      image: ${{ needs.to-lowercase.outputs.repo_lowercase }}
+      # The host's root, for free_runner_disk.sh and show_runner_resources.sh
+      options: --volume /:/host
+    env:
+      # CPU-only torch; the CUDA build fills the disk
+      UV_INDEX: https://download.pytorch.org/whl/cpu
+      UV_INDEX_STRATEGY: unsafe-best-match
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: cognitive_robot_abstract_machine
+          submodules: recursive
+
+      - name: Free disk space
+        run: cognitive_robot_abstract_machine/scripts/free_runner_disk.sh
+
+      - name: Show runner resources
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
+
+      - name: Install dependencies
+        env:
+          # Same filesystem as the venv, so uv hardlinks instead of copying and fills no disk
+          UV_CACHE_DIR: /opt/ros/.uv_cache
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/cram-env/bin/activate
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libegl1
+          uv sync --extra dev,doc --active
+
+      - name: Restore cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-demo-cache-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-demo-cache-${{ github.ref_name }}-
+            ${{ runner.os }}-demo-cache-
+
+      - name: Build ORM
+        # The ORM interfaces are not tracked, and the demos use the database
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          python scripts/regenerate_all_orm.py
+
+      - name: Run the examples and demos
+        env:
+          QT_QPA_PLATFORM: offscreen
+          LIBGL_ALWAYS_SOFTWARE: 1
+          # a hanging script fails instead of using up the job
+          SCRIPT_TIMEOUT: 15m
+        run: |
+          cd cognitive_robot_abstract_machine
+          source /opt/ros/overlay_ws/install/setup.bash
+          source /opt/ros/cram-env/bin/activate
+          scripts=(
+            coraplex/scripts/test_notebook_examples.sh
+            semantic_digital_twin/scripts/test_notebook_examples.sh
+            semantic_digital_twin/scripts/test_exercises.sh
+            semantic_digital_twin/scripts/test_quizzes.sh
+            coraplex/demos/coraplex_bullet_world_demo/test_demo.py
+            coraplex/demos/coraplex_failure_handling_demo/test_demo.py
+            coraplex/demos/coraplex_garmi_clean_up_demo/test_demo.py
+            coraplex/demos/coraplex_hsr_mujoco_demo/test_demo.py
+            coraplex/demos/coraplex_real_tracy/test_demo.py
+            experiments/src/experiments/real_stretch_apartment_demo/test_demo.py
+            experiments/src/experiments/daisy_gripper_demo/test_demo.py
+          )
+          # run every script, fail at the end
+          failed=0
+          {
+            echo "| Script | Result | Minutes |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for script in "${scripts[@]}"; do
+            echo "::group::$script"
+            started=$SECONDS
+            if timeout "$SCRIPT_TIMEOUT" "./$script"; then
+              result=passed
+            else
+              result=failed
+              failed=1
+            fi
+            echo "::endgroup::"
+            if [[ "$result" == failed ]]; then
+              echo "::error title=$script::$script failed"
+            fi
+            minutes=$(awk "BEGIN { printf \"%.1f\", ($SECONDS - $started) / 60 }")
+            echo "| \`$script\` | $result | $minutes |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit "$failed"
+
+      - name: Show runner resources after the job
+        # also after a failure, to show what filled the disk
+        if: always()
+        run: cognitive_robot_abstract_machine/scripts/show_runner_resources.sh
+
+      - name: Save cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: /github/home/.cache/semantic_digital_twin
+          key: ${{ runner.os }}-demo-cache-${{ github.ref_name }}-${{ github.run_id }}

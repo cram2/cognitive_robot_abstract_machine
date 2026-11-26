@@ -33,8 +33,10 @@ from krrood.exceptions import DataclassException
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
 )
@@ -350,8 +352,10 @@ def measure_query_durations(
 
     for amount in (100, 1000, 10000):
         samples = rustworkx_circuit.sample(amount)
-        rustworkx_call = TimedCall.of(lambda: rustworkx_circuit.log_likelihood(samples))
-        layered_call = TimedCall.of(lambda: layered.log_likelihood(samples))
+        rustworkx_call = TimedCall.of(
+            lambda: rustworkx_circuit.log_likelihood(events=samples)
+        )
+        layered_call = TimedCall.of(lambda: layered.log_likelihood(events=samples))
         query = f"log_likelihood, {amount} events"
         raise_if_answers_disagree(query, rustworkx_call.result, layered_call.result)
         results.append(
@@ -569,7 +573,7 @@ def measure_conditioning(
 
         marginal_check = layered.marginal(conditioned_variables)
         row = np.array([[point[variable] for variable in conditioned_variables]])
-        expected_log_probability = float(marginal_check.log_likelihood(row)[0])
+        expected_log_probability = float(marginal_check.log_likelihood(events=row)[0])
 
         rustworkx_call = TimedCall.of(
             lambda: rustworkx_circuit.__deepcopy__().log_conditional_in_place(point),

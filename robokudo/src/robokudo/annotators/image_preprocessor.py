@@ -15,6 +15,7 @@ This module provides an annotator for:
 from __future__ import annotations
 
 # %% Imports
+import logging
 from enum import StrEnum
 from timeit import default_timer
 
@@ -32,6 +33,8 @@ from robokudo.utils.cv_helper import get_scaled_color_image_for_depth_image
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ImagePreprocessorAnnotator(BaseAnnotator):
@@ -88,7 +91,7 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.color: npt.NDArray | None = None
         """
@@ -122,8 +125,8 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        self.depth = self.get_cas().get(CASViews.DEPTH_IMAGE)
-        self.color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        self.depth = self.get_cas().get(view_name=CASViews.DEPTH_IMAGE)
+        self.color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         cas = self.get_cas()
         color_to_depth_ratio = cas.color_to_depth_ratio
         pointcloud_camera_model = (
@@ -133,13 +136,13 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
             )
         )
         self.camera_intrinsics = Open3DCameraModelAdapter.to_intrinsic(
-            pointcloud_camera_model
+            camera_model=pointcloud_camera_model
         )
 
         if self.display_mode is self.ViewMode.DEPTH:
-            self.get_annotator_output_struct().set_image(self.depth)
+            self.get_annotator_output_struct().set_image(img=self.depth)
         else:
-            self.get_annotator_output_struct().set_image(self.color)
+            self.get_annotator_output_struct().set_image(img=self.color)
 
         resized_color = None
         resized_color = get_scaled_color_image_for_depth_image(
@@ -166,16 +169,16 @@ class ImagePreprocessorAnnotator(BaseAnnotator):
 
         cas.pointcloud_camera_model = pointcloud_camera_model
 
-        self.get_cas().set_ref(CASViews.CLOUD, cloud)
+        self.get_cas().set_ref(view_name=CASViews.CLOUD, value=cloud)
         self.get_annotator_output_struct().set_geometries(
-            cloud
+            geometries=cloud
         )  # the visualizer can only show non-NaN pointclouds
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
         return Status.SUCCESS
 
-    def key_callback(self, key: int) -> None:
+    def key_callback(self, *, key: int) -> None:
         """
         Handle keyboard input for view mode switching.
 

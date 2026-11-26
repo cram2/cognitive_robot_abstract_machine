@@ -150,7 +150,7 @@ point type; the queries then compute in that library and type.
 import jax.numpy as jnp
 
 jax_model = numpy_model.to_namespace(jnp)
-print(jax_model.log_likelihood(jnp.asarray([[0.5], [1.5]])))
+print(jax_model.log_likelihood(events=jnp.asarray([[0.5], [1.5]])))
 ```
 
 Under `jax.jit` the log-likelihood compiles into a single function. Structural queries
@@ -165,10 +165,10 @@ sum layers of a RAT-SPN, and much slower for sparsely connected ones;
 `store_edges_as` converts every inner layer of a circuit.
 
 A circuit with JAX parameters is trained by gradient descent with `fit`, or with
-`JaxGradientDescent` from `probabilistic_model.learning.jax_gradient_descent` and a `Loss`
-from `probabilistic_model.learning.gradient_descent`; a
+`JaxGradientDescent` from `probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent` and a `Loss`
+from `probabilistic_model.learning.parameters.gradient_descent.gradient_descent`; a
 circuit with PyTorch parameters with `TorchGradientDescent` from
-`probabilistic_model.learning.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
+`probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
 builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with NumPy
 parameters, which `to_namespace` moves to JAX or PyTorch for training: fully factorized input distributions in every leaf region, the cross products
 of the regions of every partition and fully connected sum layers in every other region. A

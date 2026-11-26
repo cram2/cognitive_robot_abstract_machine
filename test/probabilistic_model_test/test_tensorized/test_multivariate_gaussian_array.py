@@ -82,9 +82,14 @@ def test_from_distributions_lays_the_parameters_out_in_the_given_order(
 def test_log_density_is_the_log_likelihood_of_every_distribution(
     gaussians, distributions
 ):
+    """
+    The log-density of every Gaussian of the array is the log-likelihood of its
+    distribution.
+    """
     points = np.array([[0.0, 0.0, 0.0], [1.0, -2.0, 0.5], [2.5, 1.0, -1.0]])
     expected = np.stack(
-        [distribution.log_likelihood(points) for distribution in distributions], axis=1
+        [distribution.log_likelihood(events=points) for distribution in distributions],
+        axis=1,
     )
     np.testing.assert_allclose(gaussians.log_density(points), expected)
 

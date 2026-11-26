@@ -45,7 +45,7 @@ dev = [
     "treon",
     "bokeh",
     "mypy>=1.8",
-    "krrood[development-tools]",
+    "krrood-development-tools",
 ]
 
 doc = [
@@ -90,6 +90,18 @@ members = [
   "cramph",
   "semantic_digital_twin",
   "krrood",
+  "krrood/krrood-core",
+  "krrood/krrood-serialization",
+  "krrood/krrood-code-generation",
+  "krrood/krrood-symbolic-math",
+  "krrood/krrood-rustworkx-utils",
+  "krrood/krrood-eql",
+  "krrood/krrood-planning",
+  "krrood/krrood-ormatic",
+  "krrood/krrood-probabilistic",
+  "krrood/krrood-rdr",
+  "krrood/krrood-ontomatic",
+  "krrood/krrood-development-tools",
   "random_events",
   "probabilistic_model",
   "physics_simulators",
@@ -107,6 +119,18 @@ giskardpy             = { workspace = true }
 cramph                = { workspace = true }
 semantic_digital_twin = { workspace = true }
 krrood                = { workspace = true }
+krrood-core = { workspace = true }
+krrood-serialization = { workspace = true }
+krrood-code-generation = { workspace = true }
+krrood-symbolic-math = { workspace = true }
+krrood-rustworkx-utils = { workspace = true }
+krrood-eql = { workspace = true }
+krrood-planning = { workspace = true }
+krrood-ormatic = { workspace = true }
+krrood-probabilistic = { workspace = true }
+krrood-rdr = { workspace = true }
+krrood-ontomatic = { workspace = true }
+krrood-development-tools = { workspace = true }
 probabilistic_model   = { workspace = true }
 random_events         = { workspace = true }
 robokudo              = { workspace = true }
@@ -126,6 +150,18 @@ giskardpy = { path = "giskardpy", develop = true }
 cramph = { path = "cramph", develop = true }
 semantic_digital_twin = { path = "semantic_digital_twin", develop = true }
 krrood = { path = "krrood", develop = true }
+krrood-core = { path = "krrood/krrood-core", develop = true }
+krrood-serialization = { path = "krrood/krrood-serialization", develop = true }
+krrood-code-generation = { path = "krrood/krrood-code-generation", develop = true }
+krrood-symbolic-math = { path = "krrood/krrood-symbolic-math", develop = true }
+krrood-rustworkx-utils = { path = "krrood/krrood-rustworkx-utils", develop = true }
+krrood-eql = { path = "krrood/krrood-eql", develop = true }
+krrood-planning = { path = "krrood/krrood-planning", develop = true }
+krrood-ormatic = { path = "krrood/krrood-ormatic", develop = true }
+krrood-probabilistic = { path = "krrood/krrood-probabilistic", develop = true }
+krrood-rdr = { path = "krrood/krrood-rdr", develop = true }
+krrood-ontomatic = { path = "krrood/krrood-ontomatic", develop = true }
+krrood-development-tools = { path = "krrood/krrood-development-tools", develop = true }
 random_events = { path = "random_events", develop = true }
 probabilistic_model = { path = "probabilistic_model", develop = true }
 robokudo = { path = "robokudo", develop = true }
@@ -156,4 +192,6 @@ exclude = [
     '^test/cognitive_robot_abstract_machine_test/dataset/orm_interface_imports/',
     # the ripple down rules expert answers, left unchecked for now
     '^test/krrood_test/test_ripple_down_rules/test_expert_answers/',
+    # the tests, left unchecked
+    '^test/',
 ]

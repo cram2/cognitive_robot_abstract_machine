@@ -39,7 +39,7 @@ from krrood.entity_query_language.factories import a, variable_from
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
-from probabilistic_model.learning.gaussian_mixture.gaussian_mixture_model import (
+from probabilistic_model.learning.structure.gaussian_mixture.gaussian_mixture_model import (
     GaussianMixtureModel,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -290,9 +290,9 @@ class GaussianMixtureBenchmark:
         ):
             samples = rustworkx_circuit.sample(amount)
             rustworkx_call = TimedCall.of(
-                lambda: rustworkx_circuit.log_likelihood(samples)
+                lambda: rustworkx_circuit.log_likelihood(events=samples)
             )
-            layered_call = TimedCall.of(lambda: layered.log_likelihood(samples))
+            layered_call = TimedCall.of(lambda: layered.log_likelihood(events=samples))
             raise_if_answers_disagree(
                 query.value, rustworkx_call.result, layered_call.result
             )
@@ -383,9 +383,11 @@ class GaussianMixtureBenchmark:
 
         samples = rustworkx_truncated.sample(1000)
         rustworkx_call = TimedCall.of(
-            lambda: rustworkx_truncated.log_likelihood(samples)
+            lambda: rustworkx_truncated.log_likelihood(events=samples)
         )
-        layered_call = TimedCall.of(lambda: layered_truncated.log_likelihood(samples))
+        layered_call = TimedCall.of(
+            lambda: layered_truncated.log_likelihood(events=samples)
+        )
         raise_if_answers_disagree(
             GaussianMixtureQuery.LOG_LIKELIHOOD_AFTER_TRUNCATION.value,
             rustworkx_call.result,

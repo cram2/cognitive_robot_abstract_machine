@@ -18,13 +18,16 @@ from random_events.variable import Symbolic
 from random_events.interval import SimpleInterval
 from sortedcontainers import SortedSet
 
-from probabilistic_model.learning.gradient_descent import CrossEntropy
-from probabilistic_model.learning.region_graph.exceptions import (
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    CrossEntropy,
+)
+from probabilistic_model.learning.structure.region_graph.exceptions import (
     PredictedVariableInRegionGraphError,
 )
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
+from probabilistic_model.probabilistic_circuit.tensorized.folding import LayerFolding
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
-    DenseEdgeMatrix,
+    BlockEdgeMatrix,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
@@ -62,7 +65,7 @@ def test_a_region_graph_builds_a_layered_circuit_with_numpy_parameters(region_gr
     circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
     assert all(isinstance(parameter, np.ndarray) for parameter in circuit.parameters)
     data = np.random.default_rng(0).normal(size=(50, 6))
-    assert np.all(np.isfinite(circuit.log_likelihood(data)))
+    assert np.all(np.isfinite(circuit.log_likelihood(events=data)))
 
 
 def test_the_circuit_of_a_region_graph_moves_to_jax_with_the_same_likelihoods(
@@ -76,8 +79,8 @@ def test_the_circuit_of_a_region_graph_moves_to_jax_with_the_same_likelihoods(
     assert all(isinstance(parameter, jax.Array) for parameter in jax_circuit.parameters)
     data = np.random.default_rng(0).normal(size=(50, 6))
     np.testing.assert_allclose(
-        np.asarray(jax_circuit.log_likelihood(jnp.asarray(data))),
-        circuit.log_likelihood(data),
+        np.asarray(jax_circuit.log_likelihood(events=jnp.asarray(data))),
+        circuit.log_likelihood(events=data),
         rtol=1e-4,
     )
 
@@ -122,17 +125,18 @@ def test_the_initial_parameters_of_a_region_graph_circuit_lie_in_its_ranges():
     assert np.all((weights >= 2.0) & (weights < 3.0))
 
 
-def test_the_sum_layers_of_a_region_graph_are_fully_connected_and_dense(region_graph):
+def test_the_circuit_of_a_region_graph_is_folded(region_graph):
     """
-    Every sum layer connects every unit to every unit of its children and stores its
-    edges densely.
+    A region graph builds its circuit folded: one layer per type of layer and height,
+    every sum layer storing its edges as full blocks.
     """
     circuit = region_graph.to_probabilistic_circuit(input_units=4, sum_units=3)
+    heights = LayerFolding(root=circuit.root).heights
+    kinds = [(type(layer), heights[layer]) for layer in circuit.layers]
     sum_layers = [layer for layer in circuit.layers if isinstance(layer, SumLayer)]
+    assert len(kinds) == len(set(kinds))
     assert sum_layers
-    for layer in sum_layers:
-        assert isinstance(layer.edges, DenseEdgeMatrix)
-        assert bool(layer.edges.is_edge.all())
+    assert all(isinstance(layer.edges, BlockEdgeMatrix) for layer in sum_layers)
 
 
 # %% learning
@@ -147,9 +151,9 @@ def test_fitting_a_layered_circuit_raises_the_log_likelihood_of_its_data(region_
         input_units=4, sum_units=3
     ).to_namespace(jnp, floating_point_type=jnp.result_type(float))
     data = jnp.asarray(np.random.default_rng(0).normal(size=(500, 6)) * 0.5 + 1.0)
-    before = float(jnp.mean(circuit.log_likelihood(data)))
+    before = float(jnp.mean(circuit.log_likelihood(events=data)))
     circuit.fit(data=data, epochs=100, optimizer=optax.adam(0.05))
-    assert float(jnp.mean(circuit.log_likelihood(data))) > before + 0.5
+    assert float(jnp.mean(circuit.log_likelihood(events=data))) > before + 0.5
 
 
 # %% classification
@@ -218,7 +222,7 @@ class SeparatedCategories:
         for label in range(len(hashes)):
             candidate = self.data.copy()
             candidate[:, predicted_column] = hashes[label]
-            joint.append(np.asarray(self.circuit.log_likelihood(candidate)))
+            joint.append(np.asarray(self.circuit.log_likelihood(events=candidate)))
         return np.stack(joint, axis=1)
 
 

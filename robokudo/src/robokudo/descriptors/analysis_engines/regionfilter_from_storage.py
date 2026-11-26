@@ -32,6 +32,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -88,7 +89,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             and camera viewpoint visualization, which can be useful for
             debugging and development.
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 
@@ -102,6 +105,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 RegionFilter(),
                 # CameraViewpointVisualizer(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

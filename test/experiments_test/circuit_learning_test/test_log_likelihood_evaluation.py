@@ -11,7 +11,7 @@ from random_events.variable import Continuous
 from sortedcontainers import SortedSet
 
 from experiments.circuit_learning.measurements import ChunkedLogLikelihoodEvaluation
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
 
 # %% jax circuits
 
@@ -33,6 +33,6 @@ def test_chunked_log_likelihoods_of_a_jax_circuit_are_those_of_its_host_circuit(
     )
     np.testing.assert_allclose(
         evaluation.compute_log_likelihoods(rows=rows),
-        host.log_likelihood(rows),
+        host.log_likelihood(events=rows),
         rtol=1e-5,
     )

@@ -1,3 +1,8 @@
+"""
+Converters of rustworkx circuits into layered circuits, one group of units of a type and
+scope per layer.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,6 +19,10 @@ from probabilistic_model.adapters.rustworkx_tensorized.converter import (
 from probabilistic_model.adapters.rustworkx_tensorized.exceptions import (
     NotExactlyOneRootError,
     UnitNotConvertedError,
+)
+from probabilistic_model.distributions.binomial import (
+    BinomialDistribution,
+    TruncatedBinomialDistribution,
 )
 from probabilistic_model.distributions.distributions import (
     DiracDeltaDistribution,
@@ -43,6 +52,10 @@ from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.product_la
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
     SumLayer,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.input_layer.binomial_layer import (
+    BinomialLayer,
+    TruncatedBinomialLayer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.input_layer.dirac_delta_layer import (
     DiracDeltaLayer,
@@ -134,7 +147,6 @@ class UnitsToLayerConverter(RustworkxToTensorizedConverter[InputType, OutputType
 
 
 class SumUnitsToSumLayerConverter(UnitsToLayerConverter[SumUnit, SumLayer]):
-
     @classmethod
     def convert(
         cls, data: list[SumUnit], converted_layers: list[ConvertedLayer]
@@ -176,7 +188,6 @@ class SumUnitsToSumLayerConverter(UnitsToLayerConverter[SumUnit, SumLayer]):
 class ProductUnitsToProductLayerConverter(
     UnitsToLayerConverter[ProductUnit, ProductLayer]
 ):
-
     @classmethod
     def convert(
         cls, data: list[ProductUnit], converted_layers: list[ConvertedLayer]
@@ -219,9 +230,14 @@ class LeavesToInputLayerConverter(UnitsToLayerConverter[InputType, OutputType]):
     def convert(
         cls, data: list[Unit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
+        """
+        :return: The input layer of the distributions of the leaves, one node per leaf.
+        """
         layer = cls.output_type().from_distributions(
-            data[0].probabilistic_circuit.variables.index(data[0].variable),
-            [unit.distribution for unit in data],
+            variable_index=data[0].probabilistic_circuit.variables.index(
+                data[0].variable
+            ),
+            distributions=[unit.distribution for unit in data],
         )
         return ConvertedLayer.of_units(layer, data)
 
@@ -256,6 +272,23 @@ class IntegerLeavesToIntegerLayerConverter(
 ): ...
 
 
+class BinomialLeavesToBinomialLayerConverter(
+    LeavesToInputLayerConverter[BinomialDistribution, BinomialLayer]
+):
+    """
+    Converts leaves of binomial distributions into a :class:`BinomialLayer`.
+    """
+
+
+class TruncatedBinomialLeavesToTruncatedBinomialLayerConverter(
+    LeavesToInputLayerConverter[TruncatedBinomialDistribution, TruncatedBinomialLayer]
+):
+    """
+    Converts leaves of truncated binomial distributions into a
+    :class:`TruncatedBinomialLayer`.
+    """
+
+
 class MultivariateLeavesToLayerConverter(UnitsToLayerConverter[InputType, OutputType]):
     """
     Base class for converters of leaves whose distributions are over several variables
@@ -266,9 +299,13 @@ class MultivariateLeavesToLayerConverter(UnitsToLayerConverter[InputType, Output
     def convert(
         cls, data: list[Unit], converted_layers: list[ConvertedLayer]
     ) -> ConvertedLayer:
+        """
+        :return: The input layer of the distributions of the leaves over the variables of the
+            circuit, one node per leaf.
+        """
         layer = cls.output_type().from_distributions(
-            data[0].probabilistic_circuit.variables,
-            [unit.distribution for unit in data],
+            variables=data[0].probabilistic_circuit.variables,
+            distributions=[unit.distribution for unit in data],
         )
         return ConvertedLayer.of_units(layer, data)
 

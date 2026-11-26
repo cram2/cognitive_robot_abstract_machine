@@ -37,6 +37,7 @@ from robokudo.tree_components.better_parallel import Parallel, ParallelPolicy
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -97,7 +98,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with parallel processing
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         pre = Sequence("Preprocessing", memory=True)
         pre.add_children(
@@ -133,6 +136,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 # robokudo.annotators.query.QueryAnnotator(),
                 pre,
                 annotators,
+                WorldUpdatingAnnotator(),
                 # GenerateQueryResult(),
                 # QueryReply(),
             ]

@@ -666,7 +666,9 @@ def test_a_candidate_faces_the_maps_origin_from_every_side(pr2_apartment_context
     position = Point3(x, y, 0, reference_frame=world.root)
 
     facing = (
-        RotationMatrix.from_quaternion(ring._orientation_facing_origin(position))
+        RotationMatrix.from_quaternion(
+            ring._orientation_facing_origin(position=position)
+        )
         @ Vector3.X()
     )
 
@@ -684,7 +686,7 @@ def test_a_candidate_at_the_maps_origin_still_has_an_orientation(
     world, _, _ = pr2_apartment_context
     ring = _ring_map(world)
 
-    orientation = ring._orientation_facing_origin(ring.origin.position)
+    orientation = ring._orientation_facing_origin(position=ring.origin.position)
 
     assert np.all(np.isfinite(orientation.to_np()))
 
@@ -766,7 +768,7 @@ def test_what_a_full_segment_cannot_take_goes_to_the_next(pr2_apartment_context)
     large_and_barely_rated = np.full(100, 0.25)
 
     budgets = costmap._budget_per_segment(
-        [small_and_highly_rated, large_and_barely_rated], 50
+        segments=[small_and_highly_rated, large_and_barely_rated], number_of_samples=50
     )
 
     assert budgets == [small_and_highly_rated.size, 50 - small_and_highly_rated.size]

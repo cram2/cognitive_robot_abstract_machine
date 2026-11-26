@@ -1,3 +1,9 @@
+"""
+Tests of progressive circuits, which learn one column of weights per task.
+"""
+
+from __future__ import annotations
+
 from enum import IntEnum
 
 import numpy as np
@@ -12,19 +18,22 @@ from probabilistic_model.distributions.gaussian import (
     TruncatedGaussianDistribution,
 )
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.learning.exceptions import UnsupportedLeafDistributionError
-from probabilistic_model.learning.expectation_maximization import (
-    ExpectationMaximization,
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    UnsupportedLeafDistributionError,
 )
-from probabilistic_model.learning.progressive.exceptions import (
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
+    ExpectationMaximization,
+    MaximizationRegularization,
+)
+from probabilistic_model.learning.structure.progressive.exceptions import (
     ColumnStructureMismatchError,
     EarlierColumnShareOutOfRangeError,
     UnregisteredColumnError,
 )
-from probabilistic_model.learning.progressive.expectation_maximization import (
+from probabilistic_model.learning.structure.progressive.expectation_maximization import (
     ProgressiveExpectationMaximization,
 )
-from probabilistic_model.learning.progressive.progressive_circuit import (
+from probabilistic_model.learning.structure.progressive.progressive_circuit import (
     AlignedUnits,
     CircuitColumn,
     ProgressiveProbabilisticCircuit,
@@ -106,7 +115,7 @@ def _column_log_likelihood(
     """
     The per-sample log-likelihood computed at the root of a column.
     """
-    progressive_circuit.circuit.log_likelihood(data)
+    progressive_circuit.circuit.log_likelihood(events=data)
     return np.array(column.root.result_of_current_query)
 
 
@@ -450,11 +459,17 @@ def test_learn_fits_gaussian_leaf_to_data_of_single_column():
 
 
 def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
+    """
+    A column learned on constant data keeps the Gaussian variance of its leaf at the
+    minimum the regularization of the expectation maximization sets.
+    """
     progressive_circuit = ProgressiveProbabilisticCircuit(
         template=_make_factorized_template("x")
     )
     column = progressive_circuit.add_column(task_name="task-a")
-    expectation_maximization = ExpectationMaximization(minimum_gaussian_variance=0.25)
+    expectation_maximization = ExpectationMaximization(
+        regularization=MaximizationRegularization(minimum_gaussian_variance=0.25)
+    )
     learner = ProgressiveExpectationMaximization(
         progressive_circuit, expectation_maximization=expectation_maximization
     )
@@ -463,7 +478,7 @@ def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
 
     [gaussian_leaf] = _gaussian_leaves(progressive_circuit, column)
     assert gaussian_leaf.distribution.scale == pytest.approx(
-        np.sqrt(expectation_maximization.minimum_gaussian_variance)
+        np.sqrt(expectation_maximization.regularization.minimum_gaussian_variance)
     )
 
 
@@ -647,18 +662,22 @@ def test_add_column_shares_root_equally_before_any_column_is_learned():
 
 
 def test_adding_unlearned_column_leaves_likelihood_of_circuit_unchanged():
+    """
+    Adding a column that has not been learned yet leaves the likelihood of the circuit
+    as it was.
+    """
     progressive_circuit = ProgressiveProbabilisticCircuit(
         template=_make_mixture_template("x", "y")
     )
     data = np.random.default_rng(0).normal(size=(30, 2))
     earlier_column = progressive_circuit.add_column(task_name="task-a")
     ProgressiveExpectationMaximization(progressive_circuit).learn(data, earlier_column)
-    likelihood_before = progressive_circuit.circuit.log_likelihood(data)
+    likelihood_before = progressive_circuit.circuit.log_likelihood(events=data)
 
     progressive_circuit.add_column(task_name="task-b")
 
     np.testing.assert_array_equal(
-        progressive_circuit.circuit.log_likelihood(data), likelihood_before
+        progressive_circuit.circuit.log_likelihood(events=data), likelihood_before
     )
 
 

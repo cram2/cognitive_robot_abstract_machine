@@ -57,7 +57,9 @@ class StandaloneControllerProcess:
         """
         Launch the controller and block until it serves its world.
         """
-        self.session = RobotDemonstrationRosSession.start("controller_process_probe")
+        self.session = RobotDemonstrationRosSession.start(
+            node_name="controller_process_probe"
+        )
         self.process = StandaloneProcess(
             launcher_path=self.launcher_path, is_ready=self.is_serving_world
         )

@@ -1,4 +1,9 @@
-from __future__ import division
+"""
+Nodes that overwrite the state of the world, such as the seed configuration or the
+odometry of a mobile base.
+"""
+
+from __future__ import annotations
 
 from dataclasses import field, dataclass
 from typing_extensions import Self
@@ -16,6 +21,7 @@ from giskardpy.motion_statechart.exceptions import UnexpectedWorldEntityCountErr
 from giskardpy.motion_statechart.tasks.drive_tasks import MobileBasePoseGoal
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
+from cramph.world_access import WorldAccess
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
 
 
@@ -84,6 +90,21 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
     def build_artifacts(self) -> NodeArtifacts:
         self.odom_connection = self._current_odom_connection()
         return NodeArtifacts(observation=sm.Scalar.const_true())
+
+    def compute_world_access(self) -> WorldAccess:
+        """
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with the degrees of freedom of the drive it sets moved.
+        """
+        return (
+            super()
+            .compute_world_access()
+            .union_with(
+                other=WorldAccess(
+                    moved_degrees_of_freedom=frozenset(self.odom_connection.dofs)
+                )
+            )
+        )
 
     def _current_odom_connection(self) -> OmniDrive:
         """

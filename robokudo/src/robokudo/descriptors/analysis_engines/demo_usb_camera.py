@@ -26,6 +26,7 @@ from robokudo.pipeline import Pipeline
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -77,7 +78,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         # device = "https://raw.githubusercontent.com/cram2/coraplex/refs/heads/dev/doc/images/boxy.gif"
 
         cv_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "opencv",
+            camera="opencv",
             device=device,
             loop_mode=1,
             update_global_with_depth_parameter=True,
@@ -89,6 +90,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),
                 CollectionReaderAnnotator(descriptor=cv_config),
                 ObjectHypothesisVisualizer(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

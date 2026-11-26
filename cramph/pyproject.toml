@@ -22,7 +22,12 @@ dependencies = [
     "matplotlib>=3.6.2",
     "pydot",
     "typing_extensions",
-    "krrood>=26.10.0",
+    "krrood-core>=26.10.0",
+    "krrood-eql>=26.10.0",
+    "krrood-ormatic>=26.10.0",
+    "krrood-rustworkx-utils>=26.10.0",
+    "krrood-serialization>=26.10.0",
+    "krrood-symbolic-math>=26.10.0",
     "semantic_digital_twin>=26.10.0",
 ]
 license = "LGPL-3.0-only"

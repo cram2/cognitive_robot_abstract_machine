@@ -28,9 +28,10 @@ from experiments.probabilistic_circuit_experiments.gaussian_mixture_benchmark im
 from experiments.probabilistic_model_experiments.layered_circuit_speed import (
     TimedCall,
 )
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationLearning,
+    MaximizationRegularization,
 )
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     factorized_gaussian_mixture,
@@ -188,7 +189,9 @@ class ExpectationMaximizationSpeedComparison:
             ),
             iterations=self.iterations,
             expectation_maximization=ExpectationMaximization(
-                minimum_gaussian_variance=self.minimum_gaussian_variance
+                regularization=MaximizationRegularization(
+                    minimum_gaussian_variance=self.minimum_gaussian_variance
+                )
             ),
         )
         scikit_learn_mixture = GaussianMixture(
@@ -217,7 +220,7 @@ class ExpectationMaximizationSpeedComparison:
             expectation_maximization_duration=expectation_maximization_call.duration,
             scikit_learn_duration=scikit_learn_call.duration,
             expectation_maximization_average_log_likelihood=float(
-                np.mean(circuit.log_likelihood(circuit_data.to_numpy()))
+                np.mean(circuit.log_likelihood(events=circuit_data.to_numpy()))
             ),
             scikit_learn_average_log_likelihood=float(
                 scikit_learn_mixture.score(data.to_numpy())

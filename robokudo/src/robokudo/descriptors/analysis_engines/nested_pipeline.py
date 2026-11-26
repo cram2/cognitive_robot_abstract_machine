@@ -32,6 +32,7 @@ from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
 from robokudo.annotators.testing import SlowAnnotator
 from robokudo.gui import SetPipelineRedraw
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -80,7 +81,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with nested belief state processing
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         second_seq = Sequence(name="Belief State Pipeline", memory=True)
         second_seq.add_children(
@@ -116,5 +119,6 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         seq.add_child(SetPipelineRedraw())
         seq.add_child(condition)
+        seq.add_child(WorldUpdatingAnnotator())
 
         return seq

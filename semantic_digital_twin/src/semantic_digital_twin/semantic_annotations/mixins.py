@@ -35,7 +35,7 @@ from random_events.set import Set as EventSet
 from random_events.variable import Symbolic
 
 from semantic_digital_twin.specifications.connections import (
-    ActiveConnection1DOFSpecification,
+    ScrewAxisConnectionSpecification,
     ConnectionSpecification,
 )
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
@@ -79,6 +79,7 @@ from krrood_spatial_math.spatial_types import Pose, RotationMatrix
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
     ActiveConnection1DOF,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -777,8 +778,8 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         """
 
     def mount_on_movable_joint(
-        self, connection_specification: ActiveConnection1DOFSpecification
-    ) -> ActiveConnection1DOF:
+        self, connection_specification: ScrewAxisConnectionSpecification
+    ) -> ScrewAxisConnection:
         """
         Replace the connection the root hangs from with one built from
         ``connection_specification``, placed where
@@ -792,7 +793,7 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         placed_specification = dataclasses.replace(
             connection_specification,
             connection_T_child=self.calculate_self_T_movable_joint(
-                connection_specification.axis
+                connection_specification.screw_axis.unit_direction
             ).inverse(),
         )
         return placed_specification.reconnect(self._world, self.root)
@@ -1195,7 +1196,9 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
             return []
 
         samples = surface_circuit.sample(amount)
-        samples = samples[np.argsort(surface_circuit.log_likelihood(samples))[::-1]]
+        samples = samples[
+            np.argsort(surface_circuit.log_likelihood(events=samples))[::-1]
+        ]
         samples = np.concatenate((samples, z_coordinate), axis=1)
 
         if category_of_interest:

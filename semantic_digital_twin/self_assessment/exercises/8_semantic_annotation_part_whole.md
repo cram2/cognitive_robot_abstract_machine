@@ -30,13 +30,12 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
+from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.semantic_annotations.mixins import HasHandle, HasRootBody
 from semantic_digital_twin.semantic_annotations.part_whole import IsPartWholeRelationship
-from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-)
+from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Dresser, Handle
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
@@ -51,7 +50,7 @@ Your goal:
 - Inside one `with world.modify_world():` block, use `create_with_new_body_in_world` to create
   a `Dresser` named `dresser` (scale `Scale(0.31, 0.31, 0.21)`), a `Drawer` named `drawer`
   (scale `Scale(0.3, 0.3, 0.2)`) that slides on
-  `PrismaticConnectionSpecification(axis=Vector3.X())`, and a `Handle` named `drawer_handle`
+  `ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()))`, and a `Handle` named `drawer_handle`
 - Wire them together with `add`: the handle onto the drawer, the drawer onto the dresser
 - Store the annotations in variables named `dresser`, `drawer`, and `handle`
 
@@ -61,7 +60,7 @@ Your goal:
 # world = World.create_with_root_body()
 # with world.modify_world():
 #     dresser = Dresser.create_with_new_body_in_world(name="dresser", scale=Scale(0.31, 0.31, 0.21), world=world)
-#     drawer = ...  # pass parent_connection_specification=PrismaticConnectionSpecification(axis=Vector3.X())
+#     drawer = ...  # pass parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()))
 #     handle = ...
 #     drawer.add(...)
 #     dresser.add(...)
@@ -78,7 +77,7 @@ with world.modify_world():
         name="drawer",
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
-        parent_connection_specification=PrismaticConnectionSpecification(axis=Vector3.X()),
+        parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X())),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
@@ -94,7 +93,7 @@ with world.modify_world():
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 if drawer.handle is not handle: raise ExerciseVerificationFailed("The handle should be routed to drawer.handle.")
-if not isinstance(drawer.movable_joint, PrismaticConnection): raise ExerciseVerificationFailed("The drawer should slide on a prismatic connection.")
+if not (isinstance(drawer.movable_joint, ScrewAxisConnection) and drawer.movable_joint.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("The drawer should slide on a prismatic connection.")
 if drawer.movable_joint.parent is not dresser.root: raise ExerciseVerificationFailed("The drawer should keep sliding once it is part of the dresser.")
 if drawer not in dresser.drawers: raise ExerciseVerificationFailed("The drawer should be appended to dresser.drawers.")
 if handle.root.parent_connection.parent is not drawer.root: raise ExerciseVerificationFailed("The handle should be a kinematic child of the drawer.")

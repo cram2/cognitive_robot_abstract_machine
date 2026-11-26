@@ -10,7 +10,7 @@ import inspect
 import numpy as np
 import pytest
 
-from krrood.entity_query_language.orm.model import (
+from krrood.ormatic.data_access_objects.symbol_graph_mappings import (
     SymbolGraphMapping,
     WrappedInstanceMapping,
 )

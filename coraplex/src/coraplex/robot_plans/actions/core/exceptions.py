@@ -1,3 +1,7 @@
+"""
+The exceptions raised by the core actions.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,7 +17,7 @@ if TYPE_CHECKING:
 # %% detecting
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DetectionTargetMissing(DataclassException):
     """
     Raised when a detection is given neither the type of object to look for nor the box
@@ -35,7 +39,7 @@ class DetectionTargetMissing(DataclassException):
 # %% sending the fingers to a width
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WidthBeyondGripperOpening(DataclassException):
     """
     Raised when the fingers of a gripper are sent to a width wider than the gripper

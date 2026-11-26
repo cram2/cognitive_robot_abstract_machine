@@ -14,6 +14,7 @@ import pytest
 from cramph.context import StatechartContext
 from coraplex.plans.executors import PlanExecutor, KinematicallySimulatedPlanExecutor
 from coraplex.plans.failures import MotionMadeNoProgress
+from giskardpy.motion_statechart.exceptions import PositionLimitBlockedError
 from coraplex.robot_plans.actions.core.container import CloseAction
 from coraplex.robot_plans.actions.core.misc import MoveToReach
 from coraplex.robot_plans.actions.core.navigation import (
@@ -131,7 +132,7 @@ def prepared(
 
     :return: The plan, rewritten.
     """
-    executor.prepare(statechart_of(executor, plan))
+    executor.prepare(statechart=statechart_of(executor, plan))
     return plan
 
 
@@ -826,8 +827,8 @@ def test_a_simulated_stretch_facing_away_fails_to_reach_rather_than_turning(
     Turning to bring a target into reach sweeps the base through wide arcs, so a Stretch
     whose arm points away from the milk fails to reach it instead.
 
-    Straining towards the milk bends the held heading by less than a degree, far from
-    the turn reaching it would take.
+    Straining towards the milk bends the heading by under a degree and drives the
+    retracted arm into its position limits.
     """
     world, robot, extensions = stretch_apartment_context
     executor, action, recording = stretch_reaching_milk_from(
@@ -837,9 +838,10 @@ def test_a_simulated_stretch_facing_away_fails_to_reach_rather_than_turning(
         Pose.from_xyz_rpy(0.4, -2.3, 0, reference_frame=world.root),
     )
 
-    with pytest.raises(MotionMadeNoProgress):
+    with pytest.raises(MotionMadeNoProgress) as failure:
         executor.execute()
 
+    assert isinstance(failure.value.no_progress, PositionLimitBlockedError)
     assert_kept_its_heading(recording, tolerance=np.deg2rad(2))
 
 

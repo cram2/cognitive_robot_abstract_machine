@@ -8,7 +8,6 @@ the tests themselves only check that every pose goal is reached.
 
 from __future__ import annotations
 
-from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -362,23 +361,6 @@ def assert_every_goal_reached(runs: list[BalanceRun]):
 
 # %% robots
 
-TRACY_ARM_POSE = {
-    TracyJoint.RIGHT_SHOULDER_PAN: 0.0,
-    TracyJoint.RIGHT_SHOULDER_LIFT: -np.pi / 2,
-    TracyJoint.RIGHT_ELBOW: np.pi / 2,
-    TracyJoint.RIGHT_WRIST_1: -np.pi / 2,
-    TracyJoint.RIGHT_WRIST_2: -np.pi / 2,
-    TracyJoint.RIGHT_WRIST_3: 0.0,
-}
-"""
-An elbow-up pose of Tracy's right arm, away from its singularities.
-"""
-
-
-@pytest.fixture()
-def tracy_world_copy(tracy_world: World) -> World:
-    return deepcopy(tracy_world)
-
 
 def test_pr2_translation_rotation_balance(
     pr2_world_state_reset: World, better_pr2_pose
@@ -394,9 +376,14 @@ def test_pr2_translation_rotation_balance(
     assert_every_goal_reached(runs)
 
 
-def test_tracy_translation_rotation_balance(tracy_world_copy: World):
+def test_tracy_translation_rotation_balance(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    Tracy's right arm, starting elbow-up, reaches every offset pose goal.
+    """
     world = tracy_world_copy
-    JointState.from_str_dict(TRACY_ARM_POSE, world=world).apply_to(world)
+    JointState.from_str_dict(tracy_arm_pose, world=world).apply_to(world)
     tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
 
     runs = run_every_pose_offset(world, world.root, tip)

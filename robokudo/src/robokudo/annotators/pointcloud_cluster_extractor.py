@@ -50,6 +50,8 @@ if TYPE_CHECKING:
 
     from robokudo.types.cv import ColorToDepthRatio
 
+logger = logging.getLogger(__name__)
+
 DILATION_KERNEL = np.ones((3, 3), np.uint8)
 
 
@@ -86,7 +88,9 @@ def generate_roi_with_mask_from_points(
     x = (uvd[:, 0] / uvd[:, 2]).astype(int)
     y = (uvd[:, 1] / uvd[:, 2]).astype(int)
 
-    x_scaled, y_scaled = color_to_depth_ratio.color_pixels(np.stack((x, y), axis=1)).T
+    x_scaled, y_scaled = color_to_depth_ratio.color_pixels(
+        depth_pixels=np.stack((x, y), axis=1)
+    ).T
 
     full_mask = np.zeros((image_height, image_width), np.uint8)
     full_mask[y_scaled, x_scaled] = 255
@@ -109,7 +113,6 @@ def cluster_points(
     input_cloud: open3d.geometry.PointCloud,
     eps: float,
     min_points: int,
-    rk_logger: logging.Logger,
 ) -> list[int]:
     """
     Cluster points using DBSCAN algorithm.
@@ -117,14 +120,13 @@ def cluster_points(
     :param input_cloud: Point cloud to cluster
     :param eps: DBSCAN epsilon parameter (density threshold)
     :param min_points: Minimum points for a cluster
-    :param rk_logger: Logger instance for progress reporting
     :return: List of point indices for each cluster
 
     .. note::
        Points labeled as noise (label=-1) are ignored in the output.
     """
     # Only print progress of DBSCAN when in logging level DEBUG
-    if rk_logger.getEffectiveLevel() < logging.getLevelNamesMapping()["DEBUG"]:
+    if logger.getEffectiveLevel() < logging.getLevelNamesMapping()["DEBUG"]:
         print_progress = True
     else:
         print_progress = False
@@ -135,7 +137,7 @@ def cluster_points(
     )
 
     max_label = labels.max()
-    rk_logger.debug(f"point cloud has {max_label + 1} clusters")
+    logger.debug(f"point cloud has {max_label + 1} clusters")
     all_cluster_indices = []
     # DBScan returns label==-1 for all points that appear to be noise
     # This will be ignored
@@ -208,6 +210,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
 
     def points_and_indices_from_plane(
         self,
+        *,
         plane_model: Plane,
         cloud: open3d.geometry.PointCloud,
     ) -> tuple[
@@ -329,15 +332,15 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         :raises PointCloudTooSmallForClustering: If insufficient points are found above the plane
         """
         start_timer = default_timer()
-        self.rk_logger.info("PCE Start")
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        logger.info("Point cloud cluster extraction start")
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         color_to_depth_ratio = self.get_cas().color_to_depth_ratio
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
 
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         height, width, d = color.shape
         vis_mask = np.zeros((height, width), np.uint8)
-        plane_models = self.get_cas().filter_annotations_by_type(Plane)
+        plane_models = self.get_cas().filter_annotations_by_type(type_to_include=Plane)
         if plane_models is None or plane_models == []:
             self.feedback_message = "No plane model in CAS. Aborting."
             raise PlaneModelMissing(context="point cloud clustering")
@@ -358,7 +361,6 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             input_cloud=on_plane_cloud,
             eps=self.descriptor.parameters.eps,
             min_points=self.descriptor.parameters.dbscan_min_cluster_count,
-            rk_logger=self.rk_logger,
         )
 
         cmap = plt.get_cmap("tab20")
@@ -368,7 +370,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
         cluster_idx = 0
         for cluster_indices in all_cluster_indices:
             if len(cluster_indices) < self.descriptor.parameters.min_cluster_count:
-                self.rk_logger.debug(
+                logger.debug(
                     f"Skipping cluster {cluster_idx} with {len(cluster_indices)} points"
                 )
                 continue
@@ -393,7 +395,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             )  # limit to 0-19 range due to map size
             all_vis_clouds.append(clusters[cluster_idx]["vis_cloud"])
 
-            self.rk_logger.debug(
+            logger.debug(
                 f"Extracted cluster {cluster_idx} with {len(cluster_cloud.points)} points"
             )
 
@@ -421,7 +423,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             cluster_idx += 1
 
         if len(object_hypotheses) == 0:
-            self.rk_logger.warning("No Clusters have been found.")
+            logger.warning("No Clusters have been found.")
             end_timer = default_timer()
             self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
             return Status.FAILURE
@@ -442,7 +444,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             {"name": "Cloud", "geometry": cloud},
         ]
 
-        self.get_annotator_output_struct().set_geometries(x)
+        self.get_annotator_output_struct().set_geometries(geometries=x)
 
         vis_mask = cv2.dilate(vis_mask, DILATION_KERNEL, iterations=1)
         # make mask a 3 channel mask in order to make it work with addWeighted
@@ -458,11 +460,11 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
             ),
         )
 
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
-        self.rk_logger.info("PCE Done")
+        logger.info("Point cloud cluster extraction done")
         return Status.SUCCESS
 
 
@@ -538,11 +540,11 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         :raises EmptyPointCloud: If the input cloud is empty
         """
         start_timer = default_timer()
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         color_to_depth_ratio = self.get_cas().color_to_depth_ratio
         pointcloud_camera_model = self.get_cas().pointcloud_camera_model
 
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         height, width, d = color.shape
         vis_mask = np.zeros((height, width), np.uint8)
 
@@ -555,7 +557,6 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             input_cloud=cloud,
             eps=self.descriptor.parameters.eps,
             min_points=self.descriptor.parameters.dbscan_min_cluster_count,
-            rk_logger=self.rk_logger,
         )
 
         cmap = plt.get_cmap("tab20")
@@ -565,7 +566,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
         cluster_idx = 0
         for cluster_indices in all_cluster_indices:
             if len(cluster_indices) < self.descriptor.parameters.min_cluster_count:
-                self.rk_logger.debug(
+                logger.debug(
                     f"Skipping cluster {cluster_idx} with {len(cluster_indices)} points"
                 )
                 continue
@@ -582,7 +583,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             )  # limit to 0-19 range due to map size
             all_vis_clouds.append(clusters[cluster_idx]["vis_cloud"])
 
-            self.rk_logger.debug(
+            logger.debug(
                 f"Extracted cluster {cluster_idx} with {len(cluster_cloud.points)} points"
             )
 
@@ -610,7 +611,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             cluster_idx += 1
 
         if len(object_hypotheses) == 0:
-            self.rk_logger.warning("No Clusters have been found.")
+            logger.warning("No Clusters have been found.")
             end_timer = default_timer()
             self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
             return Status.FAILURE
@@ -623,7 +624,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             {"name": "Visualization cloud PCE", "geometry": visualization_cloud},
         ]
 
-        self.get_annotator_output_struct().set_geometries(x)
+        self.get_annotator_output_struct().set_geometries(geometries=x)
 
         vis_mask = cv2.dilate(vis_mask, DILATION_KERNEL, iterations=1)
         # make mask a 3-channel mask in order to make it work with addWeighted
@@ -639,9 +640,9 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
             ),
         )
 
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"
-        self.rk_logger.info("PCE Stop")
+        logger.info("Point cloud cluster extraction stop")
         return Status.SUCCESS

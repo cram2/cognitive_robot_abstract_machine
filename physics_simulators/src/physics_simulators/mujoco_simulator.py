@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+A simulator that runs a MuJoCo model and serves its bodies, joints, actuators and cameras.
+"""
+
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, InitVar
@@ -593,7 +597,10 @@ class MujocoSimulator(BaseSimulator):
         result = [
             self._mj_model.joint(joint_id).name
             for joint_id in range(self._mj_model.njnt)
-            if self._mj_model.joint(joint_id).type in joint_types
+            if any(
+                self._mj_model.jnt_type[joint_id] == joint_type
+                for joint_type in joint_types
+            )
         ]
         return SimulatorCallbackResult(
             type=SimulatorCallbackResult.ResultType.SUCCESS_WITHOUT_EXECUTION,
@@ -625,7 +632,10 @@ class MujocoSimulator(BaseSimulator):
                 type=SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION,
                 info=f"Joint {joint_name} not found",
             )
-        if self._mj_model.joint(joint_id).type not in joint_types:
+        if not any(
+            self._mj_model.jnt_type[joint_id] == joint_type
+            for joint_type in joint_types
+        ):
             return SimulatorCallbackResult(
                 type=SimulatorCallbackResult.ResultType.FAILURE_WITHOUT_EXECUTION,
                 info=f"Joint {joint_name} does not have allowed joint types {joint_types}",

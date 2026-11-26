@@ -22,14 +22,18 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
 )
 from probabilistic_model.exceptions import NonContinuousVariableError
-from probabilistic_model.learning.gaussian_mixture.covariance_type import (
+from probabilistic_model.learning.structure.gaussian_mixture.covariance_type import (
     CovarianceType,
 )
-from probabilistic_model.learning.gaussian_mixture.gaussian_mixture_model import (
+from probabilistic_model.learning.structure.gaussian_mixture.gaussian_mixture_model import (
     GaussianMixtureModel,
 )
-from probabilistic_model.learning.gaussian_mixture.step_mix_model import StepMixModel
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.gaussian_mixture.step_mix_model import (
+    StepMixModel,
+)
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     MultivariateLeaf,
@@ -68,6 +72,10 @@ def _circuit_columns(circuit, data: pd.DataFrame) -> np.ndarray:
 def test_the_circuit_has_the_density_of_the_fitted_mixture(
     two_clusters, covariance_type
 ):
+    """
+    The circuit of a fitted Gaussian mixture has the density of the mixture, for every
+    type of covariance.
+    """
     method = GaussianMixtureModel(
         GaussianMixture(n_components=2, covariance_type=covariance_type, random_state=0)
     )
@@ -75,7 +83,7 @@ def test_the_circuit_has_the_density_of_the_fitted_mixture(
     circuit = method.fit(two_clusters)
 
     assert circuit.log_likelihood(
-        _circuit_columns(circuit, two_clusters)
+        events=_circuit_columns(circuit, two_clusters)
     ) == pytest.approx(method.model.score_samples(two_clusters.to_numpy()))
 
 
@@ -160,6 +168,10 @@ def test_only_the_given_variables_are_fitted(two_clusters):
 
 
 def test_a_mixture_fitted_outside_is_converted(two_clusters):
+    """
+    A Gaussian mixture fitted outside of a learning method converts into a circuit with
+    its density.
+    """
     mixture = GaussianMixture(n_components=2, random_state=0).fit(
         two_clusters.to_numpy()
     )
@@ -168,7 +180,7 @@ def test_a_mixture_fitted_outside_is_converted(two_clusters):
     circuit = GaussianMixtureModel(mixture).to_probabilistic_circuit(variables)
 
     assert circuit.log_likelihood(
-        _circuit_columns(circuit, two_clusters)
+        events=_circuit_columns(circuit, two_clusters)
     ) == pytest.approx(mixture.score_samples(two_clusters.to_numpy()))
 
 
@@ -191,14 +203,17 @@ def test_each_fit_is_a_circuit_of_its_own(two_clusters):
     ids=["scikit-learn", "StepMix"],
 )
 def test_refitting_leaves_an_earlier_circuit_unchanged(two_clusters, method):
+    """
+    Fitting a learning method again leaves the circuit it fitted earlier unchanged.
+    """
     first = method.fit(two_clusters)
-    before = first.log_likelihood(_circuit_columns(first, two_clusters))
+    before = first.log_likelihood(events=_circuit_columns(first, two_clusters))
 
     method.fit(two_clusters.iloc[:200] * 3.0)
 
-    assert first.log_likelihood(_circuit_columns(first, two_clusters)) == pytest.approx(
-        before
-    )
+    assert first.log_likelihood(
+        events=_circuit_columns(first, two_clusters)
+    ) == pytest.approx(before)
 
 
 @pytest.fixture
@@ -249,16 +264,23 @@ def test_scikit_learn_rejects_discrete_variables(labelled_clusters):
 
 
 def test_stepmix_fits_continuous_data_with_the_density_of_its_mixture(two_clusters):
+    """
+    Fitted to continuous data, the StepMix circuit has the density of its mixture.
+    """
     method = _two_component_stepmix()
 
     circuit = method.fit(two_clusters)
 
     assert circuit.log_likelihood(
-        _circuit_columns(circuit, two_clusters)
+        events=_circuit_columns(circuit, two_clusters)
     ).mean() == pytest.approx(method.model.score(two_clusters.to_numpy()))
 
 
 def test_the_circuit_has_the_density_of_the_fitted_mixed_mixture(labelled_clusters):
+    """
+    Fitted to continuous and symbolic data, the StepMix circuit has the density of its
+    mixture.
+    """
     method = _two_component_stepmix()
     circuit = method.fit(labelled_clusters)
     cluster = _variable(circuit, "cluster")
@@ -272,7 +294,7 @@ def test_the_circuit_has_the_density_of_the_fitted_mixed_mixture(labelled_cluste
     )
 
     log_likelihood = circuit.log_likelihood(
-        _circuit_columns(circuit, labelled_clusters)
+        events=_circuit_columns(circuit, labelled_clusters)
     )
 
     assert log_likelihood.mean() == pytest.approx(method.model.score(stepmix_data))

@@ -37,6 +37,7 @@ from robokudo.annotators.static_object_detector import StaticObjectDetectorAnnot
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -84,7 +85,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for object detection and visualization
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
 
@@ -115,6 +118,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ObjectHypothesisVisualizer(),
                 WorldVisualizer(),
                 ClusterColorAnnotator(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

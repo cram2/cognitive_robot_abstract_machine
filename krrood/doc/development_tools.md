@@ -229,7 +229,7 @@ module they come from. Find the member by the rule's text and change it there.
 - A repository's own rule is in its `agent_rules.py`, or in a module of its
   `agent_rules` package.
 - A shared rule lives in the module for its top-level section in
-  `krrood/development_tools/agents/shipped_rules/` (in `krrood/src` of
+  `krrood/development_tools/agents/shipped_rules/` (in `krrood/krrood-development-tools/src` of
   cognitive_robot_abstract_machine).
 - A section is named for its topic, broadly enough that later rules on that topic fit
   in it (`SerializationRules`, not `JSONSerializationRules`). Each topic is one section, so

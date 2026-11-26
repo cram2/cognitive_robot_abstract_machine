@@ -1,5 +1,10 @@
+"""
+Tests of the JSON serialization of world entities, their references and shapes.
+"""
+
+from __future__ import annotations
+
 import json
-import os
 from copy import deepcopy
 
 import numpy as np
@@ -35,8 +40,7 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    ScrewConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -368,12 +372,13 @@ def test_screw_connection_json_serialization_with_world():
     with world.modify_world():
         world.add_kinematic_structure_entity(body)
         world.add_kinematic_structure_entity(body2)
-        connection = ScrewConnection.create_with_dofs(
+        connection = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=body,
             child=body2,
-            axis=Vector3.Z(),
-            screw_pitch=screw_pitch,
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=screw_pitch
+            ),
             multiplier=2.0,
             offset=0.1,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -383,34 +388,26 @@ def test_screw_connection_json_serialization_with_world():
         world.add_connection(connection)
     json_data = connection.to_json()
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
-    restored_connection = ScrewConnection.from_json(
+    restored_connection = ScrewAxisConnection.from_json(
         data=json_data, **tracker.create_kwargs()
     )
     assert connection == restored_connection
-    assert restored_connection.screw_pitch == screw_pitch
+    assert np.allclose(
+        restored_connection.screw_axis.translation_per_unit_position,
+        restored_connection.screw_axis.rotation_per_unit_position
+        * (screw_pitch / (2 * np.pi)),
+    )
     assert restored_connection.multiplier == connection.multiplier
     assert restored_connection.offset == connection.offset
-    assert np.allclose(restored_connection.axis.to_np(), connection.axis.to_np())
+    assert np.allclose(restored_connection.screw_axis, connection.screw_axis)
     assert restored_connection.raw_dof.id == connection.raw_dof.id
 
 
 def test_json_serialization_with_mesh():
-    body: Body = (
-        STLParser(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "..",
-                "semantic_digital_twin",
-                "resources",
-                "stl",
-                "milk.stl",
-            )
-        )
-        .create_world()
-        .root
-    )
+    """
+    A body with a mesh keeps its geometry through a JSON round-trip.
+    """
+    body: Body = STLParser("package://iai_objects/objects/milk.stl").create_world().root
 
     json_data = to_json(body)
     body2 = from_json(json_data)
@@ -430,7 +427,7 @@ def test_json_serialization_with_mesh():
 
 
 def _world_with_two_equally_named_connections() -> tuple[
-    World, RevoluteConnection, RevoluteConnection
+    World, ScrewAxisConnection, ScrewAxisConnection
 ]:
     """
     A world holding two revolute connections that share one name.
@@ -443,11 +440,13 @@ def _world_with_two_equally_named_connections() -> tuple[
     for index in range(2):
         with world.modify_world():
             child = Body(name=PrefixedName("link", prefix=f"branch_{index}"))
-            connection = RevoluteConnection.create_with_dofs(
+            connection = ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=world.root,
                 child=child,
-                axis=Vector3.Z(),
                 name=PrefixedName("shared_joint"),
             )
             world.add_connection(connection)

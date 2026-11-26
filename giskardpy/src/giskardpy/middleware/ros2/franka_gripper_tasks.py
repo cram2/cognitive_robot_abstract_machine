@@ -22,7 +22,6 @@ from giskardpy.motion_statechart.ros2_nodes.action_servers import (
     ActionResult,
     ActionServerTask,
 )
-from krrood.patterns.called_positionally import called_positionally
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +37,11 @@ class FrankaGripperTask(
     ``error``.
     """
 
-    @called_positionally
-    def result_callback(self, future: Future) -> None:
+    def result_callback(self, *, future: Future) -> None:
+        """
+        Differs from :meth:`ActionServerTask.result_callback` in logging the error a
+        failed gripper action reports.
+        """
         super().result_callback(future=future)
         if not self._result.result.success:
             logger.error(

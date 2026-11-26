@@ -19,18 +19,25 @@ from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
 )
-from probabilistic_model.learning.exceptions import (
-    StartingCircuitVariablesMismatchError,
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
     UnsupportedLeafDistributionError,
 )
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    StartingCircuitVariablesMismatchError,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationLearning,
     ExpectationMaximizationTraining,
     LearnableUnits,
 )
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.training_schedule import Convergence, MiniBatches
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.parameters.training_schedule import (
+    Convergence,
+    MiniBatches,
+)
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     factorized_gaussian_mixture,
     fully_factorized,
@@ -265,6 +272,10 @@ def test_fit_rejects_variables_other_than_those_of_starting_circuit():
 def test_fit_matches_diagonal_gaussian_mixture_of_scikit_learn(
     iris, iris_starting_circuit
 ):
+    """
+    Expectation maximization of a mixture of products of Gaussians reaches the means of
+    scikit-learn's diagonal Gaussian mixture from the same start.
+    """
     iterations = 10
     means = _iris_starting_means(iris)
     component_count = len(means)
@@ -284,7 +295,7 @@ def test_fit_matches_diagonal_gaussian_mixture_of_scikit_learn(
     ).fit(iris)
 
     data = iris[[variable.name for variable in circuit.variables]]
-    assert circuit.log_likelihood(data.to_numpy()).mean() == pytest.approx(
+    assert circuit.log_likelihood(events=data.to_numpy()).mean() == pytest.approx(
         scikit_learn_mixture.score(iris.to_numpy())
     )
 

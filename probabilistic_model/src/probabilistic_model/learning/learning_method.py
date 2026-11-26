@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import pandas as pd
 from typing_extensions import Iterable, Sequence
 
-from probabilistic_model.learning.jpt.variables import (
+from probabilistic_model.learning.structure.jpt.variables import (
     AnnotatedVariable,
     infer_variables_from_dataframe,
 )

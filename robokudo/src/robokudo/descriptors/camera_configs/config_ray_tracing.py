@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 # %% World sources
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class WorldDescriptorSource:
     """
     Load a standalone semantic world and camera from a world descriptor.
@@ -53,7 +53,7 @@ class WorldDescriptorSource:
     """
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class RuntimeRobotWorldSource:
     """
     Select a robot camera from RoboKudo's runtime semantic world.
@@ -72,7 +72,7 @@ class RuntimeRobotWorldSource:
 # %% Semantic Digital Twin ray-tracer configuration
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class RayTracingCameraConfiguration(BaseCameraConfig):
     """
     Configuration for a simulated RGB-D camera backed by SemDT's RayTracer.

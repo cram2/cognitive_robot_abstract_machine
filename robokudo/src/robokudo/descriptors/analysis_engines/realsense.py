@@ -1,3 +1,9 @@
+"""
+Analysis engine segmenting tabletop objects in RealSense camera data.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
 from robokudo.annotators.image_preprocessor import ImagePreprocessorAnnotator
@@ -9,9 +15,14 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segments the tabletop objects in RealSense camera data and puts them into the world.
+    """
+
     def name(self) -> str:
         return "realsense"
 
@@ -19,7 +30,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a basic pipeline that does tabletop segmentation.
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("realsense")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="realsense"
+        )
 
         seq = Pipeline("RealSensePipeline")
         seq.add_children(
@@ -31,6 +44,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointcloudCropAnnotator(),
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

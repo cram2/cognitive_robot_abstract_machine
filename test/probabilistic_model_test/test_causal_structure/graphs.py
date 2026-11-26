@@ -37,8 +37,8 @@ def graph_of(
         for name in names
     }
     return CausalGraph.from_edges(
-        node_of.values(),
-        [
+        nodes=node_of.values(),
+        edges=[
             GraphEdge.directed_edge(node_of[parent], node_of[child])
             for parent, child in directed
         ]

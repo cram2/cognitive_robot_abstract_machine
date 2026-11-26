@@ -1,0 +1,4 @@
+tests_directory = "test"
+
+[test_environments.missing]
+CHAIN_RENDERING = "offscreen"

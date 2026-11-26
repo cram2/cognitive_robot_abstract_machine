@@ -247,7 +247,7 @@ from probabilistic_model.causal_structure.domain_causal_knowledge import (
 from probabilistic_model.causal_structure.learning import (
     RelationalCausalStructureLearner,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
@@ -403,7 +403,7 @@ Here `SceneRoom` stands for the class the relational circuit models and `rooms` 
 training instances:
 
 ```python
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LayeredLearning
 from probabilistic_model.probabilistic_circuit.relational.part_learning_methods import (
     PartLearningMethods,
@@ -456,7 +456,7 @@ intervening on several of them together would.
 ### Selective backends and `EntityQueryLanguageGenerativeBackend`
 
 Neither has a notion of a causal graph. Rather than failing the whole query, they
-**warn** (via `krrood.logger`) and treat `cause` exactly like an ordinary
+**warn** (via the `krrood` logger) and treat `cause` exactly like an ordinary
 unspecified field (`...`) -- a selective backend naturally selects nothing (nothing
 equals `cause`'s wrapped `Ellipsis`), and the generative backend enumerates it if the
 field is an enum, or raises the same

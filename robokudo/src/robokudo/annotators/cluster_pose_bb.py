@@ -20,6 +20,7 @@ The module uses:
 
 from __future__ import annotations
 
+import logging
 import copy
 import math
 from timeit import default_timer
@@ -46,6 +47,8 @@ from robokudo.utils.transform import (
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ClusterPoseBBAnnotator(BaseAnnotator):
@@ -96,10 +99,10 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
     def adjust_bb_orientation_by_bb_size(
-        self, pose_orientation: npt.NDArray, bounding_box_extents: list
+        self, *, pose_orientation: npt.NDArray, bounding_box_extents: list
     ) -> tuple[npt.NDArray, list]:
         """Align bounding box axes with extent dimensions.
 
@@ -152,11 +155,13 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         geometries_to_visualize = []
 
         # Iterate over everything that is an Object hypothesis and calculate the centroid
-        object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+        object_hypotheses = self.get_cas().filter_annotations_by_type(
+            type_to_include=ObjectHypothesis
+        )
         for object_hypothesis in object_hypotheses:
             if (
                 object_hypothesis.points is None
@@ -173,8 +178,8 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
                     self.get_cas(), cluster_cloud, transform_inplace=True
                 )
             except Exception as e:
-                self.rk_logger.warning(
-                    f"Couldn't find camera viewpoint in the CAS.Fail. Error: {e}"
+                logger.warning(
+                    f"Couldn't find camera viewpoint in the common analysis structure. Error: {e}"
                 )
                 return Status.FAILURE
 
@@ -292,7 +297,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
         ]
         vis_geometries.extend(geometries_to_visualize)
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

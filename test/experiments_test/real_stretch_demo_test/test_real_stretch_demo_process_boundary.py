@@ -83,8 +83,8 @@ def test_the_scene_counts_as_populated_once_the_cereal_is_spawned(apartment_mesh
     """
     demonstration = StretchApartmentDemonstration(used_robot=Stretch)
     world = demonstration.scene_specification().create_world()
-    assert not demonstration.is_scene_populated(world)
+    assert not demonstration.is_scene_populated(world=world)
 
-    demonstration.populate_scene(world)
+    demonstration.populate_scene(world=world)
 
-    assert demonstration.is_scene_populated(world)
+    assert demonstration.is_scene_populated(world=world)

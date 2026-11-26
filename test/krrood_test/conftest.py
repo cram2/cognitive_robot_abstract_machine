@@ -13,7 +13,7 @@ from dataclasses import is_dataclass
 import pytest
 from sqlalchemy.orm import configure_mappers, sessionmaker
 
-import krrood.entity_query_language.orm.model
+import krrood.ormatic.data_access_objects.symbol_graph_mappings
 import krrood.symbol_graph.symbol_graph
 from krrood.class_diagrams.class_diagram import ClassDiagram
 from krrood.entity_query_language.predicate import (
@@ -43,7 +43,15 @@ from .dataset import (
     classes_with_generic,
     identity_hashed_values_created_on_access,
     interface_typed_fields,
+    multiple_inheritance,
     single_value_classes,
+)
+from .dataset.throwing_trials import (
+    Court,
+    ReleasePoint,
+    Throw,
+    ThrowMeasurements,
+    ThrowParameters,
 )
 from .dataset.example_classes import (
     KRROODPhysicalObject,
@@ -99,7 +107,9 @@ def generate_sqlalchemy_interface():
     all_classes |= set(classes_of_module(single_value_classes))
     all_classes |= set(classes_of_module(identity_hashed_values_created_on_access))
     all_classes |= set(classes_of_module(interface_typed_fields))
+    all_classes |= set(classes_of_module(multiple_inheritance))
     all_classes |= {Symbol, Role}
+    all_classes |= {Court, ReleasePoint, Throw, ThrowMeasurements, ThrowParameters}
 
     # remove classes that don't need persistence
     all_classes -= {HasType, HasTypes, ContainsType}

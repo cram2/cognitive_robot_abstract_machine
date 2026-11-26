@@ -5,6 +5,7 @@ Acquire sensor data from one camera interface and initialize the pipeline data s
 from __future__ import annotations
 
 # %% Imports
+import logging
 from timeit import default_timer
 from py_trees.common import Status
 from py_trees.composites import Sequence
@@ -13,10 +14,13 @@ from typing_extensions import TYPE_CHECKING
 
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.annotators.exceptions import InvalidCollectionReaderParent
+from robokudo.cas import CAS
 
 if TYPE_CHECKING:
     from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
     from robokudo.io.camera_interface import CameraInterface
+
+logger = logging.getLogger(__name__)
 
 
 class CollectionReaderAnnotator(BaseAnnotator):
@@ -95,8 +99,7 @@ class CollectionReaderAnnotator(BaseAnnotator):
 
     def update(self) -> Status:
         """
-        Main method that acquires sensor data and places it into the central pipeline data structures.
-
+        Publish a fresh CAS only after a camera acquisition succeeds.
         Return failure when available data has no owning pipeline.
         """
         if self.start_timer is None:
@@ -110,36 +113,38 @@ class CollectionReaderAnnotator(BaseAnnotator):
                 self.iterations_since_last_data
                 >= self.iterations_since_last_data_warn_threshold
             ):
-                self.rk_logger.warning(
+                logger.warning(
                     "Didn't receive sensor data since %s iterations.",
                     self.iterations_since_last_data,
                 )
-                self.rk_logger.warning("Camera data available?: %s", False)
+                logger.warning("Camera data available?: %s", False)
                 self.iterations_since_last_data = 0
             return Status.RUNNING
 
-        self.iterations_since_last_data = 0
-        time_difference = default_timer() - self.start_timer
-        self.start_timer = None
         pipeline = self.get_parent_pipeline()
         if pipeline is None:
             self.feedback_message = "Pipeline is not set!"
             return Status.FAILURE
 
-        query = pipeline.cas.query
-        pipeline.create_new_cas()
-        if query is not None:
-            pipeline.cas.query = query
-        camera_interface.set_data(pipeline.cas)
+        acquired_cas = CAS()
+        if pipeline.cas.query is not None:
+            acquired_cas.query = pipeline.cas.query
+        if camera_interface.set_data(cas=acquired_cas, world=pipeline.world) is False:
+            self.feedback_message = "Waiting for a valid sensor acquisition ..."
+            return Status.RUNNING
 
+        pipeline.create_new_cas(acquired_cas=acquired_cas)
+        self.iterations_since_last_data = 0
+        time_difference = default_timer() - self.start_timer
+        self.start_timer = None
         self.feedback_message = (
             f"Got sensor data... Waited for {time_difference} seconds"
         )
-        self.rk_logger.debug(
-            "New CAS id=%s after waiting %f seconds",
+        logger.debug(
+            "New common analysis structure identifier=%s after waiting %f seconds",
             pipeline.cas.cas_id,
             time_difference,
         )
         if self.parent is not None:
-            self.rk_logger.info("Current Behavior Tree:\n%s", unicode_tree(self.parent))
+            logger.info("Current Behavior Tree:\n%s", unicode_tree(self.parent))
         return Status.SUCCESS

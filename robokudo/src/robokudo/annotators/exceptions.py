@@ -13,7 +13,7 @@ from robokudo.exceptions import RoboKudoError
 
 
 # %% Collection reader placement
-@dataclass
+@dataclass(kw_only=True)
 class InvalidCollectionReaderParent(RoboKudoError):
     """
     A collection reader has no parent sequence to initialize.
@@ -33,7 +33,7 @@ class InvalidCollectionReaderParent(RoboKudoError):
 
 
 # %% Analysis contracts
-@dataclass
+@dataclass(kw_only=True)
 class InvalidAnalysisData(RoboKudoError):
     """
     Analysis data does not satisfy its required type.
@@ -43,6 +43,7 @@ class InvalidAnalysisData(RoboKudoError):
     """
     Type required by the analysis operation.
     """
+
     actual_type: type
     """
     Type of the supplied data.
@@ -55,7 +56,7 @@ class InvalidAnalysisData(RoboKudoError):
         return "Provide analysis data of the required type."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyAnalysisScope(RoboKudoError, ValueError):
     """
     An analysis scope selects no data.
@@ -76,7 +77,7 @@ class EmptyAnalysisScope(RoboKudoError, ValueError):
 # %% model configuration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotAPoseModelException(RoboKudoError, ValueError):
     """
     Raised when an annotator that reads body keypoints loaded a model reporting none.
@@ -102,7 +103,7 @@ class NotAPoseModelException(RoboKudoError, ValueError):
 # %% object pose estimation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DuplicateObjectClassMesh(RoboKudoError, ValueError):
     """
     Raised when more than one mesh is configured for an object class.
@@ -120,7 +121,7 @@ class DuplicateObjectClassMesh(RoboKudoError, ValueError):
         return "Configure exactly one mesh per class name."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ImageResolutionMismatch(RoboKudoError, ValueError):
     """
     Raised when the color and the depth image of a frame differ in resolution.
@@ -144,3 +145,57 @@ class ImageResolutionMismatch(RoboKudoError, ValueError):
 
     def suggest_correction(self) -> str:
         return "Scale the color image to the resolution of the depth image."
+
+
+# %% World updating
+
+
+@dataclass(kw_only=True)
+class CameraPoseOutsideWorldError(RoboKudoError, LookupError):
+    """
+    Raised when the camera pose of a pass is measured against a body that is not part of
+    the world RoboKudo perceives into.
+    """
+
+    reference_frame_name: str
+    """
+    The name of the body the camera pose is measured against.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The camera pose of the pass is measured against '{self.reference_frame_name}', "
+            f"which is not a body of the world RoboKudo perceives into, so the objects "
+            f"of the pass cannot be placed in it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "let the pipeline perceive into the world of its RoboKudo, which "
+            "RoboKudo.start gives every pipeline of the analysis engine."
+        )
+
+
+@dataclass(kw_only=True)
+class QueryServerNotStarted(RoboKudoError, RuntimeError):
+    """
+    Raised when a query annotator is updated before its initialisation connected it to
+    the query action server.
+    """
+
+    annotator_name: str
+    """
+    The name of the annotator that was updated too early.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{self.annotator_name} was updated before it was connected to the query "
+            f"action server."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "set the annotator up or initialise it before ticking it, as a behaviour "
+            "tree does when it runs the annotator."
+        )

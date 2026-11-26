@@ -51,7 +51,7 @@ from ..plan_running import robot_extensions, run_plan
 # %% a kitchen with a bowl and a cup in a drawer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KitchenWithFilledDrawer:
     """
     A PR2 in the kitchen, whose closed drawer holds a bowl and a cup.
@@ -234,7 +234,7 @@ def transport_plan(
             # The arms start stretched out, which would reach into the counter.
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(planar_goal_pose=in_front_of_the_closed_drawer),
-            OpenAction.from_handle(kitchen.drawer_handle, robot.left_arm),
+            OpenAction.from_handle(handle=kitchen.drawer_handle, arm=robot.left_arm),
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(planar_goal_pose=in_front_of_the_open_drawer),
             Parallel(

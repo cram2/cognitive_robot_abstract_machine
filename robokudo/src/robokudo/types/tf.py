@@ -17,7 +17,7 @@ from builtin_interfaces.msg import Time
 from robokudo.types.core import Type
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pose(Type):
     """6-DOF pose representation.
 
@@ -37,7 +37,7 @@ class Pose(Type):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Position(Type):
     """3-DOF position representation.
 
@@ -48,7 +48,7 @@ class Position(Type):
     translation: list[float] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StampedPose(Pose):
     """Timestamped 6-DOF pose with reference frame."""
 
@@ -60,7 +60,7 @@ class StampedPose(Pose):
     timestamp: Time = field(default_factory=Time)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StampedPosition(Position):
     """Timestamped 3-DOF position with reference frame."""
 
@@ -72,7 +72,7 @@ class StampedPosition(Position):
     timestamp: Time = field(default_factory=Time)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StampedTransform(StampedPose):
     """Timestamped transform between coordinate frames.
 

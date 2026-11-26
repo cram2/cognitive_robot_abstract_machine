@@ -8,6 +8,7 @@ sends the nodes it chose instead.
 
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, replace
 
 import pytest
@@ -84,7 +85,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.world import World
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -111,7 +112,7 @@ from ...statechart_json_round_trip import (
 # %% the executor a case is performed by
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActionRoundTripCase(NodeRoundTripCase):
     """
     The nodes that send one action or perception node class through JSON, sent from and
@@ -245,8 +246,10 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             name="elevator",
             world=world,
             scale=Scale(2, 2, 2),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.Z(),
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1.0
                 ),
@@ -256,8 +259,10 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             name="door",
             world=world,
             scale=Scale(0.05, 1, 2),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3.Y(),
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.0
                 ),
@@ -276,12 +281,12 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
     """
     return [
         ActionRoundTripCase(
-            MoveTorsoAction,
-            lambda world: [MoveTorsoAction(torso_state=TorsoState.HIGH)],
+            node_type=MoveTorsoAction,
+            build_nodes=lambda world: [MoveTorsoAction(torso_state=TorsoState.HIGH)],
         ),
         ActionRoundTripCase(
-            SetGripperAction,
-            lambda world: [
+            node_type=SetGripperAction,
+            build_nodes=lambda world: [
                 SetGripperAction(
                     gripper_configuration=_arm(
                         world
@@ -290,8 +295,8 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            MoveFingersToWidthAction,
-            lambda world: [
+            node_type=MoveFingersToWidthAction,
+            build_nodes=lambda world: [
                 MoveFingersToWidthAction(
                     two_finger_gripper=_arm(world).end_effector, width=0.04
                 )
@@ -299,20 +304,21 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
             executor_for=physically_simulated_executor,
         ),
         ActionRoundTripCase(
-            ParkArmsAction, lambda world: [ParkArmsAction(arms=_robot(world).all_arms)]
+            node_type=ParkArmsAction,
+            build_nodes=lambda world: [ParkArmsAction(arms=_robot(world).all_arms)],
         ),
         ActionRoundTripCase(
-            FollowToolCenterPointPathAction,
-            lambda world: [
+            node_type=FollowToolCenterPointPathAction,
+            build_nodes=lambda world: [
                 FollowToolCenterPointPathAction(
                     arm=_arm(world),
-                    target_locations=PoseTrajectory([_pose(world), _pose(world)]),
+                    target_locations=PoseTrajectory(poses=[_pose(world), _pose(world)]),
                 )
             ],
         ),
         ActionRoundTripCase(
-            MoveManipulatorAction,
-            lambda world: [
+            node_type=MoveManipulatorAction,
+            build_nodes=lambda world: [
                 MoveManipulatorAction(
                     goal_pose=_pose(world),
                     arm=_arm(world),
@@ -321,8 +327,8 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            MoveToReach,
-            lambda world: [
+            node_type=MoveToReach,
+            build_nodes=lambda world: [
                 MoveToReach(
                     target_pose_offset_robot=Pose2D.from_xy_yaw(0.2, -0.55),
                     reference_T_grasp=_pose(world),
@@ -339,45 +345,55 @@ def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
     :return: The cases of the actions that drive, look and perceive.
     """
     return [
-        ActionRoundTripCase(NavigateAction, lambda world: [_navigate(world)]),
         ActionRoundTripCase(
-            CarryAction,
-            lambda world: [
+            node_type=NavigateAction, build_nodes=lambda world: [_navigate(world)]
+        ),
+        ActionRoundTripCase(
+            node_type=CarryAction,
+            build_nodes=lambda world: [
                 CarryAction(navigate=_navigate(world), holding_arms=[_arm(world)])
             ],
         ),
         ActionRoundTripCase(
-            PathPlanningNavigateAction,
-            lambda world: [
+            node_type=PathPlanningNavigateAction,
+            build_nodes=lambda world: [
                 PathPlanningNavigateAction(
                     planar_goal_pose=Pose2D.from_pose(_pose(world))
                 )
             ],
         ),
         ActionRoundTripCase(
-            LookAtAction, lambda world: [LookAtAction(look_target=_pose(world))]
+            node_type=LookAtAction,
+            build_nodes=lambda world: [LookAtAction(look_target=_pose(world))],
         ),
         ActionRoundTripCase(
-            FaceAtAction, lambda world: [FaceAtAction(look_target=_pose(world))]
+            node_type=FaceAtAction,
+            build_nodes=lambda world: [FaceAtAction(look_target=_pose(world))],
         ),
         ActionRoundTripCase(
-            FaceAndLookAtAction, lambda world: [_face_and_look_at(world)]
+            node_type=FaceAndLookAtAction,
+            build_nodes=lambda world: [_face_and_look_at(world)],
         ),
-        ActionRoundTripCase(ElevatorNavigation, _elevator_navigation),
         ActionRoundTripCase(
-            DetectAction,
-            lambda world: [
+            node_type=ElevatorNavigation, build_nodes=_elevator_navigation
+        ),
+        ActionRoundTripCase(
+            node_type=DetectAction,
+            build_nodes=lambda world: [
                 DetectAction(
                     technique=DetectionTechnique.TYPES, object_sem_annotation=Milk
                 )
             ],
         ),
         ActionRoundTripCase(
-            PerceptionTask,
-            lambda world: [
+            node_type=PerceptionTask,
+            build_nodes=lambda world: [
                 PerceptionTask(
                     query=PerceptionQuery(
-                        Milk, _whole_scene(world), _robot(world), world
+                        semantic_annotation=Milk,
+                        region=_whole_scene(world),
+                        robot=_robot(world),
+                        world=world,
                     ),
                     answered_by=PerceptionSource.WORLD_MODEL,
                 )
@@ -392,28 +408,31 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
     """
     return [
         ActionRoundTripCase(
-            ReachAction,
-            lambda world: [
+            node_type=ReachAction,
+            build_nodes=lambda world: [
                 ReachAction(
                     grasp_candidate=_milk(world).grasp_candidates()[0], arm=_arm(world)
                 )
             ],
         ),
         ActionRoundTripCase(
-            GraspingAction,
-            lambda world: [
+            node_type=GraspingAction,
+            build_nodes=lambda world: [
                 GraspingAction(
                     grasp_candidate=_milk(world).grasp_candidates()[0], arm=_arm(world)
                 )
             ],
         ),
-        ActionRoundTripCase(PickUpAction, lambda world: [_pick_up(world)]),
         ActionRoundTripCase(
-            PlaceAction, lambda world: [_pick_up(world), _place(world)]
+            node_type=PickUpAction, build_nodes=lambda world: [_pick_up(world)]
         ),
         ActionRoundTripCase(
-            OpenAction,
-            lambda world: [
+            node_type=PlaceAction,
+            build_nodes=lambda world: [_pick_up(world), _place(world)],
+        ),
+        ActionRoundTripCase(
+            node_type=OpenAction,
+            build_nodes=lambda world: [
                 OpenAction(
                     grasp_candidate=_handle(world).grasp_candidates()[0],
                     arm=_arm(world),
@@ -421,8 +440,8 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            CloseAction,
-            lambda world: [
+            node_type=CloseAction,
+            build_nodes=lambda world: [
                 CloseAction(
                     grasp_candidate=_handle(world).grasp_candidates()[0],
                     arm=_arm(world),
@@ -430,19 +449,22 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            FixateObjectAction,
-            lambda world: [FixateObjectAction(end_effector=_arm(world).end_effector)],
+            node_type=FixateObjectAction,
+            build_nodes=lambda world: [
+                FixateObjectAction(end_effector=_arm(world).end_effector)
+            ],
         ),
         ActionRoundTripCase(
-            MoveAndPickUpAction, lambda world: [_move_and_pick_up(world)]
+            node_type=MoveAndPickUpAction,
+            build_nodes=lambda world: [_move_and_pick_up(world)],
         ),
         ActionRoundTripCase(
-            MoveAndPlaceAction,
-            lambda world: [_pick_up(world), _move_and_place(world)],
+            node_type=MoveAndPlaceAction,
+            build_nodes=lambda world: [_pick_up(world), _move_and_place(world)],
         ),
         ActionRoundTripCase(
-            MoveAndOpenAction,
-            lambda world: [
+            node_type=MoveAndOpenAction,
+            build_nodes=lambda world: [
                 MoveAndOpenAction(
                     navigate=_navigate(world),
                     face_and_look_at=_face_and_look_at(world),
@@ -454,14 +476,14 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            PickAndPlaceAction,
-            lambda world: [
+            node_type=PickAndPlaceAction,
+            build_nodes=lambda world: [
                 PickAndPlaceAction(pick_up=_pick_up(world), place=_place(world))
             ],
         ),
         ActionRoundTripCase(
-            TransportAction,
-            lambda world: [
+            node_type=TransportAction,
+            build_nodes=lambda world: [
                 TransportAction(
                     pick_up=_move_and_pick_up(world), place=_move_and_place(world)
                 )
@@ -473,8 +495,8 @@ def _manipulation_cases() -> list[ActionRoundTripCase]:
 def _tool_cases() -> list[ActionRoundTripCase]:
     return [
         ActionRoundTripCase(
-            MixingAction,
-            lambda world: [
+            node_type=MixingAction,
+            build_nodes=lambda world: [
                 MixingAction(
                     container=_container(world),
                     arm=_arm(world),
@@ -483,8 +505,8 @@ def _tool_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            CuttingAction,
-            lambda world: [
+            node_type=CuttingAction,
+            build_nodes=lambda world: [
                 CuttingAction(
                     object_to_cut=_container(world),
                     arm=_arm(world),
@@ -493,8 +515,8 @@ def _tool_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            WipingAction,
-            lambda world: [
+            node_type=WipingAction,
+            build_nodes=lambda world: [
                 WipingAction(
                     arm=_arm(world),
                     tool=_tool(world, Sponge),
@@ -503,8 +525,8 @@ def _tool_cases() -> list[ActionRoundTripCase]:
             ],
         ),
         ActionRoundTripCase(
-            PouringAction,
-            lambda world: [
+            node_type=PouringAction,
+            build_nodes=lambda world: [
                 PouringAction(
                     target_container=_container(world),
                     source_container=_tool(world, PouringCup),

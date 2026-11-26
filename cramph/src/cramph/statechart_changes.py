@@ -492,12 +492,43 @@ class PendingChange(ABC):
         :return: The change, with the value it has now.
         """
 
-    def is_same_change_as(self, *, other: PendingChange) -> bool:
+    @property
+    def identity(self) -> PendingChangeIdentity:
         """
-        :return: Whether `other` is the same kind of change about :attr:`node` itself,
-            whatever other node it compares equal to, so it is written only once.
+        :return: What the change is about. Pending changes of equal identity are the same
+            change, which is written only once.
         """
-        return type(other) is type(self) and other.node is self.node
+        return PendingChangeIdentity(change_type=type(self), node_id=id(self.node))
+
+
+@dataclass(frozen=True, kw_only=True)
+class PendingChangeIdentity:
+    """
+    What a :class:`PendingChange` is about: its kind and the node it is about.
+    """
+
+    change_type: type[PendingChange]
+    """
+    The class of the pending change.
+    """
+
+    node_id: int
+    """
+    The :func:`id` of the node the change is about, which tells nodes apart by identity,
+    whatever other node they compare equal to.
+    """
+
+
+@dataclass(frozen=True, kw_only=True)
+class PendingConditionChangeIdentity(PendingChangeIdentity):
+    """
+    What a :class:`PendingConditionChange` is about, which includes its transition.
+    """
+
+    transition_kind: TransitionKind
+    """
+    The kind of the transition whose condition changed.
+    """
 
 
 @dataclass(kw_only=True, eq=False)
@@ -564,13 +595,15 @@ class PendingConditionChange(PendingChange):
             ).expression,
         )
 
-    def is_same_change_as(self, *, other: PendingChange) -> bool:
+    @property
+    def identity(self) -> PendingConditionChangeIdentity:
         """
-        Is also about the same transition, see :meth:`PendingChange.is_same_change_as`.
+        Also tells the transitions apart, see :attr:`PendingChange.identity`.
         """
-        return (
-            super().is_same_change_as(other=other)
-            and other.transition_kind == self.transition_kind
+        return PendingConditionChangeIdentity(
+            change_type=type(self),
+            node_id=id(self.node),
+            transition_kind=self.transition_kind,
         )
 
 
@@ -644,14 +677,15 @@ class StatechartChangeBlock(SubclassJSONSerializer):
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
-        Resolves the nodes the changes name through the
-        :class:`~cramph.node.DeserializedNodeTracker` in `kwargs`, which also tracks
-        the nodes the block adds, so that later changes of the block find them.
+        Resolves the nodes the changes name through one
+        :class:`~cramph.node.DeserializedNodeTracker`, the one in `kwargs` or a new one,
+        which also tracks the nodes the block adds, so that later changes of the block
+        find them.
         """
-        DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
+        tracker = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         return cls(
             changes=[
-                from_json(change, **kwargs)
+                from_json(change, **{**kwargs, **tracker.create_kwargs()})
                 for change in data[StatechartChangeJSONKey.CHANGES]
             ]
         )
@@ -690,12 +724,13 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
     block closed, in order.
     """
 
-    _pending_changes: list[PendingChange] = field(
-        default_factory=list, init=False, repr=False
+    _pending_changes: dict[PendingChangeIdentity, PendingChange] = field(
+        default_factory=dict, init=False, repr=False
     )
     """
     The changes to children, chosen children and conditions recorded but not written
-    into a block yet, in the order they were first recorded.
+    into a block yet, by their :attr:`PendingChange.identity`, in the order they were
+    first recorded.
     """
 
     recorded_change_count: int = field(default=0, init=False, repr=False)
@@ -722,19 +757,6 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
             for change in self.recorded_changes
         )
 
-    def record_joined_node(self, *, node: StatechartNode) -> None:
-        """
-        Records that the children, the chosen children and every condition of `node`,
-        which just joined, are to be written into a block once the nodes they name
-        joined too.
-        """
-        if isinstance(node, CompositeNode):
-            self._record_changed_children(node=node)
-        if isinstance(node, CompositeNodeChoosingItsChild):
-            self._record_changed_chosen_children(node=node)
-        for transition_kind in TransitionKind:
-            self._record_changed_condition(node=node, transition_kind=transition_kind)
-
     def _record_changed_children(self, *, node: CompositeNode) -> None:
         self._record_pending_change(pending=PendingChildrenChange(node=node))
 
@@ -753,15 +775,11 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
     def _record_pending_change(self, *, pending: PendingChange) -> None:
         """
         Records `pending`, to be written into a block with the value it has once every
-        node it names joined :attr:`statechart`. A pending change that is the same
-        change, see :meth:`PendingChange.is_same_change_as`, stays the only one.
+        node it names joined :attr:`statechart`. A pending change of the same
+        :attr:`PendingChange.identity` recorded earlier stays the only one.
         """
         self.recorded_change_count += 1
-        if not any(
-            recorded.is_same_change_as(other=pending)
-            for recorded in self._pending_changes
-        ):
-            self._pending_changes.append(pending)
+        self._pending_changes.setdefault(pending.identity, pending)
         self._close_change_block_outside_modify()
 
     def _close_change_block_outside_modify(self) -> None:
@@ -801,8 +819,8 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
             value they have now, which no longer wait then.
         """
         ready_changes = []
-        still_pending = []
-        for pending in self._pending_changes:
+        still_pending = {}
+        for identity, pending in self._pending_changes.items():
             if pending.node._statechart is not self.statechart:
                 continue
             if all(
@@ -810,6 +828,6 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
             ):
                 ready_changes.append(pending.create_change())
             else:
-                still_pending.append(pending)
+                still_pending[identity] = pending
         self._pending_changes = still_pending
         return ready_changes

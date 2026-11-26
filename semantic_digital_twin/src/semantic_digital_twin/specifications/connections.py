@@ -6,24 +6,24 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field, fields
-from typing_extensions import TypeVar, Any, Generic, cast
+from typing_extensions import TypeVar, Any, Generic, Self, cast
 
 
 from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.utils import get_generic_type_parameters
 from semantic_digital_twin.exceptions import MissingConnectionParentError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, ScrewAxis
 from semantic_digital_twin.specifications.base import NamedSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
-    ScrewConnection,
+    ScrewAxisConnection,
 )
-from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+)
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -263,14 +263,6 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
     prismatic or revolute).
     """
 
-    axis: Vector3 = field(kw_only=True)
-    """
-    Movement axis of the connection.
-
-    Mandatory: a single-DoF connection without an axis has no meaning, so it cannot be
-    constructed.
-    """
-
     multiplier: float = 1.0
     """
     Scaling factor applied to the degree of freedom's motion.
@@ -292,49 +284,21 @@ class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], AB
     """
 
 
-@dataclass
-class PrismaticConnectionSpecification(
-    ActiveConnection1DOFSpecification[PrismaticConnection]
+@dataclass(kw_only=True)
+class ScrewAxisConnectionSpecification(
+    ActiveConnection1DOFSpecification[ScrewAxisConnection]
 ):
     """
     Declares a
-    :class:`~semantic_digital_twin.world_description.connections.PrismaticConnection`.
-
-    Use this for a single translational degree of freedom along the connection axis,
-    such as a drawer sliding in or out.
+    :class:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection`:
+    a door swinging on its hinge, a drawer sliding in or out, or a cap turning on the
+    thread of its bottle, depending on its :attr:`screw_axis`.
     """
 
-
-@dataclass
-class RevoluteConnectionSpecification(
-    ActiveConnection1DOFSpecification[RevoluteConnection]
-):
+    screw_axis: ScrewAxis
     """
-    Declares a
-    :class:`~semantic_digital_twin.world_description.connections.RevoluteConnection`.
-
-    Use this for a single rotational degree of freedom about the connection axis, such
-    as a door swinging on its hinge.
-    """
-
-
-@dataclass
-class ScrewConnectionSpecification(ActiveConnection1DOFSpecification[ScrewConnection]):
-    """
-    Declares a
-    :class:`~semantic_digital_twin.world_description.connections.ScrewConnection`.
-
-    Use this where rotation about the connection axis and translation along it are
-    coupled into a single degree of freedom, such as the thread between a bottle and its
-    cap.
-    """
-
-    screw_pitch: float = field(kw_only=True)
-    """
-    The distance between adjacent threads along the connection axis in meters.
-
-    Mandatory: a thread without a pitch couples no translation to its rotation, so it
-    cannot be constructed.
+    How the child's pose changes per unit of position, see
+    :attr:`~semantic_digital_twin.world_description.connections.ScrewAxisConnection.screw_axis`.
     """
 
 

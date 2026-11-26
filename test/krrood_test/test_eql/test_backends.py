@@ -2,6 +2,7 @@
 Answering entity queries with each backend.
 """
 
+import gc
 from datetime import datetime
 from types import EllipsisType
 
@@ -25,10 +26,10 @@ from ..dataset.identity_hashed_values_created_on_access import (
 )
 from ..dataset.semantic_world_like_classes import Apple, Body
 from krrood.entity_query_language.backends import (
-    SQLAlchemyBackend,
     EntityQueryLanguageBackend,
     EntityQueryLanguageGenerativeBackend,
 )
+from krrood.ormatic.eql_interface import SQLAlchemyBackend
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.core.base_expressions import (
     OperationResult,
@@ -145,6 +146,30 @@ def test_selective_query_multiple_backends(session, database):
 
     result = list(q.evaluate(backend=SQLAlchemyBackend(session_maker=session_maker)))
     assert len(result) == 1
+
+
+def test_the_collections_of_objects_the_database_backend_returns_stay_readable(
+    session, database
+):
+    """
+    The data access objects that the database backend returns have the collections their
+    mapping loads eagerly loaded, though the backend's session is gone once the
+    evaluation ends.
+    """
+    positions = KRROODPositions(
+        positions=[KRROODPosition(x=1, y=0, z=0), KRROODPosition(x=0, y=1, z=0)],
+        some_strings=["a"],
+    )
+    session.add(to_dao(positions))
+    session.commit()
+    positions_variable = variable(KRROODPositions, domain=None)
+
+    [dao] = an(entity(positions_variable)).evaluate(
+        backend=SQLAlchemyBackend(session_maker=sessionmaker(session.bind))
+    )
+    gc.collect()
+
+    assert len(dao.positions) == len(positions.positions)
 
 
 def test_probabilistic_backend_with_symbolic_expression():

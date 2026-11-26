@@ -1,10 +1,14 @@
+"""
+Tests that the ray tracing camera configuration selects the rendering camera and its
+pose.
+"""
+
 from __future__ import annotations
 from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
-import robokudo.world as rk_world
 from robokudo.descriptors.camera_configs.config_ray_tracing import (
     RuntimeRobotWorldSource,
     RayTracingCameraConfiguration,
@@ -35,21 +39,29 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 def test_resolver_selects_named_descriptor_camera() -> None:
+    """
+    A camera named by the source is the one taken from the descriptor's world.
+    """
     world = WorldDescriptor().world
     [camera] = world.get_semantic_annotations_by_type(Camera)
     source = WorldDescriptorSource(camera_name=camera.name)
 
-    selected_camera = RayTracingContextResolver._select_descriptor_camera(world, source)
+    selected_camera = RayTracingContextResolver._select_descriptor_camera(
+        world=world, source=source
+    )
 
     assert selected_camera is camera
 
 
 def test_resolver_rejects_unknown_camera_name() -> None:
+    """
+    A camera name the descriptor's world lacks raises :class:`CameraAnnotationMissing`.
+    """
     world = WorldDescriptor().world
     source = WorldDescriptorSource(camera_name=PrefixedName(name="unknown_camera"))
 
     with pytest.raises(CameraAnnotationMissing):
-        RayTracingContextResolver._select_descriptor_camera(world, source)
+        RayTracingContextResolver._select_descriptor_camera(world=world, source=source)
 
 
 def test_resolver_rejects_world_without_camera_annotation() -> None:
@@ -59,26 +71,27 @@ def test_resolver_rejects_world_without_camera_annotation() -> None:
     world = World()
     with pytest.raises(CameraAnnotationMissing):
         RayTracingContextResolver._select_descriptor_camera(
-            world, WorldDescriptorSource()
+            world=world, source=WorldDescriptorSource()
         )
 
 
 # %% Runtime robot camera selection
 
 
-def test_resolver_uses_runtime_robots_default_camera(monkeypatch) -> None:
+def test_resolver_uses_runtime_robots_default_camera() -> None:
+    """
+    Without a camera name, the camera is the default camera of the robot in the world.
+    """
     world = Mock(spec=World)
     robot = Mock(spec=AbstractRobot)
     camera = Mock(spec=RobotCamera)
     robot.get_default_camera.return_value = camera
     world.get_semantic_annotations_by_type.return_value = [robot]
-    monkeypatch.setattr(rk_world, "world_instance", lambda: world)
-    monkeypatch.setattr(rk_world, "init_world_entity_tracker_from_world", Mock())
     resolver = RayTracingContextResolver(
-        RayTracingCameraConfiguration(source=RuntimeRobotWorldSource())
+        camera_config=RayTracingCameraConfiguration(source=RuntimeRobotWorldSource())
     )
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=world)
 
     assert isinstance(context, RayTracingContext)
     assert context.world is world
@@ -86,9 +99,10 @@ def test_resolver_uses_runtime_robots_default_camera(monkeypatch) -> None:
     robot.get_default_camera.assert_called_once_with()
 
 
-def test_resolver_retries_runtime_lookup_after_world_becomes_available(
-    monkeypatch,
-) -> None:
+def test_resolver_retries_runtime_lookup_after_world_becomes_available() -> None:
+    """
+    A robot that appears in the world after a failed lookup is found by the next lookup.
+    """
     unavailable_world = Mock(spec=World)
     unavailable_world.get_semantic_annotations_by_type.return_value = []
     available_world = Mock(spec=World)
@@ -96,22 +110,22 @@ def test_resolver_retries_runtime_lookup_after_world_becomes_available(
     camera = Mock(spec=RobotCamera)
     robot.get_default_camera.return_value = camera
     available_world.get_semantic_annotations_by_type.return_value = [robot]
-    runtime_worlds = iter((unavailable_world, available_world))
-    monkeypatch.setattr(rk_world, "world_instance", lambda: next(runtime_worlds))
-    monkeypatch.setattr(rk_world, "init_world_entity_tracker_from_world", Mock())
     resolver = RayTracingContextResolver(
-        RayTracingCameraConfiguration(source=RuntimeRobotWorldSource())
+        camera_config=RayTracingCameraConfiguration(source=RuntimeRobotWorldSource())
     )
 
     with pytest.raises(RobotAnnotationMissing):
-        resolver.resolve()
+        resolver.resolve(perception_world=unavailable_world)
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=available_world)
     assert context.world is available_world
     assert context.camera is camera
 
 
 def test_resolver_selects_named_robot_default_camera() -> None:
+    """
+    The default camera of the robot named by the source is taken, not another robot's.
+    """
     world = Mock(spec=World)
     selected_robot = Mock(spec=AbstractRobot)
     selected_robot.name = PrefixedName(name="selected_robot")
@@ -125,7 +139,7 @@ def test_resolver_selects_named_robot_default_camera() -> None:
     ]
     source = RuntimeRobotWorldSource(robot_name=selected_robot.name)
     selected_camera = RayTracingContextResolver._select_runtime_robot_camera(
-        world, source
+        world=world, source=source
     )
 
     assert selected_camera is camera
@@ -133,6 +147,10 @@ def test_resolver_selects_named_robot_default_camera() -> None:
 
 
 def test_resolver_rejects_ambiguous_runtime_robot_selection() -> None:
+    """
+    Without a robot name, a world holding two robots raises
+    :class:`RobotAnnotationAmbiguous`.
+    """
     world = Mock(spec=World)
     first_robot = Mock(spec=AbstractRobot)
     first_robot.name = PrefixedName(name="first_robot")
@@ -141,7 +159,9 @@ def test_resolver_rejects_ambiguous_runtime_robot_selection() -> None:
     world.get_semantic_annotations_by_type.return_value = [first_robot, second_robot]
     source = RuntimeRobotWorldSource()
     with pytest.raises(RobotAnnotationAmbiguous):
-        RayTracingContextResolver._select_runtime_robot_camera(world, source)
+        RayTracingContextResolver._select_runtime_robot_camera(
+            world=world, source=source
+        )
 
 
 # %% Camera pose
@@ -160,13 +180,13 @@ def test_resolver_preserves_camera_pose_without_override(
     module_loader = Mock()
     module_loader.load_world_descriptor.return_value = descriptor
     resolver = RayTracingContextResolver(
-        RayTracingCameraConfiguration(source=WorldDescriptorSource()),
+        camera_config=RayTracingCameraConfiguration(source=WorldDescriptorSource()),
         module_loader=module_loader,
     )
     apply_camera_pose = Mock(wraps=RayTracingContextResolver._apply_camera_pose)
     monkeypatch.setattr(resolver, "_apply_camera_pose", apply_camera_pose)
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=World())
 
     apply_camera_pose.assert_not_called()
     assert context.camera is camera
@@ -192,9 +212,11 @@ def test_resolver_applies_camera_pose_override_once() -> None:
     )
     module_loader = Mock()
     module_loader.load_world_descriptor.return_value = descriptor
-    resolver = RayTracingContextResolver(config, module_loader=module_loader)
+    resolver = RayTracingContextResolver(
+        camera_config=config, module_loader=module_loader
+    )
 
-    context = resolver.resolve()
+    context = resolver.resolve(perception_world=World())
 
     assert context.camera is camera
     np.testing.assert_allclose(
@@ -211,7 +233,7 @@ def test_resolver_applies_camera_pose_override_once() -> None:
     with world.modify_world():
         camera.root.parent_connection.origin = later_pose
 
-    assert resolver.resolve().camera is camera
+    assert resolver.resolve(perception_world=World()).camera is camera
     np.testing.assert_allclose(
         camera.root.parent_connection.origin.to_np(), later_pose.to_np()
     )
@@ -233,7 +255,7 @@ def test_resolver_rejects_pose_override_for_world_root_camera() -> None:
         world.add_semantic_annotation(camera)
     with pytest.raises(CameraPoseOverrideUnavailable):
         RayTracingContextResolver._apply_camera_pose(
-            world,
-            camera,
+            world=world,
+            camera=camera,
             camera_pose=HomogeneousTransformationMatrix(),
         )
