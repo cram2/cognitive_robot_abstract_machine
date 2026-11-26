@@ -44,9 +44,9 @@ def _build_world_with_body(*, name: str) -> tuple[World, Body]:
 # %% Bolt tests
 
 
-def test_bolt_default_grasp_candidate_uses_head_offset() -> None:
+def test_bolt_default_grasp_candidates_rotate_about_axis_at_head_offset() -> None:
     """
-    Verify :meth:`Bolt.default_grasp_candidates` places the top-down grasp at
+    Verify :meth:`Bolt.default_grasp_candidates` returns rotated top-down grasps at
     :attr:`Bolt.head_offset` along local +X.
     """
     world, body = _build_world_with_body(name="bolt")
@@ -59,31 +59,65 @@ def test_bolt_default_grasp_candidate_uses_head_offset() -> None:
         world.add_semantic_annotations([bolt])
 
     candidates = bolt.default_grasp_candidates()
-    assert len(candidates) == 1
-    candidate = candidates[0]
-    assert candidate.graspable is bolt
-    assert candidate.grasp_pose.reference_frame is body
-    np.testing.assert_allclose(
-        candidate.grasp_pose.position.to_np()[:3],
-        [custom_offset, 0.0, 0.0],
-        atol=1e-9,
+    assert len(candidates) == bolt.grasp_candidate_count
+
+    expected_angles = np.linspace(
+        0.0, 2.0 * np.pi, bolt.grasp_candidate_count, endpoint=False
     )
-    expected_orientation = RotationMatrix.from_vectors(
-        x=Vector3(-1, 0, 0), y=Vector3(0, 1, 0)
-    )
-    np.testing.assert_allclose(
-        candidate.grasp_pose.rotation_matrix.to_np(),
-        expected_orientation.to_np(),
-        atol=1e-9,
-    )
+    for candidate, angle in zip(candidates, expected_angles):
+        assert candidate.graspable is bolt
+        assert candidate.grasp_pose.reference_frame is body
+        np.testing.assert_allclose(
+            candidate.grasp_pose.position.to_np()[:3],
+            [custom_offset, 0.0, 0.0],
+            atol=1e-9,
+        )
+        rotation_matrix = candidate.grasp_pose.rotation_matrix.to_np()
+        np.testing.assert_allclose(rotation_matrix[:3, 0], [-1.0, 0.0, 0.0], atol=1e-9)
+        expected_orientation = RotationMatrix.from_vectors(
+            x=Vector3(-1, 0, 0),
+            y=Vector3(0.0, float(np.cos(angle)), float(np.sin(angle))),
+        )
+        np.testing.assert_allclose(
+            rotation_matrix,
+            expected_orientation.to_np(),
+            atol=1e-9,
+        )
+
+
+def test_bolt_default_grasp_candidates_follow_grasp_candidate_count() -> None:
+    """
+    Verify :meth:`Bolt.default_grasp_candidates` respects
+    :attr:`Bolt.grasp_candidate_count`.
+    """
+    world, body = _build_world_with_body(name="bolt")
+    bolt = Bolt(root=body, grasp_candidate_count=6)
+    with world.modify_world():
+        world.add_semantic_annotations([bolt])
+
+    candidates = bolt.default_grasp_candidates()
+    assert len(candidates) == 6
+    expected_angles = np.linspace(0.0, 2.0 * np.pi, 6, endpoint=False)
+    for candidate, angle in zip(candidates, expected_angles):
+        expected_orientation = RotationMatrix.from_vectors(
+            x=Vector3(-1, 0, 0),
+            y=Vector3(0.0, float(np.cos(angle)), float(np.sin(angle))),
+        )
+        np.testing.assert_allclose(
+            candidate.grasp_pose.rotation_matrix.to_np(),
+            expected_orientation.to_np(),
+            atol=1e-9,
+        )
 
 
 # %% Screwdriver tests
 
 
-def test_screwdriver_default_grasp_candidate_uses_grasp_height() -> None:
+def test_screwdriver_default_grasp_candidates_rotate_about_axis_at_grasp_height() -> (
+    None
+):
     """
-    Verify :meth:`Screwdriver.default_grasp_candidates` offers one handle grasp at
+    Verify :meth:`Screwdriver.default_grasp_candidates` returns rotated handle grasps at
     :attr:`Screwdriver.grasp_height` along local +Z.
     """
     world, body = _build_world_with_body(name="screwdriver")
@@ -96,21 +130,49 @@ def test_screwdriver_default_grasp_candidate_uses_grasp_height() -> None:
         world.add_semantic_annotations([screwdriver])
 
     candidates = screwdriver.default_grasp_candidates()
-    assert len(candidates) == 1
-    candidate = candidates[0]
-    assert candidate.graspable is screwdriver
-    assert candidate.grasp_pose.reference_frame is body
-    np.testing.assert_allclose(
-        candidate.grasp_pose.position.to_np()[:3],
-        [0.0, 0.0, grasp_height],
-        atol=1e-9,
+    assert len(candidates) == screwdriver.grasp_candidate_count
+
+    expected_yaws = np.linspace(
+        0.0, 2.0 * np.pi, screwdriver.grasp_candidate_count, endpoint=False
     )
-    expected_orientation = RotationMatrix.from_rpy(pitch=np.pi / 2)
-    np.testing.assert_allclose(
-        candidate.grasp_pose.rotation_matrix.to_np(),
-        expected_orientation.to_np(),
-        atol=1e-9,
-    )
+    for candidate, yaw in zip(candidates, expected_yaws):
+        assert candidate.graspable is screwdriver
+        assert candidate.grasp_pose.reference_frame is body
+        np.testing.assert_allclose(
+            candidate.grasp_pose.position.to_np()[:3],
+            [0.0, 0.0, grasp_height],
+            atol=1e-9,
+        )
+        rotation_matrix = candidate.grasp_pose.rotation_matrix.to_np()
+        np.testing.assert_allclose(rotation_matrix[:3, 0], [0.0, 0.0, -1.0], atol=1e-9)
+        expected_orientation = RotationMatrix.from_rpy(yaw=float(yaw), pitch=np.pi / 2)
+        np.testing.assert_allclose(
+            rotation_matrix,
+            expected_orientation.to_np(),
+            atol=1e-9,
+        )
+
+
+def test_screwdriver_default_grasp_candidates_follow_grasp_candidate_count() -> None:
+    """
+    Verify :meth:`Screwdriver.default_grasp_candidates` respects
+    :attr:`Screwdriver.grasp_candidate_count`.
+    """
+    world, body = _build_world_with_body(name="screwdriver")
+    screwdriver = Screwdriver(root=body, grasp_candidate_count=6)
+    with world.modify_world():
+        world.add_semantic_annotations([screwdriver])
+
+    candidates = screwdriver.default_grasp_candidates()
+    assert len(candidates) == 6
+    expected_yaws = np.linspace(0.0, 2.0 * np.pi, 6, endpoint=False)
+    for candidate, yaw in zip(candidates, expected_yaws):
+        expected_orientation = RotationMatrix.from_rpy(yaw=float(yaw), pitch=np.pi / 2)
+        np.testing.assert_allclose(
+            candidate.grasp_pose.rotation_matrix.to_np(),
+            expected_orientation.to_np(),
+            atol=1e-9,
+        )
 
 
 def test_screwdriver_tool_alignment_uses_tip_body_and_target_frame() -> None:

@@ -1580,7 +1580,7 @@ class BottleCap(HasMovableJoint):
 @dataclass(eq=False, kw_only=True)
 class Bolt(HasGraspCandidates):
     """
-    A threaded bolt offering a top-down grasp along its axis.
+    A threaded bolt offering top-down grasps along its axis.
     """
 
     head_offset: float = 0.025
@@ -1592,9 +1592,9 @@ class Bolt(HasGraspCandidates):
         """
         Differs from
         :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.default_grasp_candidates`
-        by returning the single top-down grasp at :attr:`head_offset` along local +X.
+        by returning top-down grasps at :attr:`head_offset` along local +X, evenly
+        rotated about the bolt axis.
         """
-        rotation = RotationMatrix.from_vectors(x=Vector3(-1, 0, 0), y=Vector3(0, 1, 0))
         return [
             GraspCandidate(
                 graspable=self,
@@ -1602,9 +1602,15 @@ class Bolt(HasGraspCandidates):
                     position=Point3(
                         self.head_offset, 0.0, 0.0, reference_frame=self.root
                     ),
-                    orientation=rotation.quaternion,
+                    orientation=RotationMatrix.from_vectors(
+                        x=Vector3(-1, 0, 0),
+                        y=Vector3(0.0, float(np.cos(angle)), float(np.sin(angle))),
+                    ).quaternion,
                     reference_frame=self.root,
                 ),
+            )
+            for angle in np.linspace(
+                0.0, 2.0 * np.pi, self.grasp_candidate_count, endpoint=False
             )
         ]
 
@@ -1973,7 +1979,8 @@ class Screwdriver(Tool):
         """
         Differs from
         :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.default_grasp_candidates`
-        by returning the grasp on the handle at :attr:`grasp_height` along local -Z.
+        by returning top-down handle grasps at :attr:`grasp_height` along local +Z,
+        evenly rotated about the handle axis.
         """
         return [
             GraspCandidate(
@@ -1982,9 +1989,14 @@ class Screwdriver(Tool):
                     position=Point3(
                         0.0, 0.0, self.grasp_height, reference_frame=self.root
                     ),
-                    orientation=RotationMatrix.from_rpy(pitch=np.pi / 2).quaternion,
+                    orientation=RotationMatrix.from_rpy(
+                        yaw=float(yaw), pitch=np.pi / 2
+                    ).quaternion,
                     reference_frame=self.root,
                 ),
+            )
+            for yaw in np.linspace(
+                0.0, 2.0 * np.pi, self.grasp_candidate_count, endpoint=False
             )
         ]
 
