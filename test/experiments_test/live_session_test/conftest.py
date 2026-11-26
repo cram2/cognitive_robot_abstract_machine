@@ -15,7 +15,7 @@ from typing_extensions import Any, Iterator
 from experiments.live_session.session import LiveSession
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import RevoluteConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 
 from ...pytest_environment import runs_in_continuous_integration
 from ...semantic_digital_twin_test.test_adapters.test_mujoco_servos import (
@@ -68,7 +68,7 @@ class PendulumSession:
     The pendulum's world.
     """
 
-    hinge: RevoluteConnection
+    hinge: ScrewAxisConnection
     """
     The pendulum's servoed hinge.
     """

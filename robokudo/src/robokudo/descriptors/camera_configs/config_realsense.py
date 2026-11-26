@@ -1,3 +1,10 @@
+"""
+Camera configuration of an Intel RealSense camera with aligned depth, registered as
+``realsense``.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import ClassVar
@@ -11,7 +18,7 @@ from robokudo.descriptors.camera_configs.components import (
 from robokudo.descriptors.camera_configs.base_camera_config import BaseCameraConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class RealsenseCameraConfig(
     BaseCameraConfig,
     RGBDComponent,

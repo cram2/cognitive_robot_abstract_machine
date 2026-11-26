@@ -40,8 +40,13 @@ pytestmark = pytest.mark.skipif(
 
 
 def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
+    """
+    :return: A pipeline that reads the recording in *recording_directory* once, with a
+        static camera pose, and stores every frame in a freshly dropped database
+        *db_name*.
+    """
     file_reader_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
-        "file_reader",
+        camera="file_reader",
         loop=False,
         target_dir=recording_directory,
         color_to_depth_ratio=ColorToDepthRatio(horizontal=0.5, vertical=0.5),
@@ -76,8 +81,11 @@ def _build_writer_pipeline(db_name: str, recording_directory: Path) -> Pipeline:
 
 
 def _build_reader_pipeline(db_name: str) -> Pipeline:
+    """
+    :return: A pipeline that replays the frames stored in the database *db_name* once.
+    """
     mongo_descriptor = CollectionReaderDescriptorFactory.create_descriptor(
-        "mongo", loop=False, db_name=db_name
+        camera="mongo", loop=False, db_name=db_name
     )
     pipeline = Pipeline("ReaderPipeline")
     pipeline.add_children(
@@ -95,7 +103,7 @@ class TestStorageRoundtripPipeline:
     """
 
     def test_store_and_replay_sensor_data_roundtrip(
-        self, cup_on_counter_directory: Path
+        self, *, cup_on_counter_directory: Path
     ) -> None:
         db_name = f"ONLY_UNITTESTS_roundtrip_{uuid.uuid4().hex}"
         storage = Storage(db_name)
@@ -122,7 +130,7 @@ class TestStorageRoundtripPipeline:
             assert {"ids", "states"}.issubset(world_snapshot_payload["state"])
 
             query_document = Storage.encode_view_document(
-                CASViews.QUERY, {"recorded": True}
+                view_name=CASViews.QUERY, view_value={"recorded": True}
             )
             query_id = (
                 storage.db[Storage.VIEW_COLLECTION_NAME]
@@ -142,15 +150,15 @@ class TestStorageRoundtripPipeline:
                 reader_pipeline, reader_node
             )
             assert reader_status is py_trees.common.Status.SUCCESS
-            assert not reader_pipeline.cas.contains(CASViews.QUERY)
+            assert not reader_pipeline.cas.contains(view_name=CASViews.QUERY)
 
             np.testing.assert_array_equal(
-                writer_pipeline.cas.get(CASViews.COLOR_IMAGE),
-                reader_pipeline.cas.get(CASViews.COLOR_IMAGE),
+                writer_pipeline.cas.get(view_name=CASViews.COLOR_IMAGE),
+                reader_pipeline.cas.get(view_name=CASViews.COLOR_IMAGE),
             )
             np.testing.assert_allclose(
-                writer_pipeline.cas.get(CASViews.DEPTH_IMAGE),
-                reader_pipeline.cas.get(CASViews.DEPTH_IMAGE),
+                writer_pipeline.cas.get(view_name=CASViews.DEPTH_IMAGE),
+                reader_pipeline.cas.get(view_name=CASViews.DEPTH_IMAGE),
                 equal_nan=True,
             )
 
@@ -200,8 +208,8 @@ class TestStorageRoundtripPipeline:
                 is reader_pose.reference_frame
             )
 
-            assert writer_pipeline.cas.get(CASViews.COLOR_TO_DEPTH_RATIO) == (
-                reader_pipeline.cas.get(CASViews.COLOR_TO_DEPTH_RATIO)
+            assert writer_pipeline.cas.get(view_name=CASViews.COLOR_TO_DEPTH_RATIO) == (
+                reader_pipeline.cas.get(view_name=CASViews.COLOR_TO_DEPTH_RATIO)
             )
         finally:
             writer_node.destroy_node()

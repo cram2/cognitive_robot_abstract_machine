@@ -82,7 +82,7 @@ class Storage:
     cas_view_codecs = CASViewCodecRegistry()
 
     @staticmethod
-    def is_blacklisted(obj: Any) -> bool:
+    def is_blacklisted(*, obj: Any) -> bool:
         """
         Check if an object is of a blacklisted type.
 
@@ -196,7 +196,7 @@ class Storage:
         self.client.drop_database(self.db_name)
 
     @staticmethod
-    def encode_view_document(view_name: str, view_value: Any) -> dict[str, Any]:
+    def encode_view_document(*, view_name: str, view_value: Any) -> dict[str, Any]:
         """
         Encode one CAS view value into a serializable view document.
 
@@ -229,7 +229,7 @@ class Storage:
             **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
         )
 
-    def store_views_in_mongo(self, cas_dict: dict[str, Any]) -> None:
+    def store_views_in_mongo(self, *, cas_dict: dict[str, Any]) -> None:
         """
         Store CAS views in MongoDB.
 
@@ -281,7 +281,9 @@ class Storage:
                 and expected_view_name not in included_view_names
             ):
                 continue
-            view_document = self.load_view_document(cas_document, expected_view_name)
+            view_document = self.load_view_document(
+                cas_document=cas_document, view_name=expected_view_name
+            )
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
                 view_document=view_document, world=world
             )
@@ -294,7 +296,7 @@ class Storage:
             )
 
     def load_view_document(
-        self, cas_document: dict[str, Any], view_name: str
+        self, *, cas_document: dict[str, Any], view_name: str
     ) -> dict[str, Any]:
         """
         Fetch one CAS view document referenced by a recorded frame.
@@ -334,7 +336,7 @@ class Storage:
             )
 
     @staticmethod
-    def generate_dict_from_real_cas(cas: CAS) -> dict[str, Any]:
+    def generate_dict_from_real_cas(*, cas: CAS) -> dict[str, Any]:
         """
         Convert a CAS instance to a MongoDB-compatible dictionary.
 
@@ -358,7 +360,7 @@ class Storage:
 
         return result
 
-    def store_cas_dict(self, cas_dict: dict[str, Any]) -> InsertOneResult:
+    def store_cas_dict(self, *, cas_dict: dict[str, Any]) -> InsertOneResult:
         """
         Store a CAS dictionary in MongoDB.
 

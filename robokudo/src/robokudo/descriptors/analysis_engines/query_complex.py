@@ -42,7 +42,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a pipeline which responds to a query.
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         seq = Pipeline("RWPipeline")
 

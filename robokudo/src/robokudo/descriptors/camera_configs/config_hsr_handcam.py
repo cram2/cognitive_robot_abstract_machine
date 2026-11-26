@@ -21,7 +21,7 @@ from robokudo.descriptors.camera_configs.components import (
 
 
 # %% Hand camera configuration
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class HsrHandCameraConfig(
     BaseCameraConfig,
     ColorComponent,

@@ -50,7 +50,7 @@ questions = [
       "answers": [
         {"answer": "A FixedConnection", "correct": True},
         {"answer": "A Connection6DoF", "correct": False},
-        {"answer": "A PrismaticConnection", "correct": False},
+        {"answer": "A ScrewAxisConnection", "correct": False},
         {"answer": "No connection; the entity floats unattached", "correct": False}
       ],
     },

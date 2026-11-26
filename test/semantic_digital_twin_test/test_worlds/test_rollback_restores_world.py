@@ -22,7 +22,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -31,7 +31,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 @pytest.fixture
-def free_item_world() -> tuple[World, Body, Body, RevoluteConnection]:
+def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
     """
     A world whose root carries a free item on a 6 degree of freedom connection, a table
     it can be attached to, and an arm joint added after the item.
@@ -46,11 +46,11 @@ def free_item_world() -> tuple[World, Body, Body, RevoluteConnection]:
         )
         world.add_connection(FixedConnection(parent=root, child=table))
     with world.modify_world():
-        arm_joint = RevoluteConnection.create_with_dofs(
+        arm_joint = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=root,
             child=Body(name=PrefixedName("arm")),
-            axis=Vector3.Z(),
         )
         world.add_connection(arm_joint)
     with world.modify_world():
@@ -69,8 +69,11 @@ def test_rollback_of_body_removal_reconnects_it():
     root = Body(name=PrefixedName("root"))
     leaf = Body(name=PrefixedName("leaf"))
     with world.modify_world():
-        connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=leaf, axis=Vector3.Z()
+        connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=leaf,
         )
         world.add_connection(connection)
     version = world.get_world_model_manager().version
@@ -136,11 +139,13 @@ def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
 
     with world.reset_state_context():
         with world.modify_world():
-            drawer_joint = RevoluteConnection.create_with_dofs(
+            drawer_joint = ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=table,
                 child=Body(name=PrefixedName("drawer")),
-                axis=Vector3.Z(),
             )
             world.add_connection(drawer_joint)
         drawer_joint.position = 0.4

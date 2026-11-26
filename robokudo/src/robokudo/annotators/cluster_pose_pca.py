@@ -83,7 +83,7 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         annotations = self.get_cas().annotations
         geometries_to_visualize = []
 
@@ -151,7 +151,7 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
         ]
         vis_geometries.extend(geometries_to_visualize)
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

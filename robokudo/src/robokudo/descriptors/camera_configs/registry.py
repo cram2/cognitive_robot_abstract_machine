@@ -1,3 +1,10 @@
+"""
+The registry of camera configuration classes, which creates a configuration from its
+registry name.
+"""
+
+from __future__ import annotations
+
 import importlib
 import pkgutil
 
@@ -18,7 +25,7 @@ class CameraConfigRegistry:
 
     @classmethod
     def register_all(
-        cls, package_name: str = "robokudo.descriptors.camera_configs"
+        cls, *, package_name: str = "robokudo.descriptors.camera_configs"
     ) -> None:
         """
         Register all camera configs of the given package to the camera config registry.
@@ -49,7 +56,7 @@ class CameraConfigRegistry:
                     cls._registry[obj.registry_name] = obj
 
     @classmethod
-    def create_config(cls, config_type: str, **kwargs: Any) -> Any:
+    def create_config(cls, *, config_type: str, **kwargs: Any) -> Any:
         """
         Create a camera config instance based on the given config type.
 

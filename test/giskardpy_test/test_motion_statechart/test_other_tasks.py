@@ -52,9 +52,7 @@ from giskardpy.motion_statechart.tasks.pointing import (
     PointingCone,
 )
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
-    ScrewConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -74,7 +72,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
@@ -708,14 +706,16 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     with world.modify_world():
         region = Body(name=PrefixedName("region"))
         world.add_kinematic_structure_entity(region)
-        region_joint = PrismaticConnection.create_with_dofs(
+        region_joint = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.Y()
+            ),
             world=world,
             parent=world.root,
             child=region,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 2, 0, 1, reference_frame=world.root
             ),
-            axis=Vector3.Y(),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=-1.0, upper_position=1.0, maximum_speed=0.5
             ),
@@ -1132,9 +1132,11 @@ class TestArticulateGraspedMechanism:
                 name="door",
                 world=pr2_world_copy,
                 world_root_T_self=world_T_door,
-                parent_connection_specification=RevoluteConnectionSpecification(
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z()
+                    ),
                     dof_limits=limits,
-                    axis=Vector3.Z(),
                     connection_T_child=world_T_hinge.inverse() @ world_T_door,
                 ),
             )
@@ -1235,8 +1237,10 @@ class TestArticulateGraspedMechanism:
                 name="drawer",
                 world=world,
                 world_root_T_self=world_T_drawer,
-                parent_connection_specification=PrismaticConnectionSpecification(
-                    axis=Vector3.X(),
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3.X()
+                    ),
                     dof_limits=DegreeOfFreedomLimits(
                         lower=DerivativeMap(position=0.0, velocity=-10.0),
                         upper=DerivativeMap(position=open_position, velocity=10.0),
@@ -1324,10 +1328,11 @@ class TestArticulateGraspedMechanism:
                 scale=Scale(0.02, 0.04, 0.04),
                 # The thread axis points from the bottle out through the cap, here
                 # towards the robot, so unscrewing moves the cap away from the bottle.
-                parent_connection_specification=ScrewConnectionSpecification(
-                    axis=Vector3(-1, 0, 0),
+                parent_connection_specification=ScrewAxisConnectionSpecification(
                     dof_limits=limits,
-                    screw_pitch=screw_pitch,
+                    screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                        axis=Vector3(-1, 0, 0), pitch=screw_pitch
+                    ),
                 ),
             )
 
@@ -1387,7 +1392,7 @@ class TestArticulateGraspedMechanism:
         unscrew_travel_distance = float(np.linalg.norm(cap_translation))
         tightened_goal_joint_state = (
             unscrew_goal
-            - root_C_screw.rotation_angle_for_travel_distance(unscrew_travel_distance)
+            - root_C_screw.position_for_translation(distance=unscrew_travel_distance)
         )
 
         executor = StatechartExecutor(

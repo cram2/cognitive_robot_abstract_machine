@@ -67,7 +67,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         :return: The configured pipeline for data transfer
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "mongo", loop=False
+            camera="mongo", loop=False
         )
 
         seq = Pipeline("StoragePipeline")

@@ -27,18 +27,35 @@ from experiments.circuit_learning.settings import (
     EdgeRepresentation,
 )
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationTraining,
     LearnableUnits,
 )
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.jax_gradient_descent import JaxGradientDescent
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
-from probabilistic_model.learning.torch_gradient_descent import TorchGradientDescent
-from probabilistic_model.learning.training_schedule import (
+from probabilistic_model.learning.parameters.circuit_parameter_learning import (
+    CircuitParameterLearning,
+)
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.jax_expectation_maximization import (
+    JaxExpectationMaximization,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    JaxGradientDescent,
+)
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.parameters.expectation_maximization.torch_expectation_maximization import (
+    TorchExpectationMaximization,
+)
+from probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent import (
+    TorchGradientDescent,
+)
+from probabilistic_model.learning.parameters.training_schedule import (
     Convergence,
     ConvergenceHistory,
     LearningRatePlateau,
@@ -46,6 +63,9 @@ from probabilistic_model.learning.training_schedule import (
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
+)
+from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.base import (
+    Layer,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
@@ -62,6 +82,9 @@ class LearningMethod(StrEnum):
     RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_GRADIENT_DESCENT = "RAT-SPN, gradient descent"
     RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_EXPECTATION_MAXIMIZATION = (
         "RAT-SPN, expectation maximization"
+    )
+    RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_ONLINE_EXPECTATION_MAXIMIZATION = (
+        "RAT-SPN, online expectation maximization"
     )
     JOINT_PROBABILITY_TREE = "joint probability tree"
 
@@ -136,7 +159,7 @@ class TrainingContext:
         )
         placed = jax_setting.placed(circuit=circuit)
         step_memory = JaxGradientDescent(
-            placed.root, AverageNegativeLogLikelihood()
+            layer=placed.root, loss=AverageNegativeLogLikelihood()
         ).step_memory(jax_setting.asarray(rows=placed.encoded(rows)))
         batch_size = MiniBatches.fitting_in_memory(
             memory=self.device_memory(setting=setting), step_memory=step_memory
@@ -241,40 +264,29 @@ class RandomTensorizedSumProductNetworkLearning(BenchmarkMethod, ABC):
 
 
 @dataclass(kw_only=True)
-class RandomTensorizedSumProductNetworkByGradientDescent(
-    RandomTensorizedSumProductNetworkLearning
+class RandomTensorizedSumProductNetworkByMiniBatches(
+    RandomTensorizedSumProductNetworkLearning, ABC
 ):
     """
-    A RAT-SPN trained generatively by mini-batch gradient descent with Adam, whose
-    learning rate is reduced on plateaus of the training loss.
-    """
-
-    learning_rate: float = 1e-2
-    """
-    The initial learning rate of Adam.
+    A RAT-SPN whose parameters a learner of the setting's array library trains on
+    shuffled mini-batches until the training loss converges.
     """
 
     batch_size: int = 1024
     """
-    The most rows per step, fewer if they do not fit in memory; the largest batch size
-    :cite:`liu2025rethinking` tune Adam over.
+    The most rows per step, fewer if they do not fit in memory.
     """
 
-    learning_rate_plateau: LearningRatePlateau = field(
-        default_factory=LearningRatePlateau
-    )
-    """
-    The schedule of the learning rate, copied for every training.
-    """
-
-    @property
-    def name(self) -> LearningMethod:
-        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_GRADIENT_DESCENT
-
-    def settings(self) -> list[ComputationSetting]:
-        return ComputationSetting.grid(
-            array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
-        )
+    @abstractmethod
+    def learner(
+        self, *, root: Layer, setting: ComputationSetting
+    ) -> CircuitParameterLearning:
+        """
+        :param root: The root of the circuit placed as the setting says.
+        :param setting: The setting that trains.
+        :return: The learner that trains the circuit in the setting.
+        """
+        raise NotImplementedError
 
     def learn(
         self,
@@ -286,22 +298,9 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
         host = self.random_circuit(dataset=dataset)
         rows = dataset.encoded(frame=dataset.train)
         circuit = setting.placed(circuit=host)
-        data = setting.asarray(rows=circuit.encoded(rows))
-        if setting.array_library is ArrayLibrary.TORCH:
-            trainer = TorchGradientDescent(
-                circuit.root,
-                AverageNegativeLogLikelihood(),
-                learning_rate=self.learning_rate,
-                records_cuda_graphs=True,
-            )
-        else:
-            trainer = JaxGradientDescent(
-                circuit.root,
-                AverageNegativeLogLikelihood(),
-                optax.inject_hyperparams(optax.adam)(learning_rate=self.learning_rate),
-            )
+        learner = self.learner(root=circuit.root, setting=setting)
         mini_batches = MiniBatches(
-            batch_size=trainer.largest_even_batch_size(
+            batch_size=learner.largest_even_batch_size(
                 rows=min(
                     self.batch_size,
                     context.rows_per_step(circuit=host, setting=setting, rows=rows),
@@ -309,30 +308,93 @@ class RandomTensorizedSumProductNetworkByGradientDescent(
             ),
             seed=self.seed,
         )
-        run = trainer.minimize_until_converged(
-            data,
+        run = learner.minimize_until_converged(
+            setting.asarray(rows=circuit.encoded(rows)),
             convergence=context.convergence,
             mini_batches=mini_batches,
-            learning_rate_plateau=dataclasses.replace(self.learning_rate_plateau),
         )
         circuit.root = run.trained_root
         return LearnedCircuit(circuit=circuit, history=run.history)
 
 
 @dataclass(kw_only=True)
-class RandomTensorizedSumProductNetworkByExpectationMaximization(
-    RandomTensorizedSumProductNetworkLearning
+class RandomTensorizedSumProductNetworkByGradientDescent(
+    RandomTensorizedSumProductNetworkByMiniBatches
 ):
     """
-    A RAT-SPN trained by full-batch expectation maximization on its rustworkx form, on
-    the host, until the training log-likelihood converges.
+    A RAT-SPN trained generatively by mini-batch gradient descent with Adam, whose
+    learning rate is reduced on plateaus of the training loss, on batches of at most the
+    largest size :cite:`liu2025rethinking` tune Adam over.
+    """
+
+    learning_rate: float = 1e-2
+    """
+    The initial learning rate of Adam.
+    """
+
+    learning_rate_plateau: LearningRatePlateau = field(
+        default_factory=LearningRatePlateau
+    )
+    """
+    The schedule of the learning rate.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_GRADIENT_DESCENT
+
+    def settings(self) -> list[ComputationSetting]:
+        return ComputationSetting.grid(
+            array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
+        )
+
+    def learner(
+        self, *, root: Layer, setting: ComputationSetting
+    ) -> CircuitParameterLearning:
+        if setting.array_library is ArrayLibrary.TORCH:
+            return TorchGradientDescent(
+                layer=root,
+                loss=AverageNegativeLogLikelihood(),
+                learning_rate=self.learning_rate,
+                learning_rate_plateau=self.learning_rate_plateau,
+                records_cuda_graphs=True,
+            )
+        return JaxGradientDescent(
+            layer=root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.inject_hyperparams(optax.adam)(
+                learning_rate=self.learning_rate
+            ),
+            learning_rate_plateau=self.learning_rate_plateau,
+        )
+
+
+@dataclass(kw_only=True)
+class RandomTensorizedSumProductNetworkByExpectationMaximization(
+    RandomTensorizedSumProductNetworkByMiniBatches
+):
+    """
+    A RAT-SPN trained by full-batch expectation maximization until the training
+    log-likelihood converges: on its rustworkx form in the host setting, tensorized on
+    mini-batches whose statistics accumulate over every epoch in the other settings.
     """
 
     expectation_maximization: ExpectationMaximization = field(
         default_factory=ExpectationMaximization
     )
     """
-    The expectation maximization the parameters are learned with.
+    The host expectation maximization, whose regularization the tensorized one shares.
+    """
+
+    batches_per_update: int | None = None
+    """
+    The batches after which the tensorized parameters are updated, once per epoch if
+    ``None``.
+    """
+
+    step_size: float = 1.0
+    """
+    The share of the way to the maximizing parameters that a tensorized update moves.
     """
 
     @property
@@ -340,7 +402,27 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
         return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_EXPECTATION_MAXIMIZATION
 
     def settings(self) -> list[ComputationSetting]:
-        return [ComputationSetting.host()]
+        return [ComputationSetting.host()] + ComputationSetting.grid(
+            array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
+        )
+
+    def learner(
+        self, *, root: Layer, setting: ComputationSetting
+    ) -> CircuitParameterLearning:
+        if setting.array_library is ArrayLibrary.TORCH:
+            return TorchExpectationMaximization(
+                layer=root,
+                batches_per_update=self.batches_per_update,
+                step_size=self.step_size,
+                regularization=self.expectation_maximization.regularization,
+                records_cuda_graphs=True,
+            )
+        return JaxExpectationMaximization(
+            layer=root,
+            batches_per_update=self.batches_per_update,
+            step_size=self.step_size,
+            regularization=self.expectation_maximization.regularization,
+        )
 
     def learn(
         self,
@@ -349,6 +431,12 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
         setting: ComputationSetting,
         context: TrainingContext,
     ) -> LearnedCircuit:
+        """
+        Like :meth:`RandomTensorizedSumProductNetworkByMiniBatches.learn`, but in the
+        host setting on the rustworkx form of the circuit, all rows in one batch.
+        """
+        if setting.array_library is not ArrayLibrary.NUMPY:
+            return super().learn(dataset=dataset, setting=setting, context=context)
         representations = CircuitRepresentations()
         circuit = representations.convert(
             self.random_circuit(dataset=dataset), ProbabilisticCircuit
@@ -370,6 +458,43 @@ class RandomTensorizedSumProductNetworkByExpectationMaximization(
                 circuit=representations.convert(circuit, LayeredProbabilisticCircuit)
             ),
             history=history,
+        )
+
+
+@dataclass(kw_only=True)
+class RandomTensorizedSumProductNetworkByOnlineExpectationMaximization(
+    RandomTensorizedSumProductNetworkByExpectationMaximization
+):
+    """
+    A RAT-SPN trained by online expectation maximization, an update after every batch
+    with the step size of the experiments of Einsum Networks :cite:`peharz2020einsum`.
+    """
+
+    batches_per_update: int | None = 1
+    """
+    An update after every batch.
+    """
+
+    step_size: float = 0.05
+    """
+    The step size of the online expectation maximization of Einsum Networks.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        """
+        The online variant, see
+        :attr:`RandomTensorizedSumProductNetworkByExpectationMaximization.name`.
+        """
+        return LearningMethod.RANDOM_TENSORIZED_SUM_PRODUCT_NETWORK_ONLINE_EXPECTATION_MAXIMIZATION
+
+    def settings(self) -> list[ComputationSetting]:
+        """
+        The tensorized settings alone, since the host learns all rows in one batch, see
+        :meth:`RandomTensorizedSumProductNetworkByExpectationMaximization.settings`.
+        """
+        return ComputationSetting.grid(
+            array_libraries=(ArrayLibrary.JAX, ArrayLibrary.TORCH)
         )
 
 
@@ -427,6 +552,7 @@ class BenchmarkMethods:
         default_factory=lambda: [
             RandomTensorizedSumProductNetworkByGradientDescent(),
             RandomTensorizedSumProductNetworkByExpectationMaximization(),
+            RandomTensorizedSumProductNetworkByOnlineExpectationMaximization(),
             JointProbabilityTreeBaseline(),
         ]
     )

@@ -22,12 +22,13 @@ from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Vector3,
     Pose,
+    ScrewAxis,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -795,20 +796,24 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
         )
         world.add_degree_of_freedom(degree_of_freedom)
         world.add_connection(
-            RevoluteConnection(
+            ScrewAxisConnection(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z(reference_frame=knuckle)
+                ),
                 name=PrefixedName("knuckle_joint"),
                 parent=root,
                 child=knuckle,
-                axis=Vector3.Z(reference_frame=knuckle),
                 raw_dof=degree_of_freedom,
             )
         )
         world.add_connection(
-            RevoluteConnection(
+            ScrewAxisConnection(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z(reference_frame=mirrored_knuckle)
+                ),
                 name=PrefixedName("mirrored_knuckle_joint"),
                 parent=root,
                 child=mirrored_knuckle,
-                axis=Vector3.Z(reference_frame=mirrored_knuckle),
                 raw_dof=degree_of_freedom,
                 multiplier=-1.0,
             )
@@ -821,6 +826,55 @@ def test_builder_writes_a_negative_multiplier_mimic_joints_own_range(tmp_path):
         joint for joint in builder.spec.joints if joint.name == "mirrored_knuckle_joint"
     ]
     assert list(mirrored_joint.range) == pytest.approx([-0.8, 0.0])
+
+
+def _exported_hinge_position(world: World, tmp_path, name: str) -> list[float]:
+    """
+    :return: The position, in its body's frame, of the joint named ``name`` that
+        ``world`` exports to MuJoCo as.
+    """
+    builder = MujocoBuilder()
+    builder.build_world(world=world, file_path=str(tmp_path / f"{name}.xml"))
+    [joint] = [joint for joint in builder.spec.joints if joint.name == "door_hinge"]
+    return list(joint.pos)
+
+
+def test_builder_puts_a_hinge_off_the_connection_origin_on_its_axis(tmp_path):
+    """
+    MuJoCo turns a hinge about the line through the joint's position, so a hinge whose
+    axis misses the connection frame's origin is exported at its axis, in the child's
+    frame, and at the same place once the connection frame is moved onto the axis.
+    """
+    world = World()
+    with world.modify_world():
+        root = Body(name=PrefixedName("root"))
+        door = Body(name=PrefixedName("door"))
+        world.add_body(root)
+        world.add_body(door)
+        hinge_point = numpy.array([0.4, 0.0, 0.0])
+        connection = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=root,
+            child=door,
+            name=PrefixedName("door_hinge"),
+            connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                x=0.1, y=0.2
+            ),
+            screw_axis=ScrewAxis(
+                rotation_per_unit_position=Vector3.Z(),
+                translation_per_unit_position=Vector3.from_iterable(
+                    -numpy.cross([0.0, 0.0, 1.0], hinge_point)
+                ),
+            ),
+        )
+        world.add_connection(connection)
+
+    off_the_origin = _exported_hinge_position(world, tmp_path, "off_the_origin")
+    connection.move_connection_frame_onto_axis()
+    on_the_axis = _exported_hinge_position(world, tmp_path, "on_the_axis")
+
+    assert off_the_origin == pytest.approx([0.3, -0.2, 0.0])
+    assert on_the_axis == pytest.approx(off_the_origin)
 
 
 def test_mujoco_with_tracy_dae_files():
@@ -929,11 +983,13 @@ def test_spawn_body_with_connections():
         with spawn_world.modify_world():
             spawn_world.add_degree_of_freedom(dof)
             spawn_world.add_connection(
-                RevoluteConnection(
+                ScrewAxisConnection(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z(reference_frame=spawn_left_shoulder_body)
+                    ),
                     name=dof.name,
                     parent=root_body,
                     child=spawn_left_shoulder_body,
-                    axis=Vector3.Z(reference_frame=spawn_left_shoulder_body),
                     raw_dof=dof,
                     parent_T_connection_expression=left_shoulder_origin,
                 )
@@ -962,11 +1018,13 @@ def test_spawn_body_with_connections():
         with spawn_world.modify_world():
             spawn_world.add_degree_of_freedom(dof)
             spawn_world.add_connection(
-                RevoluteConnection(
+                ScrewAxisConnection(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3.Z(reference_frame=spawn_right_shoulder_body)
+                    ),
                     name=dof.name,
                     parent=root_body,
                     child=spawn_right_shoulder_body,
-                    axis=Vector3.Z(reference_frame=spawn_right_shoulder_body),
                     raw_dof=dof,
                     parent_T_connection_expression=right_shoulder_origin,
                 )
@@ -1031,11 +1089,13 @@ def test_body_frame_excludes_joint_state_at_build_time():
         world.add_body(base_body)
         world.add_degree_of_freedom(rotated_joint_dof)
         world.add_connection(
-            RevoluteConnection(
+            ScrewAxisConnection(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z(reference_frame=rotated_link)
+                ),
                 name=rotated_joint_dof.name,
                 parent=base_body,
                 child=rotated_link,
-                axis=Vector3.Z(reference_frame=rotated_link),
                 raw_dof=rotated_joint_dof,
                 parent_T_connection_expression=rotated_origin,
             )

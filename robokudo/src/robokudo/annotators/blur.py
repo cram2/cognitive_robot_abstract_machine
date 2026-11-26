@@ -70,7 +70,7 @@ class BlurAnnotator(BaseAnnotator):
         super().__init__(name, descriptor)
         self.logger.debug("%s.__init__()" % self.__class__.__name__)
 
-    def compute_bluriness(self, img: npt.NDArray) -> float:
+    def compute_bluriness(self, *, img: npt.NDArray) -> float:
         """Compute the blur metric for an image.
 
         Uses Laplacian variance to measure image sharpness:
@@ -97,10 +97,10 @@ class BlurAnnotator(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
-        color = self.get_cas().get(CASViews.COLOR_IMAGE)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
+        color = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
 
-        bluriness = self.compute_bluriness(color)
+        bluriness = self.compute_bluriness(img=color)
 
         visualization_img = copy.deepcopy(color)
         font = cv2.FONT_HERSHEY_COMPLEX
@@ -120,8 +120,8 @@ class BlurAnnotator(BaseAnnotator):
             {"name": "Cloud", "geometry": cloud},
         ]
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
-        self.get_annotator_output_struct().set_image(visualization_img)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

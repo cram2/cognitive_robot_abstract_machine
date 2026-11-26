@@ -72,7 +72,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with custom parameters
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         image_preprocessor_config = ImagePreprocessorAnnotator.Descriptor()
         image_preprocessor_config.parameters.depth_trunc = 4.5

@@ -22,14 +22,18 @@ from probabilistic_model.distributions.distributions import (
     SymbolicDistribution,
 )
 from probabilistic_model.exceptions import NonContinuousVariableError
-from probabilistic_model.learning.gaussian_mixture.covariance_type import (
+from probabilistic_model.learning.structure.gaussian_mixture.covariance_type import (
     CovarianceType,
 )
-from probabilistic_model.learning.gaussian_mixture.gaussian_mixture_model import (
+from probabilistic_model.learning.structure.gaussian_mixture.gaussian_mixture_model import (
     GaussianMixtureModel,
 )
-from probabilistic_model.learning.gaussian_mixture.step_mix_model import StepMixModel
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.gaussian_mixture.step_mix_model import (
+    StepMixModel,
+)
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     MultivariateLeaf,
