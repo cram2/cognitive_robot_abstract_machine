@@ -39,6 +39,14 @@ def correlated_gaussians() -> tuple[SortedSet, np.ndarray, float]:
     return variables, rows, -0.5 * np.log(1.0 - correlation**2)
 
 
+@pytest.fixture
+def bits() -> DependentBits:
+    """
+    Six binary variables in three pairs that copy each other.
+    """
+    return DependentBits()
+
+
 def copy_and_noise() -> tuple[np.ndarray, float]:
     """
     :return: Rows of a fair bit, its copy and an independent bit, and the entropy of
@@ -94,6 +102,22 @@ def test_binned_mutual_information_of_a_copy_is_its_entropy_and_of_noise_is_smal
 
     assert mutual_information[0, 1] == pytest.approx(entropy)
     assert mutual_information[0, 2] < 1e-3
+
+
+def test_binned_mutual_information_counted_in_chunks_is_that_of_all_rows_at_once(bits):
+    """
+    Counting the rows in chunks gives the estimate of counting them all at once.
+    """
+    rows = bits.rows()
+
+    in_chunks = BinnedMutualInformation(rows_per_chunk=7).estimate(
+        variables=bits.variables, data=rows
+    )
+    at_once = BinnedMutualInformation(rows_per_chunk=len(rows)).estimate(
+        variables=bits.variables, data=rows
+    )
+
+    np.testing.assert_allclose(in_chunks, at_once)
 
 
 # %% Gaussian

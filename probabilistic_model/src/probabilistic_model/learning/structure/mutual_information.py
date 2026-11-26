@@ -56,6 +56,12 @@ class BinnedMutualInformation(MutualInformationEstimator):
     The number of quantile bins a continuous variable with many values is cut into.
     """
 
+    rows_per_chunk: int = 65536
+    """
+    The number of rows counted at once, which bounds the memory of the count to about
+    four bytes per row of a chunk and level of every variable.
+    """
+
     def discretize_rows(
         self, *, variables: SortedSet, data: npt.NDArray[np.float64]
     ) -> npt.NDArray[np.int64]:
@@ -85,20 +91,25 @@ class BinnedMutualInformation(MutualInformationEstimator):
         number_of_rows, number_of_variables = levels.shape
         number_of_levels = levels.max(axis=0) + 1
         offsets = np.concatenate([[0], np.cumsum(number_of_levels)])
-        one_hot = np.zeros((number_of_rows, int(offsets[-1])), dtype=np.float32)
-        one_hot[
-            np.repeat(np.arange(number_of_rows), number_of_variables),
-            (levels + offsets[:-1]).ravel(),
-        ] = 1.0
-        joint = (one_hot.T @ one_hot).astype(float) / number_of_rows
+        total_levels = int(offsets[-1])
+        joint_counts = np.zeros((total_levels, total_levels))
+        for start in range(0, number_of_rows, self.rows_per_chunk):
+            chunk = levels[start : start + self.rows_per_chunk]
+            one_hot = np.zeros((len(chunk), total_levels), dtype=np.float32)
+            one_hot[
+                np.repeat(np.arange(len(chunk)), number_of_variables),
+                (chunk + offsets[:-1]).ravel(),
+            ] = 1.0
+            joint_counts += one_hot.T @ one_hot
+        joint = joint_counts / number_of_rows
         marginal = np.diag(joint)
         with np.errstate(divide="ignore", invalid="ignore"):
             terms = np.where(
                 joint > 0, joint * np.log(joint / np.outer(marginal, marginal)), 0.0
             )
-        level_of_variable = np.zeros((int(offsets[-1]), number_of_variables))
+        level_of_variable = np.zeros((total_levels, number_of_variables))
         level_of_variable[
-            np.arange(int(offsets[-1])),
+            np.arange(total_levels),
             np.repeat(np.arange(number_of_variables), number_of_levels),
         ] = 1.0
         result = level_of_variable.T @ terms @ level_of_variable
