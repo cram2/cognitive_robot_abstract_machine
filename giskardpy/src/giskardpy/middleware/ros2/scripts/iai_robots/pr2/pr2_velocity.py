@@ -5,6 +5,8 @@ Launch Giskard with closed-loop velocity control for the PR2.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from rclpy.node import Node
 
 from giskardpy.middleware.ros2.giskard import Giskard
@@ -37,7 +39,12 @@ def create_giskard(node: Node) -> Giskard:
         ),
         robot_interface_config=PR2VelocityInterface(),
         server_config=GiskardServerConfig(),
-        qp_controller_config=QPControllerConfig(target_frequency=20),
+        qp_controller_config=QPControllerConfig(
+            # below the 100 Hz of /joint_states; the braking keeps the stops slower than
+            # the shoulders' resonance between 1 and 2 Hz
+            target_frequency=80,
+            braking_time=timedelta(seconds=0.5),
+        ),
     )
 
 
