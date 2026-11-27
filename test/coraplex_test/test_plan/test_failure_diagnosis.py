@@ -71,7 +71,11 @@ from semantic_digital_twin.world_description.connections import ScrewAxisConnect
 from semantic_digital_twin.world_description.degree_of_freedom import PositionLimitSide
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from .test_failure_recovery import GraspFailingItsFirstRuns
-from coraplex.plans.executors import PhysicallySimulatedPlanExecutor
+from coraplex.plans.executors import (
+    KinematicallySimulatedPlanExecutor,
+    PhysicallySimulatedPlanExecutor,
+)
+from coraplex.plans.underspecified import SubtreeRebuild
 from cramph.context import StatechartContext
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from ...plan_running import (
@@ -752,6 +756,18 @@ class TurnAfterWindingTheWristUp:
             failure=failure,
         )
 
+    def executor_running(
+        self, *, node: StatechartNode
+    ) -> KinematicallySimulatedPlanExecutor:
+        """
+        :param node: A node built onto the world the plan ran in.
+        :return: An executor compiled to run `node` from where the plan left the
+            robot.
+        """
+        executor = simulated_executor(self.extensions)
+        executor.compile(statechart=statechart_of(executor, node))
+        return executor
+
 
 def test_a_turn_stalled_at_a_limit_is_blamed_on_the_node_that_wound_the_joint_up(
     tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
@@ -793,14 +809,25 @@ def test_unwinding_the_wrist_where_the_turn_stalled_lets_the_turn_reach_its_goal
     tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
 ) -> None:
     """
-    The wrist is turned a full turn back from the limit the turn stalled at in the
-    world the plan ran in, not in a copy, and the turn, run again from there, reaches
-    its goal instead of stalling.
+    In the world the plan ran in, not in a copy, the turn run again from where it
+    stalled stalls again. Once the wrist is turned a full turn back from its limit, the
+    turn run again reaches its goal.
     """
     plan = TurnAfterWindingTheWristUp.run(
         world=tracy_world_copy, arm_pose=tracy_arm_pose
     )
-    turn_again = Sequence(
+    stalled_again = Sequence(
+        nodes=[
+            SubtreeRebuild(root=plan.turn, candidates={}).build_for_trial(
+                world=tracy_world_copy
+            )
+        ]
+    )
+    with pytest.raises(MotionMadeNoProgress):
+        plan.executor_running(node=stalled_again).execute()
+    wrist_at_the_limit = plan.wrist.position
+
+    unwound = Sequence(
         nodes=[
             TaskWithJointsUnwound(
                 root=plan.turn,
@@ -809,11 +836,13 @@ def test_unwinding_the_wrist_where_the_turn_stalled_lets_the_turn_reach_its_goal
             ).build_for_trial(world=tracy_world_copy)
         ]
     )
-    executor = simulated_executor(plan.extensions)
-    executor.compile(statechart=statechart_of(executor, turn_again))
-    executor.execute()
+    wrist_unwound = plan.wrist.position
+    plan.executor_running(node=unwound).execute()
 
-    assert turn_again.life_cycle_state == LifeCycleValue.SUCCEEDED
+    assert (wrist_unwound, unwound.life_cycle_state) == (
+        pytest.approx(wrist_at_the_limit - math.tau),
+        LifeCycleValue.SUCCEEDED,
+    )
 
 
 def test_unwinding_a_joint_that_does_not_block_the_turn_leaves_it_stalled(
