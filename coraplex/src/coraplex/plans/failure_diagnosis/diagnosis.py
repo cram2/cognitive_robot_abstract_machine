@@ -10,6 +10,9 @@ from functools import singledispatchmethod
 
 from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph, RootCause
 from coraplex.plans.failure_diagnosis.counterfactual import (
+    PositionLimitRetry,
+    RetryFromEarlierPositions,
+    RetryWithJointsUnwound,
     StallCounterfactual,
     retry_task_with_chain_from_world_root,
 )
@@ -36,9 +39,12 @@ from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.data_types import TransitionKind
 from cramph.node import StatechartNode
 from cramph.node_runs import StatechartRuns
+from cramph.run_start_positions import RunStartPositions
 from cramph.state_history import NodeRun
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
+from giskardpy.motion_statechart.exceptions import PositionLimitBlockedError
+from giskardpy.motion_statechart.monitors.progress_monitors import BlockedPositionLimit
 from krrood.patterns.called_positionally import called_positionally
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
@@ -62,6 +68,12 @@ class FailureDiagnoser:
     a diagnosis; None if the plan has none.
     """
 
+    position_limit_retries: list[PositionLimitRetry] = field(default_factory=list)
+    """
+    The ways to retry a task stalled at position limits, tried in this order until one
+    reaches its goal.
+    """
+
     stalled_nodes: list[StatechartNode] = field(default_factory=list, init=False)
     """
     The nodes a motion failure reported as no longer approaching their goal.
@@ -78,6 +90,13 @@ class FailureDiagnoser:
     """
     The degrees of freedom that moved the bodies a motion failure reported as too close
     to each other.
+    """
+
+    blocked_position_limits: list[BlockedPositionLimit] = field(
+        default_factory=list, init=False
+    )
+    """
+    The position limits a motion failure reported as blocking the stalled nodes.
     """
 
     diagnosis_kinds: list[type[FailureDiagnosis]] = field(
@@ -98,7 +117,7 @@ class FailureDiagnoser:
         """
         :param statechart: A statechart that ran, at least in part.
         :return: A diagnoser over its causal graph, trying counterfactuals in the trial
-            its plan tries candidates in.
+            its plan tries candidates in, from where its runs found what they move.
         """
         access = statechart.context.get_extension(extension_type=ChildChooserAccess)
         choosers = [] if access is None else access.choosers
@@ -110,9 +129,24 @@ class FailureDiagnoser:
             ),
             None,
         )
+        causal_graph = RunCausalGraph.from_statechart(statechart=statechart)
+        retries: list[PositionLimitRetry] = [
+            RetryWithJointsUnwound(world=statechart.context.world)
+        ]
+        run_start_positions = statechart.context.get_extension(
+            extension_type=RunStartPositions
+        )
+        if run_start_positions is not None:
+            retries.append(
+                RetryFromEarlierPositions(
+                    world_changes=causal_graph.world_changes,
+                    run_start_positions=run_start_positions,
+                )
+            )
         return cls(
-            causal_graph=RunCausalGraph.from_statechart(statechart=statechart),
+            causal_graph=causal_graph,
             action_trial=trial,
+            position_limit_retries=retries,
         )
 
     @property
@@ -135,6 +169,7 @@ class FailureDiagnoser:
         self.stalled_nodes = []
         self.colliding_nodes = []
         self.colliding_degrees_of_freedom = frozenset()
+        self.blocked_position_limits = []
         return self.diagnose_reported_runs(failure)
 
     @singledispatchmethod
@@ -161,6 +196,8 @@ class FailureDiagnoser:
         self.stalled_nodes = list(failure.no_progress.stalled_tasks) or [
             failure.no_progress.progress_monitor.monitored_node
         ]
+        if isinstance(failure.no_progress, PositionLimitBlockedError):
+            self.blocked_position_limits = failure.no_progress.blocked_position_limits
         return [
             self.diagnose_run(reported_run=self.runs.latest_run_of_node(node=node))
             for node in self.stalled_nodes
@@ -326,10 +363,10 @@ class FailureDiagnoser:
         self, *, stalled: NodeRun
     ) -> tuple[list[RootCause], StallCounterfactual | None]:
         """
-        A task stops approaching its goal when another task drives its degrees of
-        freedom at the same time, or when its goal depends on degrees of freedom it
-        cannot move, which an earlier run left where they are. The latter holds only if
-        the task, tried again free to move them, reaches its goal.
+        A task stalls when another task drives its degrees of freedom at once, when an
+        earlier run left a joint it moves at a position limit, or when an earlier run
+        left degrees of freedom it cannot move where they are. The latter two hold only
+        if the task, retried with that joint moved back or free to move them, succeeds.
 
         :param stalled: The run that stopped approaching its goal.
         :return: The runs that made it stall, the most likely first, and what trying it
@@ -348,6 +385,28 @@ class FailureDiagnoser:
                 RootCause(causing_run=edge.cause, edges_to_origin=(edge,))
                 for edge in conflicts
             ], None
+        blocked = [
+            limit
+            for limit in self.blocked_position_limits
+            if limit.task is stalled.node
+        ]
+        blocked_degrees_of_freedom = frozenset(
+            limit.degree_of_freedom for limit in blocked
+        )
+        limit_counterfactual = None
+        for retry in self.position_limit_retries:
+            counterfactual = retry.try_in(
+                trial=self.action_trial,
+                stalled=stalled,
+                blocked_position_limits=blocked,
+            )
+            if counterfactual is None:
+                continue
+            if counterfactual == retry.reached:
+                return self.last_plan_runs_moving(
+                    degrees_of_freedom=blocked_degrees_of_freedom, statement=stalled
+                ), counterfactual
+            limit_counterfactual = counterfactual
         unmovable = (
             access.read_degrees_of_freedom - access.moved_or_held_degrees_of_freedom
         )
@@ -357,7 +416,7 @@ class FailureDiagnoser:
             if isinstance(edge, WorldStateEdge) and edge.degrees_of_freedom & unmovable
         ]
         if not left_by_earlier:
-            return [], None
+            return [], limit_counterfactual
         counterfactual = retry_task_with_chain_from_world_root(
             task=stalled.node, trial=self.action_trial
         )

@@ -7,13 +7,18 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 import pytest
 
 from coraplex.datastructures.enums import InsertionPosition
 from coraplex.exceptions import MotionDidNotFinish
 from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph
-from coraplex.plans.failure_diagnosis.counterfactual import StallCounterfactual
+from coraplex.plans.failure_diagnosis.counterfactual import (
+    StallCounterfactual,
+    RetryWithJointsUnwound,
+    TaskWithJointsUnwound,
+)
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
 from coraplex.plans.failure_diagnosis.diagnosis import FailureDiagnoser
 from coraplex.plans.failure_diagnosis.exceptions import (
@@ -44,19 +49,34 @@ from cramph.composites import Parallel, Sequence, StatementNode
 from cramph.data_types import LifeCycleValue
 from cramph.failure_handling import HandledOnFailure, LimitedRecovery, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
+from cramph.node_runs import StatechartRuns
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
+from giskardpy.motion_statechart.monitors.progress_monitors import BlockedPositionLimit
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
+from giskardpy.motion_statechart.tasks.cartesian_tasks import (
+    CartesianOrientation,
+    CartesianPose,
+)
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from krrood.entity_query_language.factories import a, variable_from
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose, Pose2D, Vector3
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_parts import EndEffector
+from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
+from semantic_digital_twin.world_description.degree_of_freedom import PositionLimitSide
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from .test_failure_recovery import GraspFailingItsFirstRuns
-from coraplex.plans.executors import PhysicallySimulatedPlanExecutor
+from coraplex.plans.executors import (
+    KinematicallySimulatedPlanExecutor,
+    PhysicallySimulatedPlanExecutor,
+)
+from coraplex.plans.underspecified import SubtreeRebuild
 from cramph.context import StatechartContext
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from ...plan_running import (
@@ -65,6 +85,7 @@ from ...plan_running import (
     statechart_of,
     world_of,
 )
+from ...dataset.wound_up_wrist import ShortWrist, WristWinding
 from ...pytest_environment import runs_in_continuous_integration
 
 # %% mimics
@@ -159,13 +180,17 @@ class RecoveryByRootCause(LimitedRecovery):
 
 
 def run_until_it_fails(
-    plan: StatechartNode, extensions: list, failure: type[Exception]
+    plan: StatechartNode,
+    extensions: list,
+    failure: type[Exception],
+    **executor_options,
 ) -> tuple[Statechart, Exception]:
     """
+    :param executor_options: Further arguments of the simulated executor.
     :return: The statechart of `plan`, run until it failed with `failure`, and the
         failure.
     """
-    executor = simulated_executor(extensions)
+    executor = simulated_executor(extensions, **executor_options)
     executor.compile(statechart=statechart_of(executor, plan))
     with pytest.raises(failure) as raised:
         executor.execute()
@@ -614,6 +639,365 @@ def test_a_place_depends_on_the_pick_up_that_attached_its_object(
     assert isinstance(attached.cause.node, MoveBranch)
     assert Action.enclosing_action_of(node=attached.cause.node) is pick_up
     assert attached.frames == {milk.root}
+
+
+# %% a wrist turn stalls at the limit an earlier node wound the wrist up to
+
+
+def tracy_turning_its_tool(
+    *,
+    world: World,
+    wrist_position: float,
+    arm_pose: dict[TracyJoint, float],
+    angle: float = math.pi / 2,
+) -> tuple[list, CartesianPose]:
+    """
+    :param world: Tracy's world, whose right arm is put in `arm_pose`.
+    :param wrist_position: Where the last wrist joint starts.
+    :param arm_pose: The pose of the rest of the right arm.
+    :param angle: How far to turn the tool about its own axis from where it starts.
+    :return: The context extensions of Tracy's plans, and the turn of its right tool,
+        to a goal fixed in the world.
+    """
+    JointState.from_str_dict(
+        arm_pose | {TracyJoint.RIGHT_WRIST_3: wrist_position}, world=world
+    ).apply_to(world)
+    tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    turn = CartesianPose(
+        kinematic_chain=KinematicChain(root=world.root, tip=tip),
+        goal_pose=world.transform(
+            Pose.from_xyz_axis_angle(
+                axis=Vector3(z=1), angle=angle, reference_frame=tip
+            ),
+            world.root,
+        ),
+    )
+    tracy = world.get_semantic_annotations_by_type(Tracy)[0]
+    return robot_extensions(tracy), turn
+
+
+def orientation_task_of(turn: CartesianPose) -> CartesianOrientation:
+    """
+    :return: The task of `turn` that turns the tool, the one its wrist blocks.
+    """
+    [orientation] = [
+        node for node in turn.nodes if isinstance(node, CartesianOrientation)
+    ]
+    return orientation
+
+
+@dataclass(kw_only=True)
+class TurnAfterWindingTheWristUp:
+    """
+    Tracy's plan that winds its wrist a full turn up to the upper limit and then turns
+    its tool, run until the turn stalls at that limit.
+    """
+
+    extensions: list
+    """
+    The context extensions of the plan.
+    """
+
+    wrist: ScrewAxisConnection
+    """
+    The last wrist joint of the right arm.
+    """
+
+    wind_up: JointPositionList
+    """
+    The joint move winding the wrist up, which leaves the tool where it was.
+    """
+
+    turn: CartesianPose
+    """
+    The tool's turn, which stalls at the wrist's upper limit.
+    """
+
+    statechart: Statechart
+    """
+    The plan's statechart, run until the turn stalled.
+    """
+
+    failure: MotionMadeNoProgress
+    """
+    The stall of the turn.
+    """
+
+    @classmethod
+    def run(
+        cls, *, world: World, arm_pose: dict[TracyJoint, float]
+    ) -> TurnAfterWindingTheWristUp:
+        """
+        :param world: Tracy's world.
+        :param arm_pose: The pose of the right arm but its last wrist joint.
+        :return: The plan, run in `world` until the turn stalled.
+        """
+        extensions, turn = tracy_turning_its_tool(
+            world=world, wrist_position=WristWinding.UNWOUND.value, arm_pose=arm_pose
+        )
+        wrist = world.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
+        wind_up = JointPositionList(
+            name="wind up the wrist",
+            goal_state=JointState.from_mapping({wrist: WristWinding.WOUND_UP.value}),
+        )
+        # Winding the wrist a full turn takes most of the simulated time a plan of
+        # tasks is given by default.
+        statechart, failure = run_until_it_fails(
+            Sequence(nodes=[wind_up, turn]),
+            extensions,
+            MotionMadeNoProgress,
+            simulation_time_per_action=timedelta(seconds=80),
+        )
+        return cls(
+            extensions=extensions,
+            wrist=wrist,
+            wind_up=wind_up,
+            turn=turn,
+            statechart=statechart,
+            failure=failure,
+        )
+
+    def executor_running(
+        self, *, node: StatechartNode
+    ) -> KinematicallySimulatedPlanExecutor:
+        """
+        :param node: A node built onto the world the plan ran in.
+        :return: An executor compiled to run `node` from where the plan left the
+            robot.
+        """
+        executor = simulated_executor(self.extensions)
+        executor.compile(statechart=statechart_of(executor, node))
+        return executor
+
+
+def test_a_turn_stalled_at_a_limit_is_blamed_on_the_node_that_wound_the_joint_up(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    A joint move turns the wrist a full turn, which leaves the tool where it was, but
+    the tool's turn after it then stalls at the wrist's upper limit.
+
+    Tried again with the wrist turned a full turn back, the turn reaches its goal, so
+    the joint move is blamed.
+    """
+    plan = TurnAfterWindingTheWristUp.run(
+        world=tracy_world_copy, arm_pose=tracy_arm_pose
+    )
+    diagnoses = FailureDiagnoser.from_statechart(
+        statechart=plan.statechart
+    ).diagnose_failure(failure=plan.failure)
+    report("tool turn after winding the wrist up", diagnoses)
+
+    [diagnosis] = [
+        diagnosis
+        for diagnosis in diagnoses
+        if diagnosis.origin_run.node is orientation_task_of(plan.turn)
+    ]
+    assert (
+        type(diagnosis),
+        diagnosis.counterfactual,
+        [root.causing_run.node for root in diagnosis.root_causes],
+        [root.edges_to_origin[0].degrees_of_freedom for root in diagnosis.root_causes],
+    ) == (
+        TaskStalled,
+        StallCounterfactual.REACHED_UNWOUND,
+        [plan.wind_up],
+        [frozenset({plan.wrist.raw_dof})],
+    )
+
+
+def test_unwinding_the_wrist_where_the_turn_stalled_lets_the_turn_reach_its_goal(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    In the world the plan ran in, not in a copy, the turn run again from where it
+    stalled stalls again.
+
+    Once the wrist is turned a full turn back from its limit, the turn run again reaches
+    its goal.
+    """
+    plan = TurnAfterWindingTheWristUp.run(
+        world=tracy_world_copy, arm_pose=tracy_arm_pose
+    )
+    stalled_again = Sequence(
+        nodes=[
+            SubtreeRebuild(root=plan.turn, candidates={}).build_for_trial(
+                world=tracy_world_copy
+            )
+        ]
+    )
+    with pytest.raises(MotionMadeNoProgress):
+        plan.executor_running(node=stalled_again).execute()
+    wrist_at_the_limit = plan.wrist.position
+
+    unwound = Sequence(
+        nodes=[
+            TaskWithJointsUnwound(
+                root=plan.turn,
+                candidates={},
+                blocked_position_limits=plan.failure.no_progress.blocked_position_limits,
+            ).build_for_trial(world=tracy_world_copy)
+        ]
+    )
+    wrist_unwound = plan.wrist.position
+    plan.executor_running(node=unwound).execute()
+
+    assert (wrist_unwound, unwound.life_cycle_state) == (
+        pytest.approx(wrist_at_the_limit - math.tau),
+        LifeCycleValue.SUCCEEDED,
+    )
+
+
+def test_unwinding_a_joint_that_does_not_block_the_turn_leaves_it_stalled(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    Turning another wrist joint a full turn leaves the tool where it was and the wrist
+    that blocks the turn at its limit, so the turn, tried again with the position task
+    running beside it, stalls again.
+    """
+    plan = TurnAfterWindingTheWristUp.run(
+        world=tracy_world_copy, arm_pose=tracy_arm_pose
+    )
+    stalled = orientation_task_of(plan.turn)
+    other_wrist = tracy_world_copy.get_connection_by_name(
+        TracyJoint.RIGHT_WRIST_1.value
+    )
+
+    assert (
+        RetryWithJointsUnwound(world=tracy_world_copy).try_in(
+            trial=FailureDiagnoser.from_statechart(
+                statechart=plan.statechart
+            ).action_trial,
+            stalled=StatechartRuns(statechart=plan.statechart).latest_run_of_node(
+                node=stalled
+            ),
+            blocked_position_limits=[
+                BlockedPositionLimit(
+                    degree_of_freedom=other_wrist.raw_dof,
+                    side=PositionLimitSide.LOWER,
+                    task=stalled,
+                )
+            ],
+        )
+        == StallCounterfactual.STILL_STALLED_UNWOUND
+    )
+
+
+def test_a_turn_stalled_at_a_limit_the_joint_started_at_is_blamed_on_no_other_node(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    The wrist starts wound up, so the tool's turn stalls at its upper limit and reaches
+    its goal with the wrist turned a full turn back, but no node of the plan wound it
+    up.
+    """
+    extensions, turn = tracy_turning_its_tool(
+        world=tracy_world_copy,
+        wrist_position=WristWinding.WOUND_UP.value,
+        arm_pose=tracy_arm_pose,
+    )
+
+    statechart, failure = run_until_it_fails(
+        Sequence(nodes=[turn]), extensions, MotionMadeNoProgress
+    )
+    diagnoses = FailureDiagnoser.from_statechart(
+        statechart=statechart
+    ).diagnose_failure(failure=failure)
+    report("tool turn from a wound up wrist", diagnoses)
+
+    [diagnosis] = [
+        diagnosis
+        for diagnosis in diagnoses
+        if diagnosis.origin_run.node is orientation_task_of(turn)
+    ]
+    assert (
+        type(diagnosis),
+        diagnosis.counterfactual,
+        diagnosis.verdict,
+    ) == (TaskStalled, StallCounterfactual.REACHED_UNWOUND, Verdict.NO_OTHER_NODE)
+
+
+def test_a_turn_stalled_at_a_short_limit_is_blamed_on_the_node_that_moved_the_joint(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    The wrist turns less than a full turn, so it cannot be unwound.
+
+    A joint move takes it close to its upper limit, and the tool's turn after it, taking
+    the short way, stalls at that limit. Tried again with the wrist put back where the
+    joint move found it, the turn takes the other way and reaches its goal, so the joint
+    move is blamed.
+    """
+    wrist = tracy_world_copy.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
+    wrist.raw_dof.limits.lower.position = ShortWrist.LOWER_LIMIT.value
+    wrist.raw_dof.limits.upper.position = ShortWrist.UPPER_LIMIT.value
+    extensions, turn = tracy_turning_its_tool(
+        world=tracy_world_copy,
+        wrist_position=ShortWrist.START.value,
+        arm_pose=tracy_arm_pose,
+        angle=ShortWrist.GOAL.value - math.tau - ShortWrist.START.value,
+    )
+    move_up = JointPositionList(
+        name="move the wrist up",
+        goal_state=JointState.from_mapping({wrist: ShortWrist.NEAR_UPPER_LIMIT.value}),
+    )
+
+    statechart, failure = run_until_it_fails(
+        Sequence(nodes=[move_up, turn]),
+        extensions,
+        MotionMadeNoProgress,
+        simulation_time_per_action=timedelta(seconds=80),
+    )
+    diagnoses = FailureDiagnoser.from_statechart(
+        statechart=statechart
+    ).diagnose_failure(failure=failure)
+    report("tool turn after moving a short wrist up", diagnoses)
+
+    [diagnosis] = [
+        diagnosis
+        for diagnosis in diagnoses
+        if diagnosis.origin_run.node is orientation_task_of(turn)
+    ]
+    assert (
+        type(diagnosis),
+        diagnosis.counterfactual,
+        [root.causing_run.node for root in diagnosis.root_causes],
+        [root.edges_to_origin[0].degrees_of_freedom for root in diagnosis.root_causes],
+    ) == (
+        TaskStalled,
+        StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS,
+        [move_up],
+        [frozenset({wrist.raw_dof})],
+    )
+
+
+def test_only_a_revolute_joint_whose_range_spans_a_full_turn_is_unwound(
+    pr2_apartment_context,
+) -> None:
+    """
+    The PR2's torso slides and its elbow turns less than a full turn, so neither is
+    turned a full turn back from a limit blocking a task.
+    """
+    world, robot, extensions = pr2_apartment_context
+    torso = world.get_connection_by_name("torso_lift_joint")
+    elbow = world.get_connection_by_name("r_elbow_flex_joint")
+    task = JointPositionList(goal_state=JointState.from_mapping({torso: 0.2}))
+
+    assert (
+        TaskWithJointsUnwound.unwindable(
+            world=world,
+            blocked_position_limits=[
+                BlockedPositionLimit(
+                    degree_of_freedom=joint.raw_dof,
+                    side=PositionLimitSide.UPPER,
+                    task=task,
+                )
+                for joint in (torso, elbow)
+            ],
+        )
+        == []
+    )
 
 
 # %% the same diagnoses in physics

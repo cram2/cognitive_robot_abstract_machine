@@ -87,7 +87,7 @@ from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.robots.armar7 import Armar7
 from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.justin import Justin
@@ -613,6 +613,29 @@ def tracy_world():
     world_with_tracy = tracy_parser.create_world()
     Tracy.from_world(world_with_tracy)
     return world_with_tracy
+
+
+@pytest.fixture()
+def tracy_arm_pose() -> dict[TracyJoint, float]:
+    """
+    :return: An elbow-up pose of Tracy's right arm, away from its singularities.
+    """
+    return {
+        TracyJoint.RIGHT_SHOULDER_PAN: 0.0,
+        TracyJoint.RIGHT_SHOULDER_LIFT: -np.pi / 2,
+        TracyJoint.RIGHT_ELBOW: np.pi / 2,
+        TracyJoint.RIGHT_WRIST_1: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_2: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_3: 0.0,
+    }
+
+
+@pytest.fixture()
+def tracy_world_copy(tracy_world: World) -> World:
+    """
+    :return: A copy of Tracy's world that a test may move the robot in.
+    """
+    return deepcopy(tracy_world)
 
 
 @pytest.fixture(scope="session")

@@ -55,6 +55,7 @@ from cramph.executor import (
     SteppedSimulationPacer,
 )
 from cramph.node import StatechartNode, TerminalNode
+from cramph.run_start_positions import RunStartPositionRecording
 from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl
 from giskardpy.motion_statechart.exceptions import (
@@ -454,9 +455,14 @@ class SimulatedPlanExecutor(PlanExecutor, StatechartExecutor, ABC):
         self.simulation_time_limit = self.simulation_time_per_action
 
     def default_executor_extensions(self) -> list[ExecutorExtension]:
+        """
+        :return: The ROS node access, the motion control driving the simulated robot,
+            and the recording of where each run found what it moves.
+        """
         return [
             RosNodeAccess(ros_node=self.ros_node),
             MotionControl(qp_controller_config=self.create_qp_controller_config()),
+            RunStartPositionRecording(),
         ]
 
     @abstractmethod
