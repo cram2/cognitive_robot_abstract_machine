@@ -29,3 +29,39 @@ class WristWinding(float, Enum):
     """
     Just short of the upper position limit.
     """
+
+
+# %% a wrist whose range is shorter than a full turn
+
+
+class ShortWrist(float, Enum):
+    """
+    Positions of the last wrist joint of Tracy's right arm, in radians, once its
+    position limits are narrowed to less than a full turn.
+    """
+
+    LOWER_LIMIT = -1.2
+    """
+    The narrowed lower position limit.
+    """
+
+    UPPER_LIMIT = 4.9
+    """
+    The narrowed upper position limit.
+    """
+
+    START = -0.3
+    """
+    Where the wrist starts.
+    """
+
+    NEAR_UPPER_LIMIT = 4.6
+    """
+    Where an earlier joint move takes the wrist, just short of the upper limit.
+    """
+
+    GOAL = 5.2
+    """
+    Where a tool turn leads from :attr:`NEAR_UPPER_LIMIT` the short way, past the upper
+    limit; from :attr:`START` the same turn ends a full turn lower, within the limits.
+    """

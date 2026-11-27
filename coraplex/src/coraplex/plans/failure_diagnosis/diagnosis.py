@@ -11,6 +11,7 @@ from functools import singledispatchmethod
 from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph, RootCause
 from coraplex.plans.failure_diagnosis.counterfactual import (
     StallCounterfactual,
+    retry_task_from_earlier_positions,
     retry_task_with_chain_from_world_root,
     retry_task_with_joints_unwound,
 )
@@ -37,6 +38,7 @@ from cramph.composites import ChildChooserAccess, StatementNode
 from cramph.data_types import TransitionKind
 from cramph.node import StatechartNode
 from cramph.node_runs import StatechartRuns
+from cramph.run_start_positions import RunStartPositions
 from cramph.state_history import NodeRun
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
@@ -63,6 +65,12 @@ class FailureDiagnoser:
     """
     The trial the plan tries its candidates in, which also tries the counterfactuals of
     a diagnosis; None if the plan has none.
+    """
+
+    run_start_positions: RunStartPositions | None = None
+    """
+    Where each run of the statechart found the degrees of freedom it moves; None if that
+    was not recorded.
     """
 
     stalled_nodes: list[StatechartNode] = field(default_factory=list, init=False)
@@ -108,7 +116,7 @@ class FailureDiagnoser:
         """
         :param statechart: A statechart that ran, at least in part.
         :return: A diagnoser over its causal graph, trying counterfactuals in the trial
-            its plan tries candidates in.
+            its plan tries candidates in, from where its runs found what they move.
         """
         access = statechart.context.get_extension(extension_type=ChildChooserAccess)
         choosers = [] if access is None else access.choosers
@@ -123,6 +131,9 @@ class FailureDiagnoser:
         return cls(
             causal_graph=RunCausalGraph.from_statechart(statechart=statechart),
             action_trial=trial,
+            run_start_positions=statechart.context.get_extension(
+                extension_type=RunStartPositions
+            ),
         )
 
     @property
@@ -340,9 +351,9 @@ class FailureDiagnoser:
     ) -> tuple[list[RootCause], StallCounterfactual | None]:
         """
         A task stalls when another task drives its degrees of freedom at once, when an
-        earlier run wound a joint it moves up to a position limit, or when an earlier run
+        earlier run left a joint it moves at a position limit, or when an earlier run
         left degrees of freedom it cannot move where they are. The latter two hold only
-        if the task, retried with that joint unwound or free to move them, succeeds.
+        if the task, retried with that joint moved back or free to move them, succeeds.
 
         :param stalled: The run that stopped approaching its goal.
         :return: The runs that made it stall, the most likely first, and what trying it
@@ -366,6 +377,9 @@ class FailureDiagnoser:
             for limit in self.blocked_position_limits
             if limit.task is stalled.node
         ]
+        blocked_degrees_of_freedom = frozenset(
+            limit.degree_of_freedom for limit in blocked
+        )
         unwound = retry_task_with_joints_unwound(
             task=stalled.node,
             blocked_position_limits=blocked,
@@ -374,11 +388,20 @@ class FailureDiagnoser:
         )
         if unwound == StallCounterfactual.REACHED_UNWOUND:
             return self.last_plan_runs_moving(
-                degrees_of_freedom=frozenset(
-                    limit.degree_of_freedom for limit in blocked
-                ),
-                statement=stalled,
+                degrees_of_freedom=blocked_degrees_of_freedom, statement=stalled
             ), unwound
+        moved_back = retry_task_from_earlier_positions(
+            task=stalled.node,
+            earlier_positions=self.earlier_positions_of(
+                degrees_of_freedom=blocked_degrees_of_freedom, stalled=stalled
+            ),
+            trial=self.action_trial,
+        )
+        if moved_back == StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS:
+            return self.last_plan_runs_moving(
+                degrees_of_freedom=blocked_degrees_of_freedom, statement=stalled
+            ), moved_back
+        limit_counterfactual = moved_back or unwound
         unmovable = (
             access.read_degrees_of_freedom - access.moved_or_held_degrees_of_freedom
         )
@@ -388,13 +411,39 @@ class FailureDiagnoser:
             if isinstance(edge, WorldStateEdge) and edge.degrees_of_freedom & unmovable
         ]
         if not left_by_earlier:
-            return [], unwound
+            return [], limit_counterfactual
         counterfactual = retry_task_with_chain_from_world_root(
             task=stalled.node, trial=self.action_trial
         )
         if counterfactual == StallCounterfactual.STILL_STALLED:
             return [], counterfactual
         return left_by_earlier, counterfactual
+
+    def earlier_positions_of(
+        self, *, degrees_of_freedom: frozenset[DegreeOfFreedom], stalled: NodeRun
+    ) -> dict[DegreeOfFreedom, float]:
+        """
+        :param degrees_of_freedom: Degrees of freedom blocking `stalled` at a limit.
+        :param stalled: A run that stopped approaching its goal.
+        :return: Each of `degrees_of_freedom` an earlier run moved, and where it was
+            when the last such run started; empty if that was not recorded.
+        """
+        if self.run_start_positions is None:
+            return {}
+        changes = self.causal_graph.world_changes
+        earlier_positions = {}
+        for degree_of_freedom in degrees_of_freedom:
+            mover = changes.last_run_that_moved(
+                degree_of_freedom_id=degree_of_freedom.id, reader=stalled
+            )
+            if mover is None:
+                continue
+            position = self.run_start_positions.position_at_start_of(
+                run=mover, degree_of_freedom=degree_of_freedom
+            )
+            if position is not None:
+                earlier_positions[degree_of_freedom] = position
+        return earlier_positions
 
     def find_causes_of_collision(self, *, colliding: NodeRun) -> list[RootCause]:
         """

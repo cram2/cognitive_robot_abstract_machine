@@ -1,7 +1,8 @@
 """
 Asks of a task that stopped approaching its goal whether it would have reached it had it
 been free to move the degrees of freedom an earlier node left where they are, or had its
-joints at a position limit been turned a full turn back from it.
+joints at a position limit been turned a full turn back from it or put back where they
+were before an earlier node moved them.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from giskardpy.motion_statechart.mixins import HasKinematicChainParameter
 from giskardpy.motion_statechart.monitors.progress_monitors import BlockedPositionLimit
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
+from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% the answer of the counterfactual
@@ -24,7 +26,7 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 class StallCounterfactual(StrEnum):
     """
     What trying a stalled task again, free to move what it only read or with its joints
-    turned away from the position limits blocking it, showed.
+    moved away from the position limits blocking it, showed.
     """
 
     REACHED = "reached its goal once free to move what an earlier node left"
@@ -37,6 +39,14 @@ class StallCounterfactual(StrEnum):
     STILL_STALLED_UNWOUND = (
         "stalled again although its joints were turned a full turn back from the "
         "position limits blocking it"
+    )
+    REACHED_FROM_EARLIER_POSITIONS = (
+        "reached its goal once its joints at a position limit were put back where they "
+        "were before an earlier node moved them"
+    )
+    STILL_STALLED_FROM_EARLIER_POSITIONS = (
+        "stalled again although its joints at a position limit were put back where "
+        "they were before an earlier node moved them"
     )
 
 
@@ -196,3 +206,62 @@ def retry_task_with_joints_unwound(
     ):
         return StallCounterfactual.REACHED_UNWOUND
     return StallCounterfactual.STILL_STALLED_UNWOUND
+
+
+# %% trying the task with its joints where they were before an earlier node moved them
+
+
+@dataclass(kw_only=True)
+class TaskFromEarlierPositions(SubtreeRebuild):
+    """
+    Rebuilds a stalled task alone onto a copy of the world, with the joints that block
+    it at a position limit put back where they were before an earlier node moved them.
+    """
+
+    earlier_positions: dict[DegreeOfFreedom, float]
+    """
+    Each blocked degree of freedom, and its position before the earlier node moved it.
+    """
+
+    def build_for_trial(self, *, world: World) -> StatechartNode:
+        """
+        Differs from
+        :meth:`~coraplex.plans.underspecified.SubtreeRebuild.build_for_trial` in first
+        putting each degree of freedom of :attr:`earlier_positions` in `world` back at
+        its earlier position.
+        """
+        for degree_of_freedom, position in self.earlier_positions.items():
+            world.state[degree_of_freedom.id].position = position
+        world.notify_state_change()
+        return super().build_for_trial(world=world)
+
+    def __str__(self) -> str:
+        """
+        :return: The stalled task and that its joints were put back.
+        """
+        return f"{self.root.name} with its blocked joints where they were before"
+
+
+def retry_task_from_earlier_positions(
+    *,
+    task: StatechartNode,
+    earlier_positions: dict[DegreeOfFreedom, float],
+    trial: ActionTrial | None,
+) -> StallCounterfactual | None:
+    """
+    :param task: A task that stopped approaching its goal.
+    :param earlier_positions: Each degree of freedom blocking it at a position limit,
+        and its position before the earlier node that last moved it.
+    :param trial: The trial to try it in, None if the plan has none.
+    :return: Whether the task reaches its goal from those positions, None if it was not
+        tried because the plan has no trial or no earlier position is known.
+    """
+    if trial is None or not earlier_positions:
+        return None
+    if trial.succeeds(
+        rebuild=TaskFromEarlierPositions(
+            root=task, candidates={}, earlier_positions=earlier_positions
+        )
+    ):
+        return StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS
+    return StallCounterfactual.STILL_STALLED_FROM_EARLIER_POSITIONS

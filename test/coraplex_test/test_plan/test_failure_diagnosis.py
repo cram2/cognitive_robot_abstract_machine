@@ -78,7 +78,7 @@ from ...plan_running import (
     statechart_of,
     world_of,
 )
-from ...dataset.wound_up_wrist import WristWinding
+from ...dataset.wound_up_wrist import ShortWrist, WristWinding
 from ...pytest_environment import runs_in_continuous_integration
 
 # %% mimics
@@ -638,23 +638,31 @@ def test_a_place_depends_on_the_pick_up_that_attached_its_object(
 
 
 def tracy_turning_its_tool(
-    *, world: World, winding: WristWinding, arm_pose: dict[TracyJoint, float]
+    *,
+    world: World,
+    wrist_position: float,
+    arm_pose: dict[TracyJoint, float],
+    angle: float = math.pi / 2,
 ) -> tuple[list, CartesianPose]:
     """
     :param world: Tracy's world, whose right arm is put in `arm_pose`.
-    :param winding: Where the last wrist joint starts.
+    :param wrist_position: Where the last wrist joint starts.
     :param arm_pose: The pose of the rest of the right arm.
-    :return: The context extensions of Tracy's plans, and a quarter turn of its right
-        tool about its own axis.
+    :param angle: How far to turn the tool about its own axis from where it starts.
+    :return: The context extensions of Tracy's plans, and the turn of its right tool,
+        to a goal fixed in the world.
     """
     JointState.from_str_dict(
-        arm_pose | {TracyJoint.RIGHT_WRIST_3: winding.value}, world=world
+        arm_pose | {TracyJoint.RIGHT_WRIST_3: wrist_position}, world=world
     ).apply_to(world)
     tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
     turn = CartesianPose(
         kinematic_chain=KinematicChain(root=world.root, tip=tip),
-        goal_pose=Pose.from_xyz_axis_angle(
-            axis=Vector3(z=1), angle=math.pi / 2, reference_frame=tip
+        goal_pose=world.transform(
+            Pose.from_xyz_axis_angle(
+                axis=Vector3(z=1), angle=angle, reference_frame=tip
+            ),
+            world.root,
         ),
     )
     tracy = world.get_semantic_annotations_by_type(Tracy)[0]
@@ -682,7 +690,9 @@ def test_a_turn_stalled_at_a_limit_is_blamed_on_the_node_that_wound_the_joint_up
     the joint move is blamed.
     """
     extensions, turn = tracy_turning_its_tool(
-        world=tracy_world_copy, winding=WristWinding.UNWOUND, arm_pose=tracy_arm_pose
+        world=tracy_world_copy,
+        wrist_position=WristWinding.UNWOUND.value,
+        arm_pose=tracy_arm_pose,
     )
     wrist = tracy_world_copy.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
     wind_up = JointPositionList(
@@ -731,7 +741,9 @@ def test_a_turn_stalled_at_a_limit_the_joint_started_at_is_blamed_on_no_other_no
     up.
     """
     extensions, turn = tracy_turning_its_tool(
-        world=tracy_world_copy, winding=WristWinding.WOUND_UP, arm_pose=tracy_arm_pose
+        world=tracy_world_copy,
+        wrist_position=WristWinding.WOUND_UP.value,
+        arm_pose=tracy_arm_pose,
     )
 
     statechart, failure = run_until_it_fails(
@@ -752,6 +764,60 @@ def test_a_turn_stalled_at_a_limit_the_joint_started_at_is_blamed_on_no_other_no
         diagnosis.counterfactual,
         diagnosis.verdict,
     ) == (TaskStalled, StallCounterfactual.REACHED_UNWOUND, Verdict.NO_OTHER_NODE)
+
+
+def test_a_turn_stalled_at_a_short_limit_is_blamed_on_the_node_that_moved_the_joint(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    The wrist turns less than a full turn, so it cannot be unwound.
+
+    A joint move takes it close to its upper limit, and the tool's turn after it, taking
+    the short way, stalls at that limit. Tried again with the wrist put back where the
+    joint move found it, the turn takes the other way and reaches its goal, so the joint
+    move is blamed.
+    """
+    wrist = tracy_world_copy.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
+    wrist.raw_dof.limits.lower.position = ShortWrist.LOWER_LIMIT.value
+    wrist.raw_dof.limits.upper.position = ShortWrist.UPPER_LIMIT.value
+    extensions, turn = tracy_turning_its_tool(
+        world=tracy_world_copy,
+        wrist_position=ShortWrist.START.value,
+        arm_pose=tracy_arm_pose,
+        angle=ShortWrist.GOAL.value - math.tau - ShortWrist.START.value,
+    )
+    move_up = JointPositionList(
+        name="move the wrist up",
+        goal_state=JointState.from_mapping({wrist: ShortWrist.NEAR_UPPER_LIMIT.value}),
+    )
+
+    statechart, failure = run_until_it_fails(
+        Sequence(nodes=[move_up, turn]),
+        extensions,
+        MotionMadeNoProgress,
+        simulation_time_per_action=timedelta(seconds=80),
+    )
+    diagnoses = FailureDiagnoser.from_statechart(
+        statechart=statechart
+    ).diagnose_failure(failure=failure)
+    report("tool turn after moving a short wrist up", diagnoses)
+
+    [diagnosis] = [
+        diagnosis
+        for diagnosis in diagnoses
+        if diagnosis.origin_run.node is orientation_task_of(turn)
+    ]
+    assert (
+        type(diagnosis),
+        diagnosis.counterfactual,
+        [root.causing_run.node for root in diagnosis.root_causes],
+        [root.edges_to_origin[0].degrees_of_freedom for root in diagnosis.root_causes],
+    ) == (
+        TaskStalled,
+        StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS,
+        [move_up],
+        [frozenset({wrist.raw_dof})],
+    )
 
 
 def test_only_a_revolute_joint_whose_range_spans_a_full_turn_is_unwound(

@@ -11,67 +11,11 @@ from cramph.executor import StatechartExecutor, TickingExecutorExtension
 from cramph.node import EndStatechart, NodeArtifacts, StatechartNode
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    FixedConnection,
-    ScrewAxisConnection,
-)
 from semantic_digital_twin.world_description.world_entity import Body
 
+from ...dataset.sliding_world import SlidingWorld
+
 # %% the world whose structure changes
-
-
-@dataclass(kw_only=True)
-class SlidingWorld:
-    """
-    A world with a box resting at the origin and a slider that moves along x, so that
-    the box moves with the slider only once it hangs below it.
-    """
-
-    world: World
-    """
-    The world holding every body.
-    """
-
-    slider: Body
-    """
-    The body moved along x by :attr:`slider_connection`.
-    """
-
-    box: Body
-    """
-    The body fixed to the root, which is moved below :attr:`slider`.
-    """
-
-    slider_connection: ScrewAxisConnection
-    """
-    The joint moving :attr:`slider` along x.
-    """
-
-
-@pytest.fixture()
-def sliding_world() -> SlidingWorld:
-    world = World()
-    root = Body(name=PrefixedName("root"))
-    slider = Body(name=PrefixedName("slider"))
-    box = Body(name=PrefixedName("box"))
-    with world.modify_world():
-        world.add_kinematic_structure_entity(root)
-        slider_connection = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
-            ),
-            world=world,
-            parent=root,
-            child=slider,
-        )
-        world.add_connection(slider_connection)
-        world.add_connection(FixedConnection(parent=root, child=box))
-    return SlidingWorld(
-        world=world, slider=slider, box=box, slider_connection=slider_connection
-    )
 
 
 @pytest.fixture()

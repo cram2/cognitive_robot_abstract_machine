@@ -20,7 +20,16 @@ import pytest
 
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from krrood_spatial_math.spatial_types import Vector3
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import (
+    FixedConnection,
+    ScrewAxisConnection,
+)
+from semantic_digital_twin.world_description.world_entity import Body
+
+from ..dataset.sliding_world import SlidingWorld
 
 # %% statechart context and executor
 
@@ -76,3 +85,32 @@ def register_orm_mappers() -> None:
     interfaces it builds on for every test.
     """
     import cramph.orm.ormatic_interface  # noqa: F401
+
+
+# %% a world with a slider
+
+
+@pytest.fixture()
+def sliding_world() -> SlidingWorld:
+    """
+    :return: A world with a slider moving along x and a box fixed beside it.
+    """
+    world = World()
+    root = Body(name=PrefixedName("root"))
+    slider = Body(name=PrefixedName("slider"))
+    box = Body(name=PrefixedName("box"))
+    with world.modify_world():
+        world.add_kinematic_structure_entity(root)
+        slider_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
+            world=world,
+            parent=root,
+            child=slider,
+        )
+        world.add_connection(slider_connection)
+        world.add_connection(FixedConnection(parent=root, child=box))
+    return SlidingWorld(
+        world=world, slider=slider, box=box, slider_connection=slider_connection
+    )
