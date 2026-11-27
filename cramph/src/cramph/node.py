@@ -57,8 +57,11 @@ from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracke
 from krrood.adapters.exceptions import UntrackedObjectError
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
+    JSONField,
     SubclassJSONSerializer,
+    from_json,
 )
+from krrood.adapters.keyword_argument import SerializationKeywordArgument
 from krrood.exceptions import DataclassException
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.field_metadata import JSONMetadata
@@ -67,6 +70,7 @@ from krrood.symbolic_math.symbolic_math import (
     GenericSymbolicType,
     Scalar,
 )
+from krrood.utils import get_full_class_name
 from cramph.structure_change_recorder import (
     StructureChangeRecorder,
     StructureChangeRecorderOutsideStatechart,
@@ -92,6 +96,18 @@ class NodeJSONKey(StrEnum):
     """
     Tells apart the nodes of one JSON document, so every place referring to the same node
     deserializes to the same instance.
+    """
+
+    TICKING_FRAMEWORK = "ticking_framework"
+    """
+    The name of the framework that ticks the node, see
+    :attr:`StatechartNode.ticking_framework`.
+    """
+
+    TICKED_NODE = "ticked_node"
+    """
+    The document of a node that a framework ticks, carried by the document of its
+    stand-in, which every other framework reads instead.
     """
 
 
@@ -922,6 +938,16 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
     The name is not unique, use :attr:`unique_name`, if you need a unique identifier.
     """
 
+    # to_json writes it as a plain name, since a serialized enum member would make the
+    # reader import the enum the ticking framework names itself with
+    ticking_framework: str | None = field(
+        default=None, metadata=JSONMetadata(serialize=False).as_dict()
+    )
+    """
+    The name of the framework that ticks this node, None if every framework that reads
+    it builds it. Any other framework reads it as a stand-in, see :class:`ReadingFramework`.
+    """
+
     _statechart: Statechart = field(init=False, default=None)
     """
     Back reference to the statechart that owns this node.
@@ -1247,22 +1273,52 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         return self.statechart.top_level_nodes
 
     def to_json(self, **kwargs: Any) -> dict[str, Any]:
-        return {
-            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
+        """
+        A node that a framework ticks is written as the document of its stand-in, which
+        carries the document of the node, see :class:`ReadingFramework`.
+
+        .. warning:: A stand-in written again carries only itself, so even the framework
+            that ticks its node reads a stand-in from that document.
+        """
+        identification = {
             NodeJSONKey.NODE_ID: self._node_id,
+            NodeJSONKey.TICKING_FRAMEWORK: self.ticking_framework,
+        }
+        document = {
+            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
+            JSONField.TYPE: get_full_class_name(self.deserialized_type),
+            **identification,
+        }
+        if self.ticking_framework is None:
+            return document
+        stand_in = self.stand_in_type(name=self.name)
+        stand_in.plot_specifications = deepcopy(self.plot_specifications)
+        stand_in.parent_node_index = self.parent_node_index
+        return {
+            **DataclassJSONSerializer.to_json(instance=stand_in, **kwargs),
+            **identification,
+            NodeJSONKey.TICKED_NODE: document,
         }
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         Deserializes the node, or returns the instance already deserialized for the same
-        node of the document, so that nodes referring to it share it.
+        node of the document, so that nodes referring to it share it. A stand-in becomes
+        the node it stands in for only if the reading framework ticks that node.
         """
         tracker = DeserializedNodeTracker.from_kwargs(from_json_kwargs=kwargs)
         node_id = data[NodeJSONKey.NODE_ID]
         if tracker.has(key=node_id):
             return tracker.get(key=node_id)
+        ticking_framework = data.get(NodeJSONKey.TICKING_FRAMEWORK)
+        ticked_node_document = data.get(NodeJSONKey.TICKED_NODE)
+        if ticked_node_document is not None and ReadingFramework.is_ticked_by_reader(
+            ticking_framework=ticking_framework, from_json_kwargs=kwargs
+        ):
+            return from_json(ticked_node_document, **kwargs)
         node = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
+        node.ticking_framework = ticking_framework
         node._take_over_node_id(node_id=node_id)
         tracker.add(key=node_id, tracked_object=node)
         return node
@@ -1648,12 +1704,27 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         """
         return ()
 
+    @classproperty
+    def deserialized_type(cls) -> type[StatechartNode]:
+        """
+        :return: The class a reader builds from the document of a node of this class.
+        """
+        return cls
+
+    @classproperty
+    def stand_in_type(cls) -> type[StatechartNode]:
+        """
+        :return: The class of the node read in place of a node of this class, which every
+            framework can import, see :class:`ReadingFramework`.
+        """
+        return StructureCopyNode
+
     def create_structure_copy(self) -> StatechartNode:
         """
         :return: A node of the base class of this node's kind, with the same name, see
             :meth:`~cramph.statechart.Statechart.create_structure_copy`.
         """
-        return StructureCopyNode(name=self.name)
+        return self.stand_in_type(name=self.name)
 
     def create_structure_counterpart(self) -> StatechartNode:
         """
@@ -2447,6 +2518,33 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
         return None
 
 
+@dataclass(kw_only=True)
+class ReadingFramework(SerializationKeywordArgument):
+    """
+    The framework a document of nodes is read by. It builds the nodes it ticks, and
+    reads a stand-in for every node another framework ticks, without importing the
+    class of that node. A reader naming no framework reads a stand-in for every node a
+    framework ticks.
+    """
+
+    framework_name: str
+    """
+    The name of the framework, as :attr:`StatechartNode.ticking_framework` names it.
+    """
+
+    @classmethod
+    def is_ticked_by_reader(
+        cls, *, ticking_framework: str | None, from_json_kwargs: dict[str, Any]
+    ) -> bool:
+        """
+        :param ticking_framework: The name of the framework that ticks a node.
+        :param from_json_kwargs: The keyword arguments of a ``from_json`` call.
+        :return: Whether the framework reading the document ticks that node.
+        """
+        reader = from_json_kwargs.get(cls._keyword())
+        return reader is not None and reader.framework_name == ticking_framework
+
+
 def expanded_child_field(default: Any = MISSING) -> Any:
     """
     Declares a field of a composite node that holds a child the node creates in
@@ -2548,8 +2646,12 @@ class CompositeNode(StatechartNode):
         """
         return ()
 
-    def create_structure_copy(self) -> CompositeNode:
-        return StructureCopyCompositeNode(name=self.name)
+    @classproperty
+    def stand_in_type(cls) -> type[CompositeNode]:
+        """
+        :return: A composite node class, see :meth:`StatechartNode.stand_in_type`.
+        """
+        return StructureCopyCompositeNode
 
     def adopt_handed_children(self) -> None:
         """
