@@ -340,9 +340,12 @@ class CountedParameters(InitialParameters):
         )
         variance = np.where(
             counts > 1,
-            np.bincount(latent, weights=column**2, minlength=self.hidden_states)
-            / rows_per_state
-            - location**2,
+            np.bincount(
+                latent,
+                weights=(column - location[latent]) ** 2,
+                minlength=self.hidden_states,
+            )
+            / rows_per_state,
             column.var(),
         )
         return GaussianParameters(

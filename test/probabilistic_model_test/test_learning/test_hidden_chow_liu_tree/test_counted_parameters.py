@@ -109,6 +109,25 @@ def test_gaussians_are_the_moments_of_the_rows_in_each_latent_state():
     np.testing.assert_allclose(gaussians.scale, [1.0, 2.0])
 
 
+def test_gaussians_keep_their_scale_for_values_far_from_zero():
+    """
+    Values far from zero whose spread is small give the same scales as the same spread
+    around zero.
+    """
+    column = 1e9 + np.array([1.0, 3.0, 10.0, 14.0])
+    parameters = CountedParameters(
+        variables=SortedSet([Continuous("a")]),
+        data=column[:, None],
+        hidden_states=2,
+        latent_states=np.array([[0], [0], [1], [1]]),
+    )
+
+    gaussians = parameters.gaussian_parameters(variable_index=0)
+
+    np.testing.assert_allclose(gaussians.location, 1e9 + np.array([2.0, 12.0]))
+    np.testing.assert_allclose(gaussians.scale, [1.0, 2.0])
+
+
 def test_a_latent_state_without_rows_takes_the_moments_of_the_whole_column():
     """
     A latent state that no row is in gets the mean and standard deviation of the column,
