@@ -9,11 +9,15 @@ import collections
 
 import jax.numpy as jnp
 import numpy as np
+import optax
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from krrood.ormatic.data_access_objects.helper import to_dao
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    TrainingState,
+)
 from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
 from probabilistic_model.probabilistic_circuit.tensorized.layered_probabilistic_circuit import (
     LayeredProbabilisticCircuit,
@@ -122,3 +126,29 @@ def test_parameters_of_another_backend_are_loaded_as_numpy_arrays(
     assert all(isinstance(parameter, np.ndarray) for parameter in loaded.parameters)
     for loaded_parameter, parameter in zip(loaded.parameters, jax_circuit.parameters):
         np.testing.assert_array_equal(loaded_parameter, np.asarray(parameter))
+
+
+# %% training state
+
+
+def test_a_jax_training_state_is_loaded_with_its_parameters_and_loss(session: Session):
+    """
+    The parameters and the loss of a jax training state are stored and loaded back as
+    numpy arrays of the same values.
+    """
+    from probabilistic_model.orm.ormatic_interface import TrainingStateDAO
+
+    parameters = [jnp.ones(3), jnp.arange(2.0)]
+    state = TrainingState(
+        parameters=parameters,
+        loss=jnp.asarray(1.5),
+        optimizer_state=optax.adam(learning_rate=0.1).init(parameters),
+    )
+
+    session.add(to_dao(state))
+    session.commit()
+    loaded = session.scalars(select(TrainingStateDAO)).one().from_dao()
+
+    for loaded_parameter, parameter in zip(loaded.parameters, parameters, strict=True):
+        np.testing.assert_array_equal(loaded_parameter, np.asarray(parameter))
+    np.testing.assert_array_equal(loaded.loss, np.asarray(state.loss))
