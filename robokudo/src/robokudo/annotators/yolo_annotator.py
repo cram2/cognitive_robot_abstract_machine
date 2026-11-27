@@ -195,9 +195,6 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
     Detects objects with a YOLO model and annotates them as classified hypotheses.
     """
 
-    model_location: str = field(init=False, repr=False)
-    """Where the YOLO model is loaded from."""
-
     model: YOLO | None = field(default=None, init=False, repr=False)
     """The YOLO detection model, loaded during setup."""
 
@@ -226,9 +223,6 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
         super().__post_init__()
 
-        self.model_location: str = self.descriptor.parameters.model_location(
-            annotator_name=self.name
-        )
         self.image_region_comparator = RoiComparator(weight=1.0)
 
     def setup(self, **kwargs: Any) -> bool:
@@ -237,7 +231,7 @@ class YoloAnnotator(ThreadedAnnotator[YoloDescriptor]):
         """
         parameters = self.descriptor.parameters
         parameters.models_directory.mkdir(parents=True, exist_ok=True)
-        self.model = YOLO(self.model_location)
+        self.model = YOLO(parameters.model_location(annotator_name=self.name))
         self.class_names = self._load_class_names()
         if parameters.precision_mode:
             self.segmentation_model = SAM(

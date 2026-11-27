@@ -217,12 +217,19 @@ def test_setup_creates_missing_models_directory(model_loader, scene):
     assert scene.models_directory.is_dir()
 
 
-def test_annotator_without_model_raises(model_loader, scene):
+def test_setup_without_model_raises(
+    model_loader: MockModelLoader, scene: CupScene
+) -> None:
+    """
+    Missing model configuration is rejected when loading resources during setup.
+    """
     descriptor = scene.descriptor()
     descriptor.parameters.pretrained_model = None
 
+    annotator = YoloAnnotator(descriptor=descriptor)
+
     with pytest.raises(DetectionModelNotConfigured):
-        YoloAnnotator(descriptor=descriptor)
+        annotator.setup()
 
 
 def test_custom_weights_and_class_names_are_read_from_ros_package(
