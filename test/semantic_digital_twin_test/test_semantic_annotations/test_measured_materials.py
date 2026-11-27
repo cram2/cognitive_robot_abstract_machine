@@ -1,6 +1,7 @@
 """
 Tests for the qualities the literature reports for the materials of semantic
-annotations, and for setting them on an annotation and on the parts of a fruit.
+annotations, and for setting them on an annotation and on the parts of a whole, such as
+a fruit or an egg.
 """
 
 from __future__ import annotations
@@ -13,6 +14,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.part_whole.measured_parts import (
+    HasMeasuredParts,
+)
 from semantic_digital_twin.semantic_annotations.qualities.measured_material import (
     MeasuredMaterial,
 )
@@ -24,8 +28,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Cereal,
     Core,
     Cucumber,
-    Fruit,
-    FruitPart,
+    Egg,
     Orange,
     Peach,
     Pit,
@@ -72,21 +75,23 @@ def interval_ends(qualities: list[Quality]) -> list[float]:
     ]
 
 
-def fruit_with_mapped_parts(world: World, fruit_type: type[Fruit]) -> Fruit:
+def whole_with_mapped_parts(
+    world: World, whole_type: type[HasMeasuredParts]
+) -> HasMeasuredParts:
     """
-    :param world: The world to create the fruit in, inside its modification.
-    :param fruit_type: A kind of fruit.
-    :return: A fruit of ``fruit_type`` with one part of each kind its measured part
+    :param world: The world to create the whole in, inside its modification.
+    :param whole_type: A kind of whole, such as a kind of fruit.
+    :return: A whole of ``whole_type`` with one part of each kind its measured part
         materials map.
     """
-    fruit = fruit_type.create_with_new_body_in_world(name="fruit", world=world)
-    for part_type in fruit_type.measured_part_materials:
-        fruit.add(
+    whole = whole_type.create_with_new_body_in_world(name="whole", world=world)
+    for part_type in whole_type.measured_part_materials:
+        whole.add(
             part=part_type.create_with_new_body_in_world(
                 name=part_type.__name__, world=world
             )
         )
-    return fruit
+    return whole
 
 
 # %% The measured materials
@@ -125,15 +130,15 @@ def test_no_measured_material_is_another_under_a_second_name() -> None:
 def test_every_measured_material_is_the_material_of_some_annotation() -> None:
     """
     Every measured material is the material of a kind of annotation or of a part of a
-    kind of fruit.
+    kind of whole.
     """
     annotation_types = every_subclass_of(HasRootBody)
     used = {
         annotation_type.measured_material for annotation_type in annotation_types
     } | {
         material
-        for fruit_type in annotation_types & every_subclass_of(Fruit)
-        for material in fruit_type.measured_part_materials.values()
+        for whole_type in every_subclass_of(HasMeasuredParts)
+        for material in whole_type.measured_part_materials.values()
     }
 
     assert used - {None} == set(MeasuredMaterial)
@@ -202,53 +207,64 @@ def test_an_annotation_without_a_measured_material_keeps_no_qualities() -> None:
     assert cereal.qualities == []
 
 
-# %% Setting the measured qualities on a fruit and its parts
+# %% Setting the measured qualities on a whole and its parts
+
+WHOLE_TYPES = [
+    Apple,
+    Avocado,
+    Banana,
+    Cucumber,
+    Orange,
+    Peach,
+    Strawberry,
+    Tomato,
+    Watermelon,
+    Egg,
+]
 
 
 @pytest.mark.parametrize(
-    "fruit_type",
-    [Apple, Avocado, Banana, Cucumber, Orange, Peach, Strawberry, Tomato, Watermelon],
+    "whole_type", WHOLE_TYPES, ids=lambda whole_type: whole_type.__name__
 )
-def test_every_part_of_a_fruit_gets_the_qualities_of_its_material(
-    fruit_type: type[Fruit],
+def test_every_part_of_a_whole_gets_the_qualities_of_its_material(
+    whole_type: type[HasMeasuredParts],
 ) -> None:
     """
-    Setting the measured qualities of a fruit sets, on each part of a mapped kind, the
-    qualities reported for that part's material.
+    Setting the measured qualities of a whole, such as a fruit, sets on each part of a
+    mapped kind the qualities reported for that part's material.
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
-        fruit = fruit_with_mapped_parts(world, fruit_type)
-        fruit.set_measured_qualities()
+        whole = whole_with_mapped_parts(world, whole_type)
+        whole.set_measured_qualities()
 
-    assert {type(part): by_type(part.qualities) for part in fruit.parts} == {
+    assert {type(part): by_type(part.qualities) for part in whole.parts} == {
         part_type: by_type(material.value.create_qualities())
-        for part_type, material in fruit_type.measured_part_materials.items()
+        for part_type, material in whole_type.measured_part_materials.items()
     }
 
 
 @pytest.mark.parametrize(
-    "fruit_type",
-    [Apple, Avocado, Banana, Cucumber, Orange, Peach, Strawberry, Tomato, Watermelon],
+    "whole_type", WHOLE_TYPES, ids=lambda whole_type: whole_type.__name__
 )
-def test_a_fruit_gets_the_qualities_of_its_own_material(
-    fruit_type: type[Fruit],
+def test_a_whole_gets_the_qualities_of_its_own_material(
+    whole_type: type[HasMeasuredParts],
 ) -> None:
     """
-    The fruit itself gets the qualities reported for the whole fruit, and none if only
-    its parts were measured.
+    The whole itself gets the qualities reported for it, and none if only its parts were
+    measured.
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
-        fruit = fruit_with_mapped_parts(world, fruit_type)
-        fruit.set_measured_qualities()
+        whole = whole_with_mapped_parts(world, whole_type)
+        whole.set_measured_qualities()
 
     expected = (
         []
-        if fruit_type.measured_material is None
-        else fruit_type.measured_material.value.create_qualities()
+        if whole_type.measured_material is None
+        else whole_type.measured_material.value.create_qualities()
     )
-    assert by_type(fruit.qualities) == by_type(expected)
+    assert by_type(whole.qualities) == by_type(expected)
 
 
 @pytest.mark.parametrize(
@@ -256,7 +272,7 @@ def test_a_fruit_gets_the_qualities_of_its_own_material(
     [(Apple, Core), (Avocado, Pit)],
 )
 def test_a_part_whose_material_was_not_measured_keeps_no_qualities(
-    fruit_type: type[Fruit], part_type: type[FruitPart]
+    fruit_type: type[HasMeasuredParts], part_type: type[HasRootBody]
 ) -> None:
     """
     A part of a kind the fruit does not map, such as an apple's core, keeps its
@@ -275,30 +291,31 @@ def test_a_part_whose_material_was_not_measured_keeps_no_qualities(
 # %% Persistence
 
 
-def test_the_measured_qualities_of_an_apple_survive_the_database(
+@pytest.mark.parametrize("whole_type", [Apple, Egg], ids=["Apple", "Egg"])
+def test_the_measured_qualities_of_a_whole_survive_the_database(
+    whole_type: type[HasMeasuredParts],
     in_memory_session_maker: sessionmaker[Session],
 ) -> None:
     """
-    The measured qualities of an apple and its parts survive storing the world and
+    The measured qualities of a whole and of its parts survive storing the world and
     loading it back, up to the single precision the interval ends are stored in.
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
-        apple = fruit_with_mapped_parts(world, Apple)
-        apple.set_measured_qualities()
+        whole = whole_with_mapped_parts(world, whole_type)
+        whole.set_measured_qualities()
     stored_world = to_dao(world)
     with in_memory_session_maker() as session:
         session.add(stored_world)
         session.commit()
         session.expunge_all()
         loaded_world = session.scalar(select(type(stored_world))).from_dao()
-    [loaded_apple] = loaded_world.get_semantic_annotations_by_type(Apple)
+    [loaded_whole] = loaded_world.get_semantic_annotations_by_type(whole_type)
+    loaded_parts = {type(part): part for part in loaded_whole.parts}
 
-    for loaded, stored in (
-        (loaded_apple, apple),
-        (loaded_apple.peel, apple.peel),
-        (loaded_apple.flesh, apple.flesh),
-    ):
+    for loaded, stored in [(loaded_whole, whole)] + [
+        (loaded_parts[type(part)], part) for part in whole.parts
+    ]:
         assert interval_ends(loaded.qualities) == pytest.approx(
             interval_ends(stored.qualities), rel=1e-6
         )

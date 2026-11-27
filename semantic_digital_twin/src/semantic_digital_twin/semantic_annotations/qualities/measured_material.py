@@ -383,6 +383,43 @@ class MeasuredMaterial(Enum):
     :cite:`nussinovitch1990bread`.
     """
 
+    # %% Eggs
+
+    EGG = MaterialMeasurement(
+        mass_density=MeasuredRange(lower=1085.0, upper=1085.0),
+    )
+    """
+    Whole fresh hen's eggs, weighed in air and in water; the density falls as an egg
+    ages and loses mass :cite:`tsarenko2017egg`.
+    """
+
+    EGGSHELL = MaterialMeasurement(
+        material_elasticity=MeasuredElasticity(
+            youngs_modulus=MeasuredRange(lower=19.0e9, upper=19.0e9)
+        ),
+        thickness=MeasuredRange(lower=0.403e-3, upper=0.444e-3),
+    )
+    """
+    Eggshell: full rings in compression, around the egg :cite:`lin1995eggshell`, and the
+    shell thickness of four hen genotypes :cite:`hammershoj2021egg`.
+    """
+
+    ALBUMEN = MaterialMeasurement(
+        mass_density=MeasuredRange(lower=1027.5, upper=1030.9),
+    )
+    """
+    Egg white from 25 °C down to 8 °C; being liquid, it has no elasticity
+    :cite:`tsarenko2017egg`.
+    """
+
+    YOLK = MaterialMeasurement(
+        mass_density=MeasuredRange(lower=1026.7, upper=1031.6),
+    )
+    """
+    Egg yolk from 25 °C down to 8 °C; being liquid, it has no elasticity
+    :cite:`tsarenko2017egg`.
+    """
+
     # %% Household objects
 
     STEEL = MaterialMeasurement(

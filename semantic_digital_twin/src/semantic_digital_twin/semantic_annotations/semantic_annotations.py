@@ -67,8 +67,13 @@ from semantic_digital_twin.semantic_annotations.part_whole.fruit_parts import (
     HasSeeds,
     HasStem,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
-    HasParts,
+from semantic_digital_twin.semantic_annotations.part_whole.egg_parts import (
+    HasAlbumen,
+    HasEggshell,
+    HasYolk,
+)
+from semantic_digital_twin.semantic_annotations.part_whole.measured_parts import (
+    HasMeasuredParts,
 )
 from semantic_digital_twin.semantic_annotations.qualities.measured_material import (
     MeasuredMaterial,
@@ -1238,30 +1243,10 @@ class Produce(Food):
 
 
 @dataclass(eq=False, kw_only=True)
-class Fruit(Produce, HasRipeness, HasParts):
+class Fruit(Produce, HasRipeness, HasMeasuredParts):
     """
     Fruit.
     """
-
-    @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
-        """
-        :return: For each kind of part of this kind of fruit whose material was measured,
-            that material.
-        """
-        return {}
-
-    def set_measured_qualities(self) -> None:
-        """
-        Differs from :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasRootBody.set_measured_qualities`
-        in also setting, on each part whose exact type :attr:`measured_part_materials`
-        maps, the qualities reported for its material.
-        """
-        super().set_measured_qualities()
-        for part in self.parts:
-            material = self.measured_part_materials.get(type(part))
-            if material is not None:
-                part.set_qualities_measured_for(material=material)
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1356,7 +1341,7 @@ class Tomato(Fruit, HasPeel, HasFlesh, HasSeedChamber):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the peel, flesh and seed chamber of a tomato.
         """
@@ -1409,7 +1394,7 @@ class Apple(Fruit, HasPeel, HasFlesh, HasCore, HasSeeds, HasStem):
         return MeasuredMaterial.APPLE
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the peel and flesh of an apple.
         """
@@ -1426,7 +1411,7 @@ class Avocado(Fruit, HasPeel, HasFlesh, HasPit):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the peel and flesh of an avocado.
         """
@@ -1443,7 +1428,7 @@ class Banana(Fruit, HasPeel, HasFlesh):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the peel and flesh of a banana.
         """
@@ -1467,7 +1452,7 @@ class Cucumber(Fruit, HasPeel, HasFlesh, HasSeedChamber):
         return MeasuredMaterial.CUCUMBER
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the flesh of a cucumber.
         """
@@ -1507,7 +1492,7 @@ class Orange(CitrusFruit):
         return MeasuredMaterial.ORANGE
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the peel of an orange.
         """
@@ -1530,7 +1515,7 @@ class Peach(Fruit, HasPeel, HasFlesh, HasPit, HasStem):
         return MeasuredMaterial.PEACH
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the peel of a peach.
         """
@@ -1546,7 +1531,7 @@ class Strawberry(Fruit, HasPeel, HasFlesh, HasPith):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the flesh and pith of a strawberry.
         """
@@ -1570,13 +1555,66 @@ class Watermelon(Fruit, HasPeel, HasFlesh, HasSeeds):
         return MeasuredMaterial.WATERMELON
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
         """
         :return: The measured materials of the peel and flesh of a watermelon.
         """
         return {
             Peel: MeasuredMaterial.WATERMELON_PEEL,
             Flesh: MeasuredMaterial.WATERMELON_FLESH,
+        }
+
+
+@dataclass(eq=False, kw_only=True)
+class EggPart(HasRootBody):
+    """
+    A part of an egg, such as its shell or its yolk.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Eggshell(EggPart, HasThickness):
+    """
+    The hard, mineral outer layer of an egg.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Albumen(EggPart):
+    """
+    The white of an egg, the liquid around its yolk.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Yolk(EggPart):
+    """
+    The yellow centre of an egg.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Egg(Food, HasMeasuredParts, HasEggshell, HasAlbumen, HasYolk):
+    """
+    A hen's egg.
+    """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a whole egg is made of, as measured.
+        """
+        return MeasuredMaterial.EGG
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+        """
+        :return: The measured materials of the eggshell, albumen and yolk of an egg.
+        """
+        return {
+            Eggshell: MeasuredMaterial.EGGSHELL,
+            Albumen: MeasuredMaterial.ALBUMEN,
+            Yolk: MeasuredMaterial.YOLK,
         }
 
 

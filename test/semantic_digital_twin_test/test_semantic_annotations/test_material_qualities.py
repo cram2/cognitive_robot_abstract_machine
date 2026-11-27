@@ -27,8 +27,11 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
+    Albumen,
     CitrusSegment,
     Core,
+    EggPart,
+    Eggshell,
     Flesh,
     FruitPart,
     Peel,
@@ -38,6 +41,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SeedChamber,
     Stem,
     Table,
+    Yolk,
 )
 from semantic_digital_twin.world import World
 
@@ -225,3 +229,42 @@ def test_a_flesh_has_no_thickness(world: World) -> None:
         flesh = Flesh.create_with_new_body_in_world(name="flesh", world=world)
         with pytest.raises(NoFieldAcceptsEntity):
             flesh.set_quality(quality=Thickness(value=point(50.0e-6)))
+
+
+# %% Material qualities of egg parts
+
+
+@pytest.mark.parametrize("part_type", [Eggshell, Albumen, Yolk])
+def test_every_egg_part_starts_without_density_and_elasticity(
+    world: World, part_type: type[EggPart]
+) -> None:
+    """
+    Every part of an egg has a density and an elasticity field, empty until they are
+    set.
+    """
+    with world.modify_world():
+        part = part_type.create_with_new_body_in_world(name="part", world=world)
+
+    assert part.mass_density is None
+    assert part.material_elasticity is None
+
+
+def test_an_eggshell_starts_without_a_thickness(world: World) -> None:
+    """
+    An eggshell is a layer, so it has a thickness field, empty until it is set.
+    """
+    with world.modify_world():
+        eggshell = Eggshell.create_with_new_body_in_world(name="eggshell", world=world)
+
+    assert isinstance(eggshell, HasThickness)
+    assert eggshell.thickness is None
+
+
+def test_a_yolk_has_no_thickness(world: World) -> None:
+    """
+    A yolk is no layer, so setting a thickness on it is refused.
+    """
+    with world.modify_world():
+        yolk = Yolk.create_with_new_body_in_world(name="yolk", world=world)
+        with pytest.raises(NoFieldAcceptsEntity):
+            yolk.set_quality(quality=Thickness(value=point(0.4e-3)))
