@@ -236,25 +236,37 @@ class ORMatic:
     def _add_field_typed_interfaces_to_class_diagram(self) -> None:
         """
         Add the interfaces stored fields are typed with to the class diagram, inherited
-        by the classes of the diagram that name them among their bases.
+        by the classes of the diagram that derive from them through a base of their own,
+        unless a class of the diagram lies between the two.
         """
-        implementers = list(self.class_dependency_graph.wrapped_classes)
-        classes_in_diagram = {implementer.clazz for implementer in implementers}
-        for interface in self.field_typed_interfaces - classes_in_diagram:
+        classes_in_diagram = {
+            wrapped_class.clazz
+            for wrapped_class in self.class_dependency_graph.wrapped_classes
+        }
+        added_interfaces = self.field_typed_interfaces - classes_in_diagram
+        for interface in added_interfaces:
             self.class_dependency_graph.add_node(clazz=interface)
-            wrapped_interface = self.class_dependency_graph.get_wrapped_class(
-                clazz=interface
-            )
-            for implementer in implementers:
-                if (
-                    isclass(implementer.clazz)
-                    and interface in implementer.clazz.__bases__
-                ):
-                    self.class_dependency_graph.add_relation(
-                        relation=Inheritance(
-                            source=wrapped_interface, target=implementer
-                        )
+        classes_in_diagram |= added_interfaces
+        for implementer in list(self.class_dependency_graph.wrapped_classes):
+            if not isclass(implementer.clazz):
+                continue
+            inherited_interfaces = {
+                next(
+                    ancestor
+                    for ancestor in base.__mro__
+                    if ancestor in classes_in_diagram or ancestor is object
+                )
+                for base in implementer.clazz.__bases__
+            } & added_interfaces
+            for interface in inherited_interfaces:
+                self.class_dependency_graph.add_relation(
+                    relation=Inheritance(
+                        source=self.class_dependency_graph.get_wrapped_class(
+                            clazz=interface
+                        ),
+                        target=implementer,
                     )
+                )
 
     @cached_property
     def stored_object_table(self) -> ExternalTable:
