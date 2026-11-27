@@ -73,6 +73,7 @@ class SearchAction(SequentialAction):
     @classmethod
     def looking_around(
         cls,
+        *,
         target_location: Pose,
         object_semantic_annotation: type[SemanticAnnotation],
         context: StatechartContext,

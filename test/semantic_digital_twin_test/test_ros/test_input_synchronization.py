@@ -32,14 +32,17 @@ from semantic_digital_twin.exceptions import (
     ConnectionCannotBeTrackedByTfFrameError,
     UnboundMessageTypeError,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     Connection6DoF,
     FixedConnection,
     OmniDrive,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -161,11 +164,17 @@ def world_with_two_connections() -> tuple[
         root = Body(name=PrefixedName("root"))
         part_body = Body(name=PrefixedName("part_body"))
         other_body = Body(name=PrefixedName("other_body"))
-        part_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=part_body, axis=Vector3.Z()
+        part_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=part_body,
         )
-        other_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=other_body, axis=Vector3.Z()
+        other_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=other_body,
         )
         world.add_connection(part_connection)
         world.add_connection(other_connection)
@@ -223,14 +232,17 @@ def world_with_mimic_joint() -> tuple[
         root = Body(name=PrefixedName("root"))
         driving_body = Body(name=PrefixedName("driving_body"))
         mimicking_body = Body(name=PrefixedName("mimicking_body"))
-        driving_connection = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=driving_body, axis=Vector3.Z()
+        driving_connection = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=driving_body,
         )
-        mimic_connection = RevoluteConnection(
+        mimic_connection = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             name=PrefixedName("mimic_connection"),
             parent=root,
             child=mimicking_body,
-            axis=Vector3.Z(),
             multiplier=2.0,
             offset=0.1,
             raw_dof=driving_connection.raw_dof,

@@ -86,7 +86,7 @@ class QueryBasedScheduler(
 
         new_job = Sequence("Task", memory=True)
 
-        query = self.get_cas().get(CASViews.QUERY)
+        query = self.get_cas().get(view_name=CASViews.QUERY)
 
         task_key = self.filter_fn(query)
         logger.info(f"Running perception task: {task_key}")

@@ -33,6 +33,11 @@ from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
 from krrood_spatial_math.spatial_types import Pose
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
+from semantic_digital_twin.adapters.multi_sim import MujocoSim  # noqa: E402
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName  # noqa: E402
+from semantic_digital_twin.specifications.robots import RobotSpecification  # noqa: E402
+from semantic_digital_twin.world_description.world_entity import Body  # noqa: E402
+from typing_extensions import Iterator  # noqa: E402
 
 try:
     import rclpy
@@ -117,7 +122,7 @@ def pr2_apartment_context(pr2_apartment_world):
     The shared PR2 apartment world, its robot and the context extensions of its plans,
     returned to its initial model and state after the test.
     """
-    snapshot = WorldSnapshot.capture(pr2_apartment_world)
+    snapshot = WorldSnapshot.capture(world=pr2_apartment_world)
     pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
     yield pr2_apartment_world, pr2, robot_extensions(pr2)
     snapshot.restore()
@@ -130,7 +135,7 @@ def simple_pr2_context(simple_pr2_world_setup):
     of its plans, returned to its initial model and state after the test.
     """
     world, robot_view, extensions = simple_pr2_world_setup
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     yield world, robot_view, extensions
     snapshot.restore()
 
@@ -141,7 +146,7 @@ def stretch_apartment_context(stretch_apartment_world):
     The shared Stretch apartment world, its robot and the context extensions of its
     plans, returned to its initial model and state after the test.
     """
-    snapshot = WorldSnapshot.capture(stretch_apartment_world)
+    snapshot = WorldSnapshot.capture(world=stretch_apartment_world)
     robot = stretch_apartment_world.get_semantic_annotations_by_type(Stretch)[0]
     yield stretch_apartment_world, robot, robot_extensions(robot)
     snapshot.restore()
@@ -154,7 +159,7 @@ def hsr_apartment_context(hsr_apartment_world):
     returned to its initial model and state after the test.
     """
     world, _, _ = hsr_apartment_world
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     robot = world.get_semantic_annotations_by_type(HSRB)[0]
     yield world, robot, robot_extensions(robot)
     snapshot.restore()
@@ -284,7 +289,7 @@ def nodes_of_type(
 # %% a physically simulated world without the physics
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulationThatCountsItsSteps:
     """
     Stands in for a started simulation, counting the physics steps asked of it.
@@ -348,3 +353,21 @@ def register_orm_mappers() -> None:
     interfaces it builds on for every test.
     """
     import coraplex.orm.ormatic_interface  # noqa: F401
+
+
+# %% a robot in physics
+
+
+@pytest.fixture
+def simulated_hsrb() -> Iterator[tuple[HSRB, MujocoSim]]:
+    """
+    An HSRB on an empty floor, performing in a stepped MuJoCo simulation.
+    """
+    world = World()
+    with world.modify_world():
+        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
+    hsrb = RobotSpecification(HSRB).spawn(world)
+    simulation = MujocoSim(world=world, headless=True)
+    simulation.start_stepped_simulation()
+    yield hsrb, simulation
+    simulation.stop_simulation()

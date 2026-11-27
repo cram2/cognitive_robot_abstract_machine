@@ -17,9 +17,9 @@ kernelspec:
 Many semantic annotations are made of *parts*: a drawer has a handle and a slider, a dresser has
 drawers and doors. This structural *part-of* relation is the **part-whole relationship**, and the
 semantic digital twin models it with the single, type-routed method
-{py:meth}`semantic_digital_twin.semantic_annotations.mixins.PartWholeRelationship.add`.
+{py:meth}`semantic_digital_twin.semantic_annotations.part_whole.relationship.HasParts.add`.
 
-Calling `whole.add(part)` does two things:
+Calling `whole.add(part=part)` does two things:
 
 1. It finds the typed *part-whole relationship field* of `whole` whose element type matches
    `type(part)` and stores the part there (a single-valued field like `handle`, or appends to a
@@ -49,9 +49,8 @@ drawer hangs from, which `drawer.movable_joint` returns.
 import numpy as np
 
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
-from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-)
+from krrood_spatial_math.spatial_types import ScrewAxis
+from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world_description.geometry import Scale
@@ -71,8 +70,8 @@ with world.modify_world():
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
-        parent_connection_specification=PrismaticConnectionSpecification(
-            axis=Vector3.X()
+        parent_connection_specification=ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()),
         ),
     )
     handle = Handle.create_with_new_body_in_world(
@@ -82,9 +81,9 @@ with world.modify_world():
     )
 
     # One method, routed by type: handle -> drawer.handle
-    drawer.add(handle)
+    drawer.add(part=handle)
     # drawer -> dresser.drawers (a list field, so it is appended)
-    dresser.add(drawer)
+    dresser.add(part=drawer)
 
 # add routed each part to the field whose element type it matches.
 assert drawer.handle is handle
@@ -121,8 +120,9 @@ field of its own.
 from dataclasses import dataclass, field
 from typing import Optional
 
-from semantic_digital_twin.semantic_annotations.mixins import HasHandle, HasRootBody
-from semantic_digital_twin.semantic_annotations.part_whole import IsPartWholeRelationship
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import IsPartWholeRelationship
+from semantic_digital_twin.semantic_annotations.part_whole.furniture_parts import HasHandle
 
 @dataclass(eq=False)
 class EmergencyButton(HasRootBody):
@@ -167,8 +167,8 @@ with world.modify_world():
         world=world,
         scale=Scale(0.03, 0.03, 0.02),
     )
-    panel.add(panel_handle)
-    panel.add(panel_button)
+    panel.add(part=panel_handle)
+    panel.add(part=panel_button)
 
 assert panel.handle is panel_handle
 assert panel.emergency_button is panel_button
@@ -178,11 +178,11 @@ print("panel.emergency_button is panel_button:", panel.emergency_button is panel
 
 If you try to add a part whose type matches none of the part-whole relationship fields, `add`
 refuses with
-{py:class}`semantic_digital_twin.exceptions.CannotBeAPartOf` — a `ControlPanel` has nowhere to put
+{py:class}`semantic_digital_twin.exceptions.NoFieldAcceptsEntity` — a `ControlPanel` has nowhere to put
 a `Drawer`:
 
 ```{code-cell} ipython3
-from semantic_digital_twin.exceptions import CannotBeAPartOf
+from semantic_digital_twin.exceptions import NoFieldAcceptsEntity
 
 with world.modify_world():
     stray_drawer = Drawer.create_with_new_body_in_world(
@@ -193,8 +193,8 @@ with world.modify_world():
     )
     rejected = False
     try:
-        panel.add(stray_drawer)
-    except CannotBeAPartOf as error:
+        panel.add(part=stray_drawer)
+    except NoFieldAcceptsEntity as error:
         rejected = True
         print("Rejected as expected:", error)
 

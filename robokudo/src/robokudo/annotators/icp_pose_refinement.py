@@ -98,7 +98,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
         self.class_name_to_ply_model = dict()
 
         # Load PLY PointClouds (not Meshes!) for all objects
-        ply_path = self.get_model_path("JeroenCup")
+        ply_path = self.get_model_path(class_name="JeroenCup")
         if ply_path is None or not ply_path.exists():
             logger.error("Couldn't lookup model path. Deactivating Annotator.")
             self.annotator_deactivated = True
@@ -108,7 +108,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
             self.class_name_to_ply_model["JeroenCup"] = ply_model
 
     # TODO Rewrite this so that we can load multiple files from the directory at once
-    def get_model_path(self, class_name: str = "") -> Path | None:
+    def get_model_path(self, *, class_name: str = "") -> Path | None:
         """Get path to PLY model file.
 
         Resolves model path using:
@@ -174,7 +174,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
             self.feedback_message = error_message
             return Status.SUCCESS  # Don't fail the whole pipeline
 
-        cloud = self.get_cas().get(CASViews.CLOUD)
+        cloud = self.get_cas().get(view_name=CASViews.CLOUD)
         annotations = self.get_cas().annotations
         geometries_to_visualize = []
 
@@ -314,7 +314,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
         ]
         vis_geometries.extend(geometries_to_visualize)
 
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

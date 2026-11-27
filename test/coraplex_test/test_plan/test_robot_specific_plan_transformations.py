@@ -132,7 +132,7 @@ def prepared(
 
     :return: The plan, rewritten.
     """
-    executor.prepare(statechart_of(executor, plan))
+    executor.prepare(statechart=statechart_of(executor, plan))
     return plan
 
 

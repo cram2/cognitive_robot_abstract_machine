@@ -196,12 +196,12 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, ScrewAxis, Vector3
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Box, Color, Scale
@@ -275,7 +275,7 @@ def spawn_robot_body(spawn_world: World) -> Body:
     return spawn_body
 
 
-def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
+def spawn_arm(spawn_world: World, root_body: Body) -> ScrewAxisConnection:
     """
     Spawn a single-link arm attached to ``root_body`` via a revolute joint about Z.
     """
@@ -310,11 +310,11 @@ def spawn_arm(spawn_world: World, root_body: Body) -> RevoluteConnection:
 
     with spawn_world.modify_world():
         spawn_world.add_degree_of_freedom(dof)
-        arm_connection = RevoluteConnection(
+        arm_connection = ScrewAxisConnection(
+            screw_axis=ScrewAxis(rotation_per_unit_position=Vector3.Z()),
             name=dof.name,
             parent=root_body,
             child=spawn_arm_body,
-            axis=Vector3.Z(reference_frame=spawn_arm_body),
             dof_id=dof.id,
             parent_T_connection_expression=connection_origin,
         )

@@ -55,7 +55,7 @@ questions = [
       ],
     },
     {
-      "question": "How does whole.add(part) decide where to store the part?",
+      "question": "How does whole.add(part=part) decide where to store the part?",
       "type": "multiple_choice",
       "answers": [
         {"answer": "It matches type(part) against the element types of the whole's part-whole relationship fields", "correct": True},

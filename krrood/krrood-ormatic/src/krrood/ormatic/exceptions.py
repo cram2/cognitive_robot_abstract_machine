@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.conversion_order import (
         ConversionOrderConstraint,
     )
+    from krrood.ormatic.result_loading import ResultLoading
 
 
 @dataclass(kw_only=True)
@@ -267,4 +268,29 @@ class PartOfDetachedObjectNotLoadedError(DataclassException, LookupError):
         return (
             "Convert or read the DAO while its session is open, or add it to a session "
             "again before asking for its parts."
+        )
+
+
+@dataclass(kw_only=True)
+class UnsupportedResultLoadingError(DataclassException, ValueError):
+    """
+    Raised when a :func:`~krrood.entity_query_language.factories.set_of` query is asked
+    to load its rows otherwise than as it selects them.
+    """
+
+    result_loading: ResultLoading
+    """
+    The result loading the query was asked to evaluate with.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"A set_of query loads the rows it selects as they are, so it cannot be "
+            f"loaded with {self.result_loading}."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            "Keep the subclass loading and the result content of the set_of query at "
+            "their defaults, or select one variable with entity()."
         )

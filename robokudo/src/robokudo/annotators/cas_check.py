@@ -82,7 +82,7 @@ def any_of_type_present(annotation_type: type, cas: CAS) -> bool:
     :param cas: Common Analysis System instance
     :return: True if at least one annotation exists, False otherwise
     """
-    annotations = cas.filter_annotations_by_type(annotation_type)
+    annotations = cas.filter_annotations_by_type(type_to_include=annotation_type)
     return len(annotations) > 0
 
 

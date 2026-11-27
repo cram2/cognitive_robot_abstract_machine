@@ -11,7 +11,7 @@ from random_events.variable import Continuous
 from sortedcontainers import SortedSet
 
 from experiments.circuit_learning.measurements import ChunkedLogLikelihoodEvaluation
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
 
 # %% jax circuits
 

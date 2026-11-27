@@ -1,3 +1,8 @@
+"""
+Paths for the tool center point of a held tool, such as the cutting, container and
+surface paths of the tool-based actions.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -33,7 +38,7 @@ def _local_bounding_box(body: Body, use_visual: bool = False) -> VolumetricBound
     return geometry.as_bounding_box_collection_in_frame(body).bounding_box()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ToolPathSegment:
     """
     A local curve of one geometric pattern over a fixed duration.
@@ -61,7 +66,7 @@ class ToolPathSegment:
     """
 
     def sample(
-        self, frame_np: np.ndarray, dt: float, t0: float = 0.0
+        self, *, frame_np: np.ndarray, dt: float, t0: float = 0.0
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Sample the segment's curve in the given frame.
@@ -88,7 +93,7 @@ class ToolPathSegment:
         return times, points
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ToolPath:
     """
     An ordered list of tool path segments forming one continuous path.
@@ -107,7 +112,11 @@ class ToolPath:
         return float(sum(segment.duration for segment in self.segments))
 
     def sample(
-        self, frame: HomogeneousTransformationMatrix, dt: float = 0.01, t0: float = 0.0
+        self,
+        *,
+        frame: HomogeneousTransformationMatrix,
+        dt: float = 0.01,
+        t0: float = 0.0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Sample all segments into one concatenated path.
@@ -122,7 +131,7 @@ class ToolPath:
         t = float(t0)
 
         for segment_index, segment in enumerate(self.segments):
-            times, points = segment.sample(frame.to_np(), dt=dt, t0=t)
+            times, points = segment.sample(frame_np=frame.to_np(), dt=dt, t0=t)
             if all_times:
                 times = times[1:]
                 points = points[1:]
@@ -203,7 +212,7 @@ def planar_raster_xy(tau: float, width: float, height: float, lanes: int) -> np.
     return np.array([x, y, 0.0], dtype=float)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ShearProfile:
     """
     Parameters for an oscillatory shear motion with a monotone depth profile.
@@ -230,7 +239,7 @@ class ShearProfile:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ShearXYProfile:
     """
     Parameters for an oscillatory shear motion in the XY plane.
@@ -528,7 +537,7 @@ def build_container_path(
 
     if pattern is MixingPattern.SPIRAL:
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SPIRAL,
                     duration=2.0 * duration_scale,
@@ -550,7 +559,7 @@ def build_container_path(
     stir_loops = max(1, int(np.ceil(total_duration / stir_base_duration)))
 
     return ToolPath(
-        [
+        segments=[
             ToolPathSegment(
                 kind=ToolPathSegmentKind.STIR,
                 duration=total_duration,
@@ -626,7 +635,7 @@ def build_surface_path(
 
     if technique is WipingTechnique.WIPE:
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SPIRAL,
                     duration=2.0 * duration_scale,
@@ -640,7 +649,7 @@ def build_surface_path(
         )
     if technique is WipingTechnique.SHEAR:
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SHEAR,
                     duration=1.5 * duration_scale,
@@ -657,7 +666,7 @@ def build_surface_path(
             ]
         )
     return ToolPath(
-        [
+        segments=[
             ToolPathSegment(
                 kind=ToolPathSegmentKind.RASTER,
                 duration=2.0 * duration_scale,
@@ -674,7 +683,7 @@ def build_surface_path(
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SliceAnchorPlacement:
     """
     Places cut anchors along an axis interval from a requested slice thickness and
@@ -734,13 +743,13 @@ class SliceAnchorPlacement:
             interval end.
         """
         usable_length = max(0.0, self.interval_end - self.interval_start)
-        thickness, count = self._resolve_parameters(usable_length)
+        thickness, count = self._resolve_parameters(usable_length=usable_length)
         return [
             self.interval_start + cut_index * thickness
             for cut_index in range(1, count + 1)
         ]
 
-    def _resolve_parameters(self, usable_length: float) -> tuple[float, int]:
+    def _resolve_parameters(self, *, usable_length: float) -> tuple[float, int]:
         """
         :param usable_length: Length of the usable cutting interval in meters.
         :return: The feasible ``(slice_thickness, number_of_cuts)`` pair after filling
@@ -915,4 +924,4 @@ def build_cutting_path(
             segments.append(_descend_segment(cut_index, x_value))
         segments.append(_retract_segment(cut_index, x_value))
 
-    return ToolPath(segments)
+    return ToolPath(segments=segments)

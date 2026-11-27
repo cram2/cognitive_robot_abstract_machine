@@ -33,13 +33,19 @@ def test_ratio_scaling_one_axis_is_not_identity():
 
 
 def test_depth_pixel_truncates_to_containing_pixel(half_resolution: ColorToDepthRatio):
-    assert half_resolution.depth_pixel(9.0, 7.0) == Point2D(x=4, y=1)
+    """
+    A color pixel maps to the depth pixel containing it, rounding down.
+    """
+    assert half_resolution.depth_pixel(x=9.0, y=7.0) == Point2D(x=4, y=1)
 
 
 def test_depth_region_scales_each_corner(half_resolution: ColorToDepthRatio):
+    """
+    A color region maps to the depth region spanned by its scaled corners.
+    """
     region = Rect.from_corner_points(x1=4, y1=8, x2=10, y2=20)
 
-    assert half_resolution.depth_region(region) == Rect.from_corner_points(
+    assert half_resolution.depth_region(region=region) == Rect.from_corner_points(
         x1=2, y1=2, x2=5, y2=5
     )
 
@@ -48,8 +54,11 @@ def test_depth_region_scales_each_corner(half_resolution: ColorToDepthRatio):
 
 
 def test_color_pixels_scale_each_axis(half_resolution: ColorToDepthRatio):
+    """
+    Depth pixels map back to color pixels by scaling each axis.
+    """
     depth_pixels = np.array([[2, 3], [5, 1]])
 
     np.testing.assert_array_equal(
-        half_resolution.color_pixels(depth_pixels), [[4, 12], [10, 4]]
+        half_resolution.color_pixels(depth_pixels=depth_pixels), [[4, 12], [10, 4]]
     )

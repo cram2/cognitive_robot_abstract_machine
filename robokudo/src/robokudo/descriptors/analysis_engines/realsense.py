@@ -30,7 +30,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a basic pipeline that does tabletop segmentation.
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("realsense")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="realsense"
+        )
 
         seq = Pipeline("RealSensePipeline")
         seq.add_children(

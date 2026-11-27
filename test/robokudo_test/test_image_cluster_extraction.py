@@ -36,7 +36,9 @@ def test_contour_selection_rejects_an_empty_mask(
     A mask without foreground pixels reports a missing contour.
     """
     with pytest.raises(ImageContourMissing):
-        cluster_extractor._select_contours(np.zeros((10, 10), dtype=np.uint8))
+        cluster_extractor._select_contours(
+            color_mask=np.zeros((10, 10), dtype=np.uint8)
+        )
 
 
 def test_contour_selection_keeps_the_largest_outer_contour(
@@ -52,7 +54,7 @@ def test_contour_selection_keeps_the_largest_outer_contour(
     cluster_extractor.descriptor.parameters.contour_min_size = 50
     cluster_extractor.descriptor.parameters.num_of_objects = 1
 
-    contours = cluster_extractor._select_contours(mask)
+    contours = cluster_extractor._select_contours(color_mask=mask)
 
     assert [cv2.boundingRect(contour) for contour in contours] == [(2, 2, 21, 21)]
 
@@ -71,7 +73,9 @@ def test_point_cloud_excludes_masked_depth_pixels(
     color_image = np.zeros((2, 2, 3), dtype=np.uint8)
     contour_mask = np.array([[255, 0], [0, 255]], dtype=np.uint8)
 
-    point_cloud = cluster_extractor._create_point_cloud(color_image, contour_mask)
+    point_cloud = cluster_extractor._create_point_cloud(
+        resized_color=color_image, contour_mask=contour_mask
+    )
 
     np.testing.assert_allclose(np.asarray(point_cloud.points), [[0, 0, 1], [1, 1, 1]])
 
@@ -97,7 +101,9 @@ def test_cluster_annotation_requires_minimum_points(
     contour = np.array([[[2, 2]], [[9, 2]], [[9, 9]], [[2, 9]]], dtype=np.int32)
     color_image = np.zeros((12, 12, 3), dtype=np.uint8)
 
-    clusters = cluster_extractor._extract_clusters(color_image, [contour])
+    clusters = cluster_extractor._extract_clusters(
+        resized_color=color_image, contours=[contour]
+    )
 
     assert len(clusters.point_clouds) == 1
     assert len(clusters.object_hypotheses) == annotation_count

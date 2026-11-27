@@ -56,12 +56,14 @@ from experiments.circuit_learning.settings import (
     ComputationSetting,
     Device,
 )
-from probabilistic_model.learning.jax_gradient_descent import (
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
     CompilerOption,
     CompilerVariable,
 )
-from probabilistic_model.learning.torch_gradient_descent import TorchDeviceType
-from probabilistic_model.learning.training_schedule import Convergence
+from probabilistic_model.learning.parameters.torch_circuit_parameter_learning import (
+    TorchDeviceType,
+)
+from probabilistic_model.learning.parameters.training_schedule import Convergence
 
 # %% names
 

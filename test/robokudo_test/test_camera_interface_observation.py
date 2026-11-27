@@ -55,6 +55,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
+from krrood.patterns.called_positionally import called_positionally
 
 
 @dataclass(kw_only=True)
@@ -79,7 +80,7 @@ class SynchronizedImageConfiguration(TfComponent):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LiveColorCameraConfig:
     """
     Provide the options consumed by the RGB-only reader's frame conversion.
@@ -96,7 +97,7 @@ class LiveColorCameraConfig:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenCVCameraTestConfig:
     """
     Provide the options consumed by one OpenCV frame conversion.
@@ -138,7 +139,7 @@ class OpenCVCameraTestConfig:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SeekableImageSequence:
     """
     Provide the metadata operations used after an OpenCV frame is retrieved.
@@ -154,6 +155,7 @@ class SeekableImageSequence:
     Number of frames in the source.
     """
 
+    @called_positionally
     def get(self, property_identifier: int) -> float:
         """
         Return the requested playback metadata.
@@ -165,6 +167,7 @@ class SeekableImageSequence:
             return self.frame_position
         return self.frame_count
 
+    @called_positionally
     def set(self, property_identifier: int, value: float) -> bool:
         """
         Accept a playback-position update.
@@ -206,7 +209,7 @@ def test_camera_info_conversion_preserves_effective_calibration(
     """
     The semantic pinhole model represents every relevant CameraInfo value.
     """
-    camera_model = RosCameraModelAdapter.from_camera_info(camera_info)
+    camera_model = RosCameraModelAdapter.from_camera_info(camera_info=camera_info)
 
     assert camera_model.resolution == CameraResolution(width=640, height=480)
     assert camera_model.focal_length_x == camera_info.k[0]
@@ -225,10 +228,10 @@ def test_camera_model_conversion_preserves_ros_calibration(
     """
     The reverse conversion recreates the ROS calibration values.
     """
-    camera_model = RosCameraModelAdapter.from_camera_info(camera_info)
+    camera_model = RosCameraModelAdapter.from_camera_info(camera_info=camera_info)
 
     converted_info = RosCameraModelAdapter.to_camera_info(
-        camera_model,
+        camera_model=camera_model,
         frame_id=camera_info.header.frame_id,
     )
 
@@ -278,7 +281,7 @@ def test_ros_frame_alias_reuses_robot_optical_body(
     interface.store_camera_observation(
         cas=cas,
         world=runtime_world,
-        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info=camera_info),
         camera_frame=camera_info.header.frame_id,
         timestamp_nanoseconds=123,
         modalities=(CameraModality.COLOR,),
@@ -375,7 +378,9 @@ def test_mismatched_pose_child_is_rejected_at_acquisition(
         interface.store_camera_observation(
             cas=CAS(),
             world=runtime_world,
-            camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+            camera_model=RosCameraModelAdapter.from_camera_info(
+                camera_info=camera_info
+            ),
             camera_frame=camera_info.header.frame_id,
             timestamp_nanoseconds=123,
             modalities=(CameraModality.COLOR,),
@@ -412,7 +417,7 @@ def test_camera_observation_reuses_camera_rooted_in_stream_frame(
     interface.store_camera_observation(
         cas=cas,
         world=runtime_world,
-        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info=camera_info),
         camera_frame=camera_info.header.frame_id,
         timestamp_nanoseconds=123,
         modalities=(CameraModality.COLOR,),
@@ -441,7 +446,7 @@ def test_camera_observation_creates_standalone_camera_without_world_pose(
     interface.store_camera_observation(
         cas=cas,
         world=runtime_world,
-        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info=camera_info),
         camera_frame=camera_info.header.frame_id,
         timestamp_nanoseconds=456,
         modalities=(CameraModality.COLOR,),
@@ -474,7 +479,7 @@ def test_camera_observation_connects_new_camera_in_rooted_world_without_pose(
     interface.store_camera_observation(
         cas=cas,
         world=runtime_world,
-        camera_model=RosCameraModelAdapter.from_camera_info(camera_info),
+        camera_model=RosCameraModelAdapter.from_camera_info(camera_info=camera_info),
         camera_frame=camera_info.header.frame_id,
         timestamp_nanoseconds=456,
         modalities=(CameraModality.COLOR,),
@@ -1110,7 +1115,7 @@ def test_rgb_only_reader_keeps_receiving_after_an_undecodable_frame() -> None:
     interface = object.__new__(ROSCameraWithoutDepthInterface)
     interface.lock = Lock()
     undecodable_color_image = CVBridgeWorkaround().cv2_to_imgmsg(
-        np.zeros((4, 4), dtype=np.float32), "32FC1"
+        cv_image=np.zeros((4, 4), dtype=np.float32), encoding="32FC1"
     )
 
     with pytest.raises(ValueError):
@@ -1134,12 +1139,12 @@ class TestCameraFrameFromMessages:
         bridge = CVBridgeWorkaround()
         color = np.arange(48, dtype=np.uint8).reshape((4, 4, 3))
         depth = np.arange(16, dtype=np.float32).reshape((4, 4))
-        color_data = bridge.cv2_to_imgmsg(color, "bgr8")
+        color_data = bridge.cv2_to_imgmsg(cv_image=color, encoding="bgr8")
         color_data.header.stamp = Time(sec=3, nanosec=4)
 
         frame = CameraFrame.from_messages(
             color_data=color_data,
-            depth_data=bridge.cv2_to_imgmsg(depth, "32FC1"),
+            depth_data=bridge.cv2_to_imgmsg(cv_image=depth, encoding="32FC1"),
             camera_info=camera_info,
         )
 
@@ -1153,7 +1158,7 @@ class TestCameraFrameFromMessages:
         A camera without depth delivers a frame without a depth image.
         """
         color_data = CVBridgeWorkaround().cv2_to_imgmsg(
-            np.zeros((4, 4, 3), dtype=np.uint8), "bgr8"
+            cv_image=np.zeros((4, 4, 3), dtype=np.uint8), encoding="bgr8"
         )
 
         assert CameraFrame.from_messages(color_data=color_data).depth_image is None

@@ -1,3 +1,9 @@
+"""
+Tests of the camera configuration registry.
+"""
+
+from __future__ import annotations
+
 from robokudo.descriptors.camera_configs.config_kinect_robot import KinectCameraConfig
 from robokudo.descriptors.camera_configs.config_mongodb_playback import (
     MongoCameraConfig,
@@ -8,11 +14,15 @@ from robokudo.descriptors.camera_configs.registry import CameraConfigRegistry
 
 
 class TestCameraConfigRegistry(object):
+    """
+    Tests of creating camera configurations from :class:`CameraConfigRegistry`.
+    """
+
     def test_camera_registry_valid_camera_name(self) -> None:
         """
         Test the creation of a valid camera config.
         """
-        config = CameraConfigRegistry.create_config("mongo")
+        config = CameraConfigRegistry.create_config(config_type="mongo")
         assert type(config) == MongoCameraConfig
 
     def test_camera_registry_invalid_camera_name(self) -> None:
@@ -20,7 +30,7 @@ class TestCameraConfigRegistry(object):
         Test the creation of an invalid camera config.
         """
         with pytest.raises(ValueError):
-            CameraConfigRegistry.create_config("invalid_camera_name")
+            CameraConfigRegistry.create_config(config_type="invalid_camera_name")
 
     def test_camera_registry_valid_additional_config(self) -> None:
         """
@@ -30,7 +40,7 @@ class TestCameraConfigRegistry(object):
         db_name = "other_db_name"
 
         config: MongoCameraConfig = CameraConfigRegistry.create_config(
-            "mongo",
+            config_type="mongo",
             loop=loop,
             db_name=db_name,
         )
@@ -44,7 +54,9 @@ class TestCameraConfigRegistry(object):
         Test handling of invalid additional config parameters to the camera config.
         """
         with pytest.raises(TypeError):
-            CameraConfigRegistry.create_config("mongo", invalid_config_key="any_value")
+            CameraConfigRegistry.create_config(
+                config_type="mongo", invalid_config_key="any_value"
+            )
 
     def test_camera_registry_register_multiple_times(self) -> None:
         """
