@@ -243,7 +243,9 @@ def test_apply_control_commands_omni_drive_pr2(pr2_world_state_reset):
     cmd[pr2_world_state_reset.state._index[omni_drive.y_velocity.id]] = 100
     cmd[pr2_world_state_reset.state._index[omni_drive.yaw.id]] = 100
     dt = 0.1
-    pr2_world_state_reset.apply_control_commands(cmd, dt, Derivatives.jerk)
+    pr2_world_state_reset.apply_control_commands(
+        commands=cmd, dt=dt, derivative=Derivatives.jerk
+    )
     assert pr2_world_state_reset.state[omni_drive.yaw.id].jerk == 100.0
     assert pr2_world_state_reset.state[omni_drive.yaw.id].acceleration == 100.0 * dt
     assert pr2_world_state_reset.state[omni_drive.yaw.id].velocity == 100.0 * dt * dt
@@ -290,7 +292,9 @@ def test_apply_control_commands_diff_drive(cylinder_bot_diff_world):
     cmd[cylinder_bot_diff_world.state._index[diff_drive.x_velocity.id]] = 100
     cmd[cylinder_bot_diff_world.state._index[diff_drive.yaw.id]] = 100
     dt = 0.1
-    cylinder_bot_diff_world.apply_control_commands(cmd, dt, Derivatives.jerk)
+    cylinder_bot_diff_world.apply_control_commands(
+        commands=cmd, dt=dt, derivative=Derivatives.jerk
+    )
     assert cylinder_bot_diff_world.state[diff_drive.yaw.id].jerk == 100.0
     assert cylinder_bot_diff_world.state[diff_drive.yaw.id].acceleration == 100.0 * dt
     assert cylinder_bot_diff_world.state[diff_drive.yaw.id].velocity == 100.0 * dt * dt
