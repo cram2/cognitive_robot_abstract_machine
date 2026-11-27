@@ -6,7 +6,7 @@ live objects.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, reduce
 
 from typing_extensions import TYPE_CHECKING, Any, Iterable, Iterator
 
@@ -124,10 +124,9 @@ class State(TermReader):
             Each fact reads its bindings and values in the state the facts before it
             build.
         """
-        state = self
-        for fact in facts:
-            state = state.apply_effects(Assignment(fact=fact))
-        return state
+        return reduce(
+            lambda state, fact: state.apply_effects(Assignment(fact=fact)), facts, self
+        )
 
     def apply_effects(self, *effects: Effect) -> State:
         """
@@ -142,10 +141,9 @@ class State(TermReader):
             for effect in effects
             for change in self._changes_of_effect_(effect=effect)
         ]
-        state = self
-        for change in changes:
-            state = state._apply_change_(change=change)
-        return state
+        return reduce(
+            lambda state, change: state._apply_change_(change=change), changes, self
+        )
 
     def _changes_of_effect_(self, *, effect: Effect) -> list[StateChange]:
         """
