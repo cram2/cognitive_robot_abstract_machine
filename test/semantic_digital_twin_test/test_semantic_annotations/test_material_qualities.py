@@ -13,12 +13,12 @@ from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
     QualityOutsideScale,
 )
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
-    HasDensity,
-    HasElasticity,
+    HasMassDensity,
+    HasMaterialElasticity,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
-    Density,
-    Elasticity,
+    MassDensity,
+    MaterialElasticity,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     CitrusSegment,
@@ -53,11 +53,11 @@ def point(value: float) -> SimpleInterval:
     return SimpleInterval.from_data(value, value, Bound.CLOSED, Bound.CLOSED)
 
 
-def measured_elasticity() -> Elasticity:
+def measured_material_elasticity() -> MaterialElasticity:
     """
     :return: An elasticity measured at a point within both of its scales.
     """
-    return Elasticity(youngs_modulus=point(3.0e6), poissons_ratio=point(0.33))
+    return MaterialElasticity(youngs_modulus=point(3.0e6), poissons_ratio=point(0.33))
 
 
 # %% Scales
@@ -68,7 +68,7 @@ def test_density_at_the_lower_end_of_its_scale_is_rejected() -> None:
     A density of zero, the open lower end of the density scale, is refused.
     """
     with pytest.raises(QualityOutsideScale):
-        Density(value=point(Density.scale.lower))
+        MassDensity(value=point(MassDensity.scale.lower))
 
 
 def test_youngs_modulus_at_the_lower_end_of_its_scale_is_rejected() -> None:
@@ -76,9 +76,9 @@ def test_youngs_modulus_at_the_lower_end_of_its_scale_is_rejected() -> None:
     A Young's modulus of zero, the open lower end of its scale, is refused.
     """
     with pytest.raises(QualityOutsideScale):
-        Elasticity(
-            youngs_modulus=point(Elasticity.youngs_modulus_scale.lower),
-            poissons_ratio=measured_elasticity().poissons_ratio,
+        MaterialElasticity(
+            youngs_modulus=point(MaterialElasticity.youngs_modulus_scale.lower),
+            poissons_ratio=measured_material_elasticity().poissons_ratio,
         )
 
 
@@ -87,9 +87,9 @@ def test_poissons_ratio_at_the_upper_end_of_its_scale_is_rejected() -> None:
     A Poisson's ratio of one half, the open upper end of its scale, is refused.
     """
     with pytest.raises(QualityOutsideScale):
-        Elasticity(
-            youngs_modulus=measured_elasticity().youngs_modulus,
-            poissons_ratio=point(Elasticity.poissons_ratio_scale.upper),
+        MaterialElasticity(
+            youngs_modulus=measured_material_elasticity().youngs_modulus,
+            poissons_ratio=point(MaterialElasticity.poissons_ratio_scale.upper),
         )
 
 
@@ -109,10 +109,10 @@ def test_every_fruit_part_starts_without_density_and_elasticity(
     with world.modify_world():
         part = part_type.create_with_new_body_in_world(name="part", world=world)
 
-    assert isinstance(part, HasElasticity)
-    assert isinstance(part, HasDensity)
-    assert part.density is None
-    assert part.elasticity is None
+    assert isinstance(part, HasMaterialElasticity)
+    assert isinstance(part, HasMassDensity)
+    assert part.mass_density is None
+    assert part.material_elasticity is None
 
 
 def test_density_and_elasticity_of_a_peel_are_its_qualities(world: World) -> None:
@@ -120,13 +120,13 @@ def test_density_and_elasticity_of_a_peel_are_its_qualities(world: World) -> Non
     Setting a density and an elasticity on a peel fills their fields and lists both
     among its qualities.
     """
-    density = Density(value=point(850.0))
-    elasticity = measured_elasticity()
+    mass_density = MassDensity(value=point(850.0))
+    material_elasticity = measured_material_elasticity()
     with world.modify_world():
         peel = Peel.create_with_new_body_in_world(name="peel", world=world)
-        peel.set_quality(quality=density)
-        peel.set_quality(quality=elasticity)
+        peel.set_quality(quality=mass_density)
+        peel.set_quality(quality=material_elasticity)
 
-    assert peel.density is density
-    assert peel.elasticity is elasticity
-    assert peel.qualities == [density, elasticity]
+    assert peel.mass_density is mass_density
+    assert peel.material_elasticity is material_elasticity
+    assert peel.qualities == [mass_density, material_elasticity]

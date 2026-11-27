@@ -68,7 +68,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.fruit_parts import (
     HasStem,
 )
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
-    HasElasticity,
+    HasMaterialElasticity,
     HasRipeness,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
@@ -1218,10 +1218,10 @@ class Fruit(Produce, HasRipeness):
 
 
 @dataclass(eq=False, kw_only=True)
-class FruitPart(HasRootBody, HasElasticity):
+class FruitPart(HasRootBody, HasMaterialElasticity):
     """
     An anatomical part of a fruit, such as its peel or a seed, whose material has a
-    density and an elasticity of its own.
+    mass density and an elasticity of its own.
     """
 
 

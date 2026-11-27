@@ -1,6 +1,6 @@
 """
 Qualities of semantic annotations: aspects of a single bearer, such as the ripeness of a
-fruit or the density of its flesh, that can change while the bearer stays the same.
+fruit or the mass density of its flesh, that can change while the bearer stays the same.
 
 Follows DUL and SOMA: a quality has a value in a region of its quality space, and named
 regions of that space, such as :attr:`RipenessStage.RIPE`, classify the value.
@@ -127,7 +127,7 @@ class Ripeness(Quality):
 
 
 @dataclass(kw_only=True)
-class Density(Quality):
+class MassDensity(Quality):
     """
     The mass per volume of its bearer's material, in kilograms per cubic metre.
 
@@ -136,7 +136,7 @@ class Density(Quality):
 
     value: SimpleInterval
     """
-    The density on :attr:`scale`: a single point when it was measured, or the range its
+    The mass density on :attr:`scale`: a single point when it was measured, or the range its
     measurements spread over.
     """
 
@@ -149,13 +149,13 @@ class Density(Quality):
     @classproperty
     def scale(cls) -> SimpleInterval:
         """
-        :return: The density scale: every positive density.
+        :return: The mass density scale: every positive mass density.
         """
         return SimpleInterval.from_data(0.0, float("inf"), Bound.OPEN, Bound.OPEN)
 
 
 @dataclass(kw_only=True)
-class Elasticity(Quality):
+class MaterialElasticity(Quality):
     """
     How its bearer's material deforms under load and springs back, given by the two
     constants that describe an isotropic linear elastic material.
