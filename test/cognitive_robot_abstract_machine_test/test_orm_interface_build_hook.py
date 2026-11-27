@@ -81,14 +81,18 @@ class TestOrmInterfacesBuiltOnlyByTheXdistController:
         monkeypatch.delenv(PytestEnvironmentVariable.XDIST_WORKER, raising=False)
 
         assert regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN) is True
-        assert recorded_builds == [[OrmPackage.SEMANTIC_DIGITAL_TWIN]]
+        assert recorded_builds == [
+            [OrmPackage.PROBABILISTIC_MODEL, OrmPackage.SEMANTIC_DIGITAL_TWIN]
+        ]
 
     def test_a_second_ask_does_not_build_again(self, monkeypatch, recorded_builds):
         monkeypatch.delenv(PytestEnvironmentVariable.XDIST_WORKER, raising=False)
         regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN)
 
         assert regenerate_orm_interfaces(OrmPackage.SEMANTIC_DIGITAL_TWIN) is True
-        assert recorded_builds == [[OrmPackage.SEMANTIC_DIGITAL_TWIN]]
+        assert recorded_builds == [
+            [OrmPackage.PROBABILISTIC_MODEL, OrmPackage.SEMANTIC_DIGITAL_TWIN]
+        ]
 
 
 # %% only the interfaces the tested package needs
@@ -105,7 +109,13 @@ def test_a_run_builds_only_the_interfaces_its_package_needs(
 
     regenerate_orm_interfaces(OrmPackage.CRAMPH)
 
-    assert recorded_builds == [[OrmPackage.SEMANTIC_DIGITAL_TWIN, OrmPackage.CRAMPH]]
+    assert recorded_builds == [
+        [
+            OrmPackage.PROBABILISTIC_MODEL,
+            OrmPackage.SEMANTIC_DIGITAL_TWIN,
+            OrmPackage.CRAMPH,
+        ]
+    ]
 
 
 # %% the choice a run is started with

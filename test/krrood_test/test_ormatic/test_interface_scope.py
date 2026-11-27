@@ -55,3 +55,28 @@ def test_interface_building_on_nothing_reuses_no_table_of_a_loaded_interface() -
     )
 
     assert ormatic.externally_mapped_classes == {}
+
+
+# %% classes ignored by default
+
+
+def test_an_interface_maps_no_serializer_of_a_class_outside_our_control() -> None:
+    """
+    A serializer of a class outside our control gives behaviour only, so it gets no
+    table, while the data class next to it does.
+    """
+    from ..dataset import serializer_and_record_classes
+
+    ormatic = ORMatic.from_package(
+        packages=[serializer_and_record_classes],
+        ormatic_interface_dependencies=[],
+        ignored_classes=set(),
+        type_mappings={},
+        ignore_krrood_test_classes=False,
+    )
+
+    assert serializer_and_record_classes.SerializedRecord in ormatic.mapped_classes
+    assert (
+        serializer_and_record_classes.ValueOutsideOurControlJSONSerializer
+        not in ormatic.mapped_classes
+    )

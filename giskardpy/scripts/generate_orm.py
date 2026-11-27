@@ -12,7 +12,6 @@ import numpy as np
 import giskardpy
 import giskardpy.qp.solvers
 import cramph.orm.ormatic_interface
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.custom_types import NumpyType
 from krrood.ormatic.ormatic import ORMatic
 from krrood.class_diagrams.utils import classes_of_package
@@ -23,7 +22,6 @@ from krrood.class_diagrams.utils import classes_of_package
 
 
 ignored_classes = set(classes_of_package(giskardpy.qp.solvers))
-ignored_classes |= {SubclassJSONSerializer}
 
 dependencies = [cramph.orm.ormatic_interface]
 

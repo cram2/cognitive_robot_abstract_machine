@@ -101,6 +101,7 @@ class FromDataAccessObjectConversion:
         finisher = DomainObjectFinisher(state=state, discovery_order=discovery_order)
         finisher.finish_containers()
         finisher.call_post_inits()
+        finisher.finish_sorting_containers()
 
         for work_item in discovery_order:
             state.mark_initialized(dao_instance=work_item.dao_instance)

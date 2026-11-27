@@ -56,7 +56,8 @@ def shortest_inheritance_path_length(
     :param child_class: The class whose ancestors are searched.
     :param parent_class: The ancestor to reach.
     :return: The number of inheritance levels between the two classes along the shortest
-        branch, or none if ``child_class`` is not a subclass of ``parent_class``.
+        branch, or none if ``child_class`` is not a subclass of ``parent_class``. A
+        virtual subclass of an abstract base class is one level below it.
     """
     if not (
         isclass(child_class)
@@ -67,9 +68,12 @@ def shortest_inheritance_path_length(
     if child_class == parent_class:
         return 0
     return 1 + min(
-        shortest_inheritance_path_length(base, parent_class)
-        for base in child_class.__bases__
-        if issubclass(base, parent_class)
+        (
+            shortest_inheritance_path_length(base, parent_class)
+            for base in child_class.__bases__
+            if issubclass(base, parent_class)
+        ),
+        default=0,
     )
 
 

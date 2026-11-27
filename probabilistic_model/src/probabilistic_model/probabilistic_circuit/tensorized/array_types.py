@@ -8,17 +8,78 @@ parts that compute on numpy only, are numpy arrays on the host.
 
 from __future__ import annotations
 
+from abc import ABC
+from dataclasses import dataclass
+from types import NotImplementedType
+
 import numpy as np
 import numpy.typing as npt
+from krrood.adapters.json_serializer import (
+    ExternalClassJSONSerializer,
+    NumpyNDarrayJSONSerializer,
+)
 from typing_extensions import Any, TypeAlias
+
+from probabilistic_model.probabilistic_circuit.tensorized.has_parameter_arrays import (
+    HasParameterArrays,
+)
 
 # %% values of any backend
 
-BackendArray: TypeAlias = Any
-"""
-An array of any backend that implements the Python Array API standard, which defines no
-type to annotate such an array with.
-"""
+
+class BackendArray(ABC):
+    """
+    An array of any backend that implements the Python Array API standard, such as a
+    :class:`numpy.ndarray`, a :class:`jax.Array` or a :class:`torch.Tensor`.
+
+    The standard defines no class such arrays derive from, so every class that names the
+    Array API namespace of its arrays, or exchanges them through DLPack, is a virtual
+    subclass.
+    """
+
+    @classmethod
+    def __subclasshook__(cls, subclass: type) -> bool | NotImplementedType:
+        """
+        :param subclass: The class to decide on.
+        :return: True if the class has ``__array_namespace__`` or ``__dlpack__``, else
+            the usual subclass check decides.
+        """
+        if cls is BackendArray and (
+            hasattr(subclass, "__array_namespace__") or hasattr(subclass, "__dlpack__")
+        ):
+            return True
+        return NotImplemented
+
+
+@dataclass(kw_only=True)
+class BackendArrayJSONSerializer(ExternalClassJSONSerializer[BackendArray]):
+    """
+    JSON serializer for the arrays of a backend other than numpy, which writes their
+    values on the host as a numpy array, so that they are read back as one.
+    """
+
+    @classmethod
+    def to_json(cls, *, instance: BackendArray, **kwargs: Any) -> dict[str, Any]:
+        """
+        :meth:`NumpyNDarrayJSONSerializer.to_json` of the host copy of the array, so the
+        JSON names :class:`numpy.ndarray` as its type.
+        """
+        return NumpyNDarrayJSONSerializer.to_json(
+            instance=HasParameterArrays.host_copy(instance), **kwargs
+        )
+
+    @classmethod
+    def from_json(
+        cls, *, data: dict[str, Any], clazz: type[BackendArray], **kwargs: Any
+    ) -> np.ndarray:
+        """
+        :meth:`NumpyNDarrayJSONSerializer.from_json`, which reads the array as a numpy
+        array whatever backend it was written from.
+        """
+        return NumpyNDarrayJSONSerializer.from_json(
+            data=data, clazz=np.ndarray, **kwargs
+        )
+
 
 SampleArray: TypeAlias = BackendArray
 """

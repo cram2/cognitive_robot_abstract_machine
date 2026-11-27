@@ -13,6 +13,7 @@ from enum import StrEnum
 from functools import lru_cache, reduce
 from types import NoneType, UnionType
 
+from sortedcontainers import SortedSet
 from typing_extensions import (
     Any,
     Iterable,
@@ -419,6 +420,24 @@ class CollectionShape:
         """
         return tuple(
             level.key_type for level in self.levels if isinstance(level, MappingLevel)
+        )
+
+    @classproperty
+    def containers_that_sort_their_elements(cls) -> tuple[type, ...]:
+        """
+        :return: The container classes that compare their elements, so that a container
+            of them is restored only once the objects it holds are initialised.
+        """
+        return (SortedSet,)
+
+    @property
+    def sorts_its_elements(self) -> bool:
+        """
+        :return: Whether a container of the collection compares its elements.
+        """
+        return any(
+            level.container_type in self.containers_that_sort_their_elements
+            for level in self.levels
         )
 
     @property

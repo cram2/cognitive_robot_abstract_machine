@@ -159,7 +159,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
     The root layer has exactly one node, which is the output of the circuit.
     """
 
-    variables: SortedSet
+    variables: SortedSet[Variable]
     """
     The variables of the circuit.
 

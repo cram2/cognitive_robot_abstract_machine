@@ -1,10 +1,10 @@
-# ----------------------------------------------------------------------------------------------------------------------
-# This script generates the ORM classes for the semantic_digital_twin package.
-# Dataclasses can be mapped automatically to the ORM model
-# using the ORMatic library, they just have to be registered in the classes list.
-# Classes that are self_mapped and explicitly_mapped are already mapped in the model.py file. Look there for more
-# information on how to map them.
-# ----------------------------------------------------------------------------------------------------------------------
+"""
+Generate the ORM interface of semantic_digital_twin, built on the one of
+probabilistic_model.
+
+Classes that :mod:`semantic_digital_twin.orm.model` maps itself are mapped there.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -12,6 +12,7 @@ from pathlib import Path
 
 import trimesh
 
+import probabilistic_model.orm.ormatic_interface
 import semantic_digital_twin
 import semantic_digital_twin.orm.model
 
@@ -21,7 +22,6 @@ from semantic_digital_twin.adapters.usd.parser import (
     USDJointedLinks,
     USDSceneContent,
 )
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.entity_query_language.predicate import SymbolicCallable
 from krrood.ormatic.ormatic import ORMatic
 from krrood.utils import recursive_subclasses
@@ -55,7 +55,6 @@ ignore_classes = {
     MeshFileStorage,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     SemanticDirection,
-    SubclassJSONSerializer,
     # What a USD parser builds while it reads a stage, not something a world stores.
     USDComponent,
     USDJointedLinks,
@@ -77,7 +76,7 @@ def generate_orm():
 
     ormatic = ORMatic.from_package(
         packages=[semantic_digital_twin],
-        ormatic_interface_dependencies=[],
+        ormatic_interface_dependencies=[probabilistic_model.orm.ormatic_interface],
         ignored_classes=ignore_classes,
         type_mappings={
             trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,

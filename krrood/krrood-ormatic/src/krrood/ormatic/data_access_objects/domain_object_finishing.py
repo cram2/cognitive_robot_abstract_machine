@@ -67,7 +67,23 @@ class DomainObjectFinisher:
                     data_access_object=work_item.dao_instance,
                     domain_object=domain_object,
                 )
-                self._restore_container_types(domain_object=domain_object)
+                self._restore_container_types(
+                    domain_object=domain_object, sorting_containers=False
+                )
+                processed_ids.add(id(domain_object))
+
+    def finish_sorting_containers(self) -> None:
+        """
+        Convert the lists of the collections whose containers compare their elements,
+        such as a sorted set, once every domain object is initialised and so comparable.
+        """
+        processed_ids = set()
+        for work_item in self.discovery_order:
+            domain_object = self.state.get(source=work_item.dao_instance)
+            if domain_object is not None and id(domain_object) not in processed_ids:
+                self._restore_container_types(
+                    domain_object=domain_object, sorting_containers=True
+                )
                 processed_ids.add(id(domain_object))
 
     @staticmethod
@@ -96,14 +112,22 @@ class DomainObjectFinisher:
                 )
 
     @staticmethod
-    def _restore_container_types(*, domain_object: DomainObject) -> None:
+    def _restore_container_types(
+        *, domain_object: DomainObject, sorting_containers: bool
+    ) -> None:
         """
-        Convert the lists of every collection field, nested ones included, to the sets,
-        tuples and other classes its type hint declares.
+        Convert the lists of the collection fields, nested ones included, to the sets,
+        tuples and other classes their type hints declare.
+
+        :param domain_object: The domain object whose fields are converted.
+        :param sorting_containers: Whether to convert the collections whose containers
+            compare their elements, or all the others.
         """
         for collection_field in CollectionShape.fields_with_containers_to_restore(
             clazz=type(domain_object)
         ):
+            if collection_field.shape.sorts_its_elements is not sorting_containers:
+                continue
             value = getattr(domain_object, collection_field.attribute_name, None)
             restored = collection_field.shape.restore_container_types(value=value)
             if restored is not value:
