@@ -1623,9 +1623,25 @@ class HasContainerOpening(HasRootBody, Mixin):
     @property
     def opening_radius(self) -> float:
         """
-        Radius of this container's opening, in metres.
+        Radius of the circle inscribed in this container's opening, in metres.
         """
-        return self.root.collision.scale.y / 2
+        scale = self.root.collision.scale
+        return min(scale.x, scale.y) / 2
+
+    @property
+    def lip_offset(self) -> sm.Scalar:
+        """
+        Symbolic horizontal distance from the centre of this container's opening to the
+        lip it pours over, on the side it leans to, in metres.
+        """
+        collision = self.root.collision
+        lower = collision.min_point
+        upper = collision.max_point
+        container_P_rim_exit = self._rim_exit_point()
+        return sm.sqrt(
+            (container_P_rim_exit.x - (lower.x + upper.x) / 2) ** 2
+            + (container_P_rim_exit.y - (lower.y + upper.y) / 2) ** 2
+        )
 
     def opening_direction(self) -> Vector3:
         """
@@ -1832,7 +1848,7 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
         :return: The drain of this container.
         """
         return PouringEquation(
-            container_scale=self.root.collision.scale,
+            container_height=self.root.collision.scale.z,
             outflow_rate_constant=outflow_rate_constant,
             discharge_coefficient=discharge_coefficient,
             repose_angle=repose_angle,
@@ -1947,7 +1963,7 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
             outgoing stream, plus the inflow of the incoming stream.
         """
         velocity = self.fill_equation.fill_velocity(
-            tilt=self.tilt, fill=self.fill_position
+            tilt=self.tilt, fill=self.fill_position, lip_offset=self.lip_offset
         )
         outgoing_stream = self.outgoing_stream()
         if outgoing_stream is not None:
@@ -1963,7 +1979,9 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
             per second, positive while pouring.
         """
         return (
-            -self.fill_equation.fill_velocity(tilt=self.tilt, fill=self.fill_position)
+            -self.fill_equation.fill_velocity(
+                tilt=self.tilt, fill=self.fill_position, lip_offset=self.lip_offset
+            )
             * self.capacity
         )
 
@@ -1972,4 +1990,6 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
         :return: Symbolic discharge-scaled Torricelli speed of the current pour, in
             metres per second.
         """
-        return self.fill_equation.exit_speed(tilt=self.tilt, fill=self.fill_position)
+        return self.fill_equation.exit_speed(
+            tilt=self.tilt, fill=self.fill_position, lip_offset=self.lip_offset
+        )

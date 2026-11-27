@@ -5,7 +5,7 @@ Tests of the analytic fill equations of the pouring domain.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
 import pytest
@@ -13,7 +13,6 @@ from semantic_digital_twin.physics.equations.pouring_equations import (
     PouringEquation,
 )
 from semantic_digital_twin.physics.equations.projectile_motion import ProjectileMotion
-from semantic_digital_twin.world_description.geometry import Scale
 
 # %% the cup the equations are evaluated for
 
@@ -24,9 +23,14 @@ class PouringCup:
     A rectangular cup and the operating point the equation tests evaluate it at.
     """
 
-    container_scale: Scale = field(default_factory=lambda: Scale(0.08, 0.08, 0.2))
+    container_height: float = 0.2
     """
-    Inner extents of the cup, in metres.
+    Inner height of the cup, in metres.
+    """
+
+    lip_offset: float = 0.04
+    """
+    Horizontal distance from the tilt axis to the lip, in metres.
     """
 
     repose_angle: float = 0.5
@@ -49,19 +53,19 @@ class PouringCup:
         :return: The drain of this cup.
         """
         return PouringEquation(
-            container_scale=self.container_scale,
+            container_height=self.container_height,
             repose_angle=repose_angle,
         )
 
     def expected_head(
-        self, *, lip_offset: float, tilt: float, fill: float, repose_angle: float = 0.0
+        self, *, tilt: float, fill: float, repose_angle: float = 0.0
     ) -> float:
         """
-        :return: Closed-form head of the tilted surface above a lip at ``lip_offset``.
+        :return: Closed-form head of the tilted surface above the lip.
         """
-        dry_height = self.container_scale.z * (1 - fill)
-        lip_distance = math.hypot(dry_height, lip_offset)
-        onset = math.atan2(dry_height, lip_offset) + repose_angle
+        dry_height = self.container_height * (1 - fill)
+        lip_distance = math.hypot(dry_height, self.lip_offset)
+        onset = math.atan2(dry_height, self.lip_offset) + repose_angle
         return max(0.0, lip_distance * math.sin(tilt - onset))
 
 
@@ -73,29 +77,37 @@ def cup() -> PouringCup:
     return PouringCup()
 
 
-def _head(*, equation: PouringEquation, tilt: float, fill: float) -> float:
+def _head(
+    *, cup: PouringCup, equation: PouringEquation, tilt: float, fill: float
+) -> float:
     """
     :return: The equation's numeric head at the given tilt and fill.
     """
     return equation.head_above_lip(
-        tilt=sm.Scalar(tilt), fill=sm.Scalar(fill)
+        tilt=sm.Scalar(tilt), fill=sm.Scalar(fill), lip_offset=cup.lip_offset
     ).evaluate()[0]
 
 
-def _drain(*, equation: PouringEquation, tilt: float, fill: float) -> float:
+def _drain(
+    *, cup: PouringCup, equation: PouringEquation, tilt: float, fill: float
+) -> float:
     """
     :return: The equation's numeric fill rate at the given tilt and fill.
     """
     return equation.fill_velocity(
-        tilt=sm.Scalar(tilt), fill=sm.Scalar(fill)
+        tilt=sm.Scalar(tilt), fill=sm.Scalar(fill), lip_offset=cup.lip_offset
     ).evaluate()[0]
 
 
-def _exit_speed(*, equation: PouringEquation, tilt: float, fill: float) -> float:
+def _exit_speed(
+    *, cup: PouringCup, equation: PouringEquation, tilt: float, fill: float
+) -> float:
     """
     :return: The equation's numeric exit speed at the given tilt and fill.
     """
-    return equation.exit_speed(tilt=sm.Scalar(tilt), fill=sm.Scalar(fill)).evaluate()[0]
+    return equation.exit_speed(
+        tilt=sm.Scalar(tilt), fill=sm.Scalar(fill), lip_offset=cup.lip_offset
+    ).evaluate()[0]
 
 
 # %% head above the lip
@@ -109,15 +121,18 @@ def test_the_head_is_zero_up_to_the_onset_and_the_closed_form_above_it(
     head above it.
     """
     equation = cup.equation(repose_angle=cup.repose_angle)
-    onset = float(equation.onset_tilt(fill=cup.fill).evaluate()[0])
-
-    assert _head(equation=equation, tilt=onset - 0.05, fill=cup.fill) == 0.0
-    assert _head(equation=equation, tilt=onset, fill=cup.fill) == pytest.approx(
-        0.0, abs=1e-12
+    onset = float(
+        equation.onset_tilt(fill=cup.fill, lip_offset=cup.lip_offset).evaluate()[0]
     )
-    assert _head(equation=equation, tilt=onset + 0.05, fill=cup.fill) == pytest.approx(
+
+    assert _head(cup=cup, equation=equation, tilt=onset - 0.05, fill=cup.fill) == 0.0
+    assert _head(
+        cup=cup, equation=equation, tilt=onset, fill=cup.fill
+    ) == pytest.approx(0.0, abs=1e-12)
+    assert _head(
+        cup=cup, equation=equation, tilt=onset + 0.05, fill=cup.fill
+    ) == pytest.approx(
         cup.expected_head(
-            lip_offset=cup.container_scale.y / 2,
             tilt=onset + 0.05,
             fill=cup.fill,
             repose_angle=cup.repose_angle,
@@ -135,11 +150,11 @@ def test_the_drain_follows_the_closed_form(cup: PouringCup) -> None:
     """
     equation = cup.equation()
     tilt = cup.tilt + 0.5
-    head = cup.expected_head(lip_offset=equation.lip_offset, tilt=tilt, fill=cup.fill)
+    head = cup.expected_head(tilt=tilt, fill=cup.fill)
 
-    assert _drain(equation=equation, tilt=tilt, fill=cup.fill) == pytest.approx(
-        -equation.outflow_rate_constant * head / cup.container_scale.z
-    )
+    assert _drain(
+        cup=cup, equation=equation, tilt=tilt, fill=cup.fill
+    ) == pytest.approx(-equation.outflow_rate_constant * head / cup.container_height)
 
 
 def test_an_empty_cup_drains_nothing_at_any_tilt(cup: PouringCup) -> None:
@@ -148,9 +163,13 @@ def test_an_empty_cup_drains_nothing_at_any_tilt(cup: PouringCup) -> None:
     no drain.
     """
     equation = cup.equation()
-    onset_when_empty = float(equation.onset_tilt(fill=0.0).evaluate()[0])
+    onset_when_empty = float(
+        equation.onset_tilt(fill=0.0, lip_offset=cup.lip_offset).evaluate()[0]
+    )
 
-    assert _drain(equation=equation, tilt=onset_when_empty + 0.3, fill=0.0) == 0.0
+    assert (
+        _drain(cup=cup, equation=equation, tilt=onset_when_empty + 0.3, fill=0.0) == 0.0
+    )
 
 
 # %% exit speed
@@ -162,9 +181,11 @@ def test_the_exit_speed_is_torricelli_of_the_head(cup: PouringCup) -> None:
     """
     equation = cup.equation()
     tilt = cup.tilt + 0.5
-    head = cup.expected_head(lip_offset=equation.lip_offset, tilt=tilt, fill=cup.fill)
+    head = cup.expected_head(tilt=tilt, fill=cup.fill)
 
-    assert _exit_speed(equation=equation, tilt=tilt, fill=cup.fill) == pytest.approx(
+    assert _exit_speed(
+        cup=cup, equation=equation, tilt=tilt, fill=cup.fill
+    ) == pytest.approx(
         equation.discharge_coefficient
         * math.sqrt(2 * ProjectileMotion.standard_gravity * head)
     )

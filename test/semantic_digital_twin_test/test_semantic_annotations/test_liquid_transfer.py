@@ -95,6 +95,7 @@ def _add_container(
     name: str,
     axis: Vector3,
     world_root_T_self: HomogeneousTransformationMatrix | None = None,
+    scale: Scale | None = None,
 ) -> HasFillLevel:
     """
     :param world: The world to add the container to.
@@ -103,9 +104,11 @@ def _add_container(
     :param axis: Axis the container tilts about.
     :param world_root_T_self: Pose of the container in the world; the origin if not
         given.
-    :return: A 0.1 x 0.1 x 0.2 m container without fill level, tilting on one degree of
-        freedom whose limits no test motion reaches.
+    :param scale: Extents of the container's box; 0.1 x 0.1 x 0.2 m if not given.
+    :return: A container without fill level, tilting on one degree of freedom whose
+        limits no test motion reaches.
     """
+    scale = scale or Scale(0.1, 0.1, 0.2)
     with world.modify_world():
         return container_class.create_with_new_body_in_world(
             name=name,
@@ -118,7 +121,7 @@ def _add_container(
                     upper=DerivativeMap(position=2.0, velocity=1.0),
                 ),
             ),
-            scale=Scale(0.1, 0.1, 0.2),
+            scale=scale,
         )
 
 
@@ -364,6 +367,47 @@ class TestTilt:
         assert cup.tilt.evaluate()[0] == pytest.approx(abs(angle), abs=1e-6)
 
 
+# %% pour direction
+
+
+class TestPourDirection:
+    """
+    A container pours over the lip on the side it leans to, whichever way that is.
+    """
+
+    @pytest.mark.parametrize(
+        ("axis", "lip_offset"),
+        [(Vector3(0, 1, 0), 0.05), (Vector3(1, 0, 0), 0.1)],
+        ids=["leaning-along-x", "leaning-along-y"],
+    )
+    def test_the_drain_reads_the_lip_on_the_leaning_side(
+        self, *, axis: Vector3, lip_offset: float
+    ) -> None:
+        """
+        A 0.1 x 0.2 m cup drains over the half extent along the direction it leans.
+        """
+        world = _world_with_root()
+        cup = _add_container(
+            world=world,
+            container_class=_Container,
+            name="cup",
+            axis=axis,
+            scale=Scale(0.1, 0.2, 0.2),
+        )
+        cup.initialize_fill_level(initial_fill=0.8)
+        tilt = 1.2
+        _tilt(world, cup, tilt)
+        height = cup.root.collision.scale.z
+        dry_height = height * (1 - 0.8)
+        head = math.hypot(dry_height, lip_offset) * math.sin(
+            tilt - math.atan2(dry_height, lip_offset)
+        )
+
+        assert cup.fill_velocity().evaluate()[0] == pytest.approx(
+            -cup.fill_equation.outflow_rate_constant * head / height, rel=1e-3
+        )
+
+
 # %% liquid exit point
 
 
@@ -458,7 +502,7 @@ class TestSynchronizedTransfer:
         copied_source = _counterpart(source, world=copy)
         _step_passive_state(copy, 0.05)
         faster_drain = PouringEquation(
-            container_scale=source.fill_equation.container_scale,
+            container_height=source.fill_equation.container_height,
             outflow_rate_constant=2 * source.fill_equation.outflow_rate_constant,
         )
 

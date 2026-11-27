@@ -10,10 +10,7 @@ import krrood.symbolic_math.symbolic_math as sm
 from krrood.symbolic_math.symbolic_math import Scalar
 
 from semantic_digital_twin.physics.equations.projectile_motion import ProjectileMotion
-from semantic_digital_twin.physics.exceptions import (
-    NonPositiveContainerGeometryError,
-)
-from semantic_digital_twin.world_description.geometry import Scale
+from semantic_digital_twin.physics.exceptions import NonPositiveContainerHeightError
 
 # %% pouring equation
 
@@ -40,7 +37,8 @@ class PouringEquation:
 
     :math:`H` : inner height of the container
 
-    :math:`l` : :attr:`lip_offset`, the lip's horizontal distance from the tilt axis
+    :math:`l` : the lip offset, the horizontal distance from the tilt axis to the lip
+    on the side the container leans to
 
     :math:`\theta_\mathrm{r}` : :attr:`repose_angle`
 
@@ -55,10 +53,9 @@ class PouringEquation:
     :math:`h` : :meth:`head_above_lip`
     """
 
-    container_scale: Scale
+    container_height: float
     """
-    Inner extents of the container, in metres: ``y`` across the pouring lip and ``z``
-    its height; ``x``, along the lip, does not change the normalized drain.
+    Inner height of the container, in metres.
     """
 
     outflow_rate_constant: float = 1.0
@@ -87,70 +84,73 @@ class PouringEquation:
 
     def __post_init__(self) -> None:
         """
-        :raises NonPositiveContainerGeometryError: If the width across the lip or the
-            height is not positive.
+        :raises NonPositiveContainerHeightError: If the height is not positive.
         """
-        if self.container_scale.y <= 0.0 or self.container_scale.z <= 0.0:
-            raise NonPositiveContainerGeometryError(
-                container_scale=self.container_scale
+        if self.container_height <= 0.0:
+            raise NonPositiveContainerHeightError(
+                container_height=self.container_height
             )
 
-    @property
-    def lip_offset(self) -> float:
-        """
-        Horizontal distance of the pouring lip, the container's wall, from the tilt
-        axis, in metres.
-        """
-        return self.container_scale.y / 2
-
-    def onset_tilt(self, *, fill: sm.ScalarData) -> Scalar:
+    def onset_tilt(self, *, fill: sm.ScalarData, lip_offset: sm.ScalarData) -> Scalar:
         """
         :param fill: Normalized fill level in ``[0, 1]``.
+        :param lip_offset: Horizontal distance from the tilt axis to the lip, in metres.
         :return: Symbolic tilt at which a container this full starts to pour, in
             radians; later by the repose angle for heaped contents.
         """
-        dry_height = self.container_scale.z * (1 - fill)
-        return sm.atan2(dry_height, self.lip_offset) + self.repose_angle
+        dry_height = self.container_height * (1 - fill)
+        return sm.atan2(dry_height, lip_offset) + self.repose_angle
 
-    def head_above_lip(self, *, tilt: sm.ScalarData, fill: sm.ScalarData) -> Scalar:
+    def head_above_lip(
+        self, *, tilt: sm.ScalarData, fill: sm.ScalarData, lip_offset: sm.ScalarData
+    ) -> Scalar:
         """
         :param tilt: Tilt of the container from the vertical, in radians.
         :param fill: Normalized fill level in ``[0, 1]``.
+        :param lip_offset: Horizontal distance from the tilt axis to the lip, in metres.
         :return: Symbolic height of the contents' surface above the lip, in metres; zero
             while the container does not pour.
         """
-        dry_height = self.container_scale.z * (1 - fill)
-        lip_distance = sm.sqrt(dry_height**2 + self.lip_offset**2)
+        dry_height = self.container_height * (1 - fill)
+        lip_distance = sm.sqrt(dry_height**2 + lip_offset**2)
         return sm.max(
             sm.Scalar(0.0),
-            lip_distance * sm.sin(tilt - self.onset_tilt(fill=fill)),
+            lip_distance
+            * sm.sin(tilt - self.onset_tilt(fill=fill, lip_offset=lip_offset)),
         )
 
-    def exit_speed(self, *, tilt: sm.ScalarData, fill: sm.ScalarData) -> Scalar:
+    def exit_speed(
+        self, *, tilt: sm.ScalarData, fill: sm.ScalarData, lip_offset: sm.ScalarData
+    ) -> Scalar:
         r"""
         :param tilt: Tilt of the container from the vertical, in radians.
         :param fill: Normalized fill level in ``[0, 1]``.
+        :param lip_offset: Horizontal distance from the tilt axis to the lip, in metres.
         :return: Symbolic speed of the stream leaving the lip,
             :math:`C_\mathrm{d} \sqrt{2 g h}` by Torricelli's law, in metres per second,
             with the head :math:`h` at least :attr:`minimum_head`.
         """
         head = sm.max(
-            sm.Scalar(self.minimum_head), self.head_above_lip(tilt=tilt, fill=fill)
+            sm.Scalar(self.minimum_head),
+            self.head_above_lip(tilt=tilt, fill=fill, lip_offset=lip_offset),
         )
         return self.discharge_coefficient * ProjectileMotion.speed_after_drop(
             height=head
         )
 
-    def fill_velocity(self, *, tilt: sm.ScalarData, fill: sm.ScalarData) -> Scalar:
+    def fill_velocity(
+        self, *, tilt: sm.ScalarData, fill: sm.ScalarData, lip_offset: sm.ScalarData
+    ) -> Scalar:
         """
         :param tilt: Tilt of the container from the vertical, in radians.
         :param fill: Normalized fill level in ``[0, 1]``.
+        :param lip_offset: Horizontal distance from the tilt axis to the lip, in metres.
         :return: Symbolic rate of the normalized fill level, negative while pouring and
             zero once the container is empty.
         """
         drain = (
             -self.outflow_rate_constant
-            * self.head_above_lip(tilt=tilt, fill=fill)
-            / self.container_scale.z
+            * self.head_above_lip(tilt=tilt, fill=fill, lip_offset=lip_offset)
+            / self.container_height
         )
         return sm.if_greater_zero(fill, drain, sm.Scalar(0.0))
