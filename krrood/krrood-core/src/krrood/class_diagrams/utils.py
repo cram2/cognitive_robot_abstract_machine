@@ -4,6 +4,7 @@ Resolution of the type hints of a class from the source files it is defined in.
 
 from __future__ import annotations
 
+import ast
 import builtins
 import importlib
 import inspect
@@ -237,12 +238,69 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
         except CouldNotResolveType:
             continue
 
+    object_of_an_annotated_module = resolve_name_in_annotated_modules(
+        name=name, clazz=start_object
+    )
+    if object_of_an_annotated_module is not None:
+        return object_of_an_annotated_module
+
     # Final fallback if hierarchy fails
     source_path = inspect.getsourcefile(start_object)
     raise CouldNotResolveType(
         type_name=name,
         extra_information=f"Could not find {name} in the hierarchy of {start_object} (starting from {source_path}).",
     )
+
+
+def modules_named_in_annotations(*, clazz: type) -> list[types.ModuleType]:
+    """
+    :param clazz: The class whose annotations are read.
+    :return: The modules that the postponed annotations of the class and of its bases
+        name, such as :mod:`optax` for an annotation ``optax.OptState``.
+    """
+    modules = {}
+    for base in clazz.__mro__:
+        owner_module = inspect.getmodule(base)
+        if owner_module is None:
+            continue
+        for annotation in vars(base).get("__annotations__", {}).values():
+            if not isinstance(annotation, str):
+                continue
+            for node in ast.walk(ast.parse(annotation, mode="eval")):
+                named = (
+                    vars(owner_module).get(node.id)
+                    if isinstance(node, ast.Name)
+                    else None
+                )
+                if isinstance(named, types.ModuleType):
+                    modules[named.__name__] = named
+    return list(modules.values())
+
+
+def resolve_name_in_annotated_modules(*, name: str, clazz: type) -> Any | None:
+    """
+    Resolve a name that an alias defined in another module refers to, such as
+    ``ArrayTree`` in the recursive alias that ``optax.OptState`` is.
+
+    :param name: The name to resolve.
+    :param clazz: The class whose annotations reach the alias.
+    :return: The one object of that name in a loaded module among
+        :func:`modules_named_in_annotations` and their submodules, or None if there is
+        none or more than one.
+    """
+    candidates = {}
+    for named_module in modules_named_in_annotations(clazz=clazz):
+        prefix = f"{named_module.__name__}."
+        for module_name, module in list(sys.modules.items()):
+            if module is None or not (
+                module_name == named_module.__name__ or module_name.startswith(prefix)
+            ):
+                continue
+            if name in vars(module):
+                candidates[id(vars(module)[name])] = vars(module)[name]
+    if len(candidates) != 1:
+        return None
+    return next(iter(candidates.values()))
 
 
 T = TypeVar("T")

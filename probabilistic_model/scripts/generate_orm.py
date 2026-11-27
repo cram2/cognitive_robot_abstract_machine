@@ -8,18 +8,13 @@ import logging
 from pathlib import Path
 
 import probabilistic_model
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
-from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
-    TrainingState,
-)
 from probabilistic_model.orm.custom_types import BackendArrayType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
 )
 
-# the state of a running optimizer, not something a model stores
-ignored_classes = {SubclassJSONSerializer, TrainingState}
+ignored_classes = set()
 
 dependencies = []
 
