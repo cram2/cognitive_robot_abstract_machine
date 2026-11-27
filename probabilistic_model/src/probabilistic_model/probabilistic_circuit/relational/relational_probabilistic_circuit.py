@@ -173,12 +173,12 @@ class ExchangeableDistributionTemplate(RelationalDistributionTemplate):
         """
         if variable in self.template_distribution.class_probabilistic_circuit.variables:
             return type(variable)(
-                f"{part.prefix}.{variable.name}", domain=variable.domain
+                name=f"{part.prefix}.{variable.name}", domain=variable.domain
             )
         if part.prefix == part.grounded_prefix:
             return variable
         return type(variable)(
-            part.prefix + variable.name[len(part.grounded_prefix) :],
+            name=part.prefix + variable.name[len(part.grounded_prefix) :],
             domain=variable.domain,
         )
 

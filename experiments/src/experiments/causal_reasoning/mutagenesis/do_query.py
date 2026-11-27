@@ -575,12 +575,14 @@ class MutagenesisDoQuery:
         :return: The truncated circuit's probability of the effect's value.
         """
         truncated_circuit = interventional_circuit.truncated(
-            region.fill_missing_variables_pure(interventional_circuit.variables)
+            region.fill_missing_variables_pure(
+                variables=interventional_circuit.variables
+            )
         ).distribution
 
         effect = (
             SimpleEvent.from_data({effect_variable: self.question.effect_value})
             .as_composite_set()
-            .fill_missing_variables_pure(truncated_circuit.variables)
+            .fill_missing_variables_pure(variables=truncated_circuit.variables)
         )
         return float(truncated_circuit.probability(effect))

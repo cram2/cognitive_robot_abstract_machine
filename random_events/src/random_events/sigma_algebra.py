@@ -12,7 +12,7 @@ from random_events.utils import CPPWrapper
 EMPTY_SET_SYMBOL = "∅"
 
 
-@dataclass(init=False)
+@dataclass(init=False, kw_only=True)
 class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
     """
     Abstract class for simple sets.
@@ -32,21 +32,23 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
         """
         raise NotImplementedError
 
-    def intersection_with(self, other: Self) -> Self:
+    def intersection_with(self, *, other: Self) -> Self:
         """
         Form the intersection of this object with another object.
 
         :param other: The other SimpleSet
         :return: The intersection of this set with the other set
         """
-        return self._from_cpp(self.cpp_object.intersection_with(other.cpp_object))
+        return self._from_cpp(
+            cpp_object=self.cpp_object.intersection_with(other.cpp_object)
+        )
 
     def complement(self) -> SimpleSetContainer:
         """
         :return: The complement of this set as disjoint set of simple sets.
         """
         return tuple(
-            self._from_cpp(cpp_simple_set)
+            self._from_cpp(cpp_object=cpp_simple_set)
             for cpp_simple_set in self.cpp_object.complement()
         )
 
@@ -57,7 +59,7 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
         return self.cpp_object.is_empty()
 
     @abstractmethod
-    def contains(self, item) -> bool:
+    def contains(self, *, item) -> bool:
         """
         Check if this set contains an item.
 
@@ -87,14 +89,16 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
         """
         raise NotImplementedError
 
-    def difference_with(self, other: Self) -> SimpleSetContainer:
+    def difference_with(self, *, other: Self) -> SimpleSetContainer:
         """
         Form the difference of this object with another object.
 
         :param other: The other SimpleSet
         :return: The difference as a disjoint set of simple sets.
         """
-        return self._from_cpp(self.cpp_object.difference_with(other.cpp_object))
+        return self._from_cpp(
+            cpp_object=self.cpp_object.difference_with(other.cpp_object)
+        )
 
     def to_string(self):
         """
@@ -134,7 +138,7 @@ class AbstractSimpleSet(CPPWrapper, SubclassJSONSerializer, ABC):
         raise NotImplementedError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
     """
     Abstract class for composite sets.
@@ -183,39 +187,43 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         """
         if self._simple_sets_cache is None:
             self._simple_sets_cache = tuple(
-                self.simple_set_example._from_cpp(cpp_object)
+                self.simple_set_example._from_cpp(cpp_object=cpp_object)
                 for cpp_object in self.cpp_object.simple_sets
             )
         return self._simple_sets_cache
 
-    def union_with(self, other: Self) -> Self:
+    def union_with(self, *, other: Self) -> Self:
         """
         :param other: The other set
         :return: The union of this set with the other set
         """
-        return self._from_cpp(self.cpp_object.union_with(other.cpp_object))
+        return self._from_cpp(cpp_object=self.cpp_object.union_with(other.cpp_object))
 
     def __or__(self, other: Self) -> Self:
-        return self.union_with(other)
+        return self.union_with(other=other)
 
-    def intersection_with(self, other: Self) -> Self:
+    def intersection_with(self, *, other: Self) -> Self:
         """
         :param other: The other set
         :return: The intersection of this set with the other set
         """
-        return self._from_cpp(self.cpp_object.intersection_with(other.cpp_object))
+        return self._from_cpp(
+            cpp_object=self.cpp_object.intersection_with(other.cpp_object)
+        )
 
     def __and__(self, other) -> Self:
-        return self.intersection_with(other)
+        return self.intersection_with(other=other)
 
-    def difference_with(self, other: Self) -> Self:
+    def difference_with(self, *, other: Self) -> Self:
         """
         :param other: The other set
         :return: The difference of this set with the other set
         """
-        return self._from_cpp(self.cpp_object.difference_with(other.cpp_object))
+        return self._from_cpp(
+            cpp_object=self.cpp_object.difference_with(other.cpp_object)
+        )
 
-    def subtract_disjoint(self, other: Self) -> Self:
+    def subtract_disjoint(self, *, other: Self) -> Self:
         """
         Subtract other from this via incremental bounded subtraction.
 
@@ -232,16 +240,18 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         :param other: The set to subtract.
         :return: The difference as a disjoint composite set.
         """
-        return self._from_cpp(self.cpp_object.subtract_disjoint(other.cpp_object))
+        return self._from_cpp(
+            cpp_object=self.cpp_object.subtract_disjoint(other.cpp_object)
+        )
 
     def __sub__(self, other) -> Self:
-        return self.difference_with(other)
+        return self.difference_with(other=other)
 
     def complement(self) -> Self:
         """
         :return: The complement of this set
         """
-        return self._from_cpp(self.cpp_object.complement())
+        return self._from_cpp(cpp_object=self.cpp_object.complement())
 
     def __invert__(self) -> Self:
         return self.complement()
@@ -252,13 +262,13 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         """
         return self.cpp_object.is_empty()
 
-    def contains(self, item) -> bool:
+    def contains(self, *, item) -> bool:
         """
         :param item: The item to check
         :return: If the item is in the set or not
         """
         for simple_set in self.simple_sets:
-            if simple_set.contains(item):
+            if simple_set.contains(item=item):
                 return True
         return False
 
@@ -277,7 +287,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
         return math.fsum(simple_set.size for simple_set in disjoint.simple_sets)
 
     def __contains__(self, item) -> bool:
-        return self.contains(item)
+        return self.contains(item=item)
 
     def to_string(self) -> str:
         """
@@ -305,9 +315,9 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
 
         :return: The disjoint set.
         """
-        return self._from_cpp(self.cpp_object.make_disjoint())
+        return self._from_cpp(cpp_object=self.cpp_object.make_disjoint())
 
-    def add_simple_set(self, simple_set: AbstractSimpleSet):
+    def add_simple_set(self, *, simple_set: AbstractSimpleSet):
         """
         Add a simple set to this composite set if it is not empty.
 
@@ -323,7 +333,7 @@ class AbstractCompositeSet(CPPWrapper, SubclassJSONSerializer, ABC):
 
         :return: The simplified set
         """
-        return self._from_cpp(self.cpp_object.simplify())
+        return self._from_cpp(cpp_object=self.cpp_object.simplify())
 
     def __eq__(self, other: Self) -> bool:
         return self.cpp_object == other.cpp_object

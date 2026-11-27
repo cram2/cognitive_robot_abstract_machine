@@ -63,7 +63,7 @@ def target() -> Symbolic:
     """
     The variable a classification circuit predicts.
     """
-    return Symbolic(name="target", domain=Set.from_iterable(Target))
+    return Symbolic(name="target", domain=Set.from_iterable(iterable=Target))
 
 
 def continuous_variables(number_of_variables: int, prefix: str = "") -> SortedSet:
@@ -73,7 +73,7 @@ def continuous_variables(number_of_variables: int, prefix: str = "") -> SortedSe
     :return: The variables.
     """
     return SortedSet(
-        [Continuous(f"{prefix}{index}") for index in range(number_of_variables)]
+        [Continuous(name=f"{prefix}{index}") for index in range(number_of_variables)]
     )
 
 
@@ -134,7 +134,7 @@ def test_a_leaf_region_over_an_integer_variable_raises():
     No input distribution of a region graph circuit models an integer variable.
     """
     region_graph = RegionGraph(
-        variables=SortedSet([Integer("count")]), depth=0, repetitions=1
+        variables=SortedSet([Integer(name="count")]), depth=0, repetitions=1
     ).create_random_region_graph()
     with pytest.raises(UnsupportedRegionVariableError):
         region_graph.to_probabilistic_circuit()

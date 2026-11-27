@@ -48,17 +48,23 @@ class RipenessStage(Enum):
         ontology or horticultural source fixes them.
     """
 
-    UNRIPE = SimpleInterval.from_data(0.0, 1 / 3, Bound.CLOSED, Bound.OPEN)
+    UNRIPE = SimpleInterval.from_data(
+        lower=0.0, upper=1 / 3, left=Bound.CLOSED, right=Bound.OPEN
+    )
     """
     The first third of ripening, such as a green banana or a firm avocado.
     """
 
-    RIPE = SimpleInterval.from_data(1 / 3, 2 / 3, Bound.CLOSED, Bound.OPEN)
+    RIPE = SimpleInterval.from_data(
+        lower=1 / 3, upper=2 / 3, left=Bound.CLOSED, right=Bound.OPEN
+    )
     """
     The middle third of ripening, in which a fruit is usually eaten.
     """
 
-    OVERRIPE = SimpleInterval.from_data(2 / 3, 1.0, Bound.CLOSED, Bound.CLOSED)
+    OVERRIPE = SimpleInterval.from_data(
+        lower=2 / 3, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
+    )
     """
     The last third of ripening, in which a fruit softens and starts to spoil.
     """
@@ -83,7 +89,7 @@ class Ripeness(Quality):
         """
         :raises RipenessOutsideScale: If the value reaches beyond :attr:`scale`.
         """
-        if self.scale.intersection_with(self.value) != self.value:
+        if self.scale.intersection_with(other=self.value) != self.value:
             raise RipenessOutsideScale(ripeness=self)
 
     @classproperty
@@ -91,7 +97,9 @@ class Ripeness(Quality):
         """
         :return: The ripeness scale, from 0 at the start of ripening to 1 at its end.
         """
-        return SimpleInterval.from_data(0.0, 1.0, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            lower=0.0, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
+        )
 
     @classmethod
     def from_stage(cls, *, stage: RipenessStage) -> Self:
@@ -108,6 +116,6 @@ class Ripeness(Quality):
         :raises RipenessInNoSingleStage: If no single stage holds the whole value.
         """
         for stage in RipenessStage:
-            if stage.value.intersection_with(self.value) == self.value:
+            if stage.value.intersection_with(other=self.value) == self.value:
                 return stage
         raise RipenessInNoSingleStage(ripeness=self)

@@ -454,9 +454,9 @@ class UnderspecifiedParameters(ModelQueryParameters):
         if not self.truncation_assignments_from_krrood_variables:
             return model
         complete_event = self.truncation_assignments_from_krrood_variables[0]
-        complete_event.fill_missing_variables(self.variables.values())
+        complete_event.fill_missing_variables(variables=self.variables.values())
         for event in self.truncation_assignments_from_krrood_variables[1:]:
-            complete_event = complete_event.intersection_with(event)
+            complete_event = complete_event.intersection_with(other=event)
         return model.truncated(complete_event, singleton_allowed=True).distribution
 
     def _extract_variables_from_attribute_match(
@@ -790,7 +790,9 @@ class UnderspecifiedParameters(ModelQueryParameters):
 
         if isinstance(type_, EnumType):
             simple_events = [
-                SimpleEvent.from_data({re_variable: Set.from_iterable(domain_objects)})
+                SimpleEvent.from_data(
+                    {re_variable: Set.from_iterable(iterable=domain_objects)}
+                )
             ]
         else:
             simple_events = [
@@ -829,7 +831,7 @@ class UnderspecifiedParameters(ModelQueryParameters):
 
         identifier_name = f"{attribute_match.name_from_variable_access_path}"
         identifier_variable = random_events.variable.Symbolic(
-            name=identifier_name, domain=Set.from_iterable(hashes)
+            name=identifier_name, domain=Set.from_iterable(iterable=hashes)
         )
         result[identifier_variable.name] = identifier_variable
 

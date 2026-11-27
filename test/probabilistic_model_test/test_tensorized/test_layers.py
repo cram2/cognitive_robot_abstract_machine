@@ -436,14 +436,21 @@ def test_uniform_layer_agrees_with_the_scalar_truncation(
     distributions = [
         UniformDistribution(
             variable=x,
-            interval=SimpleInterval.from_data(node_lower, node_upper, *node_bounds),
+            interval=SimpleInterval.from_data(
+                lower=node_lower,
+                upper=node_upper,
+                left=node_bounds[0],
+                right=node_bounds[1],
+            ),
         )
         for node_lower, node_upper in node_ranges
     ]
     layer = UniformLayer.from_distributions(
         variable_index=0, distributions=distributions
     )
-    event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
+    event_interval = SimpleInterval.from_data(
+        lower=lower, upper=upper, left=event_bounds[0], right=event_bounds[1]
+    )
     truncated = layer.log_truncated_of_assignment(
         assignment=event_interval.as_composite_set(),
         variable=x,
@@ -661,7 +668,9 @@ def test_gaussian_layer_agrees_with_the_scalar_truncation(
     layer = GaussianLayer.from_distributions(
         variable_index=0, distributions=distributions
     )
-    event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
+    event_interval = SimpleInterval.from_data(
+        lower=lower, upper=upper, left=event_bounds[0], right=event_bounds[1]
+    )
     truncated = layer.log_truncated_of_assignment(
         assignment=event_interval.as_composite_set(),
         variable=x,
@@ -1373,10 +1382,10 @@ def test_truncation_of_a_learned_circuit(
     variable = layered_joint_probability_tree.variables[0]
     interval = bounding_box[variable].simple_sets[0]
     half = SimpleInterval.from_data(
-        interval.lower,
-        (interval.lower + interval.upper) / 2,
-        interval.left,
-        interval.right,
+        lower=interval.lower,
+        upper=(interval.lower + interval.upper) / 2,
+        left=interval.left,
+        right=interval.right,
     )
     event = SimpleEvent.from_data(
         {variable: half.as_composite_set()}

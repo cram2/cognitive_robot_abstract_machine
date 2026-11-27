@@ -36,7 +36,9 @@ def truncated_gaussian(x) -> TruncatedGaussianDistribution:
     """
     return TruncatedGaussianDistribution(
         variable=x,
-        interval=SimpleInterval.from_data(-2, 2, Bound.CLOSED, Bound.CLOSED),
+        interval=SimpleInterval.from_data(
+            lower=-2, upper=2, left=Bound.CLOSED, right=Bound.CLOSED
+        ),
         location=2,
         scale=2.0,
     )
@@ -264,7 +266,10 @@ def test_truncated_standard_gaussian_raw_moments(
 
 def test_truncated_variance_is_precise_far_in_the_tail(x):
     distribution = TruncatedGaussianDistribution(
-        variable=x, interval=SimpleInterval.from_data(5, 6), location=0, scale=1
+        variable=x,
+        interval=SimpleInterval.from_data(lower=5, upper=6),
+        location=0,
+        scale=1,
     )
     # a standard normal, so the interval already is in scipy's standardized units
     lower, upper = distribution.lower, distribution.upper
@@ -290,7 +295,7 @@ def test_truncated_variance_is_precise_far_in_the_tail(x):
 def test_truncated_samples_average_to_the_expectation(x, lower, upper, scale):
     distribution = TruncatedGaussianDistribution(
         variable=x,
-        interval=SimpleInterval.from_data(lower, upper),
+        interval=SimpleInterval.from_data(lower=lower, upper=upper),
         location=0,
         scale=scale,
     )

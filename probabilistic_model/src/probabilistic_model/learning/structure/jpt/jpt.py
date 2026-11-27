@@ -381,7 +381,9 @@ class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
         if len(above) > 0 and above.min() < upper:
             upper, right = float(above.min()), Bound.OPEN
 
-        return SimpleInterval.from_data(lower, upper, left, right)
+        return SimpleInterval.from_data(
+            lower=lower, upper=upper, left=left, right=right
+        )
 
     def create_leaf_node(
         self, data: np.ndarray, other_data: np.ndarray | None = None

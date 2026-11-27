@@ -67,7 +67,7 @@ def interval_probability(
     event = (
         SimpleEvent.from_data({variable: closed(lower, upper)})
         .as_composite_set()
-        .fill_missing_variables_pure(circuit.variables)
+        .fill_missing_variables_pure(variables=circuit.variables)
     )
     return float(circuit.probability(event))
 
@@ -89,9 +89,9 @@ def value_event(
         circuit.
     """
     return (
-        SimpleEvent.from_data({variable: Set.from_iterable([value])})
+        SimpleEvent.from_data({variable: Set.from_iterable(iterable=[value])})
         .as_composite_set()
-        .fill_missing_variables_pure(circuit.variables)
+        .fill_missing_variables_pure(variables=circuit.variables)
     )
 
 
@@ -123,7 +123,7 @@ def test_the_shallowest_node_querying_a_variable_is_found(two_level_tree, x, y):
     assert two_level_tree.find_node_for_variable(x) is two_level_tree
     found = two_level_tree.find_node_for_variable(y)
     assert y in found.query_set
-    assert two_level_tree.find_node_for_variable(Continuous("z")) is None
+    assert two_level_tree.find_node_for_variable(Continuous(name="z")) is None
 
 
 def test_all_query_sets_are_listed_in_preorder(two_level_tree, x, y):
@@ -144,7 +144,7 @@ def test_the_root_of_a_variable_order_queries_its_first_variable(x, y, z):
 
 @pytest.mark.parametrize("number_of_causes", [3, 5])
 def test_every_cause_and_no_effect_is_queried(number_of_causes):
-    causes = [Continuous(f"x{index}") for index in range(number_of_causes)]
+    causes = [Continuous(name=f"x{index}") for index in range(number_of_causes)]
     root = MarginalDeterminismTreeNode.from_variable_order(causes)
     queried = set().union(*root.all_query_sets())
     assert queried == set(causes)
@@ -223,7 +223,7 @@ def test_a_support_deterministic_circuit_passes(build, number_of_causes):
 
 def test_a_query_variable_absent_from_the_circuit_is_a_named_violation():
     circuit, x, y = independent_circuit()
-    ghost = Continuous("ghost")
+    ghost = Continuous(name="ghost")
     causal_circuit = CausalCircuit.from_probabilistic_circuit(
         circuit,
         MarginalDeterminismTreeNode(variables={x, ghost}, query_set={ghost}),
@@ -280,9 +280,9 @@ def independent_causal_circuit() -> tuple[CausalCircuit, Continuous, Continuous]
 
 
 @pytest.fixture
-def correlated_causal_circuit() -> (
-    tuple[CausalCircuit, Continuous, Continuous, Continuous]
-):
+def correlated_causal_circuit() -> tuple[
+    CausalCircuit, Continuous, Continuous, Continuous
+]:
     """
     The causal circuit of :func:`correlated_circuit` with *x* and *w* causing *y*.
     """
@@ -563,7 +563,7 @@ def truncated_to(
     """
     event = SimpleEvent.from_data({variable: closed(lower, upper)}).as_composite_set()
     truncated = circuit.truncated(
-        event.fill_missing_variables_pure(circuit.variables)
+        event.fill_missing_variables_pure(variables=circuit.variables)
     ).distribution
     return truncated
 
@@ -575,7 +575,7 @@ def test_the_best_region_is_near_certain_once_truncated_to_one_branch(
     truncated = truncated_to(interventional_correlated, y, 9.6, 10)
     best_region = causal_circuit._best_disjoint_region(x, truncated)
     assert truncated.probability(
-        best_region.fill_missing_variables_pure(truncated.variables)
+        best_region.fill_missing_variables_pure(variables=truncated.variables)
     ) == pytest.approx(1.0, abs=0.01)
 
 

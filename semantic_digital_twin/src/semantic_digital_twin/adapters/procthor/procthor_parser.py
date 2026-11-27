@@ -228,7 +228,9 @@ class ProcthorDoor:
         scale = self.scale if scale is None else scale
 
         sampled_2d_point = semantic_handle_position.sample_point_from_event(
-            scale.to_simple_event().as_composite_set().marginal(SpatialVariables.yz)
+            scale.to_simple_event()
+            .as_composite_set()
+            .marginal(variables=SpatialVariables.yz)
         )
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]

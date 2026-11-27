@@ -576,7 +576,9 @@ class QueryMeasurement:
             if not isinstance(layer, SumLayer) or 0 not in layer.variables:
                 continue
             for node in layer.component_supports(circuit.variables):
-                supports = [support.marginal(cause) for support in node.supports]
+                supports = [
+                    support.marginal(variables=cause) for support in node.supports
+                ]
                 if len(supports) > 1 and not SumLayer.are_pairwise_disjoint(supports):
                     return False
         return True

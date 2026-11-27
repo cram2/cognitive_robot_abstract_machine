@@ -165,8 +165,8 @@ def random_sum_product_network(request) -> RandomSumProductNetworkCase:
     if request.param is VariableKinds.MIXED:
         variables = SortedSet(
             [
-                Symbolic(name="s", domain=Set.from_iterable([0, 1, 2])),
-                Symbolic(name="t", domain=Set.from_iterable([0, 1])),
+                Symbolic(name="s", domain=Set.from_iterable(iterable=[0, 1, 2])),
+                Symbolic(name="t", domain=Set.from_iterable(iterable=[0, 1])),
                 *continuous_variables(2, prefix="x"),
             ]
         )

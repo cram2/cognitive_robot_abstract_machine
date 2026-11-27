@@ -74,7 +74,7 @@ def independent_circuit() -> tuple[ProbabilisticCircuit, Continuous, Continuous]
         P(y∈[0,1]) = 0.5 regardless of x.
         P(y | do(x)) = P(y) for all x in the support.
     """
-    x, y = Continuous("x"), Continuous("y")
+    x, y = Continuous(name="x"), Continuous(name="y")
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)
     root.add_subcircuit(mixture_of_intervals(circuit, x, [(0.6, 0, 1), (0.4, 1, 2)]))
@@ -82,9 +82,9 @@ def independent_circuit() -> tuple[ProbabilisticCircuit, Continuous, Continuous]
     return circuit, x, y
 
 
-def three_variable_circuit() -> (
-    tuple[ProbabilisticCircuit, Continuous, Continuous, Continuous]
-):
+def three_variable_circuit() -> tuple[
+    ProbabilisticCircuit, Continuous, Continuous, Continuous
+]:
     """
     ProductUnit(SumUnit_x, SumUnit_y, SumUnit_z) — all three independent.
 
@@ -96,7 +96,7 @@ def three_variable_circuit() -> (
         P(z∈[0,1]) = 0.8 regardless of x or y.
         P(z | do(x)) = P(z) with or without adjustment on y.
     """
-    x, y, z = Continuous("x"), Continuous("y"), Continuous("z")
+    x, y, z = Continuous(name="x"), Continuous(name="y"), Continuous(name="z")
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)
     for variable, first_weight in [(x, 0.7), (y, 0.4), (z, 0.8)]:
@@ -108,9 +108,9 @@ def three_variable_circuit() -> (
     return circuit, x, y, z
 
 
-def correlated_circuit() -> (
-    tuple[ProbabilisticCircuit, Continuous, Continuous, Continuous]
-):
+def correlated_circuit() -> tuple[
+    ProbabilisticCircuit, Continuous, Continuous, Continuous
+]:
     """
     SumUnit-rooted mixture where x fully determines which y region is active.
 
@@ -122,7 +122,7 @@ def correlated_circuit() -> (
         y∈[0,0.4] and y∈[9.6,10] each occur with marginal probability 0.5.
         w has the same marginal in both components — it carries no information about y.
     """
-    x, w, y = Continuous("x"), Continuous("w"), Continuous("y")
+    x, w, y = Continuous(name="x"), Continuous(name="w"), Continuous(name="y")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for x_range, y_range in [((0, 1), (0, 0.4)), ((1, 2), (9.6, 10))]:
@@ -149,7 +149,7 @@ def nested_overlap_circuit() -> tuple[ProbabilisticCircuit, Continuous, Continuo
     components do not share one support either: x∈[0,1] lies in Wide and Narrow but
     not Middle, so the mixture is not support-deterministic over x.
     """
-    x, y = Continuous("x"), Continuous("y")
+    x, y = Continuous(name="x"), Continuous(name="y")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for x_range, y_range in [((0, 3), (0, 1)), ((0, 1), (1, 2)), ((1, 3), (0, 2))]:
@@ -160,9 +160,9 @@ def nested_overlap_circuit() -> tuple[ProbabilisticCircuit, Continuous, Continuo
     return circuit, x, y
 
 
-def confounded_circuit() -> (
-    tuple[ProbabilisticCircuit, Continuous, Continuous, Continuous]
-):
+def confounded_circuit() -> tuple[
+    ProbabilisticCircuit, Continuous, Continuous, Continuous
+]:
     """
     Circuit with confounder z that drives both x and y.
 
@@ -174,7 +174,7 @@ def confounded_circuit() -> (
         P(y∈[0,1] | x∈[0,1]) = 1.0  — spurious, driven by z.
         P(y∈[0,1] | do(x))    = 0.5  — causal truth after adjusting for z.
     """
-    x, y, z = Continuous("x"), Continuous("y"), Continuous("z")
+    x, y, z = Continuous(name="x"), Continuous(name="y"), Continuous(name="z")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for lower, upper in [(0, 1), (1, 2)]:
@@ -189,7 +189,7 @@ def unnormalized_circuit() -> tuple[ProbabilisticCircuit, Continuous, Continuous
     """
     ProductUnit circuit whose SumUnit over x has weights summing to 1.6.
     """
-    x, y = Continuous("x"), Continuous("y")
+    x, y = Continuous(name="x"), Continuous(name="y")
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)
     root.add_subcircuit(mixture_of_intervals(circuit, x, [(0.8, 0, 1), (0.8, 1, 2)]))
@@ -197,9 +197,9 @@ def unnormalized_circuit() -> tuple[ProbabilisticCircuit, Continuous, Continuous
     return circuit, x, y
 
 
-def shared_cause_subcircuit_circuit() -> (
-    tuple[ProbabilisticCircuit, Continuous, Continuous]
-):
+def shared_cause_subcircuit_circuit() -> tuple[
+    ProbabilisticCircuit, Continuous, Continuous
+]:
     """
     A DAG, not a tree: the SumUnit over the cause x is mounted as a shared child of two
     different ProductUnits, matching the mounting pattern relational grounding uses when
@@ -214,7 +214,7 @@ def shared_cause_subcircuit_circuit() -> (
     Ground truth: x's two branches are disjoint regardless of which parent reaches
     them, so the circuit is support-deterministic.
     """
-    x, y = Continuous("x"), Continuous("y")
+    x, y = Continuous(name="x"), Continuous(name="y")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     shared_sum_x = mixture_of_intervals(circuit, x, [(0.6, 0, 1), (0.4, 1, 2)])
@@ -226,9 +226,9 @@ def shared_cause_subcircuit_circuit() -> (
     return circuit, x, y
 
 
-def circuit_with_a_rounded_cause_region() -> (
-    tuple[ProbabilisticCircuit, Continuous, Continuous, Continuous]
-):
+def circuit_with_a_rounded_cause_region() -> tuple[
+    ProbabilisticCircuit, Continuous, Continuous, Continuous
+]:
     """
     Two equal-weight strata whose cause ``x`` is a Dirac point each, one of them at a
     value single precision cannot represent exactly.
@@ -237,7 +237,7 @@ def circuit_with_a_rounded_cause_region() -> (
     Dirac at ``0.2`` does not hold that location exactly. Adjusting for ``z`` has to
     intervene on it all the same, within the tolerance of the Dirac.
     """
-    x, y, z = Continuous("x"), Continuous("y"), Continuous("z")
+    x, y, z = Continuous(name="x"), Continuous(name="y"), Continuous(name="z")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for x_location, y_range in [(0.2, (0, 1)), (1.0, (1, 2))]:
@@ -259,15 +259,15 @@ def symbolic_variables() -> tuple[Symbolic, Symbolic, Symbolic]:
     :return: The treatment, season and outcome variables.
     """
     return (
-        Symbolic("treatment", domain=Set.from_iterable(Treatment)),
-        Symbolic("season", domain=Set.from_iterable(Season)),
-        Symbolic("outcome", domain=Set.from_iterable(Outcome)),
+        Symbolic(name="treatment", domain=Set.from_iterable(iterable=Treatment)),
+        Symbolic(name="season", domain=Set.from_iterable(iterable=Season)),
+        Symbolic(name="outcome", domain=Set.from_iterable(iterable=Outcome)),
     )
 
 
-def discrete_confounded_circuit() -> (
-    tuple[ProbabilisticCircuit, Symbolic, Symbolic, Symbolic]
-):
+def discrete_confounded_circuit() -> tuple[
+    ProbabilisticCircuit, Symbolic, Symbolic, Symbolic
+]:
     """
     Circuit with a discrete confounder (season) driving both a discrete cause
     (treatment) and the effect (outcome), where treatment has no causal effect of its
@@ -309,9 +309,9 @@ def discrete_confounded_circuit() -> (
     return circuit, treatment, season, outcome
 
 
-def cause_specific_effect_circuit() -> (
-    tuple[ProbabilisticCircuit, Symbolic, Symbolic, Symbolic]
-):
+def cause_specific_effect_circuit() -> tuple[
+    ProbabilisticCircuit, Symbolic, Symbolic, Symbolic
+]:
     """
     Circuit where treatment has a real, differentiated causal effect on outcome within
     each season stratum. Unlike :func:`discrete_confounded_circuit`, where

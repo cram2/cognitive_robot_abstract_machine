@@ -182,7 +182,7 @@ def learned_structure(
         relations of the class in a class diagram.
     """
     nodes = [
-        GraphNode(variable=Integer(column), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        GraphNode(variable=Integer(name=column), level=NodeLevel.EXAMPLE_ATTRIBUTE)
         for column in rows.columns
     ]
     graph = FastCausalInferenceStructureLearner().learn(

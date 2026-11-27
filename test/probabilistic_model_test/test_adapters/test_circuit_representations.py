@@ -131,7 +131,7 @@ def test_region_graph_circuit_converts_into_the_same_rustworkx_distribution(
     A layered circuit of a region graph converted into a rustworkx circuit has its
     likelihood.
     """
-    variables = SortedSet(Continuous(name) for name in "wxyz")
+    variables = SortedSet(Continuous(name=name) for name in "wxyz")
     layered = (
         RegionGraph(variables=variables, partitions=2, depth=1, repetitions=2)
         .create_random_region_graph()

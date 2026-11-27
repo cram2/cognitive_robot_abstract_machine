@@ -34,7 +34,7 @@ def cause() -> Continuous:
     """
     The variable the regions are read for.
     """
-    return Continuous("x")
+    return Continuous(name="x")
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def effect() -> Continuous:
     """
     The variable the cause is asked about.
     """
-    return Continuous("y")
+    return Continuous(name="y")
 
 
 @pytest.fixture

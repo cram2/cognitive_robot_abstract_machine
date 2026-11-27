@@ -803,8 +803,8 @@ class TestFactories(unittest.TestCase):
             cereal.root.global_transform, table.supporting_surface
         ).position
 
-        assert not surface_event.contains(surface_P_milk[:2])
-        assert not surface_event.contains(surface_P_cereal[:2])
+        assert not surface_event.contains(item=surface_P_milk[:2])
+        assert not surface_event.contains(item=surface_P_cereal[:2])
 
     def test_sample_points_from_surface_with_object_and_category_of_interest(self):
         world = World.create_with_root_body("root")

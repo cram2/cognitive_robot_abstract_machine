@@ -164,10 +164,10 @@ class HyperrectangleArray:
         return SimpleEvent.from_data(
             {
                 variable: SimpleInterval.from_data(
-                    float(self.interval[index, position, 0]),
-                    float(self.interval[index, position, 1]),
-                    Bound(int(self.bounds[index, position, 0])),
-                    Bound(int(self.bounds[index, position, 1])),
+                    lower=float(self.interval[index, position, 0]),
+                    upper=float(self.interval[index, position, 1]),
+                    left=Bound(int(self.bounds[index, position, 0])),
+                    right=Bound(int(self.bounds[index, position, 1])),
                 ).as_composite_set()
                 for position, variable in enumerate(variables)
             }

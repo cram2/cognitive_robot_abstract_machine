@@ -175,7 +175,7 @@ def test_a_mixture_fitted_outside_is_converted(two_clusters):
     mixture = GaussianMixture(n_components=2, random_state=0).fit(
         two_clusters.to_numpy()
     )
-    variables = [Continuous("y"), Continuous("x")]
+    variables = [Continuous(name="y"), Continuous(name="x")]
 
     circuit = GaussianMixtureModel(mixture).to_probabilistic_circuit(variables)
 

@@ -112,7 +112,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
 
     def log_conditional(self, point: dict[Variable, Any]) -> LogConditioning[Self]:
         event = SimpleEvent.from_data(point)
-        event.fill_missing_variables(self.variables)
+        event.fill_missing_variables(variables=self.variables)
         truncation = self.log_truncated(event.as_composite_set())
         return LogConditioning(truncation.distribution, truncation.log_probability)
 

@@ -635,7 +635,9 @@ class VariableConstraintWidget(QFrame):
                 values = widget.value()
                 low, high = min(values), max(values)
                 intervals.append(
-                    SimpleInterval.from_data(low, high, Bound.CLOSED, Bound.CLOSED)
+                    SimpleInterval.from_data(
+                        lower=low, upper=high, left=Bound.CLOSED, right=Bound.CLOSED
+                    )
                 )
 
             if not intervals:
@@ -657,7 +659,10 @@ class VariableConstraintWidget(QFrame):
                 return variable, Set()  # Empty set
 
             return variable, Set.from_simple_sets(
-                *[SetElement.from_data(e, all_elements) for e in matched_elements]
+                *[
+                    SetElement.from_data(element=e, all_elements=all_elements)
+                    for e in matched_elements
+                ]
             )
 
         return None

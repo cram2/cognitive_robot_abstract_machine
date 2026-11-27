@@ -60,7 +60,7 @@ def uniform_layer_of(
         variable_index=variable_index,
         distributions=[
             UniformDistribution(
-                variable=Continuous("placeholder"),
+                variable=Continuous(name="placeholder"),
                 interval=closed(lower, upper).simple_sets[0],
             )
             for lower, upper in intervals
