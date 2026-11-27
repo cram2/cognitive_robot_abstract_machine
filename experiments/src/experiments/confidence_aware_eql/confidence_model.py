@@ -17,7 +17,7 @@ import numpy as np
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
 from krrood.exceptions import DataclassException
-from krrood.ormatic.data_access_objects.dao import get_dao_schema
+from krrood.ormatic.data_access_objects.schema import get_dao_schema
 from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,

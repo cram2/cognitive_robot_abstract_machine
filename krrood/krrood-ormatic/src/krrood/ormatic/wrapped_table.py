@@ -12,11 +12,17 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 
 import sqlalchemy
-from typing_extensions import List, TYPE_CHECKING, Optional, Set, get_origin
+from sqlalchemy.ext.orderinglist import ordering_list
+from typing_extensions import Any, List, TYPE_CHECKING, Optional, Set, get_origin
 
-from krrood.ormatic.field_storage import FieldStorage
+from krrood.ormatic.collection_shape import (
+    AssociationLeafAttribute,
+    CollectionShape,
+    MappingLevel,
+)
+from krrood.ormatic.field_storage import FieldStorage, FieldToStore, ValueStorage
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-from krrood.ormatic.data_access_objects.dao import (
+from krrood.ormatic.data_access_objects.relationships import (
     RelationshipInformationKey,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
@@ -80,57 +86,134 @@ class ColumnConstructor:
 
 
 @dataclass(kw_only=True)
+class AssociationReference:
+    """
+    A foreign key of an association table to the table of a mapped class, and the
+    relationship that reads the object it refers to.
+    """
+
+    relationship_name: str
+    """
+    The name of the relationship.
+    """
+
+    foreign_key_name: str
+    """
+    The name of the foreign key column.
+    """
+
+    table: TableLike
+    """
+    The table of the class the foreign key refers to.
+    """
+
+    is_open: bool
+    """
+    Whether objects of other classes may be referred to, which the table of every stored
+    object then holds.
+    """
+
+    nullable: bool
+    """
+    Whether a row may refer to no object, as a row marking an empty collection does.
+    """
+
+    @property
+    def foreign_key_column(self) -> ColumnConstructor:
+        """
+        :return: The foreign key column.
+        """
+        column_type = (
+            f"Mapped[{module_and_class_name(Optional)}[int]]"
+            if self.nullable
+            else "Mapped[int]"
+        )
+        return ColumnConstructor(
+            name=self.foreign_key_name,
+            type=column_type,
+            constructor=f"mapped_column(ForeignKey('{self.table.full_primary_key_name}'), nullable={self.nullable})",
+        )
+
+    def relationship(self, *, association_name: str) -> ColumnConstructor:
+        """
+        :param association_name: The name of the association class.
+        :return: The relationship reading the object the foreign key refers to.
+        """
+        if not self.is_open:
+            return ColumnConstructor(
+                name=self.relationship_name,
+                type=f"Mapped[{self.table.tablename}]",
+                constructor=f"relationship('{self.table.tablename}', foreign_keys=[{self.foreign_key_name}], lazy='selectin')",
+            )
+        root = module_and_class_name(StoredObjectDAO)
+        return ColumnConstructor(
+            name=self.relationship_name,
+            type=f"Mapped[{root}]",
+            constructor=(
+                f"relationship({root}, "
+                f"primaryjoin=lambda: {association_name}.{self.foreign_key_name} == {root}.database_id, "
+                f"foreign_keys=lambda: [{association_name}.{self.foreign_key_name}], lazy='selectin', "
+                f"info={{{_information_key(RelationshipInformationKey.DECLARED_TYPE)}: "
+                f"{module_and_class_name(self.table.domain_class)}}})"
+            ),
+        )
+
+
+@dataclass(kw_only=True)
 class AssociationObject:
     """
-    Represents an association object for many-to-many relationships in SQLAlchemy that
-    can be rendered with jinja.
+    An association table with a row per value of a collection, rendered with jinja.
+
+    A row holds its value's position and key in each level, and the value; a row without
+    a value marks an empty container.
     """
 
     name: str
     """
-    The name of the association table.
-    """
-
-    left_table_name: str
-    """
-    The name of the left (source) table.
+    The name of the association class.
     """
 
     left_foreign_key: str
     """
-    The foreign key column name for the left table.
+    The name of the foreign key column to the row of the object holding the collection.
     """
 
     left_primary_key: str
     """
-    The full primary key reference for the left table (e.g., 'TableName.primary_key').
+    The full primary key reference of the table of the object holding the collection
+    (e.g., 'TableName.primary_key').
     """
 
-    right_table_name: str
+    primary_key_name: str
     """
-    The name of the right (target) table.
-    """
-
-    right_foreign_key: str
-    """
-    The foreign key column name for the right table.
+    The name of the primary key column.
     """
 
-    right_primary_key: str
+    shape: CollectionShape
     """
-    The full primary key reference for the right table (e.g., 'TableName.primary_key').
-    """
-
-    primary_key_name: str | None = None
-    """
-    The name of the primary key column, if any.
+    The shape of the collection.
     """
 
-    declared_type_reference: str | None = None
+    key_references: dict[int, AssociationReference]
     """
-    The qualified name of the type the collection is declared with, if that type is open
-    and its objects are therefore loaded through
-    :class:`~krrood.ormatic.stored_object.StoredObjectDAO`.
+    The reference to the key's object of every level whose keys are mapped objects, by
+    the depth of the level.
+    """
+
+    key_columns: dict[int, ColumnConstructor]
+    """
+    The column holding the key of every keyed level whose keys are not mapped objects,
+    by the depth of the level.
+    """
+
+    target_reference: AssociationReference | None
+    """
+    The reference to the value's object, if the values are mapped objects.
+    """
+
+    value_column: ColumnConstructor | None
+    """
+    The column holding the value, if the values are not mapped objects.
     """
 
     @property
@@ -156,48 +239,74 @@ class AssociationObject:
         )
 
     @property
+    def index_column_names(self) -> list[str]:
+        """
+        :return: The names of the columns holding the positions of a row's value, the
+            outermost level first, which is the order the rows are read back in.
+        """
+        return [level.column_names.index for level in self.shape.levels]
+
+    def collection_class_constructor(self, *, ormatic: ORMatic) -> str:
+        """
+        :param ormatic: The ORMatic instance whose generated module imports what the
+            constructor needs.
+        :return: The collection class of the relationship holding the rows: for a
+            collection of one unkeyed level, a list that sets each appended row's
+            position, so rows built without one get their place in the list.
+        """
+        first_level = self.shape.levels[0]
+        if self.shape.is_nested or isinstance(first_level, MappingLevel):
+            return module_and_class_name(list)
+        ormatic.imported_modules.add(ordering_list.__module__)
+        return f"{module_and_class_name(ordering_list)}('{first_level.column_names.index}')"
+
+    @property
     def columns(self) -> list[ColumnConstructor]:
         """
-        :return: The foreign key column constructors for the left and right sides.
+        :return: The foreign key to the holding object, the level columns and the value
+            columns, the value's foreign key included.
         """
-        return [
+        result = [
             ColumnConstructor(
                 name=self.left_foreign_key,
                 type="Mapped[int]",
                 constructor=f"mapped_column(ForeignKey('{self.left_primary_key}'))",
-            ),
-            ColumnConstructor(
-                name=self.right_foreign_key,
-                type="Mapped[int]",
-                constructor=f"mapped_column(ForeignKey('{self.right_primary_key}'))",
-            ),
+            )
         ]
+        for level in self.shape.levels:
+            nullable = level.depth > 1
+            result.append(
+                ColumnConstructor(
+                    name=level.column_names.index,
+                    type=(
+                        f"Mapped[{module_and_class_name(Optional)}[int]]"
+                        if nullable
+                        else "Mapped[int]"
+                    ),
+                    constructor=f"mapped_column(Integer, nullable={nullable})",
+                )
+            )
+            if level.depth in self.key_columns:
+                result.append(self.key_columns[level.depth])
+            if level.depth in self.key_references:
+                result.append(self.key_references[level.depth].foreign_key_column)
+        if self.target_reference is not None:
+            result.append(self.target_reference.foreign_key_column)
+        if self.value_column is not None:
+            result.append(self.value_column)
+        return result
 
     @property
     def relationships(self) -> list[ColumnConstructor]:
         """
-        :return: The relationship constructors for this association table.
+        :return: The relationships reading the objects of the keys and the value.
         """
-        if self.declared_type_reference is None:
-            return [
-                ColumnConstructor(
-                    name="target",
-                    type=f"Mapped[{self.right_table_name}]",
-                    constructor=f"relationship('{self.right_table_name}', foreign_keys=[{self.right_foreign_key}], lazy='selectin')",
-                )
-            ]
-        root = module_and_class_name(StoredObjectDAO)
+        references = [*self.key_references.values()]
+        if self.target_reference is not None:
+            references.append(self.target_reference)
         return [
-            ColumnConstructor(
-                name="target",
-                type=f"Mapped[{root}]",
-                constructor=(
-                    f"relationship({root}, "
-                    f"primaryjoin=lambda: {self.name}.{self.right_foreign_key} == {root}.database_id, "
-                    f"foreign_keys=lambda: [{self.name}.{self.right_foreign_key}], lazy='selectin', "
-                    f"info={{{_information_key(RelationshipInformationKey.DECLARED_TYPE)}: {self.declared_type_reference}}})"
-                ),
-            )
+            reference.relationship(association_name=self.name)
+            for reference in references
         ]
 
 
@@ -339,11 +448,26 @@ class ExternalTable(TableLike):
             target_reference = module_and_class_name(target)
             if relationship.uselist:
                 [association_column] = relationship.remote_side
+                ordering_columns = ", ".join(
+                    f"{target_reference}.{column.key}"
+                    for column in relationship.order_by or []
+                )
+                ordering = (
+                    f"order_by=lambda: [{ordering_columns}], "
+                    if ordering_columns
+                    else ""
+                )
+                collection_class = (
+                    module_and_class_name(relationship.collection_class)
+                    if isclass(relationship.collection_class)
+                    else f"{module_and_class_name(ordering_list)}('{relationship.order_by[0].key}')"
+                )
                 arguments = (
                     f"{target_reference}, "
-                    f"collection_class={module_and_class_name(relationship.collection_class)}, "
+                    f"collection_class={collection_class}, "
                     f"cascade='all, delete-orphan', "
                     f"foreign_keys=lambda: [{target_reference}.{association_column.key}], "
+                    f"{ordering}"
                     f"lazy='selectin'"
                 )
             else:
@@ -881,33 +1005,16 @@ class WrappedTable(TableLike):
 
     def create_builtin_column(self, *, wrapped_field: WrappedField):
         """
-        Creates a built-in column mapping for the given wrapped field.
+        Create a column for a builtin value SQLAlchemy maps by itself.
 
-        Depending on the properties of the `wrapped_field`, this function determines
-        whether it's an enum, a built-in type, or requires additional imports. It then
-        constructs appropriate column definitions and adds them to the respective list
-        of database mappings.
-
-        :param wrapped_field: The WrappedField instance representing the field to create
-            a built-in column for.
+        :param wrapped_field: The field to create the column for.
         """
-        self.ormatic.imported_modules.add(wrapped_field.type_endpoint.__module__)
-        inner_type = module_and_class_name(wrapped_field.type_endpoint)
-        type_annotation = (
-            f"{module_and_class_name(Optional)}[{inner_type}]"
-            if wrapped_field.is_optional
-            else inner_type
-        )
-
-        if wrapped_field.type_endpoint is str:
-            constructor = f"mapped_column({module_and_class_name(sqlalchemy.types.Text)}, use_existing_column=True)"
-        else:
-            constructor = f"mapped_column(use_existing_column=True)"
         self.builtin_columns.append(
-            ColumnConstructor(
+            self.value_column(
                 name=wrapped_field.field.name,
-                type=f"Mapped[{type_annotation}]",
-                constructor=constructor,
+                value_type=wrapped_field.type_endpoint,
+                nullable=wrapped_field.is_optional,
+                storage=ValueStorage.COLUMN,
             )
         )
 
@@ -931,20 +1038,19 @@ class WrappedTable(TableLike):
             )
         )
 
-    def get_table_of_wrapped_field(self, *, wrapped_field: WrappedField) -> TableLike:
+    def get_table_of_class(
+        self, *, clazz: type, wrapped_field: WrappedField
+    ) -> TableLike:
         """
-        :param wrapped_field: The wrapped field to get the table for.
-        :return: The wrapped table for the given wrapped field.
+        :param clazz: A class a field refers to.
+        :param wrapped_field: The field referring to it.
+        :return: The table, generated here or by a dependency, mapping the class.
+        :raises WrappedTableNotFound: If no table maps the class.
         """
-        type_endpoint = wrapped_field.type_endpoint
-        try:
-            return self.ormatic.table_for(
-                wrapped_class=self.ormatic.class_dependency_graph.get_wrapped_class(
-                    clazz=type_endpoint
-                )
-            )
-        except KeyError:
-            raise WrappedTableNotFound(type_=type_endpoint, wrapped_field=wrapped_field)
+        table = self.ormatic.tables_by_class.get(clazz)
+        if table is None:
+            raise WrappedTableNotFound(type_=clazz, wrapped_field=wrapped_field)
+        return table
 
     def create_one_to_one_relationship(self, *, wrapped_field: WrappedField):
         """
@@ -965,8 +1071,8 @@ class WrappedTable(TableLike):
         )
 
         # get the target table
-        target_wrapped_table = self.get_table_of_wrapped_field(
-            wrapped_field=wrapped_field
+        target_wrapped_table = self.get_table_of_class(
+            clazz=wrapped_field.type_endpoint, wrapped_field=wrapped_field
         )
 
         # columns have to be nullable and use_alter=True since the insertion order might be incorrect otherwise
@@ -1030,107 +1136,212 @@ class WrappedTable(TableLike):
 
     def create_many_to_many_relationship(self, *, wrapped_field: WrappedField):
         """
-        Creates a many-to-many relationship mapping for the given wrapped field using an
-        association table. This allows multiple instances of the source table to
-        reference the same instances of the target table.
+        Store the collection the field holds in an association table, with a row per
+        value, and add the relationship reading its rows in the collection's order.
 
-        :param wrapped_field: The field for the many-to-many relationship.
+        :param wrapped_field: The field holding the collection.
         """
-        # get the target table
-        target_wrapped_table = self.get_table_of_wrapped_field(
-            wrapped_field=wrapped_field
-        )
-
-        # create association table name
+        field_to_store = FieldToStore(wrapped_field=wrapped_field, ormatic=self.ormatic)
+        shape = field_to_store.collection_shape
         association_table_name = (
             f"{self.tablename}_{wrapped_field.field.name}_association"
         )
 
-        # create foreign key names for the association table
-        # Always disambiguate sides using source_/target_ prefixes to avoid
-        # duplicated column names in self-referential relationships
-        left_foreign_key_name = (
-            f"_source_{self.tablename.lower()}{self.ormatic.foreign_key_postfix}"
-        )
-        right_foreign_key_name = f"_target_{target_wrapped_table.tablename.lower()}{self.ormatic.foreign_key_postfix}"
+        key_references = {}
+        key_columns = {}
+        for level in shape.levels:
+            if not isinstance(level, MappingLevel):
+                continue
+            nullable = level.depth > 1
+            key_storage = field_to_store.value_storage(value_type=level.key_type)
+            if key_storage is ValueStorage.REFERENCE:
+                key_table = self.get_table_of_class(
+                    clazz=level.key_type, wrapped_field=wrapped_field
+                )
+                key_references[level.depth] = self.association_reference(
+                    relationship_name=level.column_names.key,
+                    foreign_key_name=f"_{level.column_names.key}_{key_table.tablename.lower()}{self.ormatic.foreign_key_postfix}",
+                    table=key_table,
+                    nullable=nullable,
+                )
+            else:
+                key_columns[level.depth] = self.value_column(
+                    name=level.column_names.key,
+                    value_type=level.key_type,
+                    nullable=nullable,
+                    storage=key_storage,
+                )
 
-        # create association table metadata
-        target_is_open = target_wrapped_table.domain_class in self.ormatic.open_classes
-        if target_is_open:
-            self.ormatic.imported_modules.add(
-                target_wrapped_table.domain_class.__module__
+        target_reference = None
+        value_column = None
+        leaf_storage = field_to_store.value_storage(value_type=shape.leaf_type)
+        if leaf_storage is ValueStorage.REFERENCE:
+            target_table = self.get_table_of_class(
+                clazz=shape.leaf_type, wrapped_field=wrapped_field
             )
+            # the source_/target_ prefixes keep the columns of a self-referential
+            # collection apart
+            target_reference = self.association_reference(
+                relationship_name=AssociationLeafAttribute.TARGET,
+                foreign_key_name=f"_target_{target_table.tablename.lower()}{self.ormatic.foreign_key_postfix}",
+                table=target_table,
+                nullable=shape.is_nested,
+            )
+        else:
+            value_column = self.value_column(
+                name=AssociationLeafAttribute.VALUE,
+                value_type=shape.leaf_type,
+                nullable=shape.is_nested,
+                storage=leaf_storage,
+            )
+
         association_table = AssociationObject(
             name=association_table_name,
-            left_table_name=self.tablename,
-            left_foreign_key=left_foreign_key_name,
+            left_foreign_key=f"_source_{self.tablename.lower()}{self.ormatic.foreign_key_postfix}",
             left_primary_key=self.full_primary_key_name,
-            right_table_name=target_wrapped_table.tablename,
-            right_foreign_key=right_foreign_key_name,
-            right_primary_key=target_wrapped_table.full_primary_key_name,
             primary_key_name="database_id",
-            declared_type_reference=(
-                module_and_class_name(target_wrapped_table.domain_class)
-                if target_is_open
-                else None
-            ),
+            shape=shape,
+            key_references=key_references,
+            key_columns=key_columns,
+            target_reference=target_reference,
+            value_column=value_column,
         )
-
-        # add association table to ORMatic
         self.ormatic.association_objects.append(association_table)
 
-        # create a relationship
-        relationship_name = wrapped_field.field.name
-
-        # SQLAlchemy instruments a collection class in place (it needs an appender
-        # method), which an immutable domain container such as tuple cannot provide.
-        # The relationship is therefore held as a list at the ORM layer; from_dao
-        # restores the domain field's own tuple type once its object is populated
-        # (see DataAccessObject._finalize_object_containers).
-        collection_class_type = (
-            list
-            if wrapped_field.container_type is tuple
-            else wrapped_field.container_type
+        container_name = module_and_class_name(list)
+        collection_class = association_table.collection_class_constructor(
+            ormatic=self.ormatic
         )
-        container_name = module_and_class_name(collection_class_type)
-
-        # Association Object pattern
-        relationship_type = f"Mapped[{container_name}[{association_table.name}]]"
-        relationship_constructor = (
-            f"relationship('{association_table.name}', "
-            f"collection_class={container_name}, "
-            f"cascade='all, delete-orphan', "
-            f"foreign_keys='[{association_table.name}.{association_table.left_foreign_key}]', "
-            f"lazy='selectin')"
+        ordering_columns = ", ".join(
+            f"{association_table.name}.{column_name}"
+            for column_name in association_table.index_column_names
         )
-
         self.add_relationship(
             column_constructor=ColumnConstructor(
-                name=relationship_name,
-                type=relationship_type,
-                constructor=relationship_constructor,
+                name=wrapped_field.field.name,
+                type=f"Mapped[{container_name}[{association_table.name}]]",
+                constructor=(
+                    f"relationship('{association_table.name}', "
+                    f"collection_class={collection_class}, "
+                    f"cascade='all, delete-orphan', "
+                    f"foreign_keys='[{association_table.name}.{association_table.left_foreign_key}]', "
+                    f"order_by='[{ordering_columns}]', "
+                    f"lazy='selectin')"
+                ),
             )
         )
+
+    def association_reference(
+        self,
+        *,
+        relationship_name: str,
+        foreign_key_name: str,
+        table: TableLike,
+        nullable: bool,
+    ) -> AssociationReference:
+        """
+        :param relationship_name: The name of the relationship reading the object.
+        :param foreign_key_name: The name of the foreign key column.
+        :param table: The table of the class of the objects referred to.
+        :param nullable: Whether a row may refer to no object.
+        :return: The reference of an association table of this table to objects of the
+            class of *table*.
+        """
+        is_open = table.domain_class in self.ormatic.open_classes
+        if is_open:
+            self.ormatic.imported_modules.add(table.domain_class.__module__)
+        return AssociationReference(
+            relationship_name=relationship_name,
+            foreign_key_name=foreign_key_name,
+            table=table,
+            is_open=is_open,
+            nullable=nullable,
+        )
+
+    def value_column(
+        self, *, name: str, value_type: type, nullable: bool, storage: ValueStorage
+    ) -> ColumnConstructor:
+        """
+        :param name: The name of the column.
+        :param value_type: The type of the values the column holds.
+        :param nullable: Whether the column may hold None.
+        :param storage: How the values are stored, :attr:`ValueStorage.COLUMN` or
+            :attr:`ValueStorage.JSON`.
+        :return: A column holding the values: for a column of their own type, text for
+            a string, the type mapping's column type for a mapped type, else the type
+            SQLAlchemy derives.
+        """
+        if storage is ValueStorage.JSON:
+            self.ormatic.imported_modules.add("typing_extensions")
+            annotation = module_and_class_name(Any)
+            column_type = "JSON"
+        else:
+            self.ormatic.imported_modules.add(value_type.__module__)
+            annotation = module_and_class_name(value_type)
+            column_type = self._column_type(value_type=value_type)
+        if nullable:
+            annotation = f"{module_and_class_name(Optional)}[{annotation}]"
+        arguments = [
+            *([column_type] if column_type is not None else []),
+            f"nullable={nullable}",
+            "use_existing_column=True",
+        ]
+        return ColumnConstructor(
+            name=name,
+            type=f"Mapped[{annotation}]",
+            constructor=f"mapped_column({', '.join(arguments)})",
+        )
+
+    def _column_type(self, *, value_type: type) -> str | None:
+        """
+        :param value_type: A type with a column type of its own.
+        :return: The column type to name for values of the type, or None where
+            SQLAlchemy derives it from the annotation.
+        """
+        if value_type is str:
+            return module_and_class_name(sqlalchemy.types.Text)
+        if value_type in FieldToStore.sqlalchemy_builtins:
+            return None
+        if value_type not in self.ormatic.type_mappings:
+            return None
+        custom_type = self.ormatic.type_mappings[value_type]
+        # registered under the exact type, so the generated interface maps it
+        self.ormatic.type_mappings[value_type] = custom_type
+        return module_and_class_name(custom_type)
 
     def create_json_column(self, *, wrapped_field: WrappedField):
         """
-        Create a JSON column for a value, or a list-like of values, that krrood's JSON
+        Create a JSON column for a value, or a collection of values, that krrood's JSON
         serializer can write.
 
         :param wrapped_field: The field to extract the information from.
         """
         type_endpoint = wrapped_field.type_endpoint
         self.ormatic.imported_modules.add("typing_extensions")
-        self.ormatic.imported_modules.add(type_endpoint.__module__)
         column_name = wrapped_field.field.name
-        value_type = module_and_class_name(type_endpoint)
-        if not wrapped_field.is_container:
+        shape = FieldToStore(
+            wrapped_field=wrapped_field, ormatic=self.ormatic
+        ).collection_shape
+        is_flat_collection_of_one_class = (
+            wrapped_field.is_container
+            and shape is not None
+            and not shape.is_nested
+            and not shape.key_types
+            and isclass(type_endpoint)
+        )
+        if shape is not None and not is_flat_collection_of_one_class:
+            column_type = f"Mapped[{module_and_class_name(Any)}]"
+        elif not wrapped_field.is_container:
+            self.ormatic.imported_modules.add(type_endpoint.__module__)
+            value_type = module_and_class_name(type_endpoint)
             column_type = (
                 f"Mapped[{module_and_class_name(Optional)}[{value_type}]]"
                 if wrapped_field.is_optional
                 else f"Mapped[{value_type}]"
             )
         else:
+            self.ormatic.imported_modules.add(type_endpoint.__module__)
+            value_type = module_and_class_name(type_endpoint)
             container = (
                 Set
                 if isclass(wrapped_field.container_type)
@@ -1146,22 +1357,17 @@ class WrappedTable(TableLike):
         )
 
     def create_custom_type(self, *, wrapped_field: WrappedField):
-        type_endpoint = wrapped_field.type_endpoint
-        custom_type = self.ormatic.type_mappings[type_endpoint]
-        self.ormatic.type_mappings[type_endpoint] = custom_type
-        self.ormatic.imported_modules.add(type_endpoint.__module__)
-        column_name = wrapped_field.field.name
-        column_type = (
-            f"Mapped[{module_and_class_name(type_endpoint)}]"
-            if not wrapped_field.is_optional
-            else f"Mapped[{module_and_class_name(Optional)}[{module_and_class_name(type_endpoint)}]]"
-        )
+        """
+        Create a column of the type the type mappings give for the field's type.
 
-        constructor = f"mapped_column({module_and_class_name(custom_type)}, nullable={wrapped_field.is_optional}, use_existing_column=True)"
-
+        :param wrapped_field: The field to create the column for.
+        """
         self.custom_columns.append(
-            ColumnConstructor(
-                name=column_name, type=column_type, constructor=constructor
+            self.value_column(
+                name=wrapped_field.field.name,
+                value_type=wrapped_field.type_endpoint,
+                nullable=wrapped_field.is_optional,
+                storage=ValueStorage.COLUMN,
             )
         )
 

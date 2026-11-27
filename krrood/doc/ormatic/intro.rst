@@ -66,7 +66,10 @@ To ensure unambiguous translation and an ergonomic generated ORM, ORMatic adhere
 
 - **Protected Fields:** Any dataclass field name beginning with ``_`` is ignored for persistence. These protected fields are suitable for transient or derived runtime data.
 - **Optional Types:** The only guaranteed supported union is :py:class:`Optional[T] <typing.Optional>`. Other unions are modeled using a shared superclass if there exists a common base that is not `object`.
-- **Collections:** Iterables must be non-optional and non-nested. For an "optional list," use a default factory that returns an empty collection.
+- **Collections:** Lists, tuples, sets and dictionaries, nested ones included, must be non-optional. For an "optional list," use a default factory that returns an empty collection.
+
+  - A collection whose values and keys are builtins, enums, classes or types with a type mapping or JSON serializer is stored as JSON.
+  - A collection that holds a mapped class, as its values or as the keys of a dictionary, is stored as an association table with a row per value. A column ``index_<depth>`` per level holds the value's position, a dictionary's key is held by ``key_<depth>``, and the rows are read back in the order of their positions. A set keeps the order it iterates in when stored; a row without a value marks an empty inner collection.
 - **Inheritance and Polymorphism:** Inheritance is supported and generates `joined-table <https://docs.sqlalchemy.org/en/20/orm/inheritance.html>`_ inheritance. Note that only the *first* base class in a multiple inheritance structure is considered for queries using abstract classes.
 - **Type Discipline:** Dataclass fields require concrete, non-ambiguous type annotations. Prefer small dataclasses or value objects over primitive types when modeling relationships.
 
@@ -84,6 +87,7 @@ Execution of ORMatic on a set of classes produces a module containing:
 - ``*DAO`` Classes: One class per dataclass (and per explicit mapping). Each is a SQLAlchemy declarative model that includes:
   - Columns for fields with built-in or custom types
   - Foreign keys and relationships inferred from nested dataclasses and collections
+  - One association class per collection that holds a mapped class
   - ``__mapper_args__`` for inheritance and polymorphic configuration
 
 ORMatic analyzes the dataclass structure to identify scalar fields, one-to-one, one-to-many, and many-to-many associations. This information is then used to generate a full, decoupled SQLAlchemy declarative layer via a Jinja template.
@@ -97,9 +101,7 @@ If you want to generally know how to write classes that work out of the box with
  2. Never write you own ``__init__``.
  3. Apply side effects (e. g. setting back references) in the ``__post_init__``
  4. Use protected fields, those whose name begins with ``_`` only for computational state that doesnt need persistence (e. g. caching, indexing, ...)
- 5. Don't use nested containers as public fields
- 6. Don't use dicts as public fields
- 7. Never use optional containers, use empty containers by default.
+ 5. Never use optional containers, use empty containers by default.
 
 Persisting Objects
 ------------------------

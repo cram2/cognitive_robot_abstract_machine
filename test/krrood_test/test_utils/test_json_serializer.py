@@ -614,6 +614,45 @@ def test_timezone_keeps_its_name():
     assert result.tzname(None) == zone.tzname(None)
 
 
+# %% dictionaries
+
+
+class DictionaryKeyColour(Enum):
+    """
+    A key a dictionary cannot hold as a JSON object key.
+    """
+
+    RED = 1
+    """
+    A colour.
+    """
+
+
+DICTIONARIES = [
+    {"b": 1, "a": 2},
+    {2: [1.0, 2.0], 1: []},
+    {DictionaryKeyColour.RED: {"inner": True}},
+    {},
+]
+
+
+@pytest.mark.parametrize(
+    "dictionary", DICTIONARIES, ids=[repr(value) for value in DICTIONARIES]
+)
+def test_dictionary_roundtrips_with_its_keys_and_their_order(dictionary):
+    result = from_json(json.loads(json.dumps(to_json(dictionary))))
+
+    assert result == dictionary
+    assert list(result) == list(dictionary)
+    assert [type(key) for key in result] == [type(key) for key in dictionary]
+
+
+def test_list_of_dictionaries_roundtrips():
+    value = [{"a": 1}, {"b": 2}]
+
+    assert from_json(json.loads(json.dumps(to_json(value)))) == value
+
+
 # %% serializers registered for a type
 
 

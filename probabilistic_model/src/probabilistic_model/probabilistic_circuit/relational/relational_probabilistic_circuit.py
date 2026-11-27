@@ -19,7 +19,7 @@ import pandas as pd
 from typing_extensions import TYPE_CHECKING, Any, Callable, Hashable
 
 from krrood.class_diagrams.utils import common_base_class
-from krrood.ormatic.data_access_objects.dao import (
+from krrood.ormatic.data_access_objects.schema import (
     DataAccessObjectSchema,
     get_dao_schema,
 )
@@ -238,7 +238,7 @@ class RelationalProbabilisticCircuit:
 
     schema_information: DataAccessObjectSchema | None = field(init=False, default=None)
     """
-    The :class:`~krrood.ormatic.data_access_objects.dao.DataAccessObjectSchema`
+    The :class:`~krrood.ormatic.data_access_objects.schema.DataAccessObjectSchema`
     describing the DAO class's columns and relationships.
     """
 
