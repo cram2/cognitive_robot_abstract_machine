@@ -8,9 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.mixin import Mixin
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootKinematicStructureEntity,
+)
+from semantic_digital_twin.semantic_annotations.qualities.quality import Quality
+from semantic_digital_twin.semantic_annotations.qualities.relationship import (
+    HasQualities,
 )
 from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
@@ -43,7 +48,8 @@ class HasParts(HasRootKinematicStructureEntity, HasSemanticRelationships, Mixin)
     ) -> None:
         """
         Add ``part`` as a structural part, routing it to the matching part-whole
-        relationship field by type, and record the change in the world.
+        relationship field by type, and record the change in the world. The part takes
+        the :attr:`default_part_qualities` of its kind whose type it has no quality of.
 
         :param part: The part to add.
         :param field_name: The name of the part-whole relationship field to add the part
@@ -65,6 +71,20 @@ class HasParts(HasRootKinematicStructureEntity, HasSemanticRelationships, Mixin)
             self, IsPartWholeRelationship.of_wrapped_field(wrapped_field=wrapped_field)
         )
         self._store_in_field(entity=part, wrapped_field=wrapped_field)
+        default_qualities = self.default_part_qualities.get(type(part), [])
+        if not default_qualities:
+            return
+        for quality in part.qualities_not_yet_set(among=default_qualities):
+            part.set_quality(quality=quality)
+
+    @classproperty
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
+        """
+        :return: For each kind of part, the qualities a part of that kind takes when it
+            is added to a whole of this kind, since one kind of part, such as a peel,
+            serves many wholes; new ones on each call. None by default.
+        """
+        return {}
 
     @property
     def parts(self) -> list[HasRootKinematicStructureEntity]:

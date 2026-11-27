@@ -18,7 +18,7 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MaterialElasticity,
     Ripeness,
     RipenessStage,
-    LayerThickness,
+    SkinThickness,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
@@ -134,7 +134,7 @@ def test_apple_peel_keeps_its_density_and_elasticity(
 
 
 def stored_and_loaded_peel_with(
-    quality: LayerThickness | MaterialElasticity, session_maker: sessionmaker[Session]
+    quality: SkinThickness | MaterialElasticity, session_maker: sessionmaker[Session]
 ) -> Peel:
     """
     :param quality: A quality of an apple's peel.
@@ -157,7 +157,7 @@ def test_apple_peel_keeps_its_thickness(
     The thickness of an apple's peel survives storing its world and loading it back, up
     to the single precision the interval ends are stored in.
     """
-    thickness = LayerThickness(
+    thickness = SkinThickness(
         value=SimpleInterval.from_data(
             lower=33.3e-6, upper=78.3e-6, left=Bound.CLOSED, right=Bound.CLOSED
         )
@@ -165,7 +165,7 @@ def test_apple_peel_keeps_its_thickness(
 
     loaded = stored_and_loaded_peel_with(
         thickness, in_memory_session_maker
-    ).layer_thickness
+    ).skin_thickness
 
     assert (loaded.value.lower, loaded.value.upper) == pytest.approx(
         (thickness.value.lower, thickness.value.upper), rel=1e-6

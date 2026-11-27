@@ -69,18 +69,22 @@ from semantic_digital_twin.semantic_annotations.part_whole.fruit_parts import (
 )
 from semantic_digital_twin.semantic_annotations.part_whole.egg_parts import (
     HasAlbumen,
-    HasEggshell,
+    HasShell,
     HasYolk,
 )
-from semantic_digital_twin.semantic_annotations.part_whole.measured_parts import (
-    HasMeasuredParts,
+from semantic_digital_twin.semantic_annotations.qualities.quality import (
+    MassDensity,
+    MaterialElasticity,
+    Quality,
+    SkinThickness,
 )
-from semantic_digital_twin.semantic_annotations.qualities.measured_material import (
-    MeasuredMaterial,
+from semantic_digital_twin.semantic_annotations.qualities.relationship import (
+    HasQualities,
 )
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
     HasRipeness,
-    HasLayerThickness,
+    MadeOfSteel,
+    HasSkinThickness,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (
@@ -1018,11 +1022,19 @@ class WineBottle(Bottle):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a wine bottle is made of, as measured.
+        :return: The qualities of glass from handbook compilations: the Young's modulus
+            of float glass and the Poisson's ratio of soda glass
+            :cite:`engineeringtoolbox_density_solids,wikipedia_youngs_modulus,engineeringtoolbox_poissons_ratio`.
         """
-        return MeasuredMaterial.GLASS
+        return [
+            MassDensity(value=Quality.closed_range(lower=2400.0, upper=2800.0)),
+            MaterialElasticity(
+                youngs_modulus=Quality.closed_range(lower=47.7e9, upper=83.6e9),
+                poissons_ratio=Quality.closed_range(lower=0.22, upper=0.22),
+            ),
+        ]
 
 
 @dataclass(eq=False)
@@ -1142,11 +1154,14 @@ class Bread(Food):
     }
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What bread is made of, as measured.
+        :return: The apparent density of the crumb of five commercial breads
+            :cite:`nussinovitch1990bread`.
         """
-        return MeasuredMaterial.BREAD
+        return [
+            MassDensity(value=Quality.closed_range(lower=130.0, upper=340.0)),
+        ]
 
 
 @dataclass(eq=False)
@@ -1211,11 +1226,14 @@ class Milk(Food, IsPerceivable):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What fills a container of milk, as measured.
+        :return: The density of milk at 20 °C, which dominates a full container of it;
+            being liquid, it has no elasticity :cite:`goff_milk_physical`.
         """
-        return MeasuredMaterial.MILK
+        return [
+            MassDensity(value=Quality.closed_range(lower=1027.0, upper=1033.0)),
+        ]
 
 
 @dataclass(eq=False)
@@ -1243,7 +1261,7 @@ class Produce(Food):
 
 
 @dataclass(eq=False, kw_only=True)
-class Fruit(Produce, HasRipeness, HasMeasuredParts):
+class Fruit(Produce, HasRipeness):
     """
     Fruit.
     """
@@ -1257,7 +1275,7 @@ class FruitPart(HasRootBody):
 
 
 @dataclass(eq=False, kw_only=True)
-class Peel(FruitPart, HasLayerThickness):
+class Peel(FruitPart, HasSkinThickness):
     """
     The outer layer of a fruit, its skin or rind (botanically the exocarp, Plant
     Ontology PO:0009085).
@@ -1341,14 +1359,31 @@ class Tomato(Fruit, HasPeel, HasFlesh, HasSeedChamber):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the peel, flesh and seed chamber of a tomato.
+        :return: The qualities of the parts of a tomato, by kind of part: its peel:
+            tensile strips of skin :cite:`li2012tomato,kunabroniowska2011tomato`, whose
+            measured Poisson's ratio of 0.38 to 0.73 lies beyond the scale and is left
+            out; its flesh: the mesocarp in compression :cite:`li2012tomato`; its seed
+            chamber: the locular gel around the seeds in compression
+            :cite:`li2012tomato`.
         """
         return {
-            Peel: MeasuredMaterial.TOMATO_PEEL,
-            Flesh: MeasuredMaterial.TOMATO_FLESH,
-            SeedChamber: MeasuredMaterial.TOMATO_SEED_CHAMBER,
+            Peel: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=2.297e6, upper=9.59e6)
+                ),
+            ],
+            Flesh: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=0.726e6, upper=0.846e6)
+                ),
+            ],
+            SeedChamber: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=0.048e6, upper=0.124e6)
+                ),
+            ],
         }
 
 
@@ -1359,11 +1394,16 @@ class Lettuce(Vegetable):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What lettuce is made of, as measured.
+        :return: The Young's modulus of tensile strips of leaves of var. Crispa lettuce
+            :cite:`xavier2022lettuce`.
         """
-        return MeasuredMaterial.LETTUCE
+        return [
+            MaterialElasticity(
+                youngs_modulus=Quality.closed_range(lower=2.23e6, upper=5.08e6)
+            ),
+        ]
 
 
 @dataclass(eq=False)
@@ -1373,11 +1413,18 @@ class Carrot(Vegetable):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a carrot is made of, as measured.
+        :return: The elastic constants of raw carrot root in compression: a Japanese
+            carrot before boiling :cite:`ogawa2015carrot`, and Chantenay and Nairobi
+            along the root :cite:`morrell2019carrot`.
         """
-        return MeasuredMaterial.CARROT
+        return [
+            MaterialElasticity(
+                youngs_modulus=Quality.closed_range(lower=3.0e6, upper=8.31e6),
+                poissons_ratio=Quality.closed_range(lower=0.35, upper=0.40),
+            ),
+        ]
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1387,20 +1434,41 @@ class Apple(Fruit, HasPeel, HasFlesh, HasCore, HasSeeds, HasStem):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a whole apple is made of, as measured.
+        :return: The qualities of whole apples: the density of three early cultivars
+            :cite:`ozturk2011apple`, and the elastic constants of Golden Delicious fruit
+            from acoustic and puncture tests :cite:`grotte2002golden`.
         """
-        return MeasuredMaterial.APPLE
+        return [
+            MassDensity(value=Quality.closed_range(lower=929.0, upper=946.0)),
+            MaterialElasticity(
+                youngs_modulus=Quality.closed_range(lower=1.63e6, upper=3.94e6),
+                poissons_ratio=Quality.closed_range(lower=0.173, upper=0.221),
+            ),
+        ]
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the peel and flesh of an apple.
+        :return: The qualities of the parts of an apple, by kind of part: its peel:
+            tensile strips of Fuji and Starkrimson peel in both directions
+            :cite:`wang2015apple`, and the histological skin thickness across cultivars
+            :cite:`homutova2006apple`; its flesh: quasi-static compression; under impact
+            it measures about 9 MPa :cite:`stropek2022apple`.
         """
         return {
-            Peel: MeasuredMaterial.APPLE_PEEL,
-            Flesh: MeasuredMaterial.APPLE_FLESH,
+            Peel: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=17.79e6, upper=24.00e6)
+                ),
+                SkinThickness(value=Quality.closed_range(lower=33.3e-6, upper=78.3e-6)),
+            ],
+            Flesh: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=2.7e6, upper=4.6e6)
+                ),
+            ],
         }
 
 
@@ -1411,13 +1479,23 @@ class Avocado(Fruit, HasPeel, HasFlesh, HasPit):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the peel and flesh of an avocado.
+        :return: The qualities of the parts of an avocado, by kind of part: its peel:
+            Hass skin, from a plant-patent comparison of cultivars
+            :cite:`uspp14239avocado`; its flesh: slices of Hass flesh, from 2.29 MPa
+            unripe down to 0.16 MPa after five days of ripening
+            :cite:`farinas2021avocado`.
         """
         return {
-            Peel: MeasuredMaterial.AVOCADO_PEEL,
-            Flesh: MeasuredMaterial.AVOCADO_FLESH,
+            Peel: [
+                SkinThickness(value=Quality.closed_range(lower=1.6e-3, upper=1.6e-3)),
+            ],
+            Flesh: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=0.16e6, upper=2.29e6)
+                ),
+            ],
         }
 
 
@@ -1428,13 +1506,22 @@ class Banana(Fruit, HasPeel, HasFlesh):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the peel and flesh of a banana.
+        :return: The qualities of the parts of a banana, by kind of part: its peel:
+            green Nendran and Dwarf Cavendish bananas, measured with calipers
+            :cite:`kachru1995banana`; its flesh: cylinders of pulp in compression, from
+            day 1 to day 12 after harvest :cite:`ciro2005banana`.
         """
         return {
-            Peel: MeasuredMaterial.BANANA_PEEL,
-            Flesh: MeasuredMaterial.BANANA_FLESH,
+            Peel: [
+                SkinThickness(value=Quality.closed_range(lower=2.95e-3, upper=3.65e-3)),
+            ],
+            Flesh: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=1.09e6, upper=1.75e6)
+                ),
+            ],
         }
 
 
@@ -1445,19 +1532,28 @@ class Cucumber(Fruit, HasPeel, HasFlesh, HasSeedChamber):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a whole cucumber is made of, as measured.
+        :return: The specific gravity of whole Kurume-H cucumbers
+            :cite:`kojima1975cucumber`.
         """
-        return MeasuredMaterial.CUCUMBER
+        return [
+            MassDensity(value=Quality.closed_range(lower=980.0, upper=980.0)),
+        ]
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the flesh of a cucumber.
+        :return: The qualities of the parts of a cucumber, by kind of part: its flesh:
+            compression with skin and seeds removed, 29 kgf/cm²
+            :cite:`kojima1975cucumber`.
         """
         return {
-            Flesh: MeasuredMaterial.CUCUMBER_FLESH,
+            Flesh: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=2.844e6, upper=2.844e6)
+                ),
+            ],
         }
 
 
@@ -1485,19 +1581,36 @@ class Orange(CitrusFruit):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a whole orange is made of, as measured.
+        :return: The qualities of whole oranges: the density from large to small grades
+            :cite:`sharifi2007orange`, and the elastic constants in whole-fruit
+            compression :cite:`namdari2018orange`.
         """
-        return MeasuredMaterial.ORANGE
+        return [
+            MassDensity(value=Quality.closed_range(lower=999.0, upper=1046.0)),
+            MaterialElasticity(
+                youngs_modulus=Quality.closed_range(lower=0.584e6, upper=0.584e6),
+                poissons_ratio=Quality.closed_range(lower=0.24, upper=0.24),
+            ),
+        ]
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the peel of an orange.
+        :return: The qualities of the parts of an orange, by kind of part: its peel:
+            quasi-static compression with digital image correlation; the thickness is
+            the mean 6.2 mm within one standard deviation :cite:`jentzsch2022citrus`.
         """
         return {
-            Peel: MeasuredMaterial.ORANGE_PEEL,
+            Peel: [
+                MassDensity(value=Quality.closed_range(lower=746.0, upper=746.0)),
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=1.985e4, upper=1.985e4),
+                    poissons_ratio=Quality.closed_range(lower=-0.05, upper=-0.05),
+                ),
+                SkinThickness(value=Quality.closed_range(lower=5.4e-3, upper=7.0e-3)),
+            ],
         }
 
 
@@ -1508,19 +1621,31 @@ class Peach(Fruit, HasPeel, HasFlesh, HasPit, HasStem):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a whole peach is made of, as measured.
+        :return: The elastic constants of halved peaches in compression, for a drop
+            simulation :cite:`kabas2015peach`.
         """
-        return MeasuredMaterial.PEACH
+        return [
+            MaterialElasticity(
+                youngs_modulus=Quality.closed_range(lower=0.89e6, upper=0.89e6),
+                poissons_ratio=Quality.closed_range(lower=0.29, upper=0.29),
+            ),
+        ]
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the peel of a peach.
+        :return: The qualities of the parts of a peach, by kind of part: its peel:
+            tensile strips of Red Haven skin, which include flesh, so their thickness is
+            no peel thickness :cite:`cermak2011peach`.
         """
         return {
-            Peel: MeasuredMaterial.PEACH_PEEL,
+            Peel: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=1.08e6, upper=1.08e6)
+                ),
+            ],
         }
 
 
@@ -1531,13 +1656,24 @@ class Strawberry(Fruit, HasPeel, HasFlesh, HasPith):
     """
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the flesh and pith of a strawberry.
+        :return: The qualities of the parts of a strawberry, by kind of part: its flesh:
+            the cortex in uniaxial compression from 35 °C down to 1 °C
+            :cite:`an2022strawberry`; its pith: the same compression tests
+            :cite:`an2022strawberry`.
         """
         return {
-            Flesh: MeasuredMaterial.STRAWBERRY_FLESH,
-            Pith: MeasuredMaterial.STRAWBERRY_PITH,
+            Flesh: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=0.274e6, upper=0.614e6)
+                ),
+            ],
+            Pith: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=0.333e6, upper=0.695e6)
+                ),
+            ],
         }
 
 
@@ -1548,20 +1684,38 @@ class Watermelon(Fruit, HasPeel, HasFlesh, HasSeeds):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a whole watermelon is made of, as measured.
+        :return: The density of whole watermelons across storage conditions
+            :cite:`khater2016watermelon`.
         """
-        return MeasuredMaterial.WATERMELON
+        return [
+            MassDensity(value=Quality.closed_range(lower=927.84, upper=973.57)),
+        ]
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the peel and flesh of a watermelon.
+        :return: The qualities of the parts of a watermelon, by kind of part: its peel:
+            the green outer rind of Crimson Sweet and Charleston Gray
+            :cite:`sadrnia2008watermelon`, and the thickness of the whole rind
+            :cite:`khater2016watermelon`; its flesh: red flesh in compression
+            :cite:`sadrnia2008watermelon`.
         """
         return {
-            Peel: MeasuredMaterial.WATERMELON_PEEL,
-            Flesh: MeasuredMaterial.WATERMELON_FLESH,
+            Peel: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=4.937e6, upper=5.357e6)
+                ),
+                SkinThickness(
+                    value=Quality.closed_range(lower=12.11e-3, upper=20.28e-3)
+                ),
+            ],
+            Flesh: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=0.396e6, upper=0.536e6)
+                ),
+            ],
         }
 
 
@@ -1573,9 +1727,9 @@ class EggPart(HasRootBody):
 
 
 @dataclass(eq=False, kw_only=True)
-class Eggshell(EggPart, HasLayerThickness):
+class Shell(HasRootBody, HasSkinThickness):
     """
-    The hard, mineral outer layer of an egg.
+    The hard outer covering of an object such as an egg or a nut.
     """
 
 
@@ -1594,27 +1748,46 @@ class Yolk(EggPart):
 
 
 @dataclass(eq=False, kw_only=True)
-class Egg(Food, HasMeasuredParts, HasEggshell, HasAlbumen, HasYolk):
+class Egg(Food, HasShell, HasAlbumen, HasYolk):
     """
     A hen's egg.
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a whole egg is made of, as measured.
+        :return: The density of whole fresh hen's eggs, weighed in air and in water; it
+            falls as an egg ages and loses mass :cite:`tsarenko2017egg`.
         """
-        return MeasuredMaterial.EGG
+        return [
+            MassDensity(value=Quality.closed_range(lower=1085.0, upper=1085.0)),
+        ]
 
     @classproperty
-    def measured_part_materials(cls) -> dict[type[HasRootBody], MeasuredMaterial]:
+    def default_part_qualities(cls) -> dict[type[HasQualities], list[Quality]]:
         """
-        :return: The measured materials of the eggshell, albumen and yolk of an egg.
+        :return: The qualities of the parts of an egg, by kind of part: its shell: full
+            rings in compression, around the egg :cite:`lin1995eggshell`, and its
+            thickness across four hen genotypes :cite:`hammershoj2021egg`; its albumen:
+            from 25 °C down to 8 °C, a liquid without elasticity
+            :cite:`tsarenko2017egg`; its yolk: from 25 °C down to 8 °C, a liquid without
+            elasticity :cite:`tsarenko2017egg`.
         """
         return {
-            Eggshell: MeasuredMaterial.EGGSHELL,
-            Albumen: MeasuredMaterial.ALBUMEN,
-            Yolk: MeasuredMaterial.YOLK,
+            Shell: [
+                MaterialElasticity(
+                    youngs_modulus=Quality.closed_range(lower=19.0e9, upper=19.0e9)
+                ),
+                SkinThickness(
+                    value=Quality.closed_range(lower=0.403e-3, upper=0.444e-3)
+                ),
+            ],
+            Albumen: [
+                MassDensity(value=Quality.closed_range(lower=1027.5, upper=1030.9)),
+            ],
+            Yolk: [
+                MassDensity(value=Quality.closed_range(lower=1026.7, upper=1031.6)),
+            ],
         }
 
 
@@ -1761,11 +1934,20 @@ class Potato(Vegetable):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a potato is made of, as measured.
+        :return: The qualities of potato flesh: the specific gravity targeted for
+            processing cultivars :cite:`wang2017potato`, cylinders in axial compression
+            :cite:`solomon2006potato`, and a Poisson's ratio back-calculated with a
+            finite element model :cite:`celik2026potato`.
         """
-        return MeasuredMaterial.POTATO
+        return [
+            MassDensity(value=Quality.closed_range(lower=1080.0, upper=1095.0)),
+            MaterialElasticity(
+                youngs_modulus=Quality.closed_range(lower=2.17e6, upper=5.18e6),
+                poissons_ratio=Quality.closed_range(lower=0.406, upper=0.441),
+            ),
+        ]
 
 
 @dataclass(eq=False)
@@ -1813,11 +1995,14 @@ class Book(IsGraspable):
     book_front: BookFront | None = None
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a book is made of, as measured.
+        :return: The density of paper, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
         """
-        return MeasuredMaterial.PAPER
+        return [
+            MassDensity(value=Quality.closed_range(lower=700.0, upper=1150.0)),
+        ]
 
 
 @dataclass(eq=False)
@@ -1832,7 +2017,7 @@ class SaltPepperShaker(SaltContainer):
 
 
 @dataclass(eq=False)
-class Cutlery(HasHandle, Tableware):
+class Cutlery(HasHandle, Tableware, MadeOfSteel):
     """
     A piece of cutlery, lying flat, grasped from above and across its length.
     """
@@ -1874,13 +2059,6 @@ class Fork(Cutlery):
     A fork.
     """
 
-    @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
-        """
-        :return: What a fork is made of, as measured.
-        """
-        return MeasuredMaterial.STEEL
-
 
 @dataclass(eq=False)
 class Knife(Cutlery):
@@ -1888,26 +2066,12 @@ class Knife(Cutlery):
     A butter knife.
     """
 
-    @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
-        """
-        :return: What a knife is made of, as measured.
-        """
-        return MeasuredMaterial.STEEL
-
 
 @dataclass(eq=False)
 class Spoon(Cutlery, IsPerceivable):
     """
     A spoon.
     """
-
-    @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
-        """
-        :return: What a spoon is made of, as measured.
-        """
-        return MeasuredMaterial.STEEL
 
 
 @dataclass(eq=False)
@@ -2029,11 +2193,14 @@ class Parcel(IsGraspable):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a parcel is made of, as measured.
+        :return: The density of cardboard, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
         """
-        return MeasuredMaterial.CARDBOARD
+        return [
+            MassDensity(value=Quality.closed_range(lower=700.0, upper=700.0)),
+        ]
 
 
 @dataclass(eq=False)
@@ -2271,17 +2438,10 @@ class Whisk(ToolWithHandle):
 
 
 @dataclass(eq=False)
-class CuttingKnife(ToolWithHandle):
+class CuttingKnife(ToolWithHandle, MadeOfSteel):
     """
     A knife for cutting food objects.
     """
-
-    @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
-        """
-        :return: What a cutting knife is made of, as measured.
-        """
-        return MeasuredMaterial.STEEL
 
     def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         return [
@@ -2321,11 +2481,14 @@ class Sponge(Tool):
     """
 
     @classproperty
-    def measured_material(cls) -> MeasuredMaterial | None:
+    def default_qualities(cls) -> list[Quality]:
         """
-        :return: What a sponge is made of, as measured.
+        :return: The density of polyurethane foam, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
         """
-        return MeasuredMaterial.POLYURETHANE_FOAM
+        return [
+            MassDensity(value=Quality.closed_range(lower=30.0, upper=30.0)),
+        ]
 
     def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         if isinstance(target, Body):

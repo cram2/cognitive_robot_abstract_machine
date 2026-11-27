@@ -18,20 +18,19 @@ from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
     HasMassDensity,
     HasMaterialElasticity,
-    HasLayerThickness,
+    HasSkinThickness,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
-    LayerThickness,
+    SkinThickness,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Albumen,
     CitrusSegment,
     Core,
-    EggPart,
-    Eggshell,
+    Shell,
     Flesh,
     FruitPart,
     Peel,
@@ -186,7 +185,7 @@ def test_an_elasticity_without_a_poissons_ratio_is_accepted() -> None:
     )
 
 
-# %% Layer thickness of a peel
+# %% Skin thickness of a peel
 
 
 def test_thickness_at_the_lower_end_of_its_scale_is_rejected() -> None:
@@ -194,7 +193,7 @@ def test_thickness_at_the_lower_end_of_its_scale_is_rejected() -> None:
     A thickness of zero, the open lower end of the thickness scale, is refused.
     """
     with pytest.raises(QualityOutsideScale):
-        LayerThickness(value=point(LayerThickness.scale.lower))
+        SkinThickness(value=point(SkinThickness.scale.lower))
 
 
 def test_a_peel_starts_without_a_thickness(world: World) -> None:
@@ -204,20 +203,20 @@ def test_a_peel_starts_without_a_thickness(world: World) -> None:
     with world.modify_world():
         peel = Peel.create_with_new_body_in_world(name="peel", world=world)
 
-    assert isinstance(peel, HasLayerThickness)
-    assert peel.layer_thickness is None
+    assert isinstance(peel, HasSkinThickness)
+    assert peel.skin_thickness is None
 
 
 def test_the_thickness_of_a_peel_is_its_quality(world: World) -> None:
     """
     Setting a thickness on a peel fills its field and lists it among its qualities.
     """
-    thickness = LayerThickness(value=point(50.0e-6))
+    thickness = SkinThickness(value=point(50.0e-6))
     with world.modify_world():
         peel = Peel.create_with_new_body_in_world(name="peel", world=world)
         peel.set_quality(quality=thickness)
 
-    assert peel.layer_thickness is thickness
+    assert peel.skin_thickness is thickness
     assert peel.qualities == [thickness]
 
 
@@ -228,15 +227,15 @@ def test_a_flesh_has_no_thickness(world: World) -> None:
     with world.modify_world():
         flesh = Flesh.create_with_new_body_in_world(name="flesh", world=world)
         with pytest.raises(NoFieldAcceptsEntity):
-            flesh.set_quality(quality=LayerThickness(value=point(50.0e-6)))
+            flesh.set_quality(quality=SkinThickness(value=point(50.0e-6)))
 
 
 # %% Material qualities of egg parts
 
 
-@pytest.mark.parametrize("part_type", [Eggshell, Albumen, Yolk])
+@pytest.mark.parametrize("part_type", [Shell, Albumen, Yolk])
 def test_every_egg_part_starts_without_density_and_elasticity(
-    world: World, part_type: type[EggPart]
+    world: World, part_type: type[HasRootBody]
 ) -> None:
     """
     Every part of an egg has a density and an elasticity field, empty until they are
@@ -249,22 +248,22 @@ def test_every_egg_part_starts_without_density_and_elasticity(
     assert part.material_elasticity is None
 
 
-def test_an_eggshell_starts_without_a_thickness(world: World) -> None:
+def test_a_shell_starts_without_a_thickness(world: World) -> None:
     """
-    An eggshell is a layer, so it has a thickness field, empty until it is set.
+    A shell is an outer covering, so it has a thickness field, empty until it is set.
     """
     with world.modify_world():
-        eggshell = Eggshell.create_with_new_body_in_world(name="eggshell", world=world)
+        shell = Shell.create_with_new_body_in_world(name="shell", world=world)
 
-    assert isinstance(eggshell, HasLayerThickness)
-    assert eggshell.layer_thickness is None
+    assert isinstance(shell, HasSkinThickness)
+    assert shell.skin_thickness is None
 
 
 def test_a_yolk_has_no_thickness(world: World) -> None:
     """
-    A yolk is no layer, so setting a thickness on it is refused.
+    A yolk is no outer covering, so setting a thickness on it is refused.
     """
     with world.modify_world():
         yolk = Yolk.create_with_new_body_in_world(name="yolk", world=world)
         with pytest.raises(NoFieldAcceptsEntity):
-            yolk.set_quality(quality=LayerThickness(value=point(0.4e-3)))
+            yolk.set_quality(quality=SkinThickness(value=point(0.4e-3)))

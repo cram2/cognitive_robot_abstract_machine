@@ -147,14 +147,14 @@ def test_every_fruit_starts_without_a_ripeness(
     assert fruit.ripeness is None
 
 
-def test_fruit_without_a_ripeness_has_no_qualities(world: World) -> None:
+def test_fruit_without_a_ripeness_has_only_its_default_qualities(world: World) -> None:
     """
-    A fruit whose ripeness is unknown lists no qualities.
+    A fruit whose ripeness is unknown lists only the qualities its kind starts with.
     """
     with world.modify_world():
         apple = Apple.create_with_new_body_in_world(name="apple", world=world)
 
-    assert apple.qualities == []
+    assert apple.qualities == Apple.default_qualities
 
 
 def test_ripeness_of_a_fruit_is_its_quality(world: World) -> None:
@@ -167,7 +167,7 @@ def test_ripeness_of_a_fruit_is_its_quality(world: World) -> None:
         apple.set_quality(quality=ripeness)
 
     assert apple.ripeness is ripeness
-    assert apple.qualities == [ripeness]
+    assert apple.qualities == [ripeness, *Apple.default_qualities]
 
 
 # %% Setting qualities

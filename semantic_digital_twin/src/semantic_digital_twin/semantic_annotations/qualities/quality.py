@@ -47,6 +47,17 @@ class Quality(ABC):
         if scale.intersection_with(other=value) != value:
             raise QualityOutsideScale(quality=self, value=value, scale=scale)
 
+    @staticmethod
+    def closed_range(*, lower: float, upper: float) -> SimpleInterval:
+        """
+        :param lower: The smallest measured value.
+        :param upper: The largest measured value, equal to ``lower`` for a single one.
+        :return: The closed interval the measured values of a quality spread over.
+        """
+        return SimpleInterval.from_data(
+            lower=lower, upper=upper, left=Bound.CLOSED, right=Bound.CLOSED
+        )
+
 
 # %% Ripeness
 
@@ -223,13 +234,14 @@ class MaterialElasticity(Quality):
         )
 
 
-# %% Layers
+# %% Outer coverings
 
 
 @dataclass(kw_only=True)
-class LayerThickness(Quality):
+class SkinThickness(Quality):
     """
-    How thick its bearer is across its surface, such as the skin of a fruit, in metres.
+    How thick its bearer, the outer covering of an object such as the peel of a fruit or
+    the shell of an egg, is across its surface, in metres.
     """
 
     value: SimpleInterval

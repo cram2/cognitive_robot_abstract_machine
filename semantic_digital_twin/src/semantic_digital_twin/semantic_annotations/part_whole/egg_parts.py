@@ -1,5 +1,6 @@
 """
-Mixins for each part of an egg: its shell, its albumen and its yolk.
+Mixins for the parts of an egg: its shell, which covers nuts and seeds too, its albumen
+and its yolk.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
         Albumen,
-        Eggshell,
+        Shell,
         Yolk,
     )
 
@@ -29,18 +30,18 @@ if TYPE_CHECKING:
 
 
 @dataclass(eq=False, kw_only=True)
-class HasEggshell(HasParts, Mixin):
+class HasShell(HasParts, Mixin):
     """
-    A mixin class for semantic annotations that have an eggshell.
+    A mixin class for semantic annotations that have a shell.
     """
 
-    eggshell: Eggshell | None = field(
+    shell: Shell | None = field(
         default=None,
         hash=False,
         metadata=IsPartWholeRelationship().as_dict(),
     )
     """
-    The eggshell of the semantic annotation.
+    The shell of the semantic annotation.
     """
 
 
