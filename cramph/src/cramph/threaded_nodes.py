@@ -108,12 +108,11 @@ class ThreadedNode(StatechartNode, ABC):
 @dataclass(eq=False, repr=False, kw_only=True)
 class FunctionCall(SucceedsOnObservingTrue, FailsOnObservingFalse, ThreadedNode):
     """
-    Calls a function once when it starts, in a thread of its own, while the statechart
-    ticks on.
+    Calls a function once when it starts, in a thread of its own, and observes unknown
+    while it runs.
 
-    It observes unknown until the function returned or raised, then succeeds, or fails
-    if the function raised one of :attr:`failure_types`, so a surrounding node can react
-    to that failure. Any other exception is raised out of the tick.
+    It succeeds once the function returned, and fails if it raised one of
+    :attr:`failure_types`; any other exception is raised out of the tick.
     """
 
     function: Callable[[], Any]
