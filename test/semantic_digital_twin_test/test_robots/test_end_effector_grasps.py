@@ -166,7 +166,9 @@ class EndEffectorWithSkewedAxes(EndEffector):
 
 def test_the_approach_axis_is_the_grasp_frames_x_axis(pr2_gripper) -> None:
     np.testing.assert_allclose(
-        (pr2_gripper.tool_R_grasp @ Vector3Dimensional.X()).to_np()[:3],
+        (
+            pr2_gripper.tool_R_grasp.to_coordinate_change() @ Vector3Dimensional.X()
+        ).to_np()[:3],
         pr2_gripper.approach_axis.to_np()[:3],
         atol=1e-9,
     )
@@ -174,7 +176,9 @@ def test_the_approach_axis_is_the_grasp_frames_x_axis(pr2_gripper) -> None:
 
 def test_the_closing_axis_is_the_grasp_frames_y_axis(pr2_gripper) -> None:
     np.testing.assert_allclose(
-        (pr2_gripper.tool_R_grasp @ Vector3Dimensional.Y()).to_np()[:3],
+        (
+            pr2_gripper.tool_R_grasp.to_coordinate_change() @ Vector3Dimensional.Y()
+        ).to_np()[:3],
         pr2_gripper.closing_axis.to_np()[:3],
         atol=1e-9,
     )
@@ -249,7 +253,10 @@ def test_tool_frame_goal_applies_the_end_effectors_own_orientation(
 
     goal = pr2_gripper.tool_frame_goal(grasp)
 
-    expected = grasp.rotation_matrix @ pr2_gripper.tool_R_grasp.inverse()
+    expected = (
+        grasp.rotation_matrix.to_coordinate_change()
+        @ pr2_gripper.tool_R_grasp.inverse()
+    )
     np.testing.assert_allclose(
         goal.rotation_matrix.to_np(), expected.to_np(), atol=1e-9
     )
@@ -298,7 +305,7 @@ def test_the_held_grasp_is_turned_the_way_the_gripper_faces(pr2_gripper) -> None
         pr2_gripper.tool_frame.global_transform, body
     )
     np.testing.assert_allclose(
-        (body_R_grasp @ grasp_R_tool).to_np(),
+        (body_R_grasp.to_coordinate_change() @ grasp_R_tool).to_np(),
         body_T_tool.rotation_matrix.to_np(),
         atol=1e-9,
     )

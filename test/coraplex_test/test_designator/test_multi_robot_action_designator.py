@@ -383,7 +383,7 @@ def test_navigate_multi(multiple_robot_apartment_context, rclpy_node):
     robot_base_position = view.root.global_transform.position.to_np()
     # An identity heading points the robot's front along the world's x-axis, whatever
     # the axes its own base happens to be modelled with.
-    world_R_base = view.mobile_base.root.global_transform.rotation_matrix
+    world_R_base = view.mobile_base.root.global_transform.rotation
     world_V_forward = world_R_base @ view.mobile_base.forward_axis
 
     assert robot_base_position[:3] == pytest.approx(target_position, abs=0.01)

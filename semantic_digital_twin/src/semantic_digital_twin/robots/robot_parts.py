@@ -894,7 +894,9 @@ class EndEffector(AbstractRobotPart, ABC):
         grasp_R_tool = self.tool_R_grasp.inverse()
         return Pose3Dimensional(
             position=grasp_pose.position,
-            orientation=(grasp_pose.rotation_matrix @ grasp_R_tool).quaternion,
+            orientation=(
+                grasp_pose.rotation_matrix.to_coordinate_change() @ grasp_R_tool
+            ).quaternion,
             reference_frame=grasp_pose.reference_frame,
         )
 
@@ -912,7 +914,7 @@ class EndEffector(AbstractRobotPart, ABC):
         oriented = self.tool_frame_goal(grasp_pose)
         return Pose3Dimensional(
             position=grasp_pose.position
-            - oriented.rotation_matrix @ tool_P_point.vector3,
+            - oriented.rotation_matrix.to_coordinate_change() @ tool_P_point.vector3,
             orientation=oriented.quaternion,
             reference_frame=grasp_pose.reference_frame,
         )
@@ -962,7 +964,7 @@ class EndEffector(AbstractRobotPart, ABC):
         body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=body_T_tool @ tool_P_grasp,
-            rotation_matrix=body_T_tool.rotation_matrix @ self.tool_R_grasp,
+            rotation_matrix=body_T_tool.rotation @ self.tool_R_grasp,
             reference_frame=body,
         ).pose
 
@@ -1206,7 +1208,7 @@ class MobileBase(
         reference_T_heading = heading_3_dimensional.to_coordinate_change()
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             reference_T_heading.position,
-            reference_T_heading.rotation_matrix @ self.base_R_front.inverse(),
+            reference_T_heading.rotation @ self.base_R_front.inverse(),
             reference_frame=heading.reference_frame,
         ).pose
 

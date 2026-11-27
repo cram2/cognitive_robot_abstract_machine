@@ -369,6 +369,11 @@ class ScrewAxisMapping(AlternativeMapping[ScrewAxis]):
 class HomogeneousTransformationMatrix3DimensionalMapping(
     AlternativeMapping[HomogeneousTransformationMatrix3Dimensional]
 ):
+    """
+    A stored transformation: where its child frame's origin lies, its rotation, and the
+    frames it changes between.
+    """
+
     position: Point3Dimensional
     axis_angle: AxisAngle
 
@@ -389,7 +394,7 @@ class HomogeneousTransformationMatrix3DimensionalMapping(
     def to_domain_object(self) -> HomogeneousTransformationMatrix3Dimensional:
         return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=self.position,
-            rotation_matrix=self.axis_angle.to_coordinate_change(),
+            rotation_matrix=RotationMatrix.from_axis_angle(self.axis_angle),
             reference_frame=self.reference_frame,
             child_frame=self.child_frame,
         )
@@ -400,19 +405,37 @@ class HomogeneousTransformationMatrix3DimensionalMapping(
 
 
 @dataclass(eq=False)
-class RotationMatrixMapping(
-    HomogeneousTransformationMatrix3DimensionalMapping,
-    AlternativeMapping[RotationMatrix],
-):
+class RotationMatrixMapping(AlternativeMapping[RotationMatrix]):
     """
-    A stored rotation: a stored transformation whose position is the origin.
+    A stored orientation: the rotation of a :class:`RotationMatrix` and the frame it is
+    given in.
     """
 
+    axis_angle: AxisAngle
+    """
+    The rotation, as an axis and the angle about it.
+    """
+
+    reference_frame: KinematicStructureEntity | None
+    """
+    The frame the orientation is given in, or *None* where it is given in no frame.
+    """
+
+    @classmethod
+    def from_domain_object(cls, *, obj: RotationMatrix) -> Self:
+        return cls(axis_angle=obj.axis_angle, reference_frame=obj.reference_frame)
+
     def to_domain_object(self) -> RotationMatrix:
-        rotation_matrix = self.axis_angle.to_coordinate_change()
+        rotation_matrix = RotationMatrix.from_axis_angle(self.axis_angle)
         rotation_matrix.reference_frame = self.reference_frame
-        rotation_matrix.child_frame = self.child_frame
         return rotation_matrix
+
+    @classmethod
+    def required_pre_build_classes(cls) -> list[type]:
+        """
+        :return: The axis-angle, which is stored before the orientation it gives.
+        """
+        return [AxisAngle]
 
 
 @dataclass(eq=False, kw_only=True)

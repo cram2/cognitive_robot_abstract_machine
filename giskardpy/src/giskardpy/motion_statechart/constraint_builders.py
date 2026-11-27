@@ -251,7 +251,7 @@ class GeometricConstraintBuilder:
         hack = RotationMatrix.from_axis_angle(
             AxisAngle(Vector3Dimensional.Z(), -0.0001)
         )
-        frame_R_current = frame_R_current.dot(other=hack)
+        frame_R_current = frame_R_current.to_coordinate_change() @ hack
         current_quaternion = frame_R_current.quaternion
         goal_quaternion = frame_R_goal.quaternion
         goal_quaternion = sm.if_less(

@@ -925,11 +925,22 @@ class HomogeneousTransformationMatrix3Dimensional(
     @property
     def rotation_matrix(self) -> RotationMatrix:
         """
-        :return: The rotation this transformation is composed of. It has no child
-            frame: it turns directions given in the child frame, but moves no position
-            given there into the reference frame.
+        :return: The orientation of the child frame, given in the reference frame.
         """
         return RotationMatrix(data=self, reference_frame=self.reference_frame)
+
+    @property
+    def rotation(self) -> HomogeneousTransformationMatrix3Dimensional:
+        """
+        This change without its translation. It has no child frame: it turns
+        directions given in the child frame, but moves no position given there into
+        the reference frame.
+        """
+        result = HomogeneousTransformationMatrix3Dimensional(
+            data=self, reference_frame=self.reference_frame
+        )
+        result[:3, 3] = _ConstantMatrixParts.ZERO_TRANSLATION
+        return result
 
     @property
     def keeps_x_y_plane(self) -> bool:
@@ -986,29 +997,26 @@ class HomogeneousTransformationMatrix3Dimensional(
 
 
 @dataclass(eq=False, init=False, repr=False)
-class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
+class RotationMatrix(
+    SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional],
+    Orientation,
+):
     """
-    An element of SO(3), as a transformation whose translation is zero: a rotation
-    about the common origin of its child and reference frame.
-
-    Composed with another rotation, or inverted, it stays a rotation; composed with any
-    other transformation it is a :class:`HomogeneousTransformationMatrix3Dimensional`.
+    An orientation as the 3x3 matrix whose columns are the oriented frame's axes, given
+    in its reference frame, stored in the upper left block of a 4x4 matrix.
     """
 
     def __init__(
         self,
         data: sm.MatrixData | None = None,
         reference_frame: CartesianFrame3Dimensional | None = None,
-        child_frame: CartesianFrame3Dimensional | None = None,
     ):
         """
         :param data: A matrix whose upper left 3x3 block is the rotation; any
             translation it holds is dropped.
-        :param reference_frame: The frame the rotation turns into.
-        :param child_frame: The frame the rotation turns from.
+        :param reference_frame: The frame the orientation is given in.
         """
         self.reference_frame = reference_frame
-        self.child_frame = child_frame
         if data is None:
             self._casadi_sx = ca.SX.eye(4)
         else:
@@ -1028,17 +1036,16 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
     @classmethod
     def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
         """
-        Overrides :meth:`HomogeneousTransformationMatrix3Dimensional._from_constant_json`:
-        a rotation is stored as its quaternion alone.
+        A rotation matrix is stored as its quaternion alone.
         """
-        result = Quaternion.from_iterable(data["quaternion"]).to_coordinate_change()
-        result.reference_frame = cls._parse_optional_frame_from_json(
-            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        return cls.from_quaternion(
+            Quaternion.from_iterable(
+                data["quaternion"],
+                reference_frame=cls._parse_optional_frame_from_json(
+                    data, frame=SpatialFrameKey.REFERENCE, **kwargs
+                ),
+            )
         )
-        result.child_frame = cls._parse_optional_frame_from_json(
-            data, frame=SpatialFrameKey.CHILD, **kwargs
-        )
-        return result
 
     def _constant_to_json(self) -> dict[str, Any]:
         return {
@@ -1168,13 +1175,16 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
             reference_frame=self.reference_frame,
         )
 
-    @property
-    def rotation_matrix(self) -> RotationMatrix:
-        """
-        Overrides :attr:`HomogeneousTransformationMatrix3Dimensional.rotation_matrix`:
-        a rotation is its own rotation part, child frame included.
-        """
-        return self
+    def to_coordinate_change(self) -> HomogeneousTransformationMatrix3Dimensional:
+        return HomogeneousTransformationMatrix3Dimensional(
+            data=self, reference_frame=self.reference_frame
+        )
+
+    @classmethod
+    def from_coordinate_change(
+        cls, *, change: HomogeneousTransformationMatrix3Dimensional
+    ) -> RotationMatrix:
+        return change.rotation_matrix
 
     @property
     def axis_angle(self) -> AxisAngle:
@@ -1317,14 +1327,10 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
 
     def inverse(self) -> RotationMatrix:
         """
-        Overrides :meth:`HomogeneousTransformationMatrix3Dimensional.inverse`: the
-        inverse of a rotation is the rotation by its transpose.
+        :return: The orientation of the reference frame given in the oriented frame, the
+            transpose. The oriented frame is not named, so it has no reference frame.
         """
-        return RotationMatrix(
-            self.casadi_sx.T,
-            reference_frame=self.child_frame,
-            child_frame=self.reference_frame,
-        )
+        return RotationMatrix(self.casadi_sx.T)
 
     @property
     def rpy(self) -> tuple[sm.Scalar, sm.Scalar, sm.Scalar]:
@@ -1357,9 +1363,7 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
         """
         :return: This rotation with each of its axes scaled to the length of one.
         """
-        result = RotationMatrix(
-            self, reference_frame=self.reference_frame, child_frame=self.child_frame
-        )
+        result = RotationMatrix(self, reference_frame=self.reference_frame)
         for column in range(3):
             result[:3, column] = result[:3, column].scale(a=1.0)
         return result
@@ -1379,8 +1383,7 @@ class RotationMatrix(HomogeneousTransformationMatrix3Dimensional):
         :param other: The second rotation matrix.
         :return: The angular error between the two rotation matrices as an expression.
         """
-        r_distance = self.dot(other=other.inverse())
-        return r_distance.angle
+        return RotationMatrix(ca.mtimes(self.casadi_sx, other.casadi_sx.T)).angle
 
 
 @dataclass(eq=False, init=False, repr=False)
@@ -2266,12 +2269,14 @@ class Quaternion(
             reference_frame=self.reference_frame,
         )
 
-    def to_coordinate_change(self) -> RotationMatrix:
-        return RotationMatrix.from_quaternion(self)
+    def to_coordinate_change(self) -> HomogeneousTransformationMatrix3Dimensional:
+        return RotationMatrix.from_quaternion(self).to_coordinate_change()
 
     @classmethod
-    def from_coordinate_change(cls, *, change: RotationMatrix) -> Quaternion:
-        return cls.from_rotation_matrix(change)
+    def from_coordinate_change(
+        cls, *, change: HomogeneousTransformationMatrix3Dimensional
+    ) -> Quaternion:
+        return cls.from_rotation_matrix(change.rotation_matrix)
 
     def multiply(self, q: Quaternion) -> Quaternion:
         return Quaternion(
@@ -2547,12 +2552,14 @@ class AxisAngle(
         """
         return Quaternion.from_axis_angle(self)
 
-    def to_coordinate_change(self) -> RotationMatrix:
-        return RotationMatrix.from_axis_angle(self)
+    def to_coordinate_change(self) -> HomogeneousTransformationMatrix3Dimensional:
+        return RotationMatrix.from_axis_angle(self).to_coordinate_change()
 
     @classmethod
-    def from_coordinate_change(cls, *, change: RotationMatrix) -> AxisAngle:
-        return cls.from_rotation_matrix(change)
+    def from_coordinate_change(
+        cls, *, change: HomogeneousTransformationMatrix3Dimensional
+    ) -> AxisAngle:
+        return cls.from_rotation_matrix(change.rotation_matrix)
 
 
 @dataclass(eq=False, init=False, repr=False, kw_only=True)

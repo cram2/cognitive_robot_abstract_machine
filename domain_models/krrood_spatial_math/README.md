@@ -22,7 +22,7 @@ coordinate system. Its base depends on `krrood` alone.
   inverted and composed; `AffineCoordinateChange`, between affine frames, which keeps
   straight lines and maps homogeneous coordinates; and `RigidCoordinateChange`, between
   Cartesian frames, which also keeps distances and angles and splits into its
-  `rotation_matrix` and `translation`.
+  `rotation` and `translation`.
 - `krrood_spatial_math.cartesian_frame_3_dimensional`: `CartesianFrame3Dimensional`, the right-handed
   Cartesian frame of physical space that positions and directions are expressed in,
   and how serialized values refer to one.
@@ -69,10 +69,13 @@ coordinate system. Its base depends on `krrood` alone.
   it, `SymbolicSpatialValue[HomogeneousTransformationMatrix3Dimensional]`, which fixes its
   kind of frame and coordinate type, and `transform` takes a transformation as a change of
   that type. How a change moves a value comes from its kind of value: the vector and
-  point are a `Vector` and a `Point`, the pose a `Pose`, `Quaternion` and `AxisAngle` an
-  `Orientation`, and `Displacement`, `Twist` and `ScrewAxis` a `VectorPair`, two
-  three-dimensional vectors that a change of frame moves by its adjoint action. A
-  `RotationMatrix` is the transformation without translation, SO(3) within SE(3).
+  point are a `Vector` and a `Point`, the pose a `Pose`, `Quaternion`, `AxisAngle` and
+  `RotationMatrix` an `Orientation`, and `Displacement`, `Twist` and `ScrewAxis` a `VectorPair`, two
+  three-dimensional vectors that a change of frame moves by its adjoint action.
+  An orientation is the value of a transformation without translation, which its
+  `to_coordinate_change` gives and `HomogeneousTransformationMatrix3Dimensional.rotation`
+  cuts out of any transformation; `HomogeneousTransformationMatrix3Dimensional` is the
+  only 3D change.
 - `krrood_spatial_math.spatial_types_2_dimensional`, with the same extra: their
   counterparts on a plane, `Point2Dimensional`, `Vector2Dimensional` and
   `Pose2Dimensional`, which lie on the x-y plane of their reference frame and are

@@ -36,12 +36,12 @@ from .dataset.spaces import FloatCoordinatePoint3Dimensional
 
 def test_a_rotation_turns_a_point_about_the_origin(table_frame, camera_frame):
     """
-    A rotation applied to a point turns it about the origin of the point's frame and
-    gives it in the rotation's frame.
+    The rotation a rotation matrix is the value of turns a point about the origin of the
+    point's frame and gives it in the rotation's frame.
     """
     quarter_turn_about_z = RotationMatrix.from_rpy(
         yaw=math.pi / 2, reference_frame=table_frame
-    )
+    ).to_coordinate_change()
 
     turned = quarter_turn_about_z @ Point3Dimensional(
         1, 0, 0, reference_frame=camera_frame
@@ -85,7 +85,7 @@ def test_a_transformation_turns_an_axis_angle(table_frame, camera_frame):
     assert turned.reference_frame is table_frame
     np.testing.assert_allclose(
         turned.to_coordinate_change().to_np(),
-        (table_T_camera.rotation_matrix @ turn_about_x.to_coordinate_change()).to_np(),
+        (table_T_camera.rotation @ turn_about_x.to_coordinate_change()).to_np(),
         atol=1e-12,
     )
 

@@ -373,7 +373,8 @@ def _turned_around(grasp: GraspCandidate, nearer_by: float = 0.0) -> GraspCandid
         Pose3Dimensional(
             position=Point3Dimensional.from_iterable(root_P_grasp),
             orientation=(
-                grasp_pose.rotation_matrix @ RotationMatrix.from_rpy(yaw=np.pi)
+                grasp_pose.rotation_matrix.to_coordinate_change()
+                @ RotationMatrix.from_rpy(yaw=np.pi)
             ).quaternion,
             reference_frame=grasp.graspable.root,
         ),

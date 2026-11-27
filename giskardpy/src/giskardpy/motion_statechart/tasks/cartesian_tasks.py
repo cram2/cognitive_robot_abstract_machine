@@ -611,7 +611,9 @@ class CartesianPositionStraight(
         line_length = root_V_line.norm()
         root_V_line.scale(1)
         root_R_line = RotationMatrix.from_x_axis(root_V_line)
-        line_V_travelled = root_R_line.inverse() @ (root_P_tip - root_P_line_start)
+        line_V_travelled = root_R_line.inverse().to_coordinate_change() @ (
+            root_P_tip - root_P_line_start
+        )
 
         lateral_weight = self.weight * self.lateral_weight_factor
         artifacts.geometry.add_position_constraint(
@@ -672,9 +674,7 @@ class CartesianOrientation(
             orientation and the goal orientation.
         """
         artifacts = MotionNodeArtifacts()
-        root_R_goal = (
-            self.root_T_goal_reference_frame.rotation_matrix @ self.goal_orientation
-        )
+        root_R_goal = self.root_T_goal_reference_frame.rotation @ self.goal_orientation
 
         # Get current tip orientation in root frame
         root_T_current = self.context.world.compose_forward_kinematics_expression(

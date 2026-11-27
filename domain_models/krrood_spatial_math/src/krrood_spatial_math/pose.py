@@ -77,5 +77,5 @@ class Orientation(CoordinateRepresentation, ABC):
 
     def apply_transformation(self, *, transformation: RigidCoordinateChange) -> Self:
         return self.from_coordinate_change(
-            change=transformation.rotation_matrix @ self.to_coordinate_change()
+            change=transformation.rotation @ self.to_coordinate_change()
         )

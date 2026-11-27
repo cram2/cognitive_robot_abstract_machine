@@ -255,7 +255,7 @@ def test_camera_view_frame_x_axis_is_the_forward_axis(pr2_world_copy: World) -> 
     root_T_camera = camera.root.global_transform
 
     root_T_view = camera.world_T_forward_view.to_np()
-    root_V_forward = (root_T_camera.rotation_matrix @ camera.viewing_direction).to_np()
+    root_V_forward = (root_T_camera.rotation @ camera.viewing_direction).to_np()
 
     assert np.allclose(root_T_view[:3, 0], root_V_forward.flatten()[:3], atol=1e-9)
     assert np.allclose(root_T_view[:3, 3], root_T_camera.to_np()[:3, 3], atol=1e-9)

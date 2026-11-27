@@ -203,7 +203,7 @@ class HomogeneousTransformationMatrix2Dimensional(
         return sm.atan2(self[1, 0], self[0, 0])
 
     @property
-    def rotation_matrix(self) -> HomogeneousTransformationMatrix2Dimensional:
+    def rotation(self) -> HomogeneousTransformationMatrix2Dimensional:
         return HomogeneousTransformationMatrix2Dimensional.from_xy_yaw(
             yaw=self.yaw, reference_frame=self.reference_frame
         )

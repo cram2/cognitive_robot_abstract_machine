@@ -327,7 +327,7 @@ b_P_q = Point3Dimensional(0.6, 0.3, 0, reference_frame=b)
 a_P_q = a_T_b @ b_P_q
 print("q in a:", a_P_q[:3].to_list(), "given in", a_P_q.reference_frame.name)
 
-R, p = a_T_b.rotation_matrix, a_T_b.position
+R, p = a_T_b.rotation, a_T_b.position
 assert np.allclose(a_P_q, p + R @ Vector3Dimensional(0.6, 0.3, 0))
 assert np.allclose(a_T_b.pose.position, p)
 ```
@@ -737,7 +737,8 @@ def lock_traces(angles):
     matrix = oriented(angles)
     rotation = np.asarray(matrix)[:3, :3]
     pitch_axis = np.asarray(
-        oriented(dict(roll=0, pitch=0, yaw=angles["yaw"])) @ Vector3Dimensional(0, 1, 0)
+        oriented(dict(roll=0, pitch=0, yaw=angles["yaw"])).to_coordinate_change()
+        @ Vector3Dimensional(0, 1, 0)
     )[:3]
     x, y, z = columns([rotation @ point for point in box_corners])
     marked = columns([rotation @ corner])

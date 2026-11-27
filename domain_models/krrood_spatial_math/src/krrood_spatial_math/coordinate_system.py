@@ -404,7 +404,7 @@ class RigidCoordinateChange(
 
     @property
     @abstractmethod
-    def rotation_matrix(self) -> RigidCoordinateChange:
+    def rotation(self) -> RigidCoordinateChange:
         """
         This change without the shift between the origins: it turns the axes only.
         """

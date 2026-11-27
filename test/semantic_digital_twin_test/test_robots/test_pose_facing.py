@@ -206,7 +206,9 @@ def test_forward_axis_points_along_the_heading(
 
     base_pose = mobile_base.pose_facing(heading=heading)
 
-    world_V_forward = base_pose.rotation_matrix @ mobile_base.forward_axis
+    world_V_forward = (
+        base_pose.rotation_matrix.to_coordinate_change() @ mobile_base.forward_axis
+    )
     np.testing.assert_allclose(
         world_V_forward.to_np()[:3].flatten(),
         [np.cos(heading_yaw), np.sin(heading_yaw), 0.0],
@@ -279,7 +281,7 @@ def test_the_heading_of_a_base_pose_is_the_heading_it_was_placed_at(
 
     read_back = HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
         base_pose.position,
-        base_pose.rotation_matrix @ mobile_base.base_R_front,
+        base_pose.rotation_matrix.to_coordinate_change() @ mobile_base.base_R_front,
         reference_frame=base_pose.reference_frame,
     ).pose
 

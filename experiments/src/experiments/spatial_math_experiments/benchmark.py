@@ -192,7 +192,7 @@ class SpatialOperands:
             case SpatialOperation.INVERT_TRANSFORMATION:
                 return self.base_T_arm.inverse()
             case SpatialOperation.ROTATE_POINT:
-                return self.base_T_arm.rotation_matrix @ self.point
+                return self.base_T_arm.rotation @ self.point
             case SpatialOperation.SUBTRACT_POINTS:
                 return self.point - self.other_point
             case SpatialOperation.MOVE_POINT:

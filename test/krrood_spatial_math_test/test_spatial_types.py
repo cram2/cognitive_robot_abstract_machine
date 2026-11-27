@@ -206,8 +206,8 @@ class TestRotationMatrix:
             RotationMatrix.from_rpy(reference_frame=reference_frame).reference_frame
             == reference_frame
         )
-        assert (m1 @ m2).reference_frame == reference_frame
-        assert (m2 @ m1).reference_frame == reference_frame2
+        assert (m1.to_coordinate_change() @ m2).reference_frame == reference_frame
+        assert (m2.to_coordinate_change() @ m1).reference_frame == reference_frame2
         assert m1.x_vector().reference_frame == reference_frame
         assert m1.y_vector().reference_frame == reference_frame
         assert m1.z_vector().reference_frame == reference_frame
@@ -220,10 +220,11 @@ class TestRotationMatrix:
             ).reference_frame
             == reference_frame
         )
-        assert m1.inverse().child_frame == reference_frame
+        assert m1.inverse().reference_frame is None
 
     def test_matmul_type_preservation(self):
         rotation_matrix = RotationMatrix()
+        rotation = rotation_matrix.to_coordinate_change()
         works = [
             Vector3Dimensional(x=1, y=1, z=1),
             rotation_matrix,
@@ -240,11 +241,11 @@ class TestRotationMatrix:
         ]
 
         for other in works:
-            assert isinstance(rotation_matrix @ other, type(other))
+            assert isinstance(rotation @ other, type(other))
         for other in does_not_work:
             with pytest.raises(UnsupportedOperationError):
                 # noinspection PyTypeChecker
-                rotation_matrix @ other
+                rotation @ other
 
     def test_x_y_z_vector(self):
         v = np.array([1, 1, 1])
@@ -448,7 +449,7 @@ class TestRotationMatrix:
         r = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
 
         # Test orthogonality: R @ R.T = I
-        should_be_identity = r @ r.T
+        should_be_identity = r.to_np() @ r.T.to_np()
         assert np.allclose(should_be_identity, np.eye(4), atol=1e-10)
 
         # Test that determinant is 1 (proper rotation, not reflection)
@@ -465,7 +466,7 @@ class TestRotationMatrix:
         assert isinstance(r_t, RotationMatrix)
 
         # For rotation matrices: R.T = R^(-1)
-        product = r @ r_t
+        product = r.to_np() @ r_t.to_np()
         identity = RotationMatrix()
         assert np.allclose(product, identity, atol=1e-10)
 
@@ -486,7 +487,9 @@ class TestRotationMatrix:
         assert np.allclose(r_inv, r_t, atol=1e-10)
 
         # R @ R^(-1) = I
-        identity_check = r @ r_inv
+        identity_check = (
+            r.to_coordinate_change() @ r_inv.to_coordinate_change()
+        ).to_np()
         identity = RotationMatrix()
         assert np.allclose(identity_check, identity, atol=1e-10)
 
@@ -499,13 +502,17 @@ class TestRotationMatrix:
         r3 = RotationMatrix.from_rpy(0, 0, 0.3)  # Yaw
 
         # Test that composition works
-        combined = r3 @ r2 @ r1
+        combined = (
+            r3.to_coordinate_change()
+            @ r2.to_coordinate_change()
+            @ r1.to_coordinate_change()
+        ).rotation_matrix
         assert isinstance(combined, RotationMatrix)
 
         # Note: Order matters in rotation composition, so this might not be exactly equal
         # but both should be valid rotation matrices
         assert np.allclose(combined.generic_matrix.det(), 1.0)
-        assert np.allclose(combined @ combined.T, np.eye(4), atol=1e-10)
+        assert np.allclose(combined.to_np() @ combined.T.to_np(), np.eye(4), atol=1e-10)
 
     def test_vector_rotation(self):
         """
@@ -518,7 +525,7 @@ class TestRotationMatrix:
 
         # Rotate unit vector along X-axis
         x_axis = Vector3Dimensional.X()
-        rotated = r_z90 @ x_axis
+        rotated = r_z90.to_coordinate_change() @ x_axis
 
         assert isinstance(rotated, Vector3Dimensional)
         # Should become Y-axis
@@ -527,7 +534,7 @@ class TestRotationMatrix:
 
         # Test with regular Vector3Dimensional
         v = Vector3Dimensional(x=1, y=0, z=0)
-        rotated_v = r_z90 @ v
+        rotated_v = r_z90.to_coordinate_change() @ v
         assert isinstance(rotated_v, Vector3Dimensional)
         assert np.allclose(rotated_v[:3], np.array([0, 1, 0]), atol=1e-10)
 
@@ -544,7 +551,7 @@ class TestRotationMatrix:
         r1 = RotationMatrix.from_rpy(0.1, 0.2, 0.3)
         r2 = RotationMatrix.from_rpy(0.2, 0.3, 0.4)
 
-        result = r1 @ r2
+        result = r1.to_coordinate_change() @ r2
         # Frame handling depends on implementation, krrood_test basic structure
         assert hasattr(result, "reference_frame")
 
@@ -593,7 +600,7 @@ class TestRotationMatrix:
         r = RotationMatrix.from_axis_angle(AxisAngle(axis_unit, angle))
 
         # Test that axis is preserved (rotation around axis shouldn't change axis)
-        rotated_axis = r @ axis_unit
+        rotated_axis = r.to_coordinate_change() @ axis_unit
         # For rotation around axis, the axis should remain unchanged
         dot_product = axis_unit @ rotated_axis
         assert np.allclose(dot_product, 1.0, atol=1e-10)
@@ -629,7 +636,7 @@ class TestRotationMatrix:
 
         # Should be able to compose with other rotations
         r_numeric = RotationMatrix.from_rpy(0.1, 0, 0)
-        result = r_sym @ r_numeric
+        result = r_sym.to_coordinate_change() @ r_numeric
 
         assert isinstance(result, RotationMatrix)
 
@@ -651,7 +658,9 @@ class TestRotationMatrix:
         assert compiled_rotation.shape == (4, 4)
         assert np.allclose(compiled_rotation.generic_matrix.det(), 1.0)
         assert np.allclose(
-            compiled_rotation @ compiled_rotation.T, np.eye(4), atol=1e-10
+            compiled_rotation.to_np() @ compiled_rotation.T.to_np(),
+            np.eye(4),
+            atol=1e-10,
         )
 
     def test_edge_cases(self):
@@ -699,8 +708,8 @@ class TestRotationMatrix:
             r1,
             r1.T,
             r1.inverse(),
-            r1 @ r2,
-            r2 @ r1,
+            r1.to_coordinate_change() @ r2,
+            r2.to_coordinate_change() @ r1,
         ]
 
         for r in operations_to_test:
@@ -1621,7 +1630,7 @@ class TestTransformationMatrix:
 
         for other in works:
             assert isinstance(transform @ other, type(other))
-        assert type(transform @ RotationMatrix()) is type(transform)
+        assert type(transform @ RotationMatrix()) is RotationMatrix
         for other in does_not_work:
             with pytest.raises(UnsupportedOperationError):
                 # noinspection PyTypeChecker

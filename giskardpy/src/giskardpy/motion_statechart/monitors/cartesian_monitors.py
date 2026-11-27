@@ -136,9 +136,7 @@ class OrientationReached(
         :return: Artifacts observing whether the tip is turned less than
             :attr:`threshold` away from :attr:`goal_orientation`.
         """
-        root_R_goal = (
-            self.root_T_goal_reference_frame.rotation_matrix @ self.goal_orientation
-        )
+        root_R_goal = self.root_T_goal_reference_frame.rotation @ self.goal_orientation
         root_R_current = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         ).rotation_matrix
@@ -219,7 +217,7 @@ class VectorsAligned(
 
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
-        ).rotation_matrix
+        ).rotation
         root_V_tip_normal = root_R_tip.dot(other=tip_V_tip_normal)
         error = root_V_tip_normal.angle_between(root_V_root_normal)
         return NodeArtifacts(observation=error < self.threshold)

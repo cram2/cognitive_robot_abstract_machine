@@ -207,7 +207,7 @@ class MoveToReach(
         world_z = Vector3Dimensional.Z()
         target_R_robot_pointing_to_target = RotationMatrix.from_vectors(
             x=target_V_robot, z=world_z
-        ) @ RotationMatrix.from_rpy(yaw=self.hip_rotation)
+        ).to_coordinate_change() @ RotationMatrix.from_rpy(yaw=self.hip_rotation)
 
         target_T_robot = (
             HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(

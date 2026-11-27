@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 
 from krrood.symbolic_math.exceptions import UnsupportedOperationError
-from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 
 from krrood_spatial_math.coordinate_system import (
     CoordinateRepresentation,
@@ -109,6 +108,7 @@ def test_an_affine_change_never_shifts_a_vector_of_a_new_space(sheet_to_poster):
         (Pose2Dimensional, Pose),
         (Quaternion, Orientation),
         (AxisAngle, Orientation),
+        (RotationMatrix, Orientation),
         (Twist, VectorPair),
         (ScrewAxis, VectorPair),
         (Displacement, VectorPair),
@@ -190,17 +190,18 @@ def test_a_transformation_turns_an_orientation_by_its_rotation_only():
     orientation = Quaternion.from_rpy(roll=0.3, pitch=0.0, yaw=0.0)
 
     np.testing.assert_array_almost_equal(
-        (shifted_rotation @ orientation).to_np(), (rotation @ orientation).to_np()
+        (shifted_rotation @ orientation).to_np(),
+        (rotation.to_coordinate_change() @ orientation).to_np(),
     )
 
 
-# %% rotations as the transformations without translation, SO(3) within SE(3)
+# %% rotation matrices as orientations, and the rotation of a transformation
 
 
 @pytest.fixture
 def quarter_turn() -> RotationMatrix:
     """
-    A quarter turn about the z-axis.
+    The orientation a quarter turn about the z-axis gives a frame.
     """
     return RotationMatrix.from_rpy(roll=0.0, pitch=0.0, yaw=np.pi / 2)
 
@@ -215,83 +216,90 @@ def shifted_quarter_turn() -> HomogeneousTransformationMatrix3Dimensional:
     )
 
 
-def test_a_rotation_is_a_transformation():
+def test_a_rotation_matrix_is_an_orientation_and_never_a_change():
     """
-    SO(3) is the subgroup of SE(3) without translation, so a rotation is a
-    transformation.
+    A rotation matrix gives which way a frame faces, as a quaternion does.
     """
-    assert issubclass(RotationMatrix, HomogeneousTransformationMatrix3Dimensional)
+    assert issubclass(RotationMatrix, Orientation)
+    assert not issubclass(RotationMatrix, SymbolicSpatialChange)
 
 
-def test_a_rotation_has_no_translation_and_is_its_own_rotation_part(quarter_turn):
-    """
-    A rotation shifts nothing, and its rotation part is itself.
-    """
-    np.testing.assert_array_equal(quarter_turn.position.to_np()[:3], np.zeros(3))
-    assert quarter_turn.rotation_matrix is quarter_turn
-
-
-def test_a_rotation_composed_with_a_rotation_is_a_rotation(quarter_turn):
-    """
-    Rotations are closed under composition.
-    """
-    assert type(quarter_turn @ quarter_turn) is RotationMatrix
-
-
-def test_the_inverse_of_a_rotation_is_a_rotation_between_swapped_frames(
-    table_frame, camera_frame
+def test_the_rotation_of_a_transformation_is_the_change_without_its_translation(
+    table_frame, shifted_quarter_turn
 ):
     """
-    Rotations are closed under inversion, which swaps the frames they turn between.
+    The rotation turns what it is applied to as the transformation does, and shifts
+    nothing.
     """
-    table_R_camera = RotationMatrix.from_rpy(yaw=0.5, reference_frame=table_frame)
-    table_R_camera.child_frame = camera_frame
+    shifted_quarter_turn.reference_frame = table_frame
 
-    camera_R_table = table_R_camera.inverse()
+    rotation = shifted_quarter_turn.rotation
 
-    assert type(camera_R_table) is RotationMatrix
-    assert (camera_R_table.reference_frame, camera_R_table.child_frame) == (
-        camera_frame,
-        table_frame,
+    assert type(rotation) is HomogeneousTransformationMatrix3Dimensional
+    assert rotation.reference_frame is table_frame
+    np.testing.assert_array_equal(rotation.position.to_np()[:3], np.zeros(3))
+    np.testing.assert_array_almost_equal(
+        rotation.to_np()[:3, :3], shifted_quarter_turn.to_np()[:3, :3]
     )
 
 
-def test_a_transformation_composed_with_a_rotation_keeps_its_translation(
+def test_the_rotation_matrix_of_a_transformation_is_its_orientation(
+    table_frame, shifted_quarter_turn
+):
+    shifted_quarter_turn.reference_frame = table_frame
+
+    orientation = shifted_quarter_turn.rotation_matrix
+
+    assert type(orientation) is RotationMatrix
+    assert orientation.reference_frame is table_frame
+    np.testing.assert_array_almost_equal(
+        orientation.to_np()[:3, :3], shifted_quarter_turn.to_np()[:3, :3]
+    )
+
+
+def test_a_rotation_matrix_is_the_value_of_its_change(quarter_turn):
+    """
+    A rotation matrix and the rotation it is the value of convert into each other.
+    """
+    change = quarter_turn.to_coordinate_change()
+
+    assert type(change) is HomogeneousTransformationMatrix3Dimensional
+    np.testing.assert_array_almost_equal(
+        RotationMatrix.from_coordinate_change(change=change).to_np(),
+        quarter_turn.to_np(),
+    )
+
+
+def test_a_transformation_turns_a_rotation_matrix_by_its_rotation_only(
     quarter_turn, shifted_quarter_turn
 ):
     """
-    Composing with a rotation leaves SO(3), so the translation is kept, never dropped.
+    A change of frame re-expresses an orientation, so the translation is dropped.
     """
-    composed = shifted_quarter_turn @ quarter_turn
+    turned = shifted_quarter_turn @ quarter_turn
 
-    assert type(composed) is HomogeneousTransformationMatrix3Dimensional
+    assert type(turned) is RotationMatrix
     np.testing.assert_array_almost_equal(
-        composed.position.to_np(), shifted_quarter_turn.position.to_np()
+        turned.to_np(),
+        (shifted_quarter_turn.rotation @ quarter_turn.to_coordinate_change()).to_np(),
     )
 
 
-def test_a_rotation_hashes_like_the_transformation_without_translation(quarter_turn):
-    """
-    A rotation and the transformation without translation are one group element.
-    """
-    without_translation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
-        yaw=np.pi / 2
-    )
-
-    assert hash(quarter_turn) == hash(without_translation)
-
-
-def test_a_rotation_refuses_a_value_given_in_another_frame_than_its_child_frame(
-    table_frame, camera_frame, gripper_frame
+def test_the_inverse_of_a_rotation_matrix_turns_back_and_has_no_reference_frame(
+    table_frame,
 ):
     """
-    A rotation checks the frame of what it turns, as every transformation does.
+    The inverse is the orientation of the reference frame in the oriented frame, which a
+    rotation matrix does not name.
     """
     table_R_camera = RotationMatrix.from_rpy(yaw=0.5, reference_frame=table_frame)
-    table_R_camera.child_frame = camera_frame
 
-    with pytest.raises(ReferenceFrameMismatchError):
-        table_R_camera @ Point3Dimensional(1, 0, 0, reference_frame=gripper_frame)
+    camera_R_table = table_R_camera.inverse()
+
+    assert camera_R_table.reference_frame is None
+    np.testing.assert_array_almost_equal(
+        camera_R_table.to_np()[:3, :3], table_R_camera.to_np()[:3, :3].T
+    )
 
 
 def test_a_transformation_has_no_settable_translation(shifted_quarter_turn):
@@ -324,6 +332,7 @@ def test_normalizing_a_rotation_leaves_it_unchanged():
         Vector3Dimensional,
         Quaternion,
         AxisAngle,
+        RotationMatrix,
         Pose3Dimensional,
     ],
 )
@@ -339,7 +348,6 @@ def test_a_symbolic_value_is_a_coordinate_representation(value_type):
     "change_type",
     [
         HomogeneousTransformationMatrix3Dimensional,
-        RotationMatrix,
         HomogeneousTransformationMatrix2Dimensional,
     ],
 )
