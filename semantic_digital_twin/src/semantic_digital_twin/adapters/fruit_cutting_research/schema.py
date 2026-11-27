@@ -18,8 +18,8 @@ from semantic_digital_twin.adapters.fruit_cutting_research.exceptions import (
     UnknownTissueId,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
-    Density,
-    Elasticity,
+    MassDensity,
+    MaterialElasticity,
     Ripeness,
     RipenessStage,
 )
@@ -108,7 +108,7 @@ class FruitCuttingRecordKey(StrEnum):
 
     DENSITY = "density_kg_m3"
     """
-    In a tissue's material values: its density in kilograms per cubic metre.
+    In a tissue's material values: its mass density in kilograms per cubic metre.
     """
 
     YOUNGS_MODULUS = "E_MPa"
@@ -353,9 +353,9 @@ class FruitCuttingMaterial:
     The tissue the values belong to.
     """
 
-    density: float | None = None
+    mass_density: float | None = None
     """
-    The density in kilograms per cubic metre, ``None`` for a tissue simulated as a fixed
+    The mass density in kilograms per cubic metre, ``None`` for a tissue simulated as a fixed
     rigid body.
     """
 
@@ -378,7 +378,7 @@ class FruitCuttingMaterial:
         """
         return cls(
             tissue=tissue,
-            density=data.get(FruitCuttingRecordKey.DENSITY),
+            mass_density=data.get(FruitCuttingRecordKey.DENSITY),
             youngs_modulus=data.get(FruitCuttingRecordKey.YOUNGS_MODULUS),
             poissons_ratio=data.get(FruitCuttingRecordKey.POISSONS_RATIO),
         )
@@ -390,22 +390,22 @@ class FruitCuttingMaterial:
         """
         return 1.0e6
 
-    def to_density(self) -> Density | None:
+    def to_mass_density(self) -> MassDensity | None:
         """
-        :return: The density of the tissue, ``None`` if the record gives none.
+        :return: The mass density of the tissue, ``None`` if the record gives none.
         """
-        if self.density is None:
+        if self.mass_density is None:
             return None
-        return Density(value=self._point(value=self.density))
+        return MassDensity(value=self._point(value=self.mass_density))
 
-    def to_elasticity(self) -> Elasticity | None:
+    def to_material_elasticity(self) -> MaterialElasticity | None:
         """
         :return: The elasticity of the tissue, ``None`` if the record gives no elastic
             constants.
         """
         if self.youngs_modulus is None or self.poissons_ratio is None:
             return None
-        return Elasticity(
+        return MaterialElasticity(
             youngs_modulus=self._point(
                 value=self.youngs_modulus * self.pascals_per_megapascal
             ),
@@ -418,7 +418,9 @@ class FruitCuttingMaterial:
         :param value: A value the sample was simulated with.
         :return: The interval holding only ``value``: a sample is one draw, not a range.
         """
-        return SimpleInterval.from_data(value, value, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            lower=value, upper=value, left=Bound.CLOSED, right=Bound.CLOSED
+        )
 
 
 @dataclass(kw_only=True)

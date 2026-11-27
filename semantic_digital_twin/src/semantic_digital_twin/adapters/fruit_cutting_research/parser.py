@@ -279,8 +279,8 @@ class FruitCuttingSampleParser(USDStageParser):
         world.add_semantic_annotation(part)
         fruit.add(part=part)
         for quality in (
-            part_prim.material.to_density(),
-            part_prim.material.to_elasticity(),
+            part_prim.material.to_mass_density(),
+            part_prim.material.to_material_elasticity(),
         ):
             if quality is not None:
                 part.set_quality(quality=quality)

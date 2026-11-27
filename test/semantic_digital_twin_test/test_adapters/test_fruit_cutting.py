@@ -28,8 +28,8 @@ from semantic_digital_twin.adapters.fruit_cutting_research.schema import (
     FruitCuttingTissue,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
-    Density,
-    Elasticity,
+    MassDensity,
+    MaterialElasticity,
     RipenessStage,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -143,17 +143,21 @@ def point(value: float) -> SimpleInterval:
     :param value: A value a sample records.
     :return: The interval holding only ``value``.
     """
-    return SimpleInterval.from_data(value, value, Bound.CLOSED, Bound.CLOSED)
+    return SimpleInterval.from_data(
+        lower=value, upper=value, left=Bound.CLOSED, right=Bound.CLOSED
+    )
 
 
-def expected_qualities(*, record: dict, tissue: str) -> tuple[Density, Elasticity]:
+def expected_qualities(
+    *, record: dict, tissue: str
+) -> tuple[MassDensity, MaterialElasticity]:
     """
     :param record: A sample's record as JSON data.
     :param tissue: The name of one of its soft tissues.
-    :return: The density and elasticity the record gives that tissue.
+    :return: The mass density and elasticity the record gives that tissue.
     """
     material = record["materials"][tissue]
-    return Density(value=point(material["density_kg_m3"])), Elasticity(
+    return MassDensity(value=point(material["density_kg_m3"])), MaterialElasticity(
         youngs_modulus=point(
             material["E_MPa"] * FruitCuttingMaterial.pascals_per_megapascal
         ),
@@ -299,33 +303,35 @@ def test_orange_pulp_comes_in_citrus_segments(orange: Orange) -> None:
 
 def test_tissue_values_become_the_qualities_of_their_part(apple: Apple) -> None:
     """
-    The peel's density and elasticity are the values the record gives its tissue.
+    The peel's mass density and elasticity are the values the record gives its tissue.
     """
-    density, elasticity = expected_qualities(
+    mass_density, material_elasticity = expected_qualities(
         record=FixtureSample.APPLE.record, tissue=FruitCuttingTissue.PEEL
     )
 
-    assert apple.peel.density == density
-    assert apple.peel.elasticity == elasticity
+    assert apple.peel.mass_density == mass_density
+    assert apple.peel.material_elasticity == material_elasticity
 
 
 def test_rigid_seed_has_a_density_and_no_elasticity(apple: Apple) -> None:
     """
-    A rigid seed's record gives it a density but no elastic constants.
+    A rigid seed's record gives it a mass density but no elastic constants.
     """
     seed_material = FixtureSample.APPLE.record["materials"][FruitCuttingTissue.SEEDS]
 
     for seed in apple.seeds:
-        assert seed.density == Density(value=point(seed_material["density_kg_m3"]))
-        assert seed.elasticity is None
+        assert seed.mass_density == MassDensity(
+            value=point(seed_material["density_kg_m3"])
+        )
+        assert seed.material_elasticity is None
 
 
 def test_fixed_pit_has_no_material_values(avocado: Avocado) -> None:
     """
     The record gives the fixed rigid pit no material values, so they stay unknown.
     """
-    assert avocado.pit.density is None
-    assert avocado.pit.elasticity is None
+    assert avocado.pit.mass_density is None
+    assert avocado.pit.material_elasticity is None
 
 
 def test_peel_takes_the_values_of_the_tissue_its_mesh_is_made_of(
@@ -334,12 +340,12 @@ def test_peel_takes_the_values_of_the_tissue_its_mesh_is_made_of(
     """
     The orange's peel mesh is made of ``Rind``, so the peel has the rind's values.
     """
-    density, elasticity = expected_qualities(
+    mass_density, material_elasticity = expected_qualities(
         record=FixtureSample.ORANGE.record, tissue=FruitCuttingTissue.RIND
     )
 
-    assert orange.peel.density == density
-    assert orange.peel.elasticity == elasticity
+    assert orange.peel.mass_density == mass_density
+    assert orange.peel.material_elasticity == material_elasticity
 
 
 def test_segments_take_the_values_of_their_pulp_not_their_membrane(
@@ -349,13 +355,13 @@ def test_segments_take_the_values_of_their_pulp_not_their_membrane(
     Segment meshes hold pulp and membrane faces; the membrane has no part, so each
     segment has the pulp's values.
     """
-    density, elasticity = expected_qualities(
+    mass_density, material_elasticity = expected_qualities(
         record=FixtureSample.ORANGE.record, tissue=FruitCuttingTissue.PULP
     )
 
     for segment in orange.citrus_segments:
-        assert segment.density == density
-        assert segment.elasticity == elasticity
+        assert segment.mass_density == mass_density
+        assert segment.material_elasticity == material_elasticity
 
 
 def test_reference_apple_has_no_ripeness(apple: Apple) -> None:
@@ -401,8 +407,8 @@ def release_sample_folders() -> list[Path]:
 def test_released_model_becomes_its_fruit_with_qualities(folder: Path) -> None:
     """
     Each released model becomes one fruit of its type with the ripeness of its stage,
-    every fruit part of the world is one of its parts, and each part's density is one
-    its record gives.
+    every fruit part of the world is one of its parts, and each part's mass density is
+    one its record gives.
     """
     sample = FruitCuttingSample.from_json(
         data=json.loads((folder / FruitCuttingSampleFile.RECORD).read_text())
@@ -415,6 +421,6 @@ def test_released_model_becomes_its_fruit_with_qualities(folder: Path) -> None:
     assert {id(part) for part in world.get_semantic_annotations_by_type(FruitPart)} == {
         id(part) for part in fruit.parts
     }
-    recorded_densities = [material.to_density() for material in sample.materials]
+    recorded_densities = [material.to_mass_density() for material in sample.materials]
     for part in fruit.parts:
-        assert part.density in recorded_densities
+        assert part.mass_density in recorded_densities
