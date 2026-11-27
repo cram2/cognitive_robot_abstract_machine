@@ -1047,13 +1047,10 @@ class WrappedTable(TableLike):
         :return: The table, generated here or by a dependency, mapping the class.
         :raises WrappedTableNotFound: If no table maps the class.
         """
-        for wrapped_class, table in [
-            *self.ormatic.wrapped_tables.items(),
-            *self.ormatic.external_tables.items(),
-        ]:
-            if wrapped_class.clazz == clazz:
-                return table
-        raise WrappedTableNotFound(type_=clazz, wrapped_field=wrapped_field)
+        table = self.ormatic.tables_by_class.get(clazz)
+        if table is None:
+            raise WrappedTableNotFound(type_=clazz, wrapped_field=wrapped_field)
+        return table
 
     def create_one_to_one_relationship(self, *, wrapped_field: WrappedField):
         """

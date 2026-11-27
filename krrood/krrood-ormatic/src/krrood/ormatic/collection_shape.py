@@ -24,6 +24,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.collection_kind import AnyCollection, CollectionKind
 from krrood.class_diagrams.utils import common_base_class
+from krrood.patterns.classproperty import classproperty
 
 
 # %% column names
@@ -282,9 +283,29 @@ class CollectionShape:
             )
         return cls(levels=(level, *inner.levels), leaf_type=inner.leaf_type)
 
-    @staticmethod
+    @classproperty
+    def restored_container_types(cls) -> dict[type, type[AnyCollection]]:
+        """
+        :return: The class a container is restored as, by the origin of the annotation
+            declaring it.
+        """
+        return {
+            **{
+                sequence_class: sequence_class
+                for sequence_class in CollectionKind.ELEMENT_SEQUENCE.value
+            },
+            collections.abc.Sequence: list,
+            collections.abc.MutableSequence: list,
+            collections.abc.Set: set,
+            collections.abc.MutableSet: set,
+            dict: dict,
+            collections.abc.Mapping: dict,
+            collections.abc.MutableMapping: dict,
+        }
+
+    @classmethod
     def _level_and_element_type(
-        *, annotation: Any, depth: int
+        cls, *, annotation: Any, depth: int
     ) -> tuple[CollectionLevel, Any] | None:
         """
         :param annotation: An annotation.
@@ -296,57 +317,52 @@ class CollectionShape:
         arguments = get_args(annotation)
         if origin is None and annotation in CollectionKind.ELEMENT_SEQUENCE.value:
             return SequenceLevel(container_type=annotation, depth=depth), Any
-        if origin is None or not arguments:
+        container_type = cls.restored_container_types.get(origin)
+        if container_type is None or not arguments:
             return None
-        if origin in CollectionKind.MAPPING.value or origin in (
-            collections.abc.Mapping,
-            collections.abc.MutableMapping,
-        ):
+        if container_type in CollectionKind.MAPPING.value:
             if len(arguments) != 2:
                 return None
             key_type, value_type = arguments
             return MappingLevel(
-                container_type=dict, depth=depth, key_type=key_type
+                container_type=container_type, depth=depth, key_type=key_type
             ), value_type
-        if origin in CollectionKind.ELEMENT_SEQUENCE.value:
-            container_type = origin
-        elif origin in (collections.abc.Sequence, collections.abc.MutableSequence):
-            container_type = list
-        elif origin in (collections.abc.Set, collections.abc.MutableSet):
-            container_type = set
-        else:
-            return None
-        element_types = [
-            element_type
-            for element_type in dict.fromkeys(arguments)
-            if element_type is not Ellipsis
-        ]
-        if len(element_types) == 1:
-            element_type = element_types[0]
-        else:
-            element_type = common_base_class(element_types) or reduce(
-                operator.or_, element_types
-            )
+        element_type = cls._common_type(
+            types=[
+                element_type
+                for element_type in dict.fromkeys(arguments)
+                if element_type is not Ellipsis
+            ]
+        )
         return SequenceLevel(container_type=container_type, depth=depth), element_type
 
-    @staticmethod
-    def _leaf_type(*, annotation: Any) -> Any:
+    @classmethod
+    def _leaf_type(cls, *, annotation: Any) -> Any:
         """
         :param annotation: The annotation of the values the innermost containers hold.
-        :return: The type of the values: a bounded type variable's bound, and a union's
-            lowest common base class of its members other than None, or the union of
-            those members if they have none.
+        :return: The type of the values: a bounded type variable's bound, and the
+            :meth:`_common_type` of a union's members other than None.
         """
         if isinstance(annotation, TypeVar) and annotation.__bound__ is not None:
             return annotation.__bound__
         if get_origin(annotation) in (Union, UnionType):
-            members = [
-                member for member in get_args(annotation) if member is not NoneType
-            ]
-            if len(members) == 1:
-                return members[0]
-            return common_base_class(members) or reduce(operator.or_, members)
+            return cls._common_type(
+                types=[
+                    member for member in get_args(annotation) if member is not NoneType
+                ]
+            )
         return annotation
+
+    @staticmethod
+    def _common_type(*, types: list[Any]) -> Any:
+        """
+        :param types: Distinct types.
+        :return: The only type, else the lowest common base class of the types, or
+            their union if they have none.
+        """
+        if len(types) == 1:
+            return types[0]
+        return common_base_class(types) or reduce(operator.or_, types)
 
     @property
     def leaf_types(self) -> tuple[Any, ...]:

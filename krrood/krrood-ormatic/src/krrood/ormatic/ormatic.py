@@ -434,16 +434,16 @@ class ORMatic:
     @cached_property
     def tables_by_class(self) -> dict[type, TableLike]:
         """
-        :return: The table of every mapped class, generated here or by a dependency.
+        :return: The table of every mapped class, specialized generics included,
+            generated here or by a dependency.
         """
-        result = {}
-        for wrapped_class, table in [
-            *self.external_tables.items(),
-            *self.wrapped_tables.items(),
-        ]:
-            if isclass(wrapped_class.clazz):
-                result[wrapped_class.clazz] = table
-        return result
+        return {
+            wrapped_class.clazz: table
+            for wrapped_class, table in [
+                *self.external_tables.items(),
+                *self.wrapped_tables.items(),
+            ]
+        }
 
     @staticmethod
     def part_class_of_external_table(
