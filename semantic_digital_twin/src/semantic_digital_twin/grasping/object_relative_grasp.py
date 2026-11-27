@@ -17,7 +17,7 @@ from krrood.parametrization.model_registries import (
     ModelRegistry,
     UniformPriorRegistry,
 )
-from krrood_spatial_math.spatial_types import Displacement, Vector3
+from krrood_spatial_math.spatial_types import Displacement, Vector3Dimensional
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 
 if TYPE_CHECKING:
@@ -82,8 +82,8 @@ def _any_displacement() -> Match[Displacement]:
     :return: A pattern of a displacement with every component left free.
     """
     return a(Displacement)(
-        translation=a(Vector3)(x=..., y=..., z=...),
-        rotation_vector=a(Vector3)(x=..., y=..., z=...),
+        translation=a(Vector3Dimensional)(x=..., y=..., z=...),
+        rotation_vector=a(Vector3Dimensional)(x=..., y=..., z=...),
     )
 
 

@@ -10,7 +10,7 @@ import pytest
 
 from semantic_digital_twin.robots.robot_parts import RobotCamera
 from semantic_digital_twin.robots.tiago import TiagoMujocoBody, TiagoMujocoCamera
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -44,5 +44,5 @@ def test_camera_optical_forward_follows_head_forward(
     assert camera.root.parent_connection.parent is table_world.root
     np.testing.assert_allclose(
         camera.root.parent_connection.origin.to_np() @ camera.viewing_direction.to_np(),
-        Vector3.X().to_np(),
+        Vector3Dimensional.X().to_np(),
     )

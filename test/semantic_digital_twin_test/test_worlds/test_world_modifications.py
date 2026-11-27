@@ -32,8 +32,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Oven,
 )
 from krrood_spatial_math.spatial_types import (
-    Vector3,
-    HomogeneousTransformationMatrix,
+    Vector3Dimensional,
+    HomogeneousTransformationMatrix3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -102,7 +102,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
                 parent=b1,
                 child=b2,
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.from_iterable([0, 0, 1])
+                    axis=Vector3Dimensional.from_iterable([0, 0, 1])
                 ),
                 raw_dof=dof,
             )
@@ -131,7 +131,7 @@ class ConnectionModificationTestCase(unittest.TestCase):
             world.add_connection(
                 ScrewAxisConnection(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                        axis=Vector3.from_iterable([0, 0, 1])
+                        axis=Vector3Dimensional.from_iterable([0, 0, 1])
                     ),
                     parent=b2,
                     child=b3,
@@ -285,7 +285,7 @@ def test_connection_t_child_expression_survives_json_roundtrip():
     world = World()
     root = Body(name=PrefixedName("root", prefix="review"))
     child = Body(name=PrefixedName("child", prefix="review"))
-    connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(
+    connection_T_child = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.0, y=2.0, z=3.0, child_frame=child
     )
     with world.modify_world():
@@ -312,7 +312,9 @@ def test_body_inertial_survives_world_deepcopy():
     body = Body(name=PrefixedName("heavy_body", prefix="review"))
     collision = Box(
         scale=Scale(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=body
+        ),
     )
     body.collision = ShapeCollection([collision], reference_frame=body)
     body.inertial = Inertial(mass=5.0)
@@ -339,7 +341,9 @@ def test_design_09_failed_atomic_modification_is_not_recorded():
     child = Body(name=PrefixedName("child", prefix="review"))
     collision = Box(
         scale=Scale(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=child),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=child
+        ),
     )
     child.collision = ShapeCollection([collision], reference_frame=child)
     with world.modify_world():
@@ -490,7 +494,7 @@ def test_revert_add_degree_of_freedom():
             parent=b1,
             child=b2,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                axis=Vector3.from_iterable([0, 0, 1])
+                axis=Vector3Dimensional.from_iterable([0, 0, 1])
             ),
             raw_dof=dof,
         )
@@ -528,7 +532,7 @@ def test_revert_remove_degree_of_freedom():
             parent=b1,
             child=b2,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                axis=Vector3.from_iterable([0, 0, 1])
+                axis=Vector3Dimensional.from_iterable([0, 0, 1])
             ),
             raw_dof=dof,
         )
@@ -661,7 +665,7 @@ def test_revert_set_dofs_has_hardware_interface_restores_per_dof_previous_value(
                 parent=b1,
                 child=b2,
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.from_iterable([0, 0, 1])
+                    axis=Vector3Dimensional.from_iterable([0, 0, 1])
                 ),
                 raw_dof=dof1,
             )
@@ -671,7 +675,7 @@ def test_revert_set_dofs_has_hardware_interface_restores_per_dof_previous_value(
                 parent=b2,
                 child=b3,
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.from_iterable([0, 0, 1])
+                    axis=Vector3Dimensional.from_iterable([0, 0, 1])
                 ),
                 raw_dof=dof2,
             )

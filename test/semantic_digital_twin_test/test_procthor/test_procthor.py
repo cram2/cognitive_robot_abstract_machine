@@ -31,7 +31,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
     Door,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Region, Body
@@ -58,7 +60,7 @@ class ProcTHORTestCase(unittest.TestCase):
     def test_unity_to_semantic_digital_twin_transform_identity_matrix(self):
         m = np.eye(4)
         result = unity_to_semantic_digital_twin_transform(
-            HomogeneousTransformationMatrix(data=m)
+            HomogeneousTransformationMatrix3Dimensional(data=m)
         )
         np.testing.assert_allclose(result.to_np(), np.eye(4), rtol=1e-6, atol=1e-6)
 
@@ -69,7 +71,7 @@ class ProcTHORTestCase(unittest.TestCase):
         m = np.eye(4)
         m[0, 3] = 1.0
         result = unity_to_semantic_digital_twin_transform(
-            HomogeneousTransformationMatrix(data=m)
+            HomogeneousTransformationMatrix3Dimensional(data=m)
         )
         self.assertAlmostEqual(result.position.to_np()[1], -1.0)
         np.testing.assert_allclose(result.rotation_matrix.to_np()[:3, :3], np.eye(3))
@@ -81,7 +83,7 @@ class ProcTHORTestCase(unittest.TestCase):
         m = np.eye(4)
         m[2, 3] = 2.0
         result = unity_to_semantic_digital_twin_transform(
-            HomogeneousTransformationMatrix(data=m)
+            HomogeneousTransformationMatrix3Dimensional(data=m)
         )
         self.assertAlmostEqual(float(result.position.x), 2.0, places=6)
         np.testing.assert_allclose(result.rotation_matrix.to_np()[:3, :3], np.eye(3))
@@ -100,7 +102,7 @@ class ProcTHORTestCase(unittest.TestCase):
             ]
         )
         result = unity_to_semantic_digital_twin_transform(
-            HomogeneousTransformationMatrix(data=m)
+            HomogeneousTransformationMatrix3Dimensional(data=m)
         )
 
         expected = np.eye(4)
@@ -122,7 +124,7 @@ class ProcTHORTestCase(unittest.TestCase):
             procthor_room.world_T_room.rotation_matrix.to_np(), np.eye(4)
         )
         np.testing.assert_array_equal(
-            procthor_room.world_T_room.translation_matrix.to_np()[:3, 3],
+            procthor_room.world_T_room.position.to_np()[:3],
             np.array([1.5, -1.5, 0]),
         )
 
@@ -154,7 +156,7 @@ class ProcTHORTestCase(unittest.TestCase):
             door_dict=door,
             parent_wall_width=0.05,
             thickness=0.03,
-            world_T_parent_wall=HomogeneousTransformationMatrix(),
+            world_T_parent_wall=HomogeneousTransformationMatrix3Dimensional(),
         )
 
         bounds = (
@@ -172,7 +174,7 @@ class ProcTHORTestCase(unittest.TestCase):
             door_dict=door,
             parent_wall_width=0.05,
             thickness=0.03,
-            world_T_parent_wall=HomogeneousTransformationMatrix(),
+            world_T_parent_wall=HomogeneousTransformationMatrix3Dimensional(),
         )
 
         scale = procthor_door.scale
@@ -185,7 +187,7 @@ class ProcTHORTestCase(unittest.TestCase):
             door_dict=door,
             parent_wall_width=0.05,
             thickness=0.03,
-            world_T_parent_wall=HomogeneousTransformationMatrix(),
+            world_T_parent_wall=HomogeneousTransformationMatrix3Dimensional(),
         )
 
         expected_rotation = np.array(
@@ -209,7 +211,7 @@ class ProcTHORTestCase(unittest.TestCase):
             door_dict=door,
             parent_wall_width=0.05,
             thickness=0.03,
-            world_T_parent_wall=HomogeneousTransformationMatrix(),
+            world_T_parent_wall=HomogeneousTransformationMatrix3Dimensional(),
         )
 
         double_door = procthor_door.add_to_world(world=self.world)

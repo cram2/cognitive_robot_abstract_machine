@@ -3,7 +3,9 @@ from dataclasses import dataclass
 
 from semantic_digital_twin.world_description.geometry import Mesh
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -28,7 +30,8 @@ class MeshParser(WorldSource):
         file_name = os.path.basename(self.file_path)
 
         mesh_shape = Mesh(
-            origin=HomogeneousTransformationMatrix(), filename=self.file_path
+            origin=HomogeneousTransformationMatrix3Dimensional(),
+            filename=self.file_path,
         )
         body = Body(
             name=PrefixedName(file_name),

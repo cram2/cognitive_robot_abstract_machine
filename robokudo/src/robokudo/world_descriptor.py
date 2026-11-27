@@ -15,7 +15,9 @@ from pathlib import Path
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import (
@@ -46,7 +48,7 @@ class ObjectSpec:
     """
 
     name: str
-    pose: HomogeneousTransformationMatrix
+    pose: HomogeneousTransformationMatrix3Dimensional
     mesh_path: Path | None = None
     box_scale: Scale | None = None
     cylinder_width: float | None = None
@@ -69,7 +71,7 @@ class RegionSpec:
     """
 
     name: str
-    pose: HomogeneousTransformationMatrix
+    pose: HomogeneousTransformationMatrix3Dimensional
     box_scale: Scale
     parent_name: str | None = None
     color: Color = field(default_factory=Color)
@@ -86,7 +88,7 @@ class CameraPlacement:
     Camera annotation whose optical root will be attached to the parent.
     """
 
-    parent_T_camera: HomogeneousTransformationMatrix
+    parent_T_camera: HomogeneousTransformationMatrix3Dimensional
     """
     Optical-frame pose relative to the selected parent body.
     """
@@ -136,7 +138,7 @@ class BaseWorldDescriptor:
         center_x = (bb.min_x + bb.max_x) / 2
         center_y = (bb.min_y + bb.max_y) / 2
         center_z = (bb.min_z + bb.max_z) / 2
-        mesh.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        mesh.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             -center_x, -center_y, -center_z, 0, 0, 0
         )
 
@@ -155,7 +157,7 @@ class BaseWorldDescriptor:
 
                 if spec.mesh_path is not None:
                     mesh = Mesh(
-                        origin=HomogeneousTransformationMatrix(),
+                        origin=HomogeneousTransformationMatrix3Dimensional(),
                         filename=str(spec.mesh_path),
                     )
                     if spec.center_mesh:
@@ -259,7 +261,7 @@ class BaseWorldDescriptor:
             self.world.add_semantic_annotation(camera)
 
         with self.world.modify_world():
-            connection.origin = HomogeneousTransformationMatrix(
+            connection.origin = HomogeneousTransformationMatrix3Dimensional(
                 data=placement.parent_T_camera,
                 reference_frame=parent,
                 child_frame=camera.root,

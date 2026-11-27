@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from krrood.symbolic_math.symbolic_math import trinary_logic_and
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 from semantic_digital_twin.world_description.world_entity import (
@@ -119,7 +119,7 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode, HasTipLinkParamete
                     kinematic_chain=KinematicChain(
                         root=self.environment_link, tip=self.tip_link
                     ),
-                    goal_pose=Pose(reference_frame=self.tip_link),
+                    goal_pose=Pose3Dimensional(reference_frame=self.tip_link),
                     weight=self.grasp_weight,
                 ),
                 RigidCoupling(

@@ -44,10 +44,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Whisk,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-    Pose2D,
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -81,7 +81,7 @@ def _add_box_body(world, name, size, position):
             FixedConnection(
                 parent=world.root,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     *position, reference_frame=world.root
                 ),
             )
@@ -205,7 +205,9 @@ def test_wiping_action_around_target_pose(tool_action_world):
     action = WipingAction(
         arm=robot.right_arm,
         tool=sponge,
-        target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.0, reference_frame=world.root),
+        target_pose=Pose3Dimensional.from_xyz_rpy(
+            x=2.4, y=2.2, z=1.0, reference_frame=world.root
+        ),
     )
     goals = _tool_path_goals(action, extensions)
 
@@ -296,7 +298,7 @@ def _attach_box_to_gripper(world, robot, name, size, mount_z):
             FixedConnection(
                 parent=tool_frame,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=mount_z, reference_frame=tool_frame
                 ),
             )
@@ -322,7 +324,7 @@ def test_pouring_action_pour_point_lands_on_target_container_center(
     tool_frame = robot.right_arm.end_effector.tool_frame
     tool_frame_T_source = world.compute_forward_kinematics_np(tool_frame, held_source)
     mouth_in_tool_frame = tool_frame_T_source @ np.array([0.0, 0.0, 0.1, 1.0])
-    mouth_in_world = pour_pose.homogeneous_matrix.to_np() @ mouth_in_tool_frame
+    mouth_in_world = pour_pose.to_coordinate_change().to_np() @ mouth_in_tool_frame
 
     assert mouth_in_world[0] == pytest.approx(float(container.global_pose.x), abs=1e-6)
     assert mouth_in_world[1] == pytest.approx(float(container.global_pose.y), abs=1e-6)
@@ -397,7 +399,9 @@ def test_a_wipe_counts_as_done_once_the_tool_reached_its_final_waypoint(
     action = WipingAction(
         arm=robot.right_arm,
         tool=sponge,
-        target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.0, reference_frame=world.root),
+        target_pose=Pose3Dimensional.from_xyz_rpy(
+            x=2.4, y=2.2, z=1.0, reference_frame=world.root
+        ),
     )
 
     expand(action, extensions)
@@ -427,12 +431,14 @@ def test_a_spread_wipe_is_done_only_once_the_tool_followed_its_path(
         arm=robot.right_arm,
         tool=Sponge(root=held_sponge),
         technique=WipingTechnique.SPREAD,
-        target_pose=Pose.from_xyz_rpy(x=2.4, y=2.2, z=1.1, reference_frame=world.root),
+        target_pose=Pose3Dimensional.from_xyz_rpy(
+            x=2.4, y=2.2, z=1.1, reference_frame=world.root
+        ),
     )
     plan = Sequence(
         nodes=[
             NavigateAction(
-                planar_goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                     x=1.85, y=2.2, reference_frame=world.root
                 )
             ),
@@ -494,7 +500,7 @@ def wipe_stuck_away_from_its_final_waypoint(
         arm=robot.right_arm,
         tool=Sponge(root=held_sponge),
         technique=WipingTechnique.SPREAD,
-        target_pose=Pose.from_xyz_rpy(
+        target_pose=Pose3Dimensional.from_xyz_rpy(
             x=sponge_position[0],
             y=sponge_position[1] + distance,
             z=sponge_position[2],

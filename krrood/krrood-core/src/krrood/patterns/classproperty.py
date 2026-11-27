@@ -16,7 +16,7 @@ class classproperty(Generic[T]):
     A decorator that allows a class method to be accessed as a property.
     """
 
-    def __init__(self, fget: Callable[[type[Any]], T]) -> None:
+    def __init__(self, fget: Callable[[Any], T]) -> None:
         """
         Stores the accessor function invoked when the property is read on the owning
         class.

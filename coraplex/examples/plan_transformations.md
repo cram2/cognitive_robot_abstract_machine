@@ -86,7 +86,7 @@ def show(node, depth=0):
 from cramph.composites import Sequence
 from coraplex.robot_plans.actions.core.pick_up import ReachAction
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 milk = world.get_semantic_annotations_by_type(Milk)[0]
 grasp = milk.grasp_candidates()[0]
@@ -149,7 +149,7 @@ drawer of cabinet 10:
 ```python
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Spoon
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.world_description.connections import FixedConnection
 
 spoon = STLParser(
@@ -162,7 +162,7 @@ with world.modify_world():
         FixedConnection(
             parent=world.get_body_by_name("cabinet10_drawer_top"),
             child=spoon.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -0.05, -0.05, 0
             ),
         ),
@@ -256,7 +256,7 @@ plan_transformations = [ParkArmsBeforeNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(planar_goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+        nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -267,7 +267,7 @@ The parking is part of the plan like any other action, so it is performed with i
 
 ```python
 navigate = Sequence(
-    nodes=[NavigateAction(planar_goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+    nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
 )
 
 executor, statechart = statechart_for(navigate)
@@ -301,7 +301,7 @@ plan_transformations = [ParkArmsAfterNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(planar_goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+        nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -337,7 +337,7 @@ plan_transformations = [LookAtTheGoalWhileNavigating()]
 
 navigate = expand(
     Sequence(
-        nodes=[NavigateAction(planar_goal_pose=Pose2D.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
+        nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_xy_yaw(x=1.5, y=2.4, reference_frame=world.root))]
     )
 )
 
@@ -373,7 +373,7 @@ class ParkArmsBeforeLongDrives(ParkArmsBeforeNavigating):
 ```python
 plan_transformations = [ParkArmsBeforeLongDrives()]
 
-navigate = expand(Sequence(nodes=[NavigateAction(planar_goal_pose=Pose2D.from_pose(pr2.root.global_pose))]))
+navigate = expand(Sequence(nodes=[NavigateAction(planar_goal_pose=Pose2Dimensional.from_pose(pr2.root.global_pose))]))
 
 show(navigate)
 ```

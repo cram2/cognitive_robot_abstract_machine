@@ -12,7 +12,7 @@ from krrood_spatial_math.spatial_types import (
     Displacement,
     ScrewAxis,
     Twist,
-    Vector3,
+    Vector3Dimensional,
     VectorPair,
 )
 
@@ -33,8 +33,8 @@ def test_a_vector_pair_stores_its_vectors_under_their_names(
     translational_name = vector_pair_type._translational_part_name
     vector_pair = vector_pair_type(
         **{
-            rotational_name: Vector3(1.0, 2.0, 3.0),
-            translational_name: Vector3(4.0, 5.0, 6.0),
+            rotational_name: Vector3Dimensional(1.0, 2.0, 3.0),
+            translational_name: Vector3Dimensional(4.0, 5.0, 6.0),
         }
     )
 
@@ -52,4 +52,6 @@ def test_a_vector_pair_takes_its_vectors_only_by_name(
     Passing the vectors positionally is refused, so they cannot be swapped unnoticed.
     """
     with pytest.raises(TypeError):
-        vector_pair_type(Vector3(1.0, 0.0, 0.0), Vector3(0.0, 1.0, 0.0))
+        vector_pair_type(
+            Vector3Dimensional(1.0, 0.0, 0.0), Vector3Dimensional(0.0, 1.0, 0.0)
+        )

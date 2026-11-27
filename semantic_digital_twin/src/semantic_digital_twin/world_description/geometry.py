@@ -35,13 +35,13 @@ from random_events.product_algebra import SimpleEvent
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import MalformedHexColor
 from semantic_digital_twin.mixin import HasSimulatorProperties
+from krrood_spatial_math.point import Point
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point,
-    Point2,
-    Point3,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.exceptions import (
     InvalidColorChannelCount,
     MeshFileNotPlaceableByAPose,
@@ -478,7 +478,7 @@ class Scale:
 
     def to_simple_event(
         self,
-        extend_result_in_direction: Vector3 | None = None,
+        extend_result_in_direction: Vector3Dimensional | None = None,
         amount: float = 0.0,
     ) -> SimpleEvent:
         simple_event = SimpleEvent.from_data(
@@ -497,7 +497,7 @@ class Scale:
         return simple_event
 
     def _extend_simple_event_in_direction(
-        self, simple_event: SimpleEvent, direction: Vector3, amount: float
+        self, simple_event: SimpleEvent, direction: Vector3Dimensional, amount: float
     ) -> SimpleEvent:
         """
         Extend the inner event in the specified direction to create the container
@@ -534,8 +534,8 @@ class Scale:
         return simple_event
 
     def to_bounding_box(self) -> VolumetricBoundingBox:
-        min_point = Point3(-self.x / 2, -self.y / 2, -self.z / 2)
-        max_point = Point3(self.x / 2, self.y / 2, self.z / 2)
+        min_point = Point3Dimensional(-self.x / 2, -self.y / 2, -self.z / 2)
+        max_point = Point3Dimensional(self.x / 2, self.y / 2, self.z / 2)
         return VolumetricBoundingBox.from_min_max(min_point, max_point, None)
 
     def to_np(self) -> np.ndarray:
@@ -552,8 +552,8 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
     Base class for all shapes in the world.
     """
 
-    origin: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
+    origin: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=HomogeneousTransformationMatrix3Dimensional
     )
 
     color: Color = field(default_factory=Color)
@@ -651,7 +651,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         for field_ in fields(self):
             self_value = getattr(self, field_.name)
             other_value = getattr(other, field_.name)
-            if isinstance(self_value, HomogeneousTransformationMatrix):
+            if isinstance(self_value, HomogeneousTransformationMatrix3Dimensional):
                 values_equal = np.allclose(self_value.to_np(), other_value.to_np())
             else:
                 values_equal = self_value == other_value
@@ -663,7 +663,7 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         """
         Creates a copy of this shape without the reference frame.
         """
-        new_origin = HomogeneousTransformationMatrix(
+        new_origin = HomogeneousTransformationMatrix3Dimensional(
             self.origin.to_np(),
         )
         shape_props = fields(self)
@@ -699,10 +699,12 @@ class Shape(ABC, SubclassJSONSerializer, HasSimulatorProperties):
         center_x = (bounding_box.min_x + bounding_box.max_x) / 2
         center_y = (bounding_box.min_y + bounding_box.max_y) / 2
         center_z = (bounding_box.min_z + bounding_box.max_z) / 2
-        self.origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=Point3(-center_x, -center_y, -center_z),
-            rotation_matrix=self.origin.rotation_matrix,
-            reference_frame=self.origin.reference_frame,
+        self.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                point=Point3Dimensional(-center_x, -center_y, -center_z),
+                rotation_matrix=self.origin.rotation_matrix,
+                reference_frame=self.origin.reference_frame,
+            )
         )
 
 
@@ -724,8 +726,8 @@ class Mesh(Shape):
     Filename of the mesh.
     """
 
-    file_T_mesh: HomogeneousTransformationMatrix = field(
-        default_factory=HomogeneousTransformationMatrix
+    file_T_mesh: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=HomogeneousTransformationMatrix3Dimensional
     )
     """
     The mesh's own frame in the coordinates its file stores the vertices in; the
@@ -734,7 +736,7 @@ class Mesh(Shape):
     """
 
     @property
-    def file_origin(self) -> HomogeneousTransformationMatrix:
+    def file_origin(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Where to place the file's vertices, once :attr:`scale` stretched them along the
         file's axes, for them to lie where this mesh lies, relative to the frame
@@ -751,7 +753,7 @@ class Mesh(Shape):
         mesh_T_scaled_file = np.eye(4)
         mesh_T_scaled_file[:3, :3] = mesh_R_file
         mesh_T_scaled_file[:3, 3] = -scale * (mesh_R_file @ file_T_mesh[:3, 3])
-        return HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix3Dimensional(
             self.origin.to_np() @ mesh_T_scaled_file,
             reference_frame=self.origin.reference_frame,
         )
@@ -1017,7 +1019,7 @@ class Mesh(Shape):
         cls,
         ply_file_path: str,
         texture_file_path: str | None = None,
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
         scale: Scale | None = None,
     ) -> Mesh:
         """
@@ -1069,7 +1071,7 @@ class Mesh(Shape):
     def from_trimesh(
         cls,
         mesh: trimesh.Trimesh,
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
         scale: Scale | None = None,
         uv: np.ndarray | None = None,
         texture_file_path: str | None = None,
@@ -1099,7 +1101,7 @@ class Mesh(Shape):
         """
         file_type = file_type.lower()
         if origin is None:
-            origin = HomogeneousTransformationMatrix()
+            origin = HomogeneousTransformationMatrix3Dimensional()
         if scale is None:
             scale = Scale()
         if uv is not None:
@@ -1131,7 +1133,7 @@ class Mesh(Shape):
     def box(
         cls,
         extents: tuple[float, float, float] = (1.0, 1.0, 1.0),
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
         scale: Scale | None = None,
     ) -> Mesh:
         """
@@ -1153,7 +1155,7 @@ class Mesh(Shape):
         cls,
         side: float,
         height: float,
-        origin: HomogeneousTransformationMatrix | None = None,
+        origin: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Mesh:
         """
         Create an upright prism of equilateral cross-section, its apex pointing along +x.
@@ -1209,7 +1211,7 @@ class Mesh(Shape):
     @classmethod
     def from_3d_points(
         cls,
-        points_3d: list[Point3],
+        points_3d: list[Point3Dimensional],
         reference_frame: KinematicStructureEntity | None = None,
         minimum_thickness: float = 0.005,
         singular_value_ratio_tolerance: float = 1e-7,
@@ -1281,7 +1283,9 @@ class Mesh(Shape):
 
         return cls.from_trimesh(
             mesh=hull,
-            origin=HomogeneousTransformationMatrix(reference_frame=reference_frame),
+            origin=HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=reference_frame
+            ),
         )
 
     @classmethod
@@ -1471,9 +1475,9 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
         against this region, using the slab method.
 
         .. note::
-            ``start``/``direction`` are plain arrays rather than :class:`Point3`/
-            :class:`Vector3` on purpose: this runs once per graph node on every
-            collision check, and :class:`Point3`/:class:`Vector3` arithmetic pays a
+            ``start``/``direction`` are plain arrays rather than :class:`Point3Dimensional`/
+            :class:`Vector3Dimensional` on purpose: this runs once per graph node on every
+            collision check, and :class:`Point3Dimensional`/:class:`Vector3Dimensional` arithmetic pays a
             symbolic (casadi) cost on every access. Callers should convert to arrays
             once before looping, not per call.
 
@@ -1506,9 +1510,9 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
 PointT = TypeVar("PointT", bound=Point)
 """
 The point type an :class:`AxisAlignedBox` subclass is asked about --
-:class:`~krrood_spatial_math.spatial_types.Point3` for a box expressed over three
-axes, :class:`~krrood_spatial_math.spatial_types.Point2` for one expressed over a
-plane.
+:class:`~krrood_spatial_math.spatial_types.Point3Dimensional` for a box expressed over
+three axes, :class:`~krrood_spatial_math.spatial_types_2_dimensional.Point2Dimensional` for one
+expressed over a plane.
 """
 
 
@@ -1585,7 +1589,9 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
     @classmethod
     @abstractmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls,
+        simple_event: SimpleEvent,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.
@@ -1628,9 +1634,9 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         """
         Express this bounding box's lower and upper corners as plain-float vectors.
 
-        Array-based, not ``Point3``-based, for the same reason as
+        Array-based, not ``Point3Dimensional``-based, for the same reason as
         :meth:`from_array_bounds`: :meth:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes.calculate_connectivity`
-        reads these generically across dimensionality, and a 2D box has no ``Point3``
+        reads these generically across dimensionality, and a 2D box has no ``Point3Dimensional``
         corners of its own.
 
         :return: The corners, in the same frame as ``origin``.
@@ -1645,16 +1651,16 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         cls,
         lower: npt.NDArray[np.float64],
         upper: npt.NDArray[np.float64],
-        origin: HomogeneousTransformationMatrix,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         Rebuild a bounding box from the plain-float corners :meth:`to_array_bounds`
         returns.
 
-        Array-based rather than ``Point3``-based on purpose:
+        Array-based rather than ``Point3Dimensional``-based on purpose:
         :meth:`~semantic_digital_twin.world_description.graph_of_convex_sets.boxes.GraphOfBoundingBoxes.calculate_connectivity`
         uses this to rebuild a box generically across dimensionality, and a 2D box has
-        no ``Point3`` corners to build from.
+        no ``Point3Dimensional`` corners to build from.
 
         :param lower: The lower corner.
         :param upper: The upper corner.
@@ -1664,7 +1670,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         return cls(*lower, *upper, origin)
 
     def transform_to_origin(
-        self, reference_T_new_origin: HomogeneousTransformationMatrix
+        self, reference_T_new_origin: HomogeneousTransformationMatrix3Dimensional
     ) -> Self:
         """
         Transform the bounding box to a different reference frame.
@@ -1672,7 +1678,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :param reference_T_new_origin: The origin to express the box relative to.
         :return: The box, re-expressed relative to ``reference_T_new_origin``.
         """
-        reference_T_new_origin = HomogeneousTransformationMatrix(
+        reference_T_new_origin = HomogeneousTransformationMatrix3Dimensional(
             data=reference_T_new_origin.to_np(),
             reference_frame=reference_T_new_origin.reference_frame,
         )
@@ -1684,8 +1690,10 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         self_T_new_pose = reference_T_new_origin.inverse() @ new_origin_reference_T_self
 
         list_self_T_corner = [
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                corner.to_point3() if isinstance(corner, Point2) else corner
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                corner.to_point_3_dimensional()
+                if isinstance(corner, Point2Dimensional)
+                else corner
             ).to_np()
             for corner in self.get_points()
         ]
@@ -1726,7 +1734,7 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
 
 
 @dataclass(eq=False)
-class VolumetricBoundingBox(AxisAlignedBox[Point3]):
+class VolumetricBoundingBox(AxisAlignedBox[Point3Dimensional]):
     """
     An axis-aligned box in three-dimensional space.
     """
@@ -1761,7 +1769,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
     The maximum z-coordinate of the bounding box, relative to the origin.
     """
 
-    origin: HomogeneousTransformationMatrix
+    origin: HomogeneousTransformationMatrix3Dimensional
     """
     The origin of the bounding box.
     """
@@ -1835,11 +1843,11 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         return [self.depth, self.width, self.height]
 
     @property
-    def center(self) -> Point3:
+    def center(self) -> Point3Dimensional:
         """
         :return: The center point of the bounding box, in the same frame as ``origin``.
         """
-        return Point3(
+        return Point3Dimensional(
             self.x_interval.center(),
             self.y_interval.center(),
             self.z_interval.center(),
@@ -1867,7 +1875,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
             self.origin,
         )
 
-    def contains(self, point: Point3) -> bool:
+    def contains(self, point: Point3Dimensional) -> bool:
         """
         Check if the bounding box contains a point.
         """
@@ -1879,7 +1887,9 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
 
     @classmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls,
+        simple_event: SimpleEvent,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.
@@ -1938,7 +1948,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
     def from_mesh(
         cls,
         mesh: trimesh.Trimesh,
-        origin: HomogeneousTransformationMatrix,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         Create a bounding box from a trimesh object.
@@ -1958,14 +1968,14 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
             origin=origin,
         )
 
-    def get_points(self) -> list[Point3]:
+    def get_points(self) -> list[Point3Dimensional]:
         """
-        Get the 8 corners of the bounding box as Point3 objects.
+        Get the 8 corners of the bounding box as Point3Dimensional objects.
 
-        :return: A list of Point3 objects representing the corners of the bounding box.
+        :return: A list of Point3Dimensional objects representing the corners of the bounding box.
         """
         return [
-            Point3(x, y, z)
+            Point3Dimensional(x, y, z)
             for x in (self.min_x, self.max_x)
             for y in (self.min_y, self.max_y)
             for z in (self.min_z, self.max_z)
@@ -1974,9 +1984,9 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
     @classmethod
     def from_min_max(
         cls,
-        min_point: Point3,
-        max_point: Point3,
-        origin: HomogeneousTransformationMatrix,
+        min_point: Point3Dimensional,
+        max_point: Point3Dimensional,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> Self:
         """
         Set the axis-aligned bounding box from a minimum and maximum point.
@@ -1998,7 +2008,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
         x = (self.max_x + self.min_x) / 2 + float(self.origin.x)
         y = (self.max_y + self.min_y) / 2 + float(self.origin.y)
         z = (self.max_z + self.min_z) / 2 + float(self.origin.z)
-        origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x, y, z, 0, 0, 0, self.origin.reference_frame
         )
         return Box(origin=origin, scale=scale)
@@ -2016,7 +2026,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
 
 
 @dataclass(eq=False)
-class PlanarBoundingBox(AxisAlignedBox[Point2]):
+class PlanarBoundingBox(AxisAlignedBox[Point2Dimensional]):
     """
     An axis-aligned box in the x-y plane, with no z-extent.
 
@@ -2045,7 +2055,7 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
     The maximum y-coordinate of the bounding box, relative to the origin.
     """
 
-    origin: HomogeneousTransformationMatrix
+    origin: HomogeneousTransformationMatrix3Dimensional
     """
     The origin of the bounding box.
     """
@@ -2098,11 +2108,11 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
         return self.depth * self.width
 
     @property
-    def center(self) -> Point2:
+    def center(self) -> Point2Dimensional:
         """
         :return: The center of the bounding box, in the same frame as ``origin``.
         """
-        return Point2(
+        return Point2Dimensional(
             self.x_interval.center(),
             self.y_interval.center(),
             reference_frame=self.origin.reference_frame,
@@ -2124,7 +2134,7 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             self.origin,
         )
 
-    def contains(self, point: Point2) -> bool:
+    def contains(self, point: Point2Dimensional) -> bool:
         """
         Check if the bounding box contains a point.
         """
@@ -2154,7 +2164,9 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
 
     @classmethod
     def from_simple_event(
-        cls, simple_event: SimpleEvent, origin: HomogeneousTransformationMatrix
+        cls,
+        simple_event: SimpleEvent,
+        origin: HomogeneousTransformationMatrix3Dimensional,
     ) -> list[Self]:
         """
         Create a list of bounding boxes from a simple random event.
@@ -2171,15 +2183,15 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             result.append(cls(x.lower, y.lower, x.upper, y.upper, origin))
         return result
 
-    def get_points(self) -> list[Point2]:
+    def get_points(self) -> list[Point2Dimensional]:
         """
-        Get the 4 corners of the bounding box as ``Point2`` objects, in the box's own
+        Get the 4 corners of the bounding box as ``Point2Dimensional`` objects, in the box's own
         local frame.
 
-        :return: A list of Point2 objects representing the corners of the bounding box.
+        :return: A list of Point2Dimensional objects representing the corners of the bounding box.
         """
         return [
-            Point2(x, y, reference_frame=self.origin.reference_frame)
+            Point2Dimensional(x, y, reference_frame=self.origin.reference_frame)
             for x in (self.min_x, self.max_x)
             for y in (self.min_y, self.max_y)
         ]

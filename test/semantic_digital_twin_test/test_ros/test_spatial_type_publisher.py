@@ -22,7 +22,7 @@ from semantic_digital_twin.adapters.ros.visualization.spatial_type_publisher imp
     EvaluatedSpatialTypePublisher,
     SpatialTypePublisher,
 )
-from krrood_spatial_math.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
@@ -69,7 +69,7 @@ def test_marker_publisher_draws_markers_from_the_given_values(rclpy_node):
             EvaluatedSpatialTypeVisualization(
                 spatial_type_markers=SpatialTypeMarkers.from_visualization(
                     visualization=SpatialTypeVisualization(
-                        spatial_type=Point3(x=unresolvable)
+                        spatial_type=Point3Dimensional(x=unresolvable)
                     ),
                     root_frame_name="map",
                 ),
@@ -89,7 +89,9 @@ def test_marker_publisher_deletes_markers_no_longer_published(rclpy_node):
     marker_publisher = EvaluatedSpatialTypePublisher(node=rclpy_node)
     fake = FakeMarkerPublisher()
     marker_publisher.publisher = fake
-    visualization = SpatialTypeVisualization(spatial_type=Point3(), namespace="removed")
+    visualization = SpatialTypeVisualization(
+        spatial_type=Point3Dimensional(), namespace="removed"
+    )
     marker_publisher.publish(
         evaluated_visualizations=[
             EvaluatedSpatialTypeVisualization(
@@ -133,7 +135,7 @@ def test_compiled_visualizations_evaluate_the_current_variable_values(
     compiled_visualizations = CompiledSpatialTypeVisualizations(
         visualizations=[
             SpatialTypeVisualization(
-                spatial_type=Point3(
+                spatial_type=Point3Dimensional(
                     x=dof.variables.position, reference_frame=cylinder_bot_world.root
                 )
             )
@@ -161,7 +163,7 @@ def test_compiled_visualizations_return_values_later_evaluations_leave_unchanged
     compiled_visualizations = CompiledSpatialTypeVisualizations(
         visualizations=[
             SpatialTypeVisualization(
-                spatial_type=Point3(
+                spatial_type=Point3Dimensional(
                     x=dof.variables.position, reference_frame=cylinder_bot_world.root
                 )
             )
@@ -181,7 +183,7 @@ def test_compiled_visualizations_return_values_later_evaluations_leave_unchanged
 
 
 def test_publish_once_publishes_expected_markers(rclpy_node, cylinder_bot_world):
-    point = Point3(1, 2, 3, reference_frame=cylinder_bot_world.root)
+    point = Point3Dimensional(1, 2, 3, reference_frame=cylinder_bot_world.root)
 
     publisher = SpatialTypePublisher.publish_once(
         spatial_type=point, node=rclpy_node, world=cylinder_bot_world
@@ -200,7 +202,9 @@ def test_markers_update_on_state_change(rclpy_node, cylinder_bot_world):
     A world state change republishes the markers at the new value.
     """
     dof = first_moving_dof(cylinder_bot_world)
-    point = Point3(x=dof.variables.position, reference_frame=cylinder_bot_world.root)
+    point = Point3Dimensional(
+        x=dof.variables.position, reference_frame=cylinder_bot_world.root
+    )
 
     publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
     fake = capture(publisher)
@@ -221,7 +225,9 @@ def test_set_requests_replaces_previous(rclpy_node, cylinder_bot_world):
     publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
     publisher.add(
         request=SpatialTypeVisualization(
-            spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
+            spatial_type=Point3Dimensional(
+                0, 0, 0, reference_frame=cylinder_bot_world.root
+            ),
             namespace="a",
         )
     )
@@ -230,7 +236,9 @@ def test_set_requests_replaces_previous(rclpy_node, cylinder_bot_world):
     publisher.set_requests(
         requests=[
             SpatialTypeVisualization(
-                spatial_type=Point3(1, 1, 1, reference_frame=cylinder_bot_world.root),
+                spatial_type=Point3Dimensional(
+                    1, 1, 1, reference_frame=cylinder_bot_world.root
+                ),
                 namespace="b",
             )
         ]
@@ -253,11 +261,15 @@ def test_add_all_publishes_all_requests(rclpy_node, cylinder_bot_world):
     publisher.add_all(
         requests=[
             SpatialTypeVisualization(
-                spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
+                spatial_type=Point3Dimensional(
+                    0, 0, 0, reference_frame=cylinder_bot_world.root
+                ),
                 namespace="a",
             ),
             SpatialTypeVisualization(
-                spatial_type=Point3(1, 1, 1, reference_frame=cylinder_bot_world.root),
+                spatial_type=Point3Dimensional(
+                    1, 1, 1, reference_frame=cylinder_bot_world.root
+                ),
                 namespace="b",
             ),
         ]
@@ -275,7 +287,9 @@ def test_clear_deletes_previously_published_markers(rclpy_node, cylinder_bot_wor
     fake = capture(publisher)
     publisher.add(
         request=SpatialTypeVisualization(
-            spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root)
+            spatial_type=Point3Dimensional(
+                0, 0, 0, reference_frame=cylinder_bot_world.root
+            )
         )
     )
     published_identities = {
@@ -299,11 +313,15 @@ def test_publish_deletes_only_removed_request_markers(rclpy_node, cylinder_bot_w
     publisher.add_all(
         requests=[
             SpatialTypeVisualization(
-                spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
+                spatial_type=Point3Dimensional(
+                    0, 0, 0, reference_frame=cylinder_bot_world.root
+                ),
                 namespace="keep",
             ),
             SpatialTypeVisualization(
-                spatial_type=Point3(1, 1, 1, reference_frame=cylinder_bot_world.root),
+                spatial_type=Point3Dimensional(
+                    1, 1, 1, reference_frame=cylinder_bot_world.root
+                ),
                 namespace="drop",
             ),
         ]
@@ -312,7 +330,9 @@ def test_publish_deletes_only_removed_request_markers(rclpy_node, cylinder_bot_w
     publisher.set_requests(
         requests=[
             SpatialTypeVisualization(
-                spatial_type=Point3(0, 0, 0, reference_frame=cylinder_bot_world.root),
+                spatial_type=Point3Dimensional(
+                    0, 0, 0, reference_frame=cylinder_bot_world.root
+                ),
                 namespace="keep",
             )
         ]
@@ -343,7 +363,9 @@ def test_state_change_reuses_the_compiled_function(
     recompiling.
     """
     dof = first_moving_dof(cylinder_bot_world)
-    point = Point3(x=dof.variables.position, reference_frame=cylinder_bot_world.root)
+    point = Point3Dimensional(
+        x=dof.variables.position, reference_frame=cylinder_bot_world.root
+    )
     publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
     fake = capture(publisher)
     publisher.add(request=SpatialTypeVisualization(spatial_type=point))
@@ -364,7 +386,9 @@ def test_state_change_builds_no_markers(rclpy_node, cylinder_bot_world, monkeypa
     A state change writes the new value into the markers built on registration.
     """
     dof = first_moving_dof(cylinder_bot_world)
-    point = Point3(x=dof.variables.position, reference_frame=cylinder_bot_world.root)
+    point = Point3Dimensional(
+        x=dof.variables.position, reference_frame=cylinder_bot_world.root
+    )
     publisher = SpatialTypePublisher(node=rclpy_node, _world=cylinder_bot_world)
     fake = capture(publisher)
     publisher.add(request=SpatialTypeVisualization(spatial_type=point, label="point"))

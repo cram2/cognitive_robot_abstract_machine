@@ -33,7 +33,7 @@ from semantic_digital_twin.world_description.connections import (
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 from krrood.entity_query_language.factories import entity, variable, an, the
 ```
@@ -70,7 +70,7 @@ body = Body(name=PrefixedName("body"))
 with world.modify_world():
     root_C_base = Connection6DoF.create_with_dofs(parent=root, child=base, world=world)
     base_C_body = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxis(rotation_per_unit_position=Vector3.Z(reference_frame=base)), parent=base,
+            screw_axis=ScrewAxis(rotation_per_unit_position=Vector3Dimensional.Z(reference_frame=base)), parent=base,
             child=body,
             world=world
         )

@@ -35,7 +35,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from krrood.exceptions import DataclassException
 from krrood.patterns.called_positionally import called_positionally
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -507,8 +509,10 @@ class TestJoiningAWorldWithARobot:
         shared = shared_world_with_a_robot.world
         shared.get_body_by_name(
             FrameName.HEAD
-        ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=0.5, z=1.2, yaw=0.3, reference_frame=shared.root
+        ).parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=0.5, z=1.2, yaw=0.3, reference_frame=shared.root
+            )
         )
         moved_camera_pose = shared.get_body_by_name(
             FrameName.CAMERA
@@ -541,7 +545,7 @@ class TestJoiningAWorldWithARobot:
         )
         expected_pose = (
             shared.get_body_by_name(FrameName.CAMERA).global_transform.to_np()
-            @ HomogeneousTransformationMatrix.from_xyz_quaternion(
+            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 *bounding_box.pose.translation, *bounding_box.pose.rotation
             ).to_np()
         )
@@ -550,7 +554,7 @@ class TestJoiningAWorldWithARobot:
             robokudo_joined_to_a_robot,
             cas_seen_from(
                 robokudo_joined_to_a_robot.world,
-                HomogeneousTransformationMatrix(
+                HomogeneousTransformationMatrix3Dimensional(
                     data=shared.get_body_by_name(
                         FrameName.CAMERA
                     ).global_transform.to_np()

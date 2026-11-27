@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -35,7 +35,7 @@ def door_world() -> World:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
                 world=world,
                 parent=branch_root,

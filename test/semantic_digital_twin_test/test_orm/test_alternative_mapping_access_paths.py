@@ -17,30 +17,29 @@ from krrood.ormatic.data_access_objects.symbol_graph_mappings import (
 from krrood.symbol_graph.symbol_graph import SymbolGraph
 from semantic_digital_twin.orm.model import (
     AxisAngleMapping,
-    HomogeneousTransformationMatrixMapping,
-    Point2Mapping,
-    Point3Mapping,
-    Pose2DMapping,
-    PoseMapping,
+    HomogeneousTransformationMatrix3DimensionalMapping,
+    Point2DimensionalMapping,
+    Point3DimensionalMapping,
+    Pose2DimensionalMapping,
+    Pose3DimensionalMapping,
     QuaternionMapping,
     RotationMatrixMapping,
     DisplacementMapping,
     ScrewAxisMapping,
     TwistMapping,
-    Vector3Mapping,
+    Vector3DimensionalMapping,
     WorldMapping,
     WorldStateMapping,
 )
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
-    Pose,
-    Pose2D,
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
     RotationMatrix,
     Displacement,
     ScrewAxis,
     Twist,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -51,15 +50,15 @@ from semantic_digital_twin.world_description.world_entity import Body
     [
         WorldMapping,
         WorldStateMapping,
-        Vector3Mapping,
-        Point3Mapping,
+        Vector3DimensionalMapping,
+        Point3DimensionalMapping,
         QuaternionMapping,
         AxisAngleMapping,
         RotationMatrixMapping,
-        HomogeneousTransformationMatrixMapping,
-        PoseMapping,
-        Point2Mapping,
-        Pose2DMapping,
+        HomogeneousTransformationMatrix3DimensionalMapping,
+        Pose3DimensionalMapping,
+        Point2DimensionalMapping,
+        Pose2DimensionalMapping,
         DisplacementMapping,
         TwistMapping,
         ScrewAxisMapping,
@@ -103,17 +102,21 @@ def test_every_field_of_an_alternative_mapping_is_reachable_on_its_domain_class(
             lambda axis, angle: RotationMatrix.from_axis_angle(AxisAngle(axis, angle)),
         ),
         (
-            HomogeneousTransformationMatrixMapping,
-            HomogeneousTransformationMatrix.from_xyz_axis_angle,
+            HomogeneousTransformationMatrix3DimensionalMapping,
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle,
         ),
-        (PoseMapping, Pose.from_xyz_axis_angle),
+        (Pose3DimensionalMapping, Pose3Dimensional.from_xyz_axis_angle),
     ],
-    ids=["RotationMatrix", "HomogeneousTransformationMatrix", "Pose"],
+    ids=[
+        "RotationMatrix",
+        "HomogeneousTransformationMatrix3Dimensional",
+        "Pose3Dimensional",
+    ],
 )
 def test_rotation_survives_being_stored_as_axis_angle(
     mapping, rotation_from_axis_angle, axis, angle
 ):
-    rotation = rotation_from_axis_angle(axis=Vector3(*axis), angle=angle)
+    rotation = rotation_from_axis_angle(axis=Vector3Dimensional(*axis), angle=angle)
 
     stored = mapping.from_domain_object(obj=rotation)
     restored = stored.to_domain_object()
@@ -142,8 +145,10 @@ def test_a_vector_pair_survives_being_stored(mapping, vector_pair_type):
         world.add_kinematic_structure_entity(root)
     vector_pair = vector_pair_type(
         **{
-            vector_pair_type._rotational_part_name: Vector3(0.0, 0.4, 0.0),
-            vector_pair_type._translational_part_name: Vector3(0.1, 0.0, -0.2),
+            vector_pair_type._rotational_part_name: Vector3Dimensional(0.0, 0.4, 0.0),
+            vector_pair_type._translational_part_name: Vector3Dimensional(
+                0.1, 0.0, -0.2
+            ),
         },
         reference_frame=root,
     )

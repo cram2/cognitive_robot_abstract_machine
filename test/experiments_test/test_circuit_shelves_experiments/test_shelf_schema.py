@@ -21,7 +21,7 @@ from experiments.shelf_generation_experiments.utils import MeshCandidate, Object
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Body
@@ -89,7 +89,7 @@ def _make_layer(relative_height: float = 0.0) -> RelationalCircuitExperimentShel
             RelationalCircuitExperimentObject2D(
                 object_type=ObjectType.BOOK,
                 scale=Scale(x=0.05, y=0.1, z=0.2),
-                pose=Pose2D.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
+                pose=Pose2Dimensional.from_xy_yaw(x=0.0, y=0.0, yaw=0.0),
                 source_id="chair_src",
             )
         ],

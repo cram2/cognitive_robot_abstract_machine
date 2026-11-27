@@ -24,7 +24,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     UnknownObject,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description import geometry
 from semantic_digital_twin.world_description.connections import (
@@ -150,7 +152,7 @@ def add_perceivable_object(
     :return: The body of the object.
     """
     world_body = world.get_body_by_name(PrefixedName(name=FrameName.WORLD))
-    world_T_object = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_object = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         *position, yaw=yaw, reference_frame=world_body
     )
     body = Body(
@@ -372,7 +374,9 @@ class TestNewObjects:
         cylinder_center = (0.0, 0.01, 1.02)
         cylinder = Cylinder(
             geometry=geometry.Cylinder(
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(*cylinder_center),
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    *cylinder_center
+                ),
                 width=0.08,
                 height=0.12,
             )
@@ -400,7 +404,7 @@ class TestNewObjects:
         hypothesis.annotations.append(
             Cylinder(
                 geometry=geometry.Cylinder(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         *cylinder_center
                     ),
                     width=0.08,

@@ -39,11 +39,11 @@ from giskardpy.motion_statechart.mixins import (
 from giskardpy.motion_statechart.weights import VelocityScale
 from krrood.symbolic_math.symbolic_math import Scalar, trinary_if_cases
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Pose,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Pose3Dimensional,
     RotationMatrix,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
@@ -72,7 +72,7 @@ class DrivenBaseTask(ConvergingTask, HasGoalPoseParameter, ABC):
     The body the drive carries.
     """
 
-    parent_T_goal_reference_frame: HomogeneousTransformationMatrix
+    parent_T_goal_reference_frame: HomogeneousTransformationMatrix3Dimensional
     """
     The pose of the reference frame of :attr:`goal_pose` relative to the parent of the
     drive, as the goal running this task fixed it.
@@ -86,7 +86,7 @@ class DrivenBaseTask(ConvergingTask, HasGoalPoseParameter, ABC):
         return self.driven_body.parent_kinematic_structure_entity
 
     @property
-    def parent_T_goal(self) -> Pose:
+    def parent_T_goal(self) -> Pose3Dimensional:
         """
         :return: :attr:`goal_pose` relative to :attr:`drive_parent`.
         """
@@ -94,7 +94,7 @@ class DrivenBaseTask(ConvergingTask, HasGoalPoseParameter, ABC):
         parent_T_goal.reference_frame = self.drive_parent
         return parent_T_goal
 
-    def parent_T_base(self) -> HomogeneousTransformationMatrix:
+    def parent_T_base(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :return: The pose of :attr:`driven_body` relative to :attr:`drive_parent`, over
             the degrees of freedom of the drive.
@@ -145,7 +145,7 @@ class DrivenBaseRotation(DrivenBaseTask, HasCruiseAngularVelocityParameter, ABC)
 
     @abstractmethod
     def parent_R_goal(
-        self, *, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix3Dimensional
     ) -> RotationMatrix:
         """
         :param parent_T_base: The pose of the base relative to the drive's parent.
@@ -181,7 +181,7 @@ class BaseOrientation(DrivenBaseRotation):
     """
 
     def parent_R_goal(
-        self, *, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix3Dimensional
     ) -> RotationMatrix:
         return self.parent_T_goal.rotation_matrix
 
@@ -194,7 +194,7 @@ class BaseHeading(DrivenBaseRotation):
     """
 
     def parent_R_goal(
-        self, *, parent_T_base: HomogeneousTransformationMatrix
+        self, *, parent_T_base: HomogeneousTransformationMatrix3Dimensional
     ) -> RotationMatrix:
         parent_V_base_to_goal = self.parent_T_goal.position - self.parent_P_viewpoint(
             parent_T_base=parent_T_base
@@ -202,13 +202,13 @@ class BaseHeading(DrivenBaseRotation):
         parent_V_base_to_goal.scale(1)
         return RotationMatrix.from_vectors(
             x=parent_V_base_to_goal,
-            z=Vector3.Z(reference_frame=self.drive_parent),
+            z=Vector3Dimensional.Z(reference_frame=self.drive_parent),
             reference_frame=self.drive_parent,
         )
 
     def parent_P_viewpoint(
-        self, *, parent_T_base: HomogeneousTransformationMatrix
-    ) -> Point3:
+        self, *, parent_T_base: HomogeneousTransformationMatrix3Dimensional
+    ) -> Point3Dimensional:
         """
         :param parent_T_base: The pose of the base relative to the drive's parent.
         :return: The point relative to the drive's parent the base faces the position of
@@ -260,8 +260,8 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
         return super().build_artifacts()
 
     def parent_P_viewpoint(
-        self, *, parent_T_base: HomogeneousTransformationMatrix
-    ) -> Point3:
+        self, *, parent_T_base: HomogeneousTransformationMatrix3Dimensional
+    ) -> Point3Dimensional:
         return self._parent_T_start_binding.root_T_tip.position
 
 
@@ -277,7 +277,7 @@ class MobileBasePoseGoal(ABC):
     @classmethod
     @abstractmethod
     def moving_base_of(
-        cls, *, robot: AbstractRobot, goal_pose: Pose, threshold: float
+        cls, *, robot: AbstractRobot, goal_pose: Pose3Dimensional, threshold: float
     ) -> Self:
         """
         :param robot: The robot whose base is put at `goal_pose`.
@@ -318,7 +318,7 @@ class DrivenBaseGoal(
     The base moved, by the drive attaching its robot to its parent.
     """
 
-    root_T_goal_reference_frame: HomogeneousTransformationMatrix | None = (
+    root_T_goal_reference_frame: HomogeneousTransformationMatrix3Dimensional | None = (
         expanded_child_field(default=None)
     )
     """
@@ -355,7 +355,7 @@ class DrivenBaseGoal(
 
     @classmethod
     def moving_base_of(
-        cls, *, robot: AbstractRobot, goal_pose: Pose, threshold: float
+        cls, *, robot: AbstractRobot, goal_pose: Pose3Dimensional, threshold: float
     ) -> Self:
         """
         Differs from :meth:`MobileBasePoseGoal.moving_base_of` in requiring `robot` to
@@ -380,7 +380,9 @@ class DrivenBaseGoal(
     def goal_binding_root(self) -> KinematicStructureEntity:
         return self._drive_parent
 
-    def _root_T_goal_reference_frame_to_bind(self) -> HomogeneousTransformationMatrix:
+    def _root_T_goal_reference_frame_to_bind(
+        self,
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Differs from
         :meth:`BindsGoalReferenceFrame._root_T_goal_reference_frame_to_bind` in binding
@@ -393,7 +395,7 @@ class DrivenBaseGoal(
         Add the node running the tasks.
         """
         self.root_T_goal_reference_frame = (
-            HomogeneousTransformationMatrix.create_with_variables(
+            HomogeneousTransformationMatrix3Dimensional.create_with_variables(
                 str(self._goal_reference_frame_name)
             )
         )

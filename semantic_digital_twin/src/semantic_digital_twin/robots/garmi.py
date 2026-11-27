@@ -46,8 +46,8 @@ from semantic_digital_twin.robots.robot_parts import (
     Torso,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
     RotationMatrix,
 )
 from semantic_digital_twin.world_description.connection_properties import (
@@ -201,9 +201,11 @@ class GarmiCamera(RobotCamera[FieldOfViewCameraModel]):
         return cls(
             root=cls.create_optical_body(
                 robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-                HomogeneousTransformationMatrix(
+                HomogeneousTransformationMatrix3Dimensional(
                     data=RotationMatrix.from_vectors(
-                        x=-Vector3.Y(), y=-Vector3.Z(), z=Vector3.X()
+                        x=-Vector3Dimensional.Y(),
+                        y=-Vector3Dimensional.Z(),
+                        z=Vector3Dimensional.X(),
                     )
                 ),
             ),
@@ -423,12 +425,12 @@ class GarmiLeftGripper(
         return [gripper_open, gripper_close]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Z(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -483,12 +485,12 @@ class GarmiRightGripper(
         return [gripper_open, gripper_close]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Z(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.NEGATIVE_Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.NEGATIVE_Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -682,8 +684,8 @@ class GarmiMobileBase(MobileBase[OmniDrive], HasTorso[GarmiTorso]):
     """
 
     @classproperty
-    def forward_axis(cls) -> Vector3:
-        return Vector3.X()
+    def forward_axis(cls) -> Vector3Dimensional:
+        return Vector3Dimensional.X()
 
     @classproperty
     def drive_velocity_limits(cls) -> DriveVelocityLimits:

@@ -51,7 +51,7 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     DifferentialDrive,
@@ -176,12 +176,12 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
         return [gripper_open, gripper_close]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -480,8 +480,8 @@ class StretchMobileBase(
     full_body_controlled: bool = field(default=True, kw_only=True)
 
     @classproperty
-    def forward_axis(cls) -> Vector3:
-        return Vector3.NEGATIVE_Y()
+    def forward_axis(cls) -> Vector3Dimensional:
+        return Vector3Dimensional.NEGATIVE_Y()
 
     def setup_hardware_interfaces(self):
         for joint_name in (StretchJoint.RIGHT_WHEEL, StretchJoint.LEFT_WHEEL):

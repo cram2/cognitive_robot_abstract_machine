@@ -32,9 +32,9 @@ from semantic_digital_twin.grasping.grasp_strategies import GraspFromAnySide
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ._statements import allowed_intervals
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Displacement,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Mesh
@@ -59,7 +59,9 @@ def carton() -> Milk:
         [
             Mesh.from_trimesh(
                 mesh=trimesh.creation.box(extents=CARTON_EXTENTS),
-                origin=HomogeneousTransformationMatrix(reference_frame=body),
+                origin=HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=body
+                ),
             )
         ],
         reference_frame=body,
@@ -259,8 +261,8 @@ def small_displacement(rng: np.random.Generator, rise: float) -> Displacement:
         random axis.
     """
     return Displacement(
-        translation=Vector3(0.0, 0.0, rise),
-        rotation_vector=Vector3(*rng.normal(0.0, 0.05, 3)),
+        translation=Vector3Dimensional(0.0, 0.0, rise),
+        rotation_vector=Vector3Dimensional(*rng.normal(0.0, 0.05, 3)),
     )
 
 
@@ -298,8 +300,8 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
     for grasp in grasps:
         assert grasp.height > LIFTING_HEIGHT
         assert grasp.result.lifted
-        assert isinstance(grasp.result.slip.translation, Vector3)
-        assert isinstance(grasp.result.slip.rotation_vector, Vector3)
+        assert isinstance(grasp.result.slip.translation, Vector3Dimensional)
+        assert isinstance(grasp.result.slip.rotation_vector, Vector3Dimensional)
 
 
 def test_a_uniform_prior_cannot_answer_for_lifting_grasps(carton):

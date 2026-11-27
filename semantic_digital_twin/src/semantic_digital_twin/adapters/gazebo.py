@@ -36,9 +36,9 @@ from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Vector3Dimensional,
     ScrewAxis,
 )
 from semantic_digital_twin.world import World
@@ -93,7 +93,7 @@ class SdfJointType(StrEnum):
             SdfJointType.FIXED: FixedConnectionSpecification,
         }[self]
 
-    def create_screw_axis(self, *, direction: Vector3) -> ScrewAxis:
+    def create_screw_axis(self, *, direction: Vector3Dimensional) -> ScrewAxis:
         """
         :param direction: The unit vector this movable joint moves along or about.
         :return: The screw axis of the connection this movable joint type becomes.
@@ -318,7 +318,7 @@ class GazeboParser(WorldModelParser):
         world: World,
         include_element: ElementTree.Element,
         instance_name: str | None,
-        wrapper_pose: HomogeneousTransformationMatrix | None = None,
+        wrapper_pose: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> None:
         """
         Resolves an ``include`` to its model file and attaches an instance of it.
@@ -353,7 +353,7 @@ class GazeboParser(WorldModelParser):
         self,
         world: World,
         sub_world: World,
-        pose: HomogeneousTransformationMatrix,
+        pose: HomogeneousTransformationMatrix3Dimensional,
         is_static: bool,
     ) -> None:
         """
@@ -530,7 +530,7 @@ class GazeboParser(WorldModelParser):
         world: World,
         root_body: Body,
         body: Body,
-        root_T_link: HomogeneousTransformationMatrix,
+        root_T_link: HomogeneousTransformationMatrix3Dimensional,
         is_static: bool,
     ) -> None:
         """
@@ -632,7 +632,9 @@ class GazeboParser(WorldModelParser):
 
         return Inertial(
             mass=self.parse_float(element, "mass", 1.0),
-            center_of_mass=Point3(*link_T_inertial[:3, 3], reference_frame=body),
+            center_of_mass=Point3Dimensional(
+                *link_T_inertial[:3, 3], reference_frame=body
+            ),
             inertia=InertiaTensor(data=inertia),
         )
 
@@ -662,7 +664,7 @@ class GazeboParser(WorldModelParser):
     def parse_geometry(
         self,
         element: ElementTree.Element,
-        origin: HomogeneousTransformationMatrix,
+        origin: HomogeneousTransformationMatrix3Dimensional,
         color: Color,
     ) -> Shape:
         """
@@ -733,7 +735,7 @@ class GazeboParser(WorldModelParser):
         self,
         element: ElementTree.Element,
         bodies: dict[str, Body],
-        model_T_link: dict[str, HomogeneousTransformationMatrix],
+        model_T_link: dict[str, HomogeneousTransformationMatrix3Dimensional],
     ) -> ConnectionSpecificationWithEndpoints:
         """
         Parses a ``joint`` element into the specification of the joint it states.
@@ -790,7 +792,7 @@ class GazeboParser(WorldModelParser):
 
     def parse_axis(
         self, element: ElementTree.Element, joint_name: str, parent_body: Body
-    ) -> Vector3:
+    ) -> Vector3Dimensional:
         """
         Parses the axis of a ``joint`` element.
 
@@ -806,7 +808,7 @@ class GazeboParser(WorldModelParser):
         """
         axis_element = element.find("axis")
         if axis_element is None:
-            return Vector3(0, 0, 1, reference_frame=parent_body)
+            return Vector3Dimensional(0, 0, 1, reference_frame=parent_body)
 
         uses_model_frame = axis_element.findtext("use_parent_model_frame", "0")
         if uses_model_frame.strip().lower() in self.truthy_values:
@@ -816,7 +818,7 @@ class GazeboParser(WorldModelParser):
 
         xyz_element = axis_element.find("xyz")
         if xyz_element is None:
-            return Vector3(0, 0, 1, reference_frame=parent_body)
+            return Vector3Dimensional(0, 0, 1, reference_frame=parent_body)
 
         expressed_in = xyz_element.get("expressed_in", "")
         if expressed_in:
@@ -824,7 +826,7 @@ class GazeboParser(WorldModelParser):
                 joint_name=joint_name, reference=expressed_in
             )
 
-        axis = Vector3(
+        axis = Vector3Dimensional(
             *self.parse_vector(xyz_element.text), reference_frame=parent_body
         )
         axis.scale(a=1)
@@ -888,7 +890,7 @@ class GazeboParser(WorldModelParser):
         self,
         element: ElementTree.Element | None,
         reference_frame: Body | None = None,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Parses a ``pose`` element.
 
@@ -903,7 +905,9 @@ class GazeboParser(WorldModelParser):
         :raises MalformedPose: If the pose does not hold 6 values.
         """
         if element is None:
-            return HomogeneousTransformationMatrix(reference_frame=reference_frame)
+            return HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=reference_frame
+            )
 
         for attribute in ("frame", "relative_to"):
             reference = element.get(attribute, "").strip()
@@ -915,7 +919,7 @@ class GazeboParser(WorldModelParser):
         if len(values) != 6:
             raise MalformedPose(text=text)
 
-        return HomogeneousTransformationMatrix.from_xyz_rpy(
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             *(float(value) for value in values), reference_frame=reference_frame
         )
 

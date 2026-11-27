@@ -37,12 +37,12 @@ from krrood.symbolic_math.symbolic_math import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    Point3,
-    Vector3,
+    Point3Dimensional,
+    Vector3Dimensional,
     Quaternion,
     RotationMatrix,
-    HomogeneousTransformationMatrix,
-    Pose,
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.geometry import Color
@@ -70,12 +70,12 @@ class DebugExpression:
 
     expression: (
         Scalar
-        | Point3
-        | Vector3
+        | Point3Dimensional
+        | Vector3Dimensional
         | Quaternion
         | RotationMatrix
-        | HomogeneousTransformationMatrix
-        | Pose
+        | HomogeneousTransformationMatrix3Dimensional
+        | Pose3Dimensional
     )
     """
     The tracked expression; spatial types are additionally rendered as RViz markers.
@@ -406,10 +406,12 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
     frame lies as :attr:`goal_binding_policy` says.
     """
 
-    root_T_goal_reference_frame: HomogeneousTransformationMatrix | None = field(
-        default=None,
-        init=False,
-        repr=False,
+    root_T_goal_reference_frame: HomogeneousTransformationMatrix3Dimensional | None = (
+        field(
+            default=None,
+            init=False,
+            repr=False,
+        )
     )
     """
     The pose of :attr:`goal_reference_frame` relative to :attr:`goal_binding_root`, as
@@ -456,7 +458,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
 
     def _root_T_goal_reference_frame_to_bind(
         self,
-    ) -> HomogeneousTransformationMatrix | None:
+    ) -> HomogeneousTransformationMatrix3Dimensional | None:
         """
         :return: The matrix :meth:`set_up` binds, or None to bind one over new
             variables.

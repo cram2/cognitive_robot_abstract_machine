@@ -55,7 +55,10 @@ from semantic_digital_twin.robots.robot_parts import (
     EndEffector,
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world_description.connection_properties import (
     DriveServos,
     JointDrive,
@@ -73,15 +76,18 @@ from semantic_digital_twin.world_description.world_entity import (
 
 # %% Tiago Odometry topic
 
+
 class TiagoOdomTopic(StrEnum):
     """
     Names of the topics the Tiago publishes odometry, where it does not
     follow conventional names.
     """
+
     ODOMETRY = "mobile_base_controller/odom"
     """
     The name of the topic the Tiago publishes its odometry on.
     """
+
 
 # %% Robot parts
 
@@ -268,12 +274,12 @@ class TiagoGripper(EndEffector, HasParallelGripperCommandServer, ABC):
         return [gripper_open, gripper_close]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
 
 @dataclass(eq=False)
@@ -577,8 +583,8 @@ class TiagoMobileBase(
         return TiagoOdomTopic.ODOMETRY
 
     @classproperty
-    def forward_axis(cls) -> Vector3:
-        return Vector3.X()
+    def forward_axis(cls) -> Vector3Dimensional:
+        return Vector3Dimensional.X()
 
     full_body_controlled: bool = field(default=True, kw_only=True)
 
@@ -896,12 +902,12 @@ class TiagoMujocoLeftGripper(
         return [gripper_close, gripper_open]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -950,12 +956,12 @@ class TiagoMujocoRightGripper(
         return [gripper_close, gripper_open]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -1059,7 +1065,7 @@ class TiagoMujocoCamera(RobotCamera[FieldOfViewCameraModel]):
                 robot_root._world.get_body_in_branch_by_name(
                     robot_root, TiagoMujocoBody.HEAD
                 ),
-                HomogeneousTransformationMatrix(
+                HomogeneousTransformationMatrix3Dimensional(
                     data=[[0, 0, 1, 0], [-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]]
                 ),
             ),
@@ -1148,8 +1154,8 @@ class TiagoMujocoTorso(
 @dataclass(eq=False)
 class TiagoMujocoMobileBase(MobileBase[DifferentialDrive], HasTorso[TiagoMujocoTorso]):
     @classproperty
-    def forward_axis(cls) -> Vector3:
-        return Vector3.X()
+    def forward_axis(cls) -> Vector3Dimensional:
+        return Vector3Dimensional.X()
 
     def setup_hardware_interfaces(self):
         pass

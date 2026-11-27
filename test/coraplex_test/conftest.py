@@ -30,8 +30,10 @@ from cramph.node import StatechartNode
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.predefined_maps.building_floor import BuildingFloor
-from krrood_spatial_math.spatial_types import Pose
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.adapters.multi_sim import MujocoSim  # noqa: E402
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName  # noqa: E402
@@ -56,7 +58,6 @@ except ModuleNotFoundError:
 from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 from .world_snapshot import WorldSnapshot
@@ -198,7 +199,7 @@ def whole_scene_region(pr2_apartment_context) -> VolumetricBoundingBox:
     """
     world, _, _ = pr2_apartment_context
     return VolumetricBoundingBox(
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
         min_x=-10,
         min_y=-10,
         min_z=-10,
@@ -217,7 +218,7 @@ def empty_region(pr2_apartment_context) -> VolumetricBoundingBox:
     """
     world, _, _ = pr2_apartment_context
     return VolumetricBoundingBox(
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
         min_x=-10,
         min_y=-10,
         min_z=-10,
@@ -233,7 +234,7 @@ def empty_region(pr2_apartment_context) -> VolumetricBoundingBox:
 def tool_center_point_goal(
     robot: AbstractRobot,
     arm: Arm | None = None,
-    target: Pose | None = None,
+    target: Pose3Dimensional | None = None,
 ) -> CartesianPose:
     """
     Build the goal an action would build to move an arm's tool center point.
@@ -256,7 +257,9 @@ def tool_center_point_goal(
             ).end_effector.tool_frame,
         ),
         goal_pose=(
-            Pose(reference_frame=robot._world.root) if target is None else target
+            Pose3Dimensional(reference_frame=robot._world.root)
+            if target is None
+            else target
         ),
     )
 

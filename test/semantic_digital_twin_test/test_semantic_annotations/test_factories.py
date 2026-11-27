@@ -59,10 +59,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     CoffeeMachine,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
 )
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
@@ -123,7 +123,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                        axis=Vector3.Z()
+                        axis=Vector3Dimensional.Z()
                     ),
                 ),
             )
@@ -132,7 +132,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                        axis=Vector3.X()
+                        axis=Vector3Dimensional.X()
                     ),
                 ),
             )
@@ -200,7 +200,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                        axis=Vector3.Z()
+                        axis=Vector3Dimensional.Z()
                     ),
                 ),
             )
@@ -222,7 +222,7 @@ class TestFactories(unittest.TestCase):
                 scale=Scale(0.03, 0.03, 0.02),
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                        axis=Vector3.Z(), pitch=screw_pitch
+                        axis=Vector3Dimensional.Z(), pitch=screw_pitch
                     ),
                 ),
             )
@@ -306,7 +306,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                        axis=Vector3.X()
+                        axis=Vector3Dimensional.X()
                     ),
                 ),
             )
@@ -438,7 +438,7 @@ class TestFactories(unittest.TestCase):
     def test_door_movable_joint_needs_a_handle(self):
         world, door = self._setup_door()
         with self.assertRaises(MissingSemanticAnnotationError):
-            door.calculate_self_T_movable_joint(Vector3.Z())
+            door.calculate_self_T_movable_joint(Vector3Dimensional.Z())
 
     def test_door_movable_joint_is_on_the_vertical_edge_opposite_the_handle(self):
         world, door = self._setup_door()
@@ -447,16 +447,18 @@ class TestFactories(unittest.TestCase):
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    y=0.4
+                ),
             )
             door.add(part=handle)
 
         # Test Z-axis rotation (vertical hinge)
         # handle is at y=0.4, door width is 1.0. Hinge should be at opposite side: y=-0.5
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Z())
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3Dimensional.Z())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
-            HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5).to_np(),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=-0.5).to_np(),
         )
 
         world, door = self._setup_door()
@@ -465,14 +467,16 @@ class TestFactories(unittest.TestCase):
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.4),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    y=-0.4
+                ),
             )
             door.add(part=handle)
 
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Z())
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3Dimensional.Z())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
-            HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5).to_np(),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.5).to_np(),
         )
 
     def test_door_movable_joint_is_on_the_same_edge_for_an_axis_of_either_sign(self):
@@ -481,13 +485,17 @@ class TestFactories(unittest.TestCase):
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    y=0.4
+                ),
             )
             door.add(part=handle)
 
         np.testing.assert_allclose(
-            door.calculate_self_T_movable_joint(Vector3.NEGATIVE_Z()).to_np(),
-            door.calculate_self_T_movable_joint(Vector3.Z()).to_np(),
+            door.calculate_self_T_movable_joint(
+                Vector3Dimensional.NEGATIVE_Z()
+            ).to_np(),
+            door.calculate_self_T_movable_joint(Vector3Dimensional.Z()).to_np(),
         )
 
     def test_door_mounts_on_a_hinge_opposite_its_handle(self):
@@ -496,17 +504,23 @@ class TestFactories(unittest.TestCase):
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.4),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    y=0.4
+                ),
             )
             door.add(part=handle)
         world_T_door = door.root.global_transform
-        world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Z())
+        world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(
+            Vector3Dimensional.Z()
+        )
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=0.0, upper_position=np.pi / 2
         )
 
         specification = ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             dof_limits=limits,
         )
 
@@ -525,7 +539,9 @@ class TestFactories(unittest.TestCase):
             door.root.global_transform.to_np(),
             (
                 world_T_hinge
-                @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2)
+                @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    yaw=np.pi / 2
+                )
                 @ world_T_hinge.inverse()
                 @ world_T_door
             ).to_np(),
@@ -539,7 +555,7 @@ class TestFactories(unittest.TestCase):
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=0.4, z=0.0
                 ),
             )
@@ -547,10 +563,10 @@ class TestFactories(unittest.TestCase):
 
         # Test Y-axis rotation (horizontal hinge)
         # handle z=0. Hinge should be at z=1.0 (opposite of default sign 1 if z=0)
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Y())
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3Dimensional.Y())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
-            HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0).to_np(),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(z=1.0).to_np(),
         )
 
         world, door = self._setup_door()
@@ -559,7 +575,7 @@ class TestFactories(unittest.TestCase):
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=0.5, z=0.0
                 ),
             )
@@ -567,12 +583,12 @@ class TestFactories(unittest.TestCase):
 
         # handle at z=0.5. Hinge should be at z=-1.0
         handle.root.parent_connection.parent_T_connection_expression = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(z=0.5)
         )
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Y())
+        door_T_hinge = door.calculate_self_T_movable_joint(Vector3Dimensional.Y())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
-            HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0).to_np(),
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(z=-1.0).to_np(),
         )
 
     def test_door_movable_joint_rejects_an_axis_off_the_door_plane(self):
@@ -584,7 +600,7 @@ class TestFactories(unittest.TestCase):
             )
             door.add(part=handle)
         with self.assertRaises(InvalidHingeActiveAxis):
-            door.calculate_self_T_movable_joint(Vector3(1, 1, 0))
+            door.calculate_self_T_movable_joint(Vector3Dimensional(1, 1, 0))
 
     def test_calculate_supporting_surface(self):
         world = World.create_with_root_body("root")
@@ -612,7 +628,9 @@ class TestFactories(unittest.TestCase):
             table = Table.create_with_new_body_in_world(
                 name="table",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    z=1.5
+                ),
             )
         table_scale = Scale(1.0, 1.0, 0.5)
         table.root.collision = BoundingBoxCollection.from_event(
@@ -643,14 +661,14 @@ class TestFactories(unittest.TestCase):
             table = Table.create_with_new_body_in_world(
                 name="table",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=2.0, y=-1.0, yaw=np.pi / 2
                 ),
             )
         table.root.collision = ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=0.5, y=0.3, z=0.25, reference_frame=table.root
                     ),
                     scale=Scale(1.0, 0.6, 0.5),
@@ -664,7 +682,7 @@ class TestFactories(unittest.TestCase):
             surface = table.calculate_supporting_surface()
 
         self.assertIsNotNone(surface)
-        table_top = Point3(0.5, 0.3, 0.5, reference_frame=table.root)
+        table_top = Point3Dimensional(0.5, 0.3, 0.5, reference_frame=table.root)
         expected = world.transform(table_top, world.root).to_np()[:3]
         np.testing.assert_allclose(
             surface.global_transform.position.to_np()[:3], expected, atol=1e-9
@@ -693,13 +711,17 @@ class TestFactories(unittest.TestCase):
                 name="milk",
                 world=world,
                 scale=Scale(0.03, 0.03, 0.1),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=0.5
+                ),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
                 scale=Scale(0.1, 0.03, 0.2),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=-0.5
+                ),
             )
             table = Table.create_with_new_body_in_world(
                 name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
@@ -733,19 +755,25 @@ class TestFactories(unittest.TestCase):
                 name="milk",
                 world=world,
                 scale=Scale(0.03, 0.03, 0.1),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=0.5
+                ),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
                 scale=Scale(0.1, 0.03, 0.2),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=-0.5
+                ),
             )
             cereal2 = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
                 scale=Scale(0.1, 0.03, 0.2),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.2),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    y=0.2
+                ),
             )
             table = Table.create_with_new_body_in_world(
                 name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
@@ -777,13 +805,17 @@ class TestFactories(unittest.TestCase):
                 name="milk",
                 world=world,
                 scale=Scale(0.03, 0.03, 0.1),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=0.5
+                ),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
                 scale=Scale(0.1, 0.03, 0.2),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=-0.5
+                ),
             )
             table = Table.create_with_new_body_in_world(
                 name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
@@ -813,19 +845,25 @@ class TestFactories(unittest.TestCase):
                 name="milk",
                 world=world,
                 scale=Scale(0.03, 0.03, 0.1),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=0.5
+                ),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
                 scale=Scale(0.1, 0.03, 0.2),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=-0.5
+                ),
             )
             cereal2 = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
                 scale=Scale(0.1, 0.03, 0.2),
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.2),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    y=0.2
+                ),
             )
             table = Table.create_with_new_body_in_world(
                 name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
@@ -859,10 +897,10 @@ class TestFactories(unittest.TestCase):
         world = World()
         root = Body(name=PrefixedName("root"))
         points = [
-            Point3(0, 0, 0, reference_frame=root),
-            Point3(1, 0, 0, reference_frame=root),
-            Point3(1, 1, 0, reference_frame=root),
-            Point3(0, 1, 0, reference_frame=root),
+            Point3Dimensional(0, 0, 0, reference_frame=root),
+            Point3Dimensional(1, 0, 0, reference_frame=root),
+            Point3Dimensional(1, 1, 0, reference_frame=root),
+            Point3Dimensional(0, 1, 0, reference_frame=root),
         ]
         with world.modify_world():
             world.add_body(root)
@@ -889,7 +927,9 @@ class TestFactories(unittest.TestCase):
                 name="door2",
                 scale=door_scale,
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=2),
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=2
+                ),
             )
 
         doors = list(wall.doors)
@@ -937,7 +977,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                        axis=Vector3.Z()
+                        axis=Vector3Dimensional.Z()
                     ),
                     dof_limits=limits,
                 ),
@@ -959,7 +999,7 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                        axis=Vector3.Z()
+                        axis=Vector3Dimensional.Z()
                     ),
                     dof_limits=limits,
                 ),
@@ -1005,14 +1045,14 @@ class TestFactories(unittest.TestCase):
             door_left = Door.create_with_new_body_in_world(
                 name="door_left",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, y=0.5
                 ),
             )
             door_right = Door.create_with_new_body_in_world(
                 name="door_right",
                 world=world,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, y=-0.5
                 ),
             )
@@ -1022,14 +1062,16 @@ class TestFactories(unittest.TestCase):
             world.add_semantic_annotation(double_door)
 
         # View point at origin looking forward (identity)
-        view_point_front = HomogeneousTransformationMatrix.from_xyz_rpy()
+        view_point_front = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy()
         self.assertEqual(
             double_door.calculate_left_right_door_from_view_point(view_point_front),
             (door_left, door_right),
         )
 
         # View point at x=2 looking back (180 deg around Z)
-        view_point_back = HomogeneousTransformationMatrix.from_xyz_rpy(x=2, yaw=np.pi)
+        view_point_back = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=2, yaw=np.pi
+        )
         self.assertEqual(
             double_door.calculate_left_right_door_from_view_point(view_point_back),
             (door_right, door_left),
@@ -1466,8 +1508,8 @@ def test_movable_joint_of_a_part_that_slides_or_screws_sits_at_its_origin(
         )
 
     np.testing.assert_allclose(
-        part.calculate_self_T_movable_joint(Vector3.X()).to_np(),
-        HomogeneousTransformationMatrix().to_np(),
+        part.calculate_self_T_movable_joint(Vector3Dimensional.X()).to_np(),
+        HomogeneousTransformationMatrix3Dimensional().to_np(),
     )
 
 
@@ -1478,7 +1520,7 @@ def test_drawer_mounts_on_its_movable_joint_where_it_stands():
             name="drawer",
             world=world,
             scale=Scale(0.4, 0.5, 0.6),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, yaw=0.3
             ),
         )
@@ -1487,7 +1529,7 @@ def test_drawer_mounts_on_its_movable_joint_where_it_stands():
     joint = drawer.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
         )
     )
@@ -1505,7 +1547,7 @@ def door_with_handle_at(*, y: float, z: float) -> tuple[World, Door]:
         ``y`` and ``z`` in the door's frame.
     """
     world = _world_with_root()
-    world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=2.0, y=-1.0, z=1.0, yaw=0.4
     )
     with world.modify_world():
@@ -1519,7 +1561,7 @@ def door_with_handle_at(*, y: float, z: float) -> tuple[World, Door]:
             name="handle",
             world=world,
             world_root_T_self=world_T_door
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(y=y, z=z),
+            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=y, z=z),
         )
         door.add(part=handle)
     return world, door
@@ -1532,11 +1574,15 @@ def test_a_door_on_a_horizontal_hinge_swings_about_the_edge_opposite_its_handle(
     """
     world, door = door_with_handle_at(y=0.4, z=0.0)
     world_T_door = door.root.global_transform
-    world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Y())
+    world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(
+        Vector3Dimensional.Y()
+    )
 
     joint = door.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Y()
+            )
         )
     )
 
@@ -1549,7 +1595,7 @@ def test_a_door_on_a_horizontal_hinge_swings_about_the_edge_opposite_its_handle(
         door.root.global_transform.to_np(),
         (
             world_T_hinge
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(pitch=0.5)
+            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(pitch=0.5)
             @ world_T_hinge.inverse()
             @ world_T_door
         ).to_np(),
@@ -1568,7 +1614,7 @@ def test_a_mounted_drawer_slides_along_its_axis():
             name="drawer",
             world=world,
             scale=Scale(0.4, 0.5, 0.6),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1.0, yaw=0.3
             ),
         )
@@ -1576,7 +1622,9 @@ def test_a_mounted_drawer_slides_along_its_axis():
 
     joint = drawer.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X())
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3Dimensional.X()
+            )
         )
     )
     joint.position = 0.2
@@ -1584,7 +1632,10 @@ def test_a_mounted_drawer_slides_along_its_axis():
 
     np.testing.assert_allclose(
         drawer.root.global_transform.to_np(),
-        (world_T_drawer @ HomogeneousTransformationMatrix.from_xyz_rpy(x=0.2)).to_np(),
+        (
+            world_T_drawer
+            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.2)
+        ).to_np(),
         atol=1e-12,
     )
 
@@ -1600,7 +1651,7 @@ def test_a_mounted_bottle_cap_advances_by_its_pitch_per_turn():
             name="cap",
             world=world,
             scale=Scale(0.03, 0.03, 0.02),
-            world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.5, z=0.8, roll=0.2
             ),
         )
@@ -1609,7 +1660,7 @@ def test_a_mounted_bottle_cap_advances_by_its_pitch_per_turn():
     joint = cap.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                axis=Vector3.Z(), pitch=0.004
+                axis=Vector3Dimensional.Z(), pitch=0.004
             )
         )
     )
@@ -1618,7 +1669,10 @@ def test_a_mounted_bottle_cap_advances_by_its_pitch_per_turn():
 
     np.testing.assert_allclose(
         cap.root.global_transform.to_np(),
-        (world_T_cap @ HomogeneousTransformationMatrix.from_xyz_rpy(z=0.004)).to_np(),
+        (
+            world_T_cap
+            @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(z=0.004)
+        ).to_np(),
         atol=1e-12,
     )
 
@@ -1632,14 +1686,18 @@ def test_mounting_a_door_again_replaces_its_joint_and_keeps_it_in_place():
     world_T_door = door.root.global_transform
     first = door.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z())
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            )
         )
     )
     connection_count = len(world.connections)
 
     second = door.mount_on_movable_joint(
         ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Y()
+            )
         )
     )
 
@@ -1679,7 +1737,7 @@ def test_a_door_on_its_hinge_reports_how_far_it_stands_open():
             scale=Scale(0.03, 1, 2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.5, maximum_speed=1.0

@@ -45,17 +45,21 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Drawer,
 )
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
+from krrood_spatial_math.exceptions import FramesOfDifferentSpacesError
+from krrood_spatial_math.space import EuclideanSpace
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.derivatives import (
     Derivatives,
     DerivativeMap,
 )
 
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose2D,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.testing import StateChangeCounter, world_setup  # noqa: F401
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -152,7 +156,7 @@ def test_set_state(world_setup):
     c3: Connection6DoF = world.get_connection(world.root, bf)
     transform = RotationMatrix.from_rpy(1, 0, 0).to_np()
     transform[0, 3] = 69
-    c3.origin = HomogeneousTransformationMatrix(
+    c3.origin = HomogeneousTransformationMatrix3Dimensional(
         data=transform, reference_frame=world.root, child_frame=bf
     )
     assert np.allclose(world.compute_forward_kinematics_np(world.root, bf), transform)
@@ -555,9 +559,9 @@ def test_compute_relative_pose(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    pose = HomogeneousTransformationMatrix(reference_frame=l2)
+    pose = HomogeneousTransformationMatrix3Dimensional(reference_frame=l2)
     relative_pose = world.transform(pose, l1)
-    expected_pose = HomogeneousTransformationMatrix(
+    expected_pose = HomogeneousTransformationMatrix3Dimensional(
         [
             [1.0, 0, 0.0, 1.0],
             [0.0, 1.0, 0.0, 0.0],
@@ -569,9 +573,182 @@ def test_compute_relative_pose(world_setup):
     np.testing.assert_array_almost_equal(relative_pose.to_np(), expected_pose.to_np())
 
 
+# %% the space the frames of a world's bodies chart
+
+
+def test_a_world_is_a_three_dimensional_euclidean_space():
+    """
+    The world is the space the frames of its bodies chart.
+    """
+    assert issubclass(World, EuclideanSpace)
+
+
+def test_a_body_charts_the_space_of_its_world(world_setup):
+    """
+    A body added to a world is a frame on that world's space.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    assert l1.space is world
+
+
+def test_a_body_in_no_world_charts_no_known_space():
+    """
+    A body belongs to a space only once it is added to a world.
+    """
+    assert Body(name=PrefixedName("loose")).space is None
+
+
+def test_a_body_cannot_express_a_value_of_another_worlds_body(world_setup):
+    """
+    Two worlds are two spaces, so no change relates their bodies.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    other_world = World()
+    other_body = Body(name=PrefixedName("other"))
+    with other_world.modify_world():
+        other_world.add_kinematic_structure_entity(other_body)
+
+    with pytest.raises(FramesOfDifferentSpacesError):
+        l1.express_in_own_frame(value=Vector3Dimensional.X(reference_frame=other_body))
+
+
+def test_two_bodies_sliding_along_their_x_axes_lie_on_one_plane(world_setup):  # noqa: F811
+    """
+    A prismatic connection along the x-axis keeps both bodies on one x-y plane, wherever
+    it has moved the child.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    connection: ScrewAxisConnection = world.get_connection(l1, l2)
+    world.state[connection.dof.id].position = 1.0
+    world.notify_state_change()
+
+    assert l2.embedded_plane == l1.embedded_plane
+
+
+def test_bodies_fixed_on_one_body_and_turning_about_z_lie_on_its_plane(world_setup):  # noqa: F811
+    """
+    Bodies fixed on one body, and bodies turning about their z-axes on them, share that
+    body's plane, however far apart in the tree.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    assert {body.embedded_plane for body in (l1, l2, r1, r2)} == {bf.embedded_plane}
+
+
+def test_a_body_free_to_move_in_space_lies_on_its_own_plane(world_setup):  # noqa: F811
+    """
+    A connection with six degrees of freedom may tilt or lift its child, so the child
+    does not share its parent's plane.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    assert bf.embedded_plane != world.root.embedded_plane
+
+
+def test_bodies_of_two_worlds_lie_on_two_planes(world_setup):  # noqa: F811
+    """
+    Two worlds are two spaces, so the planes of their bodies have no point in common.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    other_world = World()
+    other_body = Body(name=PrefixedName("other"))
+    with other_world.modify_world():
+        other_world.add_kinematic_structure_entity(other_body)
+
+    assert l1.embedded_plane != other_body.embedded_plane
+
+
+@pytest.fixture
+def driven_arm_world() -> tuple[World, OmniDrive, ScrewAxisConnection]:
+    """
+    :return: A world whose base is driven on the map and carries an arm turning about
+        the base's x-axis, with the drive and the arm's joint.
+    """
+    world = World()
+    with world.modify_world():
+        map_body, base, arm = (
+            Body(name=PrefixedName(name)) for name in ("map", "base", "arm")
+        )
+        world.add_kinematic_structure_entity(map_body)
+        drive = OmniDrive.create_with_dofs(world=world, parent=map_body, child=base)
+        world.add_connection(drive)
+        joint = ScrewAxisConnection.create_with_dofs(
+            world=world,
+            parent=base,
+            child=arm,
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.X()
+            ),
+        )
+        world.add_connection(joint)
+    return world, drive, joint
+
+
+@pytest.mark.parametrize("measured_pitch", [0.0, 1e-5, 0.01])
+def test_a_driven_base_lies_on_the_map_plane_however_its_imu_tilts(
+    driven_arm_world, measured_pitch
+):
+    """
+    A drive moves its base on the plane of the map; the roll and pitch an IMU measures
+    are no motion off it, so planar values relate the base and the map.
+    """
+    world, drive, joint = driven_arm_world
+    world.state[drive.pitch.id].position = measured_pitch
+    world.notify_state_change()
+
+    planar_pose = Pose2Dimensional.from_xy_yaw(
+        x=1, y=2, yaw=0.3, reference_frame=drive.child
+    )
+
+    assert drive.child.embedded_plane == drive.parent.embedded_plane
+    assert world.transform(planar_pose, drive.parent).reference_frame is drive.parent
+
+
+@pytest.mark.parametrize("joint_position", [0.0, 1e-9, 0.3])
+def test_a_body_turning_about_an_x_axis_never_lies_on_its_parents_plane(
+    driven_arm_world, joint_position
+):
+    """
+    A joint about the x-axis may tilt its child off the parent's plane, so the child
+    does not share it, even in the states where it lies on it.
+    """
+    world, drive, joint = driven_arm_world
+    joint.position = joint_position
+
+    assert joint.child.embedded_plane != joint.parent.embedded_plane
+
+
+def test_a_body_added_on_another_lies_on_its_plane(driven_arm_world):
+    """
+    A body fixed on another after the other's plane was asked for lies on that plane.
+    """
+    world, drive, joint = driven_arm_world
+    base_plane = drive.child.embedded_plane
+    tray = Body(name=PrefixedName("tray"))
+    with world.modify_world():
+        world.add_connection(FixedConnection(parent=drive.child, child=tray))
+
+    assert tray.embedded_plane == base_plane
+
+
+def test_a_body_states_its_z_axis_in_itself(world_setup):
+    """
+    The normal of a body's x-y plane is the body's own z-axis, whatever its pose.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+
+    z_axis = l2.z_axis
+
+    assert z_axis.reference_frame is l2
+    np.testing.assert_array_equal(
+        z_axis.to_np(), Vector3Dimensional.Z(reference_frame=l2).to_np()
+    )
+
+
 def test_transform_a_pose_2d(world_setup):
     """
-    A Pose2D carries no z, roll or pitch, so transforming one answers with the
+    A Pose2Dimensional carries no z, roll or pitch, so transforming one answers with the
     transformed 3D pose flattened back onto the target frame's plane.
     """
     world, l1, l2, bf, r1, r2 = world_setup
@@ -579,21 +756,23 @@ def test_transform_a_pose_2d(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    pose_2d = Pose2D.from_xy_yaw(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
+    pose_2d = Pose2Dimensional.from_xy_yaw(x=2.0, y=0.5, yaw=0.3, reference_frame=l2)
 
     relative_pose_2d = world.transform(pose_2d, l1)
 
-    assert isinstance(relative_pose_2d, Pose2D)
+    assert isinstance(relative_pose_2d, Pose2Dimensional)
     assert relative_pose_2d.reference_frame == l1
     np.testing.assert_array_almost_equal(
         relative_pose_2d.to_np(),
-        Pose2D.from_pose(world.transform(pose_2d.pose, l1)).to_np(),
+        Pose2Dimensional.from_pose(world.transform(pose_2d.pose, l1)).to_np(),
     )
 
 
 def test_compute_relative_pose_both(world_setup):
     world, l1, l2, bf, r1, r2 = world_setup
-    world.get_connection(world.root, bf).origin = HomogeneousTransformationMatrix(
+    world.get_connection(
+        world.root, bf
+    ).origin = HomogeneousTransformationMatrix3Dimensional(
         data=np.array(
             [
                 [0.0, -1.0, 0.0, 1.0],
@@ -607,7 +786,9 @@ def test_compute_relative_pose_both(world_setup):
     )
     world.notify_state_change()
 
-    pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, reference_frame=bf)
+    pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, reference_frame=bf
+    )
     relative_pose = world.transform(pose, world.root)
     # Rotation is 90 degrees around z-axis, translation is 1 along x-axis
     expected_pose = np.array(
@@ -628,7 +809,9 @@ def test_compute_relative_pose_only_translation(world_setup):
     world.state[connection.dof.id].position = 1.0
     world.notify_state_change()
 
-    pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=2.0, reference_frame=l2)
+    pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=2.0, reference_frame=l2
+    )
     relative_pose = world.transform(pose, l1)
     expected_pose = np.array(
         [
@@ -648,7 +831,7 @@ def test_compute_relative_pose_only_rotation(world_setup):
     world.state[connection.dof.id].position = np.pi / 2  # 90 degrees
     world.notify_state_change()
 
-    pose = HomogeneousTransformationMatrix(reference_frame=r2)
+    pose = HomogeneousTransformationMatrix3Dimensional(reference_frame=r2)
     relative_pose = world.transform(pose, r1)
     expected_pose = np.array(
         [
@@ -742,7 +925,7 @@ def test_merge_with_connection(world_setup, pr2_world_copy):
     pose = np.eye(4)
     pose[0, 3] = 1.0
 
-    origin = HomogeneousTransformationMatrix(pose)
+    origin = HomogeneousTransformationMatrix3Dimensional(pose)
 
     connection = pr2_world_copy.get_connection_by_name(
         PR2Joint.LEFT_GRIPPER_LEFT_FINGER
@@ -828,7 +1011,9 @@ def test_merge_with_pose(world_setup, pr2_world_copy):
     pose = np.eye(4)
     pose[0, 3] = 1.0  # Translate along x-axis
 
-    world.merge_world_at_pose(pr2_world_copy, HomogeneousTransformationMatrix(pose))
+    world.merge_world_at_pose(
+        pr2_world_copy, HomogeneousTransformationMatrix3Dimensional(pose)
+    )
 
     assert base_link in world.kinematic_structure_entities
     assert r_gripper_tool_frame in world.kinematic_structure_entities
@@ -864,7 +1049,9 @@ def test_merge_with_pose_rotation(world_setup, pr2_world_copy):
         ]
     )
 
-    world.merge_world_at_pose(pr2_world_copy, HomogeneousTransformationMatrix(pose))
+    world.merge_world_at_pose(
+        pr2_world_copy, HomogeneousTransformationMatrix3Dimensional(pose)
+    )
 
     base_footprint = world.get_kinematic_structure_entity_by_name("base_footprint")
 
@@ -963,7 +1150,7 @@ def test_copy_world(world_setup):
         original_bf_con.parent, original_bf_con.child
     )
     assert id(copy_connection) != id(original_bf_con)
-    bf.parent_connection.origin = HomogeneousTransformationMatrix(
+    bf.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
         data=np.array([[1, 0, 0, 1.5], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         reference_frame=bf.parent_connection.parent,
         child_frame=bf,
@@ -1212,7 +1399,9 @@ def test_bug_05_has_collision_respects_volume_threshold():
     tiny_body = Body(name=PrefixedName("tiny", prefix="review"))
     collision = Box(
         scale=Scale(0.001, 0.001, 0.001),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=tiny_body),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=tiny_body
+        ),
     )
     tiny_body.collision = ShapeCollection([collision], reference_frame=tiny_body)
     # volume = 1e-9 m^3, far below the documented default threshold of 1.001e-6 m^3
@@ -1226,7 +1415,9 @@ def create_body_with_box(name: str, scale: Scale) -> Body:
     body = Body(name=PrefixedName(name, prefix="review"))
     collision = Box(
         scale=scale,
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=body
+        ),
     )
     body.collision = ShapeCollection([collision], reference_frame=body)
     return body
@@ -1351,6 +1542,58 @@ def test_rebind_leaves_an_entity_this_world_does_not_contain(world_setup):
     assert World().rebind_world_entities(l1) is l1
 
 
+def test_rebind_spatial_value_is_given_in_the_copys_own_frame(world_setup):
+    """
+    A point given in a body is rebound into the corresponding body of the copy, and
+    keeps its coordinates.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    point = Point3Dimensional(x=1.0, y=2.0, z=3.0, reference_frame=l1)
+
+    rebound = world_copy.rebind_world_entities(point)
+
+    assert rebound.reference_frame is world_copy.get_body_by_name(l1.name)
+    assert rebound.to_np().tolist() == point.to_np().tolist()
+    assert point.reference_frame is l1
+
+
+def test_rebind_spatial_change_is_given_between_the_copys_own_frames(world_setup):
+    """
+    A transformation between two bodies is rebound into the corresponding bodies of the
+    copy, for its reference frame and for its child frame.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    transformation = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, reference_frame=l1, child_frame=l2
+    )
+
+    rebound = world_copy.rebind_world_entities(transformation)
+
+    assert rebound.reference_frame is world_copy.get_body_by_name(l1.name)
+    assert rebound.child_frame is world_copy.get_body_by_name(l2.name)
+
+
+def test_rebound_spatial_value_is_acted_on_by_the_copys_forward_kinematics(
+    world_setup,
+):
+    """
+    A point rebound into the copy is a point the copy's forward kinematics acts on,
+    which a point left in the frames of the original world is not.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    world_copy = deepcopy(world)
+    copy_root = world_copy.get_body_by_name(bf.name)
+    copy_tip = world_copy.get_body_by_name(l2.name)
+    point = Point3Dimensional(reference_frame=l2)
+
+    root_T_tip = world_copy.compose_forward_kinematics_expression(copy_root, copy_tip)
+    root_P_point = root_T_tip @ world_copy.rebind_world_entities(point)
+
+    assert root_P_point.reference_frame is copy_root
+
+
 def test_lookup_by_id_finds_an_annotation_sharing_a_hash_table_key(world_setup):
     """
     An annotation stays findable by its id after a later annotation of the same type
@@ -1461,8 +1704,8 @@ def test_rebind_copies_mutable_leaf_values(world_setup):
     A mutable value that is neither a world entity nor a recognized container is copied,
     not shared.
 
-    Mutating the rebound copy must not affect the original, the way sharing a `Pose`'s
-    underlying `casadi_sx` matrix would.
+    Mutating the rebound copy must not affect the original, the way sharing a
+    `Pose3Dimensional`'s underlying `casadi_sx` matrix would.
     """
 
     class MutableLeaf:
@@ -1583,7 +1826,9 @@ def test_set_omni_after_copy(pr2_world_state_reset):
 
     pr2_copy.get_body_by_name(
         "base_footprint"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(10, 10, 0)
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(10, 10, 0)
+    )
     pr2_copy.notify_state_change()
 
     np.testing.assert_array_almost_equal(
@@ -1707,7 +1952,7 @@ def test_overwrite_dof_limits_mimic(world_setup):
         body = Body(name=PrefixedName("muh"))
         mimic_connection = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3(0, 0, 1)
+                axis=Vector3Dimensional(0, 0, 1)
             ),
             parent=bf,
             child=body,
@@ -1825,7 +2070,9 @@ def test_dof_removal_simple():
     body2 = Body(name=PrefixedName("body2"))
     with world.modify_world():
         c = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=body1,
             child=body2,
@@ -1835,7 +2082,9 @@ def test_dof_removal_simple():
         world.remove_connection(c)
 
         c2 = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=body1,
             child=body2,
@@ -1910,6 +2159,35 @@ def test_a_connection_and_its_copy_in_another_world_share_an_id(world_setup):
 
     assert connection_copy is not connection
     assert connection_copy.id == connection.id
+
+
+def test_a_connection_leaves_the_offset_it_is_given_without_frames(
+    world_setup,  # noqa: F811
+):
+    """
+    One offset can place bodies under several parents, so the connection keeps the
+    frames it stamps on a copy and never on the offset it was given.
+    """
+    world, l1, l2, bf, r1, r2 = world_setup
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        0.1, 0.2, 0.3
+    )
+    connection_T_child = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        0.3, 0.2, 0.1
+    )
+
+    with world.modify_world():
+        world.add_connection(
+            FixedConnection(
+                parent=bf,
+                child=Body(name=PrefixedName("placed_by_a_shared_offset")),
+                parent_T_connection_expression=parent_T_connection,
+                connection_T_child_expression=connection_T_child,
+            )
+        )
+
+    assert parent_T_connection.reference_frame is None
+    assert connection_T_child.child_frame is None
 
 
 def test_connections_between_different_entities_have_different_ids(world_setup):
@@ -2151,7 +2429,7 @@ def test_move_branch_preserves_connection_type_and_pose():
             FixedConnection(
                 parent=root,
                 child=new_parent,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.0, y=2.0, yaw=0.5
                 ),
             )
@@ -2160,7 +2438,7 @@ def test_move_branch_preserves_connection_type_and_pose():
             FixedConnection(
                 parent=root,
                 child=fixed_child,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.3, z=0.4
                 ),
             )
@@ -2229,7 +2507,7 @@ def test_move_branch_offline_preserves_connection_type_and_pose():
             FixedConnection(
                 parent=root,
                 child=new_parent,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.0, y=2.0, yaw=0.5
                 ),
             )
@@ -2238,7 +2516,7 @@ def test_move_branch_offline_preserves_connection_type_and_pose():
             FixedConnection(
                 parent=root,
                 child=fixed_child,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.3, z=0.4
                 ),
             )
@@ -2315,7 +2593,7 @@ def create_world_with_free_floating_child() -> tuple[World, Body, Body]:
             FixedConnection(
                 parent=root,
                 child=new_parent,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.0, y=2.0, yaw=0.5
                 ),
             )
@@ -2323,8 +2601,10 @@ def create_world_with_free_floating_child() -> tuple[World, Body, Body]:
         world.add_connection(
             Connection6DoF.create_with_dofs(parent=root, child=free_child, world=world)
         )
-    free_child.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=0.3, y=-0.7, z=0.2, yaw=1.1, reference_frame=root
+    free_child.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=0.3, y=-0.7, z=0.2, yaw=1.1, reference_frame=root
+        )
     )
     return world, free_child, new_parent
 
@@ -2412,7 +2692,7 @@ def create_world_with_driven_child(
             FixedConnection(
                 parent=root,
                 child=new_parent,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.0, y=2.0, z=0.4, yaw=0.5
                 ),
             )
@@ -2421,7 +2701,7 @@ def create_world_with_driven_child(
             drive_type.create_with_dofs(parent=root, child=driven_child, world=world)
         )
     driven_child.parent_connection.origin = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.3, y=-0.7, yaw=1.1, reference_frame=root
         )
     )
@@ -2458,8 +2738,8 @@ def test_reset_state_context(pr2_world_state_reset):
     with pr2_world_state_reset.reset_state_context():
         pr2_world_state_reset.get_body_by_name(
             "base_footprint"
-        ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            10, 10, 0
+        ).parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(10, 10, 0)
         )
     assert np.allclose(state_copy, pr2_world_state_reset.state._data)
 
@@ -2624,7 +2904,9 @@ def test_clearing_the_world_detaches_connections():
     child = Body(name=PrefixedName("child", prefix="review"))
     collision = Box(
         scale=Scale(),
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=child),
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            reference_frame=child
+        ),
     )
     child.collision = ShapeCollection([collision], reference_frame=child)
     with world.modify_world():
@@ -2645,7 +2927,9 @@ def test_robot_velocity_limit_setup_does_not_touch_environment_joints():
         body = Body(name=PrefixedName(name, prefix="review"))
         collision = Box(
             scale=scale,
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=body
+            ),
         )
         body.collision = ShapeCollection([collision], reference_frame=body)
         return body
@@ -2663,7 +2947,7 @@ def test_robot_velocity_limit_setup_does_not_touch_environment_joints():
         world.add_connection(FixedConnection(parent=root, child=robot_base))
         robot_joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                axis=Vector3.Z(reference_frame=robot_base)
+                axis=Vector3Dimensional.Z(reference_frame=robot_base)
             ),
             world=world,
             parent=robot_base,
@@ -2672,7 +2956,7 @@ def test_robot_velocity_limit_setup_does_not_touch_environment_joints():
         world.add_connection(robot_joint)
         drawer_joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X(reference_frame=root)
+                axis=Vector3Dimensional.X(reference_frame=root)
             ),
             world=world,
             parent=root,
@@ -2721,7 +3005,9 @@ def test_hash_table_lookup_survives_annotation_mutation():
         body = Body(name=PrefixedName(name, prefix="review"))
         collision = Box(
             scale=scale,
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body),
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                reference_frame=body
+            ),
         )
         body.collision = ShapeCollection([collision], reference_frame=body)
         return body
@@ -3234,7 +3520,9 @@ def test_replace_with_transfers_degrees_of_freedom_and_state():
     with other_world.modify_world():
         other_world.add_body(child_body)
         conn = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=other_world,
             parent=other_world.root,
             child=child_body,

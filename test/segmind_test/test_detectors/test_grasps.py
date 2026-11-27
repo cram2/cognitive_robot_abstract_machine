@@ -35,7 +35,9 @@ from segmind.episode_segmenter import EpisodeSegmentation
 from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import EndEffector
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -110,8 +112,10 @@ def _move_to(box: Body, position: tuple[float, float, float]) -> None:
     """
     Stand ``box`` at ``position``, in the world's own frame.
     """
-    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *position, reference_frame=box.parent_connection.parent
+    box.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *position, reference_frame=box.parent_connection.parent
+        )
     )
 
 
@@ -260,8 +264,13 @@ def test_a_body_the_gripper_no_longer_holds_is_let_go_of(pr2_world_copy):
     )
     executor.tick()
 
-    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        CARRIED_AWAY, CARRIED_AWAY, CARRIED_AWAY, reference_frame=pr2_world_copy.root
+    box.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            CARRIED_AWAY,
+            CARRIED_AWAY,
+            CARRIED_AWAY,
+            reference_frame=pr2_world_copy.root,
+        )
     )
     executor.tick()
 
@@ -314,7 +323,7 @@ def _surface_under(world: World, box: Body, aside: float = 0.0) -> Body:
             FixedConnection(
                 parent=world.root,
                 child=surface,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x, y, bottom - TABLE_SIZE / 2, reference_frame=world.root
                 ),
             )
@@ -327,8 +336,10 @@ def _raise_by(box: Body, height: float) -> None:
     Move ``box`` straight up by ``height``.
     """
     x, y, z = box.global_pose.position.to_np()[:3]
-    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x, y, z + height, reference_frame=box.parent_connection.parent
+    box.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x, y, z + height, reference_frame=box.parent_connection.parent
+        )
     )
 
 
@@ -385,8 +396,10 @@ def test_an_object_is_placed_where_the_agent_let_go_of_it(pr2_world_copy):
     assert _events_of(executor, PlacingEvent, box) == []
 
     x, y, z = box.global_pose.position.to_np()[:3]
-    box.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x + MOVED_ASIDE, y, z, reference_frame=pr2_world_copy.root
+    box.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x + MOVED_ASIDE, y, z, reference_frame=pr2_world_copy.root
+        )
     )
     executor.tick()
 

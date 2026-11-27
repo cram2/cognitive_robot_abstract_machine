@@ -22,10 +22,10 @@ from semantic_digital_twin.exceptions import (
     ZeroLengthURDFJointAxisError,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.utils import (
     suppress_stdout_stderr,
@@ -284,7 +284,7 @@ class URDFParser(WorldModelParser):
         translation_offset = getattr(joint.origin, "xyz", [0, 0, 0])
         rotation_offset = getattr(joint.origin, "rpy", [0, 0, 0])
 
-        parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=translation_offset[0],
             y=translation_offset[1],
             z=translation_offset[2],
@@ -334,11 +334,11 @@ class URDFParser(WorldModelParser):
             dynamics=self.parse_dynamics(joint),
             screw_axis=(
                 ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3(*urdf_joint_axis(joint))
+                    axis=Vector3Dimensional(*urdf_joint_axis(joint))
                 )
                 if joint.type == "prismatic"
                 else ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3(*urdf_joint_axis(joint))
+                    axis=Vector3Dimensional(*urdf_joint_axis(joint))
                 )
             ),
         )
@@ -420,7 +420,7 @@ class URDFParser(WorldModelParser):
 
         return Inertial(
             mass=link.inertial.mass,
-            center_of_mass=Point3(*center_of_mass, reference_frame=body),
+            center_of_mass=Point3Dimensional(*center_of_mass, reference_frame=body),
             inertia=inertia_in_link_frame,
         )
 
@@ -439,7 +439,7 @@ class URDFParser(WorldModelParser):
         res = []
         for i, geom in enumerate(geometry):
             params = (*(geom.origin.xyz + geom.origin.rpy),) if geom.origin else ()
-            origin_transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+            origin_transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 *params, reference_frame=body
             )
             if isinstance(geom.geometry, urdfpy.Box):

@@ -27,7 +27,10 @@ from semantic_digital_twin.adapters.robocasa_dataset.semantics import (
     GripperExclusionZone,
     PlacementArea,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere
@@ -52,13 +55,13 @@ class PlacementSamplerRegion:
     Name of the body, already present in the world, this region was resolved for.
     """
 
-    local_center: Point3
+    local_center: Point3Dimensional
     """
     Centre of the region in the sampler's own frame, before the reference rotation and
     translation are applied.
     """
 
-    world_T_sampler: HomogeneousTransformationMatrix
+    world_T_sampler: HomogeneousTransformationMatrix3Dimensional
     """
     Pose of the sampler's frame in world coordinates.
     """
@@ -91,7 +94,7 @@ class PlacementSamplerRegion:
             was resolved for.
         """
         box = Box(
-            origin=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=self.local_center
             ),
             scale=Scale(self.width, self.depth, self.thickness),
@@ -102,7 +105,7 @@ class PlacementSamplerRegion:
         connection = FixedConnection(
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional(
                 self.world_T_sampler.to_np()
             ),
         )
@@ -176,11 +179,11 @@ class PlacementSamplerRegionReader:
         return PlacementSamplerRegion(
             name=PrefixedName(object_name, prefix=name_prefix),
             body_name=body_name,
-            local_center=Point3(
+            local_center=Point3Dimensional(
                 (x_minimum + x_maximum) / 2.0,
                 (y_minimum + y_maximum) / 2.0,
             ),
-            world_T_sampler=HomogeneousTransformationMatrix.from_xyz_rpy(
+            world_T_sampler=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=world_x,
                 y=world_y,
                 z=world_z,
@@ -214,7 +217,7 @@ class GripperExclusionZoneData:
     Name of the body, already present in the world, the gripper must stay away from.
     """
 
-    center: Point3
+    center: Point3Dimensional
     """
     World coordinates of the body at the moment the zone was resolved.
     """
@@ -238,7 +241,7 @@ class GripperExclusionZoneData:
         connection = FixedConnection(
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=self.center
             ),
         )
@@ -273,6 +276,6 @@ class GripperExclusionZoneReader:
         return GripperExclusionZoneData(
             name=PrefixedName(object_name, prefix=name_prefix),
             body_name=environment.objects[object_name].root_body,
-            center=Point3(*(float(value) for value in position)),
+            center=Point3Dimensional(*(float(value) for value in position)),
             radius=radius,
         )

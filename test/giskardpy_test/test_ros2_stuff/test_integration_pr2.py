@@ -50,7 +50,10 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from krrood.symbolic_math import symbolic_math as sm
 from semantic_digital_twin.robots.pr2 import PR2Joint
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -187,7 +190,7 @@ class TestCartGoals:
         """
         A pose goal of the PR2's right gripper runs through the ROS 2 interface.
         """
-        tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        tip_goal = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=giskard.right_tip
         )
 
@@ -219,16 +222,16 @@ def test_bodies_added_relative_to_the_gripper_are_placed_there_on_the_server(
     """
     r_tip = pocky_pose_setup.right_tip
     poses_relative_to_r_tip = {
-        "box": HomogeneousTransformationMatrix.from_xyz_rpy(
+        "box": HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.08, reference_frame=r_tip
         ),
-        "b1": HomogeneousTransformationMatrix.from_xyz_rpy(
+        "b1": HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.2, reference_frame=r_tip
         ),
-        "bl": HomogeneousTransformationMatrix.from_xyz_rpy(
+        "bl": HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.15, y=0.04, reference_frame=r_tip
         ),
-        "br": HomogeneousTransformationMatrix.from_xyz_rpy(
+        "br": HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.15, y=-0.04, reference_frame=r_tip
         ),
     }
@@ -297,7 +300,7 @@ def test_buffer_zone_scaling_sent_to_the_server_shrinks_the_buffer_zone_near_the
     giskard.add_box_to_world(
         name="wall",
         size=(0.1, 0.4, 0.4),
-        pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+        pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.3, reference_frame=giskard.right_tip
         ),
     )
@@ -305,7 +308,7 @@ def test_buffer_zone_scaling_sent_to_the_server_shrinks_the_buffer_zone_near_the
     wall = world.get_kinematic_structure_entity_by_name("wall")
     robot = world.get_semantic_annotations_by_type(PR2)[0]
     scaling = LinearBufferZoneScaling(
-        goal_point=Point3(reference_frame=wall), full_scale_goal_distance=0.5
+        goal_point=Point3Dimensional(reference_frame=wall), full_scale_goal_distance=0.5
     )
     buffer_zone_distance = 0.1
     statechart = Statechart(context=giskard.api.context)
@@ -340,7 +343,7 @@ def test_buffer_zone_scaling_sent_to_the_server_shrinks_the_buffer_zone_near_the
     contact = _closest_contact_with(world=world, body=wall)
     factor = scaling.scale_factor(
         world=world,
-        root_P_contact_point=Point3.from_iterable(
+        root_P_contact_point=Point3Dimensional.from_iterable(
             contact.root_P_point_on_body_a[:3], reference_frame=world.root
         ),
     ).evaluate()[0]
@@ -361,7 +364,7 @@ class TestActionServerEvents:
         statechart.add_node(
             node=(
                 joint_goal := JointPositionList(
-                    goal_state=HomogeneousTransformationMatrix(),
+                    goal_state=HomogeneousTransformationMatrix3Dimensional(),
                 )
             )
         )
@@ -395,7 +398,7 @@ class TestActionServerEvents:
                 kinematic_chain=KinematicChain(
                     root=giskard.map, tip=giskard.base_footprint
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=100, reference_frame=giskard.base_footprint
                 ),
             )
@@ -414,7 +417,7 @@ class TestActionServerEvents:
                     kinematic_chain=KinematicChain(
                         root=giskard.map, tip=giskard.base_footprint
                     ),
-                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         y=1, reference_frame=giskard.base_footprint
                     ),
                 )
@@ -439,7 +442,7 @@ class TestActionServerEvents:
                 kinematic_chain=KinematicChain(
                     root=giskard.map, tip=giskard.base_footprint
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
             )
@@ -472,7 +475,7 @@ class TestActionServerEvents:
                 kinematic_chain=KinematicChain(
                     root=giskard.map, tip=giskard.base_footprint
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
             )
@@ -514,7 +517,7 @@ class TestActionServerEvents:
                 kinematic_chain=KinematicChain(
                     root=giskard.map, tip=giskard.base_footprint
                 ),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
             )
@@ -529,7 +532,7 @@ class TestActionServerEvents:
         giskard.add_box_to_world(
             name="box",
             size=(0.05, 0.01, 0.15),
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 z=0.06, reference_frame=giskard.right_tip
             ),
             parent_link=giskard.right_tip,

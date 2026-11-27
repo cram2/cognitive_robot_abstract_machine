@@ -10,7 +10,7 @@ import numpy as np
 import open3d as o3d
 import pytest
 from cv2 import boundingRect
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 
@@ -577,7 +577,7 @@ def depth_camera_model() -> PinholeCameraModel:
         image_resolution=CameraResolution(width=320, height=240),
         focal_length_x=200.0,
         focal_length_y=100.0,
-        principal_point=Point2(x=160.0, y=120.0),
+        principal_point=Point2Dimensional(x=160.0, y=120.0),
     )
 
 

@@ -7,7 +7,7 @@ from rclpy.time import Time
 from tf2_py import LookupException
 
 from semantic_digital_twin.adapters.ros.semdt_to_ros2_converters import (
-    HomogeneousTransformationMatrixToRos2Converter,
+    HomogeneousTransformationMatrix3DimensionalToRos2Converter,
 )
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher, TfFrameNames
 from semantic_digital_twin.adapters.ros.tfwrapper import TFWrapper
@@ -45,7 +45,7 @@ def test_tf_publisher(rclpy_node, pr2_world_state_reset):
         "base_footprint"
     )[0]
     fk = pr2_world_state_reset.compute_forward_kinematics(odom_combined, base_footprint)
-    transform2 = HomogeneousTransformationMatrixToRos2Converter.convert(fk)
+    transform2 = HomogeneousTransformationMatrix3DimensionalToRos2Converter.convert(fk)
     assert transform.transform == transform2.transform
 
     tf_wrapper.lookup_transform("odom_combined", "pr2/r_gripper_tool_frame")
@@ -119,7 +119,7 @@ def test_tf_publisher_ignore_robot(rclpy_node, pr2_world_copy):
     )[0]
     base_footprint = pr2_world_copy.get_kinematic_structure_entities_by_name("box")[0]
     fk = pr2_world_copy.compute_forward_kinematics(odom_combined, base_footprint)
-    transform2 = HomogeneousTransformationMatrixToRos2Converter.convert(fk)
+    transform2 = HomogeneousTransformationMatrix3DimensionalToRos2Converter.convert(fk)
     assert transform.transform == transform2.transform
 
 

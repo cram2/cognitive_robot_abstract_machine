@@ -14,9 +14,11 @@ from cramph.composites import Sequence
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPose
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.robots.robot_parts import Arm
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose, Vector3
+from krrood_spatial_math.spatial_types import Pose3Dimensional, Vector3Dimensional
 
 from ..plan_running import expand, run_plan, simulated_executor, statechart_of
 
@@ -47,8 +49,10 @@ def pr2_holding_milk(simple_pr2_context):
     with world.modify_world():
         world.move_branch(milk_body, tool_frame)
         world.add_semantic_annotation(milk)
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *HELD_AT, yaw=HELD_YAW, reference_frame=tool_frame
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *HELD_AT, yaw=HELD_YAW, reference_frame=tool_frame
+        )
     )
     world.notify_state_change()
     return world, robot, milk, extensions
@@ -87,7 +91,9 @@ def test_a_place_puts_the_held_object_on_the_target_however_it_is_held(
     actually holds it at.
     """
     world, robot, milk, extensions = pr2_holding_milk
-    target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, yaw=np.pi / 4, reference_frame=world.root)
+    target = Pose3Dimensional.from_xyz_rpy(
+        1.2, 0.4, 0.9, yaw=np.pi / 4, reference_frame=world.root
+    )
     place = _start(
         PlaceAction(arm=robot.left_arm, graspable=milk, goal_pose=target),
         extensions,
@@ -99,7 +105,7 @@ def test_a_place_puts_the_held_object_on_the_target_however_it_is_held(
     placed_milk = descent.goal_pose.evaluate() @ tool_T_milk.to_np()
 
     np.testing.assert_allclose(
-        placed_milk, target.homogeneous_matrix.to_np(), atol=1e-9
+        placed_milk, target.to_coordinate_change().to_np(), atol=1e-9
     )
 
 
@@ -109,7 +115,7 @@ def test_a_place_runs_the_grasp_backwards(pr2_holding_milk):
     and leaves the way a pick-up would approach it.
     """
     world, robot, milk, extensions = pr2_holding_milk
-    target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
+    target = Pose3Dimensional.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
     place = _start(
         PlaceAction(arm=robot.left_arm, graspable=milk, goal_pose=target),
         extensions,
@@ -140,8 +146,8 @@ def test_a_place_leaves_the_object_standing_on_the_target(pr2_holding_milk):
     """
     world, robot, milk, extensions = pr2_holding_milk
     # Beside and below where the milk is held, so the arm can reach it from there.
-    target = Pose(
-        position=milk.root.global_pose.position + Vector3(0.0, 0.05, -0.05),
+    target = Pose3Dimensional(
+        position=milk.root.global_pose.position + Vector3Dimensional(0.0, 0.05, -0.05),
         orientation=milk.root.global_pose.orientation,
         reference_frame=world.root,
     )
@@ -170,7 +176,7 @@ def test_a_place_after_an_underspecified_pick_up_joins_the_statechart(
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
+    target = Pose3Dimensional.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
 
     pick_up = a(PickUpAction)(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
@@ -199,7 +205,7 @@ def test_place_moves_only_the_arm_it_is_given(pr2_apartment_context):
     """
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    target = Pose.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
+    target = Pose3Dimensional.from_xyz_rpy(1.2, 0.4, 0.9, reference_frame=world.root)
     place = PlaceAction(arm=robot.right_arm, graspable=milk, goal_pose=target)
     expand(Sequence(nodes=[place]), extensions)
 

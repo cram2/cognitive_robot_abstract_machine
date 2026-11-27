@@ -15,7 +15,9 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -97,7 +99,7 @@ def add_box_body(
             world=world,
             parent=world.root,
             child=body,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x, y, z, reference_frame=world.root
             ),
         )
@@ -154,7 +156,7 @@ def barrier_search_space_of(world: World) -> BoundingBoxCollection:
     :param world: The barrier world to cover.
     :return: The floor's footprint, raised to the world's full height.
     """
-    origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
     return BoundingBoxCollection(
         [
             VolumetricBoundingBox(
@@ -180,7 +182,7 @@ def navigation_scene_of(
     :return: The scene, planned between the two convex sets the graph forces the
         longest detour between.
     """
-    origin = HomogeneousTransformationMatrix(reference_frame=world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root)
     query = hardest_path_query(graph)
     waypoints = graph.path_from_to(query.start, query.goal)
     obstacles = SemanticEnvironmentAnnotation(
@@ -250,7 +252,9 @@ def test_the_third_dimension_connects_what_a_shallow_search_space_leaves_apart(
     A search space tall enough to rise over the barrier leaves the space above it, and
     with it a single connected graph.
     """
-    origin = HomogeneousTransformationMatrix(reference_frame=barrier_world.root)
+    origin = HomogeneousTransformationMatrix3Dimensional(
+        reference_frame=barrier_world.root
+    )
     shallow_search_space = BoundingBoxCollection(
         [
             VolumetricBoundingBox(

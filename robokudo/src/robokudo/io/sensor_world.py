@@ -13,7 +13,9 @@ from robokudo.exceptions import InvalidCameraObservation
 from robokudo.types.camera import CameraObservation
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -87,7 +89,7 @@ class RecordedCameraWorld:
             if source_reference is source_root
             else Body(name=deepcopy(source_reference.name), id=source_reference.id)
         )
-        pose = HomogeneousTransformationMatrix(
+        pose = HomogeneousTransformationMatrix3Dimensional(
             data=source_pose, reference_frame=reference, child_frame=pose_child
         )
         return replace(self.observation, camera=camera, world_T_camera=pose)
@@ -175,7 +177,7 @@ class RecordedCameraWorld:
                 reason="camera pose is not connected to its reference frame"
             )
         with world.modify_world():
-            connection.origin = HomogeneousTransformationMatrix(
+            connection.origin = HomogeneousTransformationMatrix3Dimensional(
                 data=observation.world_T_camera,
                 reference_frame=pose.reference_frame,
                 child_frame=pose_child,

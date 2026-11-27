@@ -46,10 +46,10 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose2D,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.reasoning.robot_predicates import bodies_in_gripper
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.specifications.connections import (
@@ -167,7 +167,7 @@ class Nudge(SucceedsOnObservingTrue, StatechartNode):
     The body that is pushed, which hangs off a connection with six degrees of freedom.
     """
 
-    displacement: Vector3
+    displacement: Vector3Dimensional
     """
     How far and which way the body slides, in the frame of its parent.
     """
@@ -202,7 +202,7 @@ class Nudge(SucceedsOnObservingTrue, StatechartNode):
         x, y, z = self.displacement.to_np()[:3] / self.duration_in_ticks
         connection = self.body.parent_connection
         connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=x, y=y, z=z, reference_frame=connection.parent
             )
             @ connection.origin
@@ -283,7 +283,7 @@ class NudgeWhileClosing(ParallelInsertion[GraspingAction]):
             Nudge(
                 name="nudge",
                 body=body,
-                displacement=Vector3.from_iterable(
+                displacement=Vector3Dimensional.from_iterable(
                     approach * self.distance,
                     reference_frame=body.parent_connection.parent,
                 ),
@@ -354,26 +354,26 @@ class FailureHandlingDemonstration(RobotDemonstration):
     How often the pick-up is run again after it failed.
     """
 
-    robot_start: HomogeneousTransformationMatrix = field(
-        default_factory=lambda: HomogeneousTransformationMatrix.from_xyz_rpy(
-            1.1, 2.5, 0
+    robot_start: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=lambda: (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.1, 2.5, 0)
         )
     )
     """
     Where the PR2 stands before the plan begins.
     """
 
-    milk_start: HomogeneousTransformationMatrix = field(
-        default_factory=lambda: HomogeneousTransformationMatrix.from_xyz_rpy(
-            2.37, 2, 1.0345
+    milk_start: HomogeneousTransformationMatrix3Dimensional = field(
+        default_factory=lambda: (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2.37, 2, 1.0345)
         )
     )
     """
     Where the milk stands on the counter.
     """
 
-    counter_stand: Pose2D = field(
-        default_factory=lambda: Pose2D.from_xy_yaw(x=1.65, y=2.4)
+    counter_stand: Pose2Dimensional = field(
+        default_factory=lambda: Pose2Dimensional.from_xy_yaw(x=1.65, y=2.4)
     )
     """
     Where the PR2 stands to pick up the milk, on the floor of the world.
@@ -450,7 +450,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
                 NavigateAction(
-                    planar_goal_pose=Pose2D(
+                    planar_goal_pose=Pose2Dimensional(
                         position=self.counter_stand.position,
                         yaw=self.counter_stand.yaw,
                         reference_frame=world.root,

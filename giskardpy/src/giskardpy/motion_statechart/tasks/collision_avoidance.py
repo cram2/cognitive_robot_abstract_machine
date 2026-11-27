@@ -56,7 +56,8 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
 from semantic_digital_twin.world import World
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3Dimensional, Vector3Dimensional
+from semantic_digital_twin.world_description.world_entity import Body
 
 # %% shared by self and external collision avoidance
 
@@ -96,7 +97,7 @@ class _CollisionAvoidanceTask(Task, HasCruiseVelocityParameter, ABC):
         return super().required_context_extensions + (MotionControlContext,)
 
     @staticmethod
-    def _weight_while_close(*, contact_normal: Vector3) -> Scalar:
+    def _weight_while_close(*, contact_normal: Vector3Dimensional) -> Scalar:
         """
         :param contact_normal: The contact normal of one avoided collision, zero while no
             collision data was computed for it.
@@ -288,7 +289,9 @@ class BufferZoneScaling(HasGoalPointParameter, ABC):
         :return: The scale factor before it is bounded.
         """
 
-    def scale_factor(self, *, world: World, root_P_contact_point: Point3) -> Scalar:
+    def scale_factor(
+        self, *, world: World, root_P_contact_point: Point3Dimensional
+    ) -> Scalar:
         """
         :param world: The world :attr:`goal_point` is in.
         :param root_P_contact_point: The closest point of one contact on the robot,
@@ -423,7 +426,10 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         return artifacts
 
     def _buffer_distance(
-        self, *, contact: AvoidedExternalContact, root_P_point_on_group: Point3
+        self,
+        *,
+        contact: AvoidedExternalContact,
+        root_P_point_on_group: Point3Dimensional,
     ) -> Scalar:
         """
         :param contact: One avoided contact of this task.

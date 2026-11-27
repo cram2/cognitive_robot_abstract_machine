@@ -56,11 +56,11 @@ from krrood.symbolic_math.symbolic_math import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
-    Vector3,
-    SpatialType,
+    Vector3Dimensional,
+    SymbolicSpatialType,
 )
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import (
@@ -107,8 +107,8 @@ class CartesianTask(
         self,
         *,
         artifacts: MotionNodeArtifacts,
-        goal: SpatialType,
-        current: SpatialType,
+        goal: SymbolicSpatialType,
+        current: SymbolicSpatialType,
     ) -> None:
         """
         Register a goal and a current spatial expression for visualization.
@@ -196,7 +196,7 @@ class DistanceAlongAxis(
     Both links may move. The axis is fixed in :attr:`root_link`.
     """
 
-    axis: Vector3
+    axis: Vector3Dimensional
     """
     The unit direction the distance is measured along, in :attr:`root_link`.
     """
@@ -262,7 +262,9 @@ class CartesianPositionTrajectory(
     accuracy.
     """
 
-    goal_reference_frame_P_current_target_point: Point3 = field(init=False, repr=False)
+    goal_reference_frame_P_current_target_point: Point3Dimensional = field(
+        init=False, repr=False
+    )
     """
     Symbolic expression representing the current target point in the goal reference
     frame.
@@ -518,8 +520,10 @@ class CartesianPositionTrajectory(
         :param float_variable_data: The FloatVariableData instance to register the
             expression with.
         """
-        self.goal_reference_frame_P_current_target_point = Point3.create_with_variables(
-            "goal_reference_frame_P_current_target_point"
+        self.goal_reference_frame_P_current_target_point = (
+            Point3Dimensional.create_with_variables(
+                "goal_reference_frame_P_current_target_point"
+            )
         )
         self.goal_reference_frame_P_current_target_point.reference_frame = (
             self.goal_reference_frame
@@ -607,7 +611,9 @@ class CartesianPositionStraight(
         line_length = root_V_line.norm()
         root_V_line.scale(1)
         root_R_line = RotationMatrix.from_x_axis(root_V_line)
-        line_V_travelled = root_R_line.inverse() @ (root_P_tip - root_P_line_start)
+        line_V_travelled = root_R_line.inverse().to_coordinate_change() @ (
+            root_P_tip - root_P_line_start
+        )
 
         lateral_weight = self.weight * self.lateral_weight_factor
         artifacts.geometry.add_position_constraint(
@@ -668,7 +674,7 @@ class CartesianOrientation(
             orientation and the goal orientation.
         """
         artifacts = MotionNodeArtifacts()
-        root_R_goal = self.root_T_goal_reference_frame @ self.goal_orientation
+        root_R_goal = self.root_T_goal_reference_frame.rotation @ self.goal_orientation
 
         # Get current tip orientation in root frame
         root_T_current = self.context.world.compose_forward_kinematics_expression(
@@ -687,7 +693,7 @@ class CartesianOrientation(
         # the goal axes are drawn at the tip, next to the current ones
         self.add_goal_and_current_debug_expressions(
             artifacts=artifacts,
-            goal=HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            goal=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=root_T_current.position, rotation_matrix=root_R_goal
             ),
             current=root_T_current,
@@ -976,7 +982,7 @@ class RigidCoupling(
         self,
         *,
         artifacts: MotionNodeArtifacts,
-        vector: Point3 | Vector3,
+        vector: Point3Dimensional | Vector3Dimensional,
         velocity_scale: float,
         name: str,
     ) -> None:

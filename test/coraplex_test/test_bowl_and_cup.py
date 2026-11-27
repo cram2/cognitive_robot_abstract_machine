@@ -29,9 +29,11 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from krrood.entity_query_language.factories import a
 from krrood.entity_query_language.query.match import Match
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
@@ -95,22 +97,24 @@ class KitchenWithFilledDrawer:
         return self.world.get_body_by_name("kitchen_island_surface")
 
     @property
-    def world_T_bowl_goal(self) -> Pose:
+    def world_T_bowl_goal(self) -> Pose3Dimensional:
         """
         :return: Where the bowl is set down on the kitchen island.
         """
         return self.world.transform(
-            Pose.from_xyz_rpy(x=0.2, z=0.05, reference_frame=self.kitchen_island),
+            Pose3Dimensional.from_xyz_rpy(
+                x=0.2, z=0.05, reference_frame=self.kitchen_island
+            ),
             self.world.root,
         )
 
     @property
-    def world_T_cup_goal(self) -> Pose:
+    def world_T_cup_goal(self) -> Pose3Dimensional:
         """
         :return: Where the cup is set down on the kitchen island.
         """
         return self.world.transform(
-            Pose.from_xyz_rpy(
+            Pose3Dimensional.from_xyz_rpy(
                 x=0.15, y=0.25, z=0.07, reference_frame=self.kitchen_island
             ),
             self.world.root,
@@ -122,7 +126,7 @@ def add_cylinder(
     name: str,
     radius: float,
     height: float,
-    parent_T_cylinder: HomogeneousTransformationMatrix,
+    parent_T_cylinder: HomogeneousTransformationMatrix3Dimensional,
 ) -> Body:
     """
     :param world: The world the cylinder is added to.
@@ -163,7 +167,7 @@ def kitchen_with_filled_drawer(
             name="cup",
             radius=0.04,
             height=0.07,
-            parent_T_cylinder=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_cylinder=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, y=0.2, z=-0.05, reference_frame=drawer
             ),
         )
@@ -174,7 +178,7 @@ def kitchen_with_filled_drawer(
             name="bowl",
             radius=0.07,
             height=0.05,
-            parent_T_cylinder=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_cylinder=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, y=-0.2, z=-0.05, reference_frame=drawer
             ),
         )
@@ -220,13 +224,13 @@ def transport_plan(
         once.
     """
     world, robot = kitchen.world, kitchen.robot
-    in_front_of_the_closed_drawer = Pose2D.from_xy_yaw(
+    in_front_of_the_closed_drawer = Pose2Dimensional.from_xy_yaw(
         x=0.4, y=0.7, reference_frame=world.root
     )
-    in_front_of_the_open_drawer = Pose2D.from_xy_yaw(
+    in_front_of_the_open_drawer = Pose2Dimensional.from_xy_yaw(
         x=0.3, y=0.89, reference_frame=world.root
     )
-    facing_the_kitchen_island = Pose2D.from_xy_yaw(
+    facing_the_kitchen_island = Pose2Dimensional.from_xy_yaw(
         x=-0.25, y=1.85, yaw=np.pi, reference_frame=world.root
     )
     return Sequence(

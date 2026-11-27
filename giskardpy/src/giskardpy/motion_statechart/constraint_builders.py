@@ -14,9 +14,9 @@ from giskardpy.qp.bound_cap import RotationBoundCap, VectorBoundCap
 from giskardpy.qp.constraint_collection import ConstraintCollection
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    Point3,
+    Point3Dimensional,
     Quaternion,
-    Vector3,
+    Vector3Dimensional,
     RotationMatrix,
 )
 
@@ -55,8 +55,8 @@ class GeometricConstraintBuilder:
     def add_point_goal_constraints(
         self,
         *,
-        frame_P_current: Point3,
-        frame_P_goal: Point3,
+        frame_P_current: Point3Dimensional,
+        frame_P_goal: Point3Dimensional,
         cruise_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData,
         name: str | None = None,
@@ -123,8 +123,8 @@ class GeometricConstraintBuilder:
     def add_vector_goal_constraints(
         self,
         *,
-        frame_V_current: Vector3,
-        frame_V_goal: Vector3,
+        frame_V_current: Vector3Dimensional,
+        frame_V_goal: Vector3Dimensional,
         cruise_velocity: sm.ScalarData,
         quadratic_weight: sm.ScalarData = DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
         name: str | None = None,
@@ -248,8 +248,10 @@ class GeometricConstraintBuilder:
         # avoid singularity
         # the sign determines in which direction the robot moves when in singularity.
         # -0.0001 preserves the old behavior from before this goal was refactored
-        hack = RotationMatrix.from_axis_angle(AxisAngle(Vector3.Z(), -0.0001))
-        frame_R_current = frame_R_current.dot(hack)
+        hack = RotationMatrix.from_axis_angle(
+            AxisAngle(Vector3Dimensional.Z(), -0.0001)
+        )
+        frame_R_current = frame_R_current.to_coordinate_change() @ hack
         current_quaternion = frame_R_current.quaternion
         goal_quaternion = frame_R_goal.quaternion
         goal_quaternion = sm.if_less(

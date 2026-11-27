@@ -49,7 +49,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Milk,
     Spoon,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_modification import (
@@ -158,14 +161,14 @@ def build_executor() -> KinematicallySimulatedPlanExecutor:
     with world.modify_world():
         world.merge_world_at_pose(
             bowl,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 2.4, 2.2, 1, reference_frame=world.root
             ),
         )
         connection = FixedConnection(
             parent=world.get_body_by_name("cabinet10_drawer_top"),
             child=spoon.root,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -0.05, -0.05, 0
             ),
         )
@@ -234,7 +237,7 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
                     FunctionCall(function=_failing_step, failure_types=(PlanFailure,)),
                     TransportAction.from_graspable_by_closest_grasps(
                         graspable=world.get_semantic_annotations_by_type(Milk)[0],
-                        goal_pose=Pose.from_xyz_rpy(
+                        goal_pose=Pose3Dimensional.from_xyz_rpy(
                             4.9, 3.3, 0.8, yaw=1.57, reference_frame=world.root
                         ),
                         arm=pr2.left_arm,
@@ -244,7 +247,7 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
             ),
             TransportAction.from_graspable_by_closest_grasps(
                 graspable=world.get_semantic_annotations_by_type(Bowl)[0],
-                goal_pose=Pose.from_xyz_rpy(
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
                     5.0, 3.3, 0.75, yaw=1.57, reference_frame=world.root
                 ),
                 arm=pr2.left_arm,
@@ -252,7 +255,7 @@ def build_plan(executor: KinematicallySimulatedPlanExecutor) -> StatechartNode:
             ),
             TransportAction.from_graspable_by_closest_grasps(
                 graspable=world.get_semantic_annotations_by_type(Spoon)[0],
-                goal_pose=Pose.from_xyz_rpy(
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
                     5.1, 3.3, 0.75, yaw=1.57, reference_frame=world.root
                 ),
                 arm=pr2.left_arm,

@@ -48,7 +48,7 @@ drawer hangs from, which `drawer.movable_joint` returns.
 ```{code-cell} ipython3
 import numpy as np
 
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional, Vector3Dimensional
 from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle, Dresser
@@ -63,20 +63,20 @@ with world.modify_world():
         name="dresser",
         scale=Scale(0.31, 0.31, 0.21),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix(),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional(),
     )
     drawer = Drawer.create_with_new_body_in_world(
         name="drawer",
         scale=Scale(0.3, 0.3, 0.2),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix(),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional(),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()),
+            screw_axis=ScrewAxis(translation_per_unit_position=Vector3Dimensional.X()),
         ),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.15),
         world=world,
     )
 
@@ -151,11 +151,11 @@ with world.modify_world():
         name="panel",
         scale=Scale(0.3, 0.2, 0.02),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(z=0.5),
     )
     panel_handle = Handle.create_with_new_body_in_world(
         name="panel_handle",
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.1, z=0.5, roll=np.pi / 2
         ),
         world=world,
@@ -163,7 +163,7 @@ with world.modify_world():
     )
     panel_button = EmergencyButton.create_with_new_body_in_world(
         name="panel_button",
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1, z=0.5),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.1, z=0.5),
         world=world,
         scale=Scale(0.03, 0.03, 0.02),
     )
@@ -189,7 +189,7 @@ with world.modify_world():
         name="stray_drawer",
         scale=Scale(0.2, 0.2, 0.2),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.6),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.6),
     )
     rejected = False
     try:

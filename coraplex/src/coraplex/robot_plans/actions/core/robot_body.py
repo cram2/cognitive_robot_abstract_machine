@@ -12,7 +12,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
     AllowCollisionForEndEffector,
 )
 from semantic_digital_twin.robots.robot_parts import Arm
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 from coraplex.datastructures.trajectory import PoseTrajectory
 from coraplex.robot_plans.actions.base import (
@@ -195,7 +195,7 @@ class FollowToolCenterPointPathAction(
         )
         return [waypoints, *self.keep_base_still()]
 
-    def _waypoint_goal(self, *, target: Pose) -> CartesianPose:
+    def _waypoint_goal(self, *, target: Pose3Dimensional) -> CartesianPose:
         """
         :param target: The waypoint the tool center point passes through.
         :return: The task reaching that waypoint.

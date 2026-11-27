@@ -7,7 +7,9 @@ from __future__ import annotations
 # %% Imports
 import numpy as np
 import pytest
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.datastructures.camera_model import CameraModality
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
@@ -33,10 +35,10 @@ from ._perception_world import (
 
 def bound_pose(
     world: World,
-    world_T_camera: HomogeneousTransformationMatrix,
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     located_through_tf: bool = False,
     reference_frame: str = FrameName.WORLD,
-) -> HomogeneousTransformationMatrix:
+) -> HomogeneousTransformationMatrix3Dimensional:
     """
     :return: ``world_T_camera``, measured against ``reference_frame`` for the test camera,
         bound to the bodies of ``world``.
@@ -62,7 +64,7 @@ class TestWorldFrame:
         An empty world gets the measured world frame as its root.
         """
         world = World()
-        world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.0, y=2.0, z=3.0
         )
 

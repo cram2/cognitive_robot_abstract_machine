@@ -14,7 +14,7 @@ from types import ModuleType
 
 import numpy
 import pytest
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from typing_extensions import Any
 
 # %% Engines without a GPU
@@ -127,7 +127,7 @@ def test_track_hands_the_engine_a_matrix_and_returns_a_pose(
     Tracking hands the engine the previous pose as a matrix and returns a pose.
     """
     estimator = estimator_module.FoundationPoseEstimator()
-    previous_pose = Pose.from_xyz_quaternion(pos_z=0.5)
+    previous_pose = Pose3Dimensional.from_xyz_quaternion(pos_z=0.5)
 
     pose = estimator.track_pose(
         object_observation=estimator.warm_up_object_observation,

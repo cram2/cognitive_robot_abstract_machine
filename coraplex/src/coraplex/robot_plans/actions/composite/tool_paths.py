@@ -10,7 +10,9 @@ from dataclasses import dataclass
 import numpy as np
 from typing_extensions import Callable
 
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -114,7 +116,7 @@ class ToolPath:
     def sample(
         self,
         *,
-        frame: HomogeneousTransformationMatrix,
+        frame: HomogeneousTransformationMatrix3Dimensional,
         dt: float = 0.01,
         t0: float = 0.0,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

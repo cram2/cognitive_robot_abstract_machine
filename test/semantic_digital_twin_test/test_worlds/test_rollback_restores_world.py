@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
@@ -47,15 +47,19 @@ def free_item_world() -> tuple[World, Body, Body, ScrewAxisConnection]:
         world.add_connection(FixedConnection(parent=root, child=table))
     with world.modify_world():
         arm_joint = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=root,
             child=Body(name=PrefixedName("arm")),
         )
         world.add_connection(arm_joint)
     with world.modify_world():
-        item.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=1.0, y=2.0, z=3.0, yaw=0.5, reference_frame=root
+        item.parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=1.0, y=2.0, z=3.0, yaw=0.5, reference_frame=root
+            )
         )
         arm_joint.position = 0.7
     return world, item, table, arm_joint
@@ -70,7 +74,9 @@ def test_rollback_of_body_removal_reconnects_it():
     leaf = Body(name=PrefixedName("leaf"))
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=root,
             child=leaf,
@@ -122,8 +128,10 @@ def test_reset_state_context_restores_state_without_model_change(free_item_world
 
     with world.reset_state_context():
         arm_joint.position = -0.3
-        item.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=5.0, reference_frame=item.parent_connection.parent
+        item.parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=5.0, reference_frame=item.parent_connection.parent
+            )
         )
 
     assert (arm_joint.position, item.global_transform.to_np().tolist()) == (
@@ -141,7 +149,7 @@ def test_degree_of_freedom_added_in_reset_state_context_keeps_its_state(
         with world.modify_world():
             drawer_joint = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
                 world=world,
                 parent=table,

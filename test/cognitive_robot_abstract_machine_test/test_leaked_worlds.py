@@ -211,11 +211,23 @@ def test_a_watched_type_creates_the_objects_it_is_asked_for(
     assert created == LeakableObject(name="the one asked for")
 
 
-def test_a_type_creating_its_own_instances_is_left_alone():
+def test_a_type_creating_its_own_instances_goes_on_creating_them_when_watched():
+    """
+    Watching keeps how a type creates its instances, as an interface's, and records
+    them.
+    """
     worlds = LivingWorlds(world_type=ObjectMakingItsOwnInstances)
-    creates_objects_itself = ObjectMakingItsOwnInstances.__new__
+    worlds.watch()
 
+    created = ObjectMakingItsOwnInstances()
+
+    assert created.made_its_own_way
+    assert [creation.world() for creation in worlds.creations] == [created]
+
+
+def test_a_watched_type_cannot_be_watched_twice(watched_objects: LivingWorlds):
+    """
+    A second record would take the first one's creation over.
+    """
     with pytest.raises(UnwatchableWorldTypeError):
-        worlds.watch()
-
-    assert ObjectMakingItsOwnInstances.__new__ is creates_objects_itself
+        LivingWorlds(world_type=LeakableObject).watch()

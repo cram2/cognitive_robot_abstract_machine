@@ -16,7 +16,10 @@ from cramph.statechart import Statechart
 from giskardpy.motion_control import MotionControl, WorldStateTrajectoryRecording
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianPosition
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -75,7 +78,7 @@ def _compile_a_recorded_drive(world: World) -> StatechartExecutor:
     statechart.add_node(
         node=CartesianPosition(
             kinematic_chain=KinematicChain(root=world.root, tip=_robot(world)),
-            goal_point=Point3(x=5, reference_frame=world.root),
+            goal_point=Point3Dimensional(x=5, reference_frame=world.root),
             name=str(_robot(world).name),
         )
     )
@@ -117,7 +120,7 @@ def _add_box_next_to_the_robot(world: World) -> Body:
             FixedConnection(
                 parent=world.root,
                 child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.5
                 ),
             )

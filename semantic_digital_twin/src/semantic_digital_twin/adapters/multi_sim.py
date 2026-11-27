@@ -58,11 +58,11 @@ from semantic_digital_twin.exceptions import (
 )
 from semantic_digital_twin.adapters.exceptions import ScrewJointUnsupportedByMujocoError
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
     Quaternion,
     RotationMatrix,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.world import World
@@ -116,7 +116,7 @@ from semantic_digital_twin.world_description.world_modification import (
 logger = logging.getLogger(__name__)
 
 
-def cas_pose_to_list(pose: HomogeneousTransformationMatrix) -> list[float]:
+def cas_pose_to_list(pose: HomogeneousTransformationMatrix3Dimensional) -> list[float]:
     """
     Converts a CAS TransformationMatrix to a list of 7 floats (position + quaternion).
 
@@ -329,7 +329,7 @@ class InertialConverter:
     The mass of the body.
     """
 
-    inertia_pos: Point3
+    inertia_pos: Point3Dimensional
     """
     The position of the inertia frame relative to the body frame [x, y, z].
     """
@@ -1147,7 +1147,8 @@ class MujocoCamera(MultiSimCamera):
 
     @staticmethod
     def _look_at_rotation(
-        camera_position: Point3, target_position: Point3
+        camera_position: Point3Dimensional,
+        target_position: Point3Dimensional,
     ) -> RotationMatrix:
         """
         Computes the world-frame orientation of a camera at ``camera_position`` looking at
@@ -1160,12 +1161,12 @@ class MujocoCamera(MultiSimCamera):
         """
         forward = target_position - camera_position
         forward.scale(1)
-        up_hint = Vector3.Z()
+        up_hint = Vector3Dimensional.Z()
         if abs(float(forward.dot(up_hint).to_np().item())) > 0.99:
-            up_hint = Vector3.Y()
+            up_hint = Vector3Dimensional.Y()
 
         z_axis = -forward
-        x_axis = up_hint.cross(z_axis)
+        x_axis = up_hint.cross(other=z_axis)
         x_axis.scale(1)
         return RotationMatrix.from_vectors(x=x_axis, z=z_axis)
 
@@ -1175,7 +1176,7 @@ class MujocoCamera(MultiSimCamera):
         bounds: numpy.ndarray,
         minimum_distance: float = 1.0,
         distance_factor: float = 1.5,
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes a fixed diagonal viewpoint that frames an axis-aligned bounding box.
 
@@ -1185,17 +1186,17 @@ class MujocoCamera(MultiSimCamera):
         :param distance_factor: Multiplier applied to the box's bounding diagonal to place the camera.
         :return: The framing camera's world-frame pose.
         """
-        minimum = Point3.from_iterable(bounds[0])
-        maximum = Point3.from_iterable(bounds[1])
+        minimum = Point3Dimensional.from_iterable(bounds[0])
+        maximum = Point3Dimensional.from_iterable(bounds[1])
         diagonal_vector = maximum - minimum
         center = minimum + diagonal_vector * 0.5
         diagonal = float(diagonal_vector.norm().to_np().item())
         distance = max(diagonal, minimum_distance) * distance_factor
-        direction = Vector3.from_iterable([1.0, -1.0, 1.0])
+        direction = Vector3Dimensional.from_iterable([1.0, -1.0, 1.0])
         direction.scale(1)
         position = center + direction * distance
         rotation = cls._look_at_rotation(position, center)
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             position, rotation
         )
 
@@ -2262,8 +2263,10 @@ class MujocoWheeledDriveJoints(MujocoConnectionJoints[DriveType], ABC):
         if not axes:
             return
         child_body_spec = builder.body_spec_of(self.connection.child)
-        child_T_connection = HomogeneousTransformationMatrix.invert_numeric_matrix(
-            self.connection.connection_T_child_expression.to_np()
+        child_T_connection = (
+            HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(
+                self.connection.connection_T_child_expression.to_np()
+            )
         )
         for axis in axes:
             child_body_spec.add_joint(
@@ -3078,7 +3081,7 @@ class MujocoBuilder(MultiSimBuilder):
         *,
         mesh_file_path: str,
         mesh_scale: list[float],
-        file_T_mesh: HomogeneousTransformationMatrix,
+        file_T_mesh: HomogeneousTransformationMatrix3Dimensional,
     ) -> str:
         """
         The name of the mesh asset for a mesh file at a scale and in a frame of its
@@ -4670,7 +4673,9 @@ class MujocoSynchronizer(MultiSimSynchronizer):
         )
         parent_T_conn = connection.parent_T_connection_expression.to_np()
         conn_T_child = (
-            HomogeneousTransformationMatrix.invert_numeric_matrix(parent_T_conn)
+            HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(
+                parent_T_conn
+            )
             @ mj_T_world
         )
         dof_xyz, dof_quat_xyzw = self._decompose_pose_matrix(conn_T_child)

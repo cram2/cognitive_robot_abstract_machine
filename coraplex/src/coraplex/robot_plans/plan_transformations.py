@@ -70,7 +70,8 @@ from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
 
@@ -240,11 +241,11 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
             )
         drive_to_the_object = a(NavigateAction)(
             planar_goal_pose=variable(
-                Pose2D,
+                Pose2Dimensional,
                 # A location samples its poses only once the drive is grounded, by
                 # which time the drawers this rewrite opens stand open.
                 domain=ReachabilityLocation(
-                    target_pose=Pose(reference_frame=graspable.root),
+                    target_pose=Pose3Dimensional(reference_frame=graspable.root),
                     arm=plan_node.arm,
                     context=plan_node.context,
                 ),

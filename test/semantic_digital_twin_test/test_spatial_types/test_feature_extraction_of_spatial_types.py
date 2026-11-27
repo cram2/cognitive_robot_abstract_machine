@@ -11,12 +11,12 @@ from krrood.parametrization.feature_extraction.feature_extractor import FeatureE
 from krrood.symbolic_math.symbolic_math import FloatVariable
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
-    HomogeneousTransformationMatrix,
-    Point3,
-    Pose,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Pose3Dimensional,
     Quaternion,
     RotationMatrix,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.inertial_properties import Inertial
 
@@ -28,7 +28,7 @@ def feature_names(extractor: FeatureExtractor) -> list[str]:
 
 
 def test_features_of_a_pose_are_read_from_the_pose_itself():
-    pose = Pose.from_xyz_rpy(x=1.0, y=2.0, z=3.0, yaw=0.5)
+    pose = Pose3Dimensional.from_xyz_rpy(x=1.0, y=2.0, z=3.0, yaw=0.5)
 
     extractor = FeatureExtractor.from_instances(instances=[pose])
 
@@ -52,13 +52,15 @@ def test_features_of_a_pose_are_read_from_the_pose_itself():
 @pytest.mark.parametrize(
     "instance",
     [
-        Point3(1.0, 2.0, 3.0),
-        Vector3(1.0, 2.0, 3.0),
+        Point3Dimensional(1.0, 2.0, 3.0),
+        Vector3Dimensional(1.0, 2.0, 3.0),
         Quaternion(0.0, 0.0, 0.0, 1.0),
-        AxisAngle(axis=Vector3(0.0, 1.0, 0.0), angle=0.4),
+        AxisAngle(axis=Vector3Dimensional(0.0, 1.0, 0.0), angle=0.4),
         RotationMatrix.from_rpy(roll=0.1, pitch=0.2, yaw=0.3),
-        HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, z=3.0, yaw=0.3),
-        Pose.from_xyz_rpy(x=1.0, y=2.0, z=3.0, yaw=0.5),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1.0, y=2.0, z=3.0, yaw=0.3
+        ),
+        Pose3Dimensional.from_xyz_rpy(x=1.0, y=2.0, z=3.0, yaw=0.5),
         Inertial(mass=2.0),
     ],
     ids=lambda instance: type(instance).__name__,
@@ -80,7 +82,7 @@ def test_features_of_a_domain_object_match_those_of_its_data_access_object(insta
 
 
 def test_a_symbolic_expression_with_free_variables_is_not_a_feature():
-    point = Point3(FloatVariable(name="x"), 2.0, 3.0)
+    point = Point3Dimensional(FloatVariable(name="x"), 2.0, 3.0)
 
     extractor = FeatureExtractor.from_instances(instances=[point])
 

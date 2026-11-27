@@ -33,7 +33,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
 )
 from giskardpy.motion_statechart.tasks.joint_tasks import JointState
-from krrood_spatial_math.spatial_types import Pose, Vector3
+from krrood_spatial_math.spatial_types import Pose3Dimensional, Vector3Dimensional
 from semantic_digital_twin.robots.tracy import TracyJoint
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import PositionLimitSide
@@ -106,8 +106,8 @@ class WatchedWristTurn:
         tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
         goal = CartesianPose(
             kinematic_chain=KinematicChain(root=world.root, tip=tip),
-            goal_pose=Pose.from_xyz_axis_angle(
-                axis=Vector3(z=1), angle=np.pi / 2, reference_frame=tip
+            goal_pose=Pose3Dimensional.from_xyz_axis_angle(
+                axis=Vector3Dimensional(z=1), angle=np.pi / 2, reference_frame=tip
             ),
         )
         executor = StatechartExecutor(

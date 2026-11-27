@@ -13,7 +13,9 @@ from robokudo.utils.region import (
     region_pose_annotation,
 )
 from robokudo.world_descriptor import BaseWorldDescriptor, RegionSpec
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.world_description.world_entity import Region
 
@@ -30,7 +32,7 @@ class TestUtilsRegion:
         spec = RegionSpec(
             name="test_region",
             box_scale=Scale(1.0, 2.0, 3.0),
-            pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
+            pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 pos_x=3.0,
                 pos_y=2.0,
                 pos_z=1.0,

@@ -50,7 +50,8 @@ from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionRea
 from giskardpy.motion_statechart.monitors.overwrite_state_monitors import SetOdometry
 from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from krrood.entity_query_language.factories import a, variable_from
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.robot_parts import EndEffector
@@ -227,7 +228,7 @@ def test_a_stalled_reach_is_blamed_on_the_navigation_that_placed_the_base(
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     navigate = NavigateAction(
-        planar_goal_pose=Pose2D.from_xy_yaw(
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
             x=1.5, y=2.4, yaw=math.pi, reference_frame=world.root
         )
     )
@@ -412,7 +413,7 @@ def test_a_step_failing_on_its_own_inside_a_handled_pick_up_is_its_own_origin(
         nodes=[
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                planar_goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                     x=1.5, y=2.4, reference_frame=world.root
                 )
             ),
@@ -497,13 +498,15 @@ def test_a_goal_out_of_reach_from_anywhere_is_blamed_on_no_other_node(
         nodes=[
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                planar_goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                     x=1.5, y=2.4, reference_frame=world.root
                 )
             ),
             MoveManipulatorAction(
                 arm=robot.right_arm,
-                goal_pose=Pose.from_xyz_rpy(2.0, 2.4, 3.0, reference_frame=world.root),
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
+                    2.0, 2.4, 3.0, reference_frame=world.root
+                ),
             ),
         ]
     )
@@ -545,7 +548,7 @@ def test_a_pick_up_out_of_candidates_is_blamed_on_the_navigation_they_share(
     world, robot, extensions = pr2_apartment_context
     milk = world.get_semantic_annotations_by_type(Milk)[0]
     navigate = NavigateAction(
-        planar_goal_pose=Pose2D.from_xy_yaw(
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
             x=1.5, y=2.4, yaw=math.pi, reference_frame=world.root
         )
     )
@@ -586,13 +589,15 @@ def test_a_place_depends_on_the_pick_up_that_attached_its_object(
     place = PlaceAction(
         arm=robot.right_arm,
         graspable=milk,
-        goal_pose=Pose.from_xyz_rpy(2.4, 2.2, 1.0, reference_frame=world.root),
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
+            2.4, 2.2, 1.0, reference_frame=world.root
+        ),
     )
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                planar_goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                     x=1.5, y=2.4, reference_frame=world.root
                 )
             ),

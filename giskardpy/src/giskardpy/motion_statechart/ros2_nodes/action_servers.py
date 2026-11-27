@@ -36,7 +36,7 @@ from cramph.data_types import LifeCycleValue, ObservationStateValue
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
 from cramph.node import NodeArtifacts
 from giskardpy.motion_statechart.ros_context import RosContextExtension
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.world_entity import Body
 from krrood.patterns.called_positionally import called_positionally
 
@@ -331,7 +331,7 @@ class NavigateActionServerTask(
     Node for calling a Navigation2 ROS2 action server to navigate to a given pose.
     """
 
-    target_pose: Pose
+    target_pose: Pose3Dimensional
     """
     Target pose to which the robot should navigate.
     """

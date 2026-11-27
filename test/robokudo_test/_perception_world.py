@@ -13,7 +13,9 @@ from enum import StrEnum
 from rclpy.node import Node
 from semantic_digital_twin.adapters.ros.world_fetcher import FetchWorldServer
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
     PinholeCameraModel,
@@ -97,17 +99,17 @@ def wait_until(
 # %% camera placement
 
 
-def camera_pose(x: float = 0.0) -> HomogeneousTransformationMatrix:
+def camera_pose(x: float = 0.0) -> HomogeneousTransformationMatrix3Dimensional:
     """
     :param x: Position of the camera along the world x axis.
     :return: A camera pose looking along the world frame axes.
     """
-    return HomogeneousTransformationMatrix.from_xyz_rpy(x=x)
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=x)
 
 
 def cas_seen_from(
     world: World,
-    world_T_camera: HomogeneousTransformationMatrix,
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     reference_frame: str = FrameName.WORLD,
 ) -> CAS:
     """
@@ -161,7 +163,7 @@ def camera_model() -> PinholeCameraModel:
 def place_camera_of(
     cas: CAS,
     world: World,
-    world_T_camera: HomogeneousTransformationMatrix,
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     interface: CameraInterface | None = None,
     reference_frame: str = FrameName.WORLD,
     camera_frame: str = FrameName.CAMERA,
@@ -221,8 +223,10 @@ def world_with_a_head_camera(robot_name: str | None = None) -> World:
             )
         )
         world.add_connection(FixedConnection(parent=head_body, child=camera_body))
-    head_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        z=1.5, reference_frame=world_body
+    head_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            z=1.5, reference_frame=world_body
+        )
     )
     return world
 

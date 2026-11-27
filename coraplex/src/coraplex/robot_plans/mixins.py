@@ -41,11 +41,11 @@ from semantic_digital_twin.robots.robot_parts import (
 from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Pose,
-    Pose2D,
+    HomogeneousTransformationMatrix3Dimensional,
+    Pose3Dimensional,
 )
-from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
+from krrood_spatial_math.cartesian_frame_3_dimensional import CartesianFrame3Dimensional
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -140,7 +140,7 @@ class HasPlanarGoalPoseParameter(ParameterMixin):
     Mixin for actions that drive the robot's base to a spot on the floor.
     """
 
-    planar_goal_pose: Pose2D
+    planar_goal_pose: Pose2Dimensional
     """
     Where the robot's base ends up on the floor, and which way the robot faces, given as
     the heading of the pose.
@@ -153,7 +153,7 @@ class HasLookTargetParameter(ParameterMixin):
     Mixin for actions that orient the robot toward a pose.
     """
 
-    look_target: Pose
+    look_target: Pose3Dimensional
     """
     The pose the action orients the robot toward.
     """
@@ -383,23 +383,23 @@ class GraspPoseSequence:
     The tool frame goals that approach a grasp, reach it and withdraw from it.
     """
 
-    pre_grasp: Pose
+    pre_grasp: Pose3Dimensional
     """
     Where the gripper waits before it moves onto the grasp, clear of the object.
     """
 
-    grasp: Pose
+    grasp: Pose3Dimensional
     """
     The tool frame goal at the grasp itself.
     """
 
-    retreat: Pose
+    retreat: Pose3Dimensional
     """
     Where the gripper rises to when it leaves the grasp.
     """
 
     @property
-    def poses(self) -> list[Pose]:
+    def poses(self) -> list[Pose3Dimensional]:
         """
         :return: :attr:`pre_grasp`, :attr:`grasp` and :attr:`retreat`, in this order.
         """
@@ -422,7 +422,7 @@ class HasGraspApproach(
     def grasp_pose_sequence(
         self,
         *,
-        reference_T_grasp: Pose,
+        reference_T_grasp: Pose3Dimensional,
         end_effector: EndEffector,
         grasp_candidate: GraspCandidate | None = None,
     ) -> GraspPoseSequence:
@@ -449,8 +449,11 @@ class HasGraspApproach(
 
     @staticmethod
     def pre_grasp_pose(
-        *, reference_T_grasp: Pose, end_effector: EndEffector, distance: float
-    ) -> Pose:
+        *,
+        reference_T_grasp: Pose3Dimensional,
+        end_effector: EndEffector,
+        distance: float,
+    ) -> Pose3Dimensional:
         """
         The goal back along the direction the gripper approaches a grasp from, aimed at
         the point the fingers meet as the grasp itself is.
@@ -460,9 +463,11 @@ class HasGraspApproach(
         :param distance: How far back along the approach direction, in meters.
         :return: The tool frame goal, in ``reference_T_grasp``'s frame.
         """
-        grasp_T_pre_grasp = HomogeneousTransformationMatrix.from_xyz_rpy(x=-distance)
+        grasp_T_pre_grasp = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=-distance
+        )
         return end_effector.tool_frame_goal_for_grasp(
-            (reference_T_grasp.homogeneous_matrix @ grasp_T_pre_grasp).pose
+            (reference_T_grasp.to_coordinate_change() @ grasp_T_pre_grasp).pose
         )
 
     def _approach_distance(self, *, grasp_candidate: GraspCandidate | None) -> float:
@@ -487,7 +492,9 @@ class HasGraspApproach(
         )
 
     @staticmethod
-    def distance_to_boundary(*, body: Body, reference_T_grasp: Pose) -> float:
+    def distance_to_boundary(
+        *, body: Body, reference_T_grasp: Pose3Dimensional
+    ) -> float:
         """
         The distance the gripper has to retrace from a grasp before it leaves the
         bounding box of `body`.
@@ -524,7 +531,9 @@ class HasGraspApproach(
         ]
         return max(min(distances, default=0.0), 0.0)
 
-    def _retreat_pose(self, *, reference_T_grasp: Pose, tool_goal: Pose) -> Pose:
+    def _retreat_pose(
+        self, *, reference_T_grasp: Pose3Dimensional, tool_goal: Pose3Dimensional
+    ) -> Pose3Dimensional:
         """
         The tool frame goal :attr:`retreat_distance` above the grasp along the world's
         z-axis (a grasp frame's own z-axis can lie flat).
@@ -536,12 +545,12 @@ class HasGraspApproach(
         target = reference_T_grasp.reference_frame
         world = target._world
         world_T_grasp = world.transform(
-            reference_T_grasp.homogeneous_matrix, world.root
+            reference_T_grasp.to_coordinate_change(), world.root
         )
-        world_T_lift = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_lift = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=self.retreat_distance, reference_frame=world.root
         )
-        return Pose(
+        return Pose3Dimensional(
             world.transform((world_T_lift @ world_T_grasp).position, target),
             tool_goal.quaternion,
             reference_frame=target,
@@ -570,7 +579,7 @@ class MovesToolCenterPoint(
     def tool_center_point_goal(
         self,
         *,
-        target: Pose,
+        target: Pose3Dimensional,
         arm: Arm,
         cruise_linear_velocity: float | None = None,
         cruise_angular_velocity: float | None = None,
@@ -665,14 +674,14 @@ class HasVariablePoses(Action, ABC):
 
     @property
     @abstractmethod
-    def variable_poses(self) -> list[Pose]:
+    def variable_poses(self) -> list[Pose3Dimensional]:
         """
         :return: The poses of this action made by :meth:`create_variable_pose`.
         """
 
     def create_variable_pose(
-        self, *, name: str, reference_frame: CartesianFrame3D
-    ) -> Pose:
+        self, *, name: str, reference_frame: CartesianFrame3Dimensional
+    ) -> Pose3Dimensional:
         """
         :param name: Names the variables of the pose, unique among the variable poses of
             this action.
@@ -680,8 +689,10 @@ class HasVariablePoses(Action, ABC):
         :return: A new pose over float variables of its own, which
             :meth:`set_variable_pose` sets.
         """
-        reference_T_pose = HomogeneousTransformationMatrix.create_with_variables(
-            f"{self.name}/{name}"
+        reference_T_pose = (
+            HomogeneousTransformationMatrix3Dimensional.create_with_variables(
+                f"{self.name}/{name}"
+            )
         )
         reference_T_pose.reference_frame = reference_frame
         return reference_T_pose.pose
@@ -695,7 +706,9 @@ class HasVariablePoses(Action, ABC):
         for pose in self.variable_poses:
             self.context.float_variable_data.register_expression(expression=pose)
 
-    def set_variable_pose(self, *, variable_pose: Pose, value: Pose) -> None:
+    def set_variable_pose(
+        self, *, variable_pose: Pose3Dimensional, value: Pose3Dimensional
+    ) -> None:
         """
         :param variable_pose: One of :attr:`variable_poses`.
         :param value: The pose `variable_pose` takes, in any frame.

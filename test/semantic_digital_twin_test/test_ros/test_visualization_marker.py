@@ -25,7 +25,9 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldHasMultipleTfPublishersError
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -80,7 +82,7 @@ def test_visualization_marker(rclpy_node, cylinder_bot_world):
     callback.last_msg = None
 
     drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
-    new_pose = HomogeneousTransformationMatrix.from_xyz_rpy(1, 1)
+    new_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1, 1)
     drive.origin = new_pose
 
     for i in range(30):
@@ -550,7 +552,9 @@ def test_the_parts_of_a_split_mesh_keep_its_color_and_origin(
     Each part is shown in the color and at the origin of the mesh it was split from.
     """
     grid_too_large_for_rviz.color = Color(hue=0.5, saturation=1.0)
-    grid_too_large_for_rviz.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+    grid_too_large_for_rviz.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1.0)
+    )
     viz = VizMarkerPublisher(
         _world=world_showing(grid_too_large_for_rviz), node=rclpy_node
     )

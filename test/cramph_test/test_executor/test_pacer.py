@@ -20,7 +20,9 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.specifications.robots import RobotSpecification
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -101,7 +103,12 @@ def test_stepped_simulation_pacer_advances_the_physics_one_cycle_per_sleep() -> 
         world.add_body(root)
         box = Body(name=PrefixedName("box"))
         box.collision = ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=Scale(0.1, 0.1, 0.1))],
+            [
+                Box(
+                    origin=HomogeneousTransformationMatrix3Dimensional(),
+                    scale=Scale(0.1, 0.1, 0.1),
+                )
+            ],
             reference_frame=box,
         )
         world.add_connection(
@@ -109,7 +116,7 @@ def test_stepped_simulation_pacer_advances_the_physics_one_cycle_per_sleep() -> 
                 world=world,
                 parent=root,
                 child=box,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=1.0, reference_frame=root
                 ),
             )

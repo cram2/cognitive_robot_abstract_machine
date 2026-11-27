@@ -21,8 +21,13 @@ from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Camera, EndEffector
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -42,7 +47,9 @@ POSITION_TOLERANCE = 0.005
 How close two distances have to be, in meters, to count as the same distance here.
 """
 
-HELD_BODY_OFFSET = HomogeneousTransformationMatrix.from_xyz_rpy(0.01, 0.02, 0.03)
+HELD_BODY_OFFSET = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+    0.01, 0.02, 0.03
+)
 """
 Where the body a gripper holds sits relative to the tool frame.
 """
@@ -97,7 +104,7 @@ def graspable_box(pr2_world_copy) -> Milk:
             FixedConnection(
                 parent=pr2_world_copy.root,
                 child=body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.6, z=0.9
                 ),
             )
@@ -137,12 +144,12 @@ class EndEffectorWithSkewedAxes(EndEffector):
     """
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3(x=1, y=1, z=0, reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional(x=1, y=1, z=0, reference_frame=self.tool_frame)
 
     def setup_hardware_interfaces(self):
         pass
@@ -159,7 +166,9 @@ class EndEffectorWithSkewedAxes(EndEffector):
 
 def test_the_approach_axis_is_the_grasp_frames_x_axis(pr2_gripper) -> None:
     np.testing.assert_allclose(
-        (pr2_gripper.tool_R_grasp @ Vector3.X()).to_np()[:3],
+        (
+            pr2_gripper.tool_R_grasp.to_coordinate_change() @ Vector3Dimensional.X()
+        ).to_np()[:3],
         pr2_gripper.approach_axis.to_np()[:3],
         atol=1e-9,
     )
@@ -167,7 +176,9 @@ def test_the_approach_axis_is_the_grasp_frames_x_axis(pr2_gripper) -> None:
 
 def test_the_closing_axis_is_the_grasp_frames_y_axis(pr2_gripper) -> None:
     np.testing.assert_allclose(
-        (pr2_gripper.tool_R_grasp @ Vector3.Y()).to_np()[:3],
+        (
+            pr2_gripper.tool_R_grasp.to_coordinate_change() @ Vector3Dimensional.Y()
+        ).to_np()[:3],
         pr2_gripper.closing_axis.to_np()[:3],
         atol=1e-9,
     )
@@ -185,10 +196,14 @@ def test_the_approach_axis_follows_the_grippers_own_convention(
     ].left_arm.end_effector
 
     np.testing.assert_allclose(
-        pr2_gripper.approach_axis.to_np()[:3], Vector3.X().to_np()[:3], atol=1e-9
+        pr2_gripper.approach_axis.to_np()[:3],
+        Vector3Dimensional.X().to_np()[:3],
+        atol=1e-9,
     )
     np.testing.assert_allclose(
-        tracy_gripper.approach_axis.to_np()[:3], Vector3.Z().to_np()[:3], atol=1e-9
+        tracy_gripper.approach_axis.to_np()[:3],
+        Vector3Dimensional.Z().to_np()[:3],
+        atol=1e-9,
     )
 
 
@@ -238,7 +253,10 @@ def test_tool_frame_goal_applies_the_end_effectors_own_orientation(
 
     goal = pr2_gripper.tool_frame_goal(grasp)
 
-    expected = grasp.rotation_matrix @ pr2_gripper.tool_R_grasp.inverse()
+    expected = (
+        grasp.rotation_matrix.to_coordinate_change()
+        @ pr2_gripper.tool_R_grasp.inverse()
+    )
     np.testing.assert_allclose(
         goal.rotation_matrix.to_np(), expected.to_np(), atol=1e-9
     )
@@ -287,7 +305,7 @@ def test_the_held_grasp_is_turned_the_way_the_gripper_faces(pr2_gripper) -> None
         pr2_gripper.tool_frame.global_transform, body
     )
     np.testing.assert_allclose(
-        (body_R_grasp @ grasp_R_tool).to_np(),
+        (body_R_grasp.to_coordinate_change() @ grasp_R_tool).to_np(),
         body_T_tool.rotation_matrix.to_np(),
         atol=1e-9,
     )
@@ -316,7 +334,7 @@ def test_the_held_grasp_can_be_read_at_any_point_of_the_gripper(pr2_gripper):
     hold_body(pr2_gripper)
 
     body_T_grasp = pr2_gripper.held_body_T_grasp_at(
-        Point3(0.0, 0.0, 0.0, reference_frame=pr2_gripper.tool_frame)
+        Point3Dimensional(0.0, 0.0, 0.0, reference_frame=pr2_gripper.tool_frame)
     )
 
     np.testing.assert_allclose(
@@ -416,7 +434,7 @@ def test_the_tool_frame_goal_for_a_grasp_puts_the_grasp_point_on_it(
 
     goal = pr2_gripper.tool_frame_goal_for_grasp(grasp)
 
-    reached = goal.homogeneous_matrix.to_np()
+    reached = goal.to_coordinate_change().to_np()
     grasp_point_once_reached = (
         reached[:3, :3] @ pr2_gripper.fingertips.tool_P_grasp.to_np()[:3].ravel()
         + reached[:3, 3]

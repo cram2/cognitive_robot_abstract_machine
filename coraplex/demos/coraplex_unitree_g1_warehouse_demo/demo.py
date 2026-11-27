@@ -30,7 +30,8 @@ from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.robots.unitree_g1 import UnitreeG1
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Parcel
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Color, Scale
 from coraplex.plans.context_extensions import RobotAccess
@@ -58,7 +59,7 @@ The pelvis is the robot's root, so its ``odom`` has to be lifted by this much fo
 robot's feet to rest on the floor rather than sink through it.
 """
 
-ROBOT_START_POSE = Pose.from_xyz_rpy(1.9, 9.1, PELVIS_HEIGHT_ABOVE_FLOOR)
+ROBOT_START_POSE = Pose3Dimensional.from_xyz_rpy(1.9, 9.1, PELVIS_HEIGHT_ABOVE_FLOOR)
 """
 Where the robot starts, in the aisle south of the two pallet stacks.
 """
@@ -68,14 +69,14 @@ PARCEL_SCALE = Scale(0.08, 0.08, 0.14)
 The extents of the transported parcel.
 """
 
-PICK_POSE = Pose.from_xyz_rpy(2.75, 9.3, 0.793)
+PICK_POSE = Pose3Dimensional.from_xyz_rpy(2.75, 9.3, 0.793)
 """
 Where the parcel starts.
 
 Rotated 90 degrees so a FRONT grasp approach can reach it.
 """
 
-PLACE_POSE = Pose.from_xyz_rpy(2.6, 7.7, 0.8)
+PLACE_POSE = Pose3Dimensional.from_xyz_rpy(2.6, 7.7, 0.8)
 """
 Where the parcel ends up.
 """
@@ -99,7 +100,7 @@ def build_world() -> World:
         robots=[
             RobotSpecification(
                 semantic_annotation_type=UnitreeG1,
-                localization_pose=ROBOT_START_POSE.homogeneous_matrix,
+                localization_pose=ROBOT_START_POSE.to_coordinate_change(),
             )
         ],
         objects=[
@@ -107,7 +108,7 @@ def build_world() -> World:
                 "parcel",
                 PARCEL_SCALE,
                 color=Color.from_rgba(red=0.85, green=0.45, blue=0.1),
-                parent_T_self=PICK_POSE.homogeneous_matrix,
+                parent_T_self=PICK_POSE.to_coordinate_change(),
             )
         ],
     ).create_world()
@@ -131,7 +132,7 @@ def straighten_torso(robot: AbstractRobot) -> JointPositionList:
     )
 
 
-def standing_pose_in_front_of(pose: Pose, world: World) -> Pose2D:
+def standing_pose_in_front_of(pose: Pose3Dimensional, world: World) -> Pose2Dimensional:
     """
     :param pose: The pose the robot should approach from its FRONT-facing side.
     :param world: The world the pose is expressed in.
@@ -139,7 +140,7 @@ def standing_pose_in_front_of(pose: Pose, world: World) -> Pose2D:
         grasp.
     """
     yaw = float(pose.yaw)
-    return Pose2D.from_xy_yaw(
+    return Pose2Dimensional.from_xy_yaw(
         pose.x - STANDING_DISTANCE * np.cos(yaw),
         pose.y - STANDING_DISTANCE * np.sin(yaw),
         yaw=yaw,
@@ -148,7 +149,10 @@ def standing_pose_in_front_of(pose: Pose, world: World) -> Pose2D:
 
 
 def build_statechart(
-    context: StatechartContext, source: Pose, destination: Pose, turn: float
+    context: StatechartContext,
+    source: Pose3Dimensional,
+    destination: Pose3Dimensional,
+    turn: float,
 ) -> Statechart:
     """
     :param context: The context the plan runs in, holding the robot carrying it out.
@@ -177,7 +181,7 @@ def build_statechart(
                 ParkArmsAction(arms=robot.all_arms),
                 straighten_torso(robot),
                 NavigateAction(
-                    planar_goal_pose=Pose2D.from_xy_yaw(
+                    planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                         yaw=turn, reference_frame=robot.root
                     )
                 ),
@@ -187,7 +191,7 @@ def build_statechart(
                 PlaceAction(
                     arm=robot.torso.left_arm,
                     graspable=parcel,
-                    goal_pose=Pose(
+                    goal_pose=Pose3Dimensional(
                         destination.position,
                         destination.quaternion,
                         reference_frame=world.root,
@@ -220,8 +224,8 @@ def lowest_collision_point_of(robot: UnitreeG1, world: World) -> float:
 
 
 def run(
-    source: Pose,
-    destination: Pose,
+    source: Pose3Dimensional,
+    destination: Pose3Dimensional,
     turn: float,
     world: World,
     robot: UnitreeG1,

@@ -22,7 +22,9 @@ from semantic_digital_twin.robots.exceptions import (
 )
 from semantic_digital_twin.robots.input_source import SimulatedJointPositionSource
 from semantic_digital_twin.robots.robot_parts import Sensor
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
@@ -143,7 +145,7 @@ def world_with_walls(*wall_center_distances: float) -> tuple[World, Body]:
                 FixedConnection(
                     parent=world.root,
                     child=wall,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=distance
                     ),
                 )

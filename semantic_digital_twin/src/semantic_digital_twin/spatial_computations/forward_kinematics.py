@@ -1,3 +1,7 @@
+"""
+Forward kinematics of a world: where each of its entities lies relative to another.
+"""
+
 from __future__ import absolute_import, annotations
 
 from dataclasses import dataclass, field
@@ -16,7 +20,9 @@ from krrood.symbolic_math.symbolic_math import (
 )
 from semantic_digital_twin.callbacks.callback import ModelChangeCallback
 from semantic_digital_twin.datastructures.types import NpMatrix4x4
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import (
     Connection,
     KinematicStructureEntity,
@@ -56,9 +62,9 @@ class ForwardKinematicsManager(ModelChangeCallback):
     `forward_kinematics_for_all_bodies` that corresponds to that body.
     """
 
-    root_T_kse_expression_cache: dict[UUID, HomogeneousTransformationMatrix] = field(
-        init=False, repr=False
-    )
+    root_T_kse_expression_cache: dict[
+        UUID, HomogeneousTransformationMatrix3Dimensional
+    ] = field(init=False, repr=False)
 
     body_id_to_all_fk_index: dict[UUID, int] = field(init=False, repr=False)
 
@@ -94,7 +100,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
 
     def update_root_T_kse_expression_cache(self):
         self.root_T_kse_expression_cache = {
-            self._world.root.id: HomogeneousTransformationMatrix()
+            self._world.root.id: HomogeneousTransformationMatrix3Dimensional()
         }
         for parent, childs in rustworkx.bfs_successors(
             self._world.kinematic_structure, self._world.root.index
@@ -142,7 +148,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
     @copy_memoize
     def compose_expression(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
             It determines the starting point of the forward kinematics calculation.
@@ -156,20 +162,20 @@ class ForwardKinematicsManager(ModelChangeCallback):
             root, tip
         )
         with CasadiLock():
-            fk = HomogeneousTransformationMatrix()
+            fk = HomogeneousTransformationMatrix3Dimensional()
             connection: Connection
             for connection in root_chain:
                 tip_T_root = connection.origin_expression.inverse()
-                fk = fk.dot(tip_T_root)
+                fk = fk.dot(other=tip_T_root)
             for connection in tip_chain:
-                fk = fk.dot(connection.origin_expression)
+                fk = fk.dot(other=connection.origin_expression)
         fk.reference_frame = root
         fk.child_frame = tip
         return fk
 
     def compute(
         self, root: KinematicStructureEntity, tip: KinematicStructureEntity
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip
         KinematicStructureEntity.
@@ -183,8 +189,8 @@ class ForwardKinematicsManager(ModelChangeCallback):
         :return: Transformation matrix representing the relative pose of the tip
             KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
-        return HomogeneousTransformationMatrix(
-            data=self.compute_np(root, tip), reference_frame=root
+        return HomogeneousTransformationMatrix3Dimensional(
+            data=self.compute_np(root, tip), reference_frame=root, child_frame=tip
         )
 
     @memoize
@@ -216,8 +222,10 @@ class ForwardKinematicsManager(ModelChangeCallback):
         if not root_is_world:
             i = self.body_id_to_all_fk_index[root]
             map_T_root = self.forward_kinematics_for_all_bodies[i : i + 4]
-            root_T_map = HomogeneousTransformationMatrix.invert_numeric_matrix(
-                map_T_root
+            root_T_map = (
+                HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(
+                    map_T_root
+                )
             )
             if tip_is_world:
                 return root_T_map

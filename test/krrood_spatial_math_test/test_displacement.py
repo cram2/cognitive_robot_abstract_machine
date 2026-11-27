@@ -9,8 +9,11 @@ import json
 import numpy as np
 
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
-from krrood_spatial_math.spatial_types import Displacement, Vector3
+from krrood_spatial_math.spatial_types import (
+    SymbolicSpatialValue,
+    Displacement,
+    Vector3Dimensional,
+)
 
 from .dataset.frames import KnownFrames
 
@@ -43,7 +46,8 @@ def test_a_displacement_returns_the_parts_it_was_given():
     The translation and rotation vector read back as they were given.
     """
     displacement = Displacement(
-        translation=Vector3(0.1, -0.2, 0.3), rotation_vector=Vector3(0.0, 0.7, 0.0)
+        translation=Vector3Dimensional(0.1, -0.2, 0.3),
+        rotation_vector=Vector3Dimensional(0.0, 0.7, 0.0),
     )
 
     np.testing.assert_allclose(displacement.translation.to_np()[:3], [0.1, -0.2, 0.3])
@@ -58,7 +62,8 @@ def test_a_displacement_stores_its_rotation_first():
     entries and its translation in the lower three.
     """
     displacement = Displacement(
-        rotation_vector=Vector3(0.1, 0.2, 0.3), translation=Vector3(4.0, 5.0, 6.0)
+        rotation_vector=Vector3Dimensional(0.1, 0.2, 0.3),
+        translation=Vector3Dimensional(4.0, 5.0, 6.0),
     )
 
     np.testing.assert_allclose(
@@ -73,7 +78,7 @@ def test_a_displacement_is_a_value_given_in_a_cartesian_frame():
     """
     A displacement is expressed in a reference frame.
     """
-    assert issubclass(Displacement, ValueInCartesianFrame3D)
+    assert issubclass(Displacement, SymbolicSpatialValue)
 
 
 def test_the_parts_of_a_displacement_are_expressed_in_its_frame(table_frame):
@@ -81,8 +86,8 @@ def test_the_parts_of_a_displacement_are_expressed_in_its_frame(table_frame):
     Both parts carry the displacement's reference frame.
     """
     displacement = Displacement(
-        translation=Vector3(0.1, 0.0, 0.0),
-        rotation_vector=Vector3(0.0, 0.0, 0.2),
+        translation=Vector3Dimensional(0.1, 0.0, 0.0),
+        rotation_vector=Vector3Dimensional(0.0, 0.0, 0.2),
         reference_frame=table_frame,
     )
 
@@ -95,8 +100,8 @@ def test_a_deserialized_displacement_refers_to_the_readers_frame(table_frame):
     A JSON round trip keeps the values and resolves the frame on the reading side.
     """
     displacement = Displacement(
-        translation=Vector3(0.1, 0.2, 0.3),
-        rotation_vector=Vector3(0.4, 0.0, 0.0),
+        translation=Vector3Dimensional(0.1, 0.2, 0.3),
+        rotation_vector=Vector3Dimensional(0.4, 0.0, 0.0),
         reference_frame=table_frame,
     )
     known_frames = KnownFrames()

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 
 # %% Principal point persistence
 
@@ -22,7 +22,7 @@ def test_pinhole_retains_principal_point_after_database_roundtrip(
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=500.0,
         focal_length_y=510.0,
-        principal_point=Point2(x=319.5, y=239.25),
+        principal_point=Point2Dimensional(x=319.5, y=239.25),
     )
     stored_model = to_dao(model)
     with in_memory_session_maker() as session:

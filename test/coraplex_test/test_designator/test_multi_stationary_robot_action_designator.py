@@ -41,9 +41,9 @@ from semantic_digital_twin.robots.daisy import DAiSy
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Pose,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Pose3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
@@ -93,22 +93,28 @@ def robot_setup(request):
 
     with world.modify_world():
         if request.param[1] == Tracy:
-            box1_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.8, 0.5, 0.93
+            box1_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0.8, 0.5, 0.93)
             )
-            box2_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.8, -0.5, 0.93
+            box2_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    0.8, -0.5, 0.93
+                )
             )
         elif request.param[1] == DAiSy:
-            box1_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.6, 1.0, 0.9
+            box1_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0.6, 1.0, 0.9)
             )
-            box2_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy(
-                0.6, 0.1, 1.2
+            box2_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(0.6, 0.1, 1.2)
             )
         else:
-            box1_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy()
-            box2_transformationmatrix = HomogeneousTransformationMatrix.from_xyz_rpy()
+            box1_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy()
+            )
+            box2_transformationmatrix = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy()
+            )
 
         box1_connection = Connection6DoF.create_with_dofs(
             world=world,
@@ -163,7 +169,9 @@ def top_down_grasp(
     """
     return GraspCandidate(
         graspable_annotation(world, body),
-        Pose.from_xyz_rpy(z=height_above_origin, pitch=np.pi / 2, reference_frame=body),
+        Pose3Dimensional.from_xyz_rpy(
+            z=height_above_origin, pitch=np.pi / 2, reference_frame=body
+        ),
     )
 
 
@@ -216,7 +224,9 @@ def test_reach_action_multi(stationary_block_context):
     box_body = world.get_body_by_name("box1")
     box = graspable_annotation(world, box_body)
     position = box_body.global_pose.position.to_np()
-    grasp_pose = Pose.from_xyz_rpy(pitch=np.pi / 2, reference_frame=box_body)
+    grasp_pose = Pose3Dimensional.from_xyz_rpy(
+        pitch=np.pi / 2, reference_frame=box_body
+    )
 
     plan = Sequence(
         nodes=[
@@ -322,12 +332,12 @@ def test_pick_up_multi(stationary_block_context):
 
 
 @pytest.fixture
-def place_position(robot_setup) -> Point3:
+def place_position(robot_setup) -> Point3Dimensional:
     world, robot_class = robot_setup
     if robot_class == Tracy:
-        return Point3(0.9, 0.0, 0.93, reference_frame=world.root)
+        return Point3Dimensional(0.9, 0.0, 0.93, reference_frame=world.root)
     elif robot_class == DAiSy:
-        return Point3(0.6, 1.2, 0.9, reference_frame=world.root)
+        return Point3Dimensional(0.6, 1.2, 0.9, reference_frame=world.root)
     else:
         raise ValueError(f"Unsupported robot class: {robot_class}")
 
@@ -352,7 +362,7 @@ def test_place_multi(stationary_block_context, place_position):
             PlaceAction(
                 arm=left_or_only_arm(view),
                 graspable=graspable_annotation(world, box_body),
-                goal_pose=Pose(place_position, reference_frame=world.root),
+                goal_pose=Pose3Dimensional(place_position, reference_frame=world.root),
             ),
         ]
     )
@@ -370,12 +380,12 @@ def test_place_multi(stationary_block_context, place_position):
 
 
 @pytest.fixture
-def anchor_position(robot_setup) -> Point3:
+def anchor_position(robot_setup) -> Point3Dimensional:
     world, robot_class = robot_setup
     if robot_class == Tracy:
-        return Point3(x=0.85, y=-0.25, z=0.95, reference_frame=world.root)
+        return Point3Dimensional(x=0.85, y=-0.25, z=0.95, reference_frame=world.root)
     elif robot_class == DAiSy:
-        return Point3(x=0.0, y=0.0, z=0.95, reference_frame=world.root)
+        return Point3Dimensional(x=0.0, y=0.0, z=0.95, reference_frame=world.root)
     else:
         raise ValueError(f"Unsupported robot class: {robot_class}")
 
@@ -383,9 +393,9 @@ def anchor_position(robot_setup) -> Point3:
 def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_position):
     world, view, extensions = stationary_block_context
     right_arm = right_or_only_arm(view)
-    anchor = Pose(anchor_position, reference_frame=world.root)
-    anchor_T = anchor.homogeneous_matrix
-    offset_T = HomogeneousTransformationMatrix.from_xyz_axis_angle(
+    anchor = Pose3Dimensional(anchor_position, reference_frame=world.root)
+    anchor_T = anchor.to_coordinate_change()
+    offset_T = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
         z=-0.03,
         axis=(0, 1, 0),
         angle=np.pi / 2,
@@ -434,7 +444,7 @@ def physically_simulated_block_context(stationary_block_context):
                 parent=world.root,
                 child=narrow_box,
                 name=PrefixedName("narrow_box_connection"),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0.8, 0.3, view.table.top_z + edge / 2
                 ),
             )
@@ -511,7 +521,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
     arm = left_or_only_arm(view)
     stood_on = box.parent_connection.parent
     resting_height = box.global_pose.position.to_np().flatten()[2]
-    target = Point3(
+    target = Point3Dimensional(
         *place_position.to_np().flatten()[:2],
         resting_height,
         reference_frame=world.root,
@@ -523,7 +533,7 @@ def test_a_place_in_physics_leaves_the_box_to_the_release(
             PlaceAction(
                 arm=arm,
                 graspable=graspable_annotation(world, box),
-                goal_pose=Pose(target, reference_frame=world.root),
+                goal_pose=Pose3Dimensional(target, reference_frame=world.root),
             ),
         ]
     )

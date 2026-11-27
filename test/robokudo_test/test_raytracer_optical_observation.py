@@ -25,7 +25,9 @@ from robokudo.io.ray_tracing_camera_interface import RayTracingCameraInterface
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.camera_rendering import RenderedRGBDFrame
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 
 
@@ -53,8 +55,8 @@ def optical_interface(perception_world: World) -> RayTracingCameraInterface:
     context = interface.context_resolver.resolve(perception_world=perception_world)
     root = context.camera.root
     with context.world.modify_world():
-        root.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(
+        root.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, y=0.2, z=0.3, yaw=np.pi / 2
             ),
             reference_frame=root.parent_connection.parent,
@@ -195,7 +197,7 @@ def test_replayed_optical_pose_updates_camera_root(
     optical_interface.set_data(cas=cas, world=perception_world)
     world = RecordedCameraWorld(observation=cas.camera_observation).project()
     camera = world.get_semantic_annotation_by_id(cas.camera_observation.camera.id)
-    world_T_optical = HomogeneousTransformationMatrix.from_xyz_rpy(
+    world_T_optical = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.0, y=2.0, z=3.0, roll=0.2, reference_frame=world.root
     )
     observation = CameraObservation(

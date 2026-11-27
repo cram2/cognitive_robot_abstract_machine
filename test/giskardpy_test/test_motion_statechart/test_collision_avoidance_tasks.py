@@ -89,12 +89,12 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.robots.daisy import DAiSy
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+    Point3Dimensional,
     RotationMatrix,
 )
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -171,7 +171,7 @@ def test_external_collision_avoidance(
             ),
             CartesianPose(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
             ),
@@ -245,7 +245,7 @@ def test_external_collision_avoidance_battle():
             FixedConnection(
                 parent=map,
                 child=wall,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.5
                 ),
             )
@@ -255,7 +255,7 @@ def test_external_collision_avoidance_battle():
             FixedConnection(
                 parent=map,
                 child=strong_odom,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=0.5
                 ),
             )
@@ -265,7 +265,7 @@ def test_external_collision_avoidance_battle():
             FixedConnection(
                 parent=map,
                 child=weak_odom,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=-0.5
                 ),
             )
@@ -323,14 +323,14 @@ def test_external_collision_avoidance_battle():
             ),
             CartesianPose(
                 kinematic_chain=KinematicChain(root=map, tip=strong),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=strong
                 ),
                 weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
             ),
             CartesianPose(
                 kinematic_chain=KinematicChain(root=map, tip=weak),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=weak
                 ),
                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
@@ -400,7 +400,7 @@ def test_external_collision_avoidance_with_weight_above_ca(
             ),
             CartesianPose(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
                 weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
@@ -445,7 +445,7 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
             ExternalCollisionAvoidance(robot=robot),
             cart_goal_reached := CartesianPose(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
             ),
@@ -523,7 +523,7 @@ def test_consumer_cleanup_after_cancel(cylinder_bot_world: World):
             ),
             CartesianPose(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-                goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_world.root
                 ),
             ),
@@ -585,7 +585,7 @@ def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World
                     kinematic_chain=KinematicChain(
                         root=cylinder_bot_world.root, tip=tip
                     ),
-                    goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=goal_x, reference_frame=cylinder_bot_world.root
                     ),
                 ),
@@ -752,11 +752,11 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
                             kinematic_chain=KinematicChain(
                                 root=pr2_with_box.root, tip=r_tip
                             ),
-                            goal_pose=Pose.from_xyz_axis_angle(
+                            goal_pose=Pose3Dimensional.from_xyz_axis_angle(
                                 x=0.8,
                                 y=-0.38,
                                 z=0.84,
-                                axis=Vector3.Y(),
+                                axis=Vector3Dimensional.Y(),
                                 angle=np.pi / 2.0,
                                 reference_frame=pr2_with_box.root,
                             ),
@@ -849,7 +849,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
                             kinematic_chain=KinematicChain(
                                 root=base_footprint, tip=r_tip
                             ),
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 0.2, reference_frame=r_tip
                             ),
                             weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
@@ -1116,7 +1116,7 @@ def _linear_scaling_at_goal(
     :return: A linear scaling towards that goal point.
     """
     return LinearBufferZoneScaling(
-        goal_point=Point3(x=x, y=y, reference_frame=world.root),
+        goal_point=Point3Dimensional(x=x, y=y, reference_frame=world.root),
         full_scale_goal_distance=full_scale_goal_distance,
     )
 
@@ -1128,7 +1128,7 @@ def _scale_factor_at_root(scaling: LinearBufferZoneScaling, world: World) -> flo
     :return: The factor of a contact point at the root of `world`.
     """
     return scaling.scale_factor(
-        world=world, root_P_contact_point=Point3(reference_frame=world.root)
+        world=world, root_P_contact_point=Point3Dimensional(reference_frame=world.root)
     ).evaluate()[0]
 
 
@@ -1190,7 +1190,7 @@ class ContactWithData:
     The distance of the contact.
     """
 
-    root_P_point_on_robot: Point3
+    root_P_point_on_robot: Point3Dimensional
     """
     The closest point of the contact on the robot, relative to the root of the world.
     """
@@ -1211,7 +1211,7 @@ def _contacts_with_data(
         ContactWithData(
             lower_error=float(constraint.lower_bound.evaluate()[0]),
             distance=float(manager.get_contact_distance_symbol(contact).evaluate()[0]),
-            root_P_point_on_robot=Point3.from_iterable(
+            root_P_point_on_robot=Point3Dimensional.from_iterable(
                 manager.closest_points_of(contact).root_P_point_on_body_a[:3],
                 reference_frame=executor.context.world.root,
             ),
@@ -1382,7 +1382,7 @@ def test_scaled_buffer_zone_lets_the_bot_come_closer_to_an_obstacle_at_its_goal(
     (contact,) = collisions.contacts
     factor = scaling.scale_factor(
         world=world,
-        root_P_contact_point=Point3.from_iterable(
+        root_P_contact_point=Point3Dimensional.from_iterable(
             contact.root_P_point_on_body_a[:3], reference_frame=world.root
         ),
     ).evaluate()[0]
@@ -1479,7 +1479,9 @@ def _build_arms_crossing_statechart(
                     ),
                     CartesianPose(
                         kinematic_chain=KinematicChain(root=base_footprint, tip=r_tip),
-                        goal_pose=Pose.from_xyz_rpy(0.2, reference_frame=r_tip),
+                        goal_pose=Pose3Dimensional.from_xyz_rpy(
+                            0.2, reference_frame=r_tip
+                        ),
                         weight=DefaultWeights.WEIGHT_ABOVE_COLLISION_AVOIDANCE,
                     ),
                 ],
@@ -1564,7 +1566,7 @@ def executor_driving_into_obstacles(
         env_connection = FixedConnection(
             parent=root,
             child=env2,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 0.75
             ),
         )
@@ -1577,7 +1579,7 @@ def executor_driving_into_obstacles(
         env_connection = FixedConnection(
             parent=root,
             child=env3,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 1.25
             ),
         )
@@ -1589,7 +1591,7 @@ def executor_driving_into_obstacles(
         env_connection = FixedConnection(
             parent=root,
             child=env4,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=-0.25
             ),
         )
@@ -1601,7 +1603,7 @@ def executor_driving_into_obstacles(
         env_connection = FixedConnection(
             parent=root,
             child=env5,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1, y=0.25
             ),
         )
@@ -1631,7 +1633,7 @@ def executor_driving_into_obstacles(
         node=Sequence(
             nodes=[
                 SetOdometry(
-                    base_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    base_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_world.root
                     )
                 ),
@@ -1641,7 +1643,7 @@ def executor_driving_into_obstacles(
                             kinematic_chain=KinematicChain(
                                 root=cylinder_bot_world.root, tip=tip
                             ),
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 x=1, reference_frame=cylinder_bot_world.root
                             ),
                         ),
@@ -1733,7 +1735,7 @@ def test_collision_for_robot_with_static_base(
                 parent=world.root,
                 child=obstacle,
                 name=PrefixedName("obstacle_conn"),
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0.5, 0.5, 1, reference_frame=world.root
                 ),
             )
@@ -1751,7 +1753,9 @@ def test_collision_for_robot_with_static_base(
                 nodes=[
                     CartesianPosition(
                         kinematic_chain=KinematicChain(root=world.root, tip=tool_frame),
-                        goal_point=Point3(0.5, 0.5, 1, reference_frame=world.root),
+                        goal_point=Point3Dimensional(
+                            0.5, 0.5, 1, reference_frame=world.root
+                        ),
                     ),
                     ExternalCollisionAvoidance(robot=robot),
                     SelfCollisionAvoidance(robot=robot),
@@ -1979,7 +1983,7 @@ def attach_box(
     name: str,
     size: tuple[float, float, float],
     parent: KinematicStructureEntity,
-    pose: HomogeneousTransformationMatrix,
+    pose: HomogeneousTransformationMatrix3Dimensional,
 ) -> Body:
     """
     Adds a box rigidly attached to ``parent`` at ``pose``.
@@ -2091,13 +2095,13 @@ def test_attached_self_collision_avoid_stick(
         name="stick",
         size=(0.16, 0.04, 0.04),
         parent=left_tip,
-        pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+        pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.04, reference_frame=left_tip
         ),
     )
     cart_goal = CartesianPose(
         kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=left_tip),
-        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+        goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             z=0.2, reference_frame=left_tip
         ),
     )
@@ -2132,13 +2136,13 @@ def test_box_overlapping_with_gripper(
         name="box",
         size=(0.2, 0.1, 0.1),
         parent=right_tip,
-        pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+        pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.05, reference_frame=right_tip
         ),
     )
     cart_goal = CartesianPose(
         kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=box),
-        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+        goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=-0.5, reference_frame=box
         ),
     )
@@ -2183,7 +2187,7 @@ def test_avoid_self_collision_specific_link(
             ),
             tip=right_tip,
         ),
-        goal_pose=Pose.from_xyz_rpy(0.2, reference_frame=right_tip),
+        goal_pose=Pose3Dimensional.from_xyz_rpy(0.2, reference_frame=right_tip),
     )
 
     run_to_end(
@@ -2241,7 +2245,7 @@ def test_get_out_of_self_collision(
             ),
             tip=left_tip,
         ),
-        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+        goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             0.15, reference_frame=left_tip
         ),
     )
@@ -2291,8 +2295,8 @@ def test_attached_two_items(
         ),
         # The boxes reach 0.2 m out of each gripper, so grippers 0.4 m apart would leave
         # them touching, which violates the collision before avoidance can act.
-        goal_pose=HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=Point3(x=0.42),
+        goal_pose=HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+            point=Point3Dimensional(x=0.42),
             rotation_matrix=RotationMatrix(
                 [[-1, 0, 0, 0], [0, 1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1.0]]
             ),
@@ -2306,7 +2310,7 @@ def test_attached_two_items(
             name=name,
             size=(0.2, 0.04, 0.04),
             parent=tip,
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, reference_frame=tip
             ),
         )
@@ -2343,7 +2347,7 @@ def test_avoid_collision_box_between_3_boxes(
         name="box",
         size=(0.2, 0.05, 0.05),
         parent=right_tip,
-        pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+        pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.08, reference_frame=right_tip
         ),
     )
@@ -2357,7 +2361,7 @@ def test_avoid_collision_box_between_3_boxes(
             name,
             size,
             parent=pr2_world_copy.root,
-            pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=x, y=y, reference_frame=right_tip
             ),
         )
@@ -2368,13 +2372,17 @@ def test_avoid_collision_box_between_3_boxes(
         [
             AlignPlanes(
                 kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=box),
-                tip_normal=Vector3.X(reference_frame=box),
-                reference_normal=Vector3.X(reference_frame=pr2_world_copy.root),
+                tip_normal=Vector3Dimensional.X(reference_frame=box),
+                reference_normal=Vector3Dimensional.X(
+                    reference_frame=pr2_world_copy.root
+                ),
             ),
             AlignPlanes(
                 kinematic_chain=KinematicChain(root=pr2_world_copy.root, tip=box),
-                tip_normal=Vector3.Y(reference_frame=box),
-                reference_normal=Vector3.Y(reference_frame=pr2_world_copy.root),
+                tip_normal=Vector3Dimensional.Y(reference_frame=box),
+                reference_normal=Vector3Dimensional.Y(
+                    reference_frame=pr2_world_copy.root
+                ),
             ),
             ExternalCollisionAvoidance(robot=robot),
             local_min,
@@ -2417,7 +2425,7 @@ def test_hsr_self_collision_avoidance(
                 "hand_gripper_tool_frame"
             ),
         ),
-        goal_pose=Pose.from_xyz_axis_angle(
+        goal_pose=Pose3Dimensional.from_xyz_axis_angle(
             x=0.5,
             reference_frame=hsr_world_copy.get_kinematic_structure_entity_by_name(
                 "hand_palm_link"

@@ -49,7 +49,8 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 from semantic_digital_twin.datastructures.definitions import GripperState, TorsoState
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from ...plan_running import robot_executor, run_plan, simulated_executor, statechart_of
 from ...statechart_json_round_trip import StatechartSentThroughJSON
@@ -57,14 +58,15 @@ from ...statechart_json_round_trip import StatechartSentThroughJSON
 # %% helpers
 
 
-def _pose_in_front_of_the_robot(world, robot) -> Pose2D:
+def _pose_in_front_of_the_robot(world, robot) -> Pose2Dimensional:
     """
     :return: A pose on the floor in the world frame, a few centimetres in front of where
         the robot stands now.
     """
-    return Pose2D.from_pose(
+    return Pose2Dimensional.from_pose(
         world.transform(
-            Pose.from_xyz_rpy(x=0.05, reference_frame=robot.root), world.root
+            Pose3Dimensional.from_xyz_rpy(x=0.05, reference_frame=robot.root),
+            world.root,
         )
     )
 
@@ -91,7 +93,7 @@ class RecordingLocationInFrontOfTheRobot(Location):
     Whether the torso stood high, once per sampling.
     """
 
-    def candidates(self) -> Iterator[Pose2D]:
+    def candidates(self) -> Iterator[Pose2Dimensional]:
         torso_high = self.robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
         self.torso_high_when_sampled.append(torso_high.is_achieved())
         yield _pose_in_front_of_the_robot(self.world, self.robot)
@@ -115,7 +117,8 @@ def test_a_plan_grounding_an_action_mid_sequence_runs_as_one_statechart(
             StatementNode(
                 statement=a(NavigateAction)(
                     planar_goal_pose=variable(
-                        Pose2D, domain=[_pose_in_front_of_the_robot(world, robot)]
+                        Pose2Dimensional,
+                        domain=[_pose_in_front_of_the_robot(world, robot)],
                     )
                 )
             ),
@@ -150,7 +153,7 @@ def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             StatementNode(
                 statement=a(NavigateAction)(
-                    planar_goal_pose=variable(Pose2D, domain=location)
+                    planar_goal_pose=variable(Pose2Dimensional, domain=location)
                 )
             ),
         ]
@@ -204,7 +207,9 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     place = PlaceAction(
         arm=robot.left_arm,
         graspable=milk,
-        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
+            0.8, -1.9, 0.7, reference_frame=world.root
+        ),
     )
     statechart = Statechart(context=simulated_executor(extensions).context)
 
@@ -231,7 +236,9 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     place = PlaceAction(
         arm=robot.left_arm,
         graspable=milk,
-        goal_pose=Pose.from_xyz_rpy(0.8, -1.9, 0.7, reference_frame=world.root),
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
+            0.8, -1.9, 0.7, reference_frame=world.root
+        ),
     )
     paused_place = PausedUntilTrue(monitor=ConstTrueNode(), monitored_node=place)
     statechart = Statechart(context=simulated_executor(extensions).context)
@@ -357,7 +364,8 @@ def test_a_plan_on_the_robot_is_sent_once_with_the_chooser_grounding_its_actions
             StatementNode(
                 statement=a(NavigateAction)(
                     planar_goal_pose=variable(
-                        Pose2D, domain=[_pose_in_front_of_the_robot(world, robot)]
+                        Pose2Dimensional,
+                        domain=[_pose_in_front_of_the_robot(world, robot)],
                     )
                 )
             ),
@@ -499,7 +507,9 @@ def test_an_underspecified_action_out_of_candidates_on_the_robot_says_it_is_empt
         lambda node_handle, context: GiskardTickingTheGoalUntilItEnded(),
     )
     plan = StatementNode(
-        statement=a(NavigateAction)(planar_goal_pose=variable(Pose2D, domain=[]))
+        statement=a(NavigateAction)(
+            planar_goal_pose=variable(Pose2Dimensional, domain=[])
+        )
     )
     executor = robot_executor(extensions)
     executor.compile(statechart=statechart_of(executor, plan))
@@ -547,7 +557,7 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     created again.
     """
     world, robot, extensions = pr2_apartment_context
-    target = Pose.from_xyz_rpy(1.0, 0.0, 1.0, reference_frame=world.root)
+    target = Pose3Dimensional.from_xyz_rpy(1.0, 0.0, 1.0, reference_frame=world.root)
     sent = Statechart(context=simulated_executor(extensions).context)
     sent.add_node(
         node=(

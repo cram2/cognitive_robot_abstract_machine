@@ -16,7 +16,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPosition,
     HoldPose,
 )
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import run_plan
 
@@ -35,7 +35,7 @@ def ran_pick_up(pr2_apartment_context):
         nodes=[
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                planar_goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                     x=1.5, y=2.4, reference_frame=world.root
                 )
             ),

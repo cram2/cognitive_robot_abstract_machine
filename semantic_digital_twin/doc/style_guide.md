@@ -94,8 +94,8 @@ a_T_c = a_T_b @ b_T_c
 ```python
 c_T_a = a_T_c.inverse()
 # for a numeric 4x4 numpy array:
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-c_T_a = HomogeneousTransformationMatrix.invert_numeric_matrix(a_T_c)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
+c_T_a = HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(a_T_c)
 ```
 Remember that:
 ```python
@@ -103,14 +103,17 @@ a_T_c.T != a_T_c.inverse()
 ```
 
 ### Combine rotation matrices and transformations
+A `RotationMatrix` is an orientation, a value like a `Quaternion`; the change that turns
+by it is a transformation without translation, `a_T_b.rotation` or
+`a_R_b.to_coordinate_change()`.
 ```python
 a_R_r = a_T_b @ b_R_r
-a_R_r = a_R_b @ b_R_r  #rotation matrices don't care about translation, so these two are equivalent
+a_R_r = a_T_b.rotation @ b_R_r  # an orientation ignores translation, so these two are equivalent
 ```
 
 ### Invert rotation matrices
 ```python
-b_R_a = a_R_b.inverse()
+b_R_a = a_R_b.inverse()  # its reference frame, b, is not named by a_R_b, so it has none
 b_R_a = a_R_b.T  # for rotation matrices only, the transpose is equal to its inverse.
 ```
 
@@ -123,7 +126,7 @@ a_P_p1 = a_T_b @ b_P_p1
 Rotating points is weird and could mean that you are doing something wrong.
 When you rotate a point, it means you are trying to move the point somewhere else, thus creating a new point.
 ```python
-a_P_p2 = a_R_b @ b_P_p1
+a_P_p2 = a_T_b.rotation @ b_P_p1
 ```
 This is conceptually different from transforming, because there the point stays at the same place, just expressed relative to a different frame.
 
@@ -131,7 +134,7 @@ This is conceptually different from transforming, because there the point stays 
 ### Transform Vectors
 ```python
 a_V_v1 = a_T_b @ b_V_v1
-a_V_v1 = a_R_b @ b_V_v1  # a vector only expresses a direction, it has no fixed place in space, therefore applying a full transformation or only a rotation results in the same vector.
+a_V_v1 = a_T_b.rotation @ b_V_v1  # a vector only expresses a direction, it has no fixed place in space, therefore applying a full transformation or only a rotation results in the same vector.
 ```
 
 ### Subtract points to automatically get a vector

@@ -55,7 +55,8 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction
 from coraplex.testing import setup_world
 from semantic_digital_twin.robots.pr2 import PR2, TorsoState
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from cramph.composites import Sequence
 
 world = setup_world()
@@ -85,14 +86,14 @@ def run(plan):
 milk = world.get_semantic_annotations_by_type(Milk)[0]
 description = TransportAction(
     pick_up=MoveAndPickUpAction.from_standing_position(
-        standing_position=Pose2D.from_xy_yaw(x=1.63, y=1.98, reference_frame=world.root),
+        standing_position=Pose2Dimensional.from_xy_yaw(x=1.63, y=1.98, reference_frame=world.root),
         grasp=milk.grasp_candidates()[0],
         arm=pr2_view.left_arm,
     ),
     place=MoveAndPlaceAction.from_standing_position(
-        standing_position=Pose2D.from_xy_yaw(x=1.64, y=3.24, reference_frame=world.root),
+        standing_position=Pose2Dimensional.from_xy_yaw(x=1.64, y=3.24, reference_frame=world.root),
         graspable=milk,
-        goal_pose=Pose.from_xyz_quaternion(
+        goal_pose=Pose3Dimensional.from_xyz_quaternion(
             2.4, 3, 1.05, 0.0, 0.0, 0.0, 1.0, reference_frame=world.root
         ),
         arm=pr2_view.left_arm,

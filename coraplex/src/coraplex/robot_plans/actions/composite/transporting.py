@@ -35,7 +35,8 @@ from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Handle
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 # %% actions running other actions as their steps
 
@@ -61,7 +62,7 @@ class TransportAction(SequentialAction):
         cls,
         *,
         graspable: IsGraspable,
-        goal_pose: Pose,
+        goal_pose: Pose3Dimensional,
         arm: Arm,
         context: StatechartContext,
         number_of_grasps: int = GraspsByCloseness.number_of_grasps,
@@ -92,7 +93,7 @@ class TransportAction(SequentialAction):
                 carry=a(CarryAction)(
                     navigate=a(NavigateAction)(
                         planar_goal_pose=variable(
-                            Pose2D,
+                            Pose2Dimensional,
                             domain=ReachabilityLocation(
                                 target_pose=goal_pose,
                                 arm=arm,
@@ -170,9 +171,9 @@ class MoveAndPlaceAction(SequentialAction):
     def from_standing_position(
         cls,
         *,
-        standing_position: Pose2D,
+        standing_position: Pose2Dimensional,
         graspable: IsGraspable,
-        goal_pose: Pose,
+        goal_pose: Pose3Dimensional,
         arm: Arm,
     ) -> Self:
         """
@@ -227,7 +228,7 @@ class MoveAndPickUpAction(SequentialAction):
     def from_standing_position(
         cls,
         *,
-        standing_position: Pose2D,
+        standing_position: Pose2Dimensional,
         grasp: GraspCandidate,
         arm: Arm,
         approach_clearance: float = HasApproachClearanceParameter.approach_clearance,
@@ -241,7 +242,7 @@ class MoveAndPickUpAction(SequentialAction):
         :param retreat_distance: How far the gripper retreats with the object.
         :return: The step picking the object up from `standing_position`.
         """
-        object_pose = Pose(reference_frame=grasp.graspable.root)
+        object_pose = Pose3Dimensional(reference_frame=grasp.graspable.root)
         return cls(
             navigate=NavigateAction(planar_goal_pose=standing_position),
             face_and_look_at=FaceAndLookAtAction(
@@ -277,9 +278,9 @@ class MoveAndPickUpAction(SequentialAction):
             pose are tried from there.
         :return: The pick-up, with the standing pose and the grasp left open.
         """
-        object_pose = Pose(reference_frame=graspable.root)
+        object_pose = Pose3Dimensional(reference_frame=graspable.root)
         standing_position = variable(
-            Pose2D,
+            Pose2Dimensional,
             domain=ReachabilityLocation(
                 target_pose=object_pose, arm=arm, context=context
             ),
@@ -333,7 +334,7 @@ class MoveAndOpenAction(SequentialAction):
 
     @classmethod
     def from_standing_position(
-        cls, *, standing_position: Pose2D, grasp: GraspCandidate, arm: Arm
+        cls, *, standing_position: Pose2Dimensional, grasp: GraspCandidate, arm: Arm
     ) -> Self:
         """
         :param standing_position: Where the robot stands while opening.
@@ -341,7 +342,7 @@ class MoveAndOpenAction(SequentialAction):
         :param arm: The arm to open with.
         :return: The step opening the container from `standing_position`.
         """
-        handle_pose = Pose(reference_frame=grasp.graspable.root)
+        handle_pose = Pose3Dimensional(reference_frame=grasp.graspable.root)
         return cls(
             navigate=NavigateAction(planar_goal_pose=standing_position),
             face_and_look_at=FaceAndLookAtAction(
@@ -373,9 +374,9 @@ class MoveAndOpenAction(SequentialAction):
             pose are tried from there.
         :return: The opening, with the standing pose and the grasp left open.
         """
-        handle_pose = Pose(reference_frame=handle.root)
+        handle_pose = Pose3Dimensional(reference_frame=handle.root)
         standing_position = variable(
-            Pose2D,
+            Pose2Dimensional,
             domain=ReachabilityLocation(
                 target_pose=handle_pose,
                 arm=arm,

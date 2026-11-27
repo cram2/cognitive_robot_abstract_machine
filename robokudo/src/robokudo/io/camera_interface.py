@@ -77,7 +77,9 @@ from semantic_digital_twin.datastructures.camera_model import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -146,8 +148,8 @@ class CameraInterface(object):
         world: World,
         reference_frame: str,
         camera_frame: str,
-        world_T_camera: HomogeneousTransformationMatrix,
-    ) -> HomogeneousTransformationMatrix:
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Bind a sampled camera pose to the bodies of ``world``.
 
@@ -180,7 +182,7 @@ class CameraInterface(object):
         ):
             raise UnknownWorldFrameError(world_frame=reference_frame)
         if camera_body is None and not self.adds_missing_camera(world=world):
-            return HomogeneousTransformationMatrix(
+            return HomogeneousTransformationMatrix3Dimensional(
                 data=world_T_camera, reference_frame=reference_body
             )
 
@@ -192,12 +194,12 @@ class CameraInterface(object):
             camera_body=camera_body,
         )
         if mount is None:
-            return HomogeneousTransformationMatrix(
+            return HomogeneousTransformationMatrix3Dimensional(
                 data=world_T_camera,
                 reference_frame=reference_body,
                 child_frame=camera_body,
             )
-        bound_world_T_camera = HomogeneousTransformationMatrix(
+        bound_world_T_camera = HomogeneousTransformationMatrix3Dimensional(
             data=world_T_camera, reference_frame=mount.parent, child_frame=mount.child
         )
         with world.modify_world():
@@ -288,7 +290,7 @@ class CameraInterface(object):
 
     def static_world_T_camera_if_configured(
         self, *, world: World, camera_frame: str
-    ) -> HomogeneousTransformationMatrix | None:
+    ) -> HomogeneousTransformationMatrix3Dimensional | None:
         """
         Return the configured static camera pose bound to ``world``.
 
@@ -315,7 +317,7 @@ class CameraInterface(object):
         camera_frame: str,
         timestamp_nanoseconds: int,
         modalities: tuple[CameraModality, ...],
-        world_T_camera: HomogeneousTransformationMatrix | None,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional | None,
     ) -> None:
         """
         Store semantic identity and effective calibration for a camera frame.
@@ -345,7 +347,7 @@ class CameraInterface(object):
         )
         if world_T_camera is not None and world_T_camera.child_frame is not camera.root:
             observation = observation.copy_with_world_T_camera(
-                world_T_camera=HomogeneousTransformationMatrix(
+                world_T_camera=HomogeneousTransformationMatrix3Dimensional(
                     data=world_T_camera,
                     reference_frame=world_T_camera.reference_frame,
                     child_frame=camera.root,
@@ -565,7 +567,7 @@ class ROSCameraInterface(CameraInterface):
 
     def world_T_camera_from_tf(
         self, *, world: World, timestamp: builtin_interfaces.msg.Time
-    ) -> HomogeneousTransformationMatrix | None:
+    ) -> HomogeneousTransformationMatrix3Dimensional | None:
         """
         Return the camera pose TF provides at ``timestamp``, bound to ``world``.
 
@@ -593,7 +595,10 @@ class ROSCameraInterface(CameraInterface):
         return world_T_camera
 
     def warn_if_world_disagrees_with_tf(
-        self, *, world: World, world_T_camera: HomogeneousTransformationMatrix
+        self,
+        *,
+        world: World,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
     ) -> None:
         """
         Log a warning if the world currently places a camera another process attached
@@ -615,7 +620,7 @@ class ROSCameraInterface(CameraInterface):
             ).transform,
             world=world,
         )
-        disagreement = HomogeneousTransformationMatrix(
+        disagreement = HomogeneousTransformationMatrix3Dimensional(
             data=np.linalg.inv(latest_world_T_camera.to_np())
             @ np.linalg.inv(world_T_camera.reference_frame.global_transform.to_np())
             @ camera_body.global_transform.to_np()

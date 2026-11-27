@@ -7,7 +7,9 @@ from __future__ import annotations
 # %% Imports
 import numpy as np
 import pytest
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from std_msgs.msg import String
 
 from robokudo.types.camera import CameraObservation
@@ -210,7 +212,7 @@ def test_krrood_codec_resolves_world_entities_against_the_given_world() -> None:
     world_body = Body(name=PrefixedName("map"))
     with world.modify_world():
         world.add_body(world_body)
-    transform = HomogeneousTransformationMatrix.from_xyz_rpy(
+    transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.0, reference_frame=world_body
     )
     codec = KrroodCodec()

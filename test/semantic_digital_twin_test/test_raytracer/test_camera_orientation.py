@@ -11,14 +11,17 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.camera_rendering import RayIntersections
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.testing import ray_test_world
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
@@ -34,8 +37,8 @@ def optical_camera(
     """
     world, body, *_ = ray_test_world
     with world.modify_world():
-        body.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(
+        body.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.2, y=0.1, z=0.3, roll=0.4, pitch=0.2, yaw=np.pi / 2
             ),
             reference_frame=body.parent_connection.parent,
@@ -58,7 +61,7 @@ def test_viewing_direction_uses_optical_root(optical_camera: Camera) -> None:
     Positive optical z is the camera's root-relative viewing direction.
     """
     np.testing.assert_array_equal(
-        optical_camera.viewing_direction.to_np(), Vector3.Z().to_np()
+        optical_camera.viewing_direction.to_np(), Vector3Dimensional.Z().to_np()
     )
     assert optical_camera.viewing_direction.reference_frame is optical_camera.root
 
@@ -76,8 +79,8 @@ def test_render_preserves_optical_orientation(
     """
     root = optical_camera.root
     with root._world.modify_world():
-        root.parent_connection.origin = HomogeneousTransformationMatrix(
-            data=HomogeneousTransformationMatrix.from_xyz_rpy(
+        root.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
+            data=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 roll=optical_roll, pitch=root_pitch
             ),
             reference_frame=root.parent_connection.parent,
@@ -153,17 +156,17 @@ def test_render_places_top_left_optical_ray_at_top_left_pixel(
 @pytest.mark.parametrize(
     "root_pose",
     [
-        HomogeneousTransformationMatrix.from_xyz_rpy(roll=np.pi / 2),
-        HomogeneousTransformationMatrix.from_xyz_rpy(pitch=np.pi / 2),
-        HomogeneousTransformationMatrix.from_xyz_rpy(yaw=np.pi / 2),
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(roll=np.pi / 2),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(pitch=np.pi / 2),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=np.pi / 2),
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.8, y=1.4, z=0.9, roll=0.4, pitch=0.7, yaw=0.3
         ),
     ],
 )
 def test_forward_view_preserves_optical_root_orientation_under_robot_motion(
     optical_camera: Camera,
-    root_pose: HomogeneousTransformationMatrix,
+    root_pose: HomogeneousTransformationMatrix3Dimensional,
 ) -> None:
     """
     Camera motion changes the world pose without changing image axes relative to its
@@ -172,7 +175,7 @@ def test_forward_view_preserves_optical_root_orientation_under_robot_motion(
     root = optical_camera.root
     world = root._world
     with world.modify_world():
-        root.parent_connection.origin = HomogeneousTransformationMatrix(
+        root.parent_connection.origin = HomogeneousTransformationMatrix3Dimensional(
             data=root_pose,
             reference_frame=root.parent_connection.parent,
             child_frame=root,
@@ -197,7 +200,7 @@ def test_render_preserves_off_center_projection(
         image_resolution=CameraResolution(width=8, height=6),
         focal_length_x=10.0,
         focal_length_y=12.0,
-        principal_point=Point2(x=2.0, y=1.0),
+        principal_point=Point2Dimensional(x=2.0, y=1.0),
     )
     optical_camera.camera_model = model
     tracer = optical_camera.root._world.ray_tracer

@@ -82,12 +82,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Tool,
     Whisk,
 )
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
 )
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -95,7 +96,9 @@ from semantic_digital_twin.world_description.geometry import (
     Scale,
     VolumetricBoundingBox,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 from ..test_designator.test_multi_robot_action_designator import _handle_annotation
@@ -140,8 +143,10 @@ def _milk(world: World) -> Milk:
     return world.get_semantic_annotations_by_type(Milk)[0]
 
 
-def _pose(world: World) -> Pose:
-    return Pose.from_xyz_rpy(x=1.5, y=2.0, z=0.9, reference_frame=world.root)
+def _pose(world: World) -> Pose3Dimensional:
+    return Pose3Dimensional.from_xyz_rpy(
+        x=1.5, y=2.0, z=0.9, reference_frame=world.root
+    )
 
 
 def _handle(world: World) -> Handle:
@@ -171,7 +176,7 @@ def _tool(world: World, tool_type: type[Tool]) -> Tool:
 
 def _whole_scene(world: World) -> VolumetricBoundingBox:
     return VolumetricBoundingBox(
-        origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+        origin=HomogeneousTransformationMatrix3Dimensional(reference_frame=world.root),
         min_x=-10,
         min_y=-10,
         min_z=-10,
@@ -189,7 +194,7 @@ def _navigate(world: World) -> NavigateAction:
     :param world: The world the goal is taken from.
     :return: A navigation to the shared test pose.
     """
-    return NavigateAction(planar_goal_pose=Pose2D.from_pose(_pose(world)))
+    return NavigateAction(planar_goal_pose=Pose2Dimensional.from_pose(_pose(world)))
 
 
 def _face_and_look_at(world: World) -> FaceAndLookAtAction:
@@ -251,7 +256,7 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             scale=Scale(2, 2, 2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1.0
@@ -264,7 +269,7 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
             scale=Scale(0.05, 1, 2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.Y()
+                    axis=Vector3Dimensional.Y()
                 ),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     lower_position=0.0, upper_position=1.0
@@ -333,7 +338,7 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
             node_type=MoveToReach,
             build_nodes=lambda world: [
                 MoveToReach(
-                    target_pose_offset_robot=Pose2D.from_xy_yaw(0.2, -0.55),
+                    target_pose_offset_robot=Pose2Dimensional.from_xy_yaw(0.2, -0.55),
                     reference_T_grasp=_pose(world),
                     hip_rotation=0.0,
                     arm=_arm(world),
@@ -361,7 +366,7 @@ def _navigation_and_perception_cases() -> list[ActionRoundTripCase]:
             node_type=PathPlanningNavigateAction,
             build_nodes=lambda world: [
                 PathPlanningNavigateAction(
-                    planar_goal_pose=Pose2D.from_pose(_pose(world))
+                    planar_goal_pose=Pose2Dimensional.from_pose(_pose(world))
                 )
             ],
         ),

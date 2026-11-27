@@ -11,7 +11,9 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from py_trees.common import Status
 from semantic_digital_twin.datastructures.camera_model import (
     CameraModality,
@@ -271,7 +273,9 @@ class PlacesItsFixedCamera(CameraInterface):
         )
 
 
-def fixed_camera_at(world_T_camera: HomogeneousTransformationMatrix) -> CameraInterface:
+def fixed_camera_at(
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional,
+) -> CameraInterface:
     """
     :param world_T_camera: The pose of the camera in the world frame.
     :return: A camera interface whose configuration fixes its camera at

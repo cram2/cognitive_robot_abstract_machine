@@ -183,6 +183,7 @@
 - Use `from __future__ import annotations` instead of wrapping types in strings (checked by `krrood check`)
 - When each class in a family declares the type it handles, carry that type as a bound generic parameter, not a `ClassVar`, so it is part of the signature and cannot disagree with a separate attribute: bind it in each member (`class MemberOfFamily(Family[ConcreteType])`)
 - Generic classes inherit `Generic` and then `krrood.patterns.subclass_safe_generic.SubClassSafeGeneric`, which narrows field types when a subclass binds a parameter. Read a bound type with `get_type_of_generic_parameter`, never via `__orig_bases__`. Such classes cannot be frozen dataclasses
+- Bind only the most specific type a generic class depends on, and derive the parameters that type already fixes as `DerivedGenericParameter`s: a point type binds its vector type and reads the frame and the coordinate type from it, so no class names one fact twice
 
 # Version control
 <!-- from VersionControlRules in krrood/development_tools/agents/shipped_rules/version_control.py -->

@@ -35,8 +35,13 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Point3, Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    Pose3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 from ..conftest import expand, motion_nodes_of, tool_center_point_goal
@@ -252,7 +257,7 @@ def test_a_reach_runs_to_its_target(pr2_apartment_context, rclpy_node) -> None:
     world, view, extensions = pr2_apartment_context
 
     milk_connection = world.get_body_by_name("milk.stl").parent_connection
-    milk_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    milk_connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         2, 1.5, 0.7, 0, 0, 0, reference_frame=milk_connection.parent
     )
     reach = ReachAction(
@@ -315,7 +320,7 @@ def test_a_transport_runs_with_its_underspecified_steps(
             ParkArmsAction(arms=view.all_arms),
             TransportAction.from_graspable_by_closest_grasps(
                 graspable=world.get_semantic_annotations_by_type(Milk)[0],
-                goal_pose=Pose.from_xyz_rpy(
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
                     2.37, 2.5, 1.05, reference_frame=world.root
                 ),
                 arm=view.right_arm,
@@ -341,7 +346,9 @@ def test_perceiving_runs_between_the_motions_around_it(pr2_apartment_context) ->
     query = PerceptionQuery(
         semantic_annotation=Milk,
         region=VolumetricBoundingBox(
-            origin=HomogeneousTransformationMatrix(reference_frame=world.root),
+            origin=HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=world.root
+            ),
             min_x=-10,
             min_y=-10,
             min_z=-10,
@@ -458,9 +465,11 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(
     ]
 
     displacement = np.array([0.25, -0.4, 0.1])
-    milk_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        *(milk_body.global_pose.position.to_np().flatten()[:3] + displacement),
-        reference_frame=world.root,
+    milk_body.parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            *(milk_body.global_pose.position.to_np().flatten()[:3] + displacement),
+            reference_frame=world.root,
+        )
     )
 
     assert targets

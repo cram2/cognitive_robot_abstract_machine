@@ -59,7 +59,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
     Milk,
 )
-from krrood_spatial_math.spatial_types import Pose2D
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.world_entity import Body
@@ -352,8 +352,8 @@ def test_underspecified_action(apartment_world_pr2_copy_with_context):
     action = a(NavigateAction)(
         planar_goal_pose=variable_from(
             [
-                Pose2D.from_xy_yaw(1, -1, reference_frame=world.root),
-                Pose2D.from_xy_yaw(2, -1, reference_frame=world.root),
+                Pose2Dimensional.from_xy_yaw(1, -1, reference_frame=world.root),
+                Pose2Dimensional.from_xy_yaw(2, -1, reference_frame=world.root),
             ]
         ),
     )
@@ -373,7 +373,7 @@ def test_underspecified_action_with_ellipsis(apartment_world_pr2_copy_with_conte
     world, robot, extensions = apartment_world_pr2_copy_with_context
     extensions = with_grounding(extensions, query_backend=ProbabilisticBackend())
     action = a(NavigateAction)(
-        planar_goal_pose=a(Pose2D.from_xy_yaw)(
+        planar_goal_pose=a(Pose2Dimensional.from_xy_yaw)(
             x=..., y=..., yaw=0.0, reference_frame=robot.root
         ),
     )
@@ -397,8 +397,12 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
                 planar_goal_pose=(
                     target_locations := variable_from(
                         [
-                            Pose2D.from_xy_yaw(1, 0, reference_frame=world.root),
-                            Pose2D.from_xy_yaw(2, 0, reference_frame=world.root),
+                            Pose2Dimensional.from_xy_yaw(
+                                1, 0, reference_frame=world.root
+                            ),
+                            Pose2Dimensional.from_xy_yaw(
+                                2, 0, reference_frame=world.root
+                            ),
                         ]
                     )
                 ),
@@ -982,7 +986,9 @@ def test_a_trial_puts_a_differentially_driven_base_at_its_goal(
     copied = trial._copy()
     trial_executor = trial._trial_executor(world=copied)
     navigation = NavigateAction(
-        planar_goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=copied.root)
+        planar_goal_pose=Pose2Dimensional.from_xy_yaw(
+            x=2.0, y=2.0, reference_frame=copied.root
+        )
     )
 
     trial_executor.prepare(statechart=statechart_of(trial_executor, navigation))
@@ -1052,7 +1058,7 @@ def test_a_trial_tries_an_action_that_already_belongs_to_a_plan(
     node the run publishes through, which a trial must not try to copy.
     """
     world, robot, executor = debugging_executor
-    stand_where_it_is = Pose2D.from_pose(robot.root.global_pose)
+    stand_where_it_is = Pose2Dimensional.from_pose(robot.root.global_pose)
     action = NavigateAction(planar_goal_pose=stand_where_it_is)
     statechart_of(executor, Sequence(nodes=[action]))
     trial = ActionTrial(

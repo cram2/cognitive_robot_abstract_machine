@@ -26,7 +26,7 @@ Just execute this cell without changing anything. It imports the required classe
 ```{code-cell} ipython3
 :tags: [remove-input]
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.geometry import Box, Sphere, Scale, Color
@@ -61,12 +61,12 @@ body: Body = ...
 ```{code-cell} ipython3
 :tags: [example-solution]
 collision_box = Box(
-    origin=HomogeneousTransformationMatrix(),
+    origin=HomogeneousTransformationMatrix3Dimensional(),
     scale=Scale(0.2, 0.2, 0.2),
     color=Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0),
 )
 visual_sphere = Sphere(
-    origin=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.3),
+    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.3),
     radius=0.1,
 )
 collision = ShapeCollection([collision_box])

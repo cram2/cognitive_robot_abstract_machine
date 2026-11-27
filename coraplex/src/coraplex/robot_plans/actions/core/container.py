@@ -39,7 +39,8 @@ from semantic_digital_twin.robots.robot_parts import Arm, EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
 )
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 # %% taking a container by its handle
@@ -78,7 +79,7 @@ class MovesContainerByItsHandle(
         # A variable, so the grasps are ranked when the action is grounded, from where
         # the robot stands then.
         where_the_robot_stands = variable(
-            Pose2D, domain=[Pose2D(reference_frame=arm._robot.root)]
+            Pose2Dimensional, domain=[Pose2Dimensional(reference_frame=arm._robot.root)]
         )
         return a(cls)(
             grasp_candidate=variable_from(
@@ -106,7 +107,9 @@ class MovesContainerByItsHandle(
             ActiveConnection1DOF
         )
 
-    def back_off_pose(self, *, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
+    def back_off_pose(
+        self, *, grasp_pose: Pose3Dimensional, end_effector: EndEffector
+    ) -> Pose3Dimensional:
         """
         The tool frame goal that clears the released handle and the container, back
         along the way the gripper came in, so an open gripper still straddling the

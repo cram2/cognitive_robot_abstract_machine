@@ -70,8 +70,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Drawer,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -753,7 +753,7 @@ def test_ChangeDifHasHardwareInterface(rclpy_node):
             w1.add_degree_of_freedom(dof)
             connection = ScrewAxisConnection(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.unit_vector(1, 1, 1)
+                    axis=Vector3Dimensional.unit_vector(1, 1, 1)
                 ),
                 raw_dof=dof,
                 parent=body1,
@@ -1370,7 +1370,7 @@ def test_simultaneous_state_and_model_updates(rclpy_node):
         w1.add_body(b2)
         connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
             world=w1,
             parent=b1,
@@ -1742,7 +1742,7 @@ def test_world_synchronizer_basic_model_sync(rclpy_node):
         w1.add_body(b2)
         conn = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
             world=w1,
             parent=b1,
@@ -1786,7 +1786,7 @@ def test_world_synchronizer_ordering_no_key_error_after_model_change(rclpy_node)
         w1.add_body(b2)
         conn = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
             world=w1,
             parent=b1,
@@ -1924,7 +1924,7 @@ def test_apply_missed_messages_interleaved_model_and_state(rclpy_node):
         world_1.add_body(body_2)
         prismatic_connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
             world=world_1,
             parent=body_1,
@@ -2378,7 +2378,7 @@ def test_combined_update_model_and_state_applied_atomically(rclpy_node):
         source_world.add_body(new_body)
         connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
             world=source_world,
             parent=source_world.root,
@@ -2587,7 +2587,7 @@ def create_connected_worlds(
         publisher_world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
                 world=publisher_world,
                 parent=parent_body,
@@ -2642,7 +2642,7 @@ def test_deferring_incoming_updates_keeps_outgoing_publishing_alive(rclpy_node):
             world_1.add_connection(
                 ScrewAxisConnection.create_with_dofs(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                        axis=Vector3.X()
+                        axis=Vector3Dimensional.X()
                     ),
                     world=world_1,
                     parent=parent_body,
@@ -2693,7 +2693,7 @@ def test_state_updates_are_applied_up_to_the_next_model_modification(rclpy_node)
             publisher_world.add_body(child_body)
             connection = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
                 world=publisher_world,
                 parent=parent_body,
@@ -3255,7 +3255,7 @@ def add_prismatic_connection(world: World, name: str) -> ScrewAxisConnection:
         world.add_body(child_body)
         connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
             world=world,
             parent=world.root,
@@ -3436,8 +3436,10 @@ def add_placed_body(world: World, body: Body) -> None:
         world.add_connection(
             Connection6DoF.create_with_dofs(world=world, parent=root, child=body)
         )
-        body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            x=0.95, z=1.04, reference_frame=root
+        body.parent_connection.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=0.95, z=1.04, reference_frame=root
+            )
         )
 
 

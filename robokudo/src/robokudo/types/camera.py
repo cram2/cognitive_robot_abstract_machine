@@ -12,7 +12,9 @@ from robokudo.exceptions import CameraPoseMissing, InvalidCameraObservation
 from robokudo.utils.ros_frames import normalize_ros_frame_id
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
@@ -46,7 +48,7 @@ class CameraObservation:
     Effective projection model of the delivered image.
     """
 
-    world_T_camera: HomogeneousTransformationMatrix | None
+    world_T_camera: HomogeneousTransformationMatrix3Dimensional | None
     """
     Sampled optical-frame pose in world coordinates, if available.
 
@@ -116,7 +118,7 @@ class CameraObservation:
         """
         return self.effective_camera_model.field_of_view
 
-    def world_T_camera_or_raise(self) -> HomogeneousTransformationMatrix:
+    def world_T_camera_or_raise(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Return the sampled pose or raise when the producer had none.
 
@@ -128,7 +130,7 @@ class CameraObservation:
         return self.world_T_camera
 
     @property
-    def camera_T_world(self) -> HomogeneousTransformationMatrix:
+    def camera_T_world(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Return the inverse sampled camera pose.
 
@@ -137,7 +139,7 @@ class CameraObservation:
         return self.world_T_camera_or_raise().inverse()
 
     def copy_with_world_T_camera(
-        self, *, world_T_camera: HomogeneousTransformationMatrix
+        self, *, world_T_camera: HomogeneousTransformationMatrix3Dimensional
     ) -> CameraObservation:
         """
         Return a copy carrying the supplied sampled camera pose.

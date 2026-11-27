@@ -18,8 +18,11 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 from giskardpy.qp.qp_controller_config import QPControllerConfig
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Point3
-from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import Point3Dimensional
+from krrood_spatial_math.spatial_types import (
+    Vector3Dimensional,
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -42,7 +45,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             Cylinder(
                 width=fucking_huge_link_length / 10,
                 height=fucking_huge_link_length,
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=-(fucking_huge_link_length / 2)
                 ),
             )
@@ -70,7 +73,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
                 world=world,
                 parent=root,
@@ -88,13 +91,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
                 world=world,
                 parent=link1,
                 child=link2,
                 dof_limits=dof_limits,
-                connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                connection_T_child_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=fucking_huge_link_length,
                 ),
             )
@@ -109,13 +112,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
                 world=world,
                 parent=link2,
                 child=link3,
                 dof_limits=dof_limits,
-                connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                connection_T_child_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     z=fucking_huge_link_length,
                 ),
             )
@@ -130,7 +133,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
                 world=world,
                 parent=link3,
@@ -148,7 +151,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
                 world=world,
                 parent=link4,
@@ -166,7 +169,7 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Y()
+                    axis=Vector3Dimensional.Y()
                 ),
                 world=world,
                 parent=link5,
@@ -224,7 +227,9 @@ def execute(link_length: float, vel_limit: float):
                         kinematic_chain=KinematicChain(
                             root=fucking_huge_robot.root, tip=eef
                         ),
-                        goal_point=Point3(y=-link_length, reference_frame=eef),
+                        goal_point=Point3Dimensional(
+                            y=-link_length, reference_frame=eef
+                        ),
                         cruise_velocity=0.2 * link_length,
                     ),
                 ]

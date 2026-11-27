@@ -17,12 +17,12 @@ from semantic_digital_twin.adapters.ros.msg_converter import (
     InputType,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Vector3Dimensional,
     Quaternion,
 )
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Cylinder,
@@ -33,14 +33,14 @@ from semantic_digital_twin.world_description.geometry import (
 
 
 @dataclass
-class HomogeneousTransformationMatrixToRos2Converter(
+class HomogeneousTransformationMatrix3DimensionalToRos2Converter(
     SemDTToRos2Converter[
-        HomogeneousTransformationMatrix, geometry_msgs.TransformStamped
+        HomogeneousTransformationMatrix3Dimensional, geometry_msgs.TransformStamped
     ]
 ):
     @classmethod
     def convert(
-        cls, data: HomogeneousTransformationMatrix
+        cls, data: HomogeneousTransformationMatrix3Dimensional
     ) -> geometry_msgs.TransformStamped:
         result = geometry_msgs.TransformStamped()
         if data.reference_frame is not None:
@@ -62,9 +62,11 @@ class HomogeneousTransformationMatrixToRos2Converter(
 
 
 @dataclass
-class PoseToRos2StampedConverter(SemDTToRos2Converter[Pose, geometry_msgs.PoseStamped]):
+class PoseToRos2StampedConverter(
+    SemDTToRos2Converter[Pose3Dimensional, geometry_msgs.PoseStamped]
+):
     @classmethod
-    def convert(cls, data: Pose) -> geometry_msgs.PoseStamped:
+    def convert(cls, data: Pose3Dimensional) -> geometry_msgs.PoseStamped:
         result = geometry_msgs.PoseStamped()
         if data.reference_frame is not None:
             result.header.frame_id = str(data.reference_frame.name)
@@ -83,9 +85,9 @@ class PoseToRos2StampedConverter(SemDTToRos2Converter[Pose, geometry_msgs.PoseSt
 
 
 @dataclass
-class PoseToRos2Converter(SemDTToRos2Converter[Pose, geometry_msgs.Pose]):
+class PoseToRos2Converter(SemDTToRos2Converter[Pose3Dimensional, geometry_msgs.Pose]):
     @classmethod
-    def convert(cls, data: Pose) -> geometry_msgs.Pose:
+    def convert(cls, data: Pose3Dimensional) -> geometry_msgs.Pose:
         result = geometry_msgs.Pose()
         position = data.position.to_np()
         orientation = data.rotation_matrix.quaternion.to_np()
@@ -102,9 +104,11 @@ class PoseToRos2Converter(SemDTToRos2Converter[Pose, geometry_msgs.Pose]):
 
 
 @dataclass
-class Point3ToRos2Converter(SemDTToRos2Converter[Point3, geometry_msgs.PointStamped]):
+class Point3DimensionalToRos2Converter(
+    SemDTToRos2Converter[Point3Dimensional, geometry_msgs.PointStamped]
+):
     @classmethod
-    def convert(cls, data: Point3) -> geometry_msgs.PointStamped:
+    def convert(cls, data: Point3Dimensional) -> geometry_msgs.PointStamped:
         point_stamped = geometry_msgs.PointStamped()
         if data.reference_frame is not None:
             point_stamped.header.frame_id = str(data.reference_frame.name)
@@ -117,10 +121,10 @@ class Point3ToRos2Converter(SemDTToRos2Converter[Point3, geometry_msgs.PointStam
 
 @dataclass
 class Vector3ToRos2Converter(
-    SemDTToRos2Converter[Vector3, geometry_msgs.Vector3Stamped]
+    SemDTToRos2Converter[Vector3Dimensional, geometry_msgs.Vector3Stamped]
 ):
     @classmethod
-    def convert(cls, data: Vector3) -> geometry_msgs.Vector3Stamped:
+    def convert(cls, data: Vector3Dimensional) -> geometry_msgs.Vector3Stamped:
         vector_stamped = geometry_msgs.Vector3Stamped()
         if data.reference_frame is not None:
             vector_stamped.header.frame_id = str(data.reference_frame.name)

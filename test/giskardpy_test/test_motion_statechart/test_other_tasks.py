@@ -64,9 +64,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
 )
 from semantic_digital_twin.world_description.geometry import Scale
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+    Point3Dimensional,
 )
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world import World
@@ -128,8 +128,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0, 0, 0, reference_frame=tip)
-        reference_point = Point3(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
         lower_limit = 0.3
         upper_limit = 0.5
@@ -178,8 +178,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0, 0, 0, reference_frame=tip)
-        reference_point = Point3(0, 0, 1.0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 1.0, reference_frame=root)
 
         lower_limit = -0.5
         upper_limit = -0.2
@@ -230,11 +230,11 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0.0, 0.0, 0.1, reference_frame=tip)
+        tip_point = Point3Dimensional(0.0, 0.0, 0.1, reference_frame=tip)
         root_P_tip_start = pr2_world_state_reset.transform(
             target_frame=root, spatial_object=tip_point
         )
-        reference_point = root_P_tip_start + Vector3(
+        reference_point = root_P_tip_start + Vector3Dimensional(
             -0.1, 0.05, -0.05, reference_frame=root
         )
 
@@ -276,8 +276,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0, 0, 0, reference_frame=tip)
-        reference_point = Point3(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
         lower_limit = 0.5
         upper_limit = 0.7
@@ -329,9 +329,9 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
         # Reference point at same x-y but different z
-        reference_point = Point3(0, 0, 0.5, reference_frame=root)
+        reference_point = Point3Dimensional(0, 0, 0.5, reference_frame=root)
 
         lower_limit = 0.0
         upper_limit = 0.1
@@ -383,9 +383,9 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0, 0, 0, reference_frame=tip)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
         # Reference point at specific x-y position but very different z
-        reference_point = Point3(0.3, 0.4, 2.0, reference_frame=root)
+        reference_point = Point3Dimensional(0.3, 0.4, 2.0, reference_frame=root)
 
         lower_limit = 0.45
         upper_limit = 0.55
@@ -437,8 +437,8 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0, 0, 0, reference_frame=tip)
-        reference_point = Point3(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
         height_lower = 0.3
         height_upper = 0.5
@@ -511,11 +511,11 @@ class TestFeatureFunctions:
             "base_footprint"
         )
 
-        tip_point = Point3(0, 0, 0, reference_frame=tip)
-        reference_point = Point3(0, 0, 0, reference_frame=root)
+        tip_point = Point3Dimensional(0, 0, 0, reference_frame=tip)
+        reference_point = Point3Dimensional(0, 0, 0, reference_frame=root)
 
-        tip_normal = Vector3(1, 0, 0, reference_frame=tip)
-        reference_normal = Vector3(1, 0, 0, reference_frame=root)
+        tip_normal = Vector3Dimensional(1, 0, 0, reference_frame=tip)
+        reference_normal = Vector3Dimensional(1, 0, 0, reference_frame=root)
 
         height_lower = 0.3
         height_upper = 0.5
@@ -623,8 +623,8 @@ def test_pointing(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_point = Point3(2, 0, 0, reference_frame=root)
-    pointing_axis = Vector3.X(reference_frame=tip)
+    goal_point = Point3Dimensional(2, 0, 0, reference_frame=root)
+    pointing_axis = Vector3Dimensional.X(reference_frame=tip)
 
     pointing = Pointing(
         kinematic_chain=KinematicChain(root=root, tip=tip),
@@ -664,7 +664,7 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
     world_P_head = head.global_pose.to_np()[:3, 3]
     steepest_tilt_at_full_height = head_tilt.dof.limits.upper.position + 0.03
     distance = world_P_head[2] / np.tan(steepest_tilt_at_full_height)
-    goal_point = Point3(
+    goal_point = Point3Dimensional(
         world_P_head[0] + distance, world_P_head[1], 0.0, reference_frame=world.root
     )
 
@@ -676,7 +676,7 @@ def test_pointing_lowers_the_torso_when_the_head_cannot_tilt_far_enough(
     pointing = Pointing(
         kinematic_chain=KinematicChain(root=base, tip=head),
         goal_point=goal_point,
-        pointing_axis=Vector3.X(reference_frame=head),
+        pointing_axis=Vector3Dimensional.X(reference_frame=head),
     )
     statechart.add_node(node=pointing)
     statechart.add_node(
@@ -708,12 +708,12 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
         world.add_kinematic_structure_entity(region)
         region_joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.Y()
+                axis=Vector3Dimensional.Y()
             ),
             world=world,
             parent=world.root,
             child=region,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 2, 0, 1, reference_frame=world.root
             ),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
@@ -732,7 +732,7 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     pointing = Pointing(
         kinematic_chain=KinematicChain(root=base, tip=head),
         goal_point=world_T_region.position,
-        pointing_axis=Vector3.X(reference_frame=head),
+        pointing_axis=Vector3Dimensional.X(reference_frame=head),
     )
     region_goal = JointPositionList(
         goal_state=JointState.from_mapping({region_joint: 0.8})
@@ -770,8 +770,8 @@ def test_pointing_cone(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    goal_point = Point3(-1, 0, 5, reference_frame=root)
-    pointing_axis = Vector3.X(tip)
+    goal_point = Point3Dimensional(-1, 0, 5, reference_frame=root)
+    pointing_axis = Vector3Dimensional.X(tip)
     cone_theta = radians(20)
     pointing_cone = PointingCone(
         kinematic_chain=KinematicChain(root=root, tip=tip),
@@ -798,7 +798,8 @@ def test_pointing_cone(pr2_world_state_reset: World):
         target_frame=root, spatial_object=goal_point
     )
     tip_origin_in_root = pr2_world_state_reset.transform(
-        target_frame=root, spatial_object=Point3(0, 0, 0, reference_frame=tip)
+        target_frame=root,
+        spatial_object=Point3Dimensional(0, 0, 0, reference_frame=tip),
     )
     root_V_goal_axis = root_P_goal - tip_origin_in_root
     root_V_goal_axis.scale(1)
@@ -831,8 +832,8 @@ def test_align_planes(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    reference_normal = Vector3.X(reference_frame=root)
-    tip_normal = Vector3.Y(reference_frame=tip)
+    reference_normal = Vector3Dimensional.X(reference_frame=root)
+    tip_normal = Vector3Dimensional.Y(reference_frame=tip)
 
     align_planes = AlignPlanes(
         kinematic_chain=KinematicChain(root=root, tip=tip),
@@ -915,7 +916,7 @@ def test_keep_held_body_upright_turns_the_body_upright(pr2_world_state_reset: Wo
             FixedConnection(
                 parent=tool_frame,
                 child=held_body,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     roll=0.4, pitch=0.3, reference_frame=tool_frame
                 ),
             )
@@ -960,7 +961,7 @@ def test_keep_held_body_upright_holds_the_axis_it_keeps_upright_as_a_number(
 
     np.testing.assert_array_equal(
         keep_upright.tip_normal.to_np(),
-        Vector3.Z(reference_frame=keep_upright.kinematic_chain.tip).to_np(),
+        Vector3Dimensional.Z(reference_frame=keep_upright.kinematic_chain.tip).to_np(),
     )
 
 
@@ -980,8 +981,8 @@ def test_align_perpendicular(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    reference_normal = Vector3.X(reference_frame=root)
-    tip_normal = Vector3.X(reference_frame=tip)
+    reference_normal = Vector3Dimensional.X(reference_frame=root)
+    tip_normal = Vector3Dimensional.X(reference_frame=tip)
 
     align_perp = AlignPerpendicular(
         kinematic_chain=KinematicChain(root=root, tip=tip),
@@ -1039,8 +1040,8 @@ def test_angle_goal(pr2_world_state_reset: World):
     )
     statechart = Statechart(context=executor.context)
 
-    tip_vector = Vector3.Y(reference_frame=tip)
-    reference_vector = Vector3.X(reference_frame=root)
+    tip_vector = Vector3Dimensional.Y(reference_frame=tip)
+    reference_vector = Vector3Dimensional.X(reference_frame=root)
 
     lower_angle = radians(30)
     upper_angle = radians(32)
@@ -1118,10 +1119,10 @@ class TestArticulateGraspedMechanism:
         """
         The PR2 opens a door by its handle and then closes it again.
         """
-        world_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
         )
-        world_T_hinge = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_hinge = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.5, y=-0.5, z=1, yaw=np.pi, reference_frame=pr2_world_copy.root
         )
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
@@ -1134,7 +1135,7 @@ class TestArticulateGraspedMechanism:
                 world_root_T_self=world_T_door,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                        axis=Vector3.Z()
+                        axis=Vector3Dimensional.Z()
                     ),
                     dof_limits=limits,
                     connection_T_child=world_T_hinge.inverse() @ world_T_door,
@@ -1144,7 +1145,7 @@ class TestArticulateGraspedMechanism:
             handle = Handle.create_with_new_body_in_world(
                 name="handle",
                 world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.5,
                     y=0.45,
                     z=1,
@@ -1175,7 +1176,7 @@ class TestArticulateGraspedMechanism:
                             kinematic_chain=KinematicChain(
                                 root=pr2_world_copy.root, tip=r_tip
                             ),
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 yaw=np.pi, reference_frame=handle
                             ),
                         ),
@@ -1229,7 +1230,7 @@ class TestArticulateGraspedMechanism:
         """
         world = pr2_world_copy
         open_position = 0.4
-        world_T_drawer = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_drawer = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=1.5, z=1, yaw=np.pi, reference_frame=world.root
         )
         with world.modify_world():
@@ -1239,7 +1240,7 @@ class TestArticulateGraspedMechanism:
                 world_root_T_self=world_T_drawer,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                        axis=Vector3.X()
+                        axis=Vector3Dimensional.X()
                     ),
                     dof_limits=DegreeOfFreedomLimits(
                         lower=DerivativeMap(position=0.0, velocity=-10.0),
@@ -1263,7 +1264,7 @@ class TestArticulateGraspedMechanism:
                 nodes=[
                     CartesianPose(
                         kinematic_chain=KinematicChain(root=world.root, tip=tip),
-                        goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             yaw=np.pi, reference_frame=handle.root
                         ),
                     ),
@@ -1313,7 +1314,7 @@ class TestArticulateGraspedMechanism:
             Bottle.create_with_new_body_in_world(
                 name="bottle",
                 world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.77, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
                 ),
                 scale=Scale(0.2, 0.06, 0.06),
@@ -1322,7 +1323,7 @@ class TestArticulateGraspedMechanism:
             bottle_cap = BottleCap.create_with_new_body_in_world(
                 name="bottle_cap",
                 world=pr2_world_copy,
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.65, y=-0.2, z=0.9, reference_frame=pr2_world_copy.root
                 ),
                 scale=Scale(0.02, 0.04, 0.04),
@@ -1331,7 +1332,7 @@ class TestArticulateGraspedMechanism:
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     dof_limits=limits,
                     screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                        axis=Vector3(-1, 0, 0), pitch=screw_pitch
+                        axis=Vector3Dimensional(-1, 0, 0), pitch=screw_pitch
                     ),
                 ),
             )
@@ -1359,7 +1360,7 @@ class TestArticulateGraspedMechanism:
                             kinematic_chain=KinematicChain(
                                 root=pr2_world_copy.root, tip=r_tip
                             ),
-                            goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            goal_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 reference_frame=cap_body
                             ),
                         ),

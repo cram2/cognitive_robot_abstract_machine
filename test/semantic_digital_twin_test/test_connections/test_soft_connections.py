@@ -12,7 +12,9 @@ from semantic_digital_twin.datastructures.soft_trunk import (
     SoftTrunk,
     SoftTrunkSection,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -137,7 +139,7 @@ class TestSoftConnectionFactories:
                 world=world,
                 parent=world.root,
                 child=tip,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.4
                 ),
                 kappa_dof_id=kappa.id,
@@ -170,7 +172,7 @@ class TestSoftConnectionFactories:
                 world=world,
                 parent=world.root,
                 child=tip,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.4
                 ),
                 bending_x_dof_id=strain_dofs["bending_x"].id,
@@ -227,7 +229,8 @@ class TestSoftConnectionRebuilding:
         segment = world.get_connections_by_type(PiecewiseConstantCurvatureConnection)[0]
 
         copied_segment = segment.copy_with_new_parent(
-            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+            Body(name=PrefixedName("new_parent")),
+            HomogeneousTransformationMatrix3Dimensional(),
         )
 
         assert copied_segment.name == segment.name
@@ -237,7 +240,8 @@ class TestSoftConnectionRebuilding:
         segment = world.get_connections_by_type(CosseratRodConnection)[0]
 
         copied_segment = segment.copy_with_new_parent(
-            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+            Body(name=PrefixedName("new_parent")),
+            HomogeneousTransformationMatrix3Dimensional(),
         )
 
         assert copied_segment.name == segment.name

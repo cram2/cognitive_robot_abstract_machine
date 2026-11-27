@@ -17,7 +17,7 @@ from coraplex.robot_plans.actions.core.robot_body import (
 )
 from cramph.composites import Sequence
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 
 @pytest.mark.skipif(
@@ -32,7 +32,9 @@ def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
     """
     hsrb, simulation = simulated_hsrb
     world = hsrb._world
-    goal = Pose.from_xyz_rpy(1.0, 0.5, 0.0, yaw=0.5, reference_frame=world.root)
+    goal = Pose3Dimensional.from_xyz_rpy(
+        1.0, 0.5, 0.0, yaw=0.5, reference_frame=world.root
+    )
     raised = hsrb.mobile_base.torso.get_joint_state_by_type(TorsoState.HIGH)
     plan = Sequence(
         nodes=[

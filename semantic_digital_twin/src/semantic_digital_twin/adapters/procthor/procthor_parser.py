@@ -46,9 +46,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     LivingRoom,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -74,7 +74,7 @@ class ProcthorDoor:
     Width of the parent wall, since we define the door relative to the wall's horizontal center.
     """
 
-    world_T_parent_wall: HomogeneousTransformationMatrix
+    world_T_parent_wall: HomogeneousTransformationMatrix3Dimensional
     """
     Transformation matrix from world root to the parent wall's origin.
     """
@@ -139,7 +139,7 @@ class ProcthorDoor:
         return Scale(self.thickness, width, height)
 
     @cached_property
-    def wall_T_door(self) -> HomogeneousTransformationMatrix:
+    def wall_T_door(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the door position from the wall's horizontal center. Converts the Unity's left-handed Y-up, Z-forward
         convention to the semantic digital twin's right-handed Z-up, X-forward convention.
@@ -153,8 +153,8 @@ class ProcthorDoor:
 
         # In unity, doors are defined as holes in the wall, so we express them as children of walls.
         # This means we just need to translate them, and can assume no rotation
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            Point3(0, -width_origin_center, height_origin_center)
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+            Point3Dimensional(0, -width_origin_center, height_origin_center)
         )
 
     def _add_double_door_to_world(self, world: World) -> DoubleDoor:
@@ -164,7 +164,7 @@ class ProcthorDoor:
         one_door_scale = Scale(self.thickness, self.scale.y * 0.5, self.scale.z)
         x_direction: float = one_door_scale.x / 2
         y_direction: float = one_door_scale.y / 2
-        handle_directions = [Vector3.Y(), Vector3.NEGATIVE_Y()]
+        handle_directions = [Vector3Dimensional.Y(), Vector3Dimensional.NEGATIVE_Y()]
 
         doors = []
 
@@ -173,7 +173,7 @@ class ProcthorDoor:
 
             horizontal_direction = (
                 HorizontalSemanticDirection.RIGHT
-                if np.allclose(direction, Vector3.Y())
+                if np.allclose(direction, Vector3Dimensional.Y())
                 else HorizontalSemanticDirection.LEFT
             )
             semantic_position = SemanticPositionDescription(
@@ -184,11 +184,11 @@ class ProcthorDoor:
                 vertical_direction_chain=[VerticalSemanticDirection.FULLY_CENTER],
             )
 
-            wall_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(
+            wall_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=x_direction,
                 y=(
                     (-y_direction)
-                    if np.allclose(direction, Vector3.Y())
+                    if np.allclose(direction, Vector3Dimensional.Y())
                     else y_direction
                 ),
             )
@@ -219,7 +219,7 @@ class ProcthorDoor:
         world: World,
         name: str | None = None,
         scale: Scale | None = None,
-        world_T_door: HomogeneousTransformationMatrix | None = None,
+        world_T_door: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> Door:
         """
         Parses the parameters according to the single door assumptions, and returns a single door factory.
@@ -232,7 +232,7 @@ class ProcthorDoor:
             .as_composite_set()
             .marginal(variables=SpatialVariables.yz)
         )
-        door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
+        door_T_handle = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=scale.x / 2, y=sampled_2d_point[0], z=sampled_2d_point[1]
         )
 
@@ -258,7 +258,7 @@ class ProcthorDoor:
         door.mount_on_movable_joint(
             ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
             )
         )
@@ -394,7 +394,7 @@ class ProcthorWall:
         return Scale(x=self.wall_thickness, y=width, z=height)
 
     @cached_property
-    def world_T_wall(self) -> HomogeneousTransformationMatrix:
+    def world_T_wall(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the wall's world position matrix from the wall's x and z coordinates.
         Calculates the yaw angle using the atan2 function based on the wall's width and depth.
@@ -408,7 +408,7 @@ class ProcthorWall:
         x_center = (self.x_coords[0] + self.x_coords[-1]) * 0.5
         z_center = (self.z_coords[0] + self.z_coords[-1]) * 0.5
 
-        world_T_wall = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_wall = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x_center, 0, z_center, 0.0, yaw, 0
         )
 
@@ -461,7 +461,7 @@ class ProcthorRoom:
     Name of the room, constructed from the room type and room ID.
     """
 
-    centered_polytope: list[Point3] = field(init=False)
+    centered_polytope: list[Point3Dimensional] = field(init=False)
     """
     Polytope representing the room's floor polygon, centered around its local 0, 0, 0 coordinate
     """
@@ -480,7 +480,7 @@ class ProcthorRoom:
         self.z_center = sum(z_coords) / polytope_length
 
         self.centered_polytope = [
-            Point3(
+            Point3Dimensional(
                 v["z"] - self.z_center,
                 -(v["x"] - self.x_center),
                 v["y"] - self.y_center,
@@ -492,14 +492,16 @@ class ProcthorRoom:
         self.name = f"{self.room_dict['roomType']}_{room_id}"
 
     @cached_property
-    def world_T_room(self) -> HomogeneousTransformationMatrix:
+    def world_T_room(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the room's world transform
         """
 
-        world_P_room = Point3(self.z_center, -self.x_center, self.y_center)
+        world_P_room = Point3Dimensional(self.z_center, -self.x_center, self.y_center)
 
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(world_P_room)
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+            world_P_room
+        )
 
     def add_to_world(self, *, world: World):
         """
@@ -547,14 +549,14 @@ class ProcthorObject:
     """
 
     @cached_property
-    def world_T_obj(self) -> HomogeneousTransformationMatrix:
+    def world_T_obj(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Computes the object's world transformation matrix from its position and rotation. Converts Unity's
         left-handed Y-up, Z-forward convention to the right-handed Z-up, X-forward convention.
         """
         obj_position = self.object_dict["position"]
         obj_rotation = self.object_dict["rotation"]
-        world_T_obj = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_obj = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             obj_position["x"],
             obj_position["y"],
             obj_position["z"],
@@ -563,7 +565,7 @@ class ProcthorObject:
             math.radians(obj_rotation["z"]),
         )
 
-        return HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix3Dimensional(
             unity_to_semantic_digital_twin_transform(world_T_obj)
         )
 
@@ -601,8 +603,8 @@ class ProcthorObject:
 
 
 def unity_to_semantic_digital_twin_transform(
-    unity_transform_matrix: HomogeneousTransformationMatrix,
-) -> HomogeneousTransformationMatrix:
+    unity_transform_matrix: HomogeneousTransformationMatrix3Dimensional,
+) -> HomogeneousTransformationMatrix3Dimensional:
     """
     Convert a left-handed Y-up, Z-forward Unity transform to the right-handed Z-up, X-forward convention used in the
     semantic digital twin.
@@ -630,7 +632,7 @@ def unity_to_semantic_digital_twin_transform(
 
     unity_transform_matrix = np.asarray(unity_transform_matrix, float).reshape(4, 4)
 
-    return HomogeneousTransformationMatrix(
+    return HomogeneousTransformationMatrix3Dimensional(
         data=conjugation_matrix @ unity_transform_matrix @ inverse_conjugation_matrix
     )
 

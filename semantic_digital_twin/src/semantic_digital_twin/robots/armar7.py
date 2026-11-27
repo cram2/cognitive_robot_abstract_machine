@@ -36,7 +36,10 @@ from semantic_digital_twin.robots.robot_parts import (
     MobileBase,
     EndEffector,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import OmniDrive
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -341,12 +344,12 @@ class Armar7LeftGripper(
         return [gripper_open, gripper_close]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Z(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.NEGATIVE_X(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.NEGATIVE_X(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -394,12 +397,12 @@ class Armar7RightGripper(
         return [gripper_open, gripper_close]
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.Z(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Z(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.NEGATIVE_X(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.NEGATIVE_X(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
@@ -482,7 +485,7 @@ class AzureKinectRGB(RobotCamera[FieldOfViewCameraModel]):
                 robot_root._world.get_body_in_branch_by_name(
                     robot_root, "AzureKinect_RGB_link"
                 ),
-                HomogeneousTransformationMatrix(),
+                HomogeneousTransformationMatrix3Dimensional(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(
@@ -566,8 +569,8 @@ class Armar7Torso(
 @dataclass(eq=False)
 class Armar7MobileBase(MobileBase[OmniDrive], HasTorso[Armar7Torso]):
     @classproperty
-    def forward_axis(cls) -> Vector3:
-        return Vector3.Y()
+    def forward_axis(cls) -> Vector3Dimensional:
+        return Vector3Dimensional.Y()
 
     def setup_hardware_interfaces(self) -> None:
         pass

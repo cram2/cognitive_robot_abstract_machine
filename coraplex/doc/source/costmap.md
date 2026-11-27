@@ -28,13 +28,13 @@ then inflated by `distance_to_obstacle`, so the robot keeps that distance to the
 
 ```python
 from coraplex.locations.costmaps import OccupancyCostmap
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 occupancy = OccupancyCostmap(
     resolution=0.02,
     width=200,
     height=200,
-    origin=Pose.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
+    origin=Pose3Dimensional.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
     world=world,
     robot_view=robot,
     distance_to_obstacle=0.2,
@@ -61,7 +61,7 @@ default camera.
 
 ```python
 from coraplex.locations.costmaps import VisibilityCostmap
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 visibility = VisibilityCostmap(
     minimum_height=1.27,
@@ -69,7 +69,7 @@ visibility = VisibilityCostmap(
     resolution=0.02,
     width=200,
     height=200,
-    origin=Pose.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
+    origin=Pose3Dimensional.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
     world=world,
 )
 ```
@@ -85,13 +85,13 @@ Here `mean` is the number of cells along each side of the costmap and `sigma` th
 
 ```python
 from coraplex.locations.costmaps import GaussianCostmap
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 gauss = GaussianCostmap(
     mean=200,
     sigma=15,
     resolution=0.02,
-    origin=Pose.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
+    origin=Pose3Dimensional.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
     world=world,
 )
 ```
@@ -106,7 +106,7 @@ stand close enough to the target, but not on top of it.
 
 ```python
 from coraplex.locations.costmaps import RingCostmap
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 ring = RingCostmap(
     standard_deviation=15,
@@ -114,7 +114,7 @@ ring = RingCostmap(
     resolution=0.02,
     width=200,
     height=200,
-    origin=Pose.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
+    origin=Pose3Dimensional.from_xyz_rpy(1, 0.3, 0, reference_frame=world.root),
     world=world,
 )
 ```

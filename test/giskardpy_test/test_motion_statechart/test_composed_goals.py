@@ -22,7 +22,7 @@ from giskardpy.motion_statechart.tasks.cartesian_tasks import (
 )
 from giskardpy.motion_statechart.graph_node import EndMotion
 from semantic_digital_twin.robots.robot_parts import MobileBase
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
@@ -51,7 +51,7 @@ def test_cartesian_pose_is_a_parallel_of_its_position_and_orientation(
         node=(
             pose := CartesianPose(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-                goal_pose=Pose.from_xyz_rpy(
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
             )
@@ -79,7 +79,9 @@ def test_nodes_handed_to_a_cartesian_pose_run_beside_its_tasks(
     statechart = Statechart(context=executor.context)
     pose = CartesianPose(
         kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-        goal_pose=Pose.from_xyz_rpy(x=0.1, reference_frame=cylinder_bot_world.root),
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
+            x=0.1, reference_frame=cylinder_bot_world.root
+        ),
     )
     hold_orientation = HoldOrientation(
         kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip)
@@ -112,7 +114,7 @@ def test_cartesian_pose_observes_its_goal_reached(
         node=(
             pose := CartesianPose(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-                goal_pose=Pose.from_xyz_rpy(
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
             )
@@ -142,7 +144,7 @@ def test_cartesian_pose_straight_is_a_parallel_of_its_tasks(
         node=(
             pose := CartesianPoseStraight(
                 kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=tip),
-                goal_pose=Pose.from_xyz_rpy(
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
                     x=0.1, reference_frame=cylinder_bot_world.root
                 ),
             )
@@ -172,7 +174,7 @@ def test_differential_drive_goal_runs_its_steps_in_one_sequence(
                 mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                     MobileBase
                 )[0],
-                goal_pose=Pose.from_xyz_rpy(
+                goal_pose=Pose3Dimensional.from_xyz_rpy(
                     x=1, reference_frame=cylinder_bot_diff_world.root
                 ),
             )
@@ -200,7 +202,7 @@ def test_differential_drive_goal_is_a_step_without_an_attempt(
                         mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
                             MobileBase
                         )[0],
-                        goal_pose=Pose.from_xyz_rpy(
+                        goal_pose=Pose3Dimensional.from_xyz_rpy(
                             x=1, reference_frame=cylinder_bot_diff_world.root
                         ),
                     )

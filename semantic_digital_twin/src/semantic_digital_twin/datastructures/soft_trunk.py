@@ -23,7 +23,10 @@ from semantic_digital_twin.world_description.soft_connections import (
 )
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
 from semantic_digital_twin.world_description.geometry import Cylinder, Color
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
+)
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -104,12 +107,12 @@ class SoftEndEffector(EndEffector):
     """
 
     @property
-    def approach_axis(self) -> Vector3:
-        return Vector3.X(reference_frame=self.tool_frame)
+    def approach_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.X(reference_frame=self.tool_frame)
 
     @property
-    def closing_axis(self) -> Vector3:
-        return Vector3.Y(reference_frame=self.tool_frame)
+    def closing_axis(self) -> Vector3Dimensional:
+        return Vector3Dimensional.Y(reference_frame=self.tool_frame)
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(cls, robot_root):
@@ -249,7 +252,7 @@ class SoftTrunk(SemanticAnnotation):
                 for segment_index in range(section.resolution):
                     color_val = (section_index + 1) / len(sections)
                     visual_shape = Cylinder(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             z=-segment_length / 2
                         ),
                         width=section.radius * 2,
@@ -375,7 +378,7 @@ class SoftTrunk(SemanticAnnotation):
                 for segment_index in range(section.resolution):
                     color_val = (section_index + 1) / len(sections)
                     visual_shape = Cylinder(
-                        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             z=-segment_length / 2
                         ),
                         width=section.radius * 2,

@@ -41,7 +41,11 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.tasks.cartesian_tasks import CartesianOrientation
 from giskardpy.motion_statechart.tasks.feature_functions import AlignPerpendicular
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
-from krrood_spatial_math.spatial_types import Point3, RotationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    RotationMatrix,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.adapters.ros.visualization import (
     spatial_type_marker_renderer,
 )
@@ -120,7 +124,7 @@ def point_debug_expression(name: str, world: World) -> DebugExpression:
     """
     return DebugExpression(
         name=name,
-        expression=Point3(
+        expression=Point3Dimensional(
             x=world.active_degrees_of_freedom[0].variables.position,
             reference_frame=world.root,
         ),
@@ -182,8 +186,8 @@ def align_planes_task(world: World) -> AlignPlanes:
     tip = world.get_body_by_name("bot")
     return AlignPlanes(
         kinematic_chain=KinematicChain(root=root, tip=tip),
-        reference_normal=Vector3.Z(reference_frame=root),
-        tip_normal=Vector3.Z(reference_frame=tip),
+        reference_normal=Vector3Dimensional.Z(reference_frame=root),
+        tip_normal=Vector3Dimensional.Z(reference_frame=tip),
         name="align",
     )
 
@@ -209,8 +213,8 @@ def align_perpendicular_task(world: World) -> AlignPerpendicular:
         kinematic_chain=KinematicChain(
             root=world.root, tip=world.get_body_by_name("bot")
         ),
-        tip_normal=Vector3.X(reference_frame=world.get_body_by_name("bot")),
-        reference_normal=Vector3.X(reference_frame=world.root),
+        tip_normal=Vector3Dimensional.X(reference_frame=world.get_body_by_name("bot")),
+        reference_normal=Vector3Dimensional.X(reference_frame=world.root),
         name="perpendicular",
     )
 
@@ -354,7 +358,9 @@ def test_vector_is_expressed_in_its_visualisation_frame(cylinder_bot_world):
     """
     root = cylinder_bot_world.root
     bot = cylinder_bot_world.get_body_by_name("bot")
-    vector = Vector3(x=1, y=0, z=0, reference_frame=root, visualisation_frame=bot)
+    vector = Vector3Dimensional(
+        x=1, y=0, z=0, reference_frame=root, visualisation_frame=bot
+    )
 
     visualization = DebugExpressionPublishing._create_visualization(
         debug_expression=DebugExpression(name="vector", expression=vector),

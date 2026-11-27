@@ -21,7 +21,9 @@ from robokudo.world_descriptor import (
     ObjectSpec,
     RegionSpec,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import Scale, Color
 
 # %% World descriptor
@@ -54,7 +56,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 name="table",
                 box_scale=Scale(1.20, 0.80, table_thickness),
                 color=Color.from_rgba(red=0.65, green=0.58, blue=0.48, opacity=1.0),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.10,
                     y=1.25,
                     z=table_top_z - (table_thickness / 2.0),
@@ -66,7 +68,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 cylinder_width=red_cylinder_width,
                 cylinder_height=red_cylinder_height,
                 color=Color.from_rgba(red=0.83, green=0.20, blue=0.20, opacity=1.0),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.20,
                     y=1.20,
                     z=table_top_z + (red_cylinder_height / 2.0),
@@ -78,7 +80,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 cylinder_width=blue_cylinder_width,
                 cylinder_height=blue_cylinder_height,
                 color=Color.from_rgba(red=0.22, green=0.37, blue=0.82, opacity=1.0),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.00,
                     y=1.32,
                     z=table_top_z + (blue_cylinder_height / 2.0),
@@ -94,7 +96,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 box_scale=Scale(1.00, 0.60, table_surface_region_thickness),
                 parent_name="table",
                 color=Color.from_rgba(red=0.10, green=0.70, blue=0.30, opacity=0.20),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=0.0,
                     y=0.0,
                     z=(table_thickness / 2.0) + (table_surface_region_thickness / 2.0),
@@ -124,7 +126,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                         CameraModality.SEGMENTATION,
                     ),
                 ),
-                parent_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_camera=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.20,
                     y=0.40,
                     z=1.05,

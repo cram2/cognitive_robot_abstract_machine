@@ -7,7 +7,9 @@ from __future__ import annotations
 from datetime import timedelta
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.contact import (
     ContactFriction,
     ContactImpedance,
@@ -44,8 +46,14 @@ def test_contact_parameters_reach_every_collision_geometry():
     body = Body(name=PrefixedName("box"))
     body.collision = ShapeCollection(
         [
-            Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1)),
-            Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1)),
+            Box(
+                origin=HomogeneousTransformationMatrix3Dimensional(),
+                scale=Scale(1, 1, 1),
+            ),
+            Box(
+                origin=HomogeneousTransformationMatrix3Dimensional(),
+                scale=Scale(1, 1, 1),
+            ),
         ],
         reference_frame=body,
     )
@@ -64,7 +72,9 @@ def test_contact_parameters_reach_every_collision_geometry():
 
 def test_a_surface_leaves_the_geometrys_own_stiffness_and_impedance():
     body = Body(name=PrefixedName("table"))
-    shape = Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1))
+    shape = Box(
+        origin=HomogeneousTransformationMatrix3Dimensional(), scale=Scale(1, 1, 1)
+    )
     body.collision = ShapeCollection([shape], reference_frame=body)
     own_stiffness = ContactStiffness(time_constant=timedelta(milliseconds=50))
     own = ContactParameters(friction=ContactFriction(), stiffness=own_stiffness)
@@ -80,7 +90,9 @@ def test_a_surface_leaves_the_geometrys_own_stiffness_and_impedance():
 
 def test_a_body_without_collision_geometry_is_skipped():
     body = Body(name=PrefixedName("frame"))
-    shape = Box(origin=HomogeneousTransformationMatrix(), scale=Scale(1, 1, 1))
+    shape = Box(
+        origin=HomogeneousTransformationMatrix3Dimensional(), scale=Scale(1, 1, 1)
+    )
     body.visual = ShapeCollection([shape], reference_frame=body)
 
     ContactParameters.create_for_surface().apply_to([body])

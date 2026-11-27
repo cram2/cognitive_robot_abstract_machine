@@ -18,8 +18,8 @@ A `DebugExpression`
 (`giskardpy.motion_statechart.graph_node.DebugExpression`) wraps three things:
 
 - a `name`, used as the label in every debugging tool,
-- an `expression` — either a `Scalar` or a spatial type (`Point3`, `Vector3`, `Quaternion`,
-  `RotationMatrix`, `HomogeneousTransformationMatrix`, or `Pose`), and
+- an `expression` — either a `Scalar` or a spatial type (`Point3Dimensional`, `Vector3Dimensional`, `Quaternion`,
+  `RotationMatrix`, `HomogeneousTransformationMatrix3Dimensional`, or `Pose3Dimensional`), and
 - a `color`, used when the expression is rendered.
 
 A node registers a debug expression by appending it to `artifacts.debug_expressions` inside its
@@ -97,7 +97,7 @@ afterwards.
 
 Each expression's `name` becomes the marker label, and its namespace is the name followed by
 the index of the node that registered it, so individual expressions can be toggled on and off
-in RViz's display tree. `Vector3` expressions are anchored to their `visualisation_frame` so
+in RViz's display tree. `Vector3Dimensional` expressions are anchored to their `visualisation_frame` so
 the arrow is drawn at the right body.
 
 This is the right tool for spatial reasoning: comparing a goal pose against the current pose,
@@ -110,7 +110,7 @@ Each spatial type renders as a different marker, and the `<task name>/goal` (gre
 ---
 width: 600px
 ---
-A `Pose` is drawn as a coordinate frame. Here `CartesianPose/goal` and `CartesianPose/current`
+A `Pose3Dimensional` is drawn as a coordinate frame. Here `CartesianPose/goal` and `CartesianPose/current`
 show the target and actual end-effector pose side by side.
 ```
 
@@ -118,7 +118,7 @@ show the target and actual end-effector pose side by side.
 ---
 width: 600px
 ---
-A `Point3` is drawn as a sphere — `CartesianPosition/goal` (green) and
+A `Point3Dimensional` is drawn as a sphere — `CartesianPosition/goal` (green) and
 `CartesianPosition/current` (red).
 ```
 
@@ -126,7 +126,7 @@ A `Point3` is drawn as a sphere — `CartesianPosition/goal` (green) and
 ---
 width: 500px
 ---
-A `Vector3` is drawn as an arrow anchored to its `visualisation_frame`. Here the green
+A `Vector3Dimensional` is drawn as an arrow anchored to its `visualisation_frame`. Here the green
 `Pointing/goal` and red `Pointing/current` arrows show where the robot should point versus
 where it currently points.
 ```

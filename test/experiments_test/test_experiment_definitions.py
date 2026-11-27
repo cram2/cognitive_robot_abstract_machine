@@ -127,6 +127,20 @@ def test_converting_seconds_to_milliseconds_scales_by_a_thousand():
     assert milliseconds.unit is Unit.MILLISECONDS
 
 
+def test_converting_milliseconds_to_microseconds_scales_by_a_thousand():
+    """
+    A microsecond is a thousandth of a millisecond.
+    """
+    milliseconds = MeanAndStandardDeviation.from_measurements(
+        [2.0, 4.0], unit=Unit.MILLISECONDS
+    )
+
+    microseconds = milliseconds.to(Unit.MICROSECONDS)
+
+    assert microseconds.mean == milliseconds.mean * 1000
+    assert microseconds.unit is Unit.MICROSECONDS
+
+
 def test_converting_an_untagged_value_is_rejected():
     value = MeanAndStandardDeviation.from_measurements([1.0, 3.0])
 

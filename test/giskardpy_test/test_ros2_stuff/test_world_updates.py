@@ -38,7 +38,7 @@ from krrood.adapters.json_serializer import to_json
 from krrood_synchronization.messages import MessageOrigin, Sender, StreamPosition
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -440,7 +440,7 @@ def add_moving_connection(world: World) -> None:
         world.add_connection(
             ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
                 world=world,
                 parent=parent_body,

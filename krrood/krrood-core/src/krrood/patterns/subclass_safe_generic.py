@@ -27,6 +27,8 @@ from krrood.class_diagrams.exceptions import CouldNotResolveType
 from krrood.class_diagrams.utils import (
     get_and_resolve_generic_type_hints_of_object_using_substitutions,
 )
+from krrood.patterns.classproperty import classproperty
+from krrood.patterns.exceptions import DerivedGenericParameterConflictError
 from krrood.patterns.interface import Interface
 from krrood.exceptions import (
     MismatchingNumberOfGenericParametersAndResolvedTypes,
@@ -62,6 +64,24 @@ ResolvableType: TypeAlias = (
     | tuple["ResolvableType", ...]
     | Any
 )
+
+
+@dataclass(kw_only=True, frozen=True)
+class DerivedGenericParameter:
+    """
+    A type parameter a class does not take, read from the type the class binds another
+    of its parameters to, so the two can never be bound inconsistently.
+    """
+
+    parameter: TypeVar
+    """
+    The type parameter read from the type bound to :attr:`source`.
+    """
+
+    source: TypeVar
+    """
+    The type parameter whose bound type binds :attr:`parameter`.
+    """
 
 
 @dataclass(kw_only=True, eq=False)
@@ -146,6 +166,128 @@ class SubClassSafeGeneric(ABC):
         )
         return Interface.is_interface(class_=declaring_class)
 
+    @classproperty
+    def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+        """
+        The type parameters this class reads from the types it binds other parameters
+        to, which then count as bound wherever a bound parameter does.
+
+        .. note::
+            The declarations of every class in the inheritance chain apply together, so
+            a class declares only the parameters it adds.
+        """
+        return ()
+
+    @classmethod
+    def _inherited_derived_generic_parameters(
+        cls,
+    ) -> tuple[DerivedGenericParameter, ...]:
+        """
+        :return: The :attr:`derived_generic_parameters` every class in the inheritance
+            chain declares, each once.
+        """
+        return tuple(
+            dict.fromkeys(
+                derived_parameter
+                for base in cls.__mro__
+                if "derived_generic_parameters" in vars(base)
+                for derived_parameter in base.derived_generic_parameters
+            )
+        )
+
+    @classmethod
+    def _derived_substitutions(
+        cls, *, substitutions: dict[Any, ResolvableType]
+    ) -> dict[Any, ResolvableType]:
+        """
+        :param substitutions: The type parameters this class binds, resolved.
+        :return: The type each derived generic parameter of the inheritance chain reads
+            from the type bound to its source, for the sources bound to a class that
+            binds it.
+        :raises DerivedGenericParameterConflictError: If another base binds a derived
+            parameter to a type that is not the derived one or a base of it, or two
+            sources fix one parameter to unrelated types.
+        """
+        derived = {}
+        for derived_parameter in cls._inherited_derived_generic_parameters():
+            derived_type = cls._type_a_source_fixes(
+                source_type=substitutions.get(derived_parameter.source),
+                parameter=derived_parameter.parameter,
+            )
+            if derived_type is None:
+                continue
+            cls._ensure_derived_type_fits(
+                parameter=derived_parameter.parameter,
+                bound_type=substitutions.get(derived_parameter.parameter),
+                derived_type=derived_type,
+            )
+            derived_before = derived.get(derived_parameter.parameter)
+            if isclass(derived_before) and isclass(derived_type):
+                if issubclass(derived_before, derived_type):
+                    continue
+                cls._ensure_derived_type_fits(
+                    parameter=derived_parameter.parameter,
+                    bound_type=derived_before,
+                    derived_type=derived_type,
+                )
+            derived[derived_parameter.parameter] = derived_type
+        return derived
+
+    @staticmethod
+    def _type_a_source_fixes(
+        *, source_type: ResolvableType, parameter: TypeVar
+    ) -> ResolvableType | None:
+        """
+        :param source_type: The type a derived parameter's source is bound to.
+        :param parameter: The derived parameter.
+        :return: The concrete type ``source_type`` fixes ``parameter`` to, by its own
+            binding or, for a generic class given type arguments, by those arguments;
+            ``None`` if it fixes none.
+        """
+        source_class = get_origin(source_type) or source_type
+        if not (
+            isclass(source_class) and issubclass(source_class, SubClassSafeGeneric)
+        ):
+            return None
+        fixed_type = source_class._get_generic_type_substitutions().get(
+            parameter, parameter
+        )
+        if source_class is not source_type:
+            type_arguments = dict(
+                zip(source_class.__parameters__, get_args(source_type))
+            )
+            fixed_type = type_arguments.get(fixed_type, fixed_type)
+        if fixed_type is None or isinstance(fixed_type, (TypeVar, TypeVarTuple)):
+            return None
+        return fixed_type
+
+    @classmethod
+    def _ensure_derived_type_fits(
+        cls,
+        *,
+        parameter: TypeVar,
+        bound_type: ResolvableType,
+        derived_type: ResolvableType,
+    ) -> None:
+        """
+        :param parameter: A derived type parameter.
+        :param bound_type: The type the parameter is otherwise bound to, if any.
+        :param derived_type: The type a source fixes the parameter to.
+        :raises DerivedGenericParameterConflictError: If both are classes and
+            ``derived_type`` is not ``bound_type`` or a subclass of it.
+        """
+        if (
+            isclass(bound_type)
+            and isclass(derived_type)
+            and not issubclass(derived_type, bound_type)
+        ):
+            raise DerivedGenericParameterConflictError(
+                clazz=cls,
+                parameter=parameter,
+                bound_type=bound_type,
+                derived_type=derived_type,
+            )
+
     @classmethod
     def get_generic_type_parameters(cls) -> list[type]:
         """
@@ -166,10 +308,20 @@ class SubClassSafeGeneric(ABC):
         :return: The concrete type it is bound to.
         :raises UnboundGenericParameter: If it is bound to no concrete type.
         """
-        bound_type = cls._get_generic_type_substitutions().get(parameter)
-        if bound_type is None or isinstance(bound_type, (TypeVar, TypeVarTuple)):
+        if not cls.binds_generic_parameter(parameter=parameter):
             raise UnboundGenericParameter(affected_class=cls, parameter=parameter)
-        return bound_type
+        return cls._get_generic_type_substitutions()[parameter]
+
+    @classmethod
+    def binds_generic_parameter(cls, *, parameter: TypeVar) -> bool:
+        """
+        :param parameter: A type parameter declared anywhere in the inheritance chain.
+        :return: Whether this class or one of its bases binds it to a concrete type.
+        """
+        bound_type = cls._get_generic_type_substitutions().get(parameter)
+        return bound_type is not None and not isinstance(
+            bound_type, (TypeVar, TypeVarTuple)
+        )
 
     @staticmethod
     def _substitutions_bind_a_concrete_type(
@@ -280,6 +432,15 @@ class SubClassSafeGeneric(ABC):
             substitutions = cls._resolve_substitutions_transitively(
                 substitutions=substitutions
             )
+        derived = cls._derived_substitutions(substitutions=substitutions)
+        renamed_derived = {
+            substitutions[parameter]: derived_type
+            for parameter, derived_type in derived.items()
+            if isinstance(substitutions.get(parameter), TypeVar)
+        }
+        substitutions = cls._resolve_substitutions_transitively(
+            substitutions=substitutions | derived | renamed_derived
+        )
 
         cls._subclass_safe_substitutions = substitutions
         return substitutions

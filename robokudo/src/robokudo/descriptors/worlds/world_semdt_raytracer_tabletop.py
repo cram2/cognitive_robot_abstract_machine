@@ -22,7 +22,9 @@ from robokudo.world_descriptor import (
     RegionSpec,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Color, Mesh, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -54,7 +56,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 name="table",
                 box_scale=Scale(1.20, 0.80, table_thickness),
                 color=Color.from_rgba(red=0.65, green=0.58, blue=0.48, opacity=1.0),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.10,
                     y=1.25,
                     z=table_top_z - (table_thickness / 2.0),
@@ -65,7 +67,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 name="box_red",
                 box_scale=Scale(0.10, 0.08, 0.10),
                 color=Color.from_rgba(red=0.83, green=0.20, blue=0.20, opacity=1.0),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.20,
                     y=1.20,
                     z=table_top_z + (0.10 / 2.0),
@@ -76,7 +78,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 name="box_blue",
                 box_scale=Scale(0.08, 0.08, 0.14),
                 color=Color.from_rgba(red=0.22, green=0.37, blue=0.82, opacity=1.0),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.00,
                     y=1.32,
                     z=table_top_z + (0.14 / 2.0),
@@ -91,7 +93,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                 name="table_surface_region",
                 box_scale=Scale(1.00, 0.60, 0.03),
                 color=Color.from_rgba(red=0.10, green=0.70, blue=0.30, opacity=0.20),
-                pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.10,
                     y=1.25,
                     z=table_top_z + 0.015,
@@ -106,12 +108,12 @@ class WorldDescriptor(BaseWorldDescriptor):
         milk_color = Color.from_rgba(red=0.95, green=0.85, blue=0.10, opacity=1.0)
         with self.world.modify_world():
             cup_visual_mesh = Mesh(
-                origin=HomogeneousTransformationMatrix(),
+                origin=HomogeneousTransformationMatrix3Dimensional(),
                 filename=cup_mesh_uri,
                 color=cup_color,
             )
             cup_collision_mesh = Mesh(
-                origin=HomogeneousTransformationMatrix(),
+                origin=HomogeneousTransformationMatrix3Dimensional(),
                 filename=cup_mesh_uri,
                 color=cup_color,
             )
@@ -127,12 +129,12 @@ class WorldDescriptor(BaseWorldDescriptor):
             self.world.add_semantic_annotation(PredefinedObject(body=cup_body))
 
             milk_visual_mesh = Mesh(
-                origin=HomogeneousTransformationMatrix(),
+                origin=HomogeneousTransformationMatrix3Dimensional(),
                 filename=milk_mesh_uri,
                 color=milk_color,
             )
             milk_collision_mesh = Mesh(
-                origin=HomogeneousTransformationMatrix(),
+                origin=HomogeneousTransformationMatrix3Dimensional(),
                 filename=milk_mesh_uri,
                 color=milk_color,
             )
@@ -148,19 +150,23 @@ class WorldDescriptor(BaseWorldDescriptor):
             self.world.add_semantic_annotation(PredefinedObject(body=milk_body))
 
         with self.world.modify_world():
-            cup_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-1.37,
-                y=0.95,
-                z=table_top_z,
-                yaw=-0.25,
-                reference_frame=root,
+            cup_connection.origin = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=-1.37,
+                    y=0.95,
+                    z=table_top_z,
+                    yaw=-0.25,
+                    reference_frame=root,
+                )
             )
-            milk_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-0.85,
-                y=0.98,
-                z=table_top_z - milk_collision_mesh.local_frame_bounding_box.min_z,
-                yaw=0.18,
-                reference_frame=root,
+            milk_connection.origin = (
+                HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    x=-0.85,
+                    y=0.98,
+                    z=table_top_z - milk_collision_mesh.local_frame_bounding_box.min_z,
+                    yaw=0.18,
+                    reference_frame=root,
+                )
             )
 
         self.build_regions(root=root, specs=region_specs)
@@ -183,7 +189,7 @@ class WorldDescriptor(BaseWorldDescriptor):
                         CameraModality.SEGMENTATION,
                     ),
                 ),
-                parent_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_camera=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-1.20,
                     y=0.40,
                     z=1.05,

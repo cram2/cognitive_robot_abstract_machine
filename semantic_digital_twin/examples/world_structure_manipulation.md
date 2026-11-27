@@ -40,7 +40,7 @@ from semantic_digital_twin.world_description.connections import (
     ScrewAxisConnection,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 world = World()
@@ -65,7 +65,7 @@ with world.modify_world():
     dof = DegreeOfFreedom(name=PrefixedName("joint_z"))
     world.add_degree_of_freedom(dof)
     c_base_link = ScrewAxisConnection(
-        screw_axis=ScrewAxis(rotation_per_unit_position=Vector3.Z(reference_frame=base)),
+        screw_axis=ScrewAxis(rotation_per_unit_position=Vector3Dimensional.Z(reference_frame=base)),
         parent=base,
         child=link,
         raw_dof=dof,

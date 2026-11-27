@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from segmind.players.data_player import FilePlayer, FrameData
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
@@ -57,14 +57,14 @@ class CSVEpisodePlayer(FilePlayer):
         Resumes the episode player.
         """
 
-    def get_objects_poses(self, frame_data: FrameData) -> dict[Body, Pose]:
+    def get_objects_poses(self, frame_data: FrameData) -> dict[Body, Pose3Dimensional]:
         """
         Extracts the poses of the objects from the frame data.
 
         :param frame_data: The frame data.
         :return: A dictionary mapping bodies to poses.
         """
-        objects_poses: dict[Body, Pose] = {}
+        objects_poses: dict[Body, Pose3Dimensional] = {}
         objects_data = frame_data.objects_data
         current_time = frame_data.time
         for obj_name in self.data_object_names:
@@ -76,7 +76,7 @@ class CSVEpisodePlayer(FilePlayer):
                 obj_orientation[3],
                 obj_orientation[0],
             )
-            obj_pose = Pose.from_xyz_quaternion(
+            obj_pose = Pose3Dimensional.from_xyz_quaternion(
                 pos_x=obj_position[0],
                 pos_y=obj_position[1],
                 pos_z=obj_position[2],

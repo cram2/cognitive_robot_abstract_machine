@@ -27,7 +27,7 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.tracy import Tracy
-from krrood_spatial_math.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
@@ -67,7 +67,9 @@ def test_the_simulated_arm_reaches_the_pose_giskard_commands_live(parked_tracy):
     world = parked_tracy._world
     tool_frame = parked_tracy.left_arm.end_effector.tool_frame
     start = world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
-    goal_point = Point3(start[0], start[1], start[2] + 0.15, reference_frame=world.root)
+    goal_point = Point3Dimensional(
+        start[0], start[1], start[2] + 0.15, reference_frame=world.root
+    )
     reach = CartesianPosition(
         name="reach",
         kinematic_chain=KinematicChain(root=world.root, tip=tool_frame),

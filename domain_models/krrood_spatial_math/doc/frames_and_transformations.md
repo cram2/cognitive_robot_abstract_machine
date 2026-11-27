@@ -34,14 +34,18 @@ from IPython.display import HTML
 from scipy.linalg import expm
 from scipy.spatial.transform import Rotation
 
-from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3D
+from krrood_spatial_math.cartesian_frame_3_dimensional import (
+    CartesianFrame3Dimensional,
+)
+from krrood_spatial_math.embedded_plane import EmbeddedPlane
+from krrood_spatial_math.space import EuclideanSpace
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
     Quaternion,
     RotationMatrix,
     ScrewAxis,
-    Vector3,
+    Vector3Dimensional,
 )
 
 
@@ -174,7 +178,7 @@ def planar_figure(height, x_range, y_range):
 
 
 def turning(angle, x=0.0, y=0.0, **frames):
-    return HomogeneousTransformationMatrix.from_xyz_rpy(
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=x, y=y, yaw=angle, **frames
     )
 ```
@@ -183,17 +187,26 @@ def turning(angle, x=0.0, y=0.0, **frames):
 
 A frame is an origin and three axes of unit length, perpendicular to each other and
 right-handed, with lengths in metres. Anything that implements
-{py:class}`~krrood_spatial_math.cartesian_frame_3d.CartesianFrame3D` is one. In
+{py:class}`~krrood_spatial_math.cartesian_frame_3_dimensional.CartesianFrame3Dimensional` is one. In
 semantic_digital_twin, every body is a frame. On this page, a frame is just a name:
 
 ```{code-cell} ipython3
 @dataclass(eq=False)
-class Frame(CartesianFrame3D[str]):
+class Frame(CartesianFrame3Dimensional[str]):
     name: str
+    space: EuclideanSpace | None = None
     id: UUID = field(default_factory=uuid4)
 
-    def express_in_own_frame(self, value):
+    def transform_into_own_frame(self, *, value):
         return value
+
+    @property
+    def z_axis(self):
+        return Vector3Dimensional.Z(reference_frame=self)
+
+    @property
+    def embedded_plane(self):
+        return EmbeddedPlane(frame_3_dimensional=self)
 
 
 a, b, c = Frame("a"), Frame("b"), Frame("c")
@@ -251,7 +264,7 @@ def matrix_lines(matrix):
 def frame_state(index):
     angle = math.radians(frame_angles[index])
     a_T_b = turning(angle, *b_origin)
-    a_q = a_T_b @ Point3(*b_q)
+    a_q = a_T_b @ Point3Dimensional(*b_q)
     traces = [
         *frame_axes(a_T_b, "b", width=4),
         go.Scatter(
@@ -307,15 +320,15 @@ In code, the frames travel with the matrix. Transforming a point given in $b$ gi
 same point, given in $a$:
 
 ```{code-cell} ipython3
-a_T_b = HomogeneousTransformationMatrix.from_xyz_rpy(
+a_T_b = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
     x=1.3, y=0.3, yaw=math.radians(30), reference_frame=a, child_frame=b
 )
-b_P_q = Point3(0.6, 0.3, 0, reference_frame=b)
+b_P_q = Point3Dimensional(0.6, 0.3, 0, reference_frame=b)
 a_P_q = a_T_b @ b_P_q
 print("q in a:", a_P_q[:3].to_list(), "given in", a_P_q.reference_frame.name)
 
-R, p = a_T_b.rotation_matrix, a_T_b.position
-assert np.allclose(a_P_q, p + R @ Vector3(0.6, 0.3, 0))
+R, p = a_T_b.rotation, a_T_b.position
+assert np.allclose(a_P_q, p + R @ Vector3Dimensional(0.6, 0.3, 0))
 assert np.allclose(a_T_b.pose.position, p)
 ```
 
@@ -328,11 +341,11 @@ matrix drops out of the product: $_aV = R\;{}_bV$. Two points subtract to a vect
 because $1 - 1 = 0$, and a point plus a vector is a point again.
 
 ```{code-cell} ipython3
-b_V_step = Vector3(0.6, 0.3, 0, reference_frame=b)
+b_V_step = Vector3Dimensional(0.6, 0.3, 0, reference_frame=b)
 a_V_step = a_T_b @ b_V_step
-assert np.allclose(a_V_step, R @ Vector3(0.6, 0.3, 0))
+assert np.allclose(a_V_step, R @ Vector3Dimensional(0.6, 0.3, 0))
 
-b_P_origin = Point3(0, 0, 0, reference_frame=b)
+b_P_origin = Point3Dimensional(0, 0, 0, reference_frame=b)
 step = a_P_q - a_T_b @ b_P_origin
 print(type(step).__name__, step[:3].to_list())
 assert np.allclose(step, a_V_step)
@@ -437,7 +450,7 @@ The product of two transformations takes its reference frame from the left facto
 its child frame from the right one:
 
 ```{code-cell} ipython3
-b_T_c = HomogeneousTransformationMatrix.from_xyz_rpy(
+b_T_c = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
     x=0.8, yaw=math.radians(60), reference_frame=b, child_frame=c
 )
 a_T_c = a_T_b @ b_T_c
@@ -572,7 +585,7 @@ assert np.allclose(b_T_a @ a_T_b, np.eye(4))
 assert np.allclose(b_T_a.position.vector3, -(R.T @ p.vector3))
 
 # for a plain 4x4 array of numbers, without building an expression:
-numeric = HomogeneousTransformationMatrix.invert_numeric_matrix(
+numeric = HomogeneousTransformationMatrix3Dimensional.invert_numeric_matrix(
     np.asarray(a_T_b)
 )
 assert np.allclose(numeric, b_T_a)
@@ -688,7 +701,7 @@ def circle(angles, name):
     points = [
         np.asarray(
             oriented(dict(angles, **{name: angles[name] + change}))
-            @ Vector3(*corner)
+            @ Vector3Dimensional(*corner)
         )[:3]
         for change in circle_changes
     ]
@@ -724,7 +737,8 @@ def lock_traces(angles):
     matrix = oriented(angles)
     rotation = np.asarray(matrix)[:3, :3]
     pitch_axis = np.asarray(
-        oriented(dict(roll=0, pitch=0, yaw=angles["yaw"])) @ Vector3(0, 1, 0)
+        oriented(dict(roll=0, pitch=0, yaw=angles["yaw"])).to_coordinate_change()
+        @ Vector3Dimensional(0, 1, 0)
     )[:3]
     x, y, z = columns([rotation @ point for point in box_corners])
     marked = columns([rotation @ corner])
@@ -932,7 +946,7 @@ rotations instead:
 q = Quaternion.from_rpy(0.3, 0.4, 0.5)
 print("q: ", [round(value, 3) for value in q.to_list()])
 print("-q:", [round(value, 3) for value in (-q).to_list()])
-assert np.allclose(q.rotation_matrix, (-q).rotation_matrix)
+assert np.allclose(q.to_coordinate_change(), (-q).to_coordinate_change())
 assert abs(float(q.rotational_distance(-q))) < 1e-6
 ```
 
@@ -954,13 +968,13 @@ the cell compares against for the screw axis of the first figure on that page.
 
 ```{code-cell} ipython3
 screw = ScrewAxis(
-    rotation_per_unit_position=Vector3(0, 0, 1),
-    translation_per_unit_position=Vector3(0, -0.3, 0.05),
+    rotation_per_unit_position=Vector3Dimensional(0, 0, 1),
+    translation_per_unit_position=Vector3Dimensional(0, -0.3, 0.05),
 )
 position = 2.0
 displacement = screw.to_displacement(position=position)
 rotation_vector = displacement.rotation_vector
-end_pose = HomogeneousTransformationMatrix.from_xyz_axis_angle(
+end_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_axis_angle(
     *displacement.translation[:3],
     axis=rotation_vector / rotation_vector.norm(),
     angle=rotation_vector.norm(),

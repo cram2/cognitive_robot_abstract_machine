@@ -44,12 +44,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Floor,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point2,
-    Point3,
-    Pose2D,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
@@ -109,7 +109,7 @@ class LookAtAction(ParallelAction, HasLookTargetParameter, HasCameraParameter):
         )
         return [pointing, *self.keep_base_still()]
 
-    def _world_P_target(self) -> Point3:
+    def _world_P_target(self) -> Point3Dimensional:
         """
         :return: Where :attr:`look_target` is in the world frame, as an expression of where
             the body it is given relative to stands while the look runs.
@@ -140,7 +140,7 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
                     root=self.world.root, tip=self.robot.root
                 ),
                 goal_point=self._target_at_base_height(),
-                pointing_axis=Vector3(
+                pointing_axis=Vector3Dimensional(
                     *self.robot.mobile_base.forward_axis.to_np()[:3],
                     reference_frame=self.robot.root,
                 ),
@@ -149,11 +149,11 @@ class FaceAtAction(ParallelAction, HasLookTargetParameter):
                 kinematic_chain=KinematicChain(
                     root=self.world.root, tip=self.robot.root
                 ),
-                goal_point=Point3(reference_frame=self.robot.root),
+                goal_point=Point3Dimensional(reference_frame=self.robot.root),
             ),
         ]
 
-    def _target_at_base_height(self) -> Point3:
+    def _target_at_base_height(self) -> Point3Dimensional:
         """
         :return: :attr:`look_target` moved vertically to the height of the base, which can
             only turn about the vertical and so can only point level.
@@ -211,7 +211,7 @@ class PathPlanningNavigateAction(
         :return: The floor's bounding box in the world's root frame.
         """
         return floor.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=self.world.root)
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=self.world.root)
         ).bounding_box()
 
     def _stands_on(self, *, floor: Floor) -> bool:
@@ -228,7 +228,7 @@ class PathPlanningNavigateAction(
             and extent.max_z <= float(base_pose.z)
         )
 
-    def _path(self) -> list[Pose2D]:
+    def _path(self) -> list[Pose2Dimensional]:
         """
         The poses the robot drives to, one per leg of the path.
 
@@ -247,7 +247,7 @@ class PathPlanningNavigateAction(
         """
         waypoints = self._waypoints()
         poses = [
-            Pose2D(
+            Pose2Dimensional(
                 waypoint,
                 yaw=np.arctan2(
                     float(next_waypoint.y - waypoint.y),
@@ -258,7 +258,7 @@ class PathPlanningNavigateAction(
         ]
         return poses + [self.planar_goal_pose]
 
-    def _waypoints(self) -> list[Point2]:
+    def _waypoints(self) -> list[Point2Dimensional]:
         """
         The points the robot travels through to get from where it stands to the target.
 
@@ -268,7 +268,7 @@ class PathPlanningNavigateAction(
         base_pose = self.robot.root.global_pose
         free_space = self._floor.navigable_space(robot=self.robot, margin=0.0)
         return free_space.path_from_to(
-            Point2.from_pose(base_pose), self.planar_goal_pose.position
+            Point2Dimensional.from_pose(base_pose), self.planar_goal_pose.position
         )
 
 
@@ -307,7 +307,9 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
             PausedUntilTrue(
                 monitor=self._elevator_open_at_floor(target_floor=self._current_floor),
                 monitored_node=NavigateAction(
-                    planar_goal_pose=Pose2D(reference_frame=self.elevator.root)
+                    planar_goal_pose=Pose2Dimensional(
+                        reference_frame=self.elevator.root
+                    )
                 ),
             ),
             *self.reattach(branch_root=self.robot.root, new_parent=self.elevator.root),
@@ -346,11 +348,11 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
         return current_floor[0]
 
     @property
-    def _pose_infront_of_elevator(self) -> Pose2D:
+    def _pose_infront_of_elevator(self) -> Pose2Dimensional:
         """
         Where the robot stands in front of the cabin's opening.
         """
-        return Pose2D.from_xy_yaw(
+        return Pose2Dimensional.from_xy_yaw(
             x=self.elevator.hole_direction[0]
             * (self.elevator.scale.x / 2 + self.exit_clearance),
             reference_frame=self.elevator.root,

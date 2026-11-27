@@ -32,8 +32,8 @@ from krrood.symbolic_math.symbolic_math import (
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -92,7 +92,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
     )
     statechart = Statechart(context=executor.context)
 
-    goal = HomogeneousTransformationMatrix.from_xyz_rpy(
+    goal = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1,
         y=-1,
         z=1,
@@ -101,7 +101,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
         yaw=1,
         reference_frame=pr2_world_state_reset.root,
     )
-    expected = HomogeneousTransformationMatrix.from_xyz_rpy(
+    expected = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1, y=-1, yaw=1, reference_frame=pr2_world_state_reset.root
     )
 
@@ -146,7 +146,9 @@ def test_joint_goal(tmp_path):
         )
         world.add_degree_of_freedom(dof)
         root_C_tip = ScrewAxisConnection(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             parent=root,
             child=tip,
             raw_dof=dof,
@@ -159,7 +161,9 @@ def test_joint_goal(tmp_path):
         )
         world.add_degree_of_freedom(dof)
         root_C_tip2 = ScrewAxisConnection(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             parent=root,
             child=tip2,
             raw_dof=dof,
@@ -465,7 +469,7 @@ def world_with_revolute_joints(
             world.add_degree_of_freedom(dof)
             joint = ScrewAxisConnection(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
                 parent=root,
                 child=Body(name=PrefixedName(f"tip_{index}")),

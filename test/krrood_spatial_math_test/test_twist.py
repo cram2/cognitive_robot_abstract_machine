@@ -11,8 +11,12 @@ import pytest
 from scipy.linalg import expm
 
 from krrood.adapters.json_serializer import from_json, to_json
-from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
-from krrood_spatial_math.spatial_types import RigidMotionRate, Twist, Vector3
+from krrood_spatial_math.spatial_types import (
+    RigidMotionRate,
+    SymbolicSpatialValue,
+    Twist,
+    Vector3Dimensional,
+)
 
 from .dataset.frames import KnownFrames
 from .reference_implementations import rigid_motion_rate_matrix
@@ -44,7 +48,8 @@ def test_a_twist_returns_the_velocities_it_was_given():
     The angular and linear velocity read back as they were given.
     """
     twist = Twist(
-        angular_velocity=Vector3(0.0, 0.0, 1.0), linear_velocity=Vector3(0.0, -1.0, 0.0)
+        angular_velocity=Vector3Dimensional(0.0, 0.0, 1.0),
+        linear_velocity=Vector3Dimensional(0.0, -1.0, 0.0),
     )
 
     np.testing.assert_allclose(twist.angular_velocity.to_np()[:3], [0.0, 0.0, 1.0])
@@ -58,7 +63,7 @@ def test_a_twist_is_a_value_given_in_a_cartesian_frame():
     """
     A twist is expressed in a reference frame.
     """
-    assert issubclass(Twist, ValueInCartesianFrame3D)
+    assert issubclass(Twist, SymbolicSpatialValue)
 
 
 def test_the_velocities_of_a_twist_are_expressed_in_its_frame(table_frame):
@@ -66,8 +71,8 @@ def test_the_velocities_of_a_twist_are_expressed_in_its_frame(table_frame):
     Both velocities carry the twist's reference frame.
     """
     twist = Twist(
-        angular_velocity=Vector3(0.0, 0.0, 0.2),
-        linear_velocity=Vector3(0.1, 0.0, 0.0),
+        angular_velocity=Vector3Dimensional(0.0, 0.0, 0.2),
+        linear_velocity=Vector3Dimensional(0.1, 0.0, 0.0),
         reference_frame=table_frame,
     )
 
@@ -80,8 +85,8 @@ def test_a_deserialized_twist_refers_to_the_readers_frame(table_frame):
     A JSON round trip keeps the values and resolves the frame on the reading side.
     """
     twist = Twist(
-        angular_velocity=Vector3(0.4, 0.0, 0.0),
-        linear_velocity=Vector3(0.1, 0.2, 0.3),
+        angular_velocity=Vector3Dimensional(0.4, 0.0, 0.0),
+        linear_velocity=Vector3Dimensional(0.1, 0.2, 0.3),
         reference_frame=table_frame,
     )
     known_frames = KnownFrames()
@@ -114,8 +119,8 @@ def test_the_displacement_of_a_twist_agrees_with_the_matrix_exponential(
     the twist's matrix times that duration.
     """
     twist = Twist(
-        angular_velocity=Vector3(0.2, -0.4, 0.9),
-        linear_velocity=Vector3(0.5, 0.1, -0.3),
+        angular_velocity=Vector3Dimensional(0.2, -0.4, 0.9),
+        linear_velocity=Vector3Dimensional(0.5, 0.1, -0.3),
     )
     expected = expm(
         rigid_motion_rate_matrix(

@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin import logger
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
@@ -120,7 +120,7 @@ def _record_a_few_of_many_joints_moving(
             world.add_connection(
                 ScrewAxisConnection(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                        axis=Vector3.X(reference_frame=root)
+                        axis=Vector3Dimensional.X(reference_frame=root)
                     ),
                     parent=root,
                     child=Body(name=PrefixedName(f"link_{index:02d}")),

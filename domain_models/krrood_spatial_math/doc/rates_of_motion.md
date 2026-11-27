@@ -30,7 +30,7 @@ from IPython.display import HTML
 from plotly.subplots import make_subplots
 from scipy.spatial.transform import Rotation
 
-from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
+from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3Dimensional
 
 
 def show(figure):
@@ -146,8 +146,8 @@ Drag the slider to move the body, and drag the figure to look at it from another
 rotation_per_position = np.array([0.0, 0.0, 1.0])
 translation_per_position = np.array([0.0, -0.3, 0.05])
 screw = ScrewAxis(
-    rotation_per_unit_position=Vector3(*rotation_per_position),
-    translation_per_unit_position=Vector3(*translation_per_position),
+    rotation_per_unit_position=Vector3Dimensional(*rotation_per_position),
+    translation_per_unit_position=Vector3Dimensional(*translation_per_position),
 )
 positions = np.linspace(0, 4 * math.pi, 73)
 displacements = [screw.to_displacement(position=float(p)) for p in positions]
@@ -250,8 +250,8 @@ turned by, in radians, and the lid rises 2 mm for every radian:
 
 ```{code-cell} ipython3
 lid = ScrewAxis(
-    rotation_per_unit_position=Vector3(0, 0, 1),
-    translation_per_unit_position=Vector3(0, 0, 0.002),
+    rotation_per_unit_position=Vector3Dimensional(0, 0, 1),
+    translation_per_unit_position=Vector3Dimensional(0, 0, 0.002),
 )
 ```
 
@@ -494,7 +494,7 @@ $(\sin\varphi, 1 - \cos\varphi, 0)$, a point on the unit circle's arc:
 
 ```{code-cell} ipython3
 driving = Twist(
-    angular_velocity=Vector3(0, 0, 1), linear_velocity=Vector3(1, 0, 0)
+    angular_velocity=Vector3Dimensional(0, 0, 1), linear_velocity=Vector3Dimensional(1, 0, 0)
 )
 angle = 1.3
 end = driving.to_displacement(duration=angle).translation
@@ -829,8 +829,8 @@ closed_forms = {
 }
 first_factorials = {"A": 2, "B": 3}
 turn_and_move = ScrewAxis(
-    rotation_per_unit_position=Vector3(0, 0, 1),
-    translation_per_unit_position=Vector3(1, 0, 0),
+    rotation_per_unit_position=Vector3Dimensional(0, 0, 1),
+    translation_per_unit_position=Vector3Dimensional(1, 0, 0),
 )
 code = np.array(
     [
@@ -1048,8 +1048,8 @@ held at $1/2$, it would be the derivative of $\varphi^2/2$, which is $\varphi$:
 ```{code-cell} ipython3
 position = sm.FloatVariable(name="position")
 turn_and_move = ScrewAxis(
-    rotation_per_unit_position=Vector3(0, 0, 1),
-    translation_per_unit_position=Vector3(1, 0, 0),
+    rotation_per_unit_position=Vector3Dimensional(0, 0, 1),
+    translation_per_unit_position=Vector3Dimensional(1, 0, 0),
 )
 y = turn_and_move.to_displacement(position=position).translation.y
 derivative = y.jacobian(variables=[position]).compile()

@@ -8,7 +8,9 @@ from typing_extensions import Any, TYPE_CHECKING, Self
 from krrood.adapters.deserialized_object_tracker import DeserializedObjectTracker
 from krrood.adapters.json_serializer import from_json
 from krrood.adapters.object_reference import ObjectReference
-from krrood_spatial_math.cartesian_frame_3d import CartesianFrame3DResolver
+from krrood_spatial_math.cartesian_frame_3_dimensional import (
+    CartesianFrame3DimensionalResolver,
+)
 from semantic_digital_twin.exceptions import (
     MissingWorldError,
     WorldEntityWithIDNotInKwargs,
@@ -40,7 +42,7 @@ class WorldEntityReference(ObjectReference):
 class WorldEntityWithIDKwargsTracker(
     # A string, because world_entity imports this module and cannot be imported back.
     DeserializedObjectTracker[UUID, "WorldEntityWithID"],
-    CartesianFrame3DResolver,
+    CartesianFrame3DimensionalResolver,
 ):
     """
     The world entities deserialized from one JSON document, by their id.

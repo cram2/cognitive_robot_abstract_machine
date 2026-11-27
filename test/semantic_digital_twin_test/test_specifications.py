@@ -84,9 +84,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     EntryWay,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Vector3Dimensional,
     ScrewAxis,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
@@ -163,7 +163,7 @@ def test_region_specification_uses_connection_specification(empty_world):
         Scale(1, 1, 1),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.Z()
+                axis=Vector3Dimensional.Z()
             ),
         ),
     )
@@ -173,7 +173,9 @@ def test_region_specification_uses_connection_specification(empty_world):
 
 def test_body_and_connection_pose_and_name_override(empty_world):
     spec = BodySpecification.box("box", Scale(1, 1, 1))
-    spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
+    spec.parent_T_self = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1, y=2, z=3
+    )
     body = spec.spawn(empty_world, name="renamed")
     assert body.name == PrefixedName("renamed")
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
@@ -182,10 +184,10 @@ def test_body_and_connection_pose_and_name_override(empty_world):
 
 def test_body_and_connection_spawn_arg_overrides_stored_pose(empty_world):
     spec = BodySpecification.box("box", Scale(1, 1, 1))
-    spec.parent_T_self = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    spec.parent_T_self = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1)
     body = spec.spawn(
         empty_world,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=5),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=5),
     )
     root_T_body = empty_world.compute_forward_kinematics(empty_world.root, body)
     np.testing.assert_allclose(root_T_body.position.to_np()[0], 5)
@@ -197,7 +199,7 @@ def test_body_and_connection_active(empty_world):
         Scale(1, 1, 1),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.Z()
+                axis=Vector3Dimensional.Z()
             ),
         ),
     )
@@ -232,7 +234,7 @@ def test_active_annotation_spawns(empty_world):
         BodySpecification.box("drawer", Scale(0.4, 0.5, 0.6)),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
         ),
     )
@@ -462,7 +464,12 @@ def test_from_event_constructor_spawns(empty_world):
         ),
         lambda pose: BodySpecification.from_3d_points(
             "shape",
-            [Point3(0, 0, 0), Point3(1, 0, 0), Point3(0, 1, 0), Point3(1, 1, 1)],
+            [
+                Point3Dimensional(0, 0, 0),
+                Point3Dimensional(1, 0, 0),
+                Point3Dimensional(0, 1, 0),
+                Point3Dimensional(1, 1, 1),
+            ],
             parent_T_self=pose,
         ),
         lambda pose: RegionSpecification.box(
@@ -474,7 +481,7 @@ def test_shape_constructors_apply_parent_T_self(empty_world, make_spec):
     """
     Each shape constructor places its entity at the pose it is given.
     """
-    pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
+    pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1, y=2, z=3)
     entity = make_spec(pose).spawn(empty_world)
     root_T_entity = empty_world.compute_forward_kinematics(empty_world.root, entity)
     np.testing.assert_allclose(root_T_entity.position.to_np()[:3], [1, 2, 3])
@@ -484,7 +491,12 @@ def test_body_specification_from_3d_points_matches_direct_construction():
     """
     ``from_3d_points`` mirrors :meth:`Body.from_3d_points`.
     """
-    points = [Point3(0, 0, 0), Point3(1, 0, 0), Point3(0, 1, 0), Point3(1, 1, 1)]
+    points = [
+        Point3Dimensional(0, 0, 0),
+        Point3Dimensional(1, 0, 0),
+        Point3Dimensional(0, 1, 0),
+        Point3Dimensional(1, 1, 1),
+    ]
     name = "polytope"
 
     materialized = BodySpecification.from_3d_points(name, points).to_domain_object(name)
@@ -664,10 +676,10 @@ def test_world_specification_with_robot():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=1.0
                     ),
-                    odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    odometry_T_robot_start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         y=2.0
                     ),
                 )
@@ -736,7 +748,8 @@ def test_a_robot_is_spawned_from_the_description_it_reads_itself(empty_world):
 
 def test_world_specification_from_urdf_with_robot():
     """
-    A robot specification places the PR2 on an omnidirectional drive below the world root.
+    A robot specification places the PR2 on an omnidirectional drive below the world
+    root.
     """
     try:
         world = WorldSpecification.from_urdf(
@@ -770,13 +783,13 @@ def test_world_specification_with_several_robots():
             robots=[
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=1.0
                     ),
                 ),
                 RobotSpecification(
                     semantic_annotation_type=PR2,
-                    localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    localization_pose=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         x=-1.0
                     ),
                 ),
@@ -830,7 +843,9 @@ def test_a_localization_is_fixed_by_default(empty_world):
 
 
 def test_a_movable_localization_starts_at_the_localization_pose(empty_world):
-    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    localization_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, y=2.0
+    )
 
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
@@ -852,7 +867,7 @@ def test_a_movable_localization_moves(empty_world):
         localization_connection_type=Connection6DoF,
     ).spawn(empty_world)
     localization = _localization_of(robot)
-    moved_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
+    moved_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=3.0, reference_frame=empty_world.root
     )
 
@@ -920,7 +935,9 @@ def test_a_robot_without_a_mobile_base_hangs_from_the_world_root_by_its_localiza
 
 
 def test_a_robot_without_a_mobile_base_starts_at_the_localization_pose(empty_world):
-    localization_pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0)
+    localization_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1.0, y=2.0
+    )
 
     robot = RobotSpecification(
         semantic_annotation_type=MinimalRobot,
@@ -949,7 +966,9 @@ def test_a_start_pose_is_rejected_for_a_robot_without_a_mobile_base():
     with pytest.raises(StartPoseWithoutMobileBaseError) as raised:
         RobotSpecification(
             semantic_annotation_type=MinimalRobot,
-            odometry_T_robot_start=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0),
+            odometry_T_robot_start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                x=1.0
+            ),
         )
 
     assert raised.value.robot_class is MinimalRobot
@@ -1141,7 +1160,7 @@ def test_connection_6dof_spec_binds_type_without_params():
 
 def test_active_1dof_spec_captures_parameters():
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.0)
-    screw_axis = ScrewAxis(translation_per_unit_position=Vector3.Z())
+    screw_axis = ScrewAxis(translation_per_unit_position=Vector3Dimensional.Z())
     spec = ScrewAxisConnectionSpecification(
         screw_axis=screw_axis,
         multiplier=2.0,
@@ -1156,7 +1175,7 @@ def test_active_1dof_spec_captures_parameters():
 
 
 def test_active_1dof_spec_defaults():
-    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3.Z())
+    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3Dimensional.Z())
     spec = ScrewAxisConnectionSpecification(screw_axis=screw_axis)
     assert spec.connection_type is ScrewAxisConnection
     assert spec._create_with_dofs_kwargs() == {
@@ -1172,7 +1191,7 @@ def test_fixed_spec_rejects_active_parameters():
     # Each connection family carries exactly its own parameters, so an inapplicable one
     # is a construction error instead of being silently dropped.
     with pytest.raises(TypeError):
-        FixedConnectionSpecification(axis=Vector3.Z())
+        FixedConnectionSpecification(axis=Vector3Dimensional.Z())
 
 
 def _connection_specification_types() -> list[type[ConnectionSpecification]]:
@@ -1194,7 +1213,7 @@ def _build_connection_specification(
     if issubclass(specification_type, ScrewAxisConnectionSpecification):
         return specification_type(
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                axis=Vector3.Z(), pitch=0.005
+                axis=Vector3Dimensional.Z(), pitch=0.005
             ),
         )
     return specification_type()
@@ -1239,7 +1258,9 @@ def test_connection_spec_connect_active_forwards_kwargs(empty_world):
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1.5)
     child = BodySpecification.box("slider", Scale(1, 1, 1)).to_domain_object()
     connection = ScrewAxisConnectionSpecification(
-        screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.Z()),
+        screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+            axis=Vector3Dimensional.Z()
+        ),
         dof_limits=limits,
     ).connect(empty_world, child=child)
     assert connection.behaves_like_a_prismatic_connection
@@ -1251,12 +1272,14 @@ def test_connection_spec_connect_active_forwards_kwargs(empty_world):
     "specification",
     [
         ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             dynamics=JointDynamics(damping=0.7, dry_friction=0.3),
         ),
         ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                axis=Vector3.Z(), pitch=0.005
+                axis=Vector3Dimensional.Z(), pitch=0.005
             ),
             dynamics=JointDynamics(damping=0.7, dry_friction=0.3),
         ),
@@ -1275,7 +1298,7 @@ def test_screw_connection_spec_connect_forwards_pitch(empty_world):
     child = BodySpecification.box("cap", Scale(1, 1, 1)).to_domain_object()
     connection = ScrewAxisConnectionSpecification(
         screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-            axis=Vector3.Z(), pitch=0.005
+            axis=Vector3Dimensional.Z(), pitch=0.005
         ),
     ).connect(empty_world, child=child)
     assert np.allclose(
@@ -1288,7 +1311,9 @@ def test_connection_spec_connect_applies_pose(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
     FixedConnectionSpecification().connect(
         empty_world,
-        parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3),
+        parent_T_connection=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1, y=2, z=3
+        ),
         child=child,
     )
     root_T_child = empty_world.compute_forward_kinematics(empty_world.root, child)
@@ -1340,11 +1365,11 @@ def test_connection_spec_connect_without_name_matches_direct_creation(empty_worl
 # like a door whose origin is its centre hanging on a hinge at its edge.
 
 
-def _hinge_T_door() -> HomogeneousTransformationMatrix:
+def _hinge_T_door() -> HomogeneousTransformationMatrix3Dimensional:
     """
     The pose of a door's centre relative to the hinge it swings on.
     """
-    return HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+    return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.5)
 
 
 def _door_on_hinge_specification() -> BodySpecification:
@@ -1352,7 +1377,9 @@ def _door_on_hinge_specification() -> BodySpecification:
         "door",
         Scale(0.03, 1, 2),
         connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             connection_T_child=_hinge_T_door(),
         ),
     )
@@ -1360,7 +1387,7 @@ def _door_on_hinge_specification() -> BodySpecification:
 
 def test_connect_places_the_child_at_its_offset_from_the_connection(empty_world):
     child = BodySpecification.box("child", Scale(1, 1, 1)).to_domain_object()
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1)
     connection = FixedConnectionSpecification(
         connection_T_child=_hinge_T_door()
     ).connect(empty_world, child=child, parent_T_connection=parent_T_connection)
@@ -1377,7 +1404,9 @@ def test_connect_places_the_child_at_its_offset_from_the_connection(empty_world)
 def test_spawn_places_the_child_at_parent_T_self_when_its_joint_is_at_zero(
     empty_world,
 ):
-    parent_T_door = HomogeneousTransformationMatrix.from_xyz_rpy(x=2, yaw=0.3)
+    parent_T_door = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=2, yaw=0.3
+    )
     door = _door_on_hinge_specification().spawn(
         empty_world, parent_T_self=parent_T_door
     )
@@ -1397,7 +1426,7 @@ def test_child_swings_about_its_connection_frame_not_its_own_origin(empty_world)
 
     expected_root_T_door = (
         _hinge_T_door().inverse()
-        @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=angle)
+        @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=angle)
         @ _hinge_T_door()
     )
     np.testing.assert_allclose(
@@ -1427,13 +1456,17 @@ def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
     )
     door = door_specification.spawn(
         empty_world,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=0.3),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1, yaw=0.3
+        ),
     )
     handle = empty_world.get_body_by_name("handle")
     root_T_door = empty_world.compute_forward_kinematics(empty_world.root, door)
 
     connection = ScrewAxisConnectionSpecification(
-        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+            axis=Vector3Dimensional.Z()
+        ),
         connection_T_child=_hinge_T_door(),
     ).reconnect(empty_world, door)
 
@@ -1451,7 +1484,9 @@ def test_reconnect_keeps_the_child_and_its_branch_where_they_are(empty_world):
 def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
     door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
     connection = ScrewAxisConnectionSpecification(
-        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+            axis=Vector3Dimensional.Z()
+        ),
         connection_T_child=_hinge_T_door(),
     ).reconnect(empty_world, door)
     angle = np.pi / 2
@@ -1461,7 +1496,7 @@ def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
 
     expected_root_T_door = (
         _hinge_T_door().inverse()
-        @ HomogeneousTransformationMatrix.from_xyz_rpy(yaw=angle)
+        @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(yaw=angle)
         @ _hinge_T_door()
     )
     np.testing.assert_allclose(
@@ -1475,12 +1510,16 @@ def test_reconnect_swings_the_child_about_the_new_connection_frame(empty_world):
     "joint_specification",
     [
         ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             offset=0.3,
             connection_T_child=_hinge_T_door(),
         ),
         ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=0.2, upper_position=1.0
             ),
@@ -1494,7 +1533,9 @@ def test_reconnect_keeps_the_child_where_it_is_when_the_joint_starts_away_from_z
 ):
     door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(
         empty_world,
-        parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=0.3),
+        parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=1, yaw=0.3
+        ),
     )
     root_T_door = empty_world.compute_forward_kinematics(empty_world.root, door)
 
@@ -1511,7 +1552,9 @@ def test_reconnect_keeps_the_child_where_it_is_when_the_joint_starts_away_from_z
 def test_reconnect_keeps_the_name_of_the_specification(empty_world):
     door = BodySpecification.box("door", Scale(0.03, 1, 2)).spawn(empty_world)
     specification = ScrewAxisConnectionSpecification(
-        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+            axis=Vector3Dimensional.Z()
+        ),
         name="front_door_hinge",
         connection_T_child=_hinge_T_door(),
     )
@@ -1529,14 +1572,16 @@ def test_reconnect_releases_the_degrees_of_freedom_of_the_replaced_connection(
         Scale(0.5, 0.5, 0.2),
         connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
         ),
     ).spawn(empty_world)
     [replaced_degree_of_freedom] = drawer.parent_connection.dofs
 
     connection = ScrewAxisConnectionSpecification(
-        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+            axis=Vector3Dimensional.Z()
+        ),
     ).reconnect(empty_world, drawer)
 
     assert set(empty_world.degrees_of_freedom) == set(connection.dofs)
@@ -1550,7 +1595,9 @@ def test_connection_T_child_survives_orm_round_trip(empty_world):
             scale=Scale(0.03, 1, 2)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             connection_T_child=_hinge_T_door(),
         ),
     )
@@ -1754,7 +1801,9 @@ def test_annotation_spec_active_door(empty_world):
             scale=Scale(0.03, 1, 2)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
         ),
     )
     annotation = spec.spawn(empty_world)
@@ -1836,7 +1885,9 @@ def test_door_joint_survives_mounting_the_door_as_a_part(empty_world):
             scale=Scale(0.03, 1, 2)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             connection_T_child=_hinge_T_door(),
         ),
     )
@@ -1866,7 +1917,7 @@ def test_drawer_joint_survives_mounting_the_drawer_as_a_part(empty_world):
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
         ),
     )
@@ -1912,7 +1963,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
         ),
     )
     aperture_a.root_specification.parent_T_self = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.8)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=-0.8)
     )
     aperture_b = Aperture.get_annotation_specification(
         "hole_b",
@@ -1921,7 +1972,7 @@ def test_nested_list_valued_parts_on_to_many_field(empty_world):
         ),
     )
     aperture_b.root_specification.parent_T_self = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(y=0.8)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.8)
     )
     wall = Wall.get_annotation_specification(
         "wall",
@@ -1969,7 +2020,7 @@ def test_nested_part_placement_is_relative_to_whole(empty_world):
         ),
     )
     handle_part.root_specification.parent_T_self = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(y=0.5)
     )
     drawer = _spawn_with_parts(
         empty_world, Drawer, Scale(0.4, 0.5, 0.6), {"handle": handle_part}
@@ -1991,7 +2042,7 @@ def test_annotation_connection_limits_threaded(empty_world):
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.Z()
+                axis=Vector3Dimensional.Z()
             ),
             dof_limits=limits,
         ),
@@ -2088,7 +2139,9 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
             scale=Scale(0.4, 0.5, 0.6)
         ),
         parent_connection_specification=ScrewAxisConnectionSpecification(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             connection_T_child=_hinge_T_door(),
         ),
         part_specifications={
@@ -2146,7 +2199,7 @@ def test_nested_composite_matches_manual_construction(empty_world):
         Drawer.get_default_root_kinematic_structure_entity_specification(scale=scale),
         parent_connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
         ),
         part_specifications={
@@ -2171,7 +2224,7 @@ def test_nested_composite_matches_manual_construction(empty_world):
             scale=scale,
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
             ),
         )
@@ -2188,7 +2241,7 @@ def test_nested_composite_matches_manual_construction(empty_world):
 
 # %% factory defaults are not shared mutable state
 # Factory overrides must not carry shared mutable spatial defaults:
-# a Vector3 default is constructed once at definition time and would
+# a Vector3Dimensional default is constructed once at definition time and would
 # be aliased by every caller that mutates it.
 
 
@@ -2219,7 +2272,7 @@ def test_factories_have_no_shared_mutable_spatial_defaults():
         f"{owner.__name__}.{method_name}({parameter.name})"
         for owner, method_name, signature in _factory_overrides()
         for parameter in signature.parameters.values()
-        if isinstance(parameter.default, (Vector3, Point3, Scale))
+        if isinstance(parameter.default, (Vector3Dimensional, Point3Dimensional, Scale))
     ]
     assert not offenders, f"shared mutable defaults: {offenders}"
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from krrood.exceptions import DataclassException
-from krrood_spatial_math.spatial_types import SpatialType
+from krrood_spatial_math.spatial_types import SymbolicSpatialType
 
 
 @dataclass
@@ -35,7 +35,7 @@ class WorldNotResolvableError(DataclassException):
     Raised when no world can be resolved for a spatial type that should be published.
     """
 
-    spatial_type: SpatialType = field(kw_only=True)
+    spatial_type: SymbolicSpatialType = field(kw_only=True)
     """
     The spatial type whose world could not be resolved.
     """

@@ -32,8 +32,8 @@ section.
   longer takes a graph ([#844](https://github.com/cram2/cognitive_robot_abstract_machine/pull/844)).
 - **semantic_digital_twin**: The `Hinge`, `Slider` and `ScrewMechanism` bodies are
   replaced by plain connections ([#699](https://github.com/cram2/cognitive_robot_abstract_machine/pull/699)). `GraspDescription` is replaced by grasp poses
-  that objects generate themselves ([#588](https://github.com/cram2/cognitive_robot_abstract_machine/pull/588)). `Pose2D.from_position_and_yaw` is replaced by
-  the `Pose2D(position, yaw)` constructor and `Pose2D.from_xy_yaw` ([#746](https://github.com/cram2/cognitive_robot_abstract_machine/pull/746)).
+  that objects generate themselves ([#588](https://github.com/cram2/cognitive_robot_abstract_machine/pull/588)). `Pose2Dimensional.from_position_and_yaw` is replaced by
+  the `Pose2Dimensional(position, yaw)` constructor and `Pose2Dimensional.from_xy_yaw` ([#746](https://github.com/cram2/cognitive_robot_abstract_machine/pull/746)).
   The spatial types leave `semantic_digital_twin.spatial_types` for the new
   `krrood_spatial_math` package, which has no re-export: import them from there
   ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)). Everything that creates a world has one method, `create_world()`,
@@ -304,14 +304,14 @@ Changes since 26.7.0.
 - **The spatial types moved to `krrood_spatial_math`.** `semantic_digital_twin.spatial_types`
   is deleted, `MissingReferenceFrameError` moves along, and `Derivatives` and
   `DerivativeMap` move to `semantic_digital_twin.world_description.derivatives`. A value is
-  brought into another frame with `CartesianFrame3D.express_in_own_frame` ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
+  brought into another frame with `CartesianFrame3Dimensional.express_in_own_frame` ([#835](https://github.com/cram2/cognitive_robot_abstract_machine/pull/835)).
 - **Worlds are created with `create_world()`.** It replaces `parse()` on every parser,
   `get_world()` on the predefined maps and `WorldSpecification.to_domain_object()`; the
   specification's `world_parser` field is now `world_source`. `WorldModelParser` moves to
   `semantic_digital_twin.world_source`, and `JointDescription` and
   `ApartmentEnvironment.populate` are removed ([#832](https://github.com/cram2/cognitive_robot_abstract_machine/pull/832)).
 - `Hinge`, `Slider` and `ScrewMechanism` bodies are replaced by plain connections ([#699](https://github.com/cram2/cognitive_robot_abstract_machine/pull/699)).
-- `Pose2D(position, yaw, reference_frame)` and `Pose2D.from_xy_yaw` replace
+- `Pose2Dimensional(position, yaw, reference_frame)` and `Pose2Dimensional.from_xy_yaw` replace
   `from_position_and_yaw` ([#746](https://github.com/cram2/cognitive_robot_abstract_machine/pull/746)).
 - `Connection` is a `WorldEntityWithID` ([#618](https://github.com/cram2/cognitive_robot_abstract_machine/pull/618)).
 - Meshes are serialised as binary GLB. A 13.2 M-face scene that ran out of memory at

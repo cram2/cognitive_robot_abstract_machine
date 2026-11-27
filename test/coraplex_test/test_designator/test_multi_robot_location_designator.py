@@ -7,7 +7,7 @@ from typing_extensions import Generator, List, Tuple
 
 
 from coraplex.locations.locations import ReachabilityLocation, VisibilityLocation
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from cramph.composites import Parallel, Sequence, TryAll, TryInOrder
 from cramph.threaded_nodes import FunctionCall
 from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction, MoveTorsoAction
@@ -24,7 +24,9 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 
 from ...conftest import SAMPLING_SEED
@@ -52,7 +54,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(HSRB)
         view = view[0] if view else HSRB.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
     elif request.param == "stretch":
@@ -63,7 +65,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(Stretch)
         view = view[0] if view else Stretch.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -75,7 +77,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(Tiago)
         view = view[0] if view else Tiago.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -87,7 +89,7 @@ def setup_multi_robot_simple_apartment(
         view = apartment_copy.get_semantic_annotations_by_type(PR2)
         view = view[0] if view else PR2.from_world(apartment_copy)
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -98,7 +100,7 @@ def setup_multi_robot_simple_apartment(
         )
         view = apartment_copy.get_semantic_annotations_by_type(Garmi)[0]
         view.root.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(1.5, 2, 0)
         )
         return apartment_copy, view
 
@@ -117,7 +119,7 @@ def multiple_robot_simple_apartment_context(
     snapshot.restore()
 
 
-def _floor_distance(pose: Pose, body) -> float:
+def _floor_distance(pose: Pose3Dimensional, body) -> float:
     """
     :return: How far `pose` stands from `body` along the floor.
     """
@@ -125,7 +127,7 @@ def _floor_distance(pose: Pose, body) -> float:
     return float(np.linalg.norm(offset))
 
 
-def _assert_faces(pose: Pose, body) -> None:
+def _assert_faces(pose: Pose3Dimensional, body) -> None:
     """
     Assert that a robot standing at `pose` has `body` straight ahead.
     """
@@ -151,7 +153,7 @@ def test_new_reachability_location_body(
     arm = right_or_only_arm(robot)
     milk = world.get_body_by_name("milk.stl")
     location = ReachabilityLocation(
-        target_pose=Pose(reference_frame=milk),
+        target_pose=Pose3Dimensional(reference_frame=milk),
         arm=arm,
         context=context_of(extensions),
     )
@@ -199,7 +201,9 @@ def test_visibility_location_body(multiple_robot_simple_apartment_context):
     world.notify_state_change()
 
     location = VisibilityLocation(
-        target_pose=Pose(reference_frame=world.get_body_by_name("milk.stl")),
+        target_pose=Pose3Dimensional(
+            reference_frame=world.get_body_by_name("milk.stl")
+        ),
         context=context_of(extensions),
     )
 

@@ -16,7 +16,7 @@ from typing_extensions import Self, Sequence
 
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.specificity_ranking import concrete_subclasses
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.exceptions import (
@@ -124,7 +124,7 @@ class PinholeCameraModel(CameraModel):
     Vertical focal length in pixels.
     """
 
-    principal_point: Point2 = field(kw_only=True)
+    principal_point: Point2Dimensional = field(kw_only=True)
     """
     Image position in pixels from the top-left corner, including fractional pixels.
     """
@@ -197,7 +197,9 @@ class PinholeCameraModel(CameraModel):
             image_resolution=resolution,
             focal_length_x=focal_length_x,
             focal_length_y=focal_length_y,
-            principal_point=Point2(x=resolution.width / 2.0, y=resolution.height / 2.0),
+            principal_point=Point2Dimensional(
+                x=resolution.width / 2.0, y=resolution.height / 2.0
+            ),
             distortion=(distortion if distortion is not None else NoCameraDistortion()),
         )
 
@@ -255,7 +257,7 @@ class PinholeCameraModel(CameraModel):
             ),
             focal_length_x=self.focal_length_x * scale_x,
             focal_length_y=self.focal_length_y * scale_y,
-            principal_point=Point2(
+            principal_point=Point2Dimensional(
                 x=float(self.principal_point.x) * scale_x,
                 y=float(self.principal_point.y) * scale_y,
             ),

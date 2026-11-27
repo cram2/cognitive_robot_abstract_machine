@@ -19,7 +19,7 @@ from krrood.symbolic_math.symbolic_math import (
     Matrix,
     VariableParameters,
 )
-from krrood_spatial_math.spatial_types import SpatialType
+from krrood_spatial_math.spatial_types import SymbolicSpatialType
 from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 from semantic_digital_twin.adapters.ros.visualization.exceptions import (
     WorldNotResolvableError,
@@ -338,7 +338,7 @@ class SpatialTypePublisher(StateChangeCallback, HasROS2Node):
     def publish_once(
         cls,
         *,
-        spatial_type: SpatialType,
+        spatial_type: SymbolicSpatialType,
         node: Node,
         color: Color | None = None,
         label: str | None = None,

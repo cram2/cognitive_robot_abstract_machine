@@ -39,7 +39,9 @@ from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.world_description.derivatives import Derivatives
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
@@ -193,7 +195,9 @@ def test_compute_fk_np_pr2_root_left_hand(pr2_world_state_reset):
     )
 
     connection = pr2_world_state_reset.get_connections_by_type(OmniDrive)[0]
-    connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, yaw=1)
+    connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=1, yaw=1
+    )
 
     fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
     np.testing.assert_array_almost_equal(

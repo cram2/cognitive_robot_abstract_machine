@@ -8,7 +8,7 @@ from krrood.adapters.json_serializer import from_json, to_json
 import numpy as np
 import pytest
 
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures import camera_model as camera_model_module
 from semantic_digital_twin.datastructures.camera_model import (
     CameraDistortion,
@@ -87,7 +87,7 @@ def test_pinhole_camera_model_rejects_nonpositive_focal_length() -> None:
             image_resolution=CameraResolution(width=640, height=480),
             focal_length_x=0.0,
             focal_length_y=400.0,
-            principal_point=Point2(x=320.0, y=240.0),
+            principal_point=Point2Dimensional(x=320.0, y=240.0),
         )
 
 
@@ -96,7 +96,7 @@ def test_pinhole_camera_model_exposes_intrinsic_matrix() -> None:
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=500.0,
         focal_length_y=510.0,
-        principal_point=Point2(x=321.0, y=239.0),
+        principal_point=Point2Dimensional(x=321.0, y=239.0),
     )
 
     assert np.array_equal(
@@ -117,7 +117,7 @@ def test_pinhole_camera_model_scales_projection_and_preserves_distortion() -> No
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=500.0,
         focal_length_y=510.0,
-        principal_point=Point2(x=321.0, y=239.0),
+        principal_point=Point2Dimensional(x=321.0, y=239.0),
         distortion=distortion,
     )
 
@@ -290,7 +290,7 @@ def test_pinhole_rejects_nonfinite_focal_lengths(
             image_resolution=CameraResolution(width=8, height=6),
             focal_length_x=focal_length if horizontal else 10.0,
             focal_length_y=12.0 if horizontal else focal_length,
-            principal_point=Point2(x=2.0, y=1.0),
+            principal_point=Point2Dimensional(x=2.0, y=1.0),
         )
 
 
@@ -326,7 +326,7 @@ def test_pinhole_retains_fractional_principal_point() -> None:
     """
     Keep a frame-free image point and expose numeric calibration entries.
     """
-    principal_point = Point2(x=319.5, y=239.25)
+    principal_point = Point2Dimensional(x=319.5, y=239.25)
     model = PinholeCameraModel(
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=500.0,
@@ -354,12 +354,12 @@ def test_pinhole_deserializes_recorded_principal_point() -> None:
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=500.0,
         focal_length_y=510.0,
-        principal_point=Point2(x=319.5, y=239.25),
+        principal_point=Point2Dimensional(x=319.5, y=239.25),
     )
     payload = to_json(model)
     restored = from_json(payload)
 
     assert restored == model
-    assert isinstance(restored.principal_point, Point2)
+    assert isinstance(restored.principal_point, Point2Dimensional)
     assert restored.principal_point.reference_frame is None
     assert to_json(restored) == to_json(model)

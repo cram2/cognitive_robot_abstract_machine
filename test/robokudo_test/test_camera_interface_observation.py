@@ -51,7 +51,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.world_entity import Body
@@ -302,10 +304,10 @@ def test_tf_binding_places_robot_camera_where_tf_located_it(
     reference, camera_body = _mounted_camera_bodies(runtime_world)
     original_parent = camera_body.parent_connection
     head_connection = original_parent.parent.parent_connection
-    head_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    head_connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         z=1.5, reference_frame=reference
     )
-    numeric_pose = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    numeric_pose = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.4,
         pos_y=0.2,
         pos_z=1.3,
@@ -352,7 +354,7 @@ def test_tf_binding_keeps_robot_camera_attached_to_the_world_frame(
         world=runtime_world,
         reference_frame="map",
         camera_frame="color_optical_frame",
-        world_T_camera=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.4),
+        world_T_camera=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.4),
     )
 
     np.testing.assert_array_equal(
@@ -369,7 +371,7 @@ def test_mismatched_pose_child_is_rejected_at_acquisition(
     """
     reference, camera_body = _mounted_camera_bodies(runtime_world)
     other_frame = camera_body.parent_connection.parent
-    pose = HomogeneousTransformationMatrix(
+    pose = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=reference, child_frame=other_frame
     )
     interface = CameraInterface(BaseCameraConfig(interface_type="test"))
@@ -850,7 +852,7 @@ def test_tf_binding_attaches_existing_camera_root_to_new_reference(
     camera_body = Body(name=PrefixedName(name="standalone_camera"))
     with runtime_world.modify_world():
         runtime_world.add_body(camera_body)
-    numeric_pose = HomogeneousTransformationMatrix()
+    numeric_pose = HomogeneousTransformationMatrix3Dimensional()
 
     pose = CameraInterface(BaseCameraConfig(interface_type="test")).bind_world_T_camera(
         world=runtime_world,
@@ -1051,7 +1053,7 @@ def test_world_turning_the_camera_beyond_tolerance_logs_a_warning(
     """
     reference, camera_body = _mounted_camera_bodies(runtime_world)
     head_connection = camera_body.parent_connection.parent.parent_connection
-    head_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    head_connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         yaw=2 * robot_camera.camera_config.tolerated_camera_pose_angle,
         reference_frame=reference,
     )

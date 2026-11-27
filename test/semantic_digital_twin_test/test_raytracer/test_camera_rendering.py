@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 from PIL import Image, UnidentifiedImageError
 from pyglet.canvas.xlib import NoSuchDisplayException
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import (
     CameraRange,
     PlumbBobCameraDistortion,
@@ -38,7 +38,9 @@ from semantic_digital_twin.spatial_computations.exceptions import (
     RayPointShapeMismatch,
     UnsupportedCameraProjection,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.testing import ray_test_world
 from semantic_digital_twin.world_description.geometry import Color
 from semantic_digital_twin.world_description.world_entity import Body
@@ -118,8 +120,8 @@ def camera_intersections(
         camera.camera_model, focal_length_x=camera.camera_model.focal_length_y
     )
     camera.camera_range = CameraRange(minimum_distance=0.1, maximum_distance=8.0)
-    camera.world_T_forward_view = HomogeneousTransformationMatrix()
-    camera.root = Mock(global_transform=HomogeneousTransformationMatrix())
+    camera.world_T_forward_view = HomogeneousTransformationMatrix3Dimensional()
+    camera.root = Mock(global_transform=HomogeneousTransformationMatrix3Dimensional())
     camera.optical_R_forward_view = Camera.optical_R_forward_view
     return CameraIntersections(ray_tracer, camera, body, query, resolution)
 
@@ -443,7 +445,7 @@ def test_camera_intersections_return_nearest_surface_first(
         (second_sphere, [0.0, -10.0, 0.0]),
     ):
         connection = world.get_connection(world.root, body)
-        connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+        connection.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=position[0],
             y=position[1],
             z=position[2],
@@ -527,7 +529,7 @@ def test_textured_render_rejects_incompatible_projection(
         focal_length_y=(
             original.focal_length_x if off_center else original.focal_length_x * 2
         ),
-        principal_point=Point2(
+        principal_point=Point2Dimensional(
             x=float(original.principal_point.x) + (0.25 if off_center else 0.0),
             y=original.principal_point.y,
         ),

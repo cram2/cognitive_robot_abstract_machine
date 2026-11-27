@@ -16,7 +16,7 @@ from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, ServoedRobotPart
 from semantic_digital_twin.robots.tiago import TiagoMujoco
 from semantic_digital_twin.robots.tracy import Tracy
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import (
@@ -43,7 +43,9 @@ def described_joint() -> ScrewAxisConnection:
         world.add_kinematic_structure_entity(parent)
         world.add_kinematic_structure_entity(child)
         joint = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=parent,
             child=child,

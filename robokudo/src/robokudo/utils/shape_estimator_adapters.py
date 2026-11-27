@@ -9,7 +9,9 @@ from dataclasses import dataclass
 
 import numpy as np
 import open3d as o3d
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import (
     Box as SemDTBox,
 )
@@ -295,7 +297,7 @@ class SphereFitAdapter(ShapeFitAdapter):
         Create a sphere annotation from a sphere fit.
         """
         sphere_fit = _as_sphere_fit(fit_result)
-        origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=float(sphere_fit.center[0]),
             pos_y=float(sphere_fit.center[1]),
             pos_z=float(sphere_fit.center[2]),
@@ -396,7 +398,7 @@ class CylinderFitAdapter(ShapeFitAdapter):
         cylinder_fit = _as_cylinder_fit(fit_result)
         rotation_matrix = rotation_matrix_from_axis(cylinder_fit.axis_direction)
         quaternion = get_quaternion_from_rotation_matrix(rotation_matrix)
-        origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=float(cylinder_fit.axis_center[0]),
             pos_y=float(cylinder_fit.axis_center[1]),
             pos_z=float(cylinder_fit.axis_center[2]),
@@ -489,7 +491,7 @@ class CuboidFitAdapter(ShapeFitAdapter):
         """
         cuboid_fit = _as_cuboid_fit(fit_result)
         quaternion = get_quaternion_from_rotation_matrix(cuboid_fit.rotation_matrix)
-        origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=float(cuboid_fit.center[0]),
             pos_y=float(cuboid_fit.center[1]),
             pos_z=float(cuboid_fit.center[2]),

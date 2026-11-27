@@ -21,13 +21,13 @@ from coraplex.robot_plans.actions.core.navigation import NavigateAction
 from coraplex.robot_plans.actions.core.robot_body import MoveManipulatorAction
 from coraplex.robot_plans.mixins import HasArmParameter, MovesToolCenterPoint
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
-    Vector3,
-    Pose,
-    Point3,
-    Pose2D,
+    Vector3Dimensional,
+    Pose3Dimensional,
+    Point3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -138,7 +138,9 @@ class DetectAction(SequentialAction):
         """
         distance = self.default_detection_distance
         return VolumetricBoundingBox(
-            origin=HomogeneousTransformationMatrix(reference_frame=self.robot.root),
+            origin=HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=self.robot.root
+            ),
             min_x=-distance,
             min_y=-distance,
             min_z=0,
@@ -159,7 +161,7 @@ class MoveToReach(
     :attr:`arm`.
     """
 
-    target_pose_offset_robot: Pose2D
+    target_pose_offset_robot: Pose2Dimensional
     """
     The pose where the robot should stand with regard to the end effector target pose.
 
@@ -171,7 +173,7 @@ class MoveToReach(
     Additional yaw applied to the orientation facing the target directly.
     """
 
-    reference_T_grasp: Pose
+    reference_T_grasp: Pose3Dimensional
     """
     The grasp frame the end effector is to reach.
     """
@@ -191,30 +193,32 @@ class MoveToReach(
         ]
 
     @property
-    def standing_pose(self) -> Pose2D:
+    def standing_pose(self) -> Pose2Dimensional:
         """
         Calculates the pose where the robot should stand to reach the target.
 
         :return: The calculated standing pose on the floor.
         """
-        reference_T_target = self.reference_T_grasp.homogeneous_matrix
-        target_V_robot = -Vector3(
+        reference_T_target = self.reference_T_grasp.to_coordinate_change()
+        target_V_robot = -Vector3Dimensional(
             x=self.target_pose_offset_robot.x, y=self.target_pose_offset_robot.y
         )
         target_V_robot.scale(1.0)
-        world_z = Vector3.Z()
+        world_z = Vector3Dimensional.Z()
         target_R_robot_pointing_to_target = RotationMatrix.from_vectors(
             x=target_V_robot, z=world_z
-        ) @ RotationMatrix.from_rpy(yaw=self.hip_rotation)
+        ).to_coordinate_change() @ RotationMatrix.from_rpy(yaw=self.hip_rotation)
 
-        target_T_robot = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            point=Point3(
-                x=self.target_pose_offset_robot.x,
-                y=self.target_pose_offset_robot.y,
-            ),
-            rotation_matrix=target_R_robot_pointing_to_target,
-            reference_frame=self.reference_T_grasp.reference_frame,
+        target_T_robot = (
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                point=Point3Dimensional(
+                    x=self.target_pose_offset_robot.x,
+                    y=self.target_pose_offset_robot.y,
+                ),
+                rotation_matrix=target_R_robot_pointing_to_target,
+                reference_frame=self.reference_T_grasp.reference_frame,
+            )
         )
         reference_T_robot = reference_T_target @ target_T_robot
         world_T_robot = self.world.transform(reference_T_robot.pose, self.world.root)
-        return Pose2D.from_pose(world_T_robot)
+        return Pose2Dimensional.from_pose(world_T_robot)

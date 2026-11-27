@@ -116,7 +116,7 @@ from giskardpy.motion_statechart.tasks.weight_scaling_goals import MaxManipulabi
 from giskardpy.motion_statechart.tasks.wiggle_insert import WiggleInsert
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import Point3Dimensional, Vector3Dimensional
 from semantic_digital_twin.world_description.world_entity import (
     Body,
     KinematicStructureEntity,
@@ -189,7 +189,8 @@ def _feature_parameters(cls: type) -> dict[str, object]:
     return {
         field.name: _declared_type(cls, field.name)
         for field in dataclasses.fields(cls)
-        if field.init and _declared_type(cls, field.name) in (Point3, Vector3)
+        if field.init
+        and _declared_type(cls, field.name) in (Point3Dimensional, Vector3Dimensional)
     }
 
 
@@ -511,7 +512,7 @@ def test_the_goal_reference_frame_is_the_frame_of_the_goal():
         kinematic_chain=KinematicChain(
             root=Body(name=PrefixedName("root")), tip=Body(name=PrefixedName("tip"))
         ),
-        goal_point=Point3(reference_frame=goal_frame),
+        goal_point=Point3Dimensional(reference_frame=goal_frame),
     )
     assert task.goal_reference_frame is goal_frame
 
@@ -522,7 +523,7 @@ def test_nodes_with_equal_parameters_are_told_apart_by_identity():
     sets.
     """
     root, tip = Body(name=PrefixedName("root")), Body(name=PrefixedName("tip"))
-    goal = Point3(reference_frame=root)
+    goal = Point3Dimensional(reference_frame=root)
     first = CartesianPosition(
         kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=goal
     )
@@ -539,15 +540,37 @@ def test_nodes_with_equal_parameters_are_told_apart_by_identity():
 @pytest.mark.parametrize(
     "node_class, feature_parameters",
     [
-        (AlignPlanes, {"tip_normal": Vector3, "reference_normal": Vector3}),
-        (AlignPerpendicular, {"tip_normal": Vector3, "reference_normal": Vector3}),
-        (AngleGoal, {"tip_vector": Vector3, "reference_vector": Vector3}),
-        (DistanceGoal, {"tip_point": Point3, "reference_point": Point3}),
-        (HeightGoal, {"tip_point": Point3, "reference_point": Point3}),
-        (ReachPoint, {"tip_point": Point3, "reference_point": Point3}),
+        (
+            AlignPlanes,
+            {"tip_normal": Vector3Dimensional, "reference_normal": Vector3Dimensional},
+        ),
+        (
+            AlignPerpendicular,
+            {"tip_normal": Vector3Dimensional, "reference_normal": Vector3Dimensional},
+        ),
+        (
+            AngleGoal,
+            {"tip_vector": Vector3Dimensional, "reference_vector": Vector3Dimensional},
+        ),
+        (
+            DistanceGoal,
+            {"tip_point": Point3Dimensional, "reference_point": Point3Dimensional},
+        ),
+        (
+            HeightGoal,
+            {"tip_point": Point3Dimensional, "reference_point": Point3Dimensional},
+        ),
+        (
+            ReachPoint,
+            {"tip_point": Point3Dimensional, "reference_point": Point3Dimensional},
+        ),
         (
             DistanceAlongAxis,
-            {"tip_point": Point3, "reference_point": Point3, "axis": Vector3},
+            {
+                "tip_point": Point3Dimensional,
+                "reference_point": Point3Dimensional,
+                "axis": Vector3Dimensional,
+            },
         ),
     ],
 )

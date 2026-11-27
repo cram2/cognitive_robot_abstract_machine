@@ -34,7 +34,11 @@ from semantic_digital_twin.datastructures.definitions import (
 )
 from semantic_digital_twin.datastructures.lidar_reading import LidarReading
 from semantic_digital_twin.reasoning.predicates import LeftOf, RightOf
-from krrood_spatial_math.spatial_types import Point3, Pose, Vector3
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    Pose3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.robots.exceptions import (
     MissingEndEffectorError,
     MissingInputSourceError,
@@ -173,7 +177,7 @@ class Fingertips:
     The frame the measurements are expressed in.
     """
 
-    closing_axis: Vector3
+    closing_axis: Vector3Dimensional
     """
     The axis the fingers close along, in :attr:`tool_frame`.
     """
@@ -188,7 +192,7 @@ class Fingertips:
     # %% where they meet
 
     @property
-    def tool_P_grasp(self) -> Point3:
+    def tool_P_grasp(self) -> Point3Dimensional:
         """
         Where the tips meet as the gripper stands, in :attr:`tool_frame`.
 
@@ -223,7 +227,7 @@ class Fingertips:
         return float((tool_P_thumb - tool_P_finger).dot(self.tool_V_finger_to_thumb))
 
     @property
-    def tool_V_finger_to_thumb(self) -> Vector3:
+    def tool_V_finger_to_thumb(self) -> Vector3Dimensional:
         """
         :attr:`closing_axis`, pointing from the finger's tip towards the thumb's, in
         :attr:`tool_frame`.
@@ -237,7 +241,7 @@ class Fingertips:
         return self.closing_axis
 
     @property
-    def thumb_P_facing_point(self) -> Point3:
+    def thumb_P_facing_point(self) -> Point3Dimensional:
         """
         The point of the thumb's tip that reaches furthest towards the finger's along
         :attr:`closing_axis`, in the thumb tip's own frame.
@@ -245,7 +249,7 @@ class Fingertips:
         return self._facing_point(self.thumb, -self.tool_V_finger_to_thumb)
 
     @property
-    def finger_P_facing_point(self) -> Point3:
+    def finger_P_facing_point(self) -> Point3Dimensional:
         """
         The point of the finger's tip that reaches furthest towards the thumb's along
         :attr:`closing_axis`, in the finger tip's own frame.
@@ -261,7 +265,9 @@ class Fingertips:
         """
         return self.thumb._world
 
-    def _facing_point(self, tip: Body, tool_V_towards_other_tip: Vector3) -> Point3:
+    def _facing_point(
+        self, tip: Body, tool_V_towards_other_tip: Vector3Dimensional
+    ) -> Point3Dimensional:
         """
         :param tip: One of the two tips.
         :param tool_V_towards_other_tip: The direction towards the other tip, in
@@ -272,7 +278,7 @@ class Fingertips:
         box = tip.collision.as_bounding_box_collection_in_frame(tip).bounding_box()
         tool_T_tip = self._world.compute_forward_kinematics(self.tool_frame, tip)
         corners = (
-            Point3(*corner, reference_frame=tip)
+            Point3Dimensional(*corner, reference_frame=tip)
             for corner in product(
                 (box.min_x, box.max_x), (box.min_y, box.max_y), (box.min_z, box.max_z)
             )
@@ -293,7 +299,7 @@ class Fingertips:
             self.tool_frame
         ).bounding_box()
 
-    def _closing_axis_coordinate(self, tool_P_point: Point3) -> float:
+    def _closing_axis_coordinate(self, tool_P_point: Point3Dimensional) -> float:
         """
         :param tool_P_point: A point in :attr:`tool_frame`.
         :return: Where it lies along :attr:`closing_axis`.
@@ -390,7 +396,7 @@ class HasTwoFingers(
 
     def _meeting_point_in_state(
         self, fingertips: Fingertips, state_type: JointStateType
-    ) -> Point3:
+    ) -> Point3Dimensional:
         """
         :param fingertips: The tips to read.
         :param state_type: The state to stand the gripper in.
@@ -403,7 +409,7 @@ class HasTwoFingers(
         return fingertips.tool_P_grasp
 
     @cached_property
-    def tool_P_grasp_when_closed(self) -> Point3:
+    def tool_P_grasp_when_closed(self) -> Point3Dimensional:
         """
         Where the fingers meet once closed, in :attr:`tool_frame`.
 
@@ -463,7 +469,9 @@ class HasTwoFingers(
 
     # %% reaching and reading back a grasp
 
-    def tool_frame_goal_for_grasp(self, grasp_pose: Pose) -> Pose:
+    def tool_frame_goal_for_grasp(
+        self, grasp_pose: Pose3Dimensional
+    ) -> Pose3Dimensional:
         """
         Express a grasp frame as the goal that puts :attr:`tool_P_grasp_when_closed` on
         it.
@@ -474,7 +482,7 @@ class HasTwoFingers(
         return self.tool_frame_goal_for_point(self.tool_P_grasp_when_closed, grasp_pose)
 
     @property
-    def held_body_T_grasp(self) -> Pose:
+    def held_body_T_grasp(self) -> Pose3Dimensional:
         """
         The grasp this gripper has on the body it holds, read at the point it holds an
         object, which is the point :meth:`tool_frame_goal_for_grasp` aims at.

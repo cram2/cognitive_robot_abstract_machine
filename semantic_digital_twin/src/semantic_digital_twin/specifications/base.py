@@ -10,7 +10,9 @@ from typing_extensions import TypeVar, Generic
 
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
@@ -74,7 +76,7 @@ class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
-        parent_T_self: HomogeneousTransformationMatrix | None = None,
+        parent_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
     ) -> TWorldEntity:
         """
         Instantiate the World Entity and add it to the given world.

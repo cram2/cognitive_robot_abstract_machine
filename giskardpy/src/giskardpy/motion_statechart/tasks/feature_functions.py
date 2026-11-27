@@ -9,7 +9,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import krrood.symbolic_math.symbolic_math as sm
-from krrood_spatial_math.spatial_types import Point3, Vector3
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    Vector3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import Color
 from giskardpy.motion_statechart.weights import VelocityScale
 from giskardpy.motion_statechart.graph_node import (
@@ -46,13 +49,13 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
     debug visualizations are registered for them.
     """
 
-    controlled_feature: Point3 | Vector3 = field(init=False)
+    controlled_feature: Point3Dimensional | Vector3Dimensional = field(init=False)
     """
     The geometric feature (point or vector) that is being controlled, expressed in the
     tip link frame.
     """
 
-    reference_feature: Point3 | Vector3 = field(init=False)
+    reference_feature: Point3Dimensional | Vector3Dimensional = field(init=False)
     """
     The geometric feature (point or vector) that serves as reference, expressed in the
     root link frame.
@@ -61,12 +64,15 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
     @abstractmethod
     def get_controlled_and_reference_features(
         self,
-    ) -> tuple[Point3 | Vector3, Point3 | Vector3]:
+    ) -> tuple[
+        Point3Dimensional | Vector3Dimensional,
+        Point3Dimensional | Vector3Dimensional,
+    ]:
         """
         Return the controlled and reference features.
 
-        :return: Tuple (controlled_feature, reference_feature), each a Point3 or
-            Vector3.
+        :return: Tuple (controlled_feature, reference_feature), each a Point3Dimensional or
+            Vector3Dimensional.
         """
         raise NotImplementedError
 
@@ -91,7 +97,7 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
             self.kinematic_chain.root, self.kinematic_chain.tip
         )
-        if isinstance(self.controlled_feature, Point3):
+        if isinstance(self.controlled_feature, Point3Dimensional):
             self.root_P_controlled_feature = root_T_tip @ tip_controlled_feature
             feature_debug_expressions.append(
                 DebugExpression(
@@ -100,7 +106,7 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
                     color=Color.from_rgba(red=1, green=0, blue=0, opacity=1),
                 )
             )
-        elif isinstance(self.controlled_feature, Vector3):
+        elif isinstance(self.controlled_feature, Vector3Dimensional):
             self.root_V_controlled_feature = root_T_tip @ tip_controlled_feature
             feature_debug_expressions.append(
                 DebugExpression(
@@ -113,7 +119,7 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
                 )
             )
 
-        if isinstance(self.reference_feature, Point3):
+        if isinstance(self.reference_feature, Point3Dimensional):
             self.root_P_reference_feature = root_reference_feature
             feature_debug_expressions.append(
                 DebugExpression(
@@ -122,7 +128,7 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
                     color=Color.from_rgba(red=0, green=1, blue=0, opacity=1),
                 )
             )
-        elif isinstance(self.reference_feature, Vector3):
+        elif isinstance(self.reference_feature, Vector3Dimensional):
             self.root_V_reference_feature = root_reference_feature
             feature_debug_expressions.append(
                 DebugExpression(
@@ -139,14 +145,16 @@ class FeatureFunctionGoal(ConvergingTask, HasKinematicChainParameter, ABC):
         artifacts.debug_expressions.extend(feature_debug_expressions)
         return artifacts
 
-    def _vector_to_draw(self, *, root_V_feature: Vector3, feature: Vector3) -> Vector3:
+    def _vector_to_draw(
+        self, *, root_V_feature: Vector3Dimensional, feature: Vector3Dimensional
+    ) -> Vector3Dimensional:
         """
         :param root_V_feature: `feature` expressed in the root of :attr:`kinematic_chain`.
         :param feature: The vector feature as the task was given it.
         :return: A copy of `root_V_feature` drawn from the visualisation frame of
             `feature`, or from the tip of :attr:`kinematic_chain` if it has none.
         """
-        vector_to_draw = Vector3.from_iterable(root_V_feature)
+        vector_to_draw = Vector3Dimensional.from_iterable(root_V_feature)
         vector_to_draw.visualisation_frame = (
             feature.visualisation_frame
             if feature.visualisation_frame is not None
@@ -226,7 +234,7 @@ class HeightGoal(
         artifacts = MotionNodeArtifacts()
         expr = (
             self.root_P_controlled_feature - self.root_P_reference_feature
-        ) @ Vector3.Z()
+        ) @ Vector3Dimensional.Z()
 
         artifacts.constraints.add_inequality_constraint(
             cruise_velocity=self.cruise_velocity,
@@ -314,7 +322,9 @@ class ReachPoint(
     meters.
     """
 
-    def get_controlled_and_reference_features(self) -> tuple[Point3, Point3]:
+    def get_controlled_and_reference_features(
+        self,
+    ) -> tuple[Point3Dimensional, Point3Dimensional]:
         return self.tip_point, self.reference_point
 
     def build_artifacts(self) -> MotionNodeArtifacts:

@@ -12,7 +12,9 @@ from robokudo.annotators.world_descriptor_bootstrap import (
 )
 from robokudo.pipeline import Pipeline
 from robokudo.world_descriptor import PredefinedObject
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Region
 
@@ -42,7 +44,7 @@ class TestWorldDescriptorBootstrapAnnotator:
             world=runtime_world,
             reference_frame="map",
             camera_frame="camera",
-            world_T_camera=HomogeneousTransformationMatrix(),
+            world_T_camera=HomogeneousTransformationMatrix3Dimensional(),
         )
 
         camera_body = runtime_world.get_body_by_name("camera")
@@ -50,7 +52,7 @@ class TestWorldDescriptorBootstrapAnnotator:
         camera_body_id = camera_body.id
         map_body_id = map_body.id
 
-        transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.1,
             pos_y=0.2,
             pos_z=0.3,

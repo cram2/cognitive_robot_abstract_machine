@@ -23,7 +23,10 @@ from robokudo.io.sensor_world import RecordedCameraWorld
 from robokudo.types.camera import CameraObservation
 from robokudo.types.cv import ImageROI
 from robokudo.types.scene import ObjectHypothesis
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -115,7 +118,7 @@ def create_camera_model() -> PinholeCameraModel:
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=525.0,
         focal_length_y=526.0,
-        principal_point=Point2(x=319.5, y=239.5),
+        principal_point=Point2Dimensional(x=319.5, y=239.5),
     )
 
 
@@ -366,7 +369,7 @@ class TestStorage:
             world=sem_world,
             reference_frame=world_frame,
             camera_frame=camera_frame,
-            world_T_camera=HomogeneousTransformationMatrix(),
+            world_T_camera=HomogeneousTransformationMatrix3Dimensional(),
         )
         camera_body = sem_world.get_body_by_name(camera_frame)
         world_body = sem_world.get_body_by_name(world_frame)
@@ -379,7 +382,7 @@ class TestStorage:
         with sem_world.modify_world():
             sem_world.add_semantic_annotation(camera)
 
-        transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
+        transform = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.1,
             pos_y=0.2,
             pos_z=0.3,

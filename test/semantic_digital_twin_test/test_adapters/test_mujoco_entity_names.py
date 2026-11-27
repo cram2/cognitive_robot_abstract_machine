@@ -21,8 +21,8 @@ from semantic_digital_twin.adapters.multi_sim import (
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connection_properties import ServoGains
@@ -53,7 +53,7 @@ def box_body(name: PrefixedName, x: float = 0.0, z: float = 0.0) -> Body:
     geometry = ShapeCollection(
         [
             Box(
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=x, z=z, reference_frame=body
                 ),
                 scale=Scale(0.1, 0.02, 0.02),
@@ -137,7 +137,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
             FixedConnection(
                 parent=root,
                 child=base,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     y=sideways_offset, reference_frame=root
                 ),
             )
@@ -145,7 +145,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
         world.add_degree_of_freedom(degree_of_freedom)
         hinge = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                axis=Vector3.Z(reference_frame=arm)
+                axis=Vector3Dimensional.Z(reference_frame=arm)
             ),
             name=PrefixedName("hinge"),
             parent=base,
@@ -155,7 +155,7 @@ def add_pendulum(world: World, root: Body, sideways_offset: float) -> Pendulum:
         world.add_connection(hinge)
         mirrored_hinge = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                axis=Vector3.Z(reference_frame=mirrored_arm)
+                axis=Vector3Dimensional.Z(reference_frame=mirrored_arm)
             ),
             name=PrefixedName("mirrored_hinge"),
             parent=base,
@@ -362,7 +362,7 @@ def twin_falling_box_world() -> TwinFallingBoxWorld:
                     world=world,
                     parent=root,
                     child=box,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         y=sideways_offset, z=height, reference_frame=root
                     ),
                 )

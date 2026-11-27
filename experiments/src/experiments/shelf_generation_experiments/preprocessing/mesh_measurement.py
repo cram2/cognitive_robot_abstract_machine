@@ -6,7 +6,10 @@ from pathlib import Path
 
 import trimesh
 
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
 
@@ -18,7 +21,7 @@ class CorrectedPosition:
     provenance of that position.
     """
 
-    position: Point2
+    position: Point2Dimensional
     """
     The object's position in world coordinates.
     """
@@ -64,7 +67,7 @@ class MeshMeasurements:
         return sum(bounds is not None for bounds in self._bounds_by_source_id.values())
 
     def corrected_position(
-        self, source_id: str, position: Point2, yaw_degrees: float
+        self, source_id: str, position: Point2Dimensional, yaw_degrees: float
     ) -> CorrectedPosition:
         """
         Correct *position* onto the true centre of *source_id*'s mesh.
@@ -82,16 +85,16 @@ class MeshMeasurements:
         bounds = self.bounds(source_id)
         if bounds is None:
             return CorrectedPosition(position=position, is_mesh_corrected=False)
-        local_offset = Point2(
+        local_offset = Point2Dimensional(
             x=(bounds.min_x + bounds.max_x) / 2,
             y=(bounds.min_y + bounds.max_y) / 2,
         )
-        world_T_local = HomogeneousTransformationMatrix.from_xyz_rpy(
+        world_T_local = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             yaw=math.radians(yaw_degrees)
         )
         world_offset = local_offset.transform(world_T_local)
         return CorrectedPosition(
-            position=Point2(
+            position=Point2Dimensional(
                 x=position.x + world_offset.x, y=position.y + world_offset.y
             ),
             is_mesh_corrected=True,
@@ -154,5 +157,5 @@ class MeshMeasurements:
             # The mesh's own frame has no reference frame of its own to carry; this
             # placeholder is never read back, since nothing here calls the
             # AxisAlignedBox operations that dereference origin.reference_frame.
-            origin=HomogeneousTransformationMatrix(),
+            origin=HomogeneousTransformationMatrix3Dimensional(),
         )

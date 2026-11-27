@@ -31,7 +31,7 @@ import logging
 import numpy as np
 
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Scale
 from semantic_digital_twin.exceptions import ExerciseVerificationFailed
@@ -44,7 +44,7 @@ Your goal:
 - Create a world with a root body and store it in a variable named `world`
 - Inside one `with world.modify_world():` block, create a `Drawer` named `drawer` with scale
   `Scale(0.2, 0.4, 0.2)` and a `Handle` named `drawer_handle` with scale `Scale(0.05, 0.02, 0.1)`
-  placed at `HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1)`, both via
+  placed at `HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.1)`, both via
   `create_with_new_body_in_world`
 - Mount the handle onto the drawer with `add`
 
@@ -68,7 +68,7 @@ with world.modify_world():
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.1),
         scale=Scale(0.05, 0.02, 0.1),
     )
     drawer.add(part=handle)

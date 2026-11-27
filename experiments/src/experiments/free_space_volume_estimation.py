@@ -25,7 +25,9 @@ from typing_extensions import TYPE_CHECKING, Sequence
 
 from experiments.experiment_definitions import VolumeBound
 from semantic_digital_twin.pipeline.mesh_decomposition.vhacd import VHACDMeshDecomposer
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
     Shape,
@@ -97,7 +99,7 @@ class ObstacleContainmentChecker:
             watertight; defaults to a VHACD decomposer tuned for speed.
         """
         world_bounding_box = shape.local_frame_bounding_box.transform_to_origin(
-            HomogeneousTransformationMatrix(reference_frame=target_frame)
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=target_frame)
         )
         world_mesh = shape.mesh_in_frame(target_frame)
         if world_mesh.is_watertight:

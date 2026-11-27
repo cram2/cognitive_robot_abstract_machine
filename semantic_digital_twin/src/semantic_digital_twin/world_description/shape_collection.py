@@ -15,7 +15,10 @@ from typing_extensions import TYPE_CHECKING
 from krrood.adapters.json_serializer import SubclassJSONSerializer, to_json, from_json
 from random_events.product_algebra import Event, SimpleEvent
 from semantic_digital_twin.exceptions import MismatchingWorld
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
 from semantic_digital_twin.world_description.geometry import (
     Shape,
     AxisAlignedBox,
@@ -158,7 +161,7 @@ class ShapeCollection(SubclassJSONSerializer):
         return concatenate(transformed_meshes)
 
     def as_bounding_box_collection_at_origin(
-        self, origin: HomogeneousTransformationMatrix
+        self, origin: HomogeneousTransformationMatrix3Dimensional
     ) -> BoundingBoxCollection:
         """
         Provides the bounding box collection for this entity given a transformation
@@ -192,7 +195,7 @@ class ShapeCollection(SubclassJSONSerializer):
         :returns: A collection of bounding boxes in world-space coordinates.
         """
         return self.as_bounding_box_collection_at_origin(
-            HomogeneousTransformationMatrix(reference_frame=reference_frame)
+            HomogeneousTransformationMatrix3Dimensional(reference_frame=reference_frame)
         )
 
     def to_json(self, **kwargs) -> dict[str, Any]:
@@ -215,14 +218,14 @@ class ShapeCollection(SubclassJSONSerializer):
         reference_frame = next(iter(frames.values())) if len(frames) == 1 else None
         return cls(shapes=shapes, reference_frame=reference_frame)
 
-    def center_of_mass_in_world(self) -> Point3:
+    def center_of_mass_in_world(self) -> Point3Dimensional:
         """
         :return: The center of mass of this shape collection in the world coordinate frame.
         """
         # Center of mass in the body's local frame (collision geometry)
         com_local: np.ndarray[np.float64] = self.combined_mesh.center_mass  # (3,)
         # Transform to world frame using the body's global pose
-        com = Point3(
+        com = Point3Dimensional(
             x=com_local[0],
             y=com_local[1],
             z=com_local[2],
@@ -234,21 +237,25 @@ class ShapeCollection(SubclassJSONSerializer):
     def scale(self):
         return (
             self.as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=self.reference_frame)
+                HomogeneousTransformationMatrix3Dimensional(
+                    reference_frame=self.reference_frame
+                )
             )
             .bounding_box()
             .scale
         )
 
     @property
-    def min_point(self) -> Point3:
-        return Point3.from_iterable(
+    def min_point(self) -> Point3Dimensional:
+        return Point3Dimensional.from_iterable(
             self.combined_mesh.bounds[0], reference_frame=self.reference_frame
         )
 
     @property
-    def max_point(self) -> Point3:
-        return Point3.from_iterable(self.combined_mesh.bounds[1], self.reference_frame)
+    def max_point(self) -> Point3Dimensional:
+        return Point3Dimensional.from_iterable(
+            self.combined_mesh.bounds[1], self.reference_frame
+        )
 
 
 @dataclass
@@ -369,9 +376,13 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
                 np.array([interval.upper for interval in combination])
                 - origin_coordinates
             )
-            origin = HomogeneousTransformationMatrix.from_point_rotation_matrix(
-                point=Point3.from_iterable(_padded_to_3d(origin_coordinates)),
-                reference_frame=reference_frame,
+            origin = (
+                HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
+                    point=Point3Dimensional.from_iterable(
+                        _padded_to_3d(origin_coordinates)
+                    ),
+                    reference_frame=reference_frame,
+                )
             )
             box = box_type.from_array_bounds(lower, upper, origin)
             if not keep_surface and any(
@@ -445,7 +456,9 @@ class BoundingBoxCollection(Generic[BoxT, PointT], ShapeCollection):
         return box_type.from_array_bounds(
             lower,
             upper,
-            HomogeneousTransformationMatrix(reference_frame=self.reference_frame),
+            HomogeneousTransformationMatrix3Dimensional(
+                reference_frame=self.reference_frame
+            ),
         )
 
 

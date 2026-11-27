@@ -9,7 +9,9 @@ from copy import deepcopy
 
 from krrood.symbolic_math.symbolic_math import CasadiLock
 
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 
 BLOCKED_WAIT_IN_SECONDS = 0.5
 """
@@ -27,7 +29,7 @@ def test_copying_a_spatial_type_waits_for_the_casadi_lock():
     Copying a spatial type reaches into CasADi, so it must not run while another thread
     holds the CasADi lock.
     """
-    matrix = HomogeneousTransformationMatrix()
+    matrix = HomogeneousTransformationMatrix3Dimensional()
     copy_finished = threading.Event()
 
     def copy_matrix() -> None:

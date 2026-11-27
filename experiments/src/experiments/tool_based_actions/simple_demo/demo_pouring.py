@@ -17,7 +17,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Bowl,
     PouringCup,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Pose2D
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 from coraplex.robot_plans.actions.composite.tool_based import PouringAction
 from coraplex.robot_plans.actions.core.navigation import NavigateAction
@@ -45,7 +48,7 @@ def main() -> None:
     with world.modify_world():
         world.merge_world_at_pose(
             bowl_world,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                 *TARGET_POSITION_XYZ, reference_frame=world.root
             ),
         )
@@ -73,7 +76,7 @@ def main() -> None:
             ParkArmsAction(arms=pr2.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             NavigateAction(
-                planar_goal_pose=Pose2D.from_xy_yaw(
+                planar_goal_pose=Pose2Dimensional.from_xy_yaw(
                     *BASE_POSITION_XYZ[:2], reference_frame=world.root
                 )
             ),

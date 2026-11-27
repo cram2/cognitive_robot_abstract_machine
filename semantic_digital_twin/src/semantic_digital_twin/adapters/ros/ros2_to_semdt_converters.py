@@ -19,12 +19,12 @@ from semantic_digital_twin.adapters.ros.msg_converter import (
 from semantic_digital_twin.datastructures.lidar_reading import LidarReading
 from semantic_digital_twin.datastructures.scan_pattern import ScanPattern
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point3,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+    Vector3Dimensional,
     Quaternion,
 )
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     Color,
@@ -38,7 +38,9 @@ from semantic_digital_twin.world_description.geometry import (
 
 @dataclass
 class TransformToSemDTConverter(
-    Ros2ToSemDTConverter[geometry_msgs.Transform, HomogeneousTransformationMatrix]
+    Ros2ToSemDTConverter[
+        geometry_msgs.Transform, HomogeneousTransformationMatrix3Dimensional
+    ]
 ):
     """
     Converts a transform that names no frames into a transformation matrix without
@@ -48,8 +50,8 @@ class TransformToSemDTConverter(
     @classmethod
     def convert(
         cls, data: geometry_msgs.Transform, world: World
-    ) -> HomogeneousTransformationMatrix:
-        return HomogeneousTransformationMatrix.from_xyz_quaternion(
+    ) -> HomogeneousTransformationMatrix3Dimensional:
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=data.translation.x,
             pos_y=data.translation.y,
             pos_z=data.translation.z,
@@ -63,7 +65,7 @@ class TransformToSemDTConverter(
 @dataclass
 class TransformStampedToSemDTConverter(
     Ros2ToSemDTConverter[
-        geometry_msgs.TransformStamped, HomogeneousTransformationMatrix
+        geometry_msgs.TransformStamped, HomogeneousTransformationMatrix3Dimensional
     ]
 ):
     """
@@ -74,7 +76,7 @@ class TransformStampedToSemDTConverter(
     @classmethod
     def convert(
         cls, data: geometry_msgs.TransformStamped, world: World
-    ) -> HomogeneousTransformationMatrix:
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         result = TransformToSemDTConverter.convert(data.transform, world)
         if data.header.frame_id != "":
             result.reference_frame = world.get_kinematic_structure_entity_by_name(
@@ -89,11 +91,11 @@ class TransformStampedToSemDTConverter(
 
 @dataclass
 class PoseStampedToSemDTConverter(
-    Ros2ToSemDTConverter[geometry_msgs.PoseStamped, Pose]
+    Ros2ToSemDTConverter[geometry_msgs.PoseStamped, Pose3Dimensional]
 ):
     @classmethod
-    def convert(cls, data: geometry_msgs.PoseStamped, world: World) -> Pose:
-        result = Pose.from_xyz_quaternion(
+    def convert(cls, data: geometry_msgs.PoseStamped, world: World) -> Pose3Dimensional:
+        result = Pose3Dimensional.from_xyz_quaternion(
             pos_x=data.pose.position.x,
             pos_y=data.pose.position.y,
             pos_z=data.pose.position.z,
@@ -110,10 +112,10 @@ class PoseStampedToSemDTConverter(
 
 
 @dataclass
-class PoseToSemDTConverter(Ros2ToSemDTConverter[geometry_msgs.Pose, Pose]):
+class PoseToSemDTConverter(Ros2ToSemDTConverter[geometry_msgs.Pose, Pose3Dimensional]):
     @classmethod
-    def convert(cls, data: geometry_msgs.Pose, world: World) -> Pose:
-        result = Pose.from_xyz_quaternion(
+    def convert(cls, data: geometry_msgs.Pose, world: World) -> Pose3Dimensional:
+        result = Pose3Dimensional.from_xyz_quaternion(
             pos_x=data.position.x,
             pos_y=data.position.y,
             pos_z=data.position.z,
@@ -127,11 +129,11 @@ class PoseToSemDTConverter(Ros2ToSemDTConverter[geometry_msgs.Pose, Pose]):
 
 @dataclass
 class PointStampedToSemDTConverter(
-    Ros2ToSemDTConverter[geometry_msgs.PointStamped, Point3]
+    Ros2ToSemDTConverter[geometry_msgs.PointStamped, Point3Dimensional]
 ):
     @classmethod
     def convert(cls, data: OutputType, world: World) -> InputType:
-        result = Point3(
+        result = Point3Dimensional(
             data.point.x,
             data.point.y,
             data.point.z,
@@ -145,11 +147,13 @@ class PointStampedToSemDTConverter(
 
 @dataclass
 class Vector3StampedToSemDTConverter(
-    Ros2ToSemDTConverter[geometry_msgs.Vector3Stamped, Vector3]
+    Ros2ToSemDTConverter[geometry_msgs.Vector3Stamped, Vector3Dimensional]
 ):
     @classmethod
-    def convert(cls, data: geometry_msgs.Vector3Stamped, world: World) -> Vector3:
-        result = Vector3(
+    def convert(
+        cls, data: geometry_msgs.Vector3Stamped, world: World
+    ) -> Vector3Dimensional:
+        result = Vector3Dimensional(
             data.vector.x,
             data.vector.y,
             data.vector.z,
@@ -196,7 +200,9 @@ class CubeMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Box]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Box:
         result = Box(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             scale=Scale(data.scale.x, data.scale.y, data.scale.z),
         )
@@ -215,7 +221,9 @@ class CylinderMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Cylinder]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Cylinder:
         result = Cylinder(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             width=data.scale.x,
             height=data.scale.z,
@@ -235,7 +243,9 @@ class SphereMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Sphere]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Sphere:
         result = Sphere(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             radius=data.scale.x / 2,
         )
@@ -264,7 +274,9 @@ class MeshMarkerToSemDTConverter(Ros2ToSemDTConverter[Marker, Mesh]):
     @classmethod
     def convert(cls, data: Marker, world: World) -> Mesh:
         result = Mesh(
-            origin=PoseToSemDTConverter.convert(data.pose, world).homogeneous_matrix,
+            origin=PoseToSemDTConverter.convert(
+                data.pose, world
+            ).to_coordinate_change(),
             color=ColorToSemDTConverter.convert(data.color, world),
             scale=Scale(data.scale.x, data.scale.y, data.scale.z),
             filename=cls.local_filename_of(data.mesh_resource),

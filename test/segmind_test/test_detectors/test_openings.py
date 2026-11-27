@@ -13,7 +13,7 @@ from segmind.episode_segmenter import EpisodeSegmentation
 from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
@@ -120,7 +120,7 @@ def drawer_on_rails(starting_position: float) -> DrawerOnRails:
         world.add_degree_of_freedom(degree_of_freedom)
         rails = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X(reference_frame=drawer)
+                axis=Vector3Dimensional.X(reference_frame=drawer)
             ),
             name=PrefixedName("rails"),
             parent=cabinet,

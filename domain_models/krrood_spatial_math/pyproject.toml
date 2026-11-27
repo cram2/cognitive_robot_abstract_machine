@@ -7,7 +7,7 @@ name = "krrood_spatial_math"
 authors = [
     { name = "Simon Stelter", email = "stelter@uni-bremen.de" },
 ]
-description = "Points, vectors, rotations and transformations in Cartesian frames."
+description = "Spaces, the coordinate systems and frames on them, the points given in those, and the changes between coordinate systems; with casadi, vectors, rotations and transformations in Cartesian frames."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 classifiers = [

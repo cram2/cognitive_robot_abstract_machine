@@ -27,12 +27,14 @@ from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.cas import CAS, CASViews
 from robokudo.pipeline import Pipeline
 from robokudo.types.camera import CameraObservation
-from krrood_spatial_math.spatial_types import Point2
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.datastructures.camera_model import PinholeCameraModel
 from semantic_digital_twin.datastructures.camera_resolution import CameraResolution
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import Camera
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.world_entity import Body
 
 # %% Camera behavior
@@ -47,7 +49,7 @@ def camera_model() -> PinholeCameraModel:
         image_resolution=CameraResolution(width=200, height=200),
         focal_length_x=100.0,
         focal_length_y=100.0,
-        principal_point=Point2(x=100.0, y=100.0),
+        principal_point=Point2Dimensional(x=100.0, y=100.0),
     )
 
 
@@ -61,7 +63,7 @@ def cas_with_cloud_at_world_origin(
     here, keeping the fixture's geometry simple).
     """
     cas = CAS()
-    world_T_camera = HomogeneousTransformationMatrix.from_xyz_quaternion(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
         pos_x=0.0,
         pos_y=0.0,
         pos_z=0.0,
@@ -72,7 +74,7 @@ def cas_with_cloud_at_world_origin(
     )
     camera_body = Body(name=PrefixedName(name="camera"))
     world_frame = Body(name=PrefixedName(name="world"))
-    world_T_camera = HomogeneousTransformationMatrix(
+    world_T_camera = HomogeneousTransformationMatrix3Dimensional(
         data=world_T_camera,
         reference_frame=world_frame,
         child_frame=camera_body,

@@ -13,8 +13,12 @@ from scipy.linalg import expm
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.exceptions import HasFreeVariablesError
-from krrood_spatial_math.cartesian_frame_3d import ValueInCartesianFrame3D
-from krrood_spatial_math.spatial_types import ScrewAxis, Twist, Vector3
+from krrood_spatial_math.spatial_types import (
+    ScrewAxis,
+    SymbolicSpatialValue,
+    Twist,
+    Vector3Dimensional,
+)
 
 from .dataset.frames import KnownFrames
 from .reference_implementations import rigid_motion_rate_matrix
@@ -44,6 +48,7 @@ def _off_the_origin(rotation: np.ndarray) -> tuple[float, ...]:
         :data:`POINT_OFF_THE_ORIGIN`: that of its point at the origin circling it.
     """
     return _tuple(-np.cross(rotation, POINT_OFF_THE_ORIGIN))
+
 
 # %% the parts of a screw axis
 
@@ -76,8 +81,8 @@ def test_a_screw_axis_returns_the_parts_it_was_given():
     The rotation and translation per unit of position read back as they were given.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, 1.0),
-        translation_per_unit_position=Vector3(0.0, -0.5, 0.0),
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, 1.0),
+        translation_per_unit_position=Vector3Dimensional(0.0, -0.5, 0.0),
     )
 
     np.testing.assert_allclose(
@@ -95,7 +100,7 @@ def test_a_screw_axis_is_a_value_given_in_a_cartesian_frame():
     """
     A screw axis is expressed in a reference frame.
     """
-    assert issubclass(ScrewAxis, ValueInCartesianFrame3D)
+    assert issubclass(ScrewAxis, SymbolicSpatialValue)
 
 
 def test_the_parts_of_a_screw_axis_are_expressed_in_its_frame(table_frame):
@@ -103,8 +108,8 @@ def test_the_parts_of_a_screw_axis_are_expressed_in_its_frame(table_frame):
     Both parts and the direction carry the screw axis's reference frame.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, 1.0),
-        translation_per_unit_position=Vector3(0.1, 0.0, 0.0),
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, 1.0),
+        translation_per_unit_position=Vector3Dimensional(0.1, 0.0, 0.0),
         reference_frame=table_frame,
     )
 
@@ -118,8 +123,8 @@ def test_a_deserialized_screw_axis_refers_to_the_readers_frame(table_frame):
     A JSON round trip keeps the values and resolves the frame on the reading side.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(1.0, 0.0, 0.0),
-        translation_per_unit_position=Vector3(0.1, 0.2, 0.3),
+        rotation_per_unit_position=Vector3Dimensional(1.0, 0.0, 0.0),
+        translation_per_unit_position=Vector3Dimensional(0.1, 0.2, 0.3),
         reference_frame=table_frame,
     )
     known_frames = KnownFrames()
@@ -143,8 +148,8 @@ def test_the_direction_of_a_turning_screw_axis_is_that_of_its_rotation():
     translation.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, 2.0),
-        translation_per_unit_position=Vector3(0.3, 0.0, 0.0),
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, 2.0),
+        translation_per_unit_position=Vector3Dimensional(0.3, 0.0, 0.0),
     )
 
     np.testing.assert_allclose(screw_axis.unit_direction.to_np()[:3], [0.0, 0.0, 1.0])
@@ -154,7 +159,9 @@ def test_the_direction_of_a_sliding_screw_axis_is_that_of_its_translation():
     """
     A screw axis that does not turn the body points along its translation.
     """
-    screw_axis = ScrewAxis(translation_per_unit_position=Vector3(0.0, 3.0, 4.0))
+    screw_axis = ScrewAxis(
+        translation_per_unit_position=Vector3Dimensional(0.0, 3.0, 4.0)
+    )
 
     np.testing.assert_allclose(screw_axis.unit_direction.to_np()[:3], [0.0, 0.6, 0.8])
 
@@ -198,8 +205,8 @@ def test_a_screw_axis_with_a_unit_rotation_or_only_a_unit_translation_is_normali
     turn is normalized by a unit translation.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(*rotation),
-        translation_per_unit_position=Vector3(*translation),
+        rotation_per_unit_position=Vector3Dimensional(*rotation),
+        translation_per_unit_position=Vector3Dimensional(*translation),
     )
 
     assert screw_axis.is_normalized
@@ -234,8 +241,8 @@ def test_a_screw_axis_without_a_unit_rotation_or_only_a_unit_translation_is_not_
     neither turns nor moves is never normalized.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(*rotation),
-        translation_per_unit_position=Vector3(*translation),
+        rotation_per_unit_position=Vector3Dimensional(*rotation),
+        translation_per_unit_position=Vector3Dimensional(*translation),
     )
 
     assert not screw_axis.is_normalized
@@ -268,8 +275,8 @@ def test_a_screw_axis_passes_through_the_origin_if_its_translation_is_parallel_t
     a screw axis that does not turn has no line to miss the origin.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(*rotation),
-        translation_per_unit_position=Vector3(*translation),
+        rotation_per_unit_position=Vector3Dimensional(*rotation),
+        translation_per_unit_position=Vector3Dimensional(*translation),
     )
 
     assert screw_axis.passes_through_origin is passes_through_origin
@@ -282,7 +289,7 @@ def test_checking_whether_a_symbolic_screw_axis_passes_through_the_origin_raises
     """
     angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position)
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, angle_per_unit_position)
     )
 
     with pytest.raises(HasFreeVariablesError):
@@ -296,7 +303,7 @@ def test_checking_whether_a_symbolic_screw_axis_is_normalized_raises():
     """
     angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position)
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, angle_per_unit_position)
     )
 
     with pytest.raises(HasFreeVariablesError):
@@ -334,7 +341,7 @@ def test_a_screw_axis_and_its_twist_turn_the_body_if_the_rotation_exceeds_the_to
     A screw axis and a twist turn the body when their rotational part is longer than the
     tolerance, which absorbs rounding errors.
     """
-    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3(*rotation))
+    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3Dimensional(*rotation))
     twist = screw_axis.to_twist(position_velocity=2)
 
     for rate in (screw_axis, twist):
@@ -348,7 +355,7 @@ def test_checking_whether_a_symbolic_screw_axis_turns_the_body_raises():
     """
     angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position)
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, angle_per_unit_position)
     )
 
     with pytest.raises(HasFreeVariablesError):
@@ -364,7 +371,11 @@ def test_checking_whether_a_symbolic_screw_axis_turns_the_body_raises():
         ((0.0, 0.0, 2.0), (0.4, 0.0, 0.5), 0.25),
         ((0.0, 0.0, 1.0), (0.0, -0.4, 0.0), 0.0),
         ((0.0, 0.0, 0.0), (0.3, 0.0, 0.0), np.inf),
-        (_tuple(2 * TILTED), _tuple(np.add(_off_the_origin(2 * TILTED), 0.5 * TILTED)), 0.25),
+        (
+            _tuple(2 * TILTED),
+            _tuple(np.add(_off_the_origin(2 * TILTED), 0.5 * TILTED)),
+            0.25,
+        ),
         (_tuple(TILTED), _off_the_origin(TILTED), 0.0),
         ((0.0, 0.0, 0.0), _tuple(TILTED), np.inf),
     ],
@@ -387,8 +398,8 @@ def test_the_translation_per_radian_is_the_part_of_the_translation_along_the_rot
     A screw axis that does not turn advances without end.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(*rotation),
-        translation_per_unit_position=Vector3(*translation),
+        rotation_per_unit_position=Vector3Dimensional(*rotation),
+        translation_per_unit_position=Vector3Dimensional(*translation),
     )
 
     assert float(screw_axis.translation_per_radian) == pytest.approx(
@@ -413,8 +424,8 @@ def test_the_axis_point_closest_to_the_origin_is_where_the_hinge_sits(
     hinge point, in the screw axis's frame.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(*rotation),
-        translation_per_unit_position=Vector3(
+        rotation_per_unit_position=Vector3Dimensional(*rotation),
+        translation_per_unit_position=Vector3Dimensional(
             *(-np.cross(rotation, hinge_point) + 0.3 * rotation)
         ),
         reference_frame=table_frame,
@@ -430,7 +441,9 @@ def test_the_axis_point_of_a_screw_axis_that_does_not_turn_is_the_origin():
     """
     A screw axis that only slides has no line, and takes the origin as its point.
     """
-    screw_axis = ScrewAxis(translation_per_unit_position=Vector3(0.3, 0.0, 0.0))
+    screw_axis = ScrewAxis(
+        translation_per_unit_position=Vector3Dimensional(0.3, 0.0, 0.0)
+    )
 
     np.testing.assert_allclose(screw_axis.axis_point_closest_to_origin[:3], 0)
 
@@ -446,8 +459,8 @@ def test_the_twist_of_a_screw_axis_scales_both_parts_by_the_position_velocity(
     speed, in the same frame.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, 1.0),
-        translation_per_unit_position=Vector3(0.0, -0.5, 0.1),
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, 1.0),
+        translation_per_unit_position=Vector3Dimensional(0.0, -0.5, 0.1),
         reference_frame=table_frame,
     )
 
@@ -466,7 +479,7 @@ def test_a_screw_axis_through_the_origin_turns_the_body_in_place():
     A revolute axis through the frame's origin rotates the body about its origin and
     does not move it.
     """
-    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3(0.0, 0.0, 1.0))
+    screw_axis = ScrewAxis(rotation_per_unit_position=Vector3Dimensional(0.0, 0.0, 1.0))
 
     displacement = screw_axis.to_displacement(position=0.8)
 
@@ -480,7 +493,9 @@ def test_a_screw_axis_that_does_not_turn_slides_the_body():
     """
     Without rotation, the body moves along the translation scaled by the position.
     """
-    screw_axis = ScrewAxis(translation_per_unit_position=Vector3(0.0, 0.6, 0.8))
+    screw_axis = ScrewAxis(
+        translation_per_unit_position=Vector3Dimensional(0.0, 0.6, 0.8)
+    )
 
     displacement = screw_axis.to_displacement(position=2.0)
 
@@ -501,11 +516,11 @@ def test_a_hinge_off_the_origin_swings_the_body_on_a_circle(
     A hinge through (0.5, 0, 0) moves the body's origin on a circle around it, which no
     displacement linear in the position could do.
     """
-    hinge = Vector3(0.5, 0.0, 0.0)
-    rotation = Vector3(0.0, 0.0, 1.0)
+    hinge = Vector3Dimensional(0.5, 0.0, 0.0)
+    rotation = Vector3Dimensional(0.0, 0.0, 1.0)
     screw_axis = ScrewAxis(
         rotation_per_unit_position=rotation,
-        translation_per_unit_position=-rotation.cross(hinge),
+        translation_per_unit_position=-rotation.cross(other=hinge),
     )
 
     displacement = screw_axis.to_displacement(position=position)
@@ -522,8 +537,8 @@ def test_the_displacement_agrees_with_the_matrix_exponential(position: float):
     screw axis's matrix times the position, on both sides of the switch to the series.
     """
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.6, 0.8),
-        translation_per_unit_position=Vector3(0.3, -0.2, 0.1),
+        rotation_per_unit_position=Vector3Dimensional(0.0, 0.6, 0.8),
+        translation_per_unit_position=Vector3Dimensional(0.3, -0.2, 0.1),
     )
     expected = expm(
         rigid_motion_rate_matrix(
@@ -552,8 +567,8 @@ def test_a_scaled_screw_axis_moves_the_body_as_the_axis_does_over_the_scaled_pos
     A screw axis need not have a unit rotation: scaling it by a factor moves the body as
     the original axis does over that factor times the position.
     """
-    rotation = Vector3(0.0, 0.6, 0.8)
-    translation = Vector3(0.3, -0.2, 0.1)
+    rotation = Vector3Dimensional(0.0, 0.6, 0.8)
+    translation = Vector3Dimensional(0.3, -0.2, 0.1)
     screw_axis = ScrewAxis(
         rotation_per_unit_position=rotation, translation_per_unit_position=translation
     )
@@ -578,8 +593,10 @@ def test_the_displacement_of_a_symbolic_screw_axis_is_finite_where_it_stops_turn
     """
     angle_per_unit_position = sm.FloatVariable(name="angle_per_unit_position")
     screw_axis = ScrewAxis(
-        rotation_per_unit_position=Vector3(0.0, 0.0, angle_per_unit_position),
-        translation_per_unit_position=Vector3(0.3, 0.0, 0.0),
+        rotation_per_unit_position=Vector3Dimensional(
+            0.0, 0.0, angle_per_unit_position
+        ),
+        translation_per_unit_position=Vector3Dimensional(0.3, 0.0, 0.0),
     )
     translation = screw_axis.to_displacement(position=2.0).translation
 

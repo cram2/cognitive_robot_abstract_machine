@@ -18,8 +18,10 @@ from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.part_finding.locating import LocatedFacesFinder
 from semantic_digital_twin.part_finding.splitting import PartSplitter
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Bowl, Rim
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Pose3Dimensional
 
 from ..conftest import SAMPLING_SEED
 from ..plan_running import context_of, robot_extensions
@@ -137,7 +139,7 @@ def pr2_and_bowl(simple_pr2_context):
     with world.modify_world():
         world.merge_world_at_pose(
             bowl_world,
-            HomogeneousTransformationMatrix.from_xyz_rpy(
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 2.4, 2.2, 1, reference_frame=world.root
             ),
         )
@@ -158,7 +160,9 @@ def test_transporting_a_bowl_grasps_it_at_its_rim(pr2_and_bowl):
     world, robot, bowl = pr2_and_bowl
     transport = TransportAction.from_graspable_by_closest_grasps(
         graspable=bowl,
-        goal_pose=Pose.from_xyz_rpy(5.0, 3.3, 0.75, reference_frame=world.root),
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
+            5.0, 3.3, 0.75, reference_frame=world.root
+        ),
         arm=robot.left_arm,
         context=context_of(robot_extensions(robot)),
     )

@@ -64,7 +64,7 @@ from semantic_digital_twin.adapters.robocasa_dataset.region_extraction import (
     PlacementSamplerRegionReader,
 )
 from semantic_digital_twin.datastructures.variables import SpatialVariables
-from krrood_spatial_math.spatial_types import Point3
+from krrood_spatial_math.spatial_types import Point3Dimensional
 
 ALL_LAYOUTS_AND_STYLES = -3
 """
@@ -322,7 +322,7 @@ class PlacementRegionFidelityMeasurer:
         start = time.perf_counter()
 
         local_corners = [
-            Point3(
+            Point3Dimensional(
                 region.local_center.x + x_sign * region.width / 2.0,
                 region.local_center.y + y_sign * region.depth / 2.0,
                 region.local_center.z + z_sign * region.thickness / 2.0,
@@ -331,7 +331,9 @@ class PlacementRegionFidelityMeasurer:
             for y_sign in (-1.0, 1.0)
             for z_sign in (-1.0, 1.0)
         ]
-        world_corners = [region.world_T_sampler.dot(corner) for corner in local_corners]
+        world_corners = [
+            region.world_T_sampler.dot(other=corner) for corner in local_corners
+        ]
         x_values = [float(corner.x) for corner in world_corners]
         y_values = [float(corner.y) for corner in world_corners]
         z_values = [float(corner.z) for corner in world_corners]

@@ -32,7 +32,9 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Shelf,
     ShelfLayer,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Scale
@@ -158,8 +160,10 @@ def test_world_fetching(rclpy_node):
     world = create_dummy_world()
     world.get_body_by_name(
         "body_2"
-    ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-        1, 1, 1, reference_frame=world.get_body_by_name("body_1")
+    ).parent_connection.origin = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            1, 1, 1, reference_frame=world.get_body_by_name("body_1")
+        )
     )
     fetcher = FetchWorldServer(node=rclpy_node, world=world)
 
@@ -228,7 +232,7 @@ def test_fetched_world_accepts_new_specification_spawns(rclpy_node):
             ),
         ).spawn(
             fetched_world,
-            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 1, 0, shelf_scale.z / 2, reference_frame=fetched_world.root
             ),
         )
@@ -236,7 +240,7 @@ def test_fetched_world_accepts_new_specification_spawns(rclpy_node):
             part=ShelfLayer.create_with_new_body_in_world(
                 world=fetched_world,
                 name="shelf_layer1",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     1, 0, 0.283, reference_frame=fetched_world.root
                 ),
                 scale=Scale(0.305, 0.85, 0.018),

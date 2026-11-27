@@ -37,7 +37,7 @@ Used Concepts:
 ## Create a drawer with a handle
 
 ```{code-cell} ipython3
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Handle
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world_description.geometry import Scale
@@ -52,11 +52,11 @@ with world.modify_world():
         name="drawer",
         scale=Scale(0.2, 0.4, 0.2),
         world=world,
-        world_root_T_self=HomogeneousTransformationMatrix(),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional(),
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
-        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1),
+        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=-0.1),
         world=world,
         scale=Scale(0.05, 0.02, 0.1)
     )

@@ -1,3 +1,8 @@
+"""
+How :class:`~krrood.patterns.subclass_safe_generic.SubClassSafeGeneric` narrows the
+fields of a class that binds its generic parameters, and reads the bound types back.
+"""
+
 import sys
 from abc import ABCMeta
 from dataclasses import fields, field as dataclass_field
@@ -25,12 +30,24 @@ from typing_extensions import (
 
 from krrood.entity_query_language.factories import variable_from
 from krrood.exceptions import UnboundGenericParameter
+from krrood.patterns.exceptions import DerivedGenericParameterConflictError
 from krrood.patterns.interface import Interface
-from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
+from krrood.patterns.classproperty import classproperty
+from krrood.patterns.subclass_safe_generic import (
+    DerivedGenericParameter,
+    SubClassSafeGeneric,
+)
 from krrood.utils import get_generic_type_parameters
 from ..dataset.abstract_class_with_generic_subclass import (
     AbstractGoal,
     GoalWithNumericTarget,
+)
+from ..dataset.measurement_readings import (
+    Length,
+    LengthReading,
+    MagnitudeType,
+    Reading,
+    UnitType,
 )
 from ..dataset.classes_with_generic import (
     FirstGeneric,
@@ -859,6 +876,461 @@ def test_a_bound_type_is_looked_up_once_per_class_and_parameter(monkeypatch):
         TextContainer.get_type_of_generic_parameter(parameter=ContentType)
         is first_lookup
     )
+
+
+def test_a_class_reports_whether_it_binds_a_parameter():
+    """
+    Whether a parameter is bound is asked without reading the bound type, so a class in
+    the middle of a chain can be told apart from one that binds everything.
+    """
+    ContentType = TypeVar("ContentType")
+    OtherType = TypeVar("OtherType")
+
+    @dataclass(kw_only=True)
+    class Container(Generic[ContentType], SubClassSafeGeneric):
+        """
+        Holds content of a type left to its subclasses.
+        """
+
+        content: ContentType
+        """
+        What the container holds.
+        """
+
+    @dataclass(kw_only=True)
+    class RenamingContainer(Container[OtherType], Generic[OtherType]):
+        """
+        Passes the content type on under another name, binding nothing.
+        """
+
+    @dataclass(kw_only=True)
+    class TextContainer(Container[str]):
+        """
+        Holds text.
+        """
+
+    assert not Container.binds_generic_parameter(parameter=ContentType)
+    assert not RenamingContainer.binds_generic_parameter(parameter=ContentType)
+    assert TextContainer.binds_generic_parameter(parameter=ContentType)
+
+
+# %% parameters read from the type another parameter is bound to
+
+
+def test_a_derived_parameter_is_read_from_the_type_its_source_is_bound_to():
+    """
+    A class that binds only its source parameter reports the derived one as bound, to
+    what the source type binds it to, and narrows the fields typed with it.
+    """
+    UnitType = TypeVar("UnitType")
+    MeasurementType = TypeVar("MeasurementType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+        unit: UnitType
+        """
+        The unit the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Generic[MeasurementType], SubClassSafeGeneric):
+        """
+        A measurement and the unit it was read in, which the measurement type fixes.
+        """
+
+        measurement: MeasurementType
+        """
+        The measurement read.
+        """
+
+        unit: UnitType
+        """
+        The unit the measurement was read in.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    @dataclass(kw_only=True)
+    class LengthReading(Reading[Metres]):
+        """
+        A reading of a length in metres.
+        """
+
+    assert not Reading.binds_generic_parameter(parameter=UnitType)
+    assert LengthReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert {
+        reading_field.name: reading_field.type
+        for reading_field in fields(LengthReading)
+    } == {"measurement": Metres, "unit": str}
+
+
+def test_a_derived_parameter_is_read_from_a_generic_class_given_type_arguments():
+    """
+    A source bound to a generic class given type arguments fixes what that class binds
+    itself and what its type arguments give.
+    """
+
+    @dataclass(kw_only=True)
+    class IntegerLengthReading(Reading[Length[int]]):
+        """
+        A reading of a length with an integer magnitude.
+        """
+
+    assert IntegerLengthReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert (
+        IntegerLengthReading.get_type_of_generic_parameter(parameter=MagnitudeType)
+        is int
+    )
+    assert {
+        reading_field.name: reading_field.type
+        for reading_field in fields(IntegerLengthReading)
+    } == {"measurement": Length[int], "magnitude": int}
+
+
+def test_a_derived_parameter_a_type_argument_leaves_open_is_bound_by_a_subclass():
+    """
+    A class whose source is a generic class given its own open type parameter binds
+    what that class binds itself, and a subclass binding the parameter binds the rest.
+    """
+
+    @dataclass(kw_only=True)
+    class IntegerLengthReading(LengthReading[int]):
+        """
+        A reading of a length with an integer magnitude.
+        """
+
+    assert LengthReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert not LengthReading.binds_generic_parameter(parameter=MagnitudeType)
+    assert (
+        IntegerLengthReading.get_type_of_generic_parameter(parameter=MagnitudeType)
+        is int
+    )
+
+
+def test_a_derived_parameter_a_base_renames_binds_the_parameter_it_renames():
+    """
+    A class deriving the parameter its base renames another one to binds both, and
+    narrows the fields typed with either.
+    """
+    UnitType = TypeVar("UnitType")
+    LengthUnitType = TypeVar("LengthUnitType", bound=str)
+    MeasurementType = TypeVar("MeasurementType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+        unit: UnitType
+        """
+        The unit the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Length(Measurement[LengthUnitType]):
+        """
+        A length, in a unit named by text.
+        """
+
+        unit_of_length: LengthUnitType
+        """
+        The unit of length the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Length[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class LengthReading(Length, Generic[MeasurementType]):
+        """
+        A length whose unit the measurement type it was read as fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(
+                    parameter=LengthUnitType, source=MeasurementType
+                ),
+            )
+
+    @dataclass(kw_only=True)
+    class MetreReading(LengthReading[Metres]):
+        """
+        A length read in metres.
+        """
+
+    assert MetreReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert {
+        reading_field.name: reading_field.type for reading_field in fields(MetreReading)
+    } == {"unit": str, "unit_of_length": str}
+
+
+def test_a_derived_parameter_binds_the_parameter_another_base_renames_it_to():
+    """
+    A class deriving a parameter that another of its bases renames binds the renamed
+    parameter too, and narrows the fields typed with it.
+    """
+    UnitType = TypeVar("UnitType")
+    LengthUnitType = TypeVar("LengthUnitType", bound=str)
+    MeasurementType = TypeVar("MeasurementType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+        unit: UnitType
+        """
+        The unit the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Length(Measurement[LengthUnitType]):
+        """
+        A length, in a unit named by text.
+        """
+
+        unit_of_length: LengthUnitType
+        """
+        The unit of length the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A measurement given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Measurement, Generic[MeasurementType]):
+        """
+        A measurement whose unit the measurement type it was read as fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    @dataclass(kw_only=True)
+    class MetreReading(Reading[Metres], Length):
+        """
+        A length read in metres.
+        """
+
+    assert MetreReading.get_type_of_generic_parameter(parameter=LengthUnitType) is str
+    assert {
+        reading_field.name: reading_field.type for reading_field in fields(MetreReading)
+    } == {"unit": str, "unit_of_length": str}
+
+
+def test_a_class_binding_a_derived_parameter_to_another_type_is_refused():
+    """
+    A class that binds a derived parameter through another base, to a type its source
+    type contradicts, fails where it is defined.
+    """
+    UnitType = TypeVar("UnitType")
+    MeasurementType = TypeVar("MeasurementType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+        unit: UnitType
+        """
+        The unit the number is given in.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Labelled(Generic[UnitType], SubClassSafeGeneric):
+        """
+        Something labelled with a unit of its own.
+        """
+
+        label: UnitType
+        """
+        The unit the label names.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Generic[MeasurementType], SubClassSafeGeneric):
+        """
+        A measurement, whose unit the measurement type fixes.
+        """
+
+        measurement: MeasurementType
+        """
+        The measurement read.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    with pytest.raises(DerivedGenericParameterConflictError):
+
+        @dataclass(kw_only=True)
+        class MislabelledReading(Reading[Metres], Labelled[int]):
+            """
+            A reading in metres labelled with another unit.
+            """
+
+
+def test_the_derived_parameters_of_every_base_apply_together():
+    """
+    A class inheriting two bases that each derive a parameter from their own source
+    reads both.
+    """
+    UnitType = TypeVar("UnitType")
+    ScaleType = TypeVar("ScaleType")
+    MeasurementType = TypeVar("MeasurementType")
+    InstrumentType = TypeVar("InstrumentType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Instrument(Generic[ScaleType], SubClassSafeGeneric):
+        """
+        A device reading values off a scale.
+        """
+
+    @dataclass(kw_only=True)
+    class Ruler(Instrument[int]):
+        """
+        An instrument with an integer scale.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Generic[MeasurementType], SubClassSafeGeneric):
+        """
+        A measurement, whose unit the measurement type fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    @dataclass(kw_only=True)
+    class Recording(Generic[InstrumentType], SubClassSafeGeneric):
+        """
+        A record of an instrument, whose scale the instrument type fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=ScaleType, source=InstrumentType),
+            )
+
+    @dataclass(kw_only=True)
+    class RulerReading(Reading[Metres], Recording[Ruler]):
+        """
+        A length in metres read off a ruler.
+        """
+
+    assert RulerReading.get_type_of_generic_parameter(parameter=UnitType) is str
+    assert RulerReading.get_type_of_generic_parameter(parameter=ScaleType) is int
+
+
+def test_two_sources_fixing_a_parameter_to_unrelated_types_are_refused():
+    """
+    A class whose two bases derive one parameter from their sources fails where it is
+    defined when the sources fix it to unrelated types.
+    """
+    UnitType = TypeVar("UnitType")
+    MeasurementType = TypeVar("MeasurementType")
+    LabelType = TypeVar("LabelType")
+
+    @dataclass(kw_only=True)
+    class Measurement(Generic[UnitType], SubClassSafeGeneric):
+        """
+        A number in some unit.
+        """
+
+    @dataclass(kw_only=True)
+    class Metres(Measurement[str]):
+        """
+        A length given in metres.
+        """
+
+    @dataclass(kw_only=True)
+    class Count(Measurement[int]):
+        """
+        A number of things.
+        """
+
+    @dataclass(kw_only=True)
+    class Reading(Generic[MeasurementType], SubClassSafeGeneric):
+        """
+        A measurement, whose unit the measurement type fixes.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (
+                DerivedGenericParameter(parameter=UnitType, source=MeasurementType),
+            )
+
+    @dataclass(kw_only=True)
+    class Label(Generic[LabelType], SubClassSafeGeneric):
+        """
+        A label naming the unit of the measurement it is given.
+        """
+
+        @classproperty
+        def derived_generic_parameters(cls) -> tuple[DerivedGenericParameter, ...]:
+            return (DerivedGenericParameter(parameter=UnitType, source=LabelType),)
+
+    with pytest.raises(DerivedGenericParameterConflictError):
+
+        @dataclass(kw_only=True)
+        class MislabelledReading(Reading[Metres], Label[Count]):
+            """
+            A reading in metres labelled with the unit of a count.
+            """
 
 
 # %% attributes an interface declares

@@ -13,7 +13,10 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 from krrood.patterns.classproperty import classproperty
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
 from scipy.optimize import linear_sum_assignment
 from semantic_digital_twin.semantic_annotations.mixins import (
     HasRootBody,
@@ -60,7 +63,7 @@ class PerceptionBelief:
     shows and collides with the shape the object was seen with.
     """
 
-    pose: HomogeneousTransformationMatrix
+    pose: HomogeneousTransformationMatrix3Dimensional
     """
     The pose of the geometry the object was seen with, relative to the world frame of
     the pass; the pose the body of :attr:`annotation` is placed at.
@@ -83,7 +86,7 @@ class PerceptionBelief:
         cls,
         *,
         hypothesis: ObjectHypothesis,
-        world_T_camera: HomogeneousTransformationMatrix,
+        world_T_camera: HomogeneousTransformationMatrix3Dimensional,
         minimum_class_confidence: float,
     ) -> PerceptionBelief | None:
         """
@@ -111,7 +114,9 @@ class PerceptionBelief:
             )
             return None
 
-        shape = replace(seen_geometry, origin=HomogeneousTransformationMatrix())
+        shape = replace(
+            seen_geometry, origin=HomogeneousTransformationMatrix3Dimensional()
+        )
         color = cls._compute_dominant_belief_color(hypothesis=hypothesis)
         if color is not None:
             shape.color = color
@@ -147,7 +152,7 @@ class PerceptionBelief:
         )
         if bounding_box is not None:
             return geometry.Box(
-                origin=HomogeneousTransformationMatrix.from_xyz_quaternion(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
                     *bounding_box.pose.translation, *bounding_box.pose.rotation
                 ),
                 scale=geometry.Scale(
@@ -169,7 +174,7 @@ class PerceptionBelief:
         x_length, y_length, z_length = oriented_box.extent
 
         return geometry.Box(
-            origin=HomogeneousTransformationMatrix(data=points_T_box),
+            origin=HomogeneousTransformationMatrix3Dimensional(data=points_T_box),
             scale=geometry.Scale(x=x_length, y=y_length, z=z_length),
         )
 
@@ -198,7 +203,7 @@ class PerceptionBelief:
         )
 
     @property
-    def center(self) -> Point3:
+    def center(self) -> Point3Dimensional:
         """
         The position of the center of the object, relative to the root of the world.
         """
@@ -259,7 +264,7 @@ class PerceptionBelief:
             return
         root_T_body = body.global_transform
         body.parent_connection.origin = (
-            HomogeneousTransformationMatrix.from_point_rotation_matrix(
+            HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
                 point=root_T_body.position
                 + (self.center - ObjectMatcher.visual_center(body=body)),
                 rotation_matrix=root_T_body.rotation_matrix,
@@ -385,7 +390,7 @@ class ObjectMatcher:
         }
 
     @staticmethod
-    def visual_center(*, body: Body) -> Point3:
+    def visual_center(*, body: Body) -> Point3Dimensional:
         """
         :param body: The body of an object.
         :return: The position of the center of the visual shapes of ``body``, or of

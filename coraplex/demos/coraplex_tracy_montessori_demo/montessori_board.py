@@ -19,7 +19,10 @@ import trimesh
 from random_events.interval import Bound, SimpleInterval
 
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point2
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world_description.geometry import (
     Box,
     Color,
@@ -89,7 +92,7 @@ class HoleOutline:
             float(minimum_y),
             float(maximum_x),
             float(maximum_y),
-            HomogeneousTransformationMatrix(),
+            HomogeneousTransformationMatrix3Dimensional(),
         )
 
     @property
@@ -102,7 +105,7 @@ class HoleOutline:
         return float((x * np.roll(y, -1) - np.roll(x, -1) * y).sum() / 2)
 
     @property
-    def centroid(self) -> Point2:
+    def centroid(self) -> Point2Dimensional:
         """
         The point the enclosed area balances about, which for a triangle is not the
         middle of its bounding box.
@@ -110,7 +113,7 @@ class HoleOutline:
         x, y = self.points[:, 0], self.points[:, 1]
         x_next, y_next = np.roll(x, -1), np.roll(y, -1)
         cross = x * y_next - x_next * y
-        return Point2(
+        return Point2Dimensional(
             float(((x + x_next) * cross).sum() / (6 * self.signed_area)),
             float(((y + y_next) * cross).sum() / (6 * self.signed_area)),
         )
@@ -187,7 +190,7 @@ class BoardHole:
     What the hole is shaped like.
     """
 
-    center: Point2
+    center: Point2Dimensional
     """
     Where the hole's area balances, which for the triangle is not the middle of its
     bounding box.
@@ -434,7 +437,7 @@ class ShapeSortingBoard:
         minimum, maximum = part.bounds
         return Box(
             scale=Scale(*part.extents),
-            origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+            origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 *(minimum + maximum) / 2
             ),
             color=self.color,
@@ -462,7 +465,9 @@ class ShapeSortingBoard:
             | {hole.bounds.max_y for hole in holes}
         )
         cells = [
-            PlanarBoundingBox(x0, y0, x1, y1, HomogeneousTransformationMatrix())
+            PlanarBoundingBox(
+                x0, y0, x1, y1, HomogeneousTransformationMatrix3Dimensional()
+            )
             for x0, x1 in zip(x_edges, x_edges[1:])
             if x1 - x0 >= self.minimum_cell_size
             for y0, y1 in zip(y_edges, y_edges[1:])
@@ -471,7 +476,7 @@ class ShapeSortingBoard:
         return [
             Box(
                 scale=Scale(cell.depth, cell.width, top - bottom),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     cell.center.x, cell.center.y, (top + bottom) / 2
                 ),
                 color=self.color,
@@ -497,7 +502,7 @@ class ShapeSortingBoard:
                     compartment.size,
                     self.geometry.lid_bottom - base_top,
                 ),
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     self.geometry.front + self.drawer_front_thickness / 2,
                     compartment.center(),
                     (self.geometry.lid_bottom + base_top) / 2,
@@ -519,7 +524,7 @@ class ShapeSortingBoard:
         return [
             Box(
                 scale=self.handle_scale,
-                origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+                origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     self.geometry.front - self.handle_scale.x / 2,
                     compartment.center(),
                     (self.geometry.lid_bottom + self.geometry.bottom) / 2,

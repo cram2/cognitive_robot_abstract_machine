@@ -10,6 +10,10 @@ from dataclasses import dataclass, field, fields, is_dataclass
 from typing_extensions import Any, TYPE_CHECKING, TypeVar
 
 from krrood.class_diagrams.collection_kind import CollectionKind
+from krrood_spatial_math.spatial_types import (
+    SymbolicSpatialChange,
+    SymbolicSpatialType,
+)
 from semantic_digital_twin.exceptions import (
     WorldEntityWithIDBelongsToAnotherWorld,
     WorldEntityWithIDNotFoundError,
@@ -54,6 +58,8 @@ class WorldEntityRebinding:
             return self._rebound_entity(obj)
         if id(obj) in self.rebound:
             return self.rebound[id(obj)]
+        if isinstance(obj, SymbolicSpatialType):
+            return self._rebound_spatial_type(spatial_type=obj)
         if self._is_walked_dataclass(obj):
             return self._rebound_dataclass(obj)
         if isinstance(obj, CollectionKind.ELEMENT_SEQUENCE.value):
@@ -82,6 +88,20 @@ class WorldEntityRebinding:
                 world=self.world, world_entity=found
             )
         return found
+
+    def _rebound_spatial_type(
+        self, *, spatial_type: SymbolicSpatialType
+    ) -> SymbolicSpatialType:
+        """
+        :param spatial_type: A spatial value or change given in frames of another world.
+            Its deep copy shares its frames, so they are rebound here.
+        :return: A copy of `spatial_type` given in :attr:`world`'s own frames.
+        """
+        result = deepcopy(spatial_type, self.rebound)
+        result.reference_frame = self.rebind(spatial_type.reference_frame)
+        if isinstance(spatial_type, SymbolicSpatialChange):
+            result.child_frame = self.rebind(spatial_type.child_frame)
+        return result
 
     @staticmethod
     def _is_walked_dataclass(obj: Any) -> bool:

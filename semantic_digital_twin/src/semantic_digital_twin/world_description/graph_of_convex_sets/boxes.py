@@ -34,10 +34,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wall,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Point2,
-    Point3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Point2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import (
     VolumetricBoundingBox,
@@ -114,6 +114,14 @@ class GraphOfBoundingBoxes(
     @abstractmethod
     def _default_search_space(self) -> BoundingBoxCollection[BoxT]:
         raise NotImplementedError
+
+    @abstractmethod
+    def _express_in_search_space(self, *, point: PointT) -> PointT:
+        """
+        :param point: A point in any reference frame of this graph's world.
+        :return: The point this graph's boxes are compared with, in the search space's
+            reference frame.
+        """
 
     @classmethod
     def box_type(cls) -> type[BoxT]:
@@ -202,7 +210,7 @@ class GraphOfBoundingBoxes(
                 box = type(node_list[i]).from_array_bounds(
                     lower,
                     upper,
-                    HomogeneousTransformationMatrix(
+                    HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=self.search_space.reference_frame
                     ),
                 )
@@ -272,9 +280,10 @@ class GraphOfBoundingBoxes(
         :raises PointOccupiedError: If the point lies within that region but in none of
             its free-space nodes.
         """
-        if not self.search_space.contains(point):
+        point_in_search_space = self._express_in_search_space(point=point)
+        if not self.search_space.contains(point_in_search_space):
             raise PointOutsideSearchSpaceError(point, self.search_space.bounding_box())
-        node = self._node_of_point(point)
+        node = self._node_of_point(point_in_search_space)
         if node is None:
             raise PointOccupiedError(point)
         return node
@@ -285,8 +294,10 @@ class GraphOfBoundingBoxes(
         :return: Whether the point lies in one of this graph's free-space nodes; a
             point beyond the region this graph was built over is not.
         """
+        point_in_search_space = self._express_in_search_space(point=point)
         return (
-            self.search_space.contains(point) and self._node_of_point(point) is not None
+            self.search_space.contains(point_in_search_space)
+            and self._node_of_point(point_in_search_space) is not None
         )
 
     def nearest_free_point(self, *, point: PointT) -> PointT:
@@ -299,7 +310,7 @@ class GraphOfBoundingBoxes(
         if self.graph.num_nodes() == 0:
             raise NoFreeSpaceError(point=point)
         reference_frame = self.search_space.reference_frame
-        coordinates = self.world.transform(point, reference_frame).to_np()[
+        coordinates = self._express_in_search_space(point=point).to_np()[
             : self.dimensionality
         ]
         nearest = min(
@@ -337,9 +348,8 @@ class GraphOfBoundingBoxes(
         :raises PointOccupiedError: If either point lies within that region but in none
             of its free-space nodes.
         """
-        reference_frame = self.search_space.reference_frame
-        start = self.world.transform(start, reference_frame)
-        goal = self.world.transform(goal, reference_frame)
+        start = self._express_in_search_space(point=start)
+        goal = self._express_in_search_space(point=goal)
 
         start_node = self.node_of_point(start)
         goal_node = self.node_of_point(goal)
@@ -437,22 +447,10 @@ class GraphOfBoundingBoxes(
     def constrain_to_free_space(self, variable: MappedVariable) -> ConditionType:
         """
         Add a where condition to ``variable``'s query, restricting it to lie within this
-        graph's free space.
+        graph's free space: an ``OR`` over one ``AND`` per box of a lower and an upper
+        bound per coordinate of :attr:`free_space_event`.
 
-        The free space is a union of boxes, so the condition is an ``OR`` over one
-        ``AND`` per box, each conjoining a lower and an upper bound per coordinate.
-        Which coordinates that is -- x, y for a planar graph; x, y, z for a
-        volumetric one -- follows from :attr:`free_space_event` alone, so this one
-        implementation serves every :class:`GraphOfBoundingBoxes` subclass.
-
-        ``variable`` is rerooted onto its query's own ``selected_variable`` before
-        its fields are read: a query's own type does not resolve (what it selects
-        lives on ``selected_variable`` instead), and a condition built directly
-        against the selection is exactly what evaluates correctly per query result
-        without needing the query's own rerooting machinery to intervene.
-
-        :param variable: The eql variable to constrain, e.g. a Pose2D- or
-            Point3-typed attribute of a query, or the query itself.
+        :param variable: The eql variable to constrain, or the query itself.
         :return: The condition that was added.
         :raises NotNumberLikeFieldError: If ``variable`` has no number-like field for
             one of this graph's spatial coordinates.
@@ -548,16 +546,21 @@ class GraphOfBoundingBoxes(
 
 @dataclass
 class VolumetricGraphOfBoundingBoxes(
-    GraphOfBoundingBoxes[VolumetricBoundingBox, Point3]
+    GraphOfBoundingBoxes[VolumetricBoundingBox, Point3Dimensional]
 ):
     """
     A graph of convex sets whose nodes are axis-aligned bounding boxes, partitioning
     free space in all three dimensions.
     """
 
+    def _express_in_search_space(
+        self, *, point: Point3Dimensional
+    ) -> Point3Dimensional:
+        return self.world.transform(point, self.search_space.reference_frame)
+
     def _default_search_space(
         self,
-    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3]:
+    ) -> BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional]:
         """
         :return: A search space spanning the entire three-dimensional space around
             ``self.world.root``.
@@ -571,7 +574,7 @@ class VolumetricGraphOfBoundingBoxes(
                     max_x=np.inf,
                     max_y=np.inf,
                     max_z=np.inf,
-                    origin=HomogeneousTransformationMatrix(
+                    origin=HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=self.world.root
                     ),
                 )
@@ -582,7 +585,7 @@ class VolumetricGraphOfBoundingBoxes(
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
-        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         search_space_event: Event,
     ) -> Event:
         """
@@ -614,7 +617,7 @@ class VolumetricGraphOfBoundingBoxes(
     def free_space_from_semantic_annotation(
         cls,
         *,
-        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
         semantic_wall_annotation: Wall | None = None,
         tolerance=0.001,
@@ -689,7 +692,7 @@ class VolumetricGraphOfBoundingBoxes(
         cls,
         *,
         world: World,
-        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         tolerance=0.001,
         bloat_obstacles: float = 0.0,
         obstacle_height_clearance: float = 0.01,
@@ -725,18 +728,31 @@ class VolumetricGraphOfBoundingBoxes(
 
 
 @dataclass
-class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]):
+class PlanarGraphOfBoundingBoxes(
+    GraphOfBoundingBoxes[PlanarBoundingBox, Point2Dimensional]
+):
     """
     A graph of convex sets whose nodes are axis-aligned bounding boxes, partitioning
-    free space on a single navigable plane.
+    free space on a single navigable plane, for base navigation: a query asks whether an
+    x,y footprint is free, and an obstacle blocks a footprint at every height.
 
-    Built for base navigation: the z-axis never enters the decomposition, so a query
-    only has to answer whether an x,y footprint is free -- and an obstacle blocks a
-    footprint at every height, since the robot has to fit through the entire column of
-    space above it, not just its floor-level silhouette.
+    A point given on another plane is taken as its projection onto the search space's.
     """
 
-    def _default_search_space(self) -> BoundingBoxCollection[PlanarBoundingBox, Point2]:
+    def _express_in_search_space(
+        self, *, point: Point2Dimensional
+    ) -> Point2Dimensional:
+        if point.reference_frame == self.search_space.reference_frame:
+            return point
+        return Point2Dimensional.from_point_3_dimensional(
+            self.world.transform(
+                point.to_point_3_dimensional(), self.search_space.reference_frame
+            )
+        )
+
+    def _default_search_space(
+        self,
+    ) -> BoundingBoxCollection[PlanarBoundingBox, Point2Dimensional]:
         """
         :return: A search space spanning the entire two-dimensional plane around
             ``self.world.root``.
@@ -748,7 +764,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
                     min_y=-np.inf,
                     max_x=np.inf,
                     max_y=np.inf,
-                    origin=HomogeneousTransformationMatrix(
+                    origin=HomogeneousTransformationMatrix3Dimensional(
                         reference_frame=self.world.root
                     ),
                 )
@@ -759,7 +775,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
     @classmethod
     def free_space_from_bounding_boxes(
         cls,
-        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+        bounding_boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         search_space_event: Event,
     ) -> Event:
         """
@@ -803,7 +819,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
     def free_space_from_semantic_annotation(
         cls,
         *,
-        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3],
+        search_space: BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional],
         semantic_obstacle_annotation: SemanticEnvironmentAnnotation,
         semantic_wall_annotation: Wall | None = None,
         tolerance=0.001,
@@ -877,7 +893,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
         world: World,
         tolerance=0.001,
         search_space: (
-            BoundingBoxCollection[VolumetricBoundingBox, Point3] | None
+            BoundingBoxCollection[VolumetricBoundingBox, Point3Dimensional] | None
         ) = None,
         bloat_obstacles: float = 0.0,
     ) -> Self:

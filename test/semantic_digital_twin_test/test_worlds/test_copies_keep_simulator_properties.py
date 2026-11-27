@@ -18,8 +18,8 @@ from typing_extensions import Any, Callable
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.adapters.multi_sim import MujocoJoint, MujocoTendon
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -66,7 +66,9 @@ def simulated_world() -> World:
     with world.modify_world():
         world.add_simulator_property(MujocoTendon(name="coupling"))
         hinge = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=root,
             child=arm,
@@ -377,18 +379,20 @@ def connect_with_dofs(
         lambda world, parent, child: FixedConnection(parent=parent, child=child),
         connect_with_dofs(
             ScrewAxisConnection,
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
         ),
         connect_with_dofs(
             ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X()
+                axis=Vector3Dimensional.X()
             ),
         ),
         connect_with_dofs(
             ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                axis=Vector3.Z(), pitch=0.01
+                axis=Vector3Dimensional.Z(), pitch=0.01
             ),
         ),
         connect_with_dofs(Connection6DoF),
@@ -451,7 +455,8 @@ def test_connection_with_new_parent_has_its_own_properties(simulated_world: Worl
     hinge = simulated_world.connections[0]
 
     moved = hinge.copy_with_new_parent(
-        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        Body(name=PrefixedName("new_parent")),
+        HomogeneousTransformationMatrix3Dimensional(),
     )
 
     assert (

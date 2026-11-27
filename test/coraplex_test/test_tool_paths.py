@@ -21,7 +21,9 @@ from coraplex.robot_plans.actions.composite.tool_paths import (
     ramp,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -45,7 +47,7 @@ def box_body():
 
 
 def _sample(path):
-    return path.sample(frame=HomogeneousTransformationMatrix())
+    return path.sample(frame=HomogeneousTransformationMatrix3Dimensional())
 
 
 def test_local_bounding_box_returns_box_extents(box_body):

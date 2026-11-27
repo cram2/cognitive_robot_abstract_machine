@@ -22,7 +22,8 @@ from coraplex.locations.costmaps import (
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from cramph.context import StatechartContext
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from krrood_spatial_math.spatial_types import Pose, Pose2D
+from krrood_spatial_math.spatial_types import Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 
 @dataclass(kw_only=True)
@@ -72,12 +73,12 @@ class CostmapLocation(Location, ABC):
             is now.
         """
 
-    def candidates(self) -> Iterator[Pose2D]:
+    def candidates(self) -> Iterator[Pose2Dimensional]:
         return self.costmap().sample(
             number_of_samples=self.number_of_samples, seed=self.sampling_seed
         )
 
-    def _in_world(self, *, pose: Pose) -> Pose:
+    def _in_world(self, *, pose: Pose3Dimensional) -> Pose3Dimensional:
         """
         :param pose: A pose in any frame of the world.
         :return: Where `pose` is in the world frame now, so a pose given relative to a
@@ -93,7 +94,7 @@ class ReachabilityLocation(CostmapLocation):
     Where the robot can stand to reach a target with one arm.
     """
 
-    target_pose: Pose
+    target_pose: Pose3Dimensional
     """
     The pose the arm is to reach.
 
@@ -137,7 +138,7 @@ class ReachabilityLocation(CostmapLocation):
         )
         return occupancy & ring
 
-    def candidates(self) -> Iterator[Pose2D]:
+    def candidates(self) -> Iterator[Pose2Dimensional]:
         """
         :return: The poses sampled from the costmap, in the order they were sampled,
             leaving out those farther from the target along the floor than the arm is
@@ -157,7 +158,7 @@ class VisibilityLocation(CostmapLocation):
     Where the robot can stand to see a target with its camera.
     """
 
-    target_pose: Pose
+    target_pose: Pose3Dimensional
     """
     The pose that should be visible.
 

@@ -95,12 +95,13 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Table,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     RotationMatrix,
-    Vector3,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
-from krrood_spatial_math.spatial_types import Point3, Pose, Pose2D
+from krrood_spatial_math.spatial_types import Point3Dimensional, Pose3Dimensional
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
@@ -358,7 +359,7 @@ class AbstractRobotPart(HasRootBody, HasRobotParts, ABC):
         cls,
         name: str,
         world: World,
-        world_root_T_self: HomogeneousTransformationMatrix | None = None,
+        world_root_T_self: HomogeneousTransformationMatrix3Dimensional | None = None,
         parent_connection_specification: ConnectionSpecification | None = None,
         scale: Scale | None = None,
     ) -> Self:
@@ -697,25 +698,29 @@ class Camera(Sensor, Generic[TCameraModel], SubClassSafeGeneric):
         return self.camera_model.resolution
 
     @property
-    def viewing_direction(self) -> Vector3:
+    def viewing_direction(self) -> Vector3Dimensional:
         """
         Return optical positive z expressed in the camera root.
 
         :return: Forward direction with the optical root as its reference frame.
         """
-        return Vector3.Z(reference_frame=self.root)
+        return Vector3Dimensional.Z(reference_frame=self.root)
 
     @classproperty
-    def optical_R_forward_view(cls: type[Camera]) -> HomogeneousTransformationMatrix:
+    def optical_R_forward_view(
+        cls: type[Camera],
+    ) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Express the x-forward viewing frame in right-down-forward optical axes.
 
         :return: Rotation from the forward-view frame into optical axes.
         """
-        return HomogeneousTransformationMatrix.from_xyz_rpy(pitch=-np.pi / 2)
+        return HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            pitch=-np.pi / 2
+        )
 
     @property
-    def world_T_forward_view(self) -> HomogeneousTransformationMatrix:
+    def world_T_forward_view(self) -> HomogeneousTransformationMatrix3Dimensional:
         """
         Return the world-space x-forward pose with the optical image orientation.
 
@@ -753,7 +758,8 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
 
     @staticmethod
     def create_optical_body(
-        mounting_body: Body, parent_T_optical: HomogeneousTransformationMatrix
+        mounting_body: Body,
+        parent_T_optical: HomogeneousTransformationMatrix3Dimensional,
     ) -> Body:
         """
         Add a geometry-free optical body when the robot description lacks an optical frame.
@@ -776,7 +782,7 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
                 FixedConnection(
                     parent=mounting_body,
                     child=optical_root,
-                    parent_T_connection_expression=HomogeneousTransformationMatrix(
+                    parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional(
                         data=parent_T_optical,
                         reference_frame=mounting_body,
                         child_frame=optical_root,
@@ -842,7 +848,7 @@ class EndEffector(AbstractRobotPart, ABC):
 
     @property
     @abstractmethod
-    def approach_axis(self) -> Vector3:
+    def approach_axis(self) -> Vector3Dimensional:
         """
         The direction the gripper travels toward an object, expressed in
         :attr:`tool_frame`.
@@ -854,7 +860,7 @@ class EndEffector(AbstractRobotPart, ABC):
 
     @property
     @abstractmethod
-    def closing_axis(self) -> Vector3:
+    def closing_axis(self) -> Vector3Dimensional:
         """
         The axis the fingers close along, expressed in :attr:`tool_frame`.
 
@@ -875,7 +881,7 @@ class EndEffector(AbstractRobotPart, ABC):
             reference_frame=self.tool_frame,
         )
 
-    def tool_frame_goal(self, grasp_pose: Pose) -> Pose:
+    def tool_frame_goal(self, grasp_pose: Pose3Dimensional) -> Pose3Dimensional:
         """
         Express a grasp frame as a goal for this end effector's tool frame.
 
@@ -886,13 +892,17 @@ class EndEffector(AbstractRobotPart, ABC):
         :return: The pose the tool frame has to reach, in ``grasp_pose``'s frame.
         """
         grasp_R_tool = self.tool_R_grasp.inverse()
-        return Pose(
+        return Pose3Dimensional(
             position=grasp_pose.position,
-            orientation=(grasp_pose.rotation_matrix @ grasp_R_tool).quaternion,
+            orientation=(
+                grasp_pose.rotation_matrix.to_coordinate_change() @ grasp_R_tool
+            ).quaternion,
             reference_frame=grasp_pose.reference_frame,
         )
 
-    def tool_frame_goal_for_point(self, tool_P_point: Point3, grasp_pose: Pose) -> Pose:
+    def tool_frame_goal_for_point(
+        self, tool_P_point: Point3Dimensional, grasp_pose: Pose3Dimensional
+    ) -> Pose3Dimensional:
         """
         Express a grasp frame as the goal that puts a point of this gripper on it, where
         :meth:`tool_frame_goal` puts the tool frame itself there.
@@ -902,9 +912,9 @@ class EndEffector(AbstractRobotPart, ABC):
         :return: The pose the tool frame has to reach, in ``grasp_pose``'s frame.
         """
         oriented = self.tool_frame_goal(grasp_pose)
-        return Pose(
+        return Pose3Dimensional(
             position=grasp_pose.position
-            - oriented.rotation_matrix @ tool_P_point.vector3,
+            - oriented.rotation_matrix.to_coordinate_change() @ tool_P_point.vector3,
             orientation=oriented.quaternion,
             reference_frame=grasp_pose.reference_frame,
         )
@@ -925,7 +935,7 @@ class EndEffector(AbstractRobotPart, ABC):
             raise MoreThanOneBodyHeld(self, children)
         return children[0]
 
-    def held_body_T_grasp_at(self, tool_P_point: Point3) -> Pose:
+    def held_body_T_grasp_at(self, tool_P_point: Point3Dimensional) -> Pose3Dimensional:
         """
         The grasp this gripper has on the body it holds, read off the transform between
         the tool frame and that body, with the grasp sitting at a given point of the
@@ -940,7 +950,9 @@ class EndEffector(AbstractRobotPart, ABC):
             raise NothingHeld(self)
         return self.body_T_grasp(body=body, tool_P_grasp=tool_P_point)
 
-    def body_T_grasp(self, *, body: Body, tool_P_grasp: Point3) -> Pose:
+    def body_T_grasp(
+        self, *, body: Body, tool_P_grasp: Point3Dimensional
+    ) -> Pose3Dimensional:
         """
         The grasp this gripper has on `body` as both stand now, whether or not `body`
         hangs off the tool frame.
@@ -950,9 +962,9 @@ class EndEffector(AbstractRobotPart, ABC):
         :return: The grasp frame, in the frame of `body`.
         """
         body_T_tool = self._world.transform(self.tool_frame.global_transform, body)
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             point=body_T_tool @ tool_P_grasp,
-            rotation_matrix=body_T_tool.rotation_matrix @ self.tool_R_grasp,
+            rotation_matrix=body_T_tool.rotation @ self.tool_R_grasp,
             reference_frame=body,
         ).pose
 
@@ -1083,7 +1095,7 @@ class MobileBase(
 
     @classproperty
     @abstractmethod
-    def forward_axis(cls) -> Vector3:
+    def forward_axis(cls) -> Vector3Dimensional:
         """
         The axis of this base that points where the robot faces.
         """
@@ -1176,9 +1188,13 @@ class MobileBase(
         A heading says where the front should point as its x-axis, so this is what turns
         one into a base pose and, inverted the other way, reads one back off a base pose.
         """
-        return RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
+        return RotationMatrix.from_vectors(
+            x=self.forward_axis, z=Vector3Dimensional.Z()
+        )
 
-    def pose_facing(self, *, heading: Pose | Pose2D) -> Pose:
+    def pose_facing(
+        self, *, heading: Pose3Dimensional | Pose2Dimensional
+    ) -> Pose3Dimensional:
         """
         The base pose whose :attr:`forward_axis` points along ``heading``.
 
@@ -1186,10 +1202,13 @@ class MobileBase(
         its x-axis, so the same heading serves bases modelled with different axes. Its
         position is kept as it is.
         """
-        reference_T_heading = heading.homogeneous_matrix
-        return HomogeneousTransformationMatrix.from_point_rotation_matrix(
+        heading_3_dimensional = (
+            heading.pose if isinstance(heading, Pose2Dimensional) else heading
+        )
+        reference_T_heading = heading_3_dimensional.to_coordinate_change()
+        return HomogeneousTransformationMatrix3Dimensional.from_point_rotation_matrix(
             reference_T_heading.position,
-            reference_T_heading.rotation_matrix @ self.base_R_front.inverse(),
+            reference_T_heading.rotation @ self.base_R_front.inverse(),
             reference_frame=heading.reference_frame,
         ).pose
 
@@ -1499,7 +1518,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             return parent_connection
         return None
 
-    def set_root_pose(self, pose: Pose) -> None:
+    def set_root_pose(self, pose: Pose3Dimensional) -> None:
         """
         Place the robot's root at ``pose``.
 
@@ -1517,7 +1536,7 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
         if pose.reference_frame is not parent_kinematic_structure_entity:
             pose = self._world.transform(pose, parent_kinematic_structure_entity)
 
-        connection.origin = pose.homogeneous_matrix
+        connection.origin = pose.to_coordinate_change()
 
     @property
     def _one_dof_connections(self) -> list[ActiveConnection1DOF]:

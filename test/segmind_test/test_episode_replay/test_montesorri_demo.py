@@ -10,7 +10,7 @@ from cramph.context import StatechartContext
 from segmind.players.csv_player import CSVEpisodePlayer
 from semantic_digital_twin.adapters.package_resolver import FileUriResolver
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 from segmind.statecharts.segmind_statechart import DetectorStatechartBuilder
@@ -29,7 +29,7 @@ def test_context():
         file_path=f"{multiverse_episodes_dir}/icub_montessori_no_hands/data.csv",
         world=world,
         time_between_frames=datetime.timedelta(milliseconds=0.1),
-        position_shift=Vector3(0, 0, 0),
+        position_shift=Vector3Dimensional(0, 0, 0),
     )
     episode_executor = StatechartExecutor(
         context=context, extensions=[EpisodeSegmentation(player=file_player)]

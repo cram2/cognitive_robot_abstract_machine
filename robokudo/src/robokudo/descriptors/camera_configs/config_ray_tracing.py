@@ -20,7 +20,9 @@ if TYPE_CHECKING:
     from semantic_digital_twin.datastructures.camera_rendering import ColorRenderingMode
 
     from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-    from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+    from krrood_spatial_math.spatial_types import (
+        HomogeneousTransformationMatrix3Dimensional,
+    )
 
 
 # %% World sources
@@ -47,7 +49,7 @@ class WorldDescriptorSource:
     Exact semantic camera name, or ``None`` for the descriptor's sole camera.
     """
 
-    camera_pose: HomogeneousTransformationMatrix | None = None
+    camera_pose: HomogeneousTransformationMatrix3Dimensional | None = None
     """
     Optional initial pose for the selected camera root.
     """

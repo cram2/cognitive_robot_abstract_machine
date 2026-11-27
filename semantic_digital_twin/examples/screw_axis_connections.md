@@ -57,7 +57,7 @@ import numpy as np
 import plotly.graph_objects as go
 from IPython.display import HTML
 
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix3Dimensional, Vector3Dimensional
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
@@ -66,13 +66,13 @@ from semantic_digital_twin.world_description.world_entity import Body
 pitch = 0.1
 
 screw_axes = {
-    "Revolute": ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
-    "Prismatic": ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.Z()),
+    "Revolute": ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3Dimensional.Z()),
+    "Prismatic": ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3Dimensional.Z()),
     "Right-handed helical": ScrewAxisConnection.create_helical_screw_axis(
-        axis=Vector3.Z(), pitch=pitch
+        axis=Vector3Dimensional.Z(), pitch=pitch
     ),
     "Left-handed helical": ScrewAxisConnection.create_helical_screw_axis(
-        axis=Vector3.Z(), pitch=-pitch
+        axis=Vector3Dimensional.Z(), pitch=-pitch
     ),
 }
 travel = {
@@ -92,10 +92,10 @@ with world.modify_world():
             parent=root,
             child=Body(name=PrefixedName(kind)),
             screw_axis=screw_axis,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.2, y=0.1, z=0.15, roll=0.5, pitch=0.3
             ),
-            connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            connection_T_child_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.15
             ),
         )
@@ -289,7 +289,7 @@ with cabinet_world.modify_world():
         world=cabinet_world,
         parent=cabinet,
         child=door,
-        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3Dimensional.Z()),
     )
     cabinet_world.add_connection(door_connection)
 
@@ -345,7 +345,7 @@ with bottle_world.modify_world():
         parent=bottle,
         child=cap,
         screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-            axis=Vector3.Z(), pitch=0.004
+            axis=Vector3Dimensional.Z(), pitch=0.004
         ),
     )
     bottle_world.add_connection(cap_connection)
@@ -385,12 +385,12 @@ with world.modify_world():
             parent=root,
             child=Body(name=PrefixedName(f"pitch {index}")),
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                axis=Vector3.Z(), pitch=2 * np.pi * pitch_per_radian
+                axis=Vector3Dimensional.Z(), pitch=2 * np.pi * pitch_per_radian
             ),
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.2, y=0.1, z=0.15, roll=0.5, pitch=0.3
             ),
-            connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            connection_T_child_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.15
             ),
         )
@@ -517,7 +517,7 @@ the child faster or slower per unit of position, keep the screw axis normalized 
 
 from krrood_spatial_math.spatial_types import ScrewAxis
 
-normalized = ScrewAxisConnection.create_helical_screw_axis(axis=Vector3.Z(), pitch=0.004)
+normalized = ScrewAxisConnection.create_helical_screw_axis(axis=Vector3Dimensional.Z(), pitch=0.004)
 scaled = ScrewAxis(
     rotation_per_unit_position=normalized.rotation_per_unit_position * 2.5,
     translation_per_unit_position=normalized.translation_per_unit_position * 2.5,
@@ -647,8 +647,8 @@ with hinge_world.modify_world():
         parent=wall,
         child=hinged_door,
         screw_axis=ScrewAxis(
-            rotation_per_unit_position=Vector3.Z(),
-            translation_per_unit_position=Vector3.from_iterable(
+            rotation_per_unit_position=Vector3Dimensional.Z(),
+            translation_per_unit_position=Vector3Dimensional.from_iterable(
                 -np.cross([0.0, 0.0, 1.0], hinge_point)
             ),
         ),

@@ -25,7 +25,10 @@ from semantic_digital_twin.world_description.exceptions import (
     MeshFileNotPlaceableByAPose,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+    Point3Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import (
@@ -48,10 +51,10 @@ def test_recenter_origin_centers_bounding_box():
     # A non-planar point cloud whose bounding box is offset from the origin.
     mesh = Mesh.from_3d_points(
         points_3d=[
-            Point3(0, 0, 0),
-            Point3(2, 0, 0),
-            Point3(0, 4, 0),
-            Point3(0, 0, 6),
+            Point3Dimensional(0, 0, 0),
+            Point3Dimensional(2, 0, 0),
+            Point3Dimensional(0, 4, 0),
+            Point3Dimensional(0, 0, 6),
         ]
     )
     bounding_box = mesh.local_frame_bounding_box
@@ -73,13 +76,15 @@ def test_recenter_origin_preserves_existing_rotation():
     # survive so the shape is not silently re-oriented.
     mesh = Mesh.from_3d_points(
         points_3d=[
-            Point3(0, 0, 0),
-            Point3(2, 0, 0),
-            Point3(0, 4, 0),
-            Point3(0, 0, 6),
+            Point3Dimensional(0, 0, 0),
+            Point3Dimensional(2, 0, 0),
+            Point3Dimensional(0, 4, 0),
+            Point3Dimensional(0, 0, 6),
         ]
     )
-    mesh.origin = HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 0, 0, 0, np.pi / 2)
+    mesh.origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        0, 0, 0, 0, 0, np.pi / 2
+    )
     expected_rotation = mesh.origin.rotation_matrix.to_np()
 
     mesh.recenter_origin()
@@ -552,7 +557,7 @@ def test_mesh_in_frame_applies_the_owning_bodys_world_transform():
             FixedConnection(
                 root,
                 child=obstacle,
-                parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=2.0, y=0.0, z=0.0, reference_frame=root
                 ),
             )
@@ -690,11 +695,12 @@ def test_a_package_mesh_turned_within_its_file_keeps_its_vertices_through_serial
     installed_mesh_file,
 ):
     """
-    A JSON round trip by package URI keeps the vertices of a mesh turned within its file.
+    A JSON round trip by package URI keeps the vertices of a mesh turned within its
+    file.
     """
     mesh = Mesh(
         filename=str(installed_mesh_file),
-        file_T_mesh=HomogeneousTransformationMatrix.from_xyz_quaternion(
+        file_T_mesh=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.01, quat_w=math.sqrt(0.5), quat_x=math.sqrt(0.5)
         ),
     )
@@ -840,10 +846,10 @@ def turned_cylinder(scale: Scale) -> Mesh:
     return Mesh(
         filename=str(CYLINDER_FILE),
         scale=scale,
-        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.3, y=-0.2, z=1.0, yaw=0.4
         ),
-        file_T_mesh=HomogeneousTransformationMatrix.from_xyz_quaternion(
+        file_T_mesh=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
             pos_x=0.01,
             pos_y=0.02,
             pos_z=0.03,

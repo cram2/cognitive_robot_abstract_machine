@@ -25,8 +25,8 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Wardrobe,
 )
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -86,7 +86,7 @@ class ApartmentEnvironment(WorldSource):
                 ),
             ).spawn(
                 world,
-                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0.455 + (0.85 / 2),
                     -0.15,
                     1.9 / 2,
@@ -104,7 +104,7 @@ class ApartmentEnvironment(WorldSource):
                     part=ShelfLayer.create_with_new_body_in_world(
                         world=world,
                         name=layer_name,
-                        world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                        world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                             0.455 + (0.85 / 2),
                             -0.15,
                             layer_height,
@@ -125,7 +125,7 @@ class ApartmentEnvironment(WorldSource):
             Wall.create_with_new_body_in_world(
                 world=world,
                 name="wall",
-                world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     0, (2.81 / 2), 0, reference_frame=world.root
                 ),
                 scale=Scale(0.03, 2.81, 0.265),
@@ -142,7 +142,7 @@ class ApartmentEnvironment(WorldSource):
             BodySpecification.mesh(
                 "bedside_table.dae",
                 self.mesh_path("bedside_table.dae"),
-                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=1.92, y=2.68, yaw=17.8 * (-np.pi / 32)
                 ),
             ),
@@ -161,7 +161,7 @@ class ApartmentEnvironment(WorldSource):
         )
         Sofa.get_annotation_specification("sofa_bed.obj", sofa_body).spawn(
             world,
-            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=1.0, y=3.15, z=sofa_body.scale.z / 2, yaw=17.75 * (-np.pi / 32)
             ),
         )
@@ -177,7 +177,7 @@ class ApartmentEnvironment(WorldSource):
             BodySpecification.mesh(
                 "walls.dae",
                 self.mesh_path("walls.dae"),
-                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=-7.34, y=1.43, z=-0.2, yaw=0
                 ),
             ),
@@ -199,13 +199,13 @@ class ApartmentEnvironment(WorldSource):
                 BodySpecification.mesh(
                     door_mesh,
                     self.mesh_path(door_mesh),
-                    parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                    parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                         -0.3246, door_y
                     ),
                 ),
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                        axis=Vector3.Z()
+                        axis=Vector3Dimensional.Z()
                     ),
                     dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                         lower_position=min(0.0, opening_angle),
@@ -219,7 +219,7 @@ class ApartmentEnvironment(WorldSource):
                         BodySpecification.mesh(
                             f"wardrobe_door_handle_{side}",
                             self.mesh_path("wardrobe_door_handle.dae"),
-                            parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                            parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                                 -0.032089, handle_y, 0.973703
                             ),
                         ),
@@ -237,7 +237,7 @@ class ApartmentEnvironment(WorldSource):
             BodySpecification.mesh(
                 "wardrobe.dae",
                 self.mesh_path("wardrobe.dae"),
-                parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
+                parent_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                     x=2, y=-0.15, yaw=-np.pi / 2
                 ),
             ),

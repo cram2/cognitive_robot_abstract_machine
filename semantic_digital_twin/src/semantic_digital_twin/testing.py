@@ -13,8 +13,10 @@ from typing_extensions import Optional, Tuple
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.callbacks.callback import StateChangeCallback
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
+from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -99,7 +101,7 @@ def world_setup() -> tuple[
 
         c_l1_l2 = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
-                axis=Vector3.X(reference_frame=l1)
+                axis=Vector3Dimensional.X(reference_frame=l1)
             ),
             parent=l1,
             child=l2,
@@ -107,7 +109,7 @@ def world_setup() -> tuple[
         )
         c_r1_r2 = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
-                axis=Vector3.Z(reference_frame=r1)
+                axis=Vector3Dimensional.Z(reference_frame=r1)
             ),
             parent=r1,
             child=r2,
@@ -138,7 +140,7 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
                     scale=Scale(0.2, 0.2, 0.2),
                 )
             ]
@@ -149,7 +151,7 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Cylinder(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
                     width=0.5,
                     height=0.2,
                 )
@@ -159,7 +161,12 @@ def world_setup_simple():
     body3 = Body(
         name=PrefixedName("sphere", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.1)]
+            [
+                Sphere(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
+                    radius=0.1,
+                )
+            ]
         ),
     )
 
@@ -168,7 +175,7 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Mesh(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
                     filename="package://iai_objects/objects/jeroen_cup.stl",
                     scale=Scale(10, 10, 10),
                 )
@@ -180,11 +187,15 @@ def world_setup_simple():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.05),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                        x=0.05
+                    ),
                     scale=Scale(0.1, 0.2, 0.2),
                 ),
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.05),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                        x=-0.05
+                    ),
                     scale=Scale(0.1, 0.2, 0.2),
                 ),
             ]
@@ -231,7 +242,7 @@ def ray_test_world():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
                     scale=Scale(0.25, 0.25, 0.25),
                 )
             ]
@@ -242,7 +253,7 @@ def ray_test_world():
         collision=ShapeCollection(
             [
                 Box(
-                    origin=HomogeneousTransformationMatrix.from_xyz_rpy(),
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
                     scale=Scale(0.25, 0.25, 0.25),
                 )
             ]
@@ -251,14 +262,24 @@ def ray_test_world():
     body3 = Body(
         name=PrefixedName("name3", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [
+                Sphere(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
+                    radius=0.01,
+                )
+            ]
         ),
     )
 
     body4 = Body(
         name=PrefixedName("name4", prefix="test"),
         collision=ShapeCollection(
-            [Sphere(origin=HomogeneousTransformationMatrix.from_xyz_rpy(), radius=0.01)]
+            [
+                Sphere(
+                    origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(),
+                    radius=0.01,
+                )
+            ]
         ),
     )
 

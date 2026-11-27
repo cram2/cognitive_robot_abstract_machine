@@ -44,7 +44,14 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.robots.pr2 import PR2
-from krrood_spatial_math.spatial_types import Point2, Point3, Pose, Pose2D
+from krrood_spatial_math.spatial_types import (
+    Point3Dimensional,
+    Pose3Dimensional,
+)
+from krrood_spatial_math.spatial_types_2_dimensional import (
+    Point2Dimensional,
+    Pose2Dimensional,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
@@ -213,7 +220,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
 
         world = self.setup_world()
         [robot] = world.get_semantic_annotations_by_type(AbstractRobot)
-        target_pose = Pose.from_xyz_rpy(
+        target_pose = Pose3Dimensional.from_xyz_rpy(
             x=0,
             y=0,
             z=1,
@@ -222,8 +229,8 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
 
         move_to_reach = a(MoveToReach)(
             reference_T_grasp=target_pose,
-            target_pose_offset_robot=a(Pose2D)(
-                position=a(Point2)(x=..., y=..., reference_frame=None),
+            target_pose_offset_robot=a(Pose2Dimensional)(
+                position=a(Point2Dimensional)(x=..., y=..., reference_frame=None),
                 yaw=...,
                 reference_frame=None,
             ),

@@ -1,6 +1,8 @@
 from robokudo.world_descriptor import BaseWorldDescriptor, PredefinedObject
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix3Dimensional,
+)
 from semantic_digital_twin.world_description.connections import Connection6DoF
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -46,11 +48,15 @@ def test_get_predefined_object_bodies():
 
     # Set origins in a separate modification block so FK is compiled first
     with test_world.modify_world():
-        result_world_C_foobar1.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=0.5, reference_frame=root
+        result_world_C_foobar1.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                z=0.5, reference_frame=root
+            )
         )
-        result_world_C_foobar2.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
-            z=1.2, reference_frame=root
+        result_world_C_foobar2.origin = (
+            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                z=1.2, reference_frame=root
+            )
         )
 
     bodies = world_descriptor.get_predefined_object_bodies()

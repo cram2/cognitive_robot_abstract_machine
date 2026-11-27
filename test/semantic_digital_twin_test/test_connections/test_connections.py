@@ -18,8 +18,8 @@ from semantic_digital_twin.exceptions import (
 )
 from krrood_spatial_math.exceptions import MissingReferenceFrameError
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
-    Vector3,
+    HomogeneousTransformationMatrix3Dimensional,
+    Vector3Dimensional,
     ScrewAxis,
 )
 from scipy.spatial.transform import Rotation
@@ -52,10 +52,14 @@ def _add_drive(world_with_two_bodies, drive_type):
 
 def test_create_with_dofs_threads_parent_T_connection_expression(world_with_two_bodies):
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.3, y=0.4
+    )
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=parent,
             child=child,
@@ -76,10 +80,12 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
     transform in as the DOF state directly.
     """
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.3, y=0.4, z=0.1
     )
-    connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.05, yaw=0.2)
+    connection_T_child = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.05, yaw=0.2
+    )
     with world.modify_world():
         connection = Connection6DoF.create_with_dofs(
             world=world,
@@ -90,7 +96,7 @@ def test_connection6dof_origin_setter_round_trips_with_non_identity_constants(
         )
         world.add_connection(connection)
 
-    desired_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
+    desired_origin = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=1.0, y=-2.0, z=0.5, yaw=0.7, reference_frame=parent
     )
     connection.origin = desired_origin
@@ -107,7 +113,7 @@ def test_connection6dof_origin_setter_requires_a_reference_frame(world_with_two_
         world.add_connection(connection)
 
     transformation_without_reference_frame = (
-        HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=1.0)
     )
 
     with pytest.raises(MissingReferenceFrameError):
@@ -124,7 +130,9 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
     """
     world, parent, child = world_with_two_bodies
     grandparent = Body(name=PrefixedName("grandparent"))
-    grandparent_T_parent = HomogeneousTransformationMatrix.from_xyz_rpy(x=2.0, y=1.0)
+    grandparent_T_parent = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=2.0, y=1.0
+    )
     with world.modify_world():
         world.add_connection(
             FixedConnection.create_with_dofs(
@@ -139,8 +147,10 @@ def test_connection6dof_origin_setter_converts_from_a_non_parent_reference_frame
         )
         world.add_connection(connection)
 
-    desired_origin_in_grandparent = HomogeneousTransformationMatrix.from_xyz_rpy(
-        x=2.5, y=1.5, z=0.2, reference_frame=grandparent
+    desired_origin_in_grandparent = (
+        HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=2.5, y=1.5, z=0.2, reference_frame=grandparent
+        )
     )
     connection.origin = desired_origin_in_grandparent
 
@@ -157,10 +167,14 @@ def test_reference_origin_excludes_joint_state(world_with_two_bodies):
     applies it a second time.
     """
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3, y=0.4)
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.3, y=0.4
+    )
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=parent,
             child=child,
@@ -232,7 +246,8 @@ def _add_screw_connection(
     world_with_two_bodies,
     screw_pitch: float,
     multiplier: float = 1.0,
-    parent_T_connection_expression: HomogeneousTransformationMatrix | None = None,
+    parent_T_connection_expression: HomogeneousTransformationMatrix3Dimensional
+    | None = None,
 ) -> ScrewAxisConnection:
     """
     Creates a helical connection about the z-axis and adds it to the world.
@@ -244,7 +259,7 @@ def _add_screw_connection(
             parent=parent,
             child=child,
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
-                axis=Vector3.Z(), pitch=screw_pitch
+                axis=Vector3Dimensional.Z(), pitch=screw_pitch
             ),
             multiplier=multiplier,
             parent_T_connection_expression=parent_T_connection_expression,
@@ -275,7 +290,7 @@ def test_screw_connection_origin_couples_rotation_and_translation(
     connection = _add_screw_connection(
         world_with_two_bodies,
         screw_pitch=screw_pitch,
-        parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+        parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
             x=0.3, y=0.4
         ),
     )
@@ -376,7 +391,7 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
 
     new_parent = Body(name=PrefixedName("new_parent"))
     copied_connection = connection.copy_with_new_parent(
-        new_parent, HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1)
+        new_parent, HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(x=0.1)
     )
 
     assert copied_connection.screw_axis is connection.screw_axis
@@ -398,7 +413,7 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
             ScrewAxisConnection,
             {
                 "screw_axis": ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
             },
         ),
@@ -406,7 +421,7 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
             ScrewAxisConnection,
             {
                 "screw_axis": ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.X()
+                    axis=Vector3Dimensional.X()
                 ),
             },
         ),
@@ -414,7 +429,7 @@ def test_screw_axis_connection_copy_with_new_parent_preserves_screw_axis(
             ScrewAxisConnection,
             {
                 "screw_axis": ScrewAxisConnection.create_helical_screw_axis(
-                    axis=Vector3.Z(), pitch=0.01
+                    axis=Vector3Dimensional.Z(), pitch=0.01
                 ),
             },
         ),
@@ -435,7 +450,8 @@ def test_copy_with_new_parent_keeps_name(
         world.add_connection(connection)
 
     copied_connection = connection.copy_with_new_parent(
-        Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+        Body(name=PrefixedName("new_parent")),
+        HomogeneousTransformationMatrix3Dimensional(),
     )
 
     assert copied_connection.name == connection.name
@@ -488,7 +504,7 @@ def test_create_with_dofs_accepts_the_shared_parameters(connection_type):
             ScrewAxisConnection,
             {
                 "screw_axis": ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Z()
+                    axis=Vector3Dimensional.Z()
                 ),
             },
         ),
@@ -578,7 +594,9 @@ def test_create_with_dofs_applies_multiplier_and_offset(world_with_two_bodies):
     offset = 0.5
     with world.modify_world():
         connection = ScrewAxisConnection.create_with_dofs(
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
             world=world,
             parent=parent,
             child=child,
@@ -662,7 +680,7 @@ def test_joint_dynamics_custom_values():
             ScrewAxisConnection,
             {
                 "screw_axis": ScrewAxisConnection.create_prismatic_screw_axis(
-                    axis=Vector3.Y()
+                    axis=Vector3Dimensional.Y()
                 ),
                 "multiplier": 2.0,
                 "offset": 0.5,
@@ -672,7 +690,7 @@ def test_joint_dynamics_custom_values():
             ScrewAxisConnection,
             {
                 "screw_axis": ScrewAxisConnection.create_revolute_screw_axis(
-                    axis=Vector3.Y()
+                    axis=Vector3Dimensional.Y()
                 ),
                 "multiplier": 2.0,
                 "offset": 0.5,
@@ -682,7 +700,7 @@ def test_joint_dynamics_custom_values():
             ScrewAxisConnection,
             {
                 "screw_axis": ScrewAxisConnection.create_helical_screw_axis(
-                    axis=Vector3.Y(), pitch=0.25
+                    axis=Vector3Dimensional.Y(), pitch=0.25
                 ),
             },
         ),
@@ -736,8 +754,10 @@ def _screw_axis_along(
     translates ``translation_per_position`` meters along it per unit of position.
     """
     return ScrewAxis(
-        rotation_per_unit_position=Vector3.from_iterable(axis * rotation_per_position),
-        translation_per_unit_position=Vector3.from_iterable(
+        rotation_per_unit_position=Vector3Dimensional.from_iterable(
+            axis * rotation_per_position
+        ),
+        translation_per_unit_position=Vector3Dimensional.from_iterable(
             axis * translation_per_position
         ),
     )
@@ -782,7 +802,7 @@ def test_screw_axis_connection_places_the_child_along_its_screw_axis(
     axis, pose = _random_screw_axis_setup(seed)
     x, y, z, roll, pitch, yaw = pose
     multiplier, offset = -1.5, 0.3
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=x, y=y, z=z, roll=roll, pitch=pitch, yaw=yaw
     )
     with world.modify_world():
@@ -901,8 +921,8 @@ def _screw_axis_through(
         the unit vector ``direction`` and advances ``translation_per_radian`` along it.
     """
     return ScrewAxis(
-        rotation_per_unit_position=Vector3.from_iterable(direction),
-        translation_per_unit_position=Vector3.from_iterable(
+        rotation_per_unit_position=Vector3Dimensional.from_iterable(direction),
+        translation_per_unit_position=Vector3Dimensional.from_iterable(
             -np.cross(direction, point) + translation_per_radian * direction
         ),
     )
@@ -936,10 +956,12 @@ def test_screw_axis_connection_turns_the_child_about_an_axis_off_the_connection_
     about that line, as the matrix exponential of the screw axis says.
     """
     world, parent, child = world_with_two_bodies
-    parent_T_connection = HomogeneousTransformationMatrix.from_xyz_rpy(
+    parent_T_connection = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
         x=0.2, y=-0.3, z=0.5, yaw=0.7
     )
-    connection_T_child = HomogeneousTransformationMatrix.from_xyz_rpy(x=0.1, roll=0.3)
+    connection_T_child = HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+        x=0.1, roll=0.3
+    )
     screw_axis = _screw_axis_through(
         point=np.array([0.4, -0.1, 0.0]),
         direction=np.array([0.0, 0.6, 0.8]),
@@ -1015,10 +1037,10 @@ def test_moving_the_connection_frame_onto_the_axis_keeps_the_motion(
             world=world,
             parent=parent,
             child=child,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.2, y=-0.3, z=0.5, yaw=0.7
             ),
-            connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            connection_T_child_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.1, roll=0.3
             ),
             screw_axis=_screw_axis_through(
@@ -1059,9 +1081,11 @@ def test_moving_the_connection_frame_onto_the_axis_keeps_the_motion(
 @pytest.mark.parametrize(
     "screw_axis",
     [
-        ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
-        ScrewAxisConnection.create_helical_screw_axis(axis=Vector3.Z(), pitch=0.004),
-        ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X()),
+        ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3Dimensional.Z()),
+        ScrewAxisConnection.create_helical_screw_axis(
+            axis=Vector3Dimensional.Z(), pitch=0.004
+        ),
+        ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3Dimensional.X()),
     ],
     ids=["revolute", "helical", "prismatic"],
 )
@@ -1079,7 +1103,7 @@ def test_moving_the_connection_frame_of_a_connection_already_on_its_axis_changes
             world=world,
             parent=parent,
             child=child,
-            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+            parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 x=0.2, yaw=0.7
             ),
             screw_axis=screw_axis,
@@ -1104,13 +1128,13 @@ def test_moving_the_connection_frame_of_a_connection_already_on_its_axis_changes
     "screw_axis",
     [
         ScrewAxisConnection.create_prismatic_screw_axis(
-            axis=Vector3.unit_vector(1, 2, 2)
+            axis=Vector3Dimensional.unit_vector(1, 2, 2)
         ),
         ScrewAxisConnection.create_helical_screw_axis(
-            axis=Vector3.unit_vector(1, 2, 2), pitch=0.02
+            axis=Vector3Dimensional.unit_vector(1, 2, 2), pitch=0.02
         ),
         ScrewAxisConnection.create_helical_screw_axis(
-            axis=Vector3.unit_vector(1, 2, 2), pitch=-0.02
+            axis=Vector3Dimensional.unit_vector(1, 2, 2), pitch=-0.02
         ),
     ],
     ids=["prismatic", "right-handed helical", "left-handed helical"],
@@ -1159,7 +1183,9 @@ def test_position_for_translation_of_a_revolute_connection_raises(
             world=world,
             parent=parent,
             child=child,
-            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
         )
         world.add_connection(connection)
 

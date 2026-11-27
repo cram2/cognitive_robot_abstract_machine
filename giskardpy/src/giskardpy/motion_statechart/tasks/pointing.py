@@ -119,7 +119,7 @@ class PointingCone(
 
         root_V_goal_axis = root_P_goal_point - root_T_tip.position
         root_V_goal_axis.scale(1)
-        root_V_pointing_axis = root_T_tip.dot(tip_V_pointing_axis)
+        root_V_pointing_axis = root_T_tip.dot(other=tip_V_pointing_axis)
         root_V_pointing_axis.visualisation_frame = self.kinematic_chain.tip
 
         root_V_goal_axis.visualisation_frame = self.kinematic_chain.tip

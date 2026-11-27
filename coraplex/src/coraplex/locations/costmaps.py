@@ -24,14 +24,14 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Floor
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from krrood_spatial_math.spatial_types import (
-    HomogeneousTransformationMatrix,
+    HomogeneousTransformationMatrix3Dimensional,
     Quaternion,
     RotationMatrix,
-    Point3,
-    Pose,
-    Pose2D,
-    Vector3,
+    Point3Dimensional,
+    Pose3Dimensional,
+    Vector3Dimensional,
 )
+from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.world_entity import Body
 
@@ -58,24 +58,18 @@ class Costmap(Location):
     """
     Width of the locations.
     """
-    origin: Pose = field(kw_only=True, default_factory=Pose)
+    origin: Pose3Dimensional = field(kw_only=True, default_factory=Pose3Dimensional)
     """
     Origin pose of the locations.
     """
     map: np.ndarray = field(default_factory=lambda: np.zeros((10, 10)), kw_only=True)
     """
-    Numpy array to save the locations distribution
-    
-    Costmaps represent the 2D distribution in a numpy array where axis 0 is the X-Axis of the coordinate system and axis 1 
-    is the Y-Axis of the coordinate system. An increase in the index of the axis of the numpy array corresponds to an increase in the 
-    value of the spatial axis. The factor by how the value of the index of the numpy corresponds to the spatial coordinate 
-    system is given by the resolution. 
+    Numpy array to save the locations distribution.
 
-    Furthermore, there is a difference in the origin of the two representations while the numpy arrays start from the top left 
-    corner, the origin given as Pose is placed in the middle of the array. The locations is build around the origin and 
-    since the array start from 0, 0 in the corner this conversion is necessary. 
+    Axis 0 is the x-axis and axis 1 the y-axis, and the resolution is how far one index
+    step reaches. The array starts in a corner while the origin is its middle.
 
-                y-axis      0, 10
+              y-axis      0, 10
         0,0 ------------------
             ------------------
             ------------------
@@ -180,12 +174,12 @@ class Costmap(Location):
         """
         return self.merge(other=other)
 
-    def candidates(self) -> Iterator[Pose2D]:
+    def candidates(self) -> Iterator[Pose2Dimensional]:
         return self.sample(number_of_samples=self.number_of_samples, seed=self.seed)
 
     def sample(
         self, *, number_of_samples: int, seed: int | None = None
-    ) -> Iterator[Pose2D]:
+    ) -> Iterator[Pose2Dimensional]:
         """
         Sample pose candidates from this map.
 
@@ -207,7 +201,7 @@ class Costmap(Location):
             random_generator=np.random.default_rng(seed),
         )
 
-    def _orientation_facing_origin(self, *, position: Point3) -> Quaternion:
+    def _orientation_facing_origin(self, *, position: Point3Dimensional) -> Quaternion:
         """
         The orientation a candidate sampled at the given position is offered with.
 
@@ -282,7 +276,7 @@ class Costmap(Location):
         *,
         number_of_samples: int,
         random_generator: np.random.Generator,
-    ) -> Iterator[Pose2D]:
+    ) -> Iterator[Pose2Dimensional]:
         """
         Sample candidates, the given number of them spread over this map's segments.
 
@@ -310,10 +304,12 @@ class Costmap(Location):
                 # Compute world position independent of origin orientation:
                 # map indices increase with world axes; origin is at the center.
                 offset = (index - center) * self.resolution
-                position = self.origin.position + Vector3(offset[0], offset[1], 0)
+                position = self.origin.position + Vector3Dimensional(
+                    offset[0], offset[1], 0
+                )
 
-                yield Pose2D.from_pose(
-                    Pose(
+                yield Pose2Dimensional.from_pose(
+                    Pose3Dimensional(
                         position,
                         self._orientation_facing_origin(position=position),
                         self.world.root,
@@ -490,7 +486,7 @@ class OccupancyCostmap(Costmap):
         cls,
         *,
         robot: AbstractRobot,
-        target: Pose,
+        target: Pose3Dimensional,
         resolution: float = 0.02,
         cells: int = 200,
     ) -> OccupancyCostmap:
@@ -530,11 +526,13 @@ class VisibilityCostmap(Costmap):
 
     maximum_height: float
 
-    target_object: Body | Pose | None = None
+    target_object: Body | Pose3Dimensional | None = None
 
     def __post_init__(self) -> None:
-        self.origin: Pose = (
-            Pose(reference_frame=self.world.root) if not self.origin else self.origin
+        self.origin: Pose3Dimensional = (
+            Pose3Dimensional(reference_frame=self.world.root)
+            if not self.origin
+            else self.origin
         )
         self._generate_map()
 
@@ -551,11 +549,14 @@ class VisibilityCostmap(Costmap):
 
         ray_tracer = RayTracer(self.world)
 
-        origin_copy = deepcopy(self.origin).homogeneous_matrix
+        origin_copy = deepcopy(self.origin).to_coordinate_change()
 
         for _ in range(4):
-            origin_copy = origin_copy @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                yaw=np.pi / 2
+            origin_copy = (
+                origin_copy
+                @ HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                    yaw=np.pi / 2
+                )
             )
             images.append(
                 ray_tracer.create_depth_map(
@@ -827,7 +828,7 @@ class RingCostmap(Costmap):
         cls,
         *,
         arm: Arm,
-        origin: Pose,
+        origin: Pose3Dimensional,
         reach_fraction: float,
         resolution: float = 0.02,
         cells: int = 200,
