@@ -17,6 +17,7 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
     Ripeness,
+    SkinThickness,
 )
 from semantic_digital_twin.semantic_annotations.qualities.relationship import (
     HasQualities,
@@ -75,4 +76,24 @@ class HasMaterialElasticity(HasMassDensity, Mixin):
     """
     The elasticity of the semantic annotation's material, or ``None`` when that is
     unknown.
+    """
+
+
+# %% Qualities of outer coverings
+
+
+@dataclass(eq=False, kw_only=True)
+class HasSkinThickness(HasQualities, Mixin):
+    """
+    A mixin class for semantic annotations that are the outer covering of an object,
+    such as the peel of a fruit or the shell of an egg.
+    """
+
+    skin_thickness: SkinThickness | None = field(
+        default=None,
+        hash=False,
+        metadata=IsQualityRelationship().as_dict(),
+    )
+    """
+    How thick the semantic annotation is, or ``None`` when that is unknown.
     """

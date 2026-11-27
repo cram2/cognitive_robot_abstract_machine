@@ -11,21 +11,28 @@ from __future__ import annotations
 import pytest
 from random_events.interval import Bound, SimpleInterval
 
+from semantic_digital_twin.exceptions import NoFieldAcceptsEntity
 from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
     QualityOutsideScale,
 )
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
     HasMassDensity,
     HasMaterialElasticity,
+    HasSkinThickness,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
+    PhysicsQuality,
+    Quality,
+    Ripeness,
+    SkinThickness,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     CitrusSegment,
     Core,
+    Shell,
     Flesh,
     FruitPart,
     Peel,
@@ -35,6 +42,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SeedChamber,
     Stem,
     Table,
+    Yolk,
 )
 from semantic_digital_twin.world import World
 
@@ -159,3 +167,124 @@ def test_density_and_elasticity_of_a_peel_are_its_qualities(world: World) -> Non
     assert peel.mass_density is mass_density
     assert peel.material_elasticity is material_elasticity
     assert peel.qualities == [mass_density, material_elasticity]
+
+
+# %% An elasticity whose Poisson's ratio was not measured
+
+
+def test_an_elasticity_without_a_poissons_ratio_is_accepted() -> None:
+    """
+    A Young's modulus can be given alone, since most measurements do not report a
+    Poisson's ratio; the ratio is then unknown.
+    """
+    youngs_modulus = measured_material_elasticity().youngs_modulus
+
+    elasticity = MaterialElasticity(youngs_modulus=youngs_modulus)
+
+    assert (elasticity.youngs_modulus, elasticity.poissons_ratio) == (
+        youngs_modulus,
+        None,
+    )
+
+
+# %% Skin thickness of a peel
+
+
+def test_thickness_at_the_lower_end_of_its_scale_is_rejected() -> None:
+    """
+    A thickness of zero, the open lower end of the thickness scale, is refused.
+    """
+    with pytest.raises(QualityOutsideScale):
+        SkinThickness(value=point(SkinThickness.scale.lower))
+
+
+def test_a_peel_starts_without_a_thickness(world: World) -> None:
+    """
+    A peel has a thickness field, empty until it is set.
+    """
+    with world.modify_world():
+        peel = Peel.create_with_new_body_in_world(name="peel", world=world)
+
+    assert isinstance(peel, HasSkinThickness)
+    assert peel.skin_thickness is None
+
+
+def test_the_thickness_of_a_peel_is_its_quality(world: World) -> None:
+    """
+    Setting a thickness on a peel fills its field and lists it among its qualities.
+    """
+    thickness = SkinThickness(value=point(50.0e-6))
+    with world.modify_world():
+        peel = Peel.create_with_new_body_in_world(name="peel", world=world)
+        peel.set_quality(quality=thickness)
+
+    assert peel.skin_thickness is thickness
+    assert peel.qualities == [thickness]
+
+
+def test_a_flesh_has_no_thickness(world: World) -> None:
+    """
+    Only a peel has a thickness, so setting one on the flesh is refused.
+    """
+    with world.modify_world():
+        flesh = Flesh.create_with_new_body_in_world(name="flesh", world=world)
+        with pytest.raises(NoFieldAcceptsEntity):
+            flesh.set_quality(quality=SkinThickness(value=point(50.0e-6)))
+
+
+# %% Material qualities of shells
+
+
+def test_a_shell_starts_without_density_and_elasticity(world: World) -> None:
+    """
+    A shell covers eggs and nuts alike, so it has a density and an elasticity field,
+    empty until they are set.
+    """
+    with world.modify_world():
+        shell = Shell.create_with_new_body_in_world(name="shell", world=world)
+
+    assert shell.mass_density is None
+    assert shell.material_elasticity is None
+
+
+def test_a_shell_starts_without_a_thickness(world: World) -> None:
+    """
+    A shell is an outer covering, so it has a thickness field, empty until it is set.
+    """
+    with world.modify_world():
+        shell = Shell.create_with_new_body_in_world(name="shell", world=world)
+
+    assert isinstance(shell, HasSkinThickness)
+    assert shell.skin_thickness is None
+
+
+def test_a_yolk_has_no_thickness(world: World) -> None:
+    """
+    A yolk is no outer covering, so setting a thickness on it is refused.
+    """
+    with world.modify_world():
+        yolk = Yolk.create_with_new_body_in_world(name="yolk", world=world)
+        with pytest.raises(NoFieldAcceptsEntity):
+            yolk.set_quality(quality=SkinThickness(value=point(0.4e-3)))
+
+
+# %% Physics qualities
+
+
+@pytest.mark.parametrize(
+    "quality_type, is_physics_quality",
+    [
+        (MassDensity, True),
+        (MaterialElasticity, True),
+        (SkinThickness, True),
+        (Ripeness, False),
+    ],
+)
+def test_only_qualities_physics_acts_on_are_physics_qualities(
+    quality_type: type[Quality], is_physics_quality: bool
+) -> None:
+    """
+    Density, elasticity and skin thickness are what a physics simulation reads; the
+    ripeness of a fruit is a quality, but not one physics acts on.
+    """
+    assert issubclass(quality_type, PhysicsQuality) == is_physics_quality

@@ -47,6 +47,17 @@ class Quality(ABC):
         if scale.intersection_with(other=value) != value:
             raise QualityOutsideScale(quality=self, value=value, scale=scale)
 
+    @staticmethod
+    def closed_range(*, lower: float, upper: float) -> SimpleInterval:
+        """
+        :param lower: The smallest measured value.
+        :param upper: The largest measured value, equal to ``lower`` for a single one.
+        :return: The closed interval the measured values of a quality spread over.
+        """
+        return SimpleInterval.from_data(
+            lower=lower, upper=upper, left=Bound.CLOSED, right=Bound.CLOSED
+        )
+
 
 # %% Ripeness
 
@@ -131,11 +142,24 @@ class Ripeness(Quality):
         raise RipenessInNoSingleStage(ripeness=self)
 
 
+# %% Physics
+
+
+@dataclass(kw_only=True)
+class PhysicsQuality(Quality, ABC):
+    """
+    A quality of its bearer's matter that physics acts on, such as its mass density or
+    its elasticity, which a physics simulation of the bearer reads.
+
+    .. note:: Not every quality is one: the ripeness of a fruit is not.
+    """
+
+
 # %% Material
 
 
 @dataclass(kw_only=True)
-class MassDensity(Quality):
+class MassDensity(PhysicsQuality):
     """
     The mass per volume of its bearer's material, in kilograms per cubic metre
     :cite:`wikipedia_density`.
@@ -162,9 +186,49 @@ class MassDensity(Quality):
             lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
         )
 
+    @classproperty
+    def steel(cls) -> MassDensity:
+        """
+        :return: The mass density of steel, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=7820.0, upper=7820.0))
+
+    @classproperty
+    def glass(cls) -> MassDensity:
+        """
+        :return: The mass density of glass, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=2400.0, upper=2800.0))
+
+    @classproperty
+    def polyurethane_foam(cls) -> MassDensity:
+        """
+        :return: The mass density of polyurethane foam, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=30.0, upper=30.0))
+
+    @classproperty
+    def paper(cls) -> MassDensity:
+        """
+        :return: The mass density of paper, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=700.0, upper=1150.0))
+
+    @classproperty
+    def cardboard(cls) -> MassDensity:
+        """
+        :return: The mass density of cardboard, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=700.0, upper=700.0))
+
 
 @dataclass(kw_only=True)
-class MaterialElasticity(Quality):
+class MaterialElasticity(PhysicsQuality):
     """
     How its bearer's material deforms under load and springs back, given by the two
     constants that describe an isotropic linear elastic material
@@ -183,11 +247,11 @@ class MaterialElasticity(Quality):
     :cite:`wikipedia_youngs_modulus`.
     """
 
-    poissons_ratio: SimpleInterval
+    poissons_ratio: SimpleInterval | None = None
     """
     How much the material narrows across a stretch relative to how much it lengthens, on
-    :attr:`poissons_ratio_scale`: a single point when measured, or a range
-    :cite:`wikipedia_poissons_ratio`.
+    :attr:`poissons_ratio_scale`: a single point when measured, a range, or ``None`` when
+    it was not measured :cite:`wikipedia_poissons_ratio`.
     """
 
     def __post_init__(self) -> None:
@@ -197,6 +261,8 @@ class MaterialElasticity(Quality):
         self._reject_value_outside_scale(
             value=self.youngs_modulus, scale=self.youngs_modulus_scale
         )
+        if self.poissons_ratio is None:
+            return
         self._reject_value_outside_scale(
             value=self.poissons_ratio, scale=self.poissons_ratio_scale
         )
@@ -218,4 +284,60 @@ class MaterialElasticity(Quality):
         """
         return SimpleInterval.from_data(
             lower=-1.0, upper=0.5, left=Bound.OPEN, right=Bound.OPEN
+        )
+
+    @classproperty
+    def steel(cls) -> MaterialElasticity:
+        """
+        :return: The elastic constants of steel, from handbook compilations; the Poisson's
+            ratio is that of 18-8 stainless steel
+            :cite:`wikipedia_youngs_modulus,engineeringtoolbox_poissons_ratio`.
+        """
+        return cls(
+            youngs_modulus=Quality.closed_range(lower=200e9, upper=200e9),
+            poissons_ratio=Quality.closed_range(lower=0.305, upper=0.305),
+        )
+
+    @classproperty
+    def glass(cls) -> MaterialElasticity:
+        """
+        :return: The elastic constants of glass, from handbook compilations: the Young's
+            modulus of float glass and the Poisson's ratio of soda glass
+            :cite:`wikipedia_youngs_modulus,engineeringtoolbox_poissons_ratio`.
+        """
+        return cls(
+            youngs_modulus=Quality.closed_range(lower=47.7e9, upper=83.6e9),
+            poissons_ratio=Quality.closed_range(lower=0.22, upper=0.22),
+        )
+
+
+# %% Outer coverings
+
+
+@dataclass(kw_only=True)
+class SkinThickness(PhysicsQuality):
+    """
+    How thick its bearer, the outer covering of an object such as the peel of a fruit or
+    the shell of an egg, is across its surface, in metres.
+    """
+
+    value: SimpleInterval
+    """
+    The thickness on :attr:`scale`: a single point when it was measured, or the range its
+    measurements spread over.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        :raises QualityOutsideScale: If the value reaches beyond :attr:`scale`.
+        """
+        self._reject_value_outside_scale(value=self.value, scale=self.scale)
+
+    @classproperty
+    def scale(cls) -> SimpleInterval:
+        """
+        :return: The thickness scale: every positive thickness.
+        """
+        return SimpleInterval.from_data(
+            lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
         )
