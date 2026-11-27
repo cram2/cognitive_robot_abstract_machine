@@ -101,9 +101,9 @@ def retry_task_with_chain_from_world_root(
 @dataclass(kw_only=True)
 class TaskWithJointsUnwound(SubtreeRebuild):
     """
-    Rebuilds a stalled task alone onto a copy of the world, with each revolute joint
-    that blocks it at a position limit turned a full turn back from that limit, which
-    leaves the robot in the same geometric configuration.
+    Rebuilds a stalled task, with the tasks running beside it, onto a copy of the world,
+    with each revolute joint that blocks it at a position limit turned a full turn back
+    from that limit, which leaves the robot in the same geometric configuration.
     """
 
     blocked_position_limits: list[BlockedPositionLimit]
@@ -121,14 +121,14 @@ class TaskWithJointsUnwound(SubtreeRebuild):
         """
         with world.batch_state_changes():
             for blocked in self.blocked_position_limits:
-                joint = self.joint_of(world=world, blocked=blocked)
+                joint = self.find_blocked_joint(world=world, blocked=blocked)
                 joint.position -= blocked.side * math.copysign(
                     math.tau, joint.multiplier
                 )
         return super().build_for_trial(world=world)
 
     @staticmethod
-    def joint_of(
+    def find_blocked_joint(
         *, world: World, blocked: BlockedPositionLimit
     ) -> ScrewAxisConnection | None:
         """
@@ -160,7 +160,7 @@ class TaskWithJointsUnwound(SubtreeRebuild):
         """
         unwindable = []
         for blocked in blocked_position_limits:
-            joint = cls.joint_of(world=world, blocked=blocked)
+            joint = cls.find_blocked_joint(world=world, blocked=blocked)
             if joint is None or not joint.behaves_like_a_revolute_connection:
                 continue
             limits = blocked.degree_of_freedom.limits
@@ -190,9 +190,10 @@ def retry_task_with_joints_unwound(
     :param blocked_position_limits: The position limits blocking `task`.
     :param world: The world `task` ran in.
     :param trial: The trial to try it in, None if the plan has none.
-    :return: Whether the task reaches its goal once its revolute joints are turned a
-        full turn back from the limits blocking them, None if it was not tried because
-        the plan has no trial or no such joint can be turned a full turn.
+    :return: Whether the task, with the tasks running beside it, reaches its goal once
+        its revolute joints are turned a full turn back from the limits blocking them,
+        None if it was not tried because the plan has no trial or no such joint can be
+        turned a full turn.
     """
     unwindable = TaskWithJointsUnwound.unwindable(
         world=world, blocked_position_limits=blocked_position_limits
@@ -201,7 +202,9 @@ def retry_task_with_joints_unwound(
         return None
     if trial.succeeds(
         rebuild=TaskWithJointsUnwound(
-            root=task, candidates={}, blocked_position_limits=unwindable
+            root=SubtreeRebuild.root_around(node=task),
+            candidates={},
+            blocked_position_limits=unwindable,
         )
     ):
         return StallCounterfactual.REACHED_UNWOUND
@@ -214,8 +217,9 @@ def retry_task_with_joints_unwound(
 @dataclass(kw_only=True)
 class TaskFromEarlierPositions(SubtreeRebuild):
     """
-    Rebuilds a stalled task alone onto a copy of the world, with the joints that block
-    it at a position limit put back where they were before an earlier node moved them.
+    Rebuilds a stalled task, with the tasks running beside it, onto a copy of the world,
+    with the joints that block it at a position limit put back where they were before
+    an earlier node moved them.
     """
 
     earlier_positions: dict[DegreeOfFreedom, float]
@@ -253,14 +257,17 @@ def retry_task_from_earlier_positions(
     :param earlier_positions: Each degree of freedom blocking it at a position limit,
         and its position before the earlier node that last moved it.
     :param trial: The trial to try it in, None if the plan has none.
-    :return: Whether the task reaches its goal from those positions, None if it was not
-        tried because the plan has no trial or no earlier position is known.
+    :return: Whether the task, with the tasks running beside it, reaches its goal from
+        those positions, None if it was not tried because the plan has no trial or no
+        earlier position is known.
     """
     if trial is None or not earlier_positions:
         return None
     if trial.succeeds(
         rebuild=TaskFromEarlierPositions(
-            root=task, candidates={}, earlier_positions=earlier_positions
+            root=SubtreeRebuild.root_around(node=task),
+            candidates={},
+            earlier_positions=earlier_positions,
         )
     ):
         return StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS

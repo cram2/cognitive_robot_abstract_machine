@@ -17,6 +17,7 @@ from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph
 from coraplex.plans.failure_diagnosis.counterfactual import (
     StallCounterfactual,
     TaskWithJointsUnwound,
+    retry_task_with_joints_unwound,
 )
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
 from coraplex.plans.failure_diagnosis.diagnosis import FailureDiagnoser
@@ -66,6 +67,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import PositionLimitSide
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from .test_failure_recovery import GraspFailingItsFirstRuns
@@ -679,6 +681,78 @@ def orientation_task_of(turn: CartesianPose) -> CartesianOrientation:
     return orientation
 
 
+@dataclass(kw_only=True)
+class TurnAfterWindingTheWristUp:
+    """
+    Tracy's plan that winds its wrist a full turn up to the upper limit and then turns
+    its tool, run until the turn stalls at that limit.
+    """
+
+    extensions: list
+    """
+    The context extensions of the plan.
+    """
+
+    wrist: ScrewAxisConnection
+    """
+    The last wrist joint of the right arm.
+    """
+
+    wind_up: JointPositionList
+    """
+    The joint move winding the wrist up, which leaves the tool where it was.
+    """
+
+    turn: CartesianPose
+    """
+    The tool's turn, which stalls at the wrist's upper limit.
+    """
+
+    statechart: Statechart
+    """
+    The plan's statechart, run until the turn stalled.
+    """
+
+    failure: MotionMadeNoProgress
+    """
+    The stall of the turn.
+    """
+
+    @classmethod
+    def run(
+        cls, *, world: World, arm_pose: dict[TracyJoint, float]
+    ) -> TurnAfterWindingTheWristUp:
+        """
+        :param world: Tracy's world.
+        :param arm_pose: The pose of the right arm but its last wrist joint.
+        :return: The plan, run in `world` until the turn stalled.
+        """
+        extensions, turn = tracy_turning_its_tool(
+            world=world, wrist_position=WristWinding.UNWOUND.value, arm_pose=arm_pose
+        )
+        wrist = world.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
+        wind_up = JointPositionList(
+            name="wind up the wrist",
+            goal_state=JointState.from_mapping({wrist: WristWinding.WOUND_UP.value}),
+        )
+        # Winding the wrist a full turn takes most of the simulated time a plan of
+        # tasks is given by default.
+        statechart, failure = run_until_it_fails(
+            Sequence(nodes=[wind_up, turn]),
+            extensions,
+            MotionMadeNoProgress,
+            simulation_time_per_action=timedelta(seconds=80),
+        )
+        return cls(
+            extensions=extensions,
+            wrist=wrist,
+            wind_up=wind_up,
+            turn=turn,
+            statechart=statechart,
+            failure=failure,
+        )
+
+
 def test_a_turn_stalled_at_a_limit_is_blamed_on_the_node_that_wound_the_joint_up(
     tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
 ) -> None:
@@ -689,35 +763,18 @@ def test_a_turn_stalled_at_a_limit_is_blamed_on_the_node_that_wound_the_joint_up
     Tried again with the wrist turned a full turn back, the turn reaches its goal, so
     the joint move is blamed.
     """
-    extensions, turn = tracy_turning_its_tool(
-        world=tracy_world_copy,
-        wrist_position=WristWinding.UNWOUND.value,
-        arm_pose=tracy_arm_pose,
-    )
-    wrist = tracy_world_copy.get_connection_by_name(TracyJoint.RIGHT_WRIST_3.value)
-    wind_up = JointPositionList(
-        name="wind up the wrist",
-        goal_state=JointState.from_mapping({wrist: WristWinding.WOUND_UP.value}),
-    )
-    plan = Sequence(nodes=[wind_up, turn])
-
-    # Winding the wrist a full turn takes most of the simulated time a plan of tasks
-    # is given by default.
-    statechart, failure = run_until_it_fails(
-        plan,
-        extensions,
-        MotionMadeNoProgress,
-        simulation_time_per_action=timedelta(seconds=80),
+    plan = TurnAfterWindingTheWristUp.run(
+        world=tracy_world_copy, arm_pose=tracy_arm_pose
     )
     diagnoses = FailureDiagnoser.from_statechart(
-        statechart=statechart
-    ).diagnose_failure(failure=failure)
+        statechart=plan.statechart
+    ).diagnose_failure(failure=plan.failure)
     report("tool turn after winding the wrist up", diagnoses)
 
     [diagnosis] = [
         diagnosis
         for diagnosis in diagnoses
-        if diagnosis.origin_run.node is orientation_task_of(turn)
+        if diagnosis.origin_run.node is orientation_task_of(plan.turn)
     ]
     assert (
         type(diagnosis),
@@ -727,8 +784,70 @@ def test_a_turn_stalled_at_a_limit_is_blamed_on_the_node_that_wound_the_joint_up
     ) == (
         TaskStalled,
         StallCounterfactual.REACHED_UNWOUND,
-        [wind_up],
-        [frozenset({wrist.raw_dof})],
+        [plan.wind_up],
+        [frozenset({plan.wrist.raw_dof})],
+    )
+
+
+def test_unwinding_the_wrist_where_the_turn_stalled_lets_the_turn_reach_its_goal(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    The wrist is turned a full turn back from the limit the turn stalled at in the
+    world the plan ran in, not in a copy, and the turn, run again from there, reaches
+    its goal instead of stalling.
+    """
+    plan = TurnAfterWindingTheWristUp.run(
+        world=tracy_world_copy, arm_pose=tracy_arm_pose
+    )
+    turn_again = Sequence(
+        nodes=[
+            TaskWithJointsUnwound(
+                root=plan.turn,
+                candidates={},
+                blocked_position_limits=plan.failure.no_progress.blocked_position_limits,
+            ).build_for_trial(world=tracy_world_copy)
+        ]
+    )
+    executor = simulated_executor(plan.extensions)
+    executor.compile(statechart=statechart_of(executor, turn_again))
+    executor.execute()
+
+    assert turn_again.life_cycle_state == LifeCycleValue.SUCCEEDED
+
+
+def test_unwinding_a_joint_that_does_not_block_the_turn_leaves_it_stalled(
+    tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
+) -> None:
+    """
+    Turning another wrist joint a full turn leaves the tool where it was and the wrist
+    that blocks the turn at its limit, so the turn, tried again with the position task
+    running beside it, stalls again.
+    """
+    plan = TurnAfterWindingTheWristUp.run(
+        world=tracy_world_copy, arm_pose=tracy_arm_pose
+    )
+    stalled = orientation_task_of(plan.turn)
+    other_wrist = tracy_world_copy.get_connection_by_name(
+        TracyJoint.RIGHT_WRIST_1.value
+    )
+
+    assert (
+        retry_task_with_joints_unwound(
+            task=stalled,
+            blocked_position_limits=[
+                BlockedPositionLimit(
+                    degree_of_freedom=other_wrist.raw_dof,
+                    side=PositionLimitSide.LOWER,
+                    task=stalled,
+                )
+            ],
+            world=tracy_world_copy,
+            trial=FailureDiagnoser.from_statechart(
+                statechart=plan.statechart
+            ).action_trial,
+        )
+        == StallCounterfactual.STILL_STALLED_UNWOUND
     )
 
 
