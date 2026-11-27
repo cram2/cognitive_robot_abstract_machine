@@ -12,6 +12,7 @@ from typing_extensions import Iterable, Iterator, Self, TYPE_CHECKING
 
 import numpy as np
 
+from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math import symbolic_math
 from random_events.interval import closed
@@ -56,6 +57,9 @@ from semantic_digital_twin.semantic_annotations.part_whole.furniture_parts impor
     HasSink,
     HasShelfLayers,
     HasRim,
+)
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
 )
 from semantic_digital_twin.semantic_annotations.part_whole.fruit_parts import (
     HasCore,
@@ -1732,6 +1736,101 @@ class BottleCap(HasMovableJoint):
         return HomogeneousTransformationMatrix()
 
 
+def _axial_top_down_grasp_candidates(
+    graspable: IsGraspable,
+) -> list[GraspCandidate]:
+    """
+    Generate evenly rotated top-down grasps along local ``-X`` at ``graspable.root``'s
+    origin.
+
+    :param graspable: The annotation offering the grasp candidates.
+    :return: The generated grasp candidates in ``graspable.root``'s frame.
+    """
+    return [
+        GraspCandidate(
+            graspable=graspable,
+            grasp_pose=Pose(
+                position=Point3(0.0, 0.0, 0.0, reference_frame=graspable.root),
+                orientation=RotationMatrix.from_vectors(
+                    x=Vector3(-1, 0, 0),
+                    y=Vector3(0.0, float(np.cos(angle)), float(np.sin(angle))),
+                ).quaternion,
+                reference_frame=graspable.root,
+            ),
+        )
+        for angle in np.linspace(
+            0.0, 2.0 * np.pi, graspable.grasp_candidate_count, endpoint=False
+        )
+    ]
+
+
+@dataclass(eq=False, kw_only=True)
+class BoltHead(IsGraspable):
+    """
+    The head of a threaded bolt, offering top-down grasps along its axis.
+    """
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        Differs from
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.default_grasp_candidates`
+        by returning top-down grasps at the head's origin, evenly rotated about local
+        ``+X``.
+        """
+        return _axial_top_down_grasp_candidates(self)
+
+
+@dataclass(eq=False, kw_only=True)
+class BoltShaft(HasRootBody):
+    """
+    The threaded shaft of a bolt.
+    """
+
+
+@dataclass(eq=False, kw_only=True)
+class Bolt(IsGraspable, HasParts):
+    """
+    A threaded bolt composed of a :class:`BoltHead` and a :class:`BoltShaft`, grasped at
+    its head when present.
+    """
+
+    head: BoltHead | None = field(
+        default=None,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The head of the bolt.
+    """
+
+    shaft: BoltShaft | None = field(
+        default=None,
+        kw_only=True,
+        metadata=IsPartWholeRelationship().as_dict(),
+    )
+    """
+    The threaded shaft of the bolt.
+    """
+
+    def grasped_part(self) -> IsGraspable:
+        """
+        :return: The bolt head; without a head, the part the bolt is grasped at
+            otherwise.
+        """
+        if self.head is None:
+            return super().grasped_part()
+        return self.head
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        Differs from
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.default_grasp_candidates`
+        by returning top-down grasps at the bolt's origin when no :attr:`head` is set,
+        evenly rotated about local ``+X``.
+        """
+        return _axial_top_down_grasp_candidates(self)
+
+
 @dataclass(eq=False)
 class Agent(HasRootBody):
     """
@@ -2068,6 +2167,54 @@ class Sponge(Tool):
             rotation @ np.array([0.0, 0.0, 1.0]),
             reference_frame=reference_frame,
         )
+
+
+@dataclass(eq=False, kw_only=True)
+class Screwdriver(Tool):
+    """
+    A handheld screwdriver tool for driving threaded fasteners.
+    """
+
+    grasp_height: float = 0.025
+    """
+    Height in metres along local +Z where a gripper grasps the handle.
+    """
+
+    @called_positionally
+    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+        tip_body = self.get_tool_frame()
+        target_frame = target if isinstance(target, Body) else target.reference_frame
+        return [
+            AlignmentPair(
+                tip_normal=Vector3(0, 0, 1, reference_frame=tip_body),
+                reference_normal=Vector3(0, 0, 1, reference_frame=target_frame),
+            )
+        ]
+
+    def default_grasp_candidates(self) -> list[GraspCandidate]:
+        """
+        Differs from
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.default_grasp_candidates`
+        by returning top-down handle grasps at :attr:`grasp_height` along local +Z,
+        evenly rotated about the handle axis.
+        """
+        return [
+            GraspCandidate(
+                graspable=self,
+                grasp_pose=Pose(
+                    position=Point3(
+                        0.0, 0.0, self.grasp_height, reference_frame=self.root
+                    ),
+                    orientation=RotationMatrix.from_rpy(
+                        yaw=float(yaw), pitch=np.pi / 2
+                    ).quaternion,
+                    reference_frame=self.root,
+                ),
+            )
+            for yaw in np.linspace(
+                0.0, 2.0 * np.pi, self.grasp_candidate_count, endpoint=False
+            )
+        ]
 
 
 @dataclass(eq=False)
