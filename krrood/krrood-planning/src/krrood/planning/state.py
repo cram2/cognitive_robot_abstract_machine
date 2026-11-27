@@ -27,8 +27,8 @@ from krrood.planning.effect import (
     StateChange,
 )
 from krrood.planning.exceptions import (
-    ActionIsNotApplicable,
-    ActionParameterIsRemoved,
+    KnowledgeActionIsNotApplicable,
+    KnowledgeActionParameterIsRemoved,
     ConflictingAssignments,
 )
 
@@ -173,9 +173,9 @@ class State(TermReader):
         :param action: A ground action.
         :return: A new state that makes the change of every effect of *action*, as
             :meth:`apply_effects` does.
-        :raises ActionParameterIsRemoved: If this state removes an object a parameter of
+        :raises KnowledgeActionParameterIsRemoved: If this state removes an object a parameter of
             *action* holds.
-        :raises ActionIsNotApplicable: If this state does not satisfy the precondition
+        :raises KnowledgeActionIsNotApplicable: If this state does not satisfy the precondition
             of *action*.
         """
         removed_objects = [
@@ -184,7 +184,7 @@ class State(TermReader):
             if id(value) in self.removed_objects
         ]
         if removed_objects:
-            raise ActionParameterIsRemoved(
+            raise KnowledgeActionParameterIsRemoved(
                 action=action, removed_objects=removed_objects
             )
         symbolic_action = action.to_symbolic()
@@ -192,7 +192,7 @@ class State(TermReader):
             condition=symbolic_action.precondition(), state=self
         )
         if not evaluation.is_satisfied:
-            raise ActionIsNotApplicable(
+            raise KnowledgeActionIsNotApplicable(
                 action=action, failed_conditions=evaluation.false_statements
             )
         return self.apply_effects(*symbolic_action.effects())

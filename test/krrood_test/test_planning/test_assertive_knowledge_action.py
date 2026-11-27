@@ -12,8 +12,8 @@ from krrood.entity_query_language.factories import a, evaluate_condition, litera
 from krrood.entity_query_language.ground_term import AttributeTerm
 from krrood.entity_query_language.query.query import Entity
 from krrood.planning.exceptions import (
-    ActionIsNotApplicable,
-    ActionParameterIsRemoved,
+    KnowledgeActionIsNotApplicable,
+    KnowledgeActionParameterIsRemoved,
 )
 from krrood.planning.fact import Fact
 from krrood.planning.state import State
@@ -164,7 +164,7 @@ def test_applying_an_action_that_is_not_applicable_is_rejected(stacking_world):
     """
     A ground action is never applied where its precondition fails.
     """
-    with pytest.raises(ActionIsNotApplicable):
+    with pytest.raises(KnowledgeActionIsNotApplicable):
         State().apply_action(
             action=Stack(block=stacking_world.a, target=stacking_world.b)
         )
@@ -175,7 +175,7 @@ def test_rejected_action_names_the_conditions_that_fail(stacking_world):
     Only the block's clearness fails: the target is clear and differs from it.
     """
     action = Stack(block=stacking_world.a, target=stacking_world.b)
-    with pytest.raises(ActionIsNotApplicable) as raised:
+    with pytest.raises(KnowledgeActionIsNotApplicable) as raised:
         State().apply_action(action=action)
     (failed,) = raised.value.failed_conditions
     fact = Fact.from_condition(condition=failed)
@@ -190,7 +190,7 @@ def test_rejected_action_names_the_conditions_that_fail_in_the_state(stacking_wo
     Block ``b`` is clear on the live objects, but the state makes it carry something.
     """
     state = State().add_facts(literal(stacking_world.b).clear == False)
-    with pytest.raises(ActionIsNotApplicable) as raised:
+    with pytest.raises(KnowledgeActionIsNotApplicable) as raised:
         state.apply_action(
             action=Stack(block=stacking_world.b, target=stacking_world.c)
         )
@@ -335,7 +335,7 @@ def test_action_whose_precondition_is_false_is_not_applicable(stacking_world):
     """
     A precondition of ``False`` holds in no state, and it is the condition that fails.
     """
-    with pytest.raises(ActionIsNotApplicable) as raised:
+    with pytest.raises(KnowledgeActionIsNotApplicable) as raised:
         State().apply_action(action=ImpossibleTouch(block=stacking_world.a))
     assert [condition._value_ for condition in raised.value.failed_conditions] == [
         False
@@ -350,7 +350,7 @@ def test_applying_an_action_on_a_removed_object_is_rejected(stacking_world):
     Block ``c`` was discarded, so it cannot be stacked anymore.
     """
     state = State().apply_action(action=Discard(block=stacking_world.c))
-    with pytest.raises(ActionParameterIsRemoved):
+    with pytest.raises(KnowledgeActionParameterIsRemoved):
         state.apply_action(
             action=Stack(block=stacking_world.c, target=stacking_world.b)
         )

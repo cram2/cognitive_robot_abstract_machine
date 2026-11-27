@@ -262,7 +262,7 @@ class ValueIsNotACollection(DataclassException):
 
 
 @dataclass(kw_only=True)
-class ActionIsNotApplicable(DataclassException):
+class KnowledgeActionIsNotApplicable(DataclassException):
     """
     A ground action was applied in a state that does not satisfy its precondition.
     """
@@ -291,7 +291,7 @@ class ActionIsNotApplicable(DataclassException):
 
 
 @dataclass(kw_only=True)
-class ActionParameterIsRemoved(DataclassException):
+class KnowledgeActionParameterIsRemoved(DataclassException):
     """
     A ground action was applied in a state that removes an object one of its parameters
     holds.
