@@ -1742,9 +1742,9 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
     Mixin that gives a container a fill level in ``[0, 1]``, the position of a virtual
     :class:`FillLevelConnection` below its root created by :meth:`initialize_fill_level`.
 
-    The container drains by :attr:`fill_equation` as it tilts, and pours into
-    :attr:`pours_into` only while the :class:`PouringStream` lands in that container's
-    opening.
+    The container drains by :attr:`fill_equation` as it tilts, and pours into another
+    container only while the :class:`PouringStream` between them lands in that
+    container's opening.
     """
 
     fill_equation: PouringEquation | None = None
@@ -1756,11 +1756,6 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
     """
     The volume this container holds at full fill, in cubic metres, where it was
     measured, or ``None`` to read it off the collision geometry.
-    """
-
-    pours_into: HasFillLevel | None = None
-    """
-    The container this one pours into; its fill rises by the volume this one loses.
     """
 
     @classproperty
@@ -1823,13 +1818,6 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
         :param fill_equation: How this container drains from now on.
         """
         self.fill_equation = fill_equation
-
-    @synchronized_attribute_modification
-    def set_pours_into(self, *, receiver: HasFillLevel | None) -> None:
-        """
-        :param receiver: The container this one pours into from now on, or ``None``.
-        """
-        self.pours_into = receiver
 
     def create_pouring_equation(
         self,
@@ -1922,40 +1910,43 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
             raise SelfPouringError(container=self)
         if source.fill_connection is None:
             raise MissingFillEquationError(source=source)
-        if source.pours_into is not None:
+        if source.outgoing_stream() is not None:
             raise SourceAlreadyCoupledError(source=source)
         if self.fill_connection is None:
             raise ReceiverNotInitializedError(receiver=self)
-        if self.poured_from() is not None:
+        if self.incoming_stream() is not None:
             raise ReceiverAlreadyCoupledError(receiver=self)
         with self._world.modify_world():
-            source.set_pours_into(receiver=self)
+            self._world.add_semantic_annotation(
+                PouringStream(source=source, receiver=self)
+            )
 
     def poured_from(self) -> HasFillLevel | None:
         """
         :return: The container that pours into this one, or ``None``.
         """
-        for container in self._world.get_semantic_annotations_by_type(HasFillLevel):
-            if container.pours_into is self:
-                return container
-        return None
+        incoming_stream = self.incoming_stream()
+        if incoming_stream is None:
+            return None
+        return incoming_stream.source
 
     def outgoing_stream(self) -> PouringStream | None:
         """
-        :return: The stream from this container into :attr:`pours_into`, or ``None``.
+        :return: The stream from this container into another, or ``None``.
         """
-        if self.pours_into is None:
-            return None
-        return PouringStream(source=self, receiver=self.pours_into)
+        for stream in self._world.get_semantic_annotations_by_type(PouringStream):
+            if stream.source is self:
+                return stream
+        return None
 
     def incoming_stream(self) -> PouringStream | None:
         """
         :return: The stream from the container pouring into this one, or ``None``.
         """
-        source = self.poured_from()
-        if source is None:
-            return None
-        return PouringStream(source=source, receiver=self)
+        for stream in self._world.get_semantic_annotations_by_type(PouringStream):
+            if stream.receiver is self:
+                return stream
+        return None
 
     def fill_velocity(self) -> sm.Scalar:
         """

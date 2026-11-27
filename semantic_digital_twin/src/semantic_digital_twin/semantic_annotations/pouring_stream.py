@@ -11,6 +11,7 @@ from krrood_spatial_math.spatial_types import Point3
 from typing_extensions import TYPE_CHECKING
 
 from semantic_digital_twin.physics.equations.projectile_motion import ProjectileMotion
+from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
@@ -18,8 +19,8 @@ if TYPE_CHECKING:
 # %% pouring stream
 
 
-@dataclass(kw_only=True)
-class PouringStream:
+@dataclass(eq=False, kw_only=True)
+class PouringStream(SemanticAnnotation):
     """
     The stream from :attr:`source` into :attr:`receiver`: it carries the source's
     outflow only while it lands in the receiver's opening, so neither container flows

@@ -28,6 +28,7 @@ from semantic_digital_twin.physics.equations.pouring_equations import (
 )
 from semantic_digital_twin.semantic_annotations.exceptions import SelfPouringError
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
+from semantic_digital_twin.semantic_annotations.pouring_stream import PouringStream
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
 )
@@ -303,6 +304,19 @@ class TestCoupling:
         with pytest.raises(SelfPouringError):
             cup.receive_outflow_from(source=cup)
 
+    def test_a_coupling_is_a_stream_in_the_world(self) -> None:
+        """
+        Coupling two containers adds one stream from the source to the receiver to the
+        world, and both containers find it.
+        """
+        world, source, receiver = _build_world()
+
+        (stream,) = world.get_semantic_annotations_by_type(PouringStream)
+
+        assert (stream.source, stream.receiver) == (source, receiver)
+        assert source.outgoing_stream() is stream
+        assert receiver.incoming_stream() is stream
+
 
 # %% geometric transfer gate
 
@@ -482,7 +496,9 @@ class TestSynchronizedTransfer:
         copy = _synchronized_copy(world)
 
         copied_source = _counterpart(source, world=copy)
-        assert copied_source.pours_into is _counterpart(receiver, world=copy)
+        (copied_stream,) = copy.get_semantic_annotations_by_type(PouringStream)
+        assert copied_stream.source is copied_source
+        assert copied_stream.receiver is _counterpart(receiver, world=copy)
         for _ in range(20):
             _step_passive_state(world, 0.05)
             _step_passive_state(copy, 0.05)
