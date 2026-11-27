@@ -12,6 +12,7 @@ from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph, RootCa
 from coraplex.plans.failure_diagnosis.counterfactual import (
     StallCounterfactual,
     retry_task_with_chain_from_world_root,
+    retry_task_with_joints_unwound,
 )
 from coraplex.plans.failure_diagnosis.exceptions import (
     FailureDiagnosis,
@@ -39,6 +40,8 @@ from cramph.node_runs import StatechartRuns
 from cramph.state_history import NodeRun
 from cramph.statechart import Statechart
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
+from giskardpy.motion_statechart.exceptions import PositionLimitBlockedError
+from giskardpy.motion_statechart.monitors.progress_monitors import BlockedPositionLimit
 from krrood.patterns.called_positionally import called_positionally
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 
@@ -78,6 +81,13 @@ class FailureDiagnoser:
     """
     The degrees of freedom that moved the bodies a motion failure reported as too close
     to each other.
+    """
+
+    blocked_position_limits: list[BlockedPositionLimit] = field(
+        default_factory=list, init=False
+    )
+    """
+    The position limits a motion failure reported as blocking the stalled nodes.
     """
 
     diagnosis_kinds: list[type[FailureDiagnosis]] = field(
@@ -135,6 +145,7 @@ class FailureDiagnoser:
         self.stalled_nodes = []
         self.colliding_nodes = []
         self.colliding_degrees_of_freedom = frozenset()
+        self.blocked_position_limits = []
         return self.diagnose_reported_runs(failure)
 
     @singledispatchmethod
@@ -161,6 +172,8 @@ class FailureDiagnoser:
         self.stalled_nodes = list(failure.no_progress.stalled_tasks) or [
             failure.no_progress.progress_monitor.monitored_node
         ]
+        if isinstance(failure.no_progress, PositionLimitBlockedError):
+            self.blocked_position_limits = failure.no_progress.blocked_position_limits
         return [
             self.diagnose_run(reported_run=self.runs.latest_run_of_node(node=node))
             for node in self.stalled_nodes
@@ -326,10 +339,10 @@ class FailureDiagnoser:
         self, *, stalled: NodeRun
     ) -> tuple[list[RootCause], StallCounterfactual | None]:
         """
-        A task stops approaching its goal when another task drives its degrees of
-        freedom at the same time, or when its goal depends on degrees of freedom it
-        cannot move, which an earlier run left where they are. The latter holds only if
-        the task, tried again free to move them, reaches its goal.
+        A task stalls when another task drives its degrees of freedom at once, when an
+        earlier run wound a joint it moves up to a position limit, or when an earlier run
+        left degrees of freedom it cannot move where they are. The latter two hold only
+        if the task, retried with that joint unwound or free to move them, succeeds.
 
         :param stalled: The run that stopped approaching its goal.
         :return: The runs that made it stall, the most likely first, and what trying it
@@ -348,6 +361,24 @@ class FailureDiagnoser:
                 RootCause(causing_run=edge.cause, edges_to_origin=(edge,))
                 for edge in conflicts
             ], None
+        blocked = [
+            limit
+            for limit in self.blocked_position_limits
+            if limit.task is stalled.node
+        ]
+        unwound = retry_task_with_joints_unwound(
+            task=stalled.node,
+            blocked_position_limits=blocked,
+            world=self.runs.statechart.context.world,
+            trial=self.action_trial,
+        )
+        if unwound == StallCounterfactual.REACHED_UNWOUND:
+            return self.last_plan_runs_moving(
+                degrees_of_freedom=frozenset(
+                    limit.degree_of_freedom for limit in blocked
+                ),
+                statement=stalled,
+            ), unwound
         unmovable = (
             access.read_degrees_of_freedom - access.moved_or_held_degrees_of_freedom
         )
@@ -357,7 +388,7 @@ class FailureDiagnoser:
             if isinstance(edge, WorldStateEdge) and edge.degrees_of_freedom & unmovable
         ]
         if not left_by_earlier:
-            return [], None
+            return [], unwound
         counterfactual = retry_task_with_chain_from_world_root(
             task=stalled.node, trial=self.action_trial
         )

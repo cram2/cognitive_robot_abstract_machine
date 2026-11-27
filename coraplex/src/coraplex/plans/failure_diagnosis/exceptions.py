@@ -158,8 +158,9 @@ class TaskStalled(FailureDiagnosis):
 
     counterfactual: StallCounterfactual | None = None
     """
-    What trying the task again, free to move what an earlier node left, showed; None if
-    no earlier node was suspected.
+    What trying the task again, free to move what an earlier node left or with its
+    joints turned a full turn back from the position limits blocking it, showed; None if
+    it was not tried again.
     """
 
     @classmethod
