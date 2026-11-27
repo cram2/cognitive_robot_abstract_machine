@@ -15,6 +15,8 @@ import numpy as np
 from typing_extensions import Self
 
 import krrood.symbolic_math.symbolic_math as sm
+from giskardpy.framework_name import MotionFramework
+from krrood.patterns.classproperty import classproperty
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.forward_kinematics_binding import (
     ForwardKinematicsBinding,
@@ -153,6 +155,13 @@ class MotionStatechartNode(StatechartNode):
     A node of a motion statechart, which may contribute constraints, an error signal and
     debug expressions to motion control.
     """
+
+    @classproperty
+    def ticking_framework(cls) -> str:
+        """
+        :return: Giskard, which ticks every motion statechart node, see :attr:`~cramph.node.StatechartNode.ticking_framework`.
+        """
+        return MotionFramework.GISKARD
 
     def create_structure_copy(self) -> MotionStatechartNode:
         return StructureCopyMotionStatechartNode(name=self.name)

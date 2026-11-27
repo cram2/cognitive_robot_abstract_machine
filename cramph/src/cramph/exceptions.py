@@ -869,6 +869,41 @@ class NotHeldByControlStructureNodeError(NodeInitializationError):
 
 
 @dataclass(kw_only=True)
+class ChildrenOwnedByAnotherFrameworkError(StatechartError):
+    """
+    Raised when a framework changes the children of a composite node whose children
+    another framework owns.
+    """
+
+    node_name: str
+    """
+    The name of the composite node.
+    """
+
+    structure_owner: str
+    """
+    The framework that owns the children of the node.
+    """
+
+    framework_name: str
+    """
+    The framework that tried to change them.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"The framework '{self.framework_name}' changed the children of the node "
+            f"'{self.node_name}', which '{self.structure_owner}' owns."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Change the children in '{self.structure_owner}', or name the framework "
+            f"that changes them as the structuring framework of the node."
+        )
+
+
+@dataclass(kw_only=True)
 class RemovedNodeStillReferencedError(StatechartError):
     """
     Raised when a node is removed from a statechart while a node that stays still refers

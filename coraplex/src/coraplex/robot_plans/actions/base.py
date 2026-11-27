@@ -11,6 +11,7 @@ from dataclasses import dataclass, field, fields
 
 from typing_extensions import TYPE_CHECKING, Any, Self
 
+from coraplex.framework_name import PlanFramework
 from coraplex.plans.context_extensions import RobotAccess
 from coraplex.plans.plan_transformation import PlanRewriting
 from krrood.patterns.classproperty import classproperty
@@ -56,6 +57,13 @@ class Action(CompositeNode, ABC):
     A parameter may also be given as an underspecified statement of its value, such as
     ``a(...)``, which is grounded when the action runs.
     """
+
+    @classproperty
+    def ticking_framework(cls) -> str:
+        """
+        :return: coraplex, which ticks every action, see :attr:`~cramph.node.StatechartNode.ticking_framework`.
+        """
+        return PlanFramework.CORAPLEX
 
     temporary_collision_rules: list[CollisionRule] = field(
         default_factory=list,

@@ -377,7 +377,7 @@ class ChildrenChange(ChangeNamingChildren):
         return ChangeApplicationOrder.CHILDREN_CHANGE
 
     def apply(self, *, statechart: Statechart) -> None:
-        self.node.set_children(children=self.children)
+        self.node._hold_children(children=self.children)
         for child in self.children:
             child.parent_node = self.node
 
@@ -746,6 +746,16 @@ class StructureChangeRecorderInStatechart(StructureChangeRecorder):
         self.recorded_change_count += 1
         self.recorded_changes.append(change)
         self._close_change_block_outside_modify()
+
+    def has_joined_since_latest_block(self, *, node: StatechartNode) -> bool:
+        """
+        :return: Whether `node` joined :attr:`statechart` since the latest block closed,
+            so that its joining is still open.
+        """
+        return any(
+            isinstance(change, NodeAddition) and change.node is node
+            for change in self.recorded_changes
+        )
 
     def _record_changed_children(self, *, node: CompositeNode) -> None:
         self._record_pending_change(pending=PendingChildrenChange(node=node))
