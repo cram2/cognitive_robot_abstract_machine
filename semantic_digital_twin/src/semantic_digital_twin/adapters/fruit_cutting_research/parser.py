@@ -107,6 +107,7 @@ class FruitCuttingSampleParser(USDStageParser):
     @classmethod
     def from_file(
         cls,
+        *,
         file_path: str,
         prefix: str | None = None,
         path_resolver: PathResolver | None = None,

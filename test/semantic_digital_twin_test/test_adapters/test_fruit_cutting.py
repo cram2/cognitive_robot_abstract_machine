@@ -125,7 +125,7 @@ def parsed_world(*, sample: FixtureSample, destination: Path) -> World:
     :return: The world the parser builds from the sample.
     """
     folder = packed_sample(sample=sample, destination=destination)
-    return FruitCuttingSampleParser.from_file(str(folder)).create_world()
+    return FruitCuttingSampleParser.from_file(file_path=str(folder)).create_world()
 
 
 def the_fruit(world: World, fruit_type: type[Fruit]) -> Fruit:
@@ -414,7 +414,7 @@ def test_released_model_becomes_its_fruit_with_qualities(folder: Path) -> None:
         data=json.loads((folder / FruitCuttingSampleFile.RECORD).read_text())
     )
 
-    world = FruitCuttingSampleParser.from_file(str(folder)).create_world()
+    world = FruitCuttingSampleParser.from_file(file_path=str(folder)).create_world()
 
     fruit = the_fruit(world, sample.fruit.fruit_type)
     assert fruit.ripeness == sample.stage.ripeness
