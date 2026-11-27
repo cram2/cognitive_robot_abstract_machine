@@ -21,7 +21,6 @@ from semantic_digital_twin.adapters.usd.parser import (
     USDJointedLinks,
     USDSceneContent,
 )
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.entity_query_language.predicate import SymbolicCallable
 from krrood.ormatic.ormatic import ORMatic
 from krrood.utils import recursive_subclasses
@@ -55,7 +54,6 @@ ignore_classes = {
     MeshFileStorage,
     semantic_digital_twin.adapters.procthor.procthor_resolver.ProcthorResolver,
     SemanticDirection,
-    SubclassJSONSerializer,
     # What a USD parser builds while it reads a stage, not something a world stores.
     USDComponent,
     USDJointedLinks,

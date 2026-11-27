@@ -3,7 +3,6 @@ from pathlib import Path
 
 import coraplex.locations.costmaps
 import giskardpy.orm.ormatic_interface
-from krrood.adapters.json_serializer import SubclassJSONSerializer
 
 from krrood.ormatic.ormatic import ORMatic
 from krrood.ormatic.utils import classes_of_module
@@ -14,8 +13,6 @@ from krrood.ormatic.utils import classes_of_module
 
 
 ignored_classes = set(classes_of_module(coraplex.locations.costmaps))
-# profiling and benchmarking measure a running system instead of describing it
-ignored_classes |= {SubclassJSONSerializer}
 
 dependencies = [giskardpy.orm.ormatic_interface]
 
