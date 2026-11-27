@@ -28,6 +28,7 @@ from robokudo.cas import CASViews
 from robokudo.identifier import BBIdentifier
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class PrintNumbers(BaseAnnotator):
@@ -79,8 +80,12 @@ class CheckQueryType(BaseAnnotator):
         super().__init__(name)
 
     def update(self) -> Status:
+        """
+        :return: :attr:`Status.SUCCESS` if the query on the CAS asks for ``numbers``,
+            :attr:`Status.FAILURE` otherwise or if there is no query.
+        """
         # Retrieve the query from the CAS
-        query = self.get_cas().get(CASViews.QUERY)
+        query = self.get_cas().get(view_name=CASViews.QUERY)
 
         # Check if the query type is 'numbers'
         if query and getattr(query.obj, "type", None) == "numbers":
@@ -94,6 +99,11 @@ class CheckQueryType(BaseAnnotator):
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Answers a query of type ``numbers`` by counting, reporting each number as feedback,
+    unless the query is preempted.
+    """
+
     def name(self) -> str:
         return "test_pipeline"
 
@@ -125,6 +135,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 pipeline_init(),  # Initialize the pipeline
                 QueryAnnotator(),  # Handle incoming queries
                 conditional_selector,  # Preemption-aware task execution
+                WorldUpdatingAnnotator(),
             ]
         )
 

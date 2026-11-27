@@ -1,3 +1,7 @@
+"""
+Tests of the uniform distribution.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -18,7 +22,10 @@ def uniform(x) -> UniformDistribution:
     A uniform distribution over [0, 2).
     """
     return UniformDistribution(
-        variable=x, interval=SimpleInterval.from_data(0, 2, Bound.CLOSED, Bound.OPEN)
+        variable=x,
+        interval=SimpleInterval.from_data(
+            lower=0, upper=2, left=Bound.CLOSED, right=Bound.OPEN
+        ),
     )
 
 
@@ -80,7 +87,10 @@ def test_truncation_to_an_interval(uniform, x):
     event = SimpleEvent.from_data({x: closed(1, 2)}).as_composite_set()
     truncation = uniform.truncated(event)
     assert truncation.distribution == UniformDistribution(
-        variable=x, interval=SimpleInterval.from_data(1, 2, Bound.CLOSED, Bound.OPEN)
+        variable=x,
+        interval=SimpleInterval.from_data(
+            lower=1, upper=2, left=Bound.CLOSED, right=Bound.OPEN
+        ),
     )
     assert truncation.probability == 0.5
 
@@ -108,10 +118,13 @@ def test_conditioning_on_a_point(uniform, x):
 
 
 def test_translation_shifts_the_interval(x):
+    """
+    Translated, a uniform distribution moves its interval.
+    """
     distribution = UniformDistribution(
-        variable=x, interval=SimpleInterval.from_data(0, 1)
+        variable=x, interval=SimpleInterval.from_data(lower=0, upper=1)
     )
-    distribution.apply_translation({x: 2.0})
+    distribution.apply_translation(translation={x: 2.0})
     assert distribution == UniformDistribution(
-        variable=x, interval=SimpleInterval.from_data(2, 3)
+        variable=x, interval=SimpleInterval.from_data(lower=2, upper=3)
     )

@@ -1,0 +1,5 @@
+tests_directory = "test"
+
+[[shared_jobs]]
+name = "chain"
+libraries = ["base", "missing"]

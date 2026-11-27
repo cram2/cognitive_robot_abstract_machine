@@ -60,7 +60,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% the pieces
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeSortingPieceSet:
     """
     The loose pieces of the set, with the sizes and colours measured off the real set.
@@ -131,7 +131,7 @@ class ShapeSortingPieceSet:
 # %% solid bodies
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SolidContact:
     """
     How the solid bodies of the scene push back once something touches them.
@@ -160,7 +160,7 @@ class SolidContact:
     How little the solid bodies give way under load: nearly not at all.
     """
 
-    def with_friction(self, friction: ContactFriction) -> ContactParameters:
+    def contact_parameters(self, *, friction: ContactFriction) -> ContactParameters:
         """
         :param friction: The friction the surface offers.
         :return: The contact of a solid surface offering ``friction``.
@@ -173,7 +173,7 @@ class SolidContact:
 # %% gripping a piece
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PieceGrip:
     """
     How low on a piece the sorting gripper takes hold of it.
@@ -184,7 +184,7 @@ class PieceGrip:
     How far the closed finger pads stay above what a gripped piece stands on.
     """
 
-    def grasp_height(self, gripper: HasTwoFingers) -> float:
+    def grasp_height(self, *, gripper: HasTwoFingers) -> float:
         """
         A grasp is aimed at where the closed fingers meet.
 
@@ -212,7 +212,7 @@ class PieceGrip:
 # %% the scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MontessoriScene:
     """
     Tracy's table, with the shape-sorting board standing on it and a row of loose pieces
@@ -295,7 +295,7 @@ class MontessoriScene:
     """
 
     @staticmethod
-    def sorting_arm(tracy: Tracy) -> Arm:
+    def sorting_arm(*, tracy: Tracy) -> Arm:
         """
         :param tracy: The robot.
         :return: The arm that sorts the pieces: the left one, as in every Tracy demo in
@@ -317,15 +317,15 @@ class MontessoriScene:
         """
         world = URDFParser.from_file(Tracy.get_ros_file_path()).create_world()
         tracy = Tracy.from_world(world)
-        self.solid_contact.with_friction(ContactFriction()).apply_to(
+        self.solid_contact.contact_parameters(friction=ContactFriction()).apply_to(
             world.bodies_with_collision
         )
         for arm in tracy.all_arms:
             arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
-        self.populate(world)
+        self.populate(world=world)
         return world
 
-    def populate(self, world: World) -> None:
+    def populate(self, *, world: World) -> None:
         """
         Stand the shape-sorting board and the loose pieces on Tracy's table.
 
@@ -335,27 +335,33 @@ class MontessoriScene:
         :param world: The world holding Tracy.
         """
         [tracy] = world.get_semantic_annotations_by_type(Tracy)
-        grasp_height = self.grip.grasp_height(self.sorting_arm(tracy).end_effector)
+        grasp_height = self.grip.grasp_height(
+            gripper=self.sorting_arm(tracy=tracy).end_effector
+        )
         with world.modify_world():
-            self._stand_the_board(world)
+            self._stand_the_board(world=world)
             for index, (hole, shape) in enumerate(self.pieces.shapes().items()):
                 piece = self._stand_piece(
-                    world,
-                    PrefixedName(f"{hole}_piece"),
-                    shape,
-                    self.piece_row_start_y + index * self.piece_row_spacing,
-                    grasp_height,
+                    world=world,
+                    name=PrefixedName(f"{hole}_piece"),
+                    shape=shape,
+                    row_y=self.piece_row_start_y + index * self.piece_row_spacing,
+                    grasp_height=grasp_height,
                 )
                 self.holes_of_pieces[piece] = hole
 
-    def _stand_the_board(self, world: World) -> None:
+    def _stand_the_board(self, *, world: World) -> None:
         """
         Bolt the board to the table straight in front of Tracy.
 
         :param world: The world being built, already open for modification.
         """
-        self.board = self.shape_sorting_board.body(PrefixedName("shape_sorting_board"))
-        self.solid_contact.with_friction(ContactFriction()).apply_to([self.board])
+        self.board = self.shape_sorting_board.body(
+            name=PrefixedName("shape_sorting_board")
+        )
+        self.solid_contact.contact_parameters(friction=ContactFriction()).apply_to(
+            [self.board]
+        )
         world.add_kinematic_structure_entity(self.board)
         world.add_connection(
             FixedConnection.create_with_dofs(
@@ -373,6 +379,7 @@ class MontessoriScene:
 
     def _stand_piece(
         self,
+        *,
         world: World,
         name: PrefixedName,
         shape: Shape,
@@ -409,8 +416,8 @@ class MontessoriScene:
                 ),
             )
         )
-        self.solid_contact.with_friction(
-            ContactParameters.create_for_grasped_object().friction
+        self.solid_contact.contact_parameters(
+            friction=ContactParameters.create_for_grasped_object().friction
         ).apply_to([body])
         piece = ShapeSortingPiece(root=body, grasp_height=grasp_height)
         world.add_semantic_annotations([piece])
@@ -420,7 +427,7 @@ class MontessoriScene:
 # %% the plan
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ShapeSortingPlan:
     """
     The plan that picks every piece of a scene up in turn and lets it go over the hole
@@ -438,7 +445,7 @@ class ShapeSortingPlan:
     than being pushed against the lid.
     """
 
-    def build(self, context: StatechartContext) -> Statechart:
+    def build(self, *, context: StatechartContext) -> Statechart:
         """
         The plan begins by parking the arms: a simulated Tracy starts parked already,
         the real one wherever it was left.
@@ -447,16 +454,16 @@ class ShapeSortingPlan:
         :return: The statechart that sorts the pieces.
         """
         robot = context.require_extension(extension_type=RobotAccess).robot
-        sorting_arm = self.scene.sorting_arm(robot)
+        sorting_arm = self.scene.sorting_arm(tracy=robot)
         actions = [ParkArmsAction(arms=robot.all_arms)]
         for piece, hole in self.scene.holes_of_pieces.items():
             [grasp] = piece.grasp_candidates()
-            actions.append(PickUpAction(grasp=grasp, arm=sorting_arm))
+            actions.append(PickUpAction(grasp_candidate=grasp, arm=sorting_arm))
             actions.append(
                 PlaceAction(
                     arm=sorting_arm,
-                    object_designator=piece,
-                    target_location=self.release_pose_over(hole, context.world),
+                    graspable=piece,
+                    goal_pose=self.release_pose_over(hole=hole, world=context.world),
                 )
             )
         actions.append(ParkArmsAction(arms=robot.all_arms))
@@ -464,7 +471,7 @@ class ShapeSortingPlan:
         statechart.add_node(node=Sequence(nodes=actions))
         return statechart
 
-    def release_pose_over(self, hole: HoleShape, world: World) -> Pose:
+    def release_pose_over(self, *, hole: HoleShape, world: World) -> Pose:
         """
         :param hole: The hole a piece is sorted into.
         :param world: The world the board stands in.
@@ -473,7 +480,7 @@ class ShapeSortingPlan:
             stood in, which is the hole's.
         """
         center = self.scene.shape_sorting_board.geometry.hole_of_shape(
-            hole
+            shape=hole
         ).bounds.center
         board_T_release = Pose.from_xyz_rpy(
             center.x,
@@ -489,7 +496,7 @@ class ShapeSortingPlan:
 # %% running it
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DemoRunner(ABC):
     """
     Carries the sorting plan out in one way: physically simulated, kinematically

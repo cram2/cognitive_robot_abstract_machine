@@ -1,3 +1,7 @@
+"""
+Tests that copies of probabilistic models are independent of the originals.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -36,17 +40,17 @@ from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 @pytest.fixture
 def horizontal() -> Continuous:
-    return Continuous("horizontal")
+    return Continuous(name="horizontal")
 
 
 @pytest.fixture
 def vertical() -> Continuous:
-    return Continuous("vertical")
+    return Continuous(name="vertical")
 
 
 @pytest.fixture
 def color() -> Symbolic:
-    return Symbolic("color", domain=Set.from_iterable(["red", "green"]))
+    return Symbolic(name="color", domain=Set.from_iterable(iterable=["red", "green"]))
 
 
 @pytest.fixture
@@ -62,7 +66,7 @@ def circuit(horizontal: Continuous, vertical: Continuous) -> ProbabilisticCircui
             leaf(
                 UniformDistribution(
                     variable=horizontal,
-                    interval=SimpleInterval.from_data(lower, lower + 1),
+                    interval=SimpleInterval.from_data(lower=lower, upper=lower + 1),
                 ),
                 result,
             )
@@ -105,13 +109,13 @@ def model(
     if request.param == ModelKind.TRUNCATED_GAUSSIAN:
         return TruncatedGaussianDistribution(
             variable=horizontal,
-            interval=SimpleInterval.from_data(-1, 1),
+            interval=SimpleInterval.from_data(lower=-1, upper=1),
             location=0.0,
             scale=1.0,
         )
     if request.param == ModelKind.UNIFORM:
         return UniformDistribution(
-            variable=horizontal, interval=SimpleInterval.from_data(0, 1)
+            variable=horizontal, interval=SimpleInterval.from_data(lower=0, upper=1)
         )
     if request.param == ModelKind.DIRAC_DELTA:
         return DiracDeltaDistribution(
@@ -173,10 +177,17 @@ def test_a_deep_copy_of_a_circuit_shares_variables_across_its_leaves(
 def test_a_deep_copy_of_a_model_does_not_move_with_the_original(
     model: ProbabilisticModel,
 ):
+    """
+    Changing a model after deep copying it leaves the copy as it was.
+    """
     copied = copy.deepcopy(model)
     samples = copied.sample(10)
-    log_likelihood_before = copied.log_likelihood(samples)
+    log_likelihood_before = copied.log_likelihood(events=samples)
     model.apply_translation(
-        {variable: 100.0 for variable in model.variables if variable.is_numeric}
+        translation={
+            variable: 100.0 for variable in model.variables if variable.is_numeric
+        }
     )
-    np.testing.assert_array_equal(copied.log_likelihood(samples), log_likelihood_before)
+    np.testing.assert_array_equal(
+        copied.log_likelihood(events=samples), log_likelihood_before
+    )

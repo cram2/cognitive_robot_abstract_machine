@@ -40,6 +40,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.moment_query import (
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     EdgeMatrix,
+    EdgeWeighting,
     RowReduction,
     SparseEdgeMatrix,
     SparseEntries,
@@ -88,10 +89,14 @@ class MixtureOfProductsCase:
         :return: The circuit with every parameter an array of that namespace.
         """
         leaf_x = GaussianLayer(
-            0, namespace.asarray([-1.0, 2.0]), namespace.asarray([0.5, 1.5])
+            np.zeros(2, dtype=np.int64),
+            namespace.asarray([-1.0, 2.0]),
+            namespace.asarray(np.log([0.5, 1.5])),
         )
         leaf_y = GaussianLayer(
-            1, namespace.asarray([0.0, 1.0]), namespace.asarray([1.0, 2.0])
+            np.full(2, 1, dtype=np.int64),
+            namespace.asarray([0.0, 1.0]),
+            namespace.asarray(np.log([1.0, 2.0])),
         )
         products = ProductLayer.node_wise_product_of([leaf_x, leaf_y])
         products.store_edges_as(edge_matrix_type)
@@ -147,14 +152,6 @@ class MixtureOfProductsCase:
         )
 
 
-@pytest.fixture
-def mixture_of_products_case() -> MixtureOfProductsCase:
-    """
-    The circuit whose queries are compared across backends.
-    """
-    return MixtureOfProductsCase(Continuous("x"), Continuous("y"))
-
-
 # %% numeric queries agree with numpy on every backend
 
 
@@ -168,9 +165,9 @@ def test_log_likelihood_on_every_backend(
     case = mixture_of_products_case
     assert_result_of_backend_equals(
         case.circuit(array_backend, edge_matrix_type).log_likelihood(
-            case.events(array_backend)
+            events=case.events(array_backend)
         ),
-        case.circuit(np).log_likelihood(case.events(np)),
+        case.circuit(np).log_likelihood(events=case.events(np)),
         array_backend,
     )
 
@@ -203,9 +200,11 @@ def test_probability_of_simple_event_of_nodes_on_every_backend(
     assert_result_of_backend_equals(
         case.circuit(
             array_backend, edge_matrix_type
-        ).root.probability_of_simple_event_of_nodes(case.simple_event, case.variables),
+        ).root.probability_of_simple_event_of_nodes(
+            event=case.simple_event, variables=case.variables
+        ),
         case.circuit(np).root.probability_of_simple_event_of_nodes(
-            case.simple_event, case.variables
+            event=case.simple_event, variables=case.variables
         ),
         array_backend,
     )
@@ -239,9 +238,11 @@ def test_log_likelihood_compiles_with_jax(mixture_of_products_case, edge_matrix_
     case = mixture_of_products_case
     with jax.enable_x64(True):
         circuit = case.circuit(jnp, edge_matrix_type)
-        result = jax.jit(circuit.log_likelihood)(case.events(jnp))
+        result = jax.jit(lambda events: circuit.log_likelihood(events=events))(
+            case.events(jnp)
+        )
         assert_result_of_backend_equals(
-            result, case.circuit(np).log_likelihood(case.events(np)), jnp
+            result, case.circuit(np).log_likelihood(events=case.events(np)), jnp
         )
 
 
@@ -272,9 +273,9 @@ def test_a_circuit_that_answered_a_query_can_be_deep_copied(
     """
     case = mixture_of_products_case
     circuit = case.circuit(array_backend, edge_matrix_type)
-    expected = np.asarray(circuit.log_likelihood(case.events(array_backend)))
+    expected = np.asarray(circuit.log_likelihood(events=case.events(array_backend)))
     assert_result_of_backend_equals(
-        copy.deepcopy(circuit).log_likelihood(case.events(array_backend)),
+        copy.deepcopy(circuit).log_likelihood(events=case.events(array_backend)),
         expected,
         array_backend,
     )
@@ -298,8 +299,8 @@ def test_storing_the_edges_in_another_matrix_keeps_the_log_likelihood(
         if isinstance(layer, InnerLayer)
     )
     np.testing.assert_allclose(
-        circuit.log_likelihood(case.events(np)),
-        case.circuit(np).log_likelihood(case.events(np)),
+        circuit.log_likelihood(events=case.events(np)),
+        case.circuit(np).log_likelihood(events=case.events(np)),
         rtol=1e-12,
     )
 
@@ -322,8 +323,8 @@ def test_a_truncated_circuit_keeps_the_type_of_its_edge_matrices(
     )
     assert truncation.probability == pytest.approx(expected.probability, rel=1e-12)
     np.testing.assert_allclose(
-        truncation.distribution.log_likelihood(case.events(np)),
-        expected.distribution.log_likelihood(case.events(np)),
+        truncation.distribution.log_likelihood(events=case.events(np)),
+        expected.distribution.log_likelihood(events=case.events(np)),
         rtol=1e-12,
     )
 
@@ -348,7 +349,7 @@ def reduced_by_definition(
     return np.stack(
         [
             combine(values[..., edges.columns[edges.rows == row]], axis=-1)
-            for row in range(edges.shape[0])
+            for row in range(edges.shape.number_of_rows)
         ],
         axis=-1,
     )
@@ -364,15 +365,54 @@ def test_reduce_by_row_on_every_backend(
     edges.
     """
     edges = edge_matrix_type.from_edge_positions(
-        uneven_rows.rows, uneven_rows.columns, uneven_rows.shape
+        rows=uneven_rows.rows, columns=uneven_rows.columns, shape=uneven_rows.shape
     )
     values = np.array(
         [[0.5, -1.0, 2.0, 0.25, -0.5, 1.5], [1.0, 2.0, -3.0, 0.5, 0.75, -0.25]]
     )
     assert_result_of_backend_equals(
         edges.reduce_by_row(
-            edges.values_of_columns(array_backend.asarray(values)), reduction
+            values=edges.values_of_columns(values=array_backend.asarray(values)),
+            reduction=reduction,
         ),
         reduced_by_definition(values, edges, reduction),
+        array_backend,
+    )
+
+
+@pytest.mark.parametrize("reduction", list(RowReduction))
+@pytest.mark.parametrize("combination", [RowReduction.SUM, RowReduction.PRODUCT])
+def test_reduce_weighted_child_values_by_row_on_every_backend(
+    uneven_rows, edge_matrix_type, reduction, combination, array_backend
+):
+    """
+    Reducing the values of the children of every row, each joined with the value of its
+    edge, gives an array of the backend of the values that matches joining and reducing
+    one row at a time.
+    """
+    edges = edge_matrix_type.from_edge_positions(
+        rows=uneven_rows.rows, columns=uneven_rows.columns, shape=uneven_rows.shape
+    )
+    values = np.array(
+        [[0.5, -1.0, 2.0, 0.25, -0.5, 1.5], [1.0, 2.0, -3.0, 0.5, 0.75, -0.25]]
+    )
+    edge_values = np.array([0.3, -0.7, 1.1, 0.2, -0.4, 0.9])
+    stored = edges.stored_values(
+        entries=SparseEntries(
+            array_backend.asarray(edge_values), uneven_rows.rows, uneven_rows.columns
+        ),
+        padding=0.0,
+    )
+    weighted_by_edge = np.zeros((2, uneven_rows.shape.number_of_columns))
+    weighted_by_edge[:, uneven_rows.columns] = combination.combine(
+        np, values[:, uneven_rows.columns], edge_values
+    )
+    assert_result_of_backend_equals(
+        edges.reduce_child_values_by_row(
+            values=array_backend.asarray(values),
+            reduction=reduction,
+            weighting=EdgeWeighting(stored=stored, combination=combination),
+        ),
+        reduced_by_definition(weighted_by_edge, edges, reduction),
         array_backend,
     )

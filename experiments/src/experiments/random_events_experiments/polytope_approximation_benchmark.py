@@ -1,13 +1,12 @@
 """
 Benchmark for :meth:`~random_events.polytope.Polytope.inner_box_approximation` and
-:meth:`~random_events.polytope.Polytope.outer_box_approximation` on 2D and 3D
-polytopes.
+:meth:`~random_events.polytope.Polytope.outer_box_approximation` on 2D and 3D polytopes.
 
 Polytopes are convex hulls of random point clouds sampled on/within a sphere shell,
 which gives well-conditioned full-dimensional polytopes with a controllable number of
 facets (more points -> more facets, up to the O(n^floor(d/2)) facet blow-up of random
-points on a sphere for higher dimensions -- not relevant here since we only use d in
-{2, 3}).
+points on a sphere for higher dimensions -- not relevant here since we only use d in {2,
+3}).
 """
 
 from __future__ import annotations
@@ -95,8 +94,9 @@ class PolytopeApproximationBenchmarkResult(ExperimentResult):
     inner_volume_diff: float
     """
     :attr:`volume` minus the exact volume covered by the inner box approximation: the
-    volume the approximation misses. Always >= 0, since the inner box approximation is
-    a subset of the polytope.
+    volume the approximation misses.
+
+    Always >= 0, since the inner box approximation is a subset of the polytope.
     """
 
     inner_box_approximation_duration: float
@@ -112,8 +112,9 @@ class PolytopeApproximationBenchmarkResult(ExperimentResult):
     outer_volume_diff: float
     """
     The exact volume covered by the outer box approximation minus :attr:`volume`: the
-    excess volume the approximation covers. Always >= 0, since the outer box
-    approximation is a superset of the polytope.
+    excess volume the approximation covers.
+
+    Always >= 0, since the outer box approximation is a superset of the polytope.
     """
 
     outer_box_approximation_duration: float
@@ -140,16 +141,16 @@ def run_benchmark(
     :return: Timing and approximation-quality measurements for this polytope.
     """
     points = random_hull_points(number_of_points, number_of_dimensions, seed)
-    polytope = Polytope.from_points(points)
+    polytope = Polytope.from_points(points=points)
     volume = exact_volume(points)
     min_volume = volume * min_volume_fraction
 
     begin = time.perf_counter()
-    inner_event = polytope.inner_box_approximation(min_volume)
+    inner_event = polytope.inner_box_approximation(minimum_volume=min_volume)
     inner_box_approximation_duration = time.perf_counter() - begin
 
     begin = time.perf_counter()
-    outer_event = polytope.outer_box_approximation(min_volume)
+    outer_event = polytope.outer_box_approximation(minimum_volume=min_volume)
     outer_box_approximation_duration = time.perf_counter() - begin
 
     return PolytopeApproximationBenchmarkResult(

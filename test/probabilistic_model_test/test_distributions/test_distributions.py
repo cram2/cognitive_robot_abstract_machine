@@ -1,3 +1,7 @@
+"""
+Tests of the integer, symbolic and Dirac delta distributions.
+"""
+
 from __future__ import annotations
 
 import json
@@ -43,7 +47,7 @@ def integer_variable() -> Integer:
     """
     An integer variable.
     """
-    return Integer("x")
+    return Integer(name="x")
 
 
 @pytest.fixture
@@ -51,7 +55,7 @@ def letter_variable() -> Symbolic:
     """
     A symbolic variable over :class:`Letter`.
     """
-    return Symbolic(name="x", domain=Set.from_iterable(Letter))
+    return Symbolic(name="x", domain=Set.from_iterable(iterable=Letter))
 
 
 @pytest.fixture
@@ -168,9 +172,35 @@ def test_integer_truncation_to_a_singleton(integer_variable):
 
 
 def test_integer_fit(integer_distribution):
-    integer_distribution.fit([1, 2, 2, 2])
+    """
+    Fitted to data, an integer distribution has the frequency of every value as its
+    probability.
+    """
+    integer_distribution.fit(data=[1, 2, 2, 2])
     assert integer_distribution.probabilities[1] == 1 / 4
     assert integer_distribution.probabilities[2] == 3 / 4
+
+
+def test_integer_likelihood_of_minus_one(integer_variable):
+    """
+    The likelihood of -1 is its probability, although Python hashes -1 as -2.
+    """
+    probabilities = MissingDict(float, {-2: 0.1, -1: 0.3, 0: 0.6})
+    distribution = IntegerDistribution(
+        variable=integer_variable, probabilities=probabilities
+    )
+    likelihood = distribution.likelihood(np.array([[-2], [-1], [0]]))
+    assert likelihood == pytest.approx(
+        [probabilities[-2], probabilities[-1], probabilities[0]]
+    )
+
+
+def test_integer_fit_of_minus_one(integer_distribution):
+    """
+    Fitted on data holding -1, the distribution keeps the frequency of -1 at -1.
+    """
+    integer_distribution.fit(data=np.array([-2, -1, -1, 0]))
+    assert dict(integer_distribution.probabilities) == {-2: 1 / 4, -1: 2 / 4, 0: 1 / 4}
 
 
 def test_integer_support(integer_distribution):
@@ -226,8 +256,8 @@ def test_symbolic_probability(letter_distribution, letter_variable):
 def test_symbolic_support(letter_distribution, letter_variable):
     all_elements = letter_variable.domain.simple_sets[0].all_elements
     assert letter_distribution.univariate_support == Set.from_simple_sets(
-        SetElement.from_data(Letter.A, all_elements),
-        SetElement.from_data(Letter.B, all_elements),
+        SetElement.from_data(element=Letter.A, all_elements=all_elements),
+        SetElement.from_data(element=Letter.B, all_elements=all_elements),
     )
 
 
@@ -240,7 +270,7 @@ def test_symbolic_fit(letter_distribution, letter_variable):
 
 
 def test_symbolic_truncation_to_a_singleton():
-    variable = Symbolic("x", domain=Set.from_iterable(["a", "b"]))
+    variable = Symbolic(name="x", domain=Set.from_iterable(iterable=["a", "b"]))
     distribution = SymbolicDistribution(
         variable=variable,
         probabilities=MissingDict(float, {hash("a"): 0.4, hash("b"): 0.6}),
@@ -262,11 +292,13 @@ def test_symbolic_likelihood_survives_a_category_whose_hash_exceeds_the_modulus(
         for candidate in (f"category_{index}" for index in range(1000))
         if abs(hash(candidate)) >= modulus
     )
-    variable = Symbolic("category", domain=Set.from_iterable([category, "other"]))
+    variable = Symbolic(
+        name="category", domain=Set.from_iterable(iterable=[category, "other"])
+    )
     distribution = SymbolicDistribution(
         variable=variable, probabilities=MissingDict(float, {hash(category): 1.0})
     )
-    log_likelihood = distribution.log_likelihood(np.array([[category]]))
+    log_likelihood = distribution.log_likelihood(events=np.array([[category]]))
     assert log_likelihood[0] == pytest.approx(0.0)
 
 
@@ -357,6 +389,16 @@ def test_dirac_delta_moments(dirac_delta, x):
     assert dirac_delta.moment(VariableMap({x: 3}), expectation)[x] == 0
 
 
+def test_dirac_delta_scaling_multiplies_the_location(x):
+    """
+    Scaled, a Dirac delta keeps its mass at the scaled location.
+    """
+    location, factor = 2.0, 3.0
+    distribution = DiracDeltaDistribution(variable=x, location=location)
+    distribution.apply_scaling(scaling={x: factor})
+    assert distribution.location == location * factor
+
+
 # %% events compatible with truncation to singletons
 
 
@@ -375,7 +417,7 @@ def test_an_event_mixing_singletons_and_intervals_is_incompatible_with_truncatio
 
 
 def test_symbolic_variables_do_not_affect_compatibility_with_truncation(x):
-    y = Symbolic("y", domain=Set.from_iterable(["a", "b"]))
+    y = Symbolic(name="y", domain=Set.from_iterable(iterable=["a", "b"]))
     event = SimpleEvent.from_data(
         {x: singleton(1.0) | singleton(2.0), y: ("a", "b")}
     ).as_composite_set()

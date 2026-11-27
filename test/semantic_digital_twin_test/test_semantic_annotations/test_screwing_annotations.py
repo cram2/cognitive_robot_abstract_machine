@@ -17,7 +17,7 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
     WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -120,8 +120,8 @@ def test_bolt_models_head_and_shaft_as_part_whole_relationships() -> None:
         head = BoltHead(root=head_body)
         shaft = BoltShaft(root=shaft_body)
         world.add_semantic_annotations([bolt, head, shaft])
-        bolt.add(head)
-        bolt.add(shaft)
+        bolt.add(part=head)
+        bolt.add(part=shaft)
 
     assert bolt.head is head
     assert bolt.shaft is shaft
@@ -150,7 +150,7 @@ def test_bolt_grasp_candidates_delegate_to_bolt_head() -> None:
         bolt = Bolt(root=bolt_body)
         head = BoltHead(root=head_body)
         world.add_semantic_annotations([bolt, head])
-        bolt.add(head)
+        bolt.add(part=head)
 
     assert bolt.grasped_part() is head
     _assert_axial_top_down_candidates(
@@ -215,15 +215,15 @@ def test_bolt_with_head_and_shaft_survives_json_round_trip() -> None:
         head = BoltHead(root=head_body)
         shaft = BoltShaft(root=shaft_body)
         world.add_semantic_annotations([bolt, head, shaft])
-        bolt.add(head)
-        bolt.add(shaft)
+        bolt.add(part=head)
+        bolt.add(part=shaft)
 
     other_world = World()
     tracker = WorldEntityWithIDKwargsTracker()
     for block in world.get_world_model_manager().model_modification_blocks:
         sent = from_json(to_json(block), **tracker.create_kwargs())
         with other_world.modify_world():
-            sent.apply(other_world)
+            sent.apply(world=other_world)
 
     [arrived_bolt] = other_world.get_semantic_annotations_by_type(Bolt)
     assert isinstance(arrived_bolt.head, BoltHead)
@@ -325,12 +325,12 @@ def test_screwdriver_tool_alignment_uses_tip_body_and_target_frame() -> None:
         pairs = screwdriver.tool_alignment(target)
         assert len(pairs) == 1
         assert pairs[0].tip_normal.reference_frame is tip_body
-        assert pairs[0].goal_normal.reference_frame is target_body
+        assert pairs[0].reference_normal.reference_frame is target_body
         np.testing.assert_allclose(
             pairs[0].tip_normal.to_np()[:3], [0.0, 0.0, 1.0], atol=1e-9
         )
         np.testing.assert_allclose(
-            pairs[0].goal_normal.to_np()[:3], [0.0, 0.0, 1.0], atol=1e-9
+            pairs[0].reference_normal.to_np()[:3], [0.0, 0.0, 1.0], atol=1e-9
         )
 
 
@@ -351,4 +351,4 @@ def test_screwdriver_tool_alignment_falls_back_to_root_without_tip_body() -> Non
     pairs = screwdriver.tool_alignment(target_body)
     assert len(pairs) == 1
     assert pairs[0].tip_normal.reference_frame is handle_body
-    assert pairs[0].goal_normal.reference_frame is target_body
+    assert pairs[0].reference_normal.reference_frame is target_body

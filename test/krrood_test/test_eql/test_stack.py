@@ -14,6 +14,7 @@ Covers:
 """
 
 import inspect
+import sys
 from dataclasses import dataclass
 
 import pytest
@@ -22,6 +23,10 @@ from krrood.entity_query_language._stack import CallStack, StackFrame
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, inference
 from krrood.symbol_graph.symbol_graph import Symbol
+import krrood.patterns.role
+from krrood.entity_query_language.explanation.explanation import (
+    _is_krrood_internal_frame,
+)
 
 
 @dataclass(kw_only=True, unsafe_hash=True)
@@ -367,3 +372,39 @@ def test_root_frame_in_outermost_wins():
     # The outermost test_stack frame is the test function itself, not inner()
     assert root is not None
     assert root.function_name == "test_root_frame_in_outermost_wins"
+
+
+# %% a name cls that is no class
+
+
+def test_a_local_named_cls_that_is_no_class_is_no_owner_class():
+    """
+    A local named cls that is no class is not taken for the class owning the frame's
+    function.
+    """
+    cls = "not a class"
+
+    frame = StackFrame.from_raw_frame(frame=sys._getframe())
+
+    assert frame.class_object is None
+
+
+# %% frames inside krrood
+
+
+def test_a_frame_without_a_module_name_in_any_krrood_distribution_is_internal() -> None:
+    """
+    A frame known only by its file is internal to krrood wherever the file is shipped,
+    not only in the distribution that records the frame.
+    """
+    frame = StackFrame(
+        filename=krrood.patterns.role.__file__,
+        lineno=1,
+        function_name="role",
+        code_snippet=None,
+        class_object=None,
+        function_object=None,
+        module_name=None,
+    )
+
+    assert _is_krrood_internal_frame(frame)

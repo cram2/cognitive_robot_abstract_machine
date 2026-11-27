@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import Region
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Classification(Annotation):
     """Classification annotation for objects.
 
@@ -70,7 +70,7 @@ class Classification(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SemanticColor(Annotation):
     """Semantic color annotation.
 
@@ -89,7 +89,7 @@ class SemanticColor(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LocationAnnotation(Annotation):
     """Location annotation for objects.
 
@@ -107,7 +107,7 @@ class LocationAnnotation(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Plane(Annotation):
     """Plane annotation for surface detection.
 
@@ -126,7 +126,7 @@ class Plane(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Shape(Annotation):
     """Base class for shape annotations.
 
@@ -149,7 +149,7 @@ class Shape(Annotation):
         return self.geometry.__class__.__name__
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cuboid(Shape):
     """Cuboid shape annotation.
 
@@ -162,7 +162,7 @@ class Cuboid(Shape):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sphere(Shape):
     """Sphere shape annotation.
 
@@ -175,7 +175,7 @@ class Sphere(Shape):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Cylinder(Shape):
     """Cylinder shape annotation.
 
@@ -188,7 +188,7 @@ class Cylinder(Shape):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColorHistogram(Annotation):
     """Color histogram annotation.
 
@@ -207,7 +207,7 @@ class ColorHistogram(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PoseAnnotation(Pose, Annotation):
     """Pose annotation combining transform and annotation functionality.
 
@@ -218,7 +218,7 @@ class PoseAnnotation(Pose, Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PositionAnnotation(Position, Annotation):
     """Position annotation combining position and annotation functionality.
 
@@ -229,7 +229,7 @@ class PositionAnnotation(Position, Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StampedPoseAnnotation(StampedPose, Annotation):
     """Timestamped pose annotation.
 
@@ -239,7 +239,7 @@ class StampedPoseAnnotation(StampedPose, Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StampedPositionAnnotation(StampedPosition, Annotation):
     """Timestamped position annotation.
 
@@ -249,7 +249,7 @@ class StampedPositionAnnotation(StampedPosition, Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StampedTransformAnnotation(StampedTransform, Annotation):
     """Timestamped transform annotation.
 
@@ -259,7 +259,7 @@ class StampedTransformAnnotation(StampedTransform, Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Encoding(Annotation):
     """An abstract Encoding Type.
 
@@ -273,7 +273,7 @@ class Encoding(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoundingBox3DAnnotation(BoundingBox3D, Annotation):
     """3D bounding box annotation.
 
@@ -283,7 +283,7 @@ class BoundingBox3DAnnotation(BoundingBox3D, Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CloudAnnotation(Points3D, Annotation):
     """Point cloud annotation.
 
@@ -293,7 +293,7 @@ class CloudAnnotation(Points3D, Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SpatiallyNearestAnnotation(Annotation):
     """
     Annotation to describe the spatially nearest object to the camera.
@@ -303,7 +303,7 @@ class SpatiallyNearestAnnotation(Annotation):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TextAnnotation(Annotation):
     """Text annotation."""
 
@@ -313,7 +313,7 @@ class TextAnnotation(Annotation):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SIFTAnnotation(Annotation):
     """SIFT feature annotation."""
 
@@ -326,18 +326,25 @@ class SIFTAnnotation(Annotation):
     @classmethod
     def from_cv2(
         cls,
+        *,
         keypoints: Sequence[cv2.KeyPoint],
         descriptors: Sequence[npt.NDArray[np.float32]],
     ) -> SIFTAnnotation:
+        """
+        :param keypoints: Keypoints OpenCV's SIFT detector found.
+        :param descriptors: The SIFT descriptor of each keypoint, in the same order.
+        :return: The annotation holding both.
+        """
         return cls(
-            keypoints=[KeyPoint.from_cv(k) for k in keypoints], descriptors=descriptors
+            keypoints=[KeyPoint.from_cv(keypoint=k) for k in keypoints],
+            descriptors=descriptors,
         )
 
     def cv2_keypoints(self) -> list[cv2.KeyPoint]:
         return [KeyPoint.to_cv(k) for k in self.keypoints]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TSDFAnnotation(Annotation):
     """A TSDF Volume annotation."""
 

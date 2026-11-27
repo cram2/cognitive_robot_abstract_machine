@@ -13,6 +13,7 @@ import argparse
 import dataclasses
 import functools
 import json
+import math
 import os
 import subprocess
 import sys
@@ -55,21 +56,16 @@ from experiments.circuit_learning.settings import (
     ComputationSetting,
     Device,
 )
-from probabilistic_model.learning.torch_gradient_descent import TorchDeviceType
-from probabilistic_model.learning.training_schedule import Convergence
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
+    CompilerOption,
+    CompilerVariable,
+)
+from probabilistic_model.learning.parameters.torch_circuit_parameter_learning import (
+    TorchDeviceType,
+)
+from probabilistic_model.learning.parameters.training_schedule import Convergence
 
 # %% names
-
-
-class CompilerVariable(StrEnum):
-    """
-    The environment variables that configure the compilers of a run.
-    """
-
-    ACCELERATED_LINEAR_ALGEBRA_OPTIONS = "XLA_FLAGS"
-    """
-    The options of the XLA compiler.
-    """
 
 
 class OutputFile(StrEnum):
@@ -429,15 +425,32 @@ class BenchmarkRunner:
         )
         print(f"{status} {run.key} {duration}", flush=True)
 
+    def run_environment(self, *, share: MachineShare) -> dict[str, str]:
+        """
+        :param share: The share of the machine a run computes on.
+        :return: The environment of the process of the run, whose jax divides the
+            processor cores of a share without the GPU into as many devices as the
+            largest power of two of at most its number of cores.
+        """
+        environment = share.process_environment(environment=dict(os.environ))
+        # autotuning makes compiling a step take minutes on large batches
+        options = [CompilerOption.GRAPHICS_PROCESSOR_AUTOTUNE_LEVEL.to_flag(value=0)]
+        if share.device is Device.CENTRAL_PROCESSOR:
+            # a power of two splits the batch sizes of the methods evenly
+            devices = 2 ** int(math.log2(len(share.processor_cores)))
+            options.append(
+                CompilerOption.HOST_PLATFORM_DEVICE_COUNT.to_flag(value=devices)
+            )
+        environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = " ".join(
+            options
+        )
+        return environment
+
     def start(self, *, run: BenchmarkRun, share: MachineShare) -> RunInProgress:
         """
         :return: The run, started in a process of its own on the share.
         """
-        environment = share.process_environment(environment=dict(os.environ))
-        # autotuning makes compiling a step take minutes on large batches
-        environment[CompilerVariable.ACCELERATED_LINEAR_ALGEBRA_OPTIONS] = (
-            "--xla_gpu_autotune_level=0"
-        )
+        environment = self.run_environment(share=share)
         limits = dataclasses.replace(
             self.limits, memory_budget_bytes=share.memory_budget_bytes
         )

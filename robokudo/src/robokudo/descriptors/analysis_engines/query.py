@@ -30,6 +30,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
 from robokudo.utils.tree import add_children_to_parent
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -80,7 +81,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         :return: The configured pipeline for query processing
         """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "kinect_wo_tf"
+            camera="kinect_wo_tf"
         )
 
         seq = Pipeline("RWPipeline")
@@ -92,6 +93,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 QueryAnnotator(),
                 CollectionReaderAnnotator(descriptor=kinect_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
+                WorldUpdatingAnnotator(),
                 QueryReply(),
                 ActionServerCheck(),
             ],

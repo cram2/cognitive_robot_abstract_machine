@@ -20,11 +20,11 @@ from scipy.special import logsumexp
 from sortedcontainers import SortedSet
 
 from probabilistic_model.adapters.circuit_representations import CircuitRepresentations
-from probabilistic_model.learning.region_graph.exceptions import (
+from probabilistic_model.learning.structure.region_graph.exceptions import (
     MultipleRootsError,
     UnsupportedRegionVariableError,
 )
-from probabilistic_model.learning.region_graph.region_graph import (
+from probabilistic_model.learning.structure.region_graph.region_graph import (
     Partition,
     Region,
     RegionGraph,
@@ -63,7 +63,7 @@ def target() -> Symbolic:
     """
     The variable a classification circuit predicts.
     """
-    return Symbolic(name="target", domain=Set.from_iterable(Target))
+    return Symbolic(name="target", domain=Set.from_iterable(iterable=Target))
 
 
 def continuous_variables(number_of_variables: int, prefix: str = "") -> SortedSet:
@@ -73,7 +73,7 @@ def continuous_variables(number_of_variables: int, prefix: str = "") -> SortedSe
     :return: The variables.
     """
     return SortedSet(
-        [Continuous(f"{prefix}{index}") for index in range(number_of_variables)]
+        [Continuous(name=f"{prefix}{index}") for index in range(number_of_variables)]
     )
 
 
@@ -134,7 +134,7 @@ def test_a_leaf_region_over_an_integer_variable_raises():
     No input distribution of a region graph circuit models an integer variable.
     """
     region_graph = RegionGraph(
-        variables=SortedSet([Integer("count")]), depth=0, repetitions=1
+        variables=SortedSet([Integer(name="count")]), depth=0, repetitions=1
     ).create_random_region_graph()
     with pytest.raises(UnsupportedRegionVariableError):
         region_graph.to_probabilistic_circuit()
@@ -282,7 +282,9 @@ def test_a_region_graph_without_splits_is_a_mixture_of_fully_factorized_inputs()
     )
     assert number_of_sum_weights(circuit) == 4
     data = np.random.default_rng(0).normal(size=(10, 3))
-    assert np.all(np.isfinite(np.asarray(circuit.log_likelihood(jnp.asarray(data)))))
+    assert np.all(
+        np.isfinite(np.asarray(circuit.log_likelihood(events=jnp.asarray(data))))
+    )
 
 
 def test_every_partition_of_a_deep_region_graph_over_few_variables_has_children():
@@ -308,7 +310,7 @@ def test_deep_region_graph_over_few_variables_becomes_a_circuit():
     ).create_random_region_graph()
     model = region_graph.to_probabilistic_circuit(input_units=3, sum_units=5)
     data = jnp.array(np.random.normal(size=(20, 5)))
-    assert jnp.all(jnp.isfinite(model.log_likelihood(data)))
+    assert jnp.all(jnp.isfinite(model.log_likelihood(events=data)))
 
 
 # %% learning

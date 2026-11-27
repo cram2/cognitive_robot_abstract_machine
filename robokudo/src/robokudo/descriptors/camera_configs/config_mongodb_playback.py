@@ -30,7 +30,7 @@ class MongoReplayMode(StrEnum):
     """
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class MongoCameraConfig(BaseCameraConfig, WorldDescriptorComponent):
     """
     Configuration class for MongoDB-based camera data playback.

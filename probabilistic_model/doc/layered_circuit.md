@@ -40,8 +40,8 @@ from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, SumUnit, ProductUnit, leaf
 
 
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 model = ProbabilisticCircuit()
 sum1, sum2, sum3 = SumUnit(probabilistic_circuit=model), SumUnit(probabilistic_circuit=model), SumUnit(probabilistic_circuit=model)
 sum4, sum5 = SumUnit(probabilistic_circuit=model), SumUnit(probabilistic_circuit=model)
@@ -54,10 +54,10 @@ prod1.add_subcircuit(sum4)
 prod2.add_subcircuit(sum3)
 prod2.add_subcircuit(sum5)
 
-d_x1 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(0, 1)), probabilistic_circuit=model)
-d_x2 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(2, 3)), probabilistic_circuit=model)
-d_y1 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(0, 1)), probabilistic_circuit=model)
-d_y2 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(3, 4)), probabilistic_circuit=model)
+d_x1 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(lower=0, upper=1)), probabilistic_circuit=model)
+d_x2 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(lower=2, upper=3)), probabilistic_circuit=model)
+d_y1 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(lower=0, upper=1)), probabilistic_circuit=model)
+d_y2 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(lower=3, upper=4)), probabilistic_circuit=model)
 
 sum2.add_subcircuit(d_x1, np.log(0.8))
 sum2.add_subcircuit(d_x2, np.log(0.2))
@@ -150,7 +150,7 @@ point type; the queries then compute in that library and type.
 import jax.numpy as jnp
 
 jax_model = numpy_model.to_namespace(jnp)
-print(jax_model.log_likelihood(jnp.asarray([[0.5], [1.5]])))
+print(jax_model.log_likelihood(events=jnp.asarray([[0.5], [1.5]])))
 ```
 
 Under `jax.jit` the log-likelihood compiles into a single function. Structural queries
@@ -165,10 +165,10 @@ sum layers of a RAT-SPN, and much slower for sparsely connected ones;
 `store_edges_as` converts every inner layer of a circuit.
 
 A circuit with JAX parameters is trained by gradient descent with `fit`, or with
-`JaxGradientDescent` from `probabilistic_model.learning.jax_gradient_descent` and a `Loss`
-from `probabilistic_model.learning.gradient_descent`; a
+`JaxGradientDescent` from `probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent` and a `Loss`
+from `probabilistic_model.learning.parameters.gradient_descent.gradient_descent`; a
 circuit with PyTorch parameters with `TorchGradientDescent` from
-`probabilistic_model.learning.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
+`probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent`. `RegionGraph.to_probabilistic_circuit`
 builds a randomly initialized RAT-SPN (Peharz et al., 2019) as a layered circuit with NumPy
 parameters, which `to_namespace` moves to JAX or PyTorch for training: fully factorized input distributions in every leaf region, the cross products
 of the regions of every partition and fully connected sum layers in every other region. A

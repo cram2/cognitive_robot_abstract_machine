@@ -39,14 +39,14 @@ Now to set up the environment, we will use URDF files for the robot and the envi
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").create_world()
-milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").create_world()
+apartment_world = URDFParser.from_file("package://iai_apartment/urdf/apartment.urdf").create_world()
+milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
 pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 ```
 
 ```{note}
-The PR2 description is resolved from the `iai_pr2_description` ROS package rather than a file shipped with
-CoraPlex. CoraPlex itself only bundles `resources/worlds` and `resources/objects`.
+The apartment, the PR2 description and the milk mesh are resolved from the `iai_apartment`, `iai_pr2_description`
+and `iai_objects` ROS packages rather than files shipped with CoraPlex.
 ```
 
 As you might have noticed each of the parsers returns an independent world which is not really useful. Therefore we need to
@@ -108,7 +108,7 @@ The plan will consist of the following steps:
 ```python
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.datastructures.definitions import TorsoState
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
@@ -136,19 +136,19 @@ plan = Sequence(
         ParkArmsAction(arms=pr2.all_arms),
         MoveTorsoAction(torso_state=TorsoState.HIGH),
         NavigateAction(
-            target_location=Pose.from_xyz_rpy(2.0, 2.0, 0.0, reference_frame=world.root)
+            planar_goal_pose=Pose2D.from_xy_yaw(x=2.0, y=2.0, reference_frame=world.root)
         ),
         PickUpAction(
-            grasp=milk.grasp_candidates()[0],
+            grasp_candidate=milk.grasp_candidates()[0],
             arm=pr2.right_arm,
         ),
         NavigateAction(
-            target_location=Pose.from_xyz_rpy(4.0, 4.0, 0.0, reference_frame=world.root)
+            planar_goal_pose=Pose2D.from_xy_yaw(x=4.0, y=4.0, reference_frame=world.root)
         ),
         PlaceAction(
             arm=pr2.right_arm,
-            object_designator=milk,
-            target_location=Pose.from_xyz_rpy(
+            graspable=milk,
+            goal_pose=Pose.from_xyz_rpy(
                 4.2, 4.0, 1.0, reference_frame=world.root
             ),
         ),

@@ -6,7 +6,6 @@ servos move its joints and its drive moves its base across the floor.
 from __future__ import annotations
 
 import pytest
-from typing_extensions import Iterator
 
 from ...plan_running import perform_in_physics, robot_extensions
 from ...pytest_environment import runs_in_continuous_integration
@@ -17,26 +16,8 @@ from coraplex.robot_plans.actions.core.robot_body import (
     ParkArmsAction,
 )
 from cramph.composites import Sequence
-from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from semantic_digital_twin.robots.hsrb import HSRB
 from krrood_spatial_math.spatial_types import Pose
-from semantic_digital_twin.specifications.robots import RobotSpecification
-from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.world_entity import Body
-
-
-@pytest.fixture
-def simulated_hsrb() -> Iterator[tuple[HSRB, MujocoSim]]:
-    world = World()
-    with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    hsrb = RobotSpecification(HSRB).spawn(world)
-    simulation = MujocoSim(world=world, headless=True)
-    simulation.start_stepped_simulation()
-    yield hsrb, simulation
-    simulation.stop_simulation()
 
 
 @pytest.mark.skipif(
@@ -45,6 +26,10 @@ def simulated_hsrb() -> Iterator[tuple[HSRB, MujocoSim]]:
 def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
     simulated_hsrb,
 ) -> None:
+    """
+    In a physical simulation the HSR raises its torso to the joint positions asked for
+    and drives to where it is sent.
+    """
     hsrb, simulation = simulated_hsrb
     world = hsrb._world
     goal = Pose.from_xyz_rpy(1.0, 0.5, 0.0, yaw=0.5, reference_frame=world.root)
@@ -53,7 +38,7 @@ def test_the_hsrb_raises_its_torso_and_drives_to_where_it_is_sent(
         nodes=[
             ParkArmsAction(arms=hsrb.all_arms),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
-            NavigateAction(target_location=goal),
+            NavigateAction(planar_goal_pose=goal),
         ]
     )
 

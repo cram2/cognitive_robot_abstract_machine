@@ -32,7 +32,7 @@ from semantic_digital_twin.datastructures.definitions import GripperState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose2D
 from semantic_digital_twin.world import World
 from ...plan_running import run_plan
 
@@ -87,13 +87,13 @@ class GraspFailingItsFirstRuns(SequentialInsertion[GraspingAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.AFTER
 
-    def is_applicable(self, plan_node: GraspingAction) -> bool:
+    def is_applicable(self, *, plan_node: GraspingAction) -> bool:
         return True
 
-    def anchor(self, plan_node: GraspingAction) -> StatechartNode:
+    def anchor(self, *, plan_node: GraspingAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: GraspingAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: GraspingAction) -> list[StatechartNode]:
         step = StepFailingItsFirstRuns(failing_runs=self.failing_runs)
         self.inserted_steps.append(step)
         return [step]
@@ -162,15 +162,15 @@ class OpenGripperBeforeReadingIt(SequentialInsertion[GripperIsOpen]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: GripperIsOpen) -> bool:
+    def is_applicable(self, *, plan_node: GripperIsOpen) -> bool:
         return self.applicable
 
-    def anchor(self, plan_node: GripperIsOpen) -> StatechartNode:
+    def anchor(self, *, plan_node: GripperIsOpen) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: GripperIsOpen) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: GripperIsOpen) -> list[StatechartNode]:
         action = SetGripperAction(
-            configuration=plan_node.end_effector.default_configuration(
+            gripper_configuration=plan_node.end_effector.default_configuration(
                 self.gripper_state
             )
         )
@@ -188,13 +188,13 @@ class TransformationOnADifferentType(SequentialInsertion[ParkArmsAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: ParkArmsAction) -> bool:
+    def is_applicable(self, *, plan_node: ParkArmsAction) -> bool:
         return True
 
-    def anchor(self, plan_node: ParkArmsAction) -> StatechartNode:
+    def anchor(self, *, plan_node: ParkArmsAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: ParkArmsAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: ParkArmsAction) -> list[StatechartNode]:
         return []
 
 
@@ -209,10 +209,10 @@ class TransformationRecordingGripperActions(PlanTransformation[SetGripperAction]
     The gripper actions this transformation was applied to, in order.
     """
 
-    def is_applicable(self, plan_node: SetGripperAction) -> bool:
+    def is_applicable(self, *, plan_node: SetGripperAction) -> bool:
         return True
 
-    def apply(self, plan_node: SetGripperAction) -> None:
+    def apply(self, *, plan_node: SetGripperAction) -> None:
         self.offered_actions.append(plan_node)
 
 
@@ -231,18 +231,18 @@ class CloseGripperBeforeAFailingStep(SequentialInsertion[StepFailingItsFirstRuns
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: StepFailingItsFirstRuns) -> bool:
+    def is_applicable(self, *, plan_node: StepFailingItsFirstRuns) -> bool:
         return True
 
-    def anchor(self, plan_node: StepFailingItsFirstRuns) -> StatechartNode:
+    def anchor(self, *, plan_node: StepFailingItsFirstRuns) -> StatechartNode:
         return plan_node
 
     def nodes_to_insert(
-        self, plan_node: StepFailingItsFirstRuns
+        self, *, plan_node: StepFailingItsFirstRuns
     ) -> list[StatechartNode]:
         return [
             SetGripperAction(
-                configuration=self.end_effector.default_configuration(
+                gripper_configuration=self.end_effector.default_configuration(
                     GripperState.CLOSE
                 )
             )
@@ -257,7 +257,7 @@ def _closed_gripper(end_effector: EndEffector) -> SetGripperAction:
     :return: An action closing the gripper of `end_effector`.
     """
     return SetGripperAction(
-        configuration=end_effector.default_configuration(GripperState.CLOSE)
+        gripper_configuration=end_effector.default_configuration(GripperState.CLOSE)
     )
 
 
@@ -269,13 +269,15 @@ def _pick_up_of_the_milk(
         recovering from a failure with `recovery`, its pick-up, and the milk.
     """
     milk = world.get_semantic_annotations_by_type(Milk)[0]
-    pick_up = PickUpAction(grasp=milk.grasp_candidates()[0], arm=robot.right_arm)
+    pick_up = PickUpAction(
+        grasp_candidate=milk.grasp_candidates()[0], arm=robot.right_arm
+    )
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=robot.all_arms),
             NavigateAction(
-                target_location=Pose.from_xyz_rpy(
-                    1.5, 2.4, 0.0, reference_frame=world.root
+                planar_goal_pose=Pose2D.from_xy_yaw(
+                    x=1.5, y=2.4, reference_frame=world.root
                 )
             ),
             HandledOnFailure(handled_node=pick_up, failure_handling_strategy=recovery),

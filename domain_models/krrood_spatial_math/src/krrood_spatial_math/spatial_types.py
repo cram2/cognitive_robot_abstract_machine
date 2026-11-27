@@ -1,3 +1,9 @@
+"""
+Symbolic spatial types, such as points, vectors, rotations, transformations, poses,
+displacements, twists and screw axes, that carry the Cartesian frames they are
+expressed in.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -5,13 +11,18 @@ from copy import deepcopy, copy
 from dataclasses import dataclass, field
 from enum import Enum, StrEnum
 
+import math
+import sys
+
 import casadi as ca
 import numpy as np
 from typing_extensions import Any, overload, Self, Callable, TypeVar
 
 import krrood.symbolic_math.symbolic_math as sm
 from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.patterns.classproperty import classproperty
 from krrood.symbolic_math.exceptions import (
+    HasFreeVariablesError,
     WrongDimensionsError,
     UnsupportedOperationError,
 )
@@ -132,9 +143,13 @@ class SpatialType(ValueInCartesianFrame3D, ABC):
         """
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
+        """
+        Extends :meth:`SubclassJSONSerializer._from_json` by reading a constant value
+        from its numbers and a symbolic one from its expression graph.
+        """
         if sm.SymbolicMathJSONKey.EXPRESSION not in data:
-            return cls._from_constant_json(data, **kwargs)
+            return cls._from_constant_json(data=data, **kwargs)
         result = sm.ExpressionGraph.from_json(
             data=data[sm.SymbolicMathJSONKey.EXPRESSION], **kwargs
         ).to_expression(expression_type=cls)
@@ -154,7 +169,7 @@ class SpatialType(ValueInCartesianFrame3D, ABC):
 
     @classmethod
     @abstractmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_constant_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
         """
         :param data: The json of a constant value, as :meth:`_constant_to_json` wrote it.
         :param kwargs: The kwargs of the ``_from_json`` that is reading it.
@@ -2481,8 +2496,111 @@ class AxisAngle(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         return RotationMatrix.from_axis_angle(self)
 
 
-@dataclass(eq=False, init=False, repr=False)
-class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class VectorPair(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer, ABC):
+    """
+    Six numbers made of two vectors given along the axes of the same reference frame:
+    a rotational part in the upper three entries and a translational part in the lower
+    three, such as the angular and the linear velocity of a :class:`Twist`.
+    """
+
+    def __init__(
+        self,
+        *,
+        rotational_part: Vector3 | None,
+        translational_part: Vector3 | None,
+        reference_frame: CartesianFrame3D | None,
+    ) -> None:
+        """
+        :param rotational_part: How the body turns, in the upper three entries; zero if
+            None.
+        :param translational_part: How a point of the body moves, in the lower three
+            entries; zero if None.
+        :param reference_frame: The frame along whose axes both vectors are given.
+        """
+        if rotational_part is None:
+            rotational_part = Vector3()
+        if translational_part is None:
+            translational_part = Vector3()
+        self.casadi_sx = sm.to_sx(
+            [
+                rotational_part.x,
+                rotational_part.y,
+                rotational_part.z,
+                translational_part.x,
+                translational_part.y,
+                translational_part.z,
+            ]
+        )
+        self.reference_frame = reference_frame
+        super().__post_init__()
+
+    @classproperty
+    @abstractmethod
+    def _rotational_part_name(cls) -> str:
+        """
+        :return: The name of the rotational part, which is both its keyword in the
+            constructor and its key in the json.
+        """
+
+    @classproperty
+    @abstractmethod
+    def _translational_part_name(cls) -> str:
+        """
+        :return: The name of the translational part, which is both its keyword in the
+            constructor and its key in the json.
+        """
+
+    def _verify_type(self) -> None:
+        if self.shape != (6, 1):
+            raise WrongDimensionsError(
+                expected_dimensions=(6, 1), actual_dimensions=self.shape
+            )
+
+    @classmethod
+    def _from_constant_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
+        reference_frame = cls._parse_optional_frame_from_json(
+            data, frame=SpatialFrameKey.REFERENCE, **kwargs
+        )
+        return cls(
+            **{
+                cls._rotational_part_name: Vector3(*data[cls._rotational_part_name]),
+                cls._translational_part_name: Vector3(
+                    *data[cls._translational_part_name]
+                ),
+            },
+            reference_frame=reference_frame,
+        )
+
+    def _constant_to_json(self) -> dict[str, Any]:
+        return {
+            self._rotational_part_name: self._rotational_part.to_np()[:3].tolist(),
+            self._translational_part_name: self._translational_part.to_np()[
+                :3
+            ].tolist(),
+        }
+
+    @property
+    def _rotational_part(self) -> Vector3:
+        """
+        :return: How the body turns, in the upper three entries.
+        """
+        return Vector3(
+            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
+        )
+
+    @property
+    def _translational_part(self) -> Vector3:
+        """
+        :return: How a point of the body moves, in the lower three entries.
+        """
+        return Vector3(
+            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        )
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class Displacement(VectorPair):
     """
     A rigid-body displacement: the transformation that rotates a body by
     :attr:`rotation_vector` about its origin and moves that origin by
@@ -2492,66 +2610,31 @@ class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
 
     def __init__(
         self,
-        translation: Vector3 | None = None,
+        *,
         rotation_vector: Vector3 | None = None,
+        translation: Vector3 | None = None,
         reference_frame: CartesianFrame3D | None = None,
-    ):
+    ) -> None:
         """
-        :param translation: Where the body's origin ended up, relative to where it
-            started, in meters. Defaults to no translation.
         :param rotation_vector: The axis the body turned around, scaled by the angle it
             turned by in radians. Defaults to no rotation.
+        :param translation: Where the body's origin ended up, relative to where it
+            started, in meters. Defaults to no translation.
         :param reference_frame: The frame along whose axes the body moved.
         """
-        if translation is None:
-            translation = Vector3()
-        if rotation_vector is None:
-            rotation_vector = Vector3()
-        self.casadi_sx = sm.to_sx(
-            [
-                translation.x,
-                translation.y,
-                translation.z,
-                rotation_vector.x,
-                rotation_vector.y,
-                rotation_vector.z,
-            ]
-        )
-        self.reference_frame = reference_frame
-        super().__post_init__()
-
-    def _verify_type(self):
-        if self.shape != (6, 1):
-            raise WrongDimensionsError(
-                expected_dimensions=(6, 1), actual_dimensions=self.shape
-            )
-
-    @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        reference_frame = cls._parse_optional_frame_from_json(
-            data, frame=SpatialFrameKey.REFERENCE, **kwargs
-        )
-        return cls(
-            translation=Vector3(*data["translation"]),
-            rotation_vector=Vector3(*data["rotation_vector"]),
+        super().__init__(
+            rotational_part=rotation_vector,
+            translational_part=translation,
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "translation": self.translation.to_np()[:3].tolist(),
-            "rotation_vector": self.rotation_vector.to_np()[:3].tolist(),
-        }
+    @classproperty
+    def _rotational_part_name(cls) -> str:
+        return "rotation_vector"
 
-    @property
-    def translation(self) -> Vector3:
-        """
-        :return: Where the body's origin ended up, relative to where it started, in
-            meters.
-        """
-        return Vector3(
-            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
-        )
+    @classproperty
+    def _translational_part_name(cls) -> str:
+        return "translation"
 
     @property
     def rotation_vector(self) -> Vector3:
@@ -2559,26 +2642,166 @@ class Displacement(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The axis the body turned around, scaled by the angle it turned by in
             radians.
         """
-        return Vector3(
-            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        return self._rotational_part
+
+    @property
+    def translation(self) -> Vector3:
+        """
+        :return: Where the body's origin ended up, relative to where it started, in
+            meters.
+        """
+        return self._translational_part
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class RigidMotionRate(VectorPair, ABC):
+    """
+    How a rigid body moves per unit of a parameter: how it turns, in the rotational
+    part, and how the point of the body at the origin of the reference frame moves, in
+    the translational part, both along that frame's axes.
+    """
+
+    @classproperty
+    def _series_rotation_angle(cls) -> float:
+        r"""
+        The rotation angle below which the left Jacobian's coefficients take three terms
+        of their series: omitting the fourth costs what the closed forms' round-off does
+        :cite:p:`todesco2023highly` (section 8):
+
+        .. math::
+
+            \frac{2 \varphi^6}{8!} = \frac{2 \varepsilon}{\varphi^2}
+            \quad\Rightarrow\quad
+            \varphi = (8!\,\varepsilon)^{1/8} \approx 0.042\ \text{rad},
+            \qquad \varepsilon\text{: machine epsilon}
+        """
+        return (math.factorial(8) * sys.float_info.epsilon) ** (1 / 8)
+
+    def _integrate(self, *, parameter_change: sm.ScalarData) -> Displacement:
+        """
+        The exponential of this rate times ``parameter_change``
+        :cite:p:`sola2018micro` (equation (172)): the body turns by the
+        rotational part times the change, and its origin moves by
+        :meth:`_apply_left_jacobian` of the translational part times the change.
+
+        :param parameter_change: How much the parameter of the rate changed.
+        :return: The displacement of the body over that change, at this constant rate,
+            finite, also in its derivatives, where the body does not turn.
+        """
+        rotation = self._rotational_part * parameter_change
+        translation = self._translational_part * parameter_change
+        return Displacement(
+            rotation_vector=rotation,
+            translation=self._apply_left_jacobian(
+                rotation=rotation, translation=translation
+            ),
+            reference_frame=self.reference_frame,
+        )
+
+    def turns_body(self, *, tolerance: float = 0.0) -> bool:
+        """
+        :param tolerance: The length of the rotational part up to which the body counts
+            as not turning, to absorb rounding errors.
+        :return: Whether the body turns: whether the rotational part is longer than
+            ``tolerance``.
+        :raises HasFreeVariablesError: if the rate has free variables.
+        """
+        if not self.is_constant():
+            raise HasFreeVariablesError(variables=self.free_variables())
+        return bool(np.linalg.norm(self._rotational_part[:3]) > tolerance)
+
+    @classmethod
+    def _apply_left_jacobian(
+        cls, *, rotation: Vector3, translation: Vector3
+    ) -> Vector3:
+        r"""
+        :param rotation: The rotation vector :math:`r` the body turns by.
+        :param translation: The vector :math:`t` the origin of the body would move by
+            without turning.
+        :return: Where the origin of the body ends up when it turns while it moves:
+            :math:`t + a\,(r \times t) + b\,(r \times (r \times t))`, with :math:`a`
+            from :meth:`_first_order_coefficient` and :math:`b` from
+            :meth:`_second_order_coefficient`. This is the left Jacobian of :math:`r`
+            applied to :math:`t` :cite:p:`eade2017lie` (section 3.2, equation (83)).
+        """
+        angle_squared = rotation.dot(rotation)
+        first_order = rotation.cross(translation)
+        second_order = rotation.cross(first_order)
+        return (
+            translation
+            + first_order * cls._first_order_coefficient(angle_squared=angle_squared)
+            + second_order * cls._second_order_coefficient(angle_squared=angle_squared)
+        )
+
+    @classmethod
+    def _first_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
+        r"""
+        The coefficient :math:`a` of :math:`r \times t` in the left Jacobian: above
+        :attr:`_series_rotation_angle` the closed form, below it the first three terms
+        of its series :cite:p:`eade2017lie` (section 3.2, equations (76) and (75)):
+
+        .. math::
+
+            a = \frac{1 - \cos\varphi}{\varphi^2}
+            \approx \frac{1}{2!} - \frac{\varphi^2}{4!} + \frac{\varphi^4}{6!}
+
+        :param angle_squared: :math:`\varphi^2`, the square of the angle the body
+            turns by.
+        """
+        angle = sm.sqrt(angle_squared)
+        series = (
+            1 / math.factorial(2)
+            - angle_squared / math.factorial(4)
+            + angle_squared**2 / math.factorial(6)
+        )
+        closed_form = (1 - sm.cos(angle)) / angle_squared
+        return sm.if_less(
+            angle_squared, cls._series_rotation_angle**2, series, closed_form
+        )
+
+    @classmethod
+    def _second_order_coefficient(cls, *, angle_squared: sm.Scalar) -> sm.Scalar:
+        r"""
+        The coefficient :math:`b` of :math:`r \times (r \times t)` in the left Jacobian:
+        above :attr:`_series_rotation_angle` the closed form, below it the first three
+        terms of its series :cite:p:`eade2017lie` (section 3.2, equations (76) and (75)):
+
+        .. math::
+
+            b = \frac{\varphi - \sin\varphi}{\varphi^3}
+            \approx \frac{1}{3!} - \frac{\varphi^2}{5!} + \frac{\varphi^4}{7!}
+
+        :param angle_squared: :math:`\varphi^2`, the square of the angle the body
+            turns by.
+        """
+        angle = sm.sqrt(angle_squared)
+        series = (
+            1 / math.factorial(3)
+            - angle_squared / math.factorial(5)
+            + angle_squared**2 / math.factorial(7)
+        )
+        closed_form = (angle - sm.sin(angle)) / (angle_squared * angle)
+        return sm.if_less(
+            angle_squared, cls._series_rotation_angle**2, series, closed_form
         )
 
 
-@dataclass(eq=False, init=False, repr=False)
-class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class Twist(RigidMotionRate):
     """
     A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
     at the origin of the reference frame moves, both along that frame's axes and per
     unit of the parameter they are taken with respect to, usually time. Unlike a
-    :class:`Displacement`, it is a velocity (Lynch and Park, *Modern Robotics*, §3.3.2).
+    :class:`Displacement`, it is a velocity :cite:p:`lynch2017modern` (section 3.3.2).
     """
 
     def __init__(
         self,
+        *,
         angular_velocity: Vector3 | None = None,
         linear_velocity: Vector3 | None = None,
         reference_frame: CartesianFrame3D | None = None,
-    ):
+    ) -> None:
         """
         :param angular_velocity: The axis the body turns around, scaled by how fast it
             turns, in radians per unit of the parameter. Defaults to no turning.
@@ -2587,45 +2810,19 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
             standing still.
         :param reference_frame: The frame along whose axes both velocities are given.
         """
-        if angular_velocity is None:
-            angular_velocity = Vector3()
-        if linear_velocity is None:
-            linear_velocity = Vector3()
-        self.casadi_sx = sm.to_sx(
-            [
-                angular_velocity.x,
-                angular_velocity.y,
-                angular_velocity.z,
-                linear_velocity.x,
-                linear_velocity.y,
-                linear_velocity.z,
-            ]
-        )
-        self.reference_frame = reference_frame
-        super().__post_init__()
-
-    def _verify_type(self):
-        if self.shape != (6, 1):
-            raise WrongDimensionsError(
-                expected_dimensions=(6, 1), actual_dimensions=self.shape
-            )
-
-    @classmethod
-    def _from_constant_json(cls, data: dict[str, Any], **kwargs) -> Self:
-        reference_frame = cls._parse_optional_frame_from_json(
-            data, frame=SpatialFrameKey.REFERENCE, **kwargs
-        )
-        return cls(
-            angular_velocity=Vector3(*data["angular_velocity"]),
-            linear_velocity=Vector3(*data["linear_velocity"]),
+        super().__init__(
+            rotational_part=angular_velocity,
+            translational_part=linear_velocity,
             reference_frame=reference_frame,
         )
 
-    def _constant_to_json(self) -> dict[str, Any]:
-        return {
-            "angular_velocity": self.angular_velocity.to_np()[:3].tolist(),
-            "linear_velocity": self.linear_velocity.to_np()[:3].tolist(),
-        }
+    @classproperty
+    def _rotational_part_name(cls) -> str:
+        return "angular_velocity"
+
+    @classproperty
+    def _translational_part_name(cls) -> str:
+        return "linear_velocity"
 
     @property
     def angular_velocity(self) -> Vector3:
@@ -2633,9 +2830,7 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: The axis the body turns around, scaled by how fast it turns, in radians
             per unit of the parameter.
         """
-        return Vector3(
-            x=self[0], y=self[1], z=self[2], reference_frame=self.reference_frame
-        )
+        return self._rotational_part
 
     @property
     def linear_velocity(self) -> Vector3:
@@ -2643,9 +2838,192 @@ class Twist(sm.SymbolicMathType, SpatialType, SubclassJSONSerializer):
         :return: How fast the point of the body at the origin of the reference frame
             moves, in meters per unit of the parameter.
         """
-        return Vector3(
-            x=self[3], y=self[4], z=self[5], reference_frame=self.reference_frame
+        return self._translational_part
+
+    def to_displacement(self, *, duration: sm.ScalarData) -> Displacement:
+        """
+        :param duration: How long the body moved at this constant twist, in units of
+            the parameter the twist is taken with respect to.
+        :return: The displacement of the body after moving that long at this twist.
+        """
+        return self._integrate(parameter_change=duration)
+
+
+@dataclass(eq=False, init=False, repr=False, kw_only=True)
+class ScrewAxis(RigidMotionRate):
+    """
+    How a rigid body's pose changes per unit of a position that moves it along a screw
+    axis: the axis's line, the pitch along it and the unit of the position. Unlike a
+    :class:`Twist`, it is not a velocity: it holds whatever the speed of the position.
+    """
+
+    def __init__(
+        self,
+        *,
+        rotation_per_unit_position: Vector3 | None = None,
+        translation_per_unit_position: Vector3 | None = None,
+        reference_frame: CartesianFrame3D | None = None,
+    ) -> None:
+        """
+        :param rotation_per_unit_position: The axis the body turns around, scaled by the
+            angle it turns by per unit of position, in radians. Defaults to no turning.
+        :param translation_per_unit_position: How far the point of the body at the
+            origin of the reference frame moves per unit of position, in meters.
+            Defaults to no moving.
+        :param reference_frame: The frame along whose axes both parts are given.
+        """
+        super().__init__(
+            rotational_part=rotation_per_unit_position,
+            translational_part=translation_per_unit_position,
+            reference_frame=reference_frame,
         )
+
+    @classproperty
+    def _rotational_part_name(cls) -> str:
+        return "rotation_per_unit_position"
+
+    @classproperty
+    def _translational_part_name(cls) -> str:
+        return "translation_per_unit_position"
+
+    @property
+    def rotation_per_unit_position(self) -> Vector3:
+        """
+        :return: The axis the body turns around, scaled by the angle it turns by per
+            unit of position, in radians.
+        """
+        return self._rotational_part
+
+    @property
+    def translation_per_unit_position(self) -> Vector3:
+        """
+        :return: How far the point of the body at the origin of the reference frame
+            moves per unit of position, in meters.
+        """
+        return self._translational_part
+
+    @property
+    def unit_direction(self) -> Vector3:
+        """
+        :return: The unit vector along the axis: that of the rotation, or of the
+            translation for an axis that does not turn the body
+            :cite:p:`lynch2017modern` (section 3.3.2.2). The zero vector for a zero
+            screw axis.
+        """
+        rotation = self.rotation_per_unit_position
+        translation = self.translation_per_unit_position
+        angle_per_unit_position = rotation.norm()
+        result = sm.if_greater_zero(
+            angle_per_unit_position,
+            rotation.safe_division(other=angle_per_unit_position),
+            translation.safe_division(other=translation.norm()),
+        )
+        result.reference_frame = self.reference_frame
+        return result
+
+    @classproperty
+    def normalization_tolerance(cls) -> float:
+        """
+        How far the length of the rotation, or of the translation of an axis that does
+        not turn the body, may lie from its normalized value, to absorb rounding errors.
+        The same tolerance tells a unit rotation and no rotation apart.
+        """
+        return 1e-9
+
+    @property
+    def is_normalized(self) -> bool:
+        """
+        :return: Whether the screw axis is normalized as :cite:t:`lynch2017modern`
+            define it (definition 3.24): the
+            body turns by one radian per unit of position, or, if it does not turn,
+            moves by one meter, each up to :attr:`normalization_tolerance`.
+        :raises HasFreeVariablesError: if the screw axis has free variables.
+        """
+        if not self.is_constant():
+            raise HasFreeVariablesError(variables=self.free_variables())
+        tolerance = self.normalization_tolerance
+        angle_per_unit_position = np.linalg.norm(self.rotation_per_unit_position[:3])
+        if abs(angle_per_unit_position - 1) <= tolerance:
+            return True
+        distance_per_unit_position = np.linalg.norm(
+            self.translation_per_unit_position[:3]
+        )
+        return bool(
+            angle_per_unit_position <= tolerance
+            and abs(distance_per_unit_position - 1) <= tolerance
+        )
+
+    @property
+    def passes_through_origin(self) -> bool:
+        """
+        :return: Whether the axis passes through the origin of the reference frame,
+            so that the translation is parallel to the rotation. A screw axis that does
+            not turn the body has no line and passes through every point.
+        :raises HasFreeVariablesError: if the screw axis has free variables.
+        """
+        if not self.is_constant():
+            raise HasFreeVariablesError(variables=self.free_variables())
+        rotation = self.rotation_per_unit_position[:3]
+        translation = self.translation_per_unit_position[:3]
+        return bool(np.allclose(np.cross(rotation, translation), 0))
+
+    @property
+    def translation_per_radian(self) -> sm.Scalar:
+        r"""
+        :return: How far the body advances along the axis per radian it turns, in
+            meters: the pitch :math:`h = \omega^\top v / \lVert\omega\rVert^2`, with
+            :math:`\omega` the rotation and :math:`v` the translation per unit of
+            position :cite:p:`murray1994mathematical` (equation (2.42)).
+            Infinite, as there, if the body does not turn.
+        """
+        rotation = self.rotation_per_unit_position
+        squared_angle_per_unit_position = rotation.dot(rotation)
+        return sm.if_greater_zero(
+            squared_angle_per_unit_position,
+            rotation.dot(self.translation_per_unit_position)
+            / squared_angle_per_unit_position,
+            sm.Scalar(np.inf),
+        )
+
+    @property
+    def axis_point_closest_to_origin(self) -> Point3:
+        r"""
+        :return: The point :math:`q = \omega \times v / \lVert\omega\rVert^2` of the
+            axis, with :math:`\omega` the rotation and :math:`v` the translation per
+            unit of position :cite:p:`murray1994mathematical` (equation (2.43)).
+            It is orthogonal to :math:`\omega` and so the axis's point closest to the
+            origin. If the body does not turn, the division by
+            :math:`\lVert\omega\rVert^2 = 0` gives zero, the origin, through which the
+            axis then runs, as there.
+        """
+        rotation = self.rotation_per_unit_position
+        result = (
+            rotation.cross(self.translation_per_unit_position)
+            .safe_division(other=rotation.dot(rotation))
+            .point3
+        )
+        result.reference_frame = self.reference_frame
+        return result
+
+    def to_twist(self, *, position_velocity: sm.ScalarData) -> Twist:
+        """
+        :param position_velocity: How fast the position changes, per unit of the
+            parameter the twist is taken with respect to, usually time.
+        :return: The twist of the body while its position changes that fast.
+        """
+        return Twist(
+            angular_velocity=self.rotation_per_unit_position * position_velocity,
+            linear_velocity=self.translation_per_unit_position * position_velocity,
+            reference_frame=self.reference_frame,
+        )
+
+    def to_displacement(self, *, position: sm.ScalarData) -> Displacement:
+        """
+        :param position: How far the body moved along the screw axis, from zero.
+        :return: The displacement of the body after moving that far along this screw
+            axis.
+        """
+        return self._integrate(parameter_change=position)
 
 
 @dataclass(eq=False, init=False, repr=False)

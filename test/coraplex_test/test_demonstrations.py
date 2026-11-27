@@ -18,6 +18,7 @@ import rclpy
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from typing_extensions import Iterator
 
+import coraplex.demonstrations
 from coraplex.demonstrations import RobotDemonstration, RobotDemonstrationRosSession
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
@@ -44,7 +45,7 @@ class PlanDeliberatelyFailed(Exception):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordingRobotSpecification(RobotSpecification):
     """
     A robot that records the worlds it is put into instead of being put into them.
@@ -131,29 +132,29 @@ class RecordingDemonstration(RobotDemonstration):
             return self.world
         return super().build_simulated_world()
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return self.scene_already_populated
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         self.populated_scene_roots.append(world.root.id)
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return robot_extensions(world.get_semantic_annotations_by_type(MinimalRobot)[0])
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         statechart = Statechart(context=context)
         statechart.add_node(
-            node=FunctionCall(function=lambda: self.run_plan_body(context))
+            node=FunctionCall(function=lambda: self.run_plan_body(context=context))
         )
         return statechart
 
     @contextmanager
-    def segment_events(self, world: World) -> Iterator[None]:
+    def segment_events(self, *, world: World) -> Iterator[None]:
         self.segmenting_events = True
         yield
         self.segmenting_events = False
 
-    def run_plan_body(self, context: StatechartContext) -> None:
+    def run_plan_body(self, *, context: StatechartContext) -> None:
         """
         Record how the plan is executed, or fail if this demonstration is meant to.
 
@@ -166,12 +167,12 @@ class RecordingDemonstration(RobotDemonstration):
             self.simulation is not None and self.simulation.is_running()
         )
 
-    def create_executor(self, world: World) -> PlanExecutor:
+    def create_executor(self, *, world: World) -> PlanExecutor:
         """
         Differs from :meth:`RobotDemonstration.create_executor` in also recording the
         executor in :attr:`observed_executor`.
         """
-        self.observed_executor = super().create_executor(world)
+        self.observed_executor = super().create_executor(world=world)
         return self.observed_executor
 
     def tear_down(self) -> None:
@@ -214,12 +215,12 @@ def test_simulated_run_puts_the_robot_into_the_scene_it_builds():
 
 def serve_from_the_controller(monkeypatch: pytest.MonkeyPatch, world: World) -> None:
     """
-    Make every fetch of a real run return `world`, as if a controller served it.
+    Make every join of a real run return `world`, as if a controller served it.
     """
     monkeypatch.setattr(
-        RobotDemonstrationRosSession,
-        "fetch_world",
-        lambda session, timeout_seconds=None: world,
+        coraplex.demonstrations,
+        "join_shared_world",
+        lambda node, timeout_seconds=None: world,
     )
 
 
@@ -434,7 +435,7 @@ def test_session_releases_a_context_it_started():
     process it ran in is left as it was found.
     """
     assert not rclpy.ok(), "another test left a ROS context running"
-    session = RobotDemonstrationRosSession.start("context_ownership_probe")
+    session = RobotDemonstrationRosSession.start(node_name="context_ownership_probe")
 
     assert session.owns_context
 
@@ -447,7 +448,7 @@ def test_session_leaves_a_context_somebody_else_started(rclpy_node):
     Inside a process that already has a ROS context -- a test, or a larger application
     embedding the demonstration -- the session must not shut that context down.
     """
-    session = RobotDemonstrationRosSession.start("context_borrowing_probe")
+    session = RobotDemonstrationRosSession.start(node_name="context_borrowing_probe")
 
     assert not session.owns_context
 
@@ -463,7 +464,7 @@ def test_a_callback_of_another_group_runs_while_one_is_busy(rclpy_node) -> None:
     A client announces itself to its controller from a callback group of its own, which
     has to be served while the node is busy choosing what the plan does next.
     """
-    session = RobotDemonstrationRosSession.start("busy_callback_probe")
+    session = RobotDemonstrationRosSession.start(node_name="busy_callback_probe")
     busy_callback_started = threading.Event()
     other_callback_ran_meanwhile = threading.Event()
     busy_callback_outcomes: list[bool] = []

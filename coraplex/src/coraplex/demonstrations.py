@@ -31,8 +31,10 @@ from cramph.visualization import RvizVisualization, WorldVisualization
 from cramph.context import ContextExtension, StatechartContext
 from cramph.statechart import Statechart
 from semantic_digital_twin.adapters.multi_sim import MujocoSim
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.adapters.ros.world_fetcher import (
+    fetch_world_from_service,
+    join_shared_world,
+)
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
@@ -60,7 +62,7 @@ exception. Joining it here ensures it has actually left that code first.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotDemonstrationRosSession:
     """
     A ROS node whose executor is spun on a background thread.
@@ -91,7 +93,7 @@ class RobotDemonstrationRosSession:
     """
 
     @classmethod
-    def start(cls, node_name: str) -> RobotDemonstrationRosSession:
+    def start(cls, *, node_name: str) -> RobotDemonstrationRosSession:
         """
         Create a node and spin its executor, initializing rclpy if nothing else has.
 
@@ -111,7 +113,7 @@ class RobotDemonstrationRosSession:
         return session
 
     def fetch_world(
-        self, timeout_seconds: float = WORLD_FETCH_TIMEOUT_SECONDS
+        self, *, timeout_seconds: float = WORLD_FETCH_TIMEOUT_SECONDS
     ) -> World:
         """
         Fetch the world that a controller is serving.
@@ -140,7 +142,7 @@ class RobotDemonstrationRosSession:
 # %% demonstrations
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotDemonstration(ABC):
     """
     A robot demonstration that runs either in simulation or against a real controller.
@@ -249,7 +251,7 @@ class RobotDemonstration(ABC):
         """
 
     @abstractmethod
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         """
         Whether ``world`` already holds the scene, for instance because the controller
         serving it was given the scene by an earlier run, in which case a real run does
@@ -259,7 +261,7 @@ class RobotDemonstration(ABC):
         :return: Whether ``world`` holds the scene already.
         """
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         """
         Add what the plan needs to the freshly built map in ``world``, such as the
         objects it acts on and the semantic annotations of the furniture, see
@@ -271,7 +273,7 @@ class RobotDemonstration(ABC):
         """
 
     @abstractmethod
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         """
         Build what the plan's nodes read from their context, at least the
         :class:`~coraplex.plans.context_extensions.RobotAccess` of the robot resolved in
@@ -280,12 +282,12 @@ class RobotDemonstration(ABC):
         """
 
     @abstractmethod
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Build the statechart this demonstration performs, in `context`.
         """
 
-    def segment_events(self, world: World) -> AbstractContextManager:
+    def segment_events(self, *, world: World) -> AbstractContextManager:
         """
         Segment what happens in ``world`` into events while the plan is performed.
 
@@ -313,7 +315,7 @@ class RobotDemonstration(ABC):
         :return: A world holding the scene and no robot.
         """
         scene = self.scene_specification().create_world()
-        self.populate_scene(scene)
+        self.populate_scene(world=scene)
         return scene
 
     def build_simulated_world(self) -> World:
@@ -337,9 +339,10 @@ class RobotDemonstration(ABC):
 
         :return: The world the controller serves, holding the scene.
         """
-        world = self.ros_session.fetch_world()
-        WorldSynchronizer(_world=world, node=self.ros_session.node)
-        if not self.is_scene_populated(world):
+        world = join_shared_world(
+            self.ros_session.node, timeout_seconds=WORLD_FETCH_TIMEOUT_SECONDS
+        )
+        if not self.is_scene_populated(world=world):
             scene = self.build_scene()
             world.merge_world(
                 scene,
@@ -354,7 +357,9 @@ class RobotDemonstration(ABC):
 
         :return: The world the plan is performed in.
         """
-        self.ros_session = RobotDemonstrationRosSession.start(self.ros_node_name)
+        self.ros_session = RobotDemonstrationRosSession.start(
+            node_name=self.ros_node_name
+        )
         if issubclass(self.executor_type, SimulatedPlanExecutor):
             if self.visualization is None and self.ros_node is not None:
                 self.visualization = RvizVisualization(
@@ -363,14 +368,14 @@ class RobotDemonstration(ABC):
             return self.build_simulated_world()
         return self.fetch_real_world()
 
-    def build_simulation(self, world: World) -> MujocoSim:
+    def build_simulation(self, *, world: World) -> MujocoSim:
         """
         :param world: The world the plan is performed in.
         :return: The physics of a physically simulated run, not started yet.
         """
         return MujocoSim(world=world, headless=self.headless)
 
-    def start_simulation(self, world: World) -> None:
+    def start_simulation(self, *, world: World) -> None:
         """
         Start the physics of a run of a
         :class:`~coraplex.plans.executors.PhysicallySimulatedPlanExecutor`, and let it
@@ -380,11 +385,11 @@ class RobotDemonstration(ABC):
         """
         if not issubclass(self.executor_type, PhysicallySimulatedPlanExecutor):
             return
-        self.simulation = self.build_simulation(world)
+        self.simulation = self.build_simulation(world=world)
         self.simulation.start_stepped_simulation()
         self.simulation.step_simulation(self.settling_duration)
 
-    def create_executor(self, world: World) -> PlanExecutor:
+    def create_executor(self, *, world: World) -> PlanExecutor:
         """
         :param world: The world the plan is performed in.
         :return: An executor of :attr:`executor_type`, set up the way this demonstration
@@ -396,7 +401,7 @@ class RobotDemonstration(ABC):
             executor_type = partial(executor_type, simulation=self.simulation)
         executor = executor_type(
             context=StatechartContext.with_extensions(
-                world=world, extensions=self.build_context_extensions(world)
+                world=world, extensions=self.build_context_extensions(world=world)
             ),
             ros_node=self.ros_node,
             collision_avoidance=self.collision_avoidance,
@@ -417,12 +422,12 @@ class RobotDemonstration(ABC):
         """
         try:
             world = self.acquire_world()
-            self.start_simulation(world)
+            self.start_simulation(world=world)
             for _ in range(self.repetitions):
-                executor = self.create_executor(world)
-                statechart = self.build_statechart(executor.context)
+                executor = self.create_executor(world=world)
+                statechart = self.build_statechart(context=executor.context)
                 event_segmentation = (
-                    self.segment_events(world)
+                    self.segment_events(world=world)
                     if self.event_segmentation
                     else nullcontext()
                 )

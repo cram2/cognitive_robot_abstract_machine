@@ -40,7 +40,7 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
         Visualizer.__init__(self, *args, **kwargs)
         Node.__init__(self, "shared_ros_visualizer")
 
-        self.shared_visualizer_state.register_observer(self)
+        self.shared_visualizer_state.register_observer(observer=self)
 
         self.ros_image_publisher: Publisher = self.create_publisher(
             Image, f"{self.pipeline.name}/output_image", 10
@@ -101,8 +101,8 @@ class SharedROSVisualizer(Visualizer, Visualizer.Observer, Node):
 
     def notify(
         self,
+        *,
         observable: Visualizer.Observable,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
         """
@@ -193,8 +193,8 @@ class AllAnnotatorROSVisualizer(Visualizer, Node):
 
     def notify(
         self,
+        *,
         observable: Visualizer.Observable,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
         """

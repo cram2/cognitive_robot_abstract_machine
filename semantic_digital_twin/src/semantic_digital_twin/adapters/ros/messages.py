@@ -1,10 +1,11 @@
 """
-The messages the synchronizers of worlds exchange over ROS 2 topics.
+The messages the synchronizers of worlds exchange over ROS 2 topics, and the snapshot a
+world is fetched as.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from uuid import UUID
 
@@ -172,6 +173,9 @@ class SnapshotField(StrEnum):
     STATES = "states"
     """The values of the free variables, inside the state."""
 
+    STREAM_POSITIONS = "stream_positions"
+    """How far the snapshot caught up with each publisher."""
+
 
 @dataclass
 class WorldModelSnapshot(SubclassJSONSerializer):
@@ -188,7 +192,16 @@ class WorldModelSnapshot(SubclassJSONSerializer):
     states: list[float]
     """The values of the free variables contained in the state snapshot."""
 
+    stream_positions: list[StreamPosition] = field(default_factory=list)
+    """
+    The position of the last message of each publisher whose changes the snapshot
+    contains; a publisher it names no position of contributed nothing to it.
+    """
+
     def to_json(self, **kwargs) -> dict[str, Any]:
+        """
+        :meth:`SubclassJSONSerializer.to_json`, laid out by :class:`SnapshotField`.
+        """
         return {
             **super().to_json(**kwargs),
             SnapshotField.MODIFICATIONS: to_json(self.modifications, **kwargs),
@@ -196,10 +209,15 @@ class WorldModelSnapshot(SubclassJSONSerializer):
                 SnapshotField.IDS: to_json(self.ids, **kwargs),
                 SnapshotField.STATES: list(self.states),
             },
+            SnapshotField.STREAM_POSITIONS: to_json(self.stream_positions, **kwargs),
         }
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        """
+        :meth:`SubclassJSONSerializer._from_json` of a snapshot laid out by
+        :class:`SnapshotField`.
+        """
         state = data.get(SnapshotField.STATE, {})
         return cls(
             modifications=[
@@ -208,7 +226,21 @@ class WorldModelSnapshot(SubclassJSONSerializer):
             ],
             ids=from_json(state[SnapshotField.IDS]),
             states=state.get(SnapshotField.STATES, []),
+            stream_positions=cls.stream_positions_from_json(json_data=data),
         )
+
+    @staticmethod
+    def stream_positions_from_json(
+        *, json_data: dict[str, Any]
+    ) -> list[StreamPosition]:
+        """
+        :param json_data: A serialized snapshot.
+        :return: The stream positions of the snapshot; none for a snapshot of a server
+            that does not name them.
+        """
+        if SnapshotField.STREAM_POSITIONS not in json_data:
+            return []
+        return from_json(json_data[SnapshotField.STREAM_POSITIONS])
 
     @staticmethod
     def apply_to_json_snapshot_to_world(
@@ -225,7 +257,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         """
         with world.modify_world():
             for modification in json_data.get(SnapshotField.MODIFICATIONS, []):
-                from_json(modification, **kwargs).apply(world)
+                from_json(modification, **kwargs).apply(world=world)
 
         state = json_data.get(SnapshotField.STATE, {})
         ids = from_json(state[SnapshotField.IDS])

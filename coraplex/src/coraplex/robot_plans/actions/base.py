@@ -34,6 +34,7 @@ from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 if TYPE_CHECKING:
     from semantic_digital_twin.world import World
@@ -92,7 +93,7 @@ class Action(CompositeNode, ABC):
             if discovered.field.init and discovered.field.name not in statechart_fields
         }
 
-    def rebound_to(self, world: World) -> Self:
+    def rebound_to(self, *, world: World) -> Self:
         """
         :param world: The world the new action refers to, such as a copy of the one this
             action refers to.
@@ -103,7 +104,7 @@ class Action(CompositeNode, ABC):
         return type(self)(
             **{
                 name: (
-                    value.rebound_to(world)
+                    value.rebound_to(world=world)
                     if isinstance(value, Action)
                     else world.rebind_world_entities(value)
                 )
@@ -128,6 +129,18 @@ class Action(CompositeNode, ABC):
             extension_type=RobotAccess
         ).controlled_root
 
+    @classmethod
+    def enclosing_action_of(cls, *, node: StatechartNode) -> Action | None:
+        """
+        :param node: A node of a plan.
+        :return: The action nearest above `node` in the plan tree, `node` itself if it
+            is an action; None if no action holds it.
+        """
+        return next(
+            (ancestor for ancestor in [node, *node.path] if isinstance(ancestor, cls)),
+            None,
+        )
+
     def keep_base_still(self) -> list[MotionStatechartNode]:
         """
         :return: The task holding the robot's base where it stands, empty when the robot
@@ -144,7 +157,10 @@ class Action(CompositeNode, ABC):
         ):
             return []
         return [
-            HoldPose(name="hold base", root_link=self.world.root, tip_link=robot.root)
+            HoldPose(
+                name="hold base",
+                kinematic_chain=KinematicChain(root=self.world.root, tip=robot.root),
+            )
         ]
 
     def expand(self) -> None:
@@ -155,7 +171,7 @@ class Action(CompositeNode, ABC):
         """
         rewriting = self.context.get_extension(extension_type=PlanRewriting)
         if rewriting is not None:
-            rewriting.configure(self)
+            rewriting.configure(node=self)
         self.temporary_collision_rules = self.create_temporary_collision_rules()
         self._create_children()
 

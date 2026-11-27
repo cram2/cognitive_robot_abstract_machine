@@ -1,3 +1,7 @@
+"""
+Actions that use a held tool on something: mixing, cutting, wiping and pouring.
+"""
+
 from __future__ import annotations
 
 import math
@@ -15,7 +19,6 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.alignment import AlignmentPair
 from semantic_digital_twin.robots.robot_part_mixins import HasMobileBase
-from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Tool
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
 from krrood_spatial_math.spatial_types import Pose
@@ -44,7 +47,11 @@ from coraplex.robot_plans.actions.base import (
     SequentialAction,
     TryAllAction,
 )
-from coraplex.robot_plans.mixins import MovesToolCenterPoint
+from coraplex.robot_plans.mixins import (
+    HasArmParameter,
+    HasToolParameter,
+    MovesToolCenterPoint,
+)
 from cramph.composites import Parallel, PausedUntilTrue
 from giskardpy.motion_statechart.weights import DefaultWeights
 from giskardpy.motion_statechart.monitors.cartesian_monitors import PositionReached
@@ -62,6 +69,7 @@ from coraplex.robot_plans.actions.composite.tool_paths import (
     planar_spiral_xy,
     planar_sweep_x,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
@@ -85,21 +93,16 @@ class FullBodyControlledAction(Action, ABC):
 
 @dataclass(kw_only=True, eq=False, repr=False)
 class ToolMotionAction(
-    FullBodyControlledAction, MovesToolCenterPoint, ActionOfSteps, ABC
+    FullBodyControlledAction,
+    MovesToolCenterPoint,
+    ActionOfSteps,
+    HasArmParameter,
+    HasToolParameter,
+    ABC,
 ):
     """
-    An action that moves a tool along a sampled tool path while keeping the tool aligned
-    with its target.
-    """
-
-    arm: Arm
-    """
-    The arm holding the tool.
-    """
-
-    tool: Tool
-    """
-    The tool that performs the motion.
+    An action that moves a tool held by :attr:`arm` along a sampled tool path while
+    keeping the tool aligned with its target.
     """
 
     pointer_stride: int = 1
@@ -144,7 +147,7 @@ class ToolMotionAction(
             for point in points
         ][::stride]
         if not waypoints:
-            raise MissingWaypoints(self)
+            raise MissingWaypoints(instance=self)
         return waypoints
 
     @property
@@ -182,17 +185,15 @@ class ToolMotionAction(
         tip = self.tool.get_tool_frame()
         alignments = [
             AlignPlanes(
-                tip_link=tip,
-                root_link=root,
+                kinematic_chain=KinematicChain(root=root, tip=tip),
                 tip_normal=pair.tip_normal,
-                goal_normal=pair.goal_normal,
+                reference_normal=pair.reference_normal,
                 weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE.value,
             )
             for pair in self._alignment_pairs
         ]
         trajectory = CartesianPositionTrajectory(
-            root_link=root,
-            tip_link=tip,
+            kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_points=self._waypoints,
             maximum_skip_ahead=self.maximum_skip_ahead,
             weight=float(DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE),
@@ -324,7 +325,7 @@ class WipingAction(ToolMotionAction, TryAllAction):
     Number of sweep cycles for the spreading motion.
     """
 
-    final_waypoint_success_tolerance: float = 0.08
+    final_waypoint_threshold: float = 0.08
     """
     Accept a stalled motion as successful if the tool ended up within this distance in
     meters of the final waypoint.
@@ -345,14 +346,14 @@ class WipingAction(ToolMotionAction, TryAllAction):
         """
         super().__post_init__()
         if self.surface is None and self.target_pose is None:
-            raise WipingTargetMissing(self)
+            raise WipingTargetMissing(instance=self)
 
     def _build_tool_path(self) -> ToolPath:
         if self.surface is not None:
             return build_surface_path(self.surface, technique=self.technique)
         if self.technique is WipingTechnique.SPREAD:
             return ToolPath(
-                [
+                segments=[
                     ToolPathSegment(
                         kind=ToolPathSegmentKind.SWEEP,
                         duration=2.0,
@@ -365,7 +366,7 @@ class WipingAction(ToolMotionAction, TryAllAction):
                 ]
             )
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SPIRAL,
                     duration=2.0,
@@ -403,17 +404,20 @@ class WipingAction(ToolMotionAction, TryAllAction):
                 monitor=Stalled(monitored_node=tool_path, timeout=self.stall_timeout),
                 monitored_node=PositionReached(
                     name=f"{self.name}/final waypoint reached",
-                    root_link=self.world.root,
-                    tip_link=self.tool.root,
+                    kinematic_chain=KinematicChain(
+                        root=self.world.root, tip=self.tool.root
+                    ),
                     goal_point=self._waypoints[-1],
-                    threshold=self.final_waypoint_success_tolerance,
+                    threshold=self.final_waypoint_threshold,
                 ),
             ),
         ]
 
 
 @dataclass(kw_only=True, eq=False, repr=False)
-class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAction):
+class PouringAction(
+    FullBodyControlledAction, MovesToolCenterPoint, SequentialAction, HasArmParameter
+):
     """
     Pour from a held source container into a target container by tilting the source next
     to the target's rim.
@@ -426,12 +430,7 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
 
     source_container: Tool
     """
-    The held container that is poured from.
-    """
-
-    arm: Arm
-    """
-    The arm holding the source container.
+    The container held by :attr:`arm` that is poured from.
     """
 
     tilt_angle: float = 1.85
@@ -498,7 +497,7 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
         return float((tool_frame_T_source @ mouth_in_source)[2])
 
     def _approach_direction(
-        self, target_pose: Pose, robot_pose: Pose
+        self, *, target_pose: Pose, robot_pose: Pose
     ) -> tuple[float, float]:
         """
         :return: The XY unit vector from the robot toward the target container,
@@ -537,7 +536,9 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
         target_pose = self.target_container.global_pose
         robot_pose = self.robot.root.global_pose
 
-        approach_x, approach_y = self._approach_direction(target_pose, robot_pose)
+        approach_x, approach_y = self._approach_direction(
+            target_pose=target_pose, robot_pose=robot_pose
+        )
         robot_right_x = approach_y
         robot_right_y = -approach_x
         side_sign = 1.0 if pour_side == PouringSide.RIGHT else -1.0
@@ -571,12 +572,16 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
         )
         tilted_rotation = base_rotation * Rotation.from_euler("y", signed_tilt_angle)
 
-        pre_pour_pose = self._pose_from_rotation(pour_x, pour_y, pour_z, base_rotation)
-        pour_pose = self._pose_from_rotation(pour_x, pour_y, pour_z, tilted_rotation)
+        pre_pour_pose = self._pose_from_rotation(
+            x=pour_x, y=pour_y, z=pour_z, rotation=base_rotation
+        )
+        pour_pose = self._pose_from_rotation(
+            x=pour_x, y=pour_y, z=pour_z, rotation=tilted_rotation
+        )
         return pre_pour_pose, pour_pose
 
     def _pose_from_rotation(
-        self, x: float, y: float, z: float, rotation: Rotation
+        self, *, x: float, y: float, z: float, rotation: Rotation
     ) -> Pose:
         """
         :param x: X position of the pose in the world frame.
@@ -611,12 +616,6 @@ class PouringAction(FullBodyControlledAction, MovesToolCenterPoint, SequentialAc
         """
         pre_pour_pose, pour_pose = self._pour_poses()
         return [
-            self.tool_center_point_goal(
-                pre_pour_pose,
-                self.arm,
-            ),
-            self.tool_center_point_goal(
-                pour_pose,
-                self.arm,
-            ),
+            self.tool_center_point_goal(target=pre_pour_pose, arm=self.arm),
+            self.tool_center_point_goal(target=pour_pose, arm=self.arm),
         ]

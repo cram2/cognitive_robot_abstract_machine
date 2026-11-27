@@ -65,12 +65,12 @@ from krrood.entity_query_language.query.match import Match
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from semantic_digital_twin.reasoning.predicates import InsideOf
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
-from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
 from semantic_digital_twin.robots.robot_part_mixins import HasTwoFingers
 from semantic_digital_twin.robots.robot_parts import Arm
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from coraplex.plans.context_extensions import RobotAccess
 from cramph.context import StatechartContext
 
@@ -81,7 +81,7 @@ if TYPE_CHECKING:
 # %% perceiving before a grasp
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
     """
     Looks at the object and detects it before a reach makes its final approach, so that
@@ -92,10 +92,10 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: ReachAction) -> bool:
+    def is_applicable(self, *, plan_node: ReachAction) -> bool:
         return True
 
-    def final_approach(self, plan_node: ReachAction) -> StatechartNode:
+    def final_approach(self, *, plan_node: ReachAction) -> StatechartNode:
         """
         :param plan_node: The reach
         :raises ReachHasNoFinalApproach: If no step of the reach moves its tool center
@@ -110,34 +110,36 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
             if isinstance(node.parent_node, Sequence)
         ]
         for step in reversed(steps):
-            if self._moves_the_tool_center_point(step, plan_node.arm):
+            if self._moves_the_tool_center_point(step=step, arm=plan_node.arm):
                 return step
-        raise ReachHasNoFinalApproach(plan_node)
+        raise ReachHasNoFinalApproach(plan_node=plan_node)
 
     @staticmethod
-    def _moves_the_tool_center_point(step: StatechartNode, arm: Arm) -> bool:
+    def _moves_the_tool_center_point(*, step: StatechartNode, arm: Arm) -> bool:
         """
         :return: Whether a Cartesian task in `step` moves the tool center point of
             `arm`.
         """
         return any(
             isinstance(node, CartesianTask)
-            and node.tip_link is arm.end_effector.tool_frame
+            and node.kinematic_chain.tip is arm.end_effector.tool_frame
             for node in [step, *step.descendants]
         )
 
-    def anchor(self, plan_node: ReachAction) -> StatechartNode:
-        return self.final_approach(plan_node)
+    def anchor(self, *, plan_node: ReachAction) -> StatechartNode:
+        return self.final_approach(plan_node=plan_node)
 
-    def nodes_to_insert(self, plan_node: ReachAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: ReachAction) -> list[StatechartNode]:
         approached_pose = plan_node.grasp_pose_sequence(
-            plan_node.grasp.grasp_pose, plan_node.arm.end_effector, plan_node.grasp
+            reference_T_grasp=plan_node.grasp_candidate.grasp_pose,
+            end_effector=plan_node.arm.end_effector,
+            grasp_candidate=plan_node.grasp_candidate,
         ).grasp
         return [
-            LookAtAction(target=approached_pose),
+            LookAtAction(look_target=approached_pose),
             DetectAction(
                 technique=DetectionTechnique.TYPES,
-                object_sem_annotation=type(plan_node.grasp.graspable),
+                object_sem_annotation=type(plan_node.grasp_candidate.graspable),
                 accept_first_if_multiple=True,
             ),
         ]
@@ -146,7 +148,7 @@ class DetectBeforeGrasp(SequentialInsertion[ReachAction]):
 # %% opening what the object lies in
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DrawerOpening(
     SequentialInsertion[MatchedType],
     Generic[MatchedType],
@@ -172,7 +174,7 @@ class DrawerOpening(
         return InsertionPosition.BEFORE
 
     def _closed_drawers_containing(
-        self, annotation: HasRootBody, world: World
+        self, *, annotation: HasRootBody, world: World
     ) -> list[Drawer]:
         """
         :param annotation: The object to locate
@@ -189,7 +191,7 @@ class DrawerOpening(
         ]
 
     def opening_nodes(
-        self, drawer: Drawer, arm: Arm, context: StatechartContext
+        self, *, drawer: Drawer, arm: Arm, context: StatechartContext
     ) -> list[StatechartNode]:
         """
         :param drawer: The drawer to open
@@ -199,15 +201,15 @@ class DrawerOpening(
         :return: The opening, from a standing pose tried together with it.
         """
         open_the_drawer = MoveAndOpenAction.from_handle_by_closest_grasps(
-            drawer.handle, arm, context
+            handle=drawer.handle, arm=arm, context=context
         )
         return [StatementNode(statement=open_the_drawer)]
 
-    def anchor(self, plan_node: StatechartNode) -> StatechartNode:
+    def anchor(self, *, plan_node: StatechartNode) -> StatechartNode:
         return plan_node
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
     """
     Opens the drawers an object lies in before the robot picks it up, so that it reaches
@@ -218,24 +220,32 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
     to a pose the object itself can be reached from.
     """
 
-    def is_applicable(self, plan_node: PickUpAction) -> bool:
+    def is_applicable(self, *, plan_node: PickUpAction) -> bool:
         return bool(
-            self._closed_drawers_containing(plan_node.grasp.graspable, plan_node.world)
+            self._closed_drawers_containing(
+                annotation=plan_node.grasp_candidate.graspable, world=plan_node.world
+            )
         )
 
-    def nodes_to_insert(self, plan_node: PickUpAction) -> list[StatechartNode]:
-        graspable = plan_node.grasp.graspable
+    def nodes_to_insert(self, *, plan_node: PickUpAction) -> list[StatechartNode]:
+        graspable = plan_node.grasp_candidate.graspable
         nodes = []
-        for drawer in self._closed_drawers_containing(graspable, plan_node.world):
-            nodes.extend(self.opening_nodes(drawer, plan_node.arm, plan_node.context))
+        for drawer in self._closed_drawers_containing(
+            annotation=graspable, world=plan_node.world
+        ):
+            nodes.extend(
+                self.opening_nodes(
+                    drawer=drawer, arm=plan_node.arm, context=plan_node.context
+                )
+            )
         drive_to_the_object = a(NavigateAction)(
-            target_location=variable(
-                Pose,
+            planar_goal_pose=variable(
+                Pose2D,
                 # A location samples its poses only once the drive is grounded, by
                 # which time the drawers this rewrite opens stand open.
                 domain=ReachabilityLocation(
-                    Pose(reference_frame=graspable.root),
-                    plan_node.arm,
+                    target_pose=Pose(reference_frame=graspable.root),
+                    arm=plan_node.arm,
                     context=plan_node.context,
                 ),
             ),
@@ -249,13 +259,13 @@ class OpenDrawerBeforePickUp(DrawerOpening[PickUpAction]):
         return nodes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PickUpTarget:
     """
     The object a pick-up takes hold of, and the arm it takes hold with.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object that is picked up.
     """
@@ -266,7 +276,7 @@ class PickUpTarget:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
     """
     Opens the drawers an object lies in before the robot moves to it and picks it up.
@@ -278,26 +288,37 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
     Otherwise each candidate gets its own opening, inside the sequence it is tried in.
     """
 
-    def matches_node(self, plan_node: StatechartNode) -> bool:
+    def matches_node(self, *, plan_node: StatechartNode) -> bool:
+        """
+        Extends :meth:`~coraplex.plans.plan_transformation.PlanTransformation.matches_node`
+        to a statement that is still to be grounded into a
+        :class:`MoveAndPickUpAction`.
+        """
         if isinstance(plan_node, StatementNode):
             return issubclass(plan_node.statement._type_, MoveAndPickUpAction)
-        return super().matches_node(plan_node)
+        return super().matches_node(plan_node=plan_node)
 
-    def is_applicable(self, plan_node: MoveAndPickUpAction | StatementNode) -> bool:
-        target = self._pick_up_target(plan_node)
+    def is_applicable(self, *, plan_node: MoveAndPickUpAction | StatementNode) -> bool:
+        target = self._pick_up_target(plan_node=plan_node)
         return target is not None and bool(
-            self._closed_drawers_containing(target.graspable, plan_node.context.world)
+            self._closed_drawers_containing(
+                annotation=target.graspable, world=plan_node.context.world
+            )
         )
 
     def nodes_to_insert(
-        self, plan_node: MoveAndPickUpAction | StatementNode
+        self, *, plan_node: MoveAndPickUpAction | StatementNode
     ) -> list[StatechartNode]:
-        target = self._pick_up_target(plan_node)
+        target = self._pick_up_target(plan_node=plan_node)
         nodes = []
         for drawer in self._closed_drawers_containing(
-            target.graspable, plan_node.context.world
+            annotation=target.graspable, world=plan_node.context.world
         ):
-            nodes.extend(self.opening_nodes(drawer, target.arm, plan_node.context))
+            nodes.extend(
+                self.opening_nodes(
+                    drawer=drawer, arm=target.arm, context=plan_node.context
+                )
+            )
         if isinstance(plan_node, StatementNode):
             # The candidates are grounded after the opening, which leaves the arms at
             # the handle, where they would stand in collision at every standing pose.
@@ -308,7 +329,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
         return nodes
 
     def _pick_up_target(
-        self, plan_node: MoveAndPickUpAction | StatementNode
+        self, *, plan_node: MoveAndPickUpAction | StatementNode
     ) -> PickUpTarget | None:
         """
         :param plan_node: A node this matches.
@@ -316,12 +337,17 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
             it is still to be grounded and its candidates differ in either.
         """
         if isinstance(plan_node, StatementNode):
-            return self._pick_up_target_shared_by_candidates_of(plan_node.statement)
+            return self._pick_up_target_shared_by_candidates_of(
+                move_and_pick_up=plan_node.statement
+            )
         pick_up = plan_node.pick_up
-        return PickUpTarget(graspable=pick_up.grasp.graspable, arm=pick_up.arm)
+        return PickUpTarget(
+            graspable=pick_up.grasp_candidate.graspable, arm=pick_up.arm
+        )
 
     @staticmethod
     def _pick_up_target_shared_by_candidates_of(
+        *,
         move_and_pick_up: Match[MoveAndPickUpAction],
     ) -> PickUpTarget | None:
         """
@@ -330,7 +356,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
             ``None`` if they are not the same for all of them, or not known before
             grounding.
         """
-        grasp = move_and_pick_up.pick_up.grasp.apply_mapping_on_external_root(
+        grasp = move_and_pick_up.pick_up.grasp_candidate.apply_mapping_on_external_root(
             instance=move_and_pick_up
         )
         arm = move_and_pick_up.pick_up.arm.apply_mapping_on_external_root(
@@ -359,7 +385,7 @@ class OpenDrawerBeforeMoveAndPickUp(DrawerOpening[MoveAndPickUpAction]):
 # %% parking around a pick-and-place
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsAroundPickAndPlaceSteps(PlanTransformation[PickAndPlaceAction]):
     """
     Parks the robot's arms before the pick-up of a pick-and-place, between it and the
@@ -367,10 +393,10 @@ class ParkArmsAroundPickAndPlaceSteps(PlanTransformation[PickAndPlaceAction]):
     one before it left them.
     """
 
-    def is_applicable(self, plan_node: PickAndPlaceAction) -> bool:
+    def is_applicable(self, *, plan_node: PickAndPlaceAction) -> bool:
         return True
 
-    def apply(self, plan_node: PickAndPlaceAction) -> None:
+    def apply(self, *, plan_node: PickAndPlaceAction) -> None:
         for step in list(plan_node.nodes):
             plan_node.insert_before(
                 reference=step, node=ParkArmsAction(arms=plan_node.robot.all_arms)
@@ -384,7 +410,7 @@ class ParkArmsAroundPickAndPlaceSteps(PlanTransformation[PickAndPlaceAction]):
 # %% parking before anything else
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
     """
     Parks the robot's arms in front of the first action of a plan.
@@ -399,12 +425,12 @@ class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: Action) -> bool:
-        return self._first_action_of_the_plan_of(plan_node) is plan_node and (
+    def is_applicable(self, *, plan_node: Action) -> bool:
+        return self._first_action_of_the_plan_of(node=plan_node) is plan_node and (
             not isinstance(plan_node, ParkArmsAction)
         )
 
-    def anchor(self, plan_node: Action) -> StatechartNode:
+    def anchor(self, *, plan_node: Action) -> StatechartNode:
         """
         :return: The node that holds `plan_node` as a step of the nearest
             :class:`~cramph.composites.Sequence` above it, or the plan itself when no
@@ -418,11 +444,11 @@ class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
             return step
         return plan_node.path[-1] if plan_node.path else plan_node
 
-    def nodes_to_insert(self, plan_node: Action) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: Action) -> list[StatechartNode]:
         return [ParkArmsAction(arms=plan_node.robot.all_arms)]
 
     @staticmethod
-    def _first_action_of_the_plan_of(node: StatechartNode) -> Action | None:
+    def _first_action_of_the_plan_of(*, node: StatechartNode) -> Action | None:
         """
         :param node: A node of a plan.
         :return: The action of that plan that runs first.
@@ -441,7 +467,7 @@ class ParkArmsBeforeFirstAction(SequentialInsertion[Action]):
 # %% holding an object at its own width
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
     """
     Closes a grasp onto the width of the object it takes hold of, instead of shutting
@@ -461,30 +487,30 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
     into it rather than merely touching it.
     """
 
-    def is_applicable(self, plan_node: GraspingAction) -> bool:
+    def is_applicable(self, *, plan_node: GraspingAction) -> bool:
         gripper = plan_node.arm.end_effector
         return (
             isinstance(gripper, HasTwoFingers)
             and gripper.fingers_are_modelled_like_the_real_ones
             and issubclass(plan_node.gripper_goal_type, MoveFingers)
-            and plan_node.grasp.graspable.root.has_collision()
+            and plan_node.grasp_candidate.graspable.root.has_collision()
         )
 
-    def apply(self, plan_node: GraspingAction) -> None:
-        closing_step = self.closing_step(plan_node)
+    def apply(self, *, plan_node: GraspingAction) -> None:
+        closing_step = self.closing_step(plan_node=plan_node)
         plan_node.statechart.replace(
             node=closing_step,
             replacement=plan_node.closing_step(
-                MoveFingersToWidthAction(
-                    gripper=plan_node.arm.end_effector,
-                    width=plan_node.grasp.width_along_closing_axis,
+                closing_goal=MoveFingersToWidthAction(
+                    two_finger_gripper=plan_node.arm.end_effector,
+                    width=plan_node.grasp_candidate.width_along_closing_axis,
                     squeeze=self.squeeze,
                 )
             ),
         )
 
     @staticmethod
-    def closing_step(plan_node: GraspingAction) -> StatechartNode:
+    def closing_step(*, plan_node: GraspingAction) -> StatechartNode:
         """
         :param plan_node: The grasp.
         :raises GraspHasNoClosingGoal: If no goal moving the fingers lies below the
@@ -494,27 +520,27 @@ class CloseFingersToObjectWidth(PlanTransformation[GraspingAction]):
         for step in reversed(plan_node.nodes):
             if any(isinstance(node, MoveFingers) for node in [step, *step.descendants]):
                 return step
-        raise GraspHasNoClosingGoal(plan_node)
+        raise GraspHasNoClosingGoal(plan_node=plan_node)
 
 
 # %% putting the base at a pose where nothing has to drive it there
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WriteTheOdometryInsteadOfDriving(ConfigurationTransformation[DrivesBase]):
     """
     Puts the base at the poses it drives to by writing the odometry, however it would be
     driven there.
     """
 
-    def is_applicable(self, plan_node: DrivesBase) -> bool:
+    def is_applicable(self, *, plan_node: DrivesBase) -> bool:
         return True
 
-    def apply(self, plan_node: DrivesBase) -> None:
+    def apply(self, *, plan_node: DrivesBase) -> None:
         plan_node.base_goal_type = SetOdometry
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WriteTheOdometryInsteadOfCommandingAPose(WriteTheOdometryInsteadOfDriving):
     """
     Puts the base at the poses it drives to by writing the odometry where the controller
@@ -522,31 +548,35 @@ class WriteTheOdometryInsteadOfCommandingAPose(WriteTheOdometryInsteadOfDriving)
     drive to follow.
     """
 
-    def is_applicable(self, plan_node: DrivesBase) -> bool:
+    def is_applicable(self, *, plan_node: DrivesBase) -> bool:
+        """
+        Unlike :meth:`WriteTheOdometryInsteadOfDriving.is_applicable`, applies only
+        where the base would be sent to its pose by a :class:`HolonomicBaseGoal`.
+        """
         return issubclass(plan_node.base_goal_type, HolonomicBaseGoal)
 
 
 # %% detecting with the real robot's perception
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DetectWithRoboKudo(ConfigurationTransformation[DetectAction]):
     """
     Answers a detection with RoboKudo instead of the world model, where the world model
     does not know what is in front of the robot.
     """
 
-    def is_applicable(self, plan_node: DetectAction) -> bool:
+    def is_applicable(self, *, plan_node: DetectAction) -> bool:
         return True
 
-    def apply(self, plan_node: DetectAction) -> None:
+    def apply(self, *, plan_node: DetectAction) -> None:
         plan_node.perception_source = PerceptionSource.ROBOKUDO
 
 
 # %% letting contact carry a body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LetContactCarryTheBodies(ConfigurationTransformation[ReattachesBranches]):
     """
     Leaves the world model alone where an action would move a body under a new parent,
@@ -554,8 +584,8 @@ class LetContactCarryTheBodies(ConfigurationTransformation[ReattachesBranches]):
     a picked object under the gripper would hold it whether or not the grasp did.
     """
 
-    def is_applicable(self, plan_node: ReattachesBranches) -> bool:
+    def is_applicable(self, *, plan_node: ReattachesBranches) -> bool:
         return True
 
-    def apply(self, plan_node: ReattachesBranches) -> None:
+    def apply(self, *, plan_node: ReattachesBranches) -> None:
         plan_node.reattaches_in_world_model = False

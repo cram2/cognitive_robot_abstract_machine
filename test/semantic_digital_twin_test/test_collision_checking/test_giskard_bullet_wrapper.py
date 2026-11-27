@@ -1,11 +1,17 @@
+"""
+Tests of collision detection with Bullet.
+"""
+
+from __future__ import annotations
+
 import copy
+import math
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import giskardpy_bullet_bindings as pb
 import pytest
 import trimesh
-from importlib.resources import files
 from pathlib import Path
 
 from semantic_digital_twin.adapters.mesh import STLParser
@@ -50,12 +56,10 @@ def clean_cache(cache_dir):
 
 @pytest.fixture
 def non_convex_mesh():
-    stl_path = os.path.join(
-        Path(files("semantic_digital_twin")).parent.parent,
-        "resources",
-        "stl",
-        "jeroen_cup.stl",
-    )
+    """
+    :return: The collision mesh of the jeroen cup.
+    """
+    stl_path = "package://iai_objects/objects/jeroen_cup.stl"
     world_with_stl = STLParser(stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]
@@ -333,3 +337,34 @@ def test_a_cached_decomposition_is_not_taken_for_a_copy_of_the_mesh(
     )
 
     assert len(copy.faces) == len(non_convex_mesh.unscaled_mesh.faces)
+
+
+# %% meshes turned within their file
+
+
+def test_a_mesh_turned_within_its_file_collides_like_its_turned_vertices(monkeypatch):
+    """
+    The turned mesh shares its file with an unturned one Bullet loaded before.
+    """
+    monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
+    unturned = Mesh.from_trimesh(
+        mesh=trimesh.creation.box(extents=(1.0, 2.0, 3.0)),
+        scale=Scale(0.5, 0.5, 0.5),
+        file_type=MeshFileFormat.OBJ,
+    )
+    turned = replace(
+        unturned,
+        file_T_mesh=HomogeneousTransformationMatrix.from_xyz_quaternion(
+            quat_w=math.sqrt(0.5), quat_x=math.sqrt(0.5)
+        ),
+    )
+    turned_vertices = Mesh.from_trimesh(
+        mesh=turned.unscaled_mesh, scale=turned.scale, file_type=MeshFileFormat.OBJ
+    )
+    create_shape_from_geometry(geometry=unturned)
+
+    turned_shape = create_shape_from_geometry(geometry=turned)
+
+    assert bounds_of(turned_shape) == bounds_of(
+        create_shape_from_geometry(geometry=turned_vertices)
+    )

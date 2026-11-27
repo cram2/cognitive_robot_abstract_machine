@@ -4,6 +4,9 @@ Tests of the semantic annotations of an environment and how they are found in a 
 
 import logging
 
+import numpy as np
+
+from krrood.adapters.json_serializer import from_json, to_json
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
 from krrood.entity_query_language.explanation.explanation import explain_inference
 from krrood.entity_query_language.factories import entity, variable, in_, inference, an
@@ -23,7 +26,8 @@ from semantic_digital_twin.predefined_maps.kitchen_environment import (
 )
 from semantic_digital_twin.reasoning.world_reasoner import WorldReasoner
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
-from semantic_digital_twin.robots.robot_parts import AbstractRobot, KinematicChain
+from semantic_digital_twin.robots.robot_parts import AbstractRobot, RobotKinematicChain
+from semantic_digital_twin.semantic_annotations.mixins import IsPerceivable
 from semantic_digital_twin.semantic_annotations.semantic_annotations import *
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Handle,
@@ -31,10 +35,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
 )
 from semantic_digital_twin.testing import *
-from semantic_digital_twin.world_description.connections import (
-    PrismaticConnection,
-    RevoluteConnection,
-)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 from semantic_digital_twin.world_description.shape_collection import (
     BoundingBoxCollection,
@@ -293,20 +294,24 @@ def inferred_handled_drawer(world) -> Drawer:
 @pytest.mark.order("second_to_last")
 def test_explain_inferred_semantic_annotations(apartment_world_copy):
     """
-    The listing names the conditions that held.
-
-    The rule's negated condition - that the body is no part of a robot - is not among
-    them: what held is the negation, and a logical operator names no condition of its
-    own. It is still stated in the verbalization of the same query.
+    The listing names the conditions that held, each comparison with the values it held
+    for, and the rule's negated condition as the sentence it states.
     """
     drawer = inferred_handled_drawer(apartment_world_copy)
     explanation = explain_inference(drawer)
     assert explanation is not None
     assert isinstance(explanation.query_root, SymbolicExpression)
+    drawer_body = drawer.root
+    handle_body = drawer.handle.root
     assert explanation.get_satisfied_conditions_as_string() == (
-        "HasCollisionGeometry (PrismaticConnection.child)"
-        "\nAND (FixedConnection.parent == PrismaticConnection.child)"
-        "\nAND (FixedConnection.child == Handle.root)"
+        "ScrewAxisConnection.behaves_like_a_prismatic_connection"
+        " (ScrewAxisConnection)"
+        "\nAND HasCollisionGeometry (ScrewAxisConnection.child)"
+        "\nAND the child of a ScrewAxisConnection is not part of a robot"
+        f"\nAND ((FixedConnection.parent = {drawer_body!r}) == "
+        f"(ScrewAxisConnection.child = {drawer_body!r}))"
+        f"\nAND ((FixedConnection.child = {handle_body!r}) == "
+        f"(Handle.root = {handle_body!r}))"
     )
     visualize = False
     if visualize:
@@ -322,22 +327,26 @@ def test_verbalize_query_that_inferred_semantic_annotations(apartment_world_copy
         renderer=HierarchicalRenderer()
     ).verbalize(expression=explanation.query_root)
     assert verbalization_paragraph == (
-        "If the child of a PrismaticConnection has collision geometry,"
-        " the child of the PrismaticConnection is not part of a robot,"
-        " the parent of a FixedConnection is the child of the PrismaticConnection,"
+        "If a ScrewAxisConnection has"
+        " behaves_like_a_prismatic_connection,"
+        " the child of the ScrewAxisConnection has collision geometry,"
+        " the child of the ScrewAxisConnection is not part of a robot,"
+        " the parent of a FixedConnection is the child of the ScrewAxisConnection,"
         " the child of the FixedConnection is the root of a Handle,"
-        " then there's a Drawer whose root is the child of the PrismaticConnection,"
+        " then there's a Drawer whose root is the child of the ScrewAxisConnection,"
         " and whose handle is the Handle"
     )
     assert verbalization_hierarchical == (
         "If\n"
-        "  - the child of a PrismaticConnection has collision geometry\n"
-        "  - the child of the PrismaticConnection is not part of a robot\n"
-        "  - the parent of a FixedConnection is the child of the PrismaticConnection\n"
+        "  - a ScrewAxisConnection has"
+        " behaves_like_a_prismatic_connection\n"
+        "  - the child of the ScrewAxisConnection has collision geometry\n"
+        "  - the child of the ScrewAxisConnection is not part of a robot\n"
+        "  - the parent of a FixedConnection is the child of the ScrewAxisConnection\n"
         "  - the child of the FixedConnection is the root of a Handle\n"
         "then\n"
         "  there's a Drawer\n"
-        "    - whose root is the child of the PrismaticConnection\n"
+        "    - whose root is the child of the ScrewAxisConnection\n"
         "    - whose handle is the Handle"
     )
 
@@ -386,11 +395,14 @@ def test_minimal_robot_annotation(pr2_world_state_reset):
 
 
 def test_kinematic_chain_with_root_equal_tip_has_no_connections():
+    """
+    A kinematic chain whose root is its tip has no connections.
+    """
 
     @dataclass(eq=False)
-    class ReviewKinematicChain(KinematicChain):
+    class ReviewKinematicChain(RobotKinematicChain):
         """
-        Minimal concrete KinematicChain for chain tests.
+        Minimal concrete RobotKinematicChain for chain tests.
         """
 
         def setup_hardware_interfaces(self):
@@ -416,8 +428,13 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
     with world.modify_world():
         world.add_kinematic_structure_entity(root)
         world.add_kinematic_structure_entity(link)
-        joint = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=link, axis=Vector3.Z(reference_frame=root)
+        joint = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3.Z(reference_frame=root)
+            ),
+            world=world,
+            parent=root,
+            child=link,
         )
         world.add_connection(joint)
         chain = ReviewKinematicChain(
@@ -478,7 +495,7 @@ class DrawerWithSlidingHandle:
     Connects the world root to the case, so the whole drawer can be moved.
     """
 
-    handle_connection: PrismaticConnection
+    handle_connection: ScrewAxisConnection
     """
     Connects the case to the handle body, so the handle can be moved within the drawer.
     """
@@ -510,14 +527,16 @@ class DrawerWithSlidingHandle:
                 world=world, parent=root, child=case
             )
             world.add_connection(base_connection)
-            handle_connection = PrismaticConnection.create_with_dofs(
+            handle_connection = ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3.X(reference_frame=case)
+                ),
                 world=world,
                 parent=case,
                 child=handle_body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=HANDLE_OFFSET_X, reference_frame=case
                 ),
-                axis=Vector3.X(reference_frame=case),
             )
             world.add_connection(handle_connection)
             world.add_semantic_annotation(handle)
@@ -652,7 +671,7 @@ def test_door_joint_is_the_revolute_connection_it_hangs_from_its_whole_on(
     )
 
     assert fridge_door.movable_joint is fridge_door.root.parent_connection
-    assert isinstance(fridge_door.movable_joint, RevoluteConnection)
+    assert fridge_door.movable_joint.behaves_like_a_revolute_connection
     assert fridge_door.movable_joint.parent is refrigerator.root
 
 
@@ -664,7 +683,7 @@ def test_drawer_joint_is_the_prismatic_connection_it_hangs_from_its_whole_on(
     )
 
     assert drawer.movable_joint is drawer.root.parent_connection
-    assert isinstance(drawer.movable_joint, PrismaticConnection)
+    assert drawer.movable_joint.behaves_like_a_prismatic_connection
 
 
 def test_a_drawer_built_with_rails_reports_how_far_it_stands_open(
@@ -695,3 +714,40 @@ def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
     kitchen_environment_world.notify_state_change()
 
     assert [drawer.opening_ratio for drawer in drawers] == [0] * len(drawers)
+
+
+# %% perceived objects
+
+
+def test_unknown_object_keeps_its_class_label_when_sent_to_another_process():
+    """
+    A perceived object keeps its class label through serialization to another process.
+    """
+    world = World()
+    body = Body(name=PrefixedName("unknown_object"))
+    with world.modify_world():
+        world.add_body(body)
+        unknown_object = UnknownObject(root=body, class_label="fork")
+        world.add_semantic_annotation(unknown_object)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+
+    received = from_json(to_json(unknown_object), **tracker.create_kwargs())
+
+    assert type(received) is UnknownObject
+    assert received.root is body
+    assert received.class_label == unknown_object.class_label
+
+
+def test_human_is_found_among_the_perceivable_objects_with_its_class_label():
+    """
+    A human is a perceivable object and keeps its class label.
+    """
+    world = World()
+    body = Body(name=PrefixedName("human"))
+    with world.modify_world():
+        world.add_body(body)
+        human = Human(root=body, class_label="person")
+        world.add_semantic_annotation(human)
+
+    assert world.get_semantic_annotations_by_type(IsPerceivable) == [human]
+    assert human.class_label == "person"

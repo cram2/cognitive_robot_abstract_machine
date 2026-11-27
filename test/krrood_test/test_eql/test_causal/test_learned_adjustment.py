@@ -30,8 +30,10 @@ from probabilistic_model.causal_structure.learning import (
     LearnedCausalStructure,
     RelationalCausalStructureLearner,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
@@ -155,7 +157,7 @@ def summer_structures(edges: list[FieldEdge]) -> dict[type, LearnedCausalStructu
     )
     nodes = [
         GraphNode(
-            variable=Integer(f"SummerDay.{summer_field.name}"),
+            variable=Integer(name=f"SummerDay.{summer_field.name}"),
             level=NodeLevel.EXAMPLE_ATTRIBUTE,
         )
         for summer_field in fields(SummerDay)
@@ -388,8 +390,8 @@ class FixedEdgesLearner(CausalStructureLearner):
     ) -> CausalGraph:
         by_name = {node.name: node for node in nodes}
         return CausalGraph.from_edges(
-            nodes,
-            [
+            nodes=nodes,
+            edges=[
                 GraphEdge.directed_edge(by_name[parent], by_name[child])
                 for child, parents in self.parent_names.items()
                 if child in by_name
@@ -458,11 +460,11 @@ def effect_probability_within(
     :return: The effect's probability within one region of the cause.
     """
     truncated = interventional.truncated(
-        region.fill_missing_variables_pure(interventional.variables)
+        region.fill_missing_variables_pure(variables=interventional.variables)
     ).distribution
     return float(
         truncated.probability(
-            effect_event.fill_missing_variables_pure(truncated.variables)
+            effect_event.fill_missing_variables_pure(variables=truncated.variables)
         )
     )
 

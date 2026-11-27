@@ -37,7 +37,7 @@ class FrankaGripperActionName(StrEnum):
     GRASP = "grasp"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveGarmiGrippersWithTheirFrankaDriver(
     PlanTransformation[MatchedType], Generic[MatchedType], SubClassSafeGeneric, ABC
 ):
@@ -75,6 +75,7 @@ class DriveGarmiGrippersWithTheirFrankaDriver(
 
     def action_name(
         self,
+        *,
         gripper: GarmiLeftGripper | GarmiRightGripper,
         action: FrankaGripperActionName,
     ) -> str:
@@ -85,13 +86,17 @@ class DriveGarmiGrippersWithTheirFrankaDriver(
             return f"{self.left_gripper_namespace}/{action}"
         return f"{self.right_gripper_namespace}/{action}"
 
-    def grasp(self, gripper: GarmiLeftGripper | GarmiRightGripper) -> GripperGraspTask:
+    def grasp(
+        self, *, gripper: GarmiLeftGripper | GarmiRightGripper
+    ) -> GripperGraspTask:
         """
         :return: A new task shutting `gripper` on whatever lies between its fingers,
             which succeeds where the fingers stop within :attr:`grasp_width_tolerance`.
         """
         return GripperGraspTask(
-            action_topic=self.action_name(gripper, FrankaGripperActionName.GRASP),
+            action_topic=self.action_name(
+                gripper=gripper, action=FrankaGripperActionName.GRASP
+            ),
             width=0.0,
             speed=self.finger_speed,
             force=self.grasp_force,
@@ -100,7 +105,7 @@ class DriveGarmiGrippersWithTheirFrankaDriver(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DriveGarmiGripperStatesWithTheirFrankaDriver(
     DriveGarmiGrippersWithTheirFrankaDriver[MoveGripper]
 ):
@@ -109,20 +114,24 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
     between them where they are sent to stand closed, through its Franka gripper driver.
     """
 
-    def is_applicable(self, plan_node: MoveGripper) -> bool:
-        return isinstance(plan_node.gripper, (GarmiLeftGripper, GarmiRightGripper))
+    def is_applicable(self, *, plan_node: MoveGripper) -> bool:
+        return isinstance(
+            plan_node.two_finger_gripper, (GarmiLeftGripper, GarmiRightGripper)
+        )
 
-    def apply(self, plan_node: MoveGripper) -> None:
+    def apply(self, *, plan_node: MoveGripper) -> None:
         """
         Puts the task in place of the step that drives the fingers: `plan_node`, or the
         action whose goal it is.
         """
-        gripper = plan_node.gripper
+        gripper = plan_node.two_finger_gripper
         if plan_node.width <= gripper.separation_in(GripperState.CLOSE):
-            task = self.grasp(gripper)
+            task = self.grasp(gripper=gripper)
         else:
             task = GripperMoveTask(
-                action_topic=self.action_name(gripper, FrankaGripperActionName.MOVE),
+                action_topic=self.action_name(
+                    gripper=gripper, action=FrankaGripperActionName.MOVE
+                ),
                 width=plan_node.width,
                 speed=self.finger_speed,
             )
@@ -131,7 +140,7 @@ class DriveGarmiGripperStatesWithTheirFrankaDriver(
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CloseGarmiFingersToWidthWithTheirFrankaDriver(
     DriveGarmiGrippersWithTheirFrankaDriver[MoveFingersToWidthAction]
 ):
@@ -140,12 +149,14 @@ class CloseGarmiFingersToWidthWithTheirFrankaDriver(
     gripper driver, whose grasp stops the fingers where the object pushes back.
     """
 
-    def is_applicable(self, plan_node: MoveFingersToWidthAction) -> bool:
-        return isinstance(plan_node.gripper, (GarmiLeftGripper, GarmiRightGripper))
+    def is_applicable(self, *, plan_node: MoveFingersToWidthAction) -> bool:
+        return isinstance(
+            plan_node.two_finger_gripper, (GarmiLeftGripper, GarmiRightGripper)
+        )
 
-    def apply(self, plan_node: MoveFingersToWidthAction) -> None:
+    def apply(self, *, plan_node: MoveFingersToWidthAction) -> None:
         plan_node.statechart.replace(
-            node=plan_node, replacement=self.grasp(plan_node.gripper)
+            node=plan_node, replacement=self.grasp(gripper=plan_node.two_finger_gripper)
         )
 
 

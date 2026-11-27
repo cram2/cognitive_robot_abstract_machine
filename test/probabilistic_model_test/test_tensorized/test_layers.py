@@ -20,6 +20,9 @@ from random_events.product_algebra import SimpleEvent
 from sortedcontainers import SortedSet
 
 from krrood.adapters.json_serializer import from_json, to_json
+from probabilistic_model.probabilistic_circuit.tensorized.matrix_shape import (
+    MatrixShape2D,
+)
 from probabilistic_model.adapters.rustworkx_tensorized.rustworkx_to_tensorized import (
     RustworkxCircuitToLayeredCircuitConverter,
 )
@@ -138,49 +141,70 @@ def test_entry_positions_by_rank_list_the_kth_entry_of_every_row(uneven_rows):
 
 
 def test_reduce_by_row_with_logaddexp_is_the_logsumexp_of_every_row(uneven_rows):
+    """
+    Reducing rows of different lengths by log-sum-exp gives the log-sum-exp of the
+    values of every row, minus infinity included.
+    """
     values = np.random.normal(size=(2, 5, uneven_rows.number_of_edges))
     values[0, 0, [1, 5]] = -np.inf
     expected = np.stack(
         [
             scipy.special.logsumexp(values[..., uneven_rows.rows == row], axis=-1)
-            for row in range(uneven_rows.shape[0])
+            for row in range(uneven_rows.shape.number_of_rows)
         ],
         axis=-1,
     )
     np.testing.assert_allclose(
-        uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP), expected
+        uneven_rows.reduce_by_row(values=values, reduction=RowReduction.LOG_SUM_EXP),
+        expected,
     )
 
 
 def test_reduce_by_row_with_add_is_the_sum_of_every_row(uneven_rows):
+    """
+    Reducing rows of different lengths by addition gives the sum of every row.
+    """
     values = np.random.normal(size=(2, 5, uneven_rows.number_of_edges))
     expected = np.stack(
         [
             values[..., uneven_rows.rows == row].sum(axis=-1)
-            for row in range(uneven_rows.shape[0])
+            for row in range(uneven_rows.shape.number_of_rows)
         ],
         axis=-1,
     )
     np.testing.assert_allclose(
-        uneven_rows.reduce_by_row(values, RowReduction.SUM), expected
+        uneven_rows.reduce_by_row(values=values, reduction=RowReduction.SUM), expected
     )
 
 
 def test_reduce_by_row_of_only_minus_infinity_with_logaddexp_is_minus_infinity(
     uneven_rows,
 ):
+    """
+    Rows whose values are all minus infinity reduce to minus infinity by log-sum-exp
+    without a floating point warning.
+    """
     values = np.full((3, uneven_rows.number_of_edges), -np.inf)
     with np.errstate(all="raise"):
-        result = uneven_rows.reduce_by_row(values, RowReduction.LOG_SUM_EXP)
-    np.testing.assert_array_equal(result, np.full((3, uneven_rows.shape[0]), -np.inf))
+        result = uneven_rows.reduce_by_row(
+            values=values, reduction=RowReduction.LOG_SUM_EXP
+        )
+    np.testing.assert_array_equal(
+        result, np.full((3, uneven_rows.shape.number_of_rows), -np.inf)
+    )
 
 
 @pytest.mark.parametrize("reduction", [RowReduction.SUM, RowReduction.LOG_SUM_EXP])
 def test_reduce_by_row_gives_a_row_without_entries_the_identity(uneven_rows, reduction):
+    """
+    A row without entries reduces to the identity of the reduction.
+    """
     values = np.random.normal(size=(3, uneven_rows.number_of_edges))
     row_without_entries = 3
     np.testing.assert_array_equal(
-        uneven_rows.reduce_by_row(values, reduction)[:, row_without_entries],
+        uneven_rows.reduce_by_row(values=values, reduction=reduction)[
+            :, row_without_entries
+        ],
         reduction.identity,
     )
 
@@ -207,8 +231,20 @@ def test_decomposability_is_decided_per_node():
 
 
 def test_sparsity_stores_every_column_once_in_order_only_for_identity_columns():
-    identity = SparseEdgeMatrix(np.array([0, 0, 1]), np.array([0, 1, 2]), (2, 3))
-    permuted = SparseEdgeMatrix(np.array([0, 0, 1]), np.array([1, 0, 2]), (2, 3))
+    """
+    A sparse matrix stores every column once in order only when its edges visit the
+    columns in order.
+    """
+    identity = SparseEdgeMatrix(
+        np.array([0, 0, 1]),
+        np.array([0, 1, 2]),
+        MatrixShape2D(number_of_rows=2, number_of_columns=3),
+    )
+    permuted = SparseEdgeMatrix(
+        np.array([0, 0, 1]),
+        np.array([1, 0, 2]),
+        MatrixShape2D(number_of_rows=2, number_of_columns=3),
+    )
     assert identity.stores_every_column_once_in_order
     assert not permuted.stores_every_column_once_in_order
 
@@ -233,11 +269,16 @@ def test_product_layer_stores_each_factor_of_a_node(
 def test_product_layer_adds_the_log_likelihoods_of_factors_in_one_child_layer(
     product_with_two_factors_in_one_child_layer,
 ):
+    """
+    A product layer adds the log-likelihoods of its factors that one child layer holds.
+    """
     events = np.array([[1.0]])
     [leaf] = product_with_two_factors_in_one_child_layer.child_layers
     np.testing.assert_array_equal(
-        product_with_two_factors_in_one_child_layer.log_likelihood_of_nodes(events),
-        leaf.log_likelihood_of_nodes(events).sum(axis=1, keepdims=True),
+        product_with_two_factors_in_one_child_layer.log_likelihood_of_nodes(
+            events=events
+        ),
+        leaf.log_likelihood_of_nodes(events=events).sum(axis=1, keepdims=True),
     )
 
 
@@ -262,10 +303,10 @@ def test_a_cross_product_multiplies_every_combination_of_child_nodes():
     product = ProductLayer.cross_product(child_layers=[first, second])
     events = np.array([[0.5, 0.5]])
     expected = (
-        first.log_likelihood_of_nodes(events)[:, :, None]
-        + second.log_likelihood_of_nodes(events)[:, None, :]
+        first.log_likelihood_of_nodes(events=events)[:, :, None]
+        + second.log_likelihood_of_nodes(events=events)[:, None, :]
     ).reshape(1, -1)
-    np.testing.assert_allclose(product.log_likelihood_of_nodes(events), expected)
+    np.testing.assert_allclose(product.log_likelihood_of_nodes(events=events), expected)
 
 
 # %% truncation of input layers in a circuit
@@ -343,7 +384,7 @@ def test_a_structural_pass_does_not_write_into_the_circuit_it_reads(
         for layer in layers_before
     ]
     points = np.array([[0.5, 0.5], [1.5, 1.5]])
-    likelihood_before = layered.log_likelihood(points)
+    likelihood_before = layered.log_likelihood(events=points)
 
     event = (
         SimpleEvent.from_data(
@@ -362,7 +403,9 @@ def test_a_structural_pass_does_not_write_into_the_circuit_it_reads(
         (type(layer).__name__, layer.number_of_nodes, to_json(layer))
         for layer in layered.layers
     ] == parameters_before
-    np.testing.assert_array_equal(layered.log_likelihood(points), likelihood_before)
+    np.testing.assert_array_equal(
+        layered.log_likelihood(events=points), likelihood_before
+    )
 
 
 # %% truncation of input layers agrees with the distributions
@@ -384,19 +427,34 @@ def test_a_structural_pass_does_not_write_into_the_circuit_it_reads(
 def test_uniform_layer_agrees_with_the_scalar_truncation(
     x, node_bounds, event_bounds, lower, upper
 ):
+    """
+    Truncating a uniform layer to an interval gives every node the probability and the
+    interval of truncating its distribution, for every combination of open bounds.
+    """
     # supports that overlap the event fully, partially, at a point and not at all
     node_ranges = [(0.0, 1.0), (0.5, 2.5), (2.0, 3.0), (3.0, 4.0), (-1.0, 5.0)]
     distributions = [
         UniformDistribution(
             variable=x,
-            interval=SimpleInterval.from_data(node_lower, node_upper, *node_bounds),
+            interval=SimpleInterval.from_data(
+                lower=node_lower,
+                upper=node_upper,
+                left=node_bounds[0],
+                right=node_bounds[1],
+            ),
         )
         for node_lower, node_upper in node_ranges
     ]
-    layer = UniformLayer.from_distributions(0, distributions)
-    event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
+    layer = UniformLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
+    event_interval = SimpleInterval.from_data(
+        lower=lower, upper=upper, left=event_bounds[0], right=event_bounds[1]
+    )
     truncated = layer.log_truncated_of_assignment(
-        event_interval.as_composite_set(), False
+        assignment=event_interval.as_composite_set(),
+        variable=x,
+        singleton_allowed=False,
     )
 
     for node, distribution in enumerate(distributions):
@@ -416,31 +474,43 @@ def test_uniform_layer_agrees_with_the_scalar_truncation(
 
 
 def test_a_singleton_turns_every_uniform_node_into_a_dirac_delta(x):
+    """
+    Truncating a uniform layer to a singleton, where singletons are allowed, gives a
+    Dirac delta layer at the point with the density of every node.
+    """
     layer = uniform_layer_of(0, [(0, 2), (1, 5)])
     assignment = singleton(1.0)
-    truncated = layer.log_truncated_of_assignment(assignment, True)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=True
+    )
     assert isinstance(truncated.layer, DiracDeltaLayer)
     for node in range(layer.number_of_nodes):
         expected_truncation = layer.node_distribution(
-            node, x
+            index=node, variable=x
         ).log_conditional_from_simple_interval(assignment.simple_sets[0], True)
         assert float(truncated.log_probabilities[node]) == pytest.approx(
             float(expected_truncation.log_probability)
         )
         assert (
-            truncated.layer.node_distribution(node, x).location
+            truncated.layer.node_distribution(index=node, variable=x).location
             == expected_truncation.distribution.location
         )
 
 
 def test_a_composite_assignment_mixes_the_truncations_to_its_simple_intervals(x):
+    """
+    Truncating a uniform layer to a union of intervals gives a sum layer over the
+    truncations to each interval, with the probability of the union for every node.
+    """
     layer = uniform_layer_of(0, [(0, 4), (0, 8)])
     assignment = closed(0, 1) | closed(3, 4)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=False
+    )
     assert isinstance(truncated.layer, SumLayer)
     assert truncated.layer.number_of_nodes == layer.number_of_nodes
     for node in range(layer.number_of_nodes):
-        expected = layer.node_distribution(node, x).probability(
+        expected = layer.node_distribution(index=node, variable=x).probability(
             SimpleEvent.from_data({x: assignment}).as_composite_set()
         )
         assert float(np.exp(truncated.log_probabilities[node])) == pytest.approx(
@@ -453,7 +523,11 @@ def three_dirac_deltas() -> DiracDeltaLayer:
     """
     Dirac deltas at 0, 1 and 2.
     """
-    return DiracDeltaLayer(0, np.array([0.0, 1.0, 2.0]), np.array([1.0, 1.0, 1.0]))
+    return DiracDeltaLayer(
+        np.zeros(3, dtype=np.int64),
+        np.array([0.0, 1.0, 2.0]),
+        np.array([1.0, 1.0, 1.0]),
+    )
 
 
 @pytest.mark.parametrize(
@@ -464,12 +538,16 @@ def three_dirac_deltas() -> DiracDeltaLayer:
 def test_dirac_delta_layer_probability_agrees_with_the_scalar_truncation(
     three_dirac_deltas, x, assignment
 ):
+    """
+    The probability of an event under every Dirac delta node is that of its
+    distribution.
+    """
     event = SimpleEvent.from_data({x: assignment})
     probabilities = three_dirac_deltas.probability_of_simple_event_of_nodes(
-        event, SortedSet([x])
+        event=event, variables=SortedSet([x])
     )
     expected_log_probabilities = [
-        three_dirac_deltas.node_distribution(node, x)
+        three_dirac_deltas.node_distribution(index=node, variable=x)
         .log_truncated(event.as_composite_set())
         .log_probability
         for node in range(three_dirac_deltas.number_of_nodes)
@@ -491,12 +569,16 @@ def test_dirac_delta_layer_probability_agrees_with_the_scalar_truncation(
 def test_dirac_delta_layer_agrees_with_the_scalar_truncation(
     three_dirac_deltas, x, assignment
 ):
+    """
+    Truncating a Dirac delta layer gives every node the probability of truncating its
+    distribution.
+    """
     log_probabilities = three_dirac_deltas.log_truncated_of_assignment(
-        assignment, False
+        assignment=assignment, variable=x, singleton_allowed=False
     ).log_probabilities
     for node in range(three_dirac_deltas.number_of_nodes):
         expected = (
-            three_dirac_deltas.node_distribution(node, x)
+            three_dirac_deltas.node_distribution(index=node, variable=x)
             .log_truncated(SimpleEvent.from_data({x: assignment}).as_composite_set())
             .log_probability
         )
@@ -511,17 +593,26 @@ def test_dirac_delta_layer_contains_a_location_an_interval_cannot_hold_exactly(x
     The layer still recognises it, or a circuit gives its own support probability zero.
     """
     location = 3.427709925174713
-    layer = DiracDeltaLayer(0, np.array([location]), np.array([1.0]))
+    layer = DiracDeltaLayer(
+        np.zeros(1, dtype=np.int64), np.array([location]), np.array([1.0])
+    )
     assert singleton(location).simple_sets[0].lower != location
     assert layer.probability_of_simple_event_of_nodes(
-        SimpleEvent.from_data({x: singleton(location)}), SortedSet([x])
+        event=SimpleEvent.from_data({x: singleton(location)}), variables=SortedSet([x])
     ) == np.array([1.0])
 
 
 def test_dirac_delta_layer_excludes_a_location_outside_its_tolerance(x):
-    layer = DiracDeltaLayer(0, np.array([1.0]), np.array([1.0]))
+    """
+    An interval that starts just above a location gives the Dirac delta there
+    probability zero.
+    """
+    layer = DiracDeltaLayer(
+        np.zeros(1, dtype=np.int64), np.array([1.0]), np.array([1.0])
+    )
     assert layer.probability_of_simple_event_of_nodes(
-        SimpleEvent.from_data({x: closed(1.0 + 1e-3, 2.0)}), SortedSet([x])
+        event=SimpleEvent.from_data({x: closed(1.0 + 1e-3, 2.0)}),
+        variables=SortedSet([x]),
     ) == np.array([0.0])
 
 
@@ -529,14 +620,22 @@ def test_dirac_delta_layer_excludes_a_location_outside_its_tolerance(x):
     "assignment", [closed(0, 1), closed(2, 2), closed(5, 6)], ids=str
 )
 def test_discrete_layer_agrees_with_the_scalar_truncation(count, assignment):
+    """
+    Truncating an integer layer gives every node the probability and the probabilities
+    of truncating its distribution, or minus infinity without mass.
+    """
     distributions = [
         IntegerDistribution(
             variable=count, probabilities=MissingDict(float, {0: 0.2, 1: 0.3, 2: 0.5})
         ),
         IntegerDistribution(variable=count, probabilities=MissingDict(float, {0: 1.0})),
     ]
-    layer = IntegerLayer.from_distributions(0, distributions)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    layer = IntegerLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=count, singleton_allowed=False
+    )
     for node, distribution in enumerate(distributions):
         expected_truncation = distribution.log_truncated(
             SimpleEvent.from_data({count: assignment}).as_composite_set()
@@ -557,15 +656,25 @@ def test_discrete_layer_agrees_with_the_scalar_truncation(count, assignment):
 def test_gaussian_layer_agrees_with_the_scalar_truncation(
     x, event_bounds, lower, upper
 ):
+    """
+    Truncating a Gaussian layer to an interval gives every node the probability and the
+    interval of truncating its distribution, for every combination of open bounds.
+    """
     node_parameters = [(0.0, 1.0), (2.0, 0.5), (-3.0, 2.0), (100.0, 0.01)]
     distributions = [
         GaussianDistribution(variable=x, location=location, scale=scale)
         for location, scale in node_parameters
     ]
-    layer = GaussianLayer.from_distributions(0, distributions)
-    event_interval = SimpleInterval.from_data(lower, upper, *event_bounds)
+    layer = GaussianLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
+    event_interval = SimpleInterval.from_data(
+        lower=lower, upper=upper, left=event_bounds[0], right=event_bounds[1]
+    )
     truncated = layer.log_truncated_of_assignment(
-        event_interval.as_composite_set(), False
+        assignment=event_interval.as_composite_set(),
+        variable=x,
+        singleton_allowed=False,
     )
 
     for node, distribution in enumerate(distributions):
@@ -588,14 +697,20 @@ def test_gaussian_layer_agrees_with_the_scalar_truncation(
 
 
 def test_gaussian_layer_truncated_to_the_real_line_stays_gaussian(x):
+    """
+    Truncating a Gaussian layer to the real line keeps it a Gaussian layer with the same
+    parameters and probability one.
+    """
     layer = GaussianLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             GaussianDistribution(variable=x, location=0.0, scale=1.0),
             GaussianDistribution(variable=x, location=5.0, scale=2.0),
         ],
     )
-    truncated = layer.log_truncated_of_assignment(reals(), False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=reals(), variable=x, singleton_allowed=False
+    )
     assert type(truncated.layer) is GaussianLayer
     np.testing.assert_allclose(truncated.log_probabilities, 0.0, atol=1e-9)
     np.testing.assert_array_equal(truncated.layer.location, layer.location)
@@ -603,25 +718,39 @@ def test_gaussian_layer_truncated_to_the_real_line_stays_gaussian(x):
 
 
 def test_gaussian_layer_marks_a_node_with_no_probability_left_as_impossible(x):
+    """
+    A node whose probability in the interval underflows gets log-probability minus
+    infinity, and the other nodes keep theirs.
+    """
     layer = GaussianLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             GaussianDistribution(variable=x, location=0.0, scale=0.001),
             GaussianDistribution(variable=x, location=100.0, scale=1.0),
         ],
     )
     log_probabilities = layer.log_truncated_of_assignment(
-        closed(99.0, 101.0), False
+        assignment=closed(99.0, 101.0), variable=x, singleton_allowed=False
     ).log_probabilities
     assert log_probabilities[0] == -np.inf
     assert log_probabilities[1] > -np.inf
 
 
 def test_a_singleton_turns_every_gaussian_node_into_a_dirac_delta(x):
+    """
+    Truncating a Gaussian layer to a singleton, where singletons are allowed, gives a
+    Dirac delta layer with the log-density of every node at the point.
+    """
     layer = GaussianLayer.from_distributions(
-        0, [GaussianDistribution(variable=x, location=0.0, scale=1.0)]
+        variable_index=0,
+        distributions=[GaussianDistribution(variable=x, location=0.0, scale=1.0)],
     )
-    truncated = layer.log_truncated_of_assignment(singleton(1.0), True)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=singleton(1.0), variable=x, singleton_allowed=True
+    )
+    truncated = layer.log_truncated_of_assignment(
+        assignment=singleton(1.0), variable=x, singleton_allowed=True
+    )
     assert isinstance(truncated.layer, DiracDeltaLayer)
     assert float(truncated.log_probabilities[0]) == pytest.approx(
         float(layer.log_likelihood_of_nodes_from_column(np.array([1.0]))[0, 0])
@@ -629,10 +758,18 @@ def test_a_singleton_turns_every_gaussian_node_into_a_dirac_delta(x):
 
 
 def test_a_composite_assignment_mixes_the_truncated_gaussians(x):
+    """
+    Truncating a Gaussian layer to a union of intervals gives a sum layer over truncated
+    Gaussians, with the probability of the union.
+    """
     distribution = GaussianDistribution(variable=x, location=0.0, scale=1.0)
-    layer = GaussianLayer.from_distributions(0, [distribution])
+    layer = GaussianLayer.from_distributions(
+        variable_index=0, distributions=[distribution]
+    )
     assignment = closed(-1, 0) | closed(1, 2)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=False
+    )
     assert isinstance(truncated.layer, SumLayer)
     assert isinstance(truncated.layer.child_layers[0], TruncatedGaussianLayer)
     assert float(np.exp(truncated.log_probabilities[0])) == pytest.approx(
@@ -646,6 +783,10 @@ def test_a_composite_assignment_mixes_the_truncated_gaussians(x):
     "assignment", [closed(0.0, 1.0), open(-5.0, 0.5), closed(2.0, 10.0)], ids=str
 )
 def test_truncated_gaussian_layer_agrees_with_the_scalar_truncation(x, assignment):
+    """
+    Truncating a truncated Gaussian layer gives every node the probability, the interval
+    and the density of truncating its distribution.
+    """
     distributions = [
         TruncatedGaussianDistribution(
             variable=x,
@@ -655,9 +796,13 @@ def test_truncated_gaussian_layer_agrees_with_the_scalar_truncation(x, assignmen
         )
         for location, scale in ((0.0, 1.0), (2.5, 0.5))
     ]
-    layer = TruncatedGaussianLayer.from_distributions(0, distributions)
+    layer = TruncatedGaussianLayer.from_distributions(
+        variable_index=0, distributions=distributions
+    )
     points = np.linspace(-1.5, 3.5, 11).reshape(-1, 1)
-    truncated = layer.log_truncated_of_assignment(assignment, False)
+    truncated = layer.log_truncated_of_assignment(
+        assignment=assignment, variable=x, singleton_allowed=False
+    )
     assert isinstance(truncated.layer, TruncatedGaussianLayer)
     for node, distribution in enumerate(distributions):
         expected_truncation = distribution.log_truncated(
@@ -671,16 +816,20 @@ def test_truncated_gaussian_layer_agrees_with_the_scalar_truncation(x, assignmen
             == expected_truncation.distribution.interval
         )
         np.testing.assert_allclose(
-            np.exp(truncated.layer.log_likelihood_of_nodes(points)[:, node]),
+            np.exp(truncated.layer.log_likelihood_of_nodes(events=points)[:, node]),
             expected_truncation.distribution.likelihood(points),
             atol=1e-9,
         )
 
 
 def test_conditioning_a_discrete_layer_on_a_value(count):
+    """
+    Conditioned on a value, every node of a discrete layer is certain of it, and the
+    log-probabilities are its log-likelihoods.
+    """
     layer = IntegerLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             IntegerDistribution(
                 variable=count, probabilities=MissingDict(float, {0: 0.2, 2: 0.8})
             ),
@@ -689,11 +838,11 @@ def test_conditioning_a_discrete_layer_on_a_value(count):
             ),
         ],
     )
-    conditioned = layer.log_conditional_of_value(2)
+    conditioned = layer.log_conditional_of_value(value=2)
     np.testing.assert_allclose(conditioned.log_probabilities, np.log([0.8, 0.0]))
     assert conditioned.layer.probabilities_of_node(0) == MissingDict(float, {2: 1.0})
     np.testing.assert_array_equal(
-        layer.log_conditional_of_value(7).log_probabilities, [-np.inf, -np.inf]
+        layer.log_conditional_of_value(value=7).log_probabilities, [-np.inf, -np.inf]
     )
 
 
@@ -889,9 +1038,13 @@ def test_alive_nodes_of_recorded_and_unrecorded_layers():
 
 
 def test_uniform_moment_is_the_difference_of_the_antiderivative(x):
+    """
+    The moment of every uniform node is the difference of the antiderivative of the
+    moment at its bounds.
+    """
     layer = uniform_layer_of(0, [(0, 2), (1, 5)])
     np.testing.assert_allclose(
-        layer.moment_of_nodes_own(1, 0.0, x), np.array([1.0, 3.0])
+        layer.moment_of_nodes_own(order=1, center=0.0, variable=x), np.array([1.0, 3.0])
     )
     np.testing.assert_allclose(
         layer.antiderivative_of_moment_at(np.array([2.0, 5.0]), 1, 0.0),
@@ -907,7 +1060,9 @@ def gaussian_layer() -> GaussianLayer:
     """
     Gaussians at -1 and 2.
     """
-    return GaussianLayer(0, np.array([-1.0, 2.0]), np.array([0.5, 1.5]))
+    return GaussianLayer(
+        np.zeros(2, dtype=np.int64), np.array([-1.0, 2.0]), np.log([0.5, 1.5])
+    )
 
 
 @pytest.fixture
@@ -917,11 +1072,11 @@ def truncated_gaussian_layer() -> TruncatedGaussianLayer:
     location.
     """
     return TruncatedGaussianLayer(
-        0,
+        np.zeros(3, dtype=np.int64),
         np.array([[-1.0, 0.5], [0.0, 3.0], [2.0, 10.0]]),
         np.full((3, 2), int(Bound.CLOSED), dtype=np.int64),
         np.array([0.0, 2.5, 0.0]),
-        np.array([1.0, 0.5, 2.0]),
+        np.log([1.0, 0.5, 2.0]),
     )
 
 
@@ -938,7 +1093,9 @@ def dirac_delta_layer() -> DiracDeltaLayer:
     """
     Dirac deltas at 0.5 and 3.
     """
-    return DiracDeltaLayer(0, np.array([0.5, 3.0]), np.ones(2))
+    return DiracDeltaLayer(
+        np.zeros(2, dtype=np.int64), np.array([0.5, 3.0]), np.ones(2)
+    )
 
 
 @pytest.fixture(
@@ -957,10 +1114,14 @@ def continuous_input_layer(request) -> AbstractContinuousLayer:
 
 
 def test_samples_of_every_node_have_the_mean_of_the_node(continuous_input_layer, x):
+    """
+    The samples of every node of a continuous layer have the mean of the node and lie in
+    its support.
+    """
     layer = continuous_input_layer
     nodes = np.repeat(np.arange(layer.number_of_nodes), 20000)
-    samples = layer.sample_of_nodes(nodes, SortedSet([x]))
-    means = layer.moment_of_nodes_own(1, 0.0, x)
+    samples = layer.sample_of_nodes(nodes=nodes, variables=SortedSet([x]))
+    means = layer.moment_of_nodes_own(order=1, center=0.0, variable=x)
     for node in range(layer.number_of_nodes):
         of_node = samples[nodes == node]
         assert of_node.mean() == pytest.approx(means[node], abs=0.05)
@@ -997,14 +1158,16 @@ def gaussian_layer_with_scale(
     :return: The layer.
     """
     location = np.zeros(2)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log_scale = np.log(scale)
     if not truncated:
-        return GaussianLayer(0, location, scale)
+        return GaussianLayer(np.zeros(2, dtype=np.int64), location, log_scale)
     return TruncatedGaussianLayer(
-        0,
+        np.zeros(2, dtype=np.int64),
         np.tile([[-1.0, 1.0]], (number_of_intervals, 1)),
         np.full((number_of_intervals, 2), int(Bound.CLOSED), dtype=np.int64),
         location,
-        scale,
+        log_scale,
     )
 
 
@@ -1060,15 +1223,21 @@ def integer_layer(request, integer_distributions) -> IntegerLayer:
     """
     :func:`integer_distributions` as a layer, with every way to store its table.
     """
-    return IntegerLayer.from_distributions(0, integer_distributions, request.param)
+    return IntegerLayer.from_distributions(
+        variable_index=0, distributions=integer_distributions, table_type=request.param
+    )
 
 
 def test_samples_of_every_discrete_node_follow_its_distribution(
     integer_layer, integer_distributions, count
 ):
+    """
+    The samples of every node of an integer layer have the frequencies of its
+    probabilities.
+    """
     amount = 20000
     nodes = np.repeat(np.arange(integer_layer.number_of_nodes), amount)
-    samples = integer_layer.sample_of_nodes(nodes, SortedSet([count]))
+    samples = integer_layer.sample_of_nodes(nodes=nodes, variables=SortedSet([count]))
     for node, distribution in enumerate(integer_distributions):
         of_node = samples[nodes == node]
         for state, probability in distribution.probabilities.items():
@@ -1078,8 +1247,16 @@ def test_samples_of_every_discrete_node_follow_its_distribution(
 
 
 def test_a_discrete_node_without_mass_samples_nothing(integer_layer, count):
-    truncated = integer_layer.log_truncated_of_assignment(closed(2, 2), False).layer
-    samples = truncated.sample_of_nodes(np.array([0, 1, 1]), SortedSet([count]))
+    """
+    A node of a truncated integer layer without probability mass samples no value, while
+    the others sample their remaining state.
+    """
+    truncated = integer_layer.log_truncated_of_assignment(
+        assignment=closed(2, 2), variable=count, singleton_allowed=False
+    ).layer
+    samples = truncated.sample_of_nodes(
+        nodes=np.array([0, 1, 1]), variables=SortedSet([count])
+    )
     assert samples[0] == 2.0
     assert np.isnan(samples[1:]).all()
 
@@ -1153,10 +1330,13 @@ def test_conversion_of_a_learned_circuit_is_valid(
 def test_log_likelihood_of_a_learned_circuit(
     joint_probability_tree, layered_joint_probability_tree
 ):
+    """
+    The layered circuit of a joint probability tree has the likelihood of the tree.
+    """
     samples = joint_probability_tree.sample(500)
     np.testing.assert_allclose(
-        layered_joint_probability_tree.log_likelihood(samples),
-        joint_probability_tree.log_likelihood(samples),
+        layered_joint_probability_tree.log_likelihood(events=samples),
+        joint_probability_tree.log_likelihood(events=samples),
     )
 
 
@@ -1181,22 +1361,31 @@ def test_expectation_of_a_learned_circuit(
 def test_samples_of_a_learned_circuit_lie_in_its_support(
     layered_joint_probability_tree,
 ):
+    """
+    Every sample of the layered circuit of a joint probability tree lies in its support.
+    """
     samples = layered_joint_probability_tree.sample(2000)
     assert not np.any(np.isnan(samples))
-    assert np.all(layered_joint_probability_tree.log_likelihood(samples) > -np.inf)
+    assert np.all(
+        layered_joint_probability_tree.log_likelihood(events=samples) > -np.inf
+    )
 
 
 def test_truncation_of_a_learned_circuit(
     joint_probability_tree, layered_joint_probability_tree
 ):
+    """
+    Truncating the layered circuit of a joint probability tree agrees with truncating
+    the tree.
+    """
     bounding_box = joint_probability_tree.support.bounding_box()
     variable = layered_joint_probability_tree.variables[0]
     interval = bounding_box[variable].simple_sets[0]
     half = SimpleInterval.from_data(
-        interval.lower,
-        (interval.lower + interval.upper) / 2,
-        interval.left,
-        interval.right,
+        lower=interval.lower,
+        upper=(interval.lower + interval.upper) / 2,
+        left=interval.left,
+        right=interval.right,
     )
     event = SimpleEvent.from_data(
         {variable: half.as_composite_set()}
@@ -1208,31 +1397,40 @@ def test_truncation_of_a_learned_circuit(
     truncation.distribution.validate()
     samples = truncation.distribution.sample(300)
     np.testing.assert_allclose(
-        truncation.distribution.log_likelihood(samples),
-        rx_truncation.distribution.log_likelihood(samples),
+        truncation.distribution.log_likelihood(events=samples),
+        rx_truncation.distribution.log_likelihood(events=samples),
     )
 
 
 def test_round_trip_of_a_learned_circuit_through_rustworkx(
     joint_probability_tree, layered_joint_probability_tree
 ):
+    """
+    The layered circuit of a joint probability tree converted back has the likelihood of
+    the tree.
+    """
     back = LayeredCircuitToRustworkxCircuitConverter.convert(
         layered_joint_probability_tree
     )
     samples = joint_probability_tree.sample(300)
     np.testing.assert_allclose(
-        back.log_likelihood(samples), joint_probability_tree.log_likelihood(samples)
+        back.log_likelihood(events=samples),
+        joint_probability_tree.log_likelihood(events=samples),
     )
 
 
 def test_json_round_trip_of_a_learned_circuit(
     joint_probability_tree, layered_joint_probability_tree
 ):
+    """
+    The layered circuit of a joint probability tree restored from JSON has its
+    likelihood.
+    """
     restored = from_json(to_json(layered_joint_probability_tree))
     samples = joint_probability_tree.sample(300)
     np.testing.assert_allclose(
-        restored.log_likelihood(samples),
-        layered_joint_probability_tree.log_likelihood(samples),
+        restored.log_likelihood(events=samples),
+        layered_joint_probability_tree.log_likelihood(events=samples),
     )
 
 

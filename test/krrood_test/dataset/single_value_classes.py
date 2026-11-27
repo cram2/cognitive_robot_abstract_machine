@@ -15,6 +15,7 @@ import zoneinfo
 from dataclasses import dataclass
 
 import numpy as np
+from numpy.typing import NDArray
 
 # %% standard library values with a native SQL type
 
@@ -262,6 +263,57 @@ class StoredArray:
     """
 
     value: np.ndarray
+    """
+    The stored array.
+    """
+
+
+@dataclass(kw_only=True)
+class StoredTypedArray:
+    """
+    Holds a numpy array whose type hint names the type of its elements.
+
+    ..note:: Arrays define ``==`` elementwise, so compare instances field by field.
+    """
+
+    value: NDArray[np.float64]
+    """
+    The stored array.
+    """
+
+
+type ArrayAlias[ScalarType: np.generic] = np.ndarray[
+    tuple[int, ...], np.dtype[ScalarType]
+]
+"""
+An array type declared with a ``type`` statement, the way :data:`numpy.typing.NDArray`
+is declared from numpy 2.5 on.
+"""
+
+
+@dataclass(kw_only=True)
+class StoredAliasedArray:
+    """
+    Holds a numpy array whose type hint is a type alias that leaves the element type open.
+
+    ..note:: Arrays define ``==`` elementwise, so compare instances field by field.
+    """
+
+    value: ArrayAlias
+    """
+    The stored array.
+    """
+
+
+@dataclass(kw_only=True)
+class StoredAliasedTypedArray:
+    """
+    Holds a numpy array whose type hint is a type alias given the type of its elements.
+
+    ..note:: Arrays define ``==`` elementwise, so compare instances field by field.
+    """
+
+    value: ArrayAlias[np.float64]
     """
     The stored array.
     """

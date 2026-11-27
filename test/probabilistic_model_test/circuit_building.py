@@ -12,8 +12,10 @@ from random_events.interval import closed
 from random_events.variable import Continuous
 
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     LeafUnit,
     ProbabilisticCircuit,
@@ -55,10 +57,10 @@ def uniform_layer_of(
     :return: A layer of one uniform distribution per interval.
     """
     return UniformLayer.from_distributions(
-        variable_index,
-        [
+        variable_index=variable_index,
+        distributions=[
             UniformDistribution(
-                variable=Continuous("placeholder"),
+                variable=Continuous(name="placeholder"),
                 interval=closed(lower, upper).simple_sets[0],
             )
             for lower, upper in intervals

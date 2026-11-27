@@ -22,7 +22,7 @@ class UniformDistribution(ContinuousDistributionWithConstrainedSupport):
         self, interval: SimpleInterval
     ) -> LogTruncation[Self]:
         # construct new interval
-        new_interval = self.interval.intersection_with(interval)
+        new_interval = self.interval.intersection_with(other=interval)
 
         if new_interval.is_empty():
             return LogTruncation.impossible()

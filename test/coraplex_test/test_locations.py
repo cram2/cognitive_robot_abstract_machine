@@ -1,3 +1,9 @@
+"""
+Tests of the locations that say where a robot can stand to reach or see a target.
+"""
+
+from __future__ import annotations
+
 from copy import deepcopy
 from dataclasses import dataclass, field
 from itertools import islice
@@ -29,7 +35,7 @@ from ..sampling import SAMPLING_SEED
 # %% test doubles
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordsHowItWasSampled(Location):
     """
     Yields one candidate and records how many samples it was asked for.
@@ -133,7 +139,7 @@ def test_a_location_that_does_not_say_how_it_samples_cannot_be_built():
     is refused where it is defined rather than silently offering nothing at runtime.
     """
 
-    @dataclass
+    @dataclass(kw_only=True)
     class SaysNothingAboutTheTerms(Location):
         pass
 
@@ -171,11 +177,13 @@ def test_a_ring_from_the_arm_reach_distance_stands_off_by_the_reach_fraction(
     # tolerance.
     arm = robot.right_arm
     expected_distance = float(arm.approximate_length()) * REACH_FRACTION
-    location = ReachabilityLocation(target, arm, context=context_of(extensions))
+    location = ReachabilityLocation(
+        target_pose=target, arm=arm, context=context_of(extensions)
+    )
 
     ring = RingCostmap.from_arm_reach_distance(
-        arm,
-        target,
+        arm=arm,
+        origin=target,
         reach_fraction=REACH_FRACTION,
         resolution=location.map_resolution,
         cells=location.map_cells,
@@ -213,14 +221,14 @@ def test_a_reachability_location_stands_around_the_reach_fraction_of_the_arm(
     )
     arm = robot.right_arm
     location = ReachabilityLocation(
-        target,
-        arm,
+        target_pose=target,
+        arm=arm,
         context=context_of(extensions),
         reach_fraction=REACH_FRACTION,
     )
     ring = RingCostmap.from_arm_reach_distance(
-        arm,
-        target,
+        arm=arm,
+        origin=target,
         reach_fraction=REACH_FRACTION,
         resolution=location.map_resolution,
         cells=location.map_cells,
@@ -249,9 +257,13 @@ def test_a_reachability_location_offers_no_standing_pose_farther_than_the_arm_is
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     arm = robot.right_arm
-    location = ReachabilityLocation(target, arm, context=context_of(extensions))
+    location = ReachabilityLocation(
+        target_pose=target, arm=arm, context=context_of(extensions)
+    )
     sampled = islice(
-        location.costmap().sample(location.number_of_samples, location.sampling_seed),
+        location.costmap().sample(
+            number_of_samples=location.number_of_samples, seed=location.sampling_seed
+        ),
         POSES_CHECKED,
     )
     assert any(
@@ -278,12 +290,15 @@ def test_a_reachability_location_offers_the_poses_in_reach_in_the_order_sampled(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     arm = robot.right_arm
-    location = ReachabilityLocation(target, arm, context=context_of(extensions))
+    location = ReachabilityLocation(
+        target_pose=target, arm=arm, context=context_of(extensions)
+    )
     in_reach = [
         pose.position.to_np()[:2]
         for pose in islice(
             location.costmap().sample(
-                location.number_of_samples, location.sampling_seed
+                number_of_samples=location.number_of_samples,
+                seed=location.sampling_seed,
             ),
             POSES_CHECKED,
         )
@@ -331,7 +346,7 @@ def test_a_reachability_location_is_sampled_around_its_target(single_robot_world
     )
 
     location = ReachabilityLocation(
-        target, robot.right_arm, context=context_of(extensions)
+        target_pose=target, arm=robot.right_arm, context=context_of(extensions)
     )
 
     np.testing.assert_allclose(
@@ -348,8 +363,8 @@ def test_a_reachability_location_samples_afresh_without_one(single_robot_world):
     world, robot, extensions = single_robot_world
 
     location = ReachabilityLocation(
-        _box_in(world).root.global_pose,
-        robot.right_arm,
+        target_pose=_box_in(world).root.global_pose,
+        arm=robot.right_arm,
         context=context_of(with_grounding(extensions, sampling_seed=None)),
     )
 
@@ -368,8 +383,8 @@ def test_a_costmap_location_builds_its_costmap_only_when_sampled_from(
     """
     world, robot, extensions = single_robot_world
     location = ReachabilityLocation(
-        _box_in(world).root.global_pose,
-        robot.right_arm,
+        target_pose=_box_in(world).root.global_pose,
+        arm=robot.right_arm,
         context=context_of(extensions),
     )
     built = []
@@ -395,8 +410,8 @@ def test_a_target_given_in_a_body_frame_follows_the_body(single_robot_world):
     world, robot, extensions = single_robot_world
     box = _box_in(world).root
     location = ReachabilityLocation(
-        Pose(reference_frame=box),
-        robot.right_arm,
+        target_pose=Pose(reference_frame=box),
+        arm=robot.right_arm,
         context=context_of(extensions),
     )
     with world.modify_world():
@@ -423,7 +438,7 @@ def test_a_visibility_location_offers_poses_facing_its_target(single_robot_world
     target = Pose.from_xyz_rpy(
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
-    location = VisibilityLocation(target, context=context_of(extensions))
+    location = VisibilityLocation(target_pose=target, context=context_of(extensions))
 
     for pose in islice(location.candidates(), POSES_CHECKED):
         heading = pose.rotation_matrix.to_np()[:2, 0]
@@ -445,7 +460,7 @@ def test_a_costmap_location_samples_with_the_seed_of_its_plan(single_robot_world
         *REACHABILITY_TARGET_POSITION, reference_frame=world.root
     )
     location = VisibilityLocation(
-        target,
+        target_pose=target,
         context=context_of(with_grounding(extensions, sampling_seed=sampling_seed)),
         number_of_samples=5,
     )
@@ -454,7 +469,9 @@ def test_a_costmap_location_samples_with_the_seed_of_its_plan(single_robot_world
 
     expected = [
         pose.position.to_np()
-        for pose in location.costmap().sample(location.number_of_samples, sampling_seed)
+        for pose in location.costmap().sample(
+            number_of_samples=location.number_of_samples, seed=sampling_seed
+        )
     ]
     np.testing.assert_array_equal(sampled, expected)
 
@@ -476,7 +493,7 @@ def test_a_plan_without_a_seed_of_its_own_samples_the_same_candidates_every_run(
         [
             pose.position.to_np()
             for pose in VisibilityLocation(
-                target, context=context, number_of_samples=5
+                target_pose=target, context=context, number_of_samples=5
             ).candidates()
         ]
         for _ in range(2)

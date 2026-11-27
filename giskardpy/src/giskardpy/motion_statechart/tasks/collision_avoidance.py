@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import field, dataclass
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from itertools import combinations
 
@@ -17,7 +17,6 @@ from krrood.patterns.classproperty import classproperty
 from cramph.node import EndedByOwner, SucceedsOnObservingTrue
 from cramph.context import ContextExtension
 from cramph.data_types import ObservationStateValue
-from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights, VelocityScale
 from giskardpy.motion_statechart.exceptions import (
     UnexpectedWorldEntityCountError,
@@ -29,6 +28,10 @@ from giskardpy.motion_statechart.graph_node import (
 )
 from cramph.node import CompositeNode, NodeArtifacts, CancelStatechart
 from giskardpy.motion_statechart.graph_node import Task
+from giskardpy.motion_statechart.mixins import (
+    HasCruiseVelocityParameter,
+    HasGoalPointParameter,
+)
 from cramph.plotters.plot_specs import NodePlotSpec, plot_specification_field
 from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.collision_checking.collision_groups import (
@@ -52,13 +55,14 @@ from semantic_digital_twin.collision_checking.collision_variable_managers import
     ExternalCollisionVariableManager,
 )
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, EndEffector
-from krrood_spatial_math.spatial_types import Vector3
+from semantic_digital_twin.world import World
+from krrood_spatial_math.spatial_types import Point3, Vector3
 
 # %% shared by self and external collision avoidance
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class _CollisionAvoidanceTask(ABC, Task):
+class _CollisionAvoidanceTask(Task, HasCruiseVelocityParameter, ABC):
     """
     Avoids collisions of :attr:`robot` with one inequality constraint per collision it
     avoids.
@@ -70,12 +74,6 @@ class _CollisionAvoidanceTask(ABC, Task):
     robot: AbstractRobot
     """
     The robot whose collisions are avoided.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast a violated collision distance is restored, in m/s; not strictly
-    enforced.
     """
 
     collision_variable_manager: BaseCollisionVariableManager | None = field(
@@ -192,6 +190,143 @@ def _single_robot_of_world(node: CompositeNode) -> AbstractRobot:
     return robots[0]
 
 
+@dataclass(eq=False, repr=False, kw_only=True)
+class CollisionAvoidance(EndedByOwner, CompositeNode, HasCruiseVelocityParameter, ABC):
+    """
+    Avoids collisions of the robot with one task, and cancels the motion once one of
+    them is violated.
+
+    .. note:: Its children are left out of drawings. Set
+        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
+        :attr:`plot_specifications` to False to draw them.
+    """
+
+    plot_specifications: NodePlotSpec = plot_specification_field(
+        NodePlotSpec.create_collapsed_composite_node_style
+    )
+    """
+    How this node is drawn: collapsed, so its children are left out.
+    """
+
+    robot: AbstractRobot | None = None
+    """
+    The robot for which the collision avoidance goal is defined; ``None`` for the only
+    robot of the world it runs in.
+    """
+
+    cancel_if_collision_violated: bool = True
+    """
+    If True, the motion will be canceled if a collision is violated.
+    """
+
+    @classproperty
+    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
+        """
+        :return: The extensions of the base, and the motion control context the avoidance
+            constraints are built in.
+        """
+        return super().required_context_extensions + (MotionControlContext,)
+
+    @abstractmethod
+    def _create_task(self) -> _CollisionAvoidanceTask:
+        """
+        :return: A new task avoiding the collisions of :attr:`robot`.
+        """
+
+    @abstractmethod
+    def _create_cancel_node(
+        self, *, task: _CollisionAvoidanceTask
+    ) -> _CancelBecauseCollisionViolated:
+        """
+        :param task: The task whose violated collisions cancel the motion.
+        :return: A new node cancelling the motion once `task` is violated.
+        """
+
+    def expand(self) -> None:
+        """
+        Add the task avoiding the collisions of :attr:`robot`, and the node cancelling
+        the motion once one is violated.
+
+        The task decides which collisions it avoids when it is built, in the context
+        that runs it.
+        """
+        if self.robot is None:
+            self.robot = _single_robot_of_world(self)
+        task = self._create_task()
+        self._add_child_to_statechart(node=task)
+        if self.cancel_if_collision_violated:
+            self._add_child_to_statechart(node=self._create_cancel_node(task=task))
+
+
+# %% buffer zones scaled by the distance to a goal
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class BufferZoneScaling(HasGoalPointParameter, ABC):
+    """
+    Scales the configured buffer zone distance of each external contact by a factor that
+    depends on the translational distance between the contact's closest point on the
+    robot and :attr:`goal_point`, bounded by :attr:`minimum_scale_factor` and
+    :attr:`maximum_scale_factor`.
+    """
+
+    minimum_scale_factor: float = 0.01
+    """
+    The smallest factor the configured buffer zone distance is scaled by.
+    """
+
+    maximum_scale_factor: float = 1.0
+    """
+    The largest factor the configured buffer zone distance is scaled by.
+    """
+
+    @abstractmethod
+    def unbounded_scale_factor(self, *, goal_distance: Scalar) -> Scalar:
+        """
+        :param goal_distance: The translational distance between a contact point and
+            :attr:`goal_point`, in meters.
+        :return: The scale factor before it is bounded.
+        """
+
+    def scale_factor(self, *, world: World, root_P_contact_point: Point3) -> Scalar:
+        """
+        :param world: The world :attr:`goal_point` is in.
+        :param root_P_contact_point: The closest point of one contact on the robot,
+            relative to the root of `world`.
+        :return: The factor the configured buffer zone distance of that contact is
+            scaled by.
+        """
+        root_P_goal = (
+            world.compose_forward_kinematics_expression(
+                world.root, self.goal_point.reference_frame
+            )
+            @ self.goal_point
+        )
+        goal_distance = root_P_goal.euclidean_distance(other=root_P_contact_point)
+        return sm.limit(
+            self.unbounded_scale_factor(goal_distance=goal_distance),
+            self.minimum_scale_factor,
+            self.maximum_scale_factor,
+        )
+
+
+@dataclass(eq=False, repr=False, kw_only=True)
+class LinearBufferZoneScaling(BufferZoneScaling):
+    """
+    Scales the buffer zones in proportion to the goal distance, reaching
+    :attr:`maximum_scale_factor` at :attr:`full_scale_goal_distance`.
+    """
+
+    full_scale_goal_distance: float
+    """
+    The goal distance in meters from which on the buffer zones are scaled by
+    :attr:`maximum_scale_factor`.
+    """
+
+    def unbounded_scale_factor(self, *, goal_distance: Scalar) -> Scalar:
+        return goal_distance / self.full_scale_goal_distance * self.maximum_scale_factor
+
+
 # %% external collision avoidance
 
 
@@ -213,6 +348,13 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
     avoided_contacts: list[AvoidedExternalContact] = field(
         default_factory=list, init=False, repr=False
     )
+
+    buffer_zone_scaling: BufferZoneScaling | None = None
+    """
+    How the buffer zone distance of each external contact is scaled by the distance of
+    its closest point on the robot to a goal, never below its violated distance;
+    ``None`` keeps the configured buffer zone distances.
+    """
 
     def build(self) -> NodeArtifacts:
         """
@@ -247,31 +389,60 @@ class _ExternalCollisionAvoidanceTask(_CollisionAvoidanceTask):
         return groups
 
     def build_artifacts(self) -> MotionNodeArtifacts:
+        """
+        :return: One inequality constraint per avoided contact that keeps its distance
+            above its buffer zone distance, scaled by :attr:`buffer_zone_scaling`, and
+            an observation that is True while no contact is violated.
+        """
         artifacts = MotionNodeArtifacts()
         manager = self.collision_variable_manager
         for contact in self.avoided_contacts:
             root_T_group = self.context.world.compose_forward_kinematics_expression(
                 self.context.world.root, contact.group.root
             )
-            root_V_point_on_group = (
+            root_P_point_on_group = (
                 root_T_group @ manager.get_group_a_P_point_on_a_symbol(contact)
-            ).vector3
+            )
             root_V_contact_normal = manager.get_root_V_contact_normal_symbol(contact)
             artifacts.constraints.add_inequality_constraint(
                 name=f"{contact.group.root.name}/{contact.rank}",
                 cruise_velocity=self.cruise_velocity,
                 velocity_scale=VelocityScale.TRANSLATION,
-                lower_error=manager.get_buffer_distance_symbol(contact)
+                lower_error=self._buffer_distance(
+                    contact=contact, root_P_point_on_group=root_P_point_on_group
+                )
                 - manager.get_contact_distance_symbol(contact),
                 upper_error=float("inf"),
                 quadratic_weight=self._weight_while_close(
                     contact_normal=root_V_contact_normal
                 ),
                 # the position distance is not accurate, but the derivative is still correct
-                task_expression=root_V_contact_normal @ root_V_point_on_group,
+                task_expression=root_V_contact_normal @ root_P_point_on_group.vector3,
             )
         artifacts.observation = self._none_violated()
         return artifacts
+
+    def _buffer_distance(
+        self, *, contact: AvoidedExternalContact, root_P_point_on_group: Point3
+    ) -> Scalar:
+        """
+        :param contact: One avoided contact of this task.
+        :param root_P_point_on_group: The closest point of `contact` on the robot,
+            relative to the root of the world.
+        :return: The buffer zone distance `contact` is kept outside of, scaled by
+            :attr:`buffer_zone_scaling`.
+        """
+        manager = self.collision_variable_manager
+        buffer_distance = manager.get_buffer_distance_symbol(contact)
+        if self.buffer_zone_scaling is None:
+            return buffer_distance
+        return sm.max(
+            buffer_distance
+            * self.buffer_zone_scaling.scale_factor(
+                world=self.context.world, root_P_contact_point=root_P_point_on_group
+            ),
+            manager.get_violated_distance_symbol(contact),
+        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -287,64 +458,32 @@ class _CancelBecauseExternalCollisionViolated(_CancelBecauseCollisionViolated):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class ExternalCollisionAvoidance(EndedByOwner, CompositeNode):
+class ExternalCollisionAvoidance(CollisionAvoidance):
     """
-    Avoids external collisions of every collision group of the robot with one task, and
-    cancels the motion once one of them is violated.
-
-    .. note:: Its children are left out of drawings. Set
-        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
-        :attr:`plot_specifications` to False to draw them.
+    Avoids external collisions of every collision group of the robot.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_composite_node_style
-    )
-
-    robot: AbstractRobot | None = None
+    buffer_zone_scaling: BufferZoneScaling | None = None
     """
-    The robot for which the collision avoidance goal is defined; ``None`` for the only
-    robot of the world it runs in.
+    How the buffer zone distance of each external contact is scaled by the distance of
+    its closest point on the robot to a goal, never below its violated distance;
+    ``None`` keeps the configured buffer zone distances.
     """
 
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast a violated collision distance is restored, in m/s; not strictly
-    enforced.
-    """
-
-    cancel_if_collision_violated: bool = True
-    """
-    If True, the motion will be canceled if a collision is violated.
-    """
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def expand(self) -> None:
-        """
-        Add the task avoiding every external collision of :attr:`robot`, and the node
-        cancelling the motion once one is violated.
-
-        The task decides which collisions it avoids when it is built, in the context
-        that runs it.
-        """
-        if self.robot is None:
-            self.robot = _single_robot_of_world(self)
-        task = _ExternalCollisionAvoidanceTask(
+    def _create_task(self) -> _ExternalCollisionAvoidanceTask:
+        return _ExternalCollisionAvoidanceTask(
             name=f"{self.name}/task",
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
+            buffer_zone_scaling=self.buffer_zone_scaling,
         )
-        self._add_child_to_statechart(node=task)
-        if self.cancel_if_collision_violated:
-            self._add_child_to_statechart(
-                node=_CancelBecauseExternalCollisionViolated(
-                    tasks=[task],
-                    name="External Collision Violated",
-                )
-            )
+
+    def _create_cancel_node(
+        self, *, task: _ExternalCollisionAvoidanceTask
+    ) -> _CancelBecauseExternalCollisionViolated:
+        return _CancelBecauseExternalCollisionViolated(
+            tasks=[task], name="External Collision Violated"
+        )
 
 
 # %% temporary collision rules
@@ -577,60 +716,22 @@ class _CancelBecauseSelfCollisionViolated(_CancelBecauseCollisionViolated):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class SelfCollisionAvoidance(EndedByOwner, CompositeNode):
+class SelfCollisionAvoidance(CollisionAvoidance):
     """
     Avoids self collisions between every checked combination of collision groups of the
-    robot with one task, and cancels the motion once one of them is violated.
-
-    .. note:: Its children are left out of drawings. Set
-        :attr:`~cramph.plotters.plot_specs.NodePlotSpec.collapse_children` of
-        :attr:`plot_specifications` to False to draw them.
+    robot.
     """
 
-    plot_specifications: NodePlotSpec = plot_specification_field(
-        NodePlotSpec.create_collapsed_composite_node_style
-    )
-
-    robot: AbstractRobot | None = None
-    """
-    The robot for which the collision avoidance goal is defined; ``None`` for the only
-    robot of the world it runs in.
-    """
-
-    cruise_velocity: float = DefaultCruiseVelocity.TRANSLATION
-    """
-    Sets how fast a violated collision distance is restored, in m/s; not strictly
-    enforced.
-    """
-
-    cancel_if_collision_violated: bool = True
-    """
-    If True, the motion will be canceled if a collision is violated.
-    """
-
-    @classproperty
-    def required_context_extensions(cls) -> tuple[type[ContextExtension], ...]:
-        return super().required_context_extensions + (MotionControlContext,)
-
-    def expand(self) -> None:
-        """
-        Add the task avoiding every self collision of :attr:`robot`, and the node
-        cancelling the motion once one is violated.
-
-        The task decides which combinations of collision groups it avoids when it is
-        built, in the context that runs it.
-        """
-        if self.robot is None:
-            self.robot = _single_robot_of_world(self)
-        task = _SelfCollisionAvoidanceTask(
+    def _create_task(self) -> _SelfCollisionAvoidanceTask:
+        return _SelfCollisionAvoidanceTask(
             name=f"{self.name}/task",
             robot=self.robot,
             cruise_velocity=self.cruise_velocity,
         )
-        self._add_child_to_statechart(node=task)
-        if self.cancel_if_collision_violated:
-            self._add_child_to_statechart(
-                node=_CancelBecauseSelfCollisionViolated(
-                    name="self collision violated", tasks=[task]
-                )
-            )
+
+    def _create_cancel_node(
+        self, *, task: _SelfCollisionAvoidanceTask
+    ) -> _CancelBecauseSelfCollisionViolated:
+        return _CancelBecauseSelfCollisionViolated(
+            name="self collision violated", tasks=[task]
+        )

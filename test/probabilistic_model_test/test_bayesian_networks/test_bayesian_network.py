@@ -76,7 +76,7 @@ def three_state_variable() -> Symbolic:
     """
     A variable over :class:`ThreeStates`.
     """
-    return Symbolic(name="x", domain=Set.from_iterable(ThreeStates))
+    return Symbolic(name="x", domain=Set.from_iterable(iterable=ThreeStates))
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ def two_state_variable() -> Symbolic:
     """
     A variable over :class:`TwoStates`.
     """
-    return Symbolic(name="y", domain=Set.from_iterable(TwoStates))
+    return Symbolic(name="y", domain=Set.from_iterable(iterable=TwoStates))
 
 
 # %% a network of two variables
@@ -130,8 +130,8 @@ def test_circuit_of_a_network_multiplies_along_the_edges(
 def test_circuit_of_a_tree_shaped_network_is_smaller_than_the_joint_table(
     three_state_variable, two_state_variable
 ):
-    z = Symbolic(name="z", domain=Set.from_iterable(ThreeStates))
-    a = Symbolic(name="a", domain=Set.from_iterable(TwoStates))
+    z = Symbolic(name="z", domain=Set.from_iterable(iterable=ThreeStates))
+    a = Symbolic(name="a", domain=Set.from_iterable(iterable=TwoStates))
     network = BayesianNetwork()
     root = Root(
         distribution_over(three_state_variable, [0.5, 0.3, 0.2]),
@@ -162,7 +162,7 @@ def test_circuit_of_a_tree_shaped_network_is_smaller_than_the_joint_table(
 
 
 def test_circuit_of_a_network_with_a_conditional_circuit(y, z):
-    parent = Symbolic(name="x", domain=Set.from_iterable(TwoStates))
+    parent = Symbolic(name="x", domain=Set.from_iterable(iterable=TwoStates))
     network = BayesianNetwork()
     root = Root(distribution_over(parent, [0.7, 0.3]), bayesian_network=network)
     y_and_z_given_parent = ConditionalProbabilisticCircuit(bayesian_network=network)

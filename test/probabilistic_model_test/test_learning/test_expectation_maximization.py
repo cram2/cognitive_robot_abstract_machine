@@ -19,18 +19,25 @@ from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
     TruncatedGaussianDistribution,
 )
-from probabilistic_model.learning.exceptions import (
-    StartingCircuitVariablesMismatchError,
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
     UnsupportedLeafDistributionError,
 )
-from probabilistic_model.learning.expectation_maximization import (
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    StartingCircuitVariablesMismatchError,
+)
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
     ExpectationMaximization,
     ExpectationMaximizationLearning,
     ExpectationMaximizationTraining,
     LearnableUnits,
 )
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.training_schedule import Convergence, MiniBatches
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.parameters.training_schedule import (
+    Convergence,
+    MiniBatches,
+)
 from probabilistic_model.probabilistic_circuit.rx.helper import (
     factorized_gaussian_mixture,
     fully_factorized,
@@ -60,7 +67,7 @@ def iris_starting_circuit(iris) -> ProbabilisticCircuit:
     """
     means = _iris_starting_means(iris)
     return factorized_gaussian_mixture(
-        [Continuous(name) for name in iris.columns],
+        [Continuous(name=name) for name in iris.columns],
         means=means,
         scales=np.ones_like(means),
     )
@@ -80,7 +87,8 @@ def _make_gaussian_leaf_circuit() -> ProbabilisticCircuit:
     """
     circuit = ProbabilisticCircuit()
     leaf(
-        GaussianDistribution(variable=Continuous("x"), location=0.0, scale=1.0), circuit
+        GaussianDistribution(variable=Continuous(name="x"), location=0.0, scale=1.0),
+        circuit,
     )
     return circuit
 
@@ -90,7 +98,7 @@ def _make_mixture_circuit() -> ProbabilisticCircuit:
     A uniform mixture of two Gaussian leaves over ``x``, centered at -1 and 1.
     """
     circuit = ProbabilisticCircuit()
-    variable = Continuous("x")
+    variable = Continuous(name="x")
     sum_root = SumUnit(probabilistic_circuit=circuit)
     for location in (-1.0, 1.0):
         component = leaf(
@@ -138,7 +146,7 @@ def test_learn_fits_gaussian_leaf_to_data():
 
 
 def test_learn_updates_only_learnable_units():
-    circuit = fully_factorized([Continuous("x"), Continuous("y")])
+    circuit = fully_factorized([Continuous(name="x"), Continuous(name="y")])
     learned_leaf = _leaf_of(circuit, "x")
     frozen_leaf = _leaf_of(circuit, "y")
     frozen_location = frozen_leaf.distribution.location
@@ -189,7 +197,7 @@ def test_learn_returns_empty_history_for_empty_data():
 
 def test_learnable_units_reject_truncated_gaussian_leaf():
     truncated_gaussian = TruncatedGaussianDistribution(
-        variable=Continuous("x"),
+        variable=Continuous(name="x"),
         interval=closed(0.0, np.inf).simple_sets[0],
         location=0.0,
         scale=1.0,
@@ -241,7 +249,7 @@ def test_fit_reads_columns_by_variable_name():
     )
 
     circuit = ExpectationMaximizationLearning(
-        fully_factorized([Continuous("x"), Continuous("y")]), iterations=1
+        fully_factorized([Continuous(name="x"), Continuous(name="y")]), iterations=1
     ).fit(data)
 
     assert _leaf_of(circuit, "x").distribution.location == pytest.approx(
@@ -265,6 +273,10 @@ def test_fit_rejects_variables_other_than_those_of_starting_circuit():
 def test_fit_matches_diagonal_gaussian_mixture_of_scikit_learn(
     iris, iris_starting_circuit
 ):
+    """
+    Expectation maximization of a mixture of products of Gaussians reaches the means of
+    scikit-learn's diagonal Gaussian mixture from the same start.
+    """
     iterations = 10
     means = _iris_starting_means(iris)
     component_count = len(means)
@@ -284,7 +296,7 @@ def test_fit_matches_diagonal_gaussian_mixture_of_scikit_learn(
     ).fit(iris)
 
     data = iris[[variable.name for variable in circuit.variables]]
-    assert circuit.log_likelihood(data.to_numpy()).mean() == pytest.approx(
+    assert circuit.log_likelihood(events=data.to_numpy()).mean() == pytest.approx(
         scikit_learn_mixture.score(iris.to_numpy())
     )
 

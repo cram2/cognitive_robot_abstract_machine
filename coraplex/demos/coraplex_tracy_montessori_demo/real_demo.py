@@ -39,15 +39,14 @@ from demo import DemoRunner, ShapeSortingPlan
 from giskardpy.middleware.ros2.scripts.iai_robots.tracy.launch_files import (
     TracyGiskardLaunchFile,
 )
-from semantic_digital_twin.adapters.ros.world_fetcher import fetch_world_from_service
-from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
+from semantic_digital_twin.adapters.ros.world_fetcher import join_shared_world
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.world import World
 
 # %% running the demo
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RunningRobot:
     """
     The real Tracy's stack, up and reachable: its world and the node the demo talks
@@ -65,7 +64,7 @@ class RunningRobot:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RealRunner(DemoRunner):
     """
     Carries the sorting plan out on the real robot, bringing its controllers up first.
@@ -94,7 +93,7 @@ class RealRunner(DemoRunner):
 
     def run(self) -> None:
         with self.running_robot() as robot:
-            self.scene.populate(robot.world)
+            self.scene.populate(world=robot.world)
             [tracy] = robot.world.get_semantic_annotations_by_type(Tracy)
             executor = RealRobotPlanExecutor(
                 context=StatechartContext.with_extensions(
@@ -105,7 +104,9 @@ class RealRunner(DemoRunner):
                 plan_adaptations=self.plan_adaptations(),
             )
             executor.compile(
-                statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+                statechart=ShapeSortingPlan(scene=self.scene).build(
+                    context=executor.context
+                )
             )
             executor.execute()
             executor.close()
@@ -143,10 +144,9 @@ class RealRunner(DemoRunner):
                 target=executor.spin, daemon=True, name="rclpy-executor"
             ).start()
 
-            world = fetch_world_from_service(
+            world = join_shared_world(
                 node=node, timeout_seconds=self.world_fetch_timeout.total_seconds()
             )
-            WorldSynchronizer(_world=world, node=node)
             yield RunningRobot(world=world, node=node)
         finally:
             os.killpg(os.getpgid(controllers.pid), signal.SIGTERM)

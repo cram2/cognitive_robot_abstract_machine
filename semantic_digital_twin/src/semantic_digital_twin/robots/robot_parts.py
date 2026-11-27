@@ -100,18 +100,19 @@ from krrood_spatial_math.spatial_types import (
     Vector3,
 )
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
-from krrood_spatial_math.spatial_types import Point3, Pose
+from krrood_spatial_math.spatial_types import Point3, Pose, Pose2D
 from semantic_digital_twin.world_description.connection_properties import JointServo
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
     ActiveConnection1DOF,
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     WheeledDrive,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
 )
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from semantic_digital_twin.world_description.geometry import (
     Scale,
     VolumetricBoundingBox,
@@ -539,13 +540,12 @@ class HasGripperActionServers(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC):
+class RobotKinematicChain(
+    AbstractRobotPart, HasInputSource[JointPositionSource], KinematicChain, ABC
+):
     """
-    A kinematic chain is a robot part that consists of a chain of bodies and connections
-    between them.
-
-    It has a root body and a tip body, and the connections between them can be computed
-    using the world description.
+    A robot part that consists of the chain of bodies and connections from its root body
+    to its tip body, so it can stand wherever a :class:`KinematicChain` is taken.
     """
 
     tip: Body = field(kw_only=True)
@@ -622,7 +622,8 @@ class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC
     def approximate_length(self) -> float:
         """
         Approximates the length of the kinematic chain by adding up  the distance
-        between each body pair along the chain. For Prismatic Connections the upper
+        between each body pair along the chain. For a :class:`ScrewAxisConnection` that
+        :attr:`~ScrewAxisConnection.behaves_like_a_prismatic_connection`, the upper
         limit of the connection is used, so the function returns the maximum length.
 
         :return: the approximate length of the kinematic chain
@@ -633,7 +634,10 @@ class KinematicChain(AbstractRobotPart, HasInputSource[JointPositionSource], ABC
             child_pose = connection.child.global_pose
             dist = (
                 connection.dof.limits.upper.position
-                if isinstance(connection, PrismaticConnection)
+                if (
+                    isinstance(connection, ScrewAxisConnection)
+                    and connection.behaves_like_a_prismatic_connection
+                )
                 else parent_pose.position.euclidean_distance(child_pose.position)
             )
             length += dist
@@ -783,7 +787,7 @@ class RobotCamera(Camera[TCameraModel], AbstractRobotPart, Generic[TCameraModel]
 
 
 @dataclass(eq=False)
-class Finger(KinematicChain, ABC):
+class Finger(RobotKinematicChain, ABC):
     """
     A finger is a kinematic chain attached to a gripper to manipulate objects.
     """
@@ -844,7 +848,7 @@ class EndEffector(AbstractRobotPart, ABC):
         :attr:`tool_frame`.
 
         It is the x-axis of the grasp frame
-        :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.grasp_candidates`
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.grasp_candidates`
         describes.
         """
 
@@ -855,7 +859,7 @@ class EndEffector(AbstractRobotPart, ABC):
         The axis the fingers close along, expressed in :attr:`tool_frame`.
 
         It is the y-axis of the grasp frame
-        :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasGraspCandidates.grasp_candidates`
+        :meth:`~semantic_digital_twin.semantic_annotations.mixins.IsGraspable.grasp_candidates`
         describes, and has to be perpendicular to :attr:`approach_axis`.
         """
 
@@ -970,7 +974,7 @@ class EndEffector(AbstractRobotPart, ABC):
 
 
 @dataclass(eq=False)
-class Torso(KinematicChain, ABC):
+class Torso(RobotKinematicChain, ABC):
     """
     The torso of a robot, which is a kinematic chain providing additional shared degrees
     of freedom to its attachments, such as arms or the neck.
@@ -978,7 +982,7 @@ class Torso(KinematicChain, ABC):
 
 
 @dataclass(eq=False)
-class Arm(KinematicChain, HasEndEffector[TGenericEndEffector], ABC):
+class Arm(RobotKinematicChain, HasEndEffector[TGenericEndEffector], ABC):
     """
     An arm is a kinematic chain that has an end effector attached to it.
     """
@@ -986,7 +990,7 @@ class Arm(KinematicChain, HasEndEffector[TGenericEndEffector], ABC):
 
 @dataclass(eq=False)
 class Neck(
-    KinematicChain,
+    RobotKinematicChain,
     HasSensors[Unpack[TGenericSensors]],
     ABC,
 ):
@@ -1174,7 +1178,7 @@ class MobileBase(
         """
         return RotationMatrix.from_vectors(x=self.forward_axis, z=Vector3.Z())
 
-    def pose_facing(self, heading: Pose) -> Pose:
+    def pose_facing(self, *, heading: Pose | Pose2D) -> Pose:
         """
         The base pose whose :attr:`forward_axis` points along ``heading``.
 
@@ -1182,9 +1186,10 @@ class MobileBase(
         its x-axis, so the same heading serves bases modelled with different axes. Its
         position is kept as it is.
         """
+        reference_T_heading = heading.homogeneous_matrix
         return HomogeneousTransformationMatrix.from_point_rotation_matrix(
-            heading.position,
-            heading.rotation_matrix @ self.base_R_front.inverse(),
+            reference_T_heading.position,
+            reference_T_heading.rotation_matrix @ self.base_R_front.inverse(),
             reference_frame=heading.reference_frame,
         ).pose
 
@@ -1293,6 +1298,21 @@ class AbstractRobot(Agent, HasRobotParts, ABC):
             < collision_manager.get_violated_distance(contact.body_a, contact.body_b)
             for contact in collision_manager.compute_collisions().contacts
             if contact.body_a in own_bodies or contact.body_b in own_bodies
+        )
+
+    @property
+    def is_within_an_external_buffer_zone(self) -> bool:
+        """
+        :return: Whether any body of this robot is closer to a body outside it than the
+            buffer-zone distance the active collision rules keep between the two.
+        """
+        own_bodies = set(self.bodies_with_collision)
+        collision_manager = self._world.collision_manager
+        return any(
+            contact.distance
+            < collision_manager.get_buffer_zone_distance(contact.body_a, contact.body_b)
+            for contact in collision_manager.compute_collisions().contacts
+            if (contact.body_a in own_bodies) != (contact.body_b in own_bodies)
         )
 
     @classmethod

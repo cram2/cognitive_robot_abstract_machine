@@ -1,3 +1,7 @@
+"""
+Tests of the product units of rustworkx circuits.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -131,7 +135,7 @@ def test_a_product_over_symbolic_and_continuous_variables_reads_domain_elements(
     Rows that hold a domain element for the symbolic variable and a number for the
     continuous one have the likelihood of both factors.
     """
-    animal = Symbolic(name="animal", domain=Set.from_iterable(["cat", "dog"]))
+    animal = Symbolic(name="animal", domain=Set.from_iterable(iterable=["cat", "dog"]))
     circuit = ProbabilisticCircuit()
     product_unit = ProductUnit(probabilistic_circuit=circuit)
     gaussian = GaussianDistribution(variable=x, location=0.0, scale=1.0)
@@ -149,7 +153,7 @@ def test_a_product_over_symbolic_and_continuous_variables_reads_domain_elements(
     )
     rows = np.array([["dog", 0.5], ["cat", -1.0]], dtype=object)
 
-    assert circuit.log_likelihood(rows) == pytest.approx(
+    assert circuit.log_likelihood(events=rows) == pytest.approx(
         np.log([0.75, 0.25]) + norm.logpdf([0.5, -1.0])
     )
 

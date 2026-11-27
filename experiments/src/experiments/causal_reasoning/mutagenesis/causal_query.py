@@ -20,7 +20,7 @@ from experiments.causal_reasoning.mutagenesis.domain import (
     MutagenesisMolecule,
     MutagenesisMoleculeAggregations,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.relational.causal import (
     RelationalCausalCircuit,
@@ -382,12 +382,14 @@ class BranchingAtomCountCausalQuery:
             {branching_atom_count_variable: float(branching_atom_count_value)}
         ).as_composite_set()
         truncated_circuit = interventional_circuit.truncated(
-            event.fill_missing_variables_pure(interventional_circuit.variables)
+            event.fill_missing_variables_pure(
+                variables=interventional_circuit.variables
+            )
         ).distribution
 
         true_event = (
             SimpleEvent.from_data({mutagenic_variable: True})
             .as_composite_set()
-            .fill_missing_variables_pure(truncated_circuit.variables)
+            .fill_missing_variables_pure(variables=truncated_circuit.variables)
         )
         return float(truncated_circuit.probability(true_event))

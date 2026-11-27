@@ -15,7 +15,7 @@ from krrood.parametrization.model_registries import (
     RelationalCircuitRegistry,
     UniformPriorRegistry,
 )
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.probabilistic_circuit.relational.relational_probabilistic_circuit import (
     RelationalProbabilisticCircuit,
 )
@@ -76,7 +76,7 @@ def grasp_frame(carton: Milk, surface_grasp: SurfaceGrasp) -> np.ndarray:
     """
     :return: The grasp frame of ``surface_grasp`` in the carton's own frame.
     """
-    return surface_grasp.grasp_candidate(carton).grasp_pose.to_np()
+    return surface_grasp.grasp_candidate(graspable=carton).grasp_pose.to_np()
 
 
 # %% grasps on the surface
@@ -137,11 +137,15 @@ def test_a_rolled_grasp_closes_along_a_turned_direction(carton):
 
 
 def test_a_point_above_the_object_is_not_on_its_surface(carton):
+    """
+    A grasp above the object lies off its surface, so no grasp candidate can be made from
+    it.
+    """
     above = SurfaceGrasp(yaw=0.0, height=1.5, depth=0.0, pitch=0.0, roll=0.0)
 
-    assert not above.reaches_surface_of(carton)
+    assert not above.reaches_surface_of(graspable=carton)
     with pytest.raises(GraspNotOnObjectError):
-        above.grasp_candidate(carton)
+        above.grasp_candidate(graspable=carton)
 
 
 # %% statements of where to grasp

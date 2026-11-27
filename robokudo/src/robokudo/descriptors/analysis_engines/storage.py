@@ -12,6 +12,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -23,7 +24,14 @@ class AnalysisEngine(AnalysisEngineInterface):
         return "storage"
 
     def implementation(self) -> Pipeline:
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        """
+        :return: A pipeline that reads and preprocesses Kinect camera data and stores it
+            with
+            :class:`StorageWriter`.
+        """
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         seq = Pipeline()
         seq.add_children(
@@ -32,6 +40,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 CollectionReaderAnnotator(descriptor=kinect_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 StorageWriter(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

@@ -19,7 +19,7 @@ from .dataset.frames import KnownFrames
 
 def test_a_displacement_has_six_entries():
     """
-    Three entries for the translation and three for the rotation vector.
+    Three entries for the rotation vector and three for the translation.
     """
     displacement = Displacement()
 
@@ -49,6 +49,20 @@ def test_a_displacement_returns_the_parts_it_was_given():
     np.testing.assert_allclose(displacement.translation.to_np()[:3], [0.1, -0.2, 0.3])
     np.testing.assert_allclose(
         displacement.rotation_vector.to_np()[:3], [0.0, 0.7, 0.0]
+    )
+
+
+def test_a_displacement_stores_its_rotation_first():
+    """
+    Like a twist and a screw axis, a displacement holds its rotation in the upper three
+    entries and its translation in the lower three.
+    """
+    displacement = Displacement(
+        rotation_vector=Vector3(0.1, 0.2, 0.3), translation=Vector3(4.0, 5.0, 6.0)
+    )
+
+    np.testing.assert_allclose(
+        displacement.to_np().ravel(), [0.1, 0.2, 0.3, 4.0, 5.0, 6.0]
     )
 
 

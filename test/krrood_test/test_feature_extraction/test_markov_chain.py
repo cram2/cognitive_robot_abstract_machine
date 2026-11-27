@@ -34,7 +34,7 @@ from ..dataset.example_classes import (
 
 @pytest.fixture
 def type_variable() -> Symbolic:
-    return Symbolic(name="type", domain=Set.from_iterable(SceneObjectType))
+    return Symbolic(name="type", domain=Set.from_iterable(iterable=SceneObjectType))
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ def type_by_state(dirac_hidden_state_template) -> list:
 
 @pytest.fixture
 def state_domain() -> Set:
-    return Set.from_iterable(range(2))
+    return Set.from_iterable(iterable=range(2))
 
 
 @pytest.fixture
@@ -149,12 +149,14 @@ def _scene_object_parts(count: int) -> list:
 
 
 def test_mismatched_transition_shape_raises(dirac_hidden_state_template):
-    mismatched_domain = Set.from_iterable(range(1))
+    mismatched_domain = Set.from_iterable(iterable=range(1))
     with pytest.raises(ShapeMismatchError):
         MarkovChainDistributionTemplate(
             template_distribution=dirac_hidden_state_template,
             starting_distribution=SymbolicDistribution(
-                variable=Symbolic(name="state", domain=Set.from_iterable(range(2))),
+                variable=Symbolic(
+                    name="state", domain=Set.from_iterable(iterable=range(2))
+                ),
                 probabilities=MissingDict(float, {0: 0.5, 1: 0.5}),
             ),
             transition_model=MultinomialDistribution(

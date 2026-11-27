@@ -134,9 +134,9 @@ def test_representation_covers_the_whole_region():
                 fraction * math.sin(math.radians(angle)),
                 0.0,
             )
-            assert any(
-                box.simple_event.contains(point) for box in boxes
-            ), f"{point} is in the disc but in none of the boxes"
+            assert any(box.simple_event.contains(item=point) for box in boxes), (
+                f"{point} is in the disc but in none of the boxes"
+            )
 
 
 def test_representation_never_claims_more_than_it_covers():

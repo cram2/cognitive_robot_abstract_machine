@@ -25,6 +25,7 @@ from robokudo.annotators.object_hypothesis_visualizer import ObjectHypothesisVis
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -69,7 +70,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             before running this pipeline, or it will not display anything.
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "mongo", db_name="store_with_annotations"
+            camera="mongo", db_name="store_with_annotations"
         )
 
         seq = Pipeline("StoragePipeline")
@@ -79,6 +80,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 ObjectHypothesisVisualizer(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

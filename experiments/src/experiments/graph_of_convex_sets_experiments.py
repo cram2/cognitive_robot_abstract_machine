@@ -2,8 +2,8 @@
 End-to-end performance benchmark for the Graph of Convex Sets (GCS) free- space
 pipeline, covering three families of environments:
 
-  * **URDF environments** — rooms loaded from `semantic_digital_twin/resources/urdf`
-    via :class:`URDFParser`.
+  * **URDF environments** — the descriptions of :class:`BenchmarkedUrdfEnvironment`,
+    loaded from their ROS packages via :class:`URDFParser`.
 
   * **PartNet-Mobility scenes** — articulated objects loaded from
     ``~/partnet-mobility-dataset`` via :class:`PartNetMobilityDatasetLoader`.
@@ -49,6 +49,7 @@ import logging
 import random
 import time
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing_extensions import Callable
 from urllib.parse import urlparse
@@ -71,6 +72,7 @@ from semantic_digital_twin.adapters.sage_10k_dataset.loader import Sage10kDatase
 from semantic_digital_twin.adapters.sage_10k_dataset.utils import (
     Sage10kActionableScenes,
 )
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from semantic_digital_twin.adapters.urdf import URDFParser
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     SemanticEnvironmentAnnotation,
@@ -93,6 +95,20 @@ from semantic_digital_twin.world_description.shape_collection import (
 from semantic_digital_twin.world_description.world_entity import Body
 
 logger = logging.getLogger(__name__)
+
+
+# %% benchmarked URDF environments
+
+
+class BenchmarkedUrdfEnvironment(StrEnum):
+    """
+    The URDF descriptions the free-space benchmark runs on, as ``package://`` URIs.
+    """
+
+    APARTMENT = "package://iai_apartment/urdf/apartment.urdf"
+    KITCHEN = "package://iai_kitchen/urdf_obj/kitchen_with_walls.urdf"
+    SIMPLE_TWO_ARM_ROBOT = "package://iai_objects/urdf/simple_two_arm_robot.urdf"
+    TABLE = "package://iai_objects/urdf/table.urdf"
 
 
 @dataclass
@@ -372,7 +388,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
                 obstacle = bounding_box.simple_event.as_composite_set() & search_event
                 if not obstacle.is_empty():
                     free_space_accumulator = free_space_accumulator.subtract_disjoint(
-                        obstacle
+                        other=obstacle
                     )
             return free_space_accumulator
 
@@ -697,20 +713,13 @@ def main():
     """
     arguments = _parse_arguments()
 
-    urdf_directory_path = (
-        Path(__file__).parent
-        / ".."
-        / ".."
-        / ".."
-        / "semantic_digital_twin"
-        / "resources"
-        / "urdf"
-    )
+    urdf_files = [
+        Path(PackageUriResolver().resolve(environment))
+        for environment in BenchmarkedUrdfEnvironment
+    ]
 
     results = []
-    for urdf_file in (
-        pbar := tqdm.tqdm(list(sorted(urdf_directory_path.glob("*.urdf"))))
-    ):
+    for urdf_file in (pbar := tqdm.tqdm(urdf_files)):
         pbar.set_description(f"Running benchmark for {urdf_file.stem}")
         results.append(GraphOfConvexSetsFreespaceBenchmark.for_urdf(urdf_file).run())
 

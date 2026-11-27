@@ -23,8 +23,10 @@ import os
 from enum import StrEnum
 
 from pymongo import MongoClient
+from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
+    WorldEntityWithIDKwargsTracker,
+)
 from typing_extensions import Any, TYPE_CHECKING
-from robokudo import world
 
 from robokudo.cas import CAS
 from robokudo.io.cas_annotation_codecs import (
@@ -42,6 +44,7 @@ from robokudo.io.exceptions import (
 if TYPE_CHECKING:
     from pymongo.results import InsertOneResult
     from pymongo.synchronous.database import Database
+    from semantic_digital_twin.world import World
 
 
 class StorageDocumentField(StrEnum):
@@ -79,7 +82,7 @@ class Storage:
     cas_view_codecs = CASViewCodecRegistry()
 
     @staticmethod
-    def is_blacklisted(obj: Any) -> bool:
+    def is_blacklisted(*, obj: Any) -> bool:
         """
         Check if an object is of a blacklisted type.
 
@@ -193,7 +196,7 @@ class Storage:
         self.client.drop_database(self.db_name)
 
     @staticmethod
-    def encode_view_document(view_name: str, view_value: Any) -> dict[str, Any]:
+    def encode_view_document(*, view_name: str, view_value: Any) -> dict[str, Any]:
         """
         Encode one CAS view value into a serializable view document.
 
@@ -212,13 +215,21 @@ class Storage:
         return document
 
     @staticmethod
-    def decode_view_document(view_document: dict[str, Any]) -> tuple[str, Any]:
+    def decode_view_document(
+        *, view_document: dict[str, Any], world: World
+    ) -> tuple[str, Any]:
         """
         Decode one serialized view document into a CAS view value.
-        """
-        return Storage.cas_view_codecs.decode_view(view_document)
 
-    def store_views_in_mongo(self, cas_dict: dict[str, Any]) -> None:
+        :param view_document: The serialized view document.
+        :param world: The world whose entities the view refers to.
+        """
+        return Storage.cas_view_codecs.decode_view(
+            document=view_document,
+            **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        )
+
+    def store_views_in_mongo(self, *, cas_dict: dict[str, Any]) -> None:
         """
         Store CAS views in MongoDB.
 
@@ -240,7 +251,9 @@ class Storage:
 
     def load_views_from_mongo_in_cas(
         self,
+        *,
         cas_document: dict[str, Any],
+        world: World,
         excluded_view_names: set[str] | None = None,
         included_view_names: set[str] | None = None,
     ) -> None:
@@ -251,6 +264,7 @@ class Storage:
         ``view_ids``.
 
         :param cas_document: CAS document to update with loaded views
+        :param world: The world whose entities the views refer to
         :param excluded_view_names: View names to leave undecoded for
             caller-specific handling.
         :param included_view_names: View names to decode when a reader
@@ -267,9 +281,11 @@ class Storage:
                 and expected_view_name not in included_view_names
             ):
                 continue
-            view_document = self.load_view_document(cas_document, expected_view_name)
+            view_document = self.load_view_document(
+                cas_document=cas_document, view_name=expected_view_name
+            )
             decoded_view_name, decoded_view_value = Storage.decode_view_document(
-                view_document
+                view_document=view_document, world=world
             )
             if decoded_view_name != expected_view_name:
                 raise RecordedViewNameMismatch(
@@ -280,7 +296,7 @@ class Storage:
             )
 
     def load_view_document(
-        self, cas_document: dict[str, Any], view_name: str
+        self, *, cas_document: dict[str, Any], view_name: str
     ) -> dict[str, Any]:
         """
         Fetch one CAS view document referenced by a recorded frame.
@@ -298,7 +314,7 @@ class Storage:
 
     @staticmethod
     def load_annotations_from_mongo_in_cas(
-        cas_document: dict[str, Any], cas: CAS
+        *, cas_document: dict[str, Any], cas: CAS, world: World
     ) -> None:
         """
         Load annotations from MongoDB into a CAS.
@@ -311,16 +327,16 @@ class Storage:
             database
         :param cas: The 'robokudo.cas.CAS' instance where the
             annotations shall be inserted to
+        :param world: The world whose entities the annotations refer to
         """
         if cas_document["annotations"]:
-            tracker = world.get_world_entity_tracker()
-            kwargs = tracker.create_kwargs() if tracker is not None else {}
             cas.annotations = deserialize_annotations(
-                cas_document["annotations"], **kwargs
+                cas_document["annotations"],
+                **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
             )
 
     @staticmethod
-    def generate_dict_from_real_cas(cas: CAS) -> dict[str, Any]:
+    def generate_dict_from_real_cas(*, cas: CAS) -> dict[str, Any]:
         """
         Convert a CAS instance to a MongoDB-compatible dictionary.
 
@@ -344,7 +360,7 @@ class Storage:
 
         return result
 
-    def store_cas_dict(self, cas_dict: dict[str, Any]) -> InsertOneResult:
+    def store_cas_dict(self, *, cas_dict: dict[str, Any]) -> InsertOneResult:
         """
         Store a CAS dictionary in MongoDB.
 

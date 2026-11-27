@@ -47,6 +47,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -109,7 +110,9 @@ class AnalysisEngine(AnalysisEngineInterface):
             The pipeline will automatically fail after 30 iterations to
             demonstrate error handling mechanisms.
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         processing_sequence = Sequence(name="Stored Data Processing", memory=True)
         processing_sequence.add_children(
@@ -125,6 +128,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                     name="Fail after 30 iterations",
                     child=SuccessEveryN("Fail Sim after 30 iter", n=30),
                 ),
+                WorldUpdatingAnnotator(),
             ]
         )
 

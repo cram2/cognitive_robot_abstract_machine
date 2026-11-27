@@ -35,6 +35,7 @@ The example below shows such a query.
 from random_events.set import SetElement, Set
 from random_events.variable import Symbolic, Continuous, Integer
 from random_events.product_algebra import Event, SimpleEvent
+from random_events.plotting import EventPlotter
 from random_events.interval import *
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -55,8 +56,8 @@ class Shape(IntEnum):
     TRIANGLE = 2
 
 
-color = Symbolic(name="color", domain=Set.from_iterable(Color))
-shape = Symbolic(name="shape", domain=Set.from_iterable(Shape))
+color = Symbolic(name="color", domain=Set.from_iterable(iterable=Color))
+shape = Symbolic(name="shape", domain=Set.from_iterable(iterable=Shape))
 
 probabilities = np.array([[2 / 15, 1 / 15, 1 / 5],
                           [1 / 5, 1 / 10, 3 / 10]])
@@ -149,7 +150,7 @@ from probabilistic_model.distributions.uniform import *
 mean = dataframe["sepal length (cm)"].mean()
 variance = dataframe["sepal length (cm)"].std()
 
-sepal_length = Continuous("sepal length (cm)")
+sepal_length = Continuous(name="sepal length (cm)")
 distribution = GaussianDistribution(variable=sepal_length, location=mean, scale=variance)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
@@ -313,7 +314,7 @@ A common perception of the mode is that it is the single point of highest densit
 ```{code-cell} ipython3
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 distribution = ProbabilisticCircuit()
-leaf(GaussianDistribution(variable=Continuous("x"), location=0, scale=1), distribution)
+leaf(GaussianDistribution(variable=Continuous(name="x"), location=0, scale=1), distribution)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
 ```
@@ -329,7 +330,7 @@ go.Figure(distribution.plot(), distribution.plotly_layout()).show()
 We can see that conditioning a Gaussian on such an event already creates a mode that has two points. Furthermore, modes can be sets of infinite many points, such as shown below.
 
 ```{code-cell} ipython3
-uniform = leaf(UniformDistribution(variable=Continuous("x"), interval=open(-1, 1).simple_sets[0]), ProbabilisticCircuit()).probabilistic_circuit
+uniform = leaf(UniformDistribution(variable=Continuous(name="x"), interval=open(-1, 1).simple_sets[0]), ProbabilisticCircuit()).probabilistic_circuit
 go.Figure(uniform.plot(), uniform.plotly_layout()).show()
 ```
 
@@ -348,7 +349,7 @@ For most practical purposes, we can define sampling as the generation of random 
 Let's look at an example from the Gaussian distribution.
 
 ```{code-cell} ipython3
-distribution = GaussianDistribution(variable=Continuous("x"), location=0, scale=1)
+distribution = GaussianDistribution(variable=Continuous(name="x"), location=0, scale=1)
 samples = distribution.sample(2)
 print(samples)
 ```
@@ -410,8 +411,8 @@ $p(x) = \mathcal{N}(x_1 | 0, 1) \cdot \mathcal{N}(x_2 | 0, 1) $.
 
 ```{code-cell} ipython3
 
-x1 = Continuous("x1")
-x2 = Continuous("x2")
+x1 = Continuous(name="x1")
+x2 = Continuous(name="x2")
 
 model = ProbabilisticCircuit()
 prod = ProductUnit(probabilistic_circuit = model)
@@ -430,9 +431,9 @@ We can now calculate the probability that $x_1 \in (0.5, 1.)
 
 ```{code-cell} ipython3
 event = SimpleEvent.from_data({x1: closed(0.25, 1.), x2: closed(0., 1.)}).as_composite_set()
-monte_carlo_probability = sum([event.contains(sample) for sample in samples]) / len(samples)
+monte_carlo_probability = sum([event.contains(item=sample) for sample in samples]) / len(samples)
 
-fig.add_traces(event.plot())
+fig.add_traces(EventPlotter(event=event).plot())
 fig.show()
 
 print("Monte Carlo Probability:", monte_carlo_probability)
@@ -461,8 +462,8 @@ Consider the kitchen scenario from the [product algebra notebook](https://cram2.
 
 ```{code-cell} ipython3
 
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 
 kitchen = SimpleEvent.from_data({x: closed(0, 6.6), y: closed(0, 7)}).as_composite_set()
 refrigerator = SimpleEvent.from_data({x: closed(5, 6), y: closed(6.3, 7)}).as_composite_set()
@@ -473,7 +474,7 @@ center_island = SimpleEvent.from_data({x: closed(2, 4), y: closed(3, 5)}).as_com
 
 occupied_spaces = refrigerator | top_kitchen_island | left_cabinets | center_island
 free_space = kitchen - occupied_spaces
-fig = go.Figure(free_space.plot(), free_space.plotly_layout())
+fig = go.Figure(EventPlotter(event=free_space).plot(), EventPlotter(event=free_space).plotly_layout())
 fig.show()
 ```
 

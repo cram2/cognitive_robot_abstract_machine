@@ -25,14 +25,15 @@ First, we import the necessary packages and define two variables.
 
 import os.path
 from random_events.product_algebra import Event, SimpleEvent
+from random_events.plotting import EventPlotter
 from random_events.variable import Continuous
 from random_events.interval import *
 from PIL import Image
 import numpy as np
 import plotly.graph_objects as go
 
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 ```
 
 Next, let's load the logo of this package.
@@ -66,8 +67,8 @@ for color in colors:
     pixel_indices = np.transpose(np.nonzero(np.all(image == color, axis=-1)))
     complex_event = indices_to_complex_event(pixel_indices)
     complex_events.append(complex_event)
-    traces = complex_event.plot(f"rgb({color[0]},{color[1]},{color[2]})")
-    fig.update_layout(complex_event.plotly_layout())
+    traces = EventPlotter(event=complex_event).plot(color=f"rgb({color[0]},{color[1]},{color[2]})")
+    fig.update_layout(EventPlotter(event=complex_event).plotly_layout())
     fig.add_traces(traces)
 
 fig.update_layout(title="Random Events Tomato")
@@ -82,7 +83,7 @@ The entire tomate as measurable space is obtained by union of all the events.
 :tags: []
 
 entire_event = complex_events[0] | complex_events[1] | complex_events[2]
-fig = go.Figure(entire_event.plot(), entire_event.plotly_layout())
+fig = go.Figure(EventPlotter(event=entire_event).plot(), EventPlotter(event=entire_event).plotly_layout())
 fig.update_layout(title="Random Events Tomato as one Event")
 fig.show()
 ```

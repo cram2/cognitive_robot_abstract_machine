@@ -1,3 +1,9 @@
+"""
+Tests of reaching a goal with robots whose links are very short or very long.
+"""
+
+from __future__ import annotations
+
 from copy import deepcopy
 
 from cramph.composites import Sequence
@@ -15,9 +21,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import Point3
 from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
 )
@@ -29,6 +33,7 @@ from semantic_digital_twin.world_description.world_entity import (
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
@@ -63,11 +68,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=root,
                 child=link1,
-                axis=Vector3.Z(),
                 dof_limits=dof_limits,
             )
         )
@@ -79,11 +86,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_cylinder),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=link1,
                 child=link2,
-                axis=Vector3.X(),
                 dof_limits=dof_limits,
                 connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     z=fucking_huge_link_length,
@@ -98,11 +107,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_cylinder),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=link2,
                 child=link3,
-                axis=Vector3.X(),
                 dof_limits=dof_limits,
                 connection_T_child_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     z=fucking_huge_link_length,
@@ -117,12 +128,14 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 world=world,
                 parent=link3,
                 child=link4,
                 dof_limits=dof_limits,
-                axis=Vector3.Z(),
             )
         )
 
@@ -133,11 +146,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.X()
+                ),
                 world=world,
                 parent=link4,
                 child=link5,
-                axis=Vector3.X(),
                 dof_limits=dof_limits,
             )
         )
@@ -149,11 +164,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
             visual=deepcopy(fucking_huge_sphere),
         )
         world.add_connection(
-            RevoluteConnection.create_with_dofs(
+            ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Y()
+                ),
                 world=world,
                 parent=link5,
                 child=eef,
-                axis=Vector3.Y(),
                 dof_limits=dof_limits,
             )
         )
@@ -161,6 +178,13 @@ def robot_factory(fucking_huge_link_length: float, vel_limit: float) -> World:
 
 
 def execute(link_length: float, vel_limit: float):
+    """
+    Move the tip of a robot built with links of link_length to a goal and run the motion
+    to its end.
+
+    :param link_length: How long each link of the robot is, in meters.
+    :param vel_limit: The velocity limit of each joint.
+    """
     fucking_huge_robot = robot_factory(
         fucking_huge_link_length=link_length, vel_limit=vel_limit
     )
@@ -197,8 +221,9 @@ def execute(link_length: float, vel_limit: float):
                         )
                     ),
                     CartesianPosition(
-                        root_link=fucking_huge_robot.root,
-                        tip_link=eef,
+                        kinematic_chain=KinematicChain(
+                            root=fucking_huge_robot.root, tip=eef
+                        ),
                         goal_point=Point3(y=-link_length, reference_frame=eef),
                         cruise_velocity=0.2 * link_length,
                     ),

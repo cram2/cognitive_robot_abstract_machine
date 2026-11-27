@@ -1,3 +1,8 @@
+"""
+Example dataclasses the krrood tests build class diagrams, queries and ORM interfaces
+from.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -28,7 +33,9 @@ from krrood.ormatic.data_access_objects.alternative_mappings import (
 )
 from krrood.patterns.subclass_safe_generic import SubClassSafeGeneric
 from krrood.symbol_graph.symbol_graph import Symbol
-from krrood import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from random_events.interval import Bound, SimpleInterval
@@ -711,7 +718,7 @@ class HolderOfSimpleInterval:
 
     bounds: SimpleInterval = field(
         default_factory=lambda: SimpleInterval.from_data(
-            0.0, 1.0, Bound.CLOSED, Bound.CLOSED
+            lower=0.0, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
         )
     )
 
@@ -1182,3 +1189,58 @@ class ActionWithMissingAggregationsMixin:
     """
 
     domain_object: Cabinet
+
+
+@dataclass(kw_only=True)
+class PouredDrop:
+    """
+    One drop of a pour, which may land outside the cup.
+    """
+
+    spilled: int
+    """
+    Whether the drop landed outside the cup.
+    """
+
+
+@dataclass(kw_only=True)
+class ConfoundedPour:
+    """
+    A pour whose speed and spilled drops share a cause, for the tests of learning a
+    causal structure that allows hidden confounders.
+    """
+
+    nozzle: int
+    """
+    Which nozzle is fitted, which drives the speed and nothing else.
+    """
+
+    tremor: int
+    """
+    Whether the hand trembles, which drives the speed and every drop.
+    """
+
+    speed: int
+    """
+    Whether the pour is fast.
+    """
+
+    drops: List[PouredDrop] = field(default_factory=list)
+    """
+    The drops of the pour.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class ConfoundedPourAggregations(AggregationStatistic[ConfoundedPour]):
+    """
+    Aggregation statistics for :class:`ConfoundedPour` over its ``drops`` field.
+    """
+
+    @aggregation_statistic(variable(ConfoundedPour).drops)
+    def drop_count(self) -> int:
+        """
+        Number of drops.
+        """
+        [result] = count(variable(PouredDrop, self.drops)).tolist()
+        return result

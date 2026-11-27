@@ -1,5 +1,11 @@
+"""
+The scenes of the SAGE-10k dataset as its JSON files describe them, and building worlds
+from them.
+"""
+
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,9 +30,12 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     DoorWithType,
 )
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
@@ -655,7 +664,7 @@ class Sage10kDoor(Sage10kWithID):
         body.visual = geometry_with_texture
 
         with world.modify_world():
-            wall_annotation.add(annotation.entry_way)
+            wall_annotation.add(part=annotation.entry_way)
 
         self._create_handle_in_world(world, annotation)
         self._create_hinge_in_world(annotation)
@@ -682,8 +691,8 @@ class Sage10kDoor(Sage10kWithID):
             world.root.global_pose
         )
         is_handle_in_room = floor_bounding_box.event.marginal(
-            SpatialVariables.xy
-        ).contains((door_T_world.x, door_T_world.y))
+            variables=SpatialVariables.xy
+        ).contains(item=(door_T_world.x, door_T_world.y))
 
         if is_handle_in_room and self.opens_inward:
             door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -702,7 +711,7 @@ class Sage10kDoor(Sage10kWithID):
                 world_root_T_self=world_root_T_handle,
                 scale=Scale(0.05, 0.02, 0.2),
             )
-            door.add(handle)
+            door.add(part=handle)
         return handle
 
     def _create_hinge_in_world(self, door: Door) -> ActiveConnection1DOF:
@@ -722,8 +731,10 @@ class Sage10kDoor(Sage10kWithID):
             )
 
         return door.mount_on_movable_joint(
-            RevoluteConnectionSpecification(
-                axis=Vector3.Z(),
+            ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 dof_limits=limits,
             )
         )

@@ -28,6 +28,7 @@ from robokudo.annotators.pointcloud_crop import PointcloudCropAnnotator
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -83,7 +84,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             and slow processing simulation, which can be useful for debugging.
         """
         kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "kinect_wo_tf"
+            camera="kinect_wo_tf"
         )
 
         seq = Pipeline("RWPipeline")
@@ -100,6 +101,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 # ClusterColorHistogramAnnotator(),
                 # ClusterPositionAnnotator(),
                 # Additional annotators (e.g., QueryAnnotator, ActionServerCheck) can be added if needed.
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

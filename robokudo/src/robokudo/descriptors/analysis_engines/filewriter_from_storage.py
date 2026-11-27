@@ -26,6 +26,7 @@ from robokudo.pipeline import Pipeline
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -66,7 +67,7 @@ class AnalysisEngine(AnalysisEngineInterface):
         :return: The configured pipeline for data transfer
         """
         cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
-            "mongo", loop=False
+            camera="mongo", loop=False
         )
 
         seq = Pipeline("StoragePipeline")
@@ -76,6 +77,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 CollectionReaderAnnotator(descriptor=cr_storage_config),
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 FileWriter(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

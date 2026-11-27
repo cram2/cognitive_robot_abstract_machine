@@ -11,8 +11,10 @@ import pandas as pd
 import pytest
 from random_events.product_algebra import SimpleEvent
 
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,

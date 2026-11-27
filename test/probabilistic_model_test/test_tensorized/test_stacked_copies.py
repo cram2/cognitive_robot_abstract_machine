@@ -1,3 +1,10 @@
+"""
+Tests of stacking copies of a layer graph that share its structure into one layer graph
+whose root holds one node per copy.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -89,7 +96,7 @@ class Variables:
 
 @pytest.fixture
 def variables() -> Variables:
-    return Variables(Continuous("x"), Continuous("y"), Integer("count"))
+    return Variables(Continuous(name="x"), Continuous(name="y"), Integer(name="count"))
 
 
 # %% stacking conditioned copies
@@ -175,11 +182,12 @@ class TestStackingConditionedCopies:
         stacked = AlignedCopiesStacker().stack(copies)
         stacked.layer.normalize()
         events = np.array([[0.0, 0.5], [0.0, 2.5], [0.0, 1.5]])
-        log_likelihoods = stacked.layer.log_likelihood_of_nodes(events)
+        log_likelihoods = stacked.layer.log_likelihood_of_nodes(events=events)
         for index, copy in enumerate(copies):
             copy.normalize()
             np.testing.assert_allclose(
-                log_likelihoods[:, index], copy.log_likelihood_of_nodes(events)[:, 0]
+                log_likelihoods[:, index],
+                copy.log_likelihood_of_nodes(events=events)[:, 0],
             )
 
     def test_layers_that_conditioning_leaves_unchanged_are_shared(
@@ -257,8 +265,8 @@ def uniform_layer_over(variables: Variables, upper: float) -> UniformLayer:
     :return: A layer of one uniform distribution over ``x`` from zero to the bound.
     """
     return UniformLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             UniformDistribution(
                 variable=variables.x, interval=closed(0.0, upper).simple_sets[0]
             )
@@ -272,7 +280,9 @@ def gaussian_layer_with_scale(variables: Variables, scale: float) -> GaussianLay
     :param scale: The scale of the Gaussian.
     :return: A layer of one Gaussian over ``x`` with mean zero.
     """
-    return GaussianLayer(0, np.zeros(1), np.full(1, scale))
+    return GaussianLayer(
+        np.zeros(1, dtype=np.int64), np.zeros(1), np.full(1, np.log(scale))
+    )
 
 
 def truncated_gaussian_layer_over(
@@ -285,11 +295,11 @@ def truncated_gaussian_layer_over(
         bound.
     """
     return TruncatedGaussianLayer(
-        0,
+        np.zeros(1, dtype=np.int64),
         np.array([[0.0, upper]]),
         np.full((1, 2), int(Bound.CLOSED), dtype=np.int64),
         np.zeros(1),
-        np.ones(1),
+        np.zeros(1),
     )
 
 
@@ -302,8 +312,8 @@ def dirac_delta_layer_with_density_cap(
     :return: A layer of one Dirac delta over ``x`` at zero.
     """
     return DiracDeltaLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             DiracDeltaDistribution(
                 variable=variables.x, location=0.0, density_cap=density_cap
             )
@@ -324,8 +334,8 @@ def integer_layer_of(
     :return: A layer of one distribution over ``count``.
     """
     return IntegerLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             IntegerDistribution(
                 variable=variables.count,
                 probabilities=MissingDict(
@@ -333,7 +343,7 @@ def integer_layer_of(
                 ),
             )
         ],
-        table_type,
+        table_type=table_type,
     )
 
 
@@ -387,8 +397,8 @@ def multivariate_gaussian_layer_with_variance_of_x(
     :return: A layer of one correlated Gaussian over ``x`` and ``y``.
     """
     return MultivariateGaussianLayer.from_distributions(
-        SortedSet([variables.x, variables.y]),
-        [gaussian_over_x_and_y(variables, variance_of_x)],
+        variables=SortedSet([variables.x, variables.y]),
+        distributions=[gaussian_over_x_and_y(variables, variance_of_x)],
     )
 
 
@@ -401,8 +411,8 @@ def truncated_multivariate_gaussian_layer_over(
     :return: A layer of one correlated Gaussian over ``x`` and ``y``, truncated to a box.
     """
     return TruncatedMultivariateGaussianLayer.from_distributions(
-        SortedSet([variables.x, variables.y]),
-        [
+        variables=SortedSet([variables.x, variables.y]),
+        distributions=[
             TruncatedMultivariateGaussianDistribution(
                 untruncated=gaussian_over_x_and_y(variables, 1.0),
                 box=SimpleEvent.from_data(
@@ -458,7 +468,7 @@ class TestEqualParametersOfEveryLeafLayerType:
         changed_parameter: float,
     ):
         layer = layer_of(variables, parameter)
-        assert layer.has_equal_parameters(layer.__deepcopy__())
+        assert layer.has_equal_parameters(other=layer.__deepcopy__())
 
     def test_a_changed_parameter_is_unequal(
         self,
@@ -468,7 +478,7 @@ class TestEqualParametersOfEveryLeafLayerType:
         changed_parameter: float,
     ):
         assert not layer_of(variables, parameter).has_equal_parameters(
-            layer_of(variables, changed_parameter)
+            other=layer_of(variables, changed_parameter)
         )
 
 
@@ -479,7 +489,7 @@ class TestStackingCopiesOfLeafLayers:
 
     def test_tables_of_different_types_are_unequal(self, variables):
         assert not integer_layer_of(variables, 0.3).has_equal_parameters(
-            integer_layer_with_sparse_table_of(variables, 0.3)
+            other=integer_layer_with_sparse_table_of(variables, 0.3)
         )
 
     def test_equal_copies_of_a_leaf_layer_are_shared(self, variables):
@@ -493,9 +503,12 @@ class TestStackingCopiesOfLeafLayers:
 
 
 def test_only_the_given_nodes_multiply_the_attached_child_layer(variables):
+    """
+    Attaching a child layer multiplies only the nodes it is attached to.
+    """
     uniform_layer = UniformLayer.from_distributions(
-        0,
-        [
+        variable_index=0,
+        distributions=[
             UniformDistribution(
                 variable=variables.x, interval=closed(0.0, 1.0).simple_sets[0]
             ),
@@ -506,13 +519,16 @@ def test_only_the_given_nodes_multiply_the_attached_child_layer(variables):
     )
     product_layer = ProductLayer.node_wise_product_of([uniform_layer])
     point_mass = DiracDeltaLayer.from_distributions(
-        1, [DiracDeltaDistribution(variable=variables.y, location=3.0, density_cap=2.0)]
+        variable_index=1,
+        distributions=[
+            DiracDeltaDistribution(variable=variables.y, location=3.0, density_cap=2.0)
+        ],
     )
     product_layer.attach_child_layer(point_mass, np.array([1]), np.array([0]))
 
     events = np.array([[0.5, 3.0]])
     np.testing.assert_allclose(
-        product_layer.log_likelihood_of_nodes(events),
+        product_layer.log_likelihood_of_nodes(events=events),
         [[np.log(1.0), np.log(0.5) + np.log(2.0)]],
     )
     np.testing.assert_array_equal(product_layer.variables, [0, 1])
@@ -522,6 +538,9 @@ def test_only_the_given_nodes_multiply_the_attached_child_layer(variables):
 
 
 def test_every_point_mass_puts_its_mass_on_its_value(variables):
+    """
+    Every point mass of a point masses layer puts all of its probability on its value.
+    """
     values = [0, 2]
     layer = LayeredProbabilisticCircuit.point_masses_layer(
         0,
@@ -533,6 +552,6 @@ def test_every_point_mass_puts_its_mass_on_its_value(variables):
         ],
     )
     np.testing.assert_array_equal(
-        layer.log_likelihood_of_nodes(np.array([[value] for value in values])),
+        layer.log_likelihood_of_nodes(events=np.array([[value] for value in values])),
         [[0.0, -np.inf], [-np.inf, 0.0]],
     )

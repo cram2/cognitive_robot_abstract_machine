@@ -27,12 +27,14 @@ class FileLoader:
 
     .. code-block:: python
 
-        pkg_path = FileLoader.get_ros_pkg_path('my_package')
-        file_path = FileLoader.get_path_to_file_in_ros_package('my_package', 'config/params.yaml')
+        pkg_path = FileLoader.get_ros_pkg_path(ros_pkg_name='my_package')
+        file_path = FileLoader.get_path_to_file_in_ros_package(
+            ros_pkg_name='my_package', relative_path='config/params.yaml'
+        )
     """
 
     @staticmethod
-    def get_ros_pkg_path(ros_pkg_name: str) -> Path:
+    def get_ros_pkg_path(*, ros_pkg_name: str) -> Path:
         """
         Get a Path object to a ROS2 package given the name
 
@@ -46,7 +48,7 @@ class FileLoader:
 
         .. code-block:: python
 
-            pkg_path = loader.get_ros_pkg_path('my_package')
+            pkg_path = loader.get_ros_pkg_path(ros_pkg_name='my_package')
             assert pkg_path.exists()
         """
         try:
@@ -57,7 +59,9 @@ class FileLoader:
             return package_path
 
     @staticmethod
-    def get_path_to_file_in_ros_package(ros_pkg_name: str, relative_path: str) -> Path:
+    def get_path_to_file_in_ros_package(
+        *, ros_pkg_name: str, relative_path: str
+    ) -> Path:
         """
         Get a Path object to a given the filename inside a ROS package. Please note, that relative_path should NOT
         start with '/', because then it would be considered as an absolute path from pathlib.Path.joinpath()
@@ -73,7 +77,9 @@ class FileLoader:
 
         .. code-block:: python
 
-            file_path = loader.get_path_to_file_in_ros_package('my_package', 'config/params.yaml')
+            file_path = loader.get_path_to_file_in_ros_package(
+                ros_pkg_name='my_package', relative_path='config/params.yaml'
+            )
             assert file_path.exists()
 
         .. note::

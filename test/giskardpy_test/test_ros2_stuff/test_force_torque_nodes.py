@@ -2,6 +2,7 @@
 Tests of the statechart nodes that watch a force-torque sensor.
 """
 
+import dataclasses
 import json
 from pathlib import Path
 
@@ -25,6 +26,15 @@ from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 
 
+def test_a_force_impact_monitor_names_its_threshold_as_a_force():
+    """
+    The value is the force above which the monitor fires, not a goal error.
+    """
+    field_names = {field.name for field in dataclasses.fields(ForceImpactMonitor)}
+    assert "force_threshold" in field_names
+    assert "threshold" not in field_names
+
+
 def test_force_impact_node(rclpy_node):
     """
     A force impact monitor observes false while the measured force stays below its
@@ -42,7 +52,7 @@ def test_force_impact_node(rclpy_node):
         node=(
             parallel := Parallel(
                 nodes=[
-                    ForceImpactMonitor(topic_name=topic_name, threshold=10),
+                    ForceImpactMonitor(topic_name=topic_name, force_threshold=10),
                     Sequence(
                         nodes=[
                             PublishOnStart(topic_name=topic_name, msg=msg_below),

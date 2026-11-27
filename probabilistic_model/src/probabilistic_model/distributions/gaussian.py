@@ -1,3 +1,7 @@
+"""
+Gaussian and truncated Gaussian distributions over one continuous variable.
+"""
+
 from __future__ import annotations
 
 import math
@@ -45,8 +49,8 @@ class GaussianDistribution(ContinuousDistribution):
     def univariate_support(self) -> Interval:
         return reals()
 
-    def log_likelihood(self, x: npt.NDArray) -> npt.NDArray:
-        return norm.logpdf(x[:, 0], loc=self.location, scale=self.scale)
+    def log_likelihood(self, *, events: npt.NDArray) -> npt.NDArray:
+        return norm.logpdf(events[:, 0], loc=self.location, scale=self.scale)
 
     def cumulative_distribution_function(self, x: npt.NDArray) -> npt.NDArray:
         return norm.cdf(x[:, 0], loc=self.location, scale=self.scale)
@@ -54,7 +58,7 @@ class GaussianDistribution(ContinuousDistribution):
     def univariate_log_mode(self) -> UnivariateLogMode:
         return UnivariateLogMode(
             singleton(self.location),
-            self.log_likelihood(np.array([[self.location]]))[0],
+            self.log_likelihood(events=np.array([[self.location]]))[0],
         )
 
     def sample(self, amount: int) -> npt.NDArray:
@@ -155,10 +159,17 @@ class GaussianDistribution(ContinuousDistribution):
     def abbreviated_symbol(self) -> str:
         return "N"
 
-    def apply_translation(self, translation: VariableMap[Variable, float]):
+    def apply_translation(self, *, translation: VariableMap[Variable, float]) -> None:
+        """
+        Moves the :attr:`location` by the translation of the variable.
+        """
         self.location += translation[self.variable]
 
-    def apply_scaling(self, scaling: VariableMap[Variable, float]):
+    def apply_scaling(self, *, scaling: VariableMap[Variable, float]) -> None:
+        """
+        Multiplies the :attr:`location` and the :attr:`scale` by the scaling of the
+        variable.
+        """
         self.location *= scaling[self.variable]
         self.scale *= scaling[self.variable]
 
@@ -199,7 +210,7 @@ class TruncatedGaussianDistribution(
         return self.truncated_normal.cdf(x[:, 0])
 
     def univariate_log_mode(self) -> UnivariateLogMode:
-        if self.interval.contains(self.location):
+        if self.interval.contains(item=self.location):
             value = self.location
         elif self.location < self.lower:
             value = self.lower
@@ -247,7 +258,7 @@ class TruncatedGaussianDistribution(
         :param interval: The simple interval, which is not a singleton.
         :return: The truncated distribution and the log-probability of the interval.
         """
-        intersection = self.interval.intersection_with(interval)
+        intersection = self.interval.intersection_with(other=interval)
         if intersection.is_empty():
             return LogTruncation.impossible()
 
@@ -264,10 +275,18 @@ class TruncatedGaussianDistribution(
             f"N({self.variable.name} | {self.location}, {self.scale}, {self.interval})"
         )
 
-    def apply_translation(self, translation: VariableMap[Variable, float]):
-        super().apply_translation(translation)
-        GaussianDistribution.apply_translation(self, translation)
+    def apply_translation(self, *, translation: VariableMap[Variable, float]) -> None:
+        """
+        Moves the :attr:`interval` and the :attr:`location` by the translation of the
+        variable.
+        """
+        super().apply_translation(translation=translation)
+        GaussianDistribution.apply_translation(self, translation=translation)
 
-    def apply_scaling(self, scale: VariableMap[Variable, float]):
-        super().apply_scaling(scale)
-        GaussianDistribution.apply_scaling(self, scale)
+    def apply_scaling(self, *, scaling: VariableMap[Variable, float]) -> None:
+        """
+        Multiplies the :attr:`interval`, the :attr:`location` and the :attr:`scale` by
+        the scaling of the variable.
+        """
+        super().apply_scaling(scaling=scaling)
+        GaussianDistribution.apply_scaling(self, scaling=scaling)

@@ -26,6 +26,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -71,7 +72,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with custom parameters
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         image_preprocessor_config = ImagePreprocessorAnnotator.Descriptor()
         image_preprocessor_config.parameters.depth_trunc = 4.5
@@ -85,6 +88,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                     "ImagePreprocessor", descriptor=image_preprocessor_config
                 ),
                 SlowAnnotator("SlowAnnotator"),
+                WorldUpdatingAnnotator(),
             ]
         )
 

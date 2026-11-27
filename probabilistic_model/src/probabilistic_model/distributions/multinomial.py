@@ -1,3 +1,9 @@
+"""
+The multinomial distribution, a joint probability table over several discrete variables.
+"""
+
+from __future__ import annotations
+
 import itertools
 from dataclasses import dataclass, field
 
@@ -91,7 +97,6 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
 
         mode = None
         for index_of_maximum in indices_of_maximum:
-
             current_mode = SimpleEvent.from_data(
                 {
                     variable: hash_map_variable_values[variable][value]
@@ -107,7 +112,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
 
     def log_conditional(self, point: dict[Variable, Any]) -> LogConditioning[Self]:
         event = SimpleEvent.from_data(point)
-        event.fill_missing_variables(self.variables)
+        event.fill_missing_variables(variables=self.variables)
         truncation = self.log_truncated(event.as_composite_set())
         return LogConditioning(truncation.distribution, truncation.log_probability)
 
@@ -154,7 +159,7 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
         indices = self.indices_from_simple_event(event)
         return self.probabilities[np.ix_(*indices)].sum()
 
-    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
+    def log_likelihood(self, *, events: npt.NDArray) -> npt.NDArray:
         return np.log(self.probabilities[tuple(events.T)])
 
     def log_truncated(
@@ -232,7 +237,6 @@ class MultinomialDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
                 for variable in self.variables
             ]
         ):
-
             # create a product unit for the current state
             product_unit = ProductUnit(probabilistic_circuit=pc)
 

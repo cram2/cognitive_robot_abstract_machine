@@ -10,6 +10,7 @@ from datetime import timedelta
 import pytest
 
 from cramph.exceptions import EmptyStatechartError
+from giskardpy.motion_statechart.exceptions import PositionLimitBlockedError
 
 from coraplex.exceptions import (
     MotionDidNotFinish,
@@ -139,7 +140,7 @@ def test_preparing_a_plan_does_not_move_the_robot(pr2_apartment_context) -> None
     executor = simulated_executor(extensions)
 
     executor.prepare(
-        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
     )
 
     assert world.state[torso].position == position_before
@@ -216,7 +217,8 @@ def executor_reaching_out_of_range(
         2, 1.5, 50, reference_frame=milk.root.parent_connection.parent
     )
     plan = ReachAction(
-        grasp=GraspCandidate.from_body_origin(milk), arm=robot_view.right_arm
+        grasp_candidate=GraspCandidate.from_body_origin(graspable=milk),
+        arm=robot_view.right_arm,
     )
     executor = simulated_executor(extensions)
     executor.compile(statechart=statechart_of(executor, plan))
@@ -228,10 +230,13 @@ def test_a_plan_that_stops_approaching_its_goal_is_given_up_on(
 ) -> None:
     """
     Nothing bounds the tick loop but the monitor, so a reach the arm cannot close on has
-    to end the run rather than tick forever.
+    to end the run rather than tick forever, naming the position limits that stop the
+    arm.
     """
-    with pytest.raises(MotionMadeNoProgress):
+    with pytest.raises(MotionMadeNoProgress) as failure:
         executor_reaching_out_of_range.execute()
+
+    assert isinstance(failure.value.no_progress, PositionLimitBlockedError)
 
 
 def test_a_plan_given_up_on_keeps_the_stalled_tasks_in_its_stored_history(

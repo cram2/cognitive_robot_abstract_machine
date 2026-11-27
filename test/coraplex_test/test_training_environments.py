@@ -20,7 +20,7 @@ def test_move_to_reach(coraplex_testing_session):
 
     training_environment = MoveToReachTrainingEnvironment(visualize=False)
 
-    training_environment.generate_episodes(2)
+    training_environment.generate_episodes(number_of_actions=2)
 
     assert len(training_environment.executed_plans) > 0
 

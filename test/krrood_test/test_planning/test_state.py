@@ -16,8 +16,8 @@ from typing_extensions import Callable
 from krrood.entity_query_language.backends import (
     EntityQueryLanguageGenerativeBackend,
     QueryBackend,
-    SQLAlchemyBackend,
 )
+from krrood.ormatic.eql_interface import SQLAlchemyBackend
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.exceptions import BackendCannotReadState
 from krrood.entity_query_language.factories import (
@@ -29,14 +29,17 @@ from krrood.entity_query_language.factories import (
     variable,
     variable_from,
 )
+from krrood.entity_query_language.ground_term import AttributeTerm
 from krrood.entity_query_language.predicate import symbolic_function
 from krrood.planning.exceptions import (
+    AssignedValueHasWrongType,
     AssignmentBypassesSetter,
     ComparisonIsNotAnEquality,
     ConditionIsNotAFact,
-    FactValueIsNotConstant,
+    FactHasVariables,
     MissingGroundTerm,
 )
+from krrood.planning.fact import Fact
 from krrood.planning.state import State
 
 from ..dataset.setting_with_side_effects import (
@@ -107,7 +110,7 @@ class TwoTowers:
         """
         :return: The state that puts ``b`` onto ``c``.
         """
-        return State().with_facts(literal(self.b).support == self.c)
+        return State().add_facts(literal(self.b).support == self.c)
 
 
 @pytest.fixture
@@ -170,7 +173,10 @@ def test_query_outside_state_reads_live_values(two_towers):
 
 
 def test_query_reads_assigned_indexed_element(two_towers):
-    state = State().with_facts(literal(two_towers.shelf).slots[0] == two_towers.c)
+    """
+    An element a fact assigns in a container is read in place of the live one.
+    """
+    state = State().add_facts(literal(two_towers.shelf).slots[0] == two_towers.c)
 
     result = a(Shelf).from_(domain=[two_towers.shelf]).slots[0].tolist(state=state)
 
@@ -178,7 +184,10 @@ def test_query_reads_assigned_indexed_element(two_towers):
 
 
 def test_index_by_expression_reads_the_same_ground_term_as_index_by_value(two_towers):
-    state = State().with_facts(literal(two_towers.shelf).slots[0] == two_towers.c)
+    """
+    An index computed by an expression names the element a constant index names.
+    """
+    state = State().add_facts(literal(two_towers.shelf).slots[0] == two_towers.c)
     slot = variable(int, [0, 1])
 
     result = a(Shelf).from_(domain=[two_towers.shelf]).slots[slot].tolist(state=state)
@@ -187,7 +196,10 @@ def test_index_by_expression_reads_the_same_ground_term_as_index_by_value(two_to
 
 
 def test_query_reads_assigned_method_call(two_towers):
-    state = State().with_facts(
+    """
+    A call a fact assigns returns the assigned value instead of running.
+    """
+    state = State().add_facts(
         literal(two_towers.a).rests_on(support=two_towers.table) == False
     )
     result = (
@@ -200,7 +212,10 @@ def test_query_reads_assigned_method_call(two_towers):
 
 
 def test_query_reads_assigned_symbolic_function(two_towers):
-    state = State().with_facts(tower_height(literal(two_towers.b)) == 3)
+    """
+    A symbolic function a fact assigns returns the assigned value.
+    """
+    state = State().add_facts(tower_height(literal(two_towers.b)) == 3)
     result = (
         (block := a(Block).from_(domain=two_towers.blocks))
         .where(tower_height(block) == 3)
@@ -211,7 +226,10 @@ def test_query_reads_assigned_symbolic_function(two_towers):
 
 
 def test_query_reads_assigned_predicate(two_towers):
-    state = State().with_facts(
+    """
+    A predicate stated as a fact holds, and one negated as a fact does not.
+    """
+    state = State().add_facts(
         not_(IsOn(block=literal(two_towers.a), support=literal(two_towers.table)))
     )
     result = (
@@ -224,7 +242,10 @@ def test_query_reads_assigned_predicate(two_towers):
 
 
 def test_query_reads_assigned_symbolic_function_class(two_towers):
-    state = State().with_facts(SupportName(block=literal(two_towers.b)) == "a")
+    """
+    A symbolic function class a fact assigns returns the assigned value.
+    """
+    state = State().add_facts(SupportName(block=literal(two_towers.b)) == "a")
     result = (
         (block := a(Block).from_(domain=two_towers.blocks))
         .where(SupportName(block=block) == "a")
@@ -240,7 +261,10 @@ def test_query_reads_assigned_symbolic_function_class(two_towers):
 def test_fact_about_a_variable_assigns_the_ground_term_of_each_of_its_values(
     two_towers,
 ):
-    state = State().with_facts(
+    """
+    A fact rooted at a variable states the value for every value of the variable.
+    """
+    state = State().add_facts(
         variable(Block, [two_towers.a, two_towers.b]).support == two_towers.c
     )
 
@@ -250,7 +274,10 @@ def test_fact_about_a_variable_assigns_the_ground_term_of_each_of_its_values(
 
 
 def test_fact_about_a_match_assigns_only_the_ground_terms_of_its_matches(two_towers):
-    state = State().with_facts(
+    """
+    A fact rooted at a match leaves the objects the match excludes unassigned.
+    """
+    state = State().add_facts(
         a(Block)(support=two_towers.table).from_(domain=two_towers.blocks).support
         == two_towers.c
     )
@@ -261,7 +288,10 @@ def test_fact_about_a_match_assigns_only_the_ground_terms_of_its_matches(two_tow
 
 
 def test_fact_with_an_expression_index_assigns_every_element_it_reaches(two_towers):
-    state = State().with_facts(
+    """
+    Each index value the expression takes names an element the fact assigns.
+    """
+    state = State().add_facts(
         literal(two_towers.shelf).slots[variable(int, [0, 1])] == two_towers.c
     )
 
@@ -272,17 +302,49 @@ def test_fact_with_an_expression_index_assigns_every_element_it_reaches(two_towe
     assert result == [two_towers.c, two_towers.c]
 
 
+# %% the ground term of a fact on literals
+
+
+def test_fact_on_literals_names_its_ground_term(two_towers):
+    """
+    A fact whose operands are literals stands for exactly one ground term.
+    """
+    fact = Fact.from_condition(condition=literal(two_towers.a).support == two_towers.c)
+
+    assert fact.ground_term == AttributeTerm(
+        instance=two_towers.a, attribute_name="support"
+    )
+
+
+def test_fact_about_a_variable_has_no_single_ground_term(two_towers):
+    """
+    A fact rooted at a variable stands for one ground term per binding.
+    """
+    fact = Fact.from_condition(
+        condition=variable(Block, [two_towers.a, two_towers.b]).support == two_towers.c
+    )
+
+    with pytest.raises(FactHasVariables):
+        fact.ground_term
+
+
 # %% conditions that are not facts
 
 
 def test_assigning_an_attribute_the_instance_lacks_is_rejected(two_towers):
+    """
+    A fact never adds an attribute to an instance.
+    """
     with pytest.raises(MissingGroundTerm):
-        State().with_facts(literal(two_towers.table).support == two_towers.a)
+        State().add_facts(literal(two_towers.table).support == two_towers.a)
 
 
 def test_assigning_an_element_the_container_lacks_is_rejected(two_towers):
+    """
+    A fact never adds a key to a container.
+    """
     with pytest.raises(MissingGroundTerm):
-        State().with_facts(literal(two_towers.shelf).slots[5] == two_towers.c)
+        State().add_facts(literal(two_towers.shelf).slots[5] == two_towers.c)
 
 
 @pytest.mark.parametrize(
@@ -295,8 +357,11 @@ def test_assigning_an_element_the_container_lacks_is_rejected(two_towers):
     ids=["property setter", "__setattr__", "__setitem__"],
 )
 def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term):
+    """
+    A state never runs the code a setter would, so it refuses the ground term.
+    """
     with pytest.raises(AssignmentBypassesSetter):
-        State().with_facts(ground_term() == True)
+        State().add_facts(ground_term() == True)
 
 
 @pytest.mark.parametrize(
@@ -312,36 +377,86 @@ def test_assigning_a_ground_term_whose_setting_runs_code_is_rejected(ground_term
     ids=["slot", "frozen dataclass", "read-only property", "immutable container"],
 )
 def test_assigning_a_ground_term_whose_setting_runs_no_code_is_accepted(ground_term):
+    """
+    Slotted and frozen fields store their value without running code of the class.
+    """
     expression = ground_term()
-    state = State().with_facts(expression == 5.0)
+    state = State().add_facts(expression == 5.0)
 
     assert expression.tolist(state=state) == [5.0]
 
 
 def test_a_comparison_other_than_equality_is_not_a_fact(two_towers):
+    """
+    An inequality constrains a value without fixing it.
+    """
     with pytest.raises(ComparisonIsNotAnEquality):
-        State().with_facts(tower_height(literal(two_towers.b)) > 3)
+        State().add_facts(tower_height(literal(two_towers.b)) > 3)
 
 
 def test_negating_a_fact_that_is_not_a_predicate_is_not_a_fact(two_towers):
+    """
+    Only a predicate can be stated not to hold.
+    """
     with pytest.raises(ConditionIsNotAFact):
-        State().with_facts(not_(literal(two_towers.b).support == two_towers.c))
+        State().add_facts(not_(literal(two_towers.b).support == two_towers.c))
 
 
-def test_a_fact_cannot_take_its_value_from_an_expression(two_towers):
-    with pytest.raises(FactValueIsNotConstant):
-        State().with_facts(
-            literal(two_towers.b).support == literal(two_towers.a).support
-        )
+def test_assigning_a_value_of_the_wrong_type_is_rejected(two_towers):
+    """
+    A support is a block or a table, never a string.
+    """
+    with pytest.raises(AssignedValueHasWrongType):
+        State().add_facts(literal(two_towers.b).support == "the floor")
+
+
+# %% facts whose value is an expression
+
+
+def test_fact_takes_its_value_from_an_expression(two_towers):
+    """
+    Block ``c`` is put on whatever ``b`` rests on.
+    """
+    state = State().add_facts(
+        literal(two_towers.c).support == literal(two_towers.b).support
+    )
+    assert literal(two_towers.c).support.tolist(state=state) == [two_towers.table]
+
+
+def test_fact_about_a_variable_takes_the_value_of_each_binding(two_towers):
+    """
+    Each block takes the name of its own support.
+    """
+    block = variable(Block, two_towers.blocks)
+    state = State().add_facts(block.name == block.support.name)
+    assert a(Block).from_(domain=two_towers.blocks).name.tolist(state=state) == [
+        "table",
+        "table",
+        "a",
+    ]
+
+
+def test_fact_reads_its_value_in_the_state_it_extends(two_towers):
+    """
+    Block ``a`` is put on what ``b`` rests on in the state, ``c``, not on the live
+    table.
+    """
+    state = two_towers.b_on_c.add_facts(
+        literal(two_towers.a).support == literal(two_towers.b).support
+    )
+    assert literal(two_towers.a).support.tolist(state=state) == [two_towers.c]
 
 
 # %% one ground term, written in several ways
 
 
 def test_call_names_one_ground_term_however_its_arguments_are_passed(two_towers):
+    """
+    Positional, keyword and defaulted arguments name one call.
+    """
     block = literal(two_towers.a)
-    by_name = State().with_facts(block.rests_on(support=two_towers.table) == False)
-    with_default = State().with_facts(
+    by_name = State().add_facts(block.rests_on(support=two_towers.table) == False)
+    with_default = State().add_facts(
         block.rests_on(support=two_towers.table, directly=True) == False
     )
 
@@ -349,17 +464,23 @@ def test_call_names_one_ground_term_however_its_arguments_are_passed(two_towers)
 
 
 def test_different_arguments_name_different_ground_terms(two_towers):
+    """
+    Assigning a call for one argument leaves the call for another live.
+    """
     block = literal(two_towers.a)
 
-    assert State().with_facts(
+    assert State().add_facts(
         block.rests_on(support=two_towers.table) == False
-    ) != State().with_facts(
+    ) != State().add_facts(
         block.rests_on(support=two_towers.table, directly=False) == False
     )
 
 
 def test_assignment_by_keyword_is_read_by_a_positional_call(two_towers):
-    state = State().with_facts(
+    """
+    A call assigned with keyword arguments is read by one written positionally.
+    """
+    state = State().add_facts(
         literal(two_towers.a).rests_on(support=two_towers.table) == False
     )
     result = (
@@ -372,13 +493,16 @@ def test_assignment_by_keyword_is_read_by_a_positional_call(two_towers):
 
 
 def test_ground_term_reached_through_another_object_is_the_same_ground_term(two_towers):
-    direct = State().with_facts(
+    """
+    An attribute reached through another object's attribute is the attribute itself.
+    """
+    direct = State().add_facts(
         literal(two_towers.a).rests_on(support=two_towers.table) == False
     )
-    through_literal = State().with_facts(
+    through_literal = State().add_facts(
         literal(two_towers).a.rests_on(support=two_towers.table) == False
     )
-    through_match = State().with_facts(
+    through_match = State().add_facts(
         the(TwoTowers).from_(domain=[two_towers]).a.rests_on(support=two_towers.table)
         == False
     )
@@ -396,7 +520,7 @@ def test_ground_terms_identify_unhashable_instances_by_identity(two_towers):
     """
     first = Block(name="d", support=two_towers.table)
     second = Block(name="d", support=two_towers.table)
-    state = State().with_facts(literal(first).support == two_towers.c)
+    state = State().add_facts(literal(first).support == two_towers.c)
 
     result = blocks_on([first, second], two_towers.table, state)
 
@@ -410,7 +534,7 @@ def test_ground_terms_identify_list_arguments_by_identity(two_towers):
     """
     first = [two_towers.b]
     second = [two_towers.b]
-    state = State().with_facts(tallest_tower(literal(first)) == 7)
+    state = State().add_facts(tallest_tower(literal(first)) == 7)
 
     heights = [
         tallest_tower(literal(tops)).tolist(state=state) for tops in (first, second)
@@ -420,11 +544,14 @@ def test_ground_terms_identify_list_arguments_by_identity(two_towers):
 
 
 def test_ground_terms_compare_hashable_arguments_by_value(two_towers):
+    """
+    Equal hashable arguments name the same call.
+    """
     key = 1
     equal_key = int("1")
     slots = literal(two_towers.shelf).slots
 
-    assert State().with_facts(slots[key] == two_towers.c) == State().with_facts(
+    assert State().add_facts(slots[key] == two_towers.c) == State().add_facts(
         slots[equal_key] == two_towers.c
     )
 
@@ -444,7 +571,7 @@ def test_equal_objects_never_share_their_ground_terms(ground_term_of):
     """
     first = PointComparedByValue(coordinate=1.0)
     second = PointComparedByValue(coordinate=1.0)
-    state = State().with_facts(ground_term_of(first) == 7.0)
+    state = State().add_facts(ground_term_of(first) == 7.0)
 
     assert ground_term_of(second).tolist(state=state) == [
         ground_term_of(second).tolist()[0]
@@ -452,9 +579,12 @@ def test_equal_objects_never_share_their_ground_terms(ground_term_of):
 
 
 def test_equal_containers_never_share_their_elements():
+    """
+    An element assigned in one container is not read from an equal one.
+    """
     first = ElementsInAnImmutableContainer(end_points=tuple([0.0, 1.0]))
     second = ElementsInAnImmutableContainer(end_points=tuple([0.0, 1.0]))
-    state = State().with_facts(literal(first).end_points[0] == 7.0)
+    state = State().add_facts(literal(first).end_points[0] == 7.0)
 
     assert literal(second).end_points[0].tolist(state=state) == [second.end_points[0]]
 
@@ -497,7 +627,10 @@ def test_python_body_reads_live_values_it_does_not_receive_as_arguments(two_towe
 
 
 def test_flattening_an_assigned_collection_ranges_over_its_new_elements(two_towers):
-    state = State().with_facts(literal(two_towers.shelf).slots == [two_towers.c])
+    """
+    A variable over an assigned collection ranges over its assigned elements.
+    """
+    state = State().add_facts(literal(two_towers.shelf).slots == [two_towers.c])
 
     result = flat_variable(a(Shelf).from_(domain=[two_towers.shelf]).slots).tolist(
         state=state
@@ -507,7 +640,10 @@ def test_flattening_an_assigned_collection_ranges_over_its_new_elements(two_towe
 
 
 def test_index_into_an_assigned_collection_reads_its_new_elements(two_towers):
-    state = State().with_facts(literal(two_towers.shelf).slots == [two_towers.c])
+    """
+    Indexing an assigned collection reads the assigned elements.
+    """
+    state = State().add_facts(literal(two_towers.shelf).slots == [two_towers.c])
 
     result = a(Shelf).from_(domain=[two_towers.shelf]).slots[0].tolist(state=state)
 
@@ -523,7 +659,7 @@ def test_assigned_predicate_overrides_what_it_derives(two_towers):
 
     ``c`` rests on ``a``, yet the state says it rests on the table.
     """
-    state = State().with_facts(
+    state = State().add_facts(
         IsOn(block=literal(two_towers.c), support=literal(two_towers.table))
     )
     result = (
@@ -536,6 +672,9 @@ def test_assigned_predicate_overrides_what_it_derives(two_towers):
 
 
 def test_assigned_call_is_never_computed(two_towers):
+    """
+    The body of an assigned call never runs.
+    """
     computed_for = []
 
     @symbolic_function
@@ -543,7 +682,7 @@ def test_assigned_call_is_never_computed(two_towers):
         computed_for.append(block)
         return tower_height(block)
 
-    state = State().with_facts(height_counting_calls(literal(two_towers.b)) == 5)
+    state = State().add_facts(height_counting_calls(literal(two_towers.b)) == 5)
     (block := a(Block).from_(domain=two_towers.blocks)).where(
         height_counting_calls(block) > 0
     ).tolist(state=state)
@@ -609,7 +748,10 @@ def test_query_started_during_another_evaluation_reads_state(two_towers):
 
 
 def test_generative_backend_reads_state(two_towers):
-    state = State().with_facts(literal(two_towers.c).support == two_towers.table)
+    """
+    The generative backend evaluates queries under a state as the default backend does.
+    """
+    state = State().add_facts(literal(two_towers.c).support == two_towers.table)
     generated = a(Block)(name=variable_from(["d", "e"]), support=two_towers.table)
     generated.where(literal(two_towers.c).support == two_towers.table)
 
@@ -640,26 +782,35 @@ def test_backend_that_cannot_read_a_state_refuses_one(
 # %% building states
 
 
-def test_with_facts_leaves_the_original_state_unchanged(two_towers):
+def test_add_facts_leaves_the_original_state_unchanged(two_towers):
+    """
+    Adding facts returns a new state.
+    """
     state = State()
 
-    state.with_facts(literal(two_towers.b).support == two_towers.c)
+    state.add_facts(literal(two_towers.b).support == two_towers.c)
 
     assert state.assignments == {}
 
 
 def test_later_fact_replaces_an_earlier_one(two_towers):
-    state = two_towers.b_on_c.with_facts(literal(two_towers.b).support == two_towers.a)
+    """
+    Of two facts on one ground term, the later one holds.
+    """
+    state = two_towers.b_on_c.add_facts(literal(two_towers.b).support == two_towers.a)
 
-    assert state == State().with_facts(literal(two_towers.b).support == two_towers.a)
+    assert state == State().add_facts(literal(two_towers.b).support == two_towers.a)
 
 
 def test_later_fact_replaces_one_written_another_way(two_towers):
+    """
+    A later fact replaces an earlier one on the same ground term written differently.
+    """
     block = literal(two_towers.a)
     state = (
         State()
-        .with_facts(block.rests_on(support=two_towers.table) == False)
-        .with_facts(block.rests_on(support=two_towers.table, directly=True) == True)
+        .add_facts(block.rests_on(support=two_towers.table) == False)
+        .add_facts(block.rests_on(support=two_towers.table, directly=True) == True)
     )
 
     assert list(state.assignments.values()) == [True]
@@ -669,13 +820,19 @@ def test_later_fact_replaces_one_written_another_way(two_towers):
 
 
 def test_states_with_the_same_facts_are_equal_and_hash_alike(two_towers):
+    """
+    States are compared by what they assign.
+    """
     first = two_towers.b_on_c
-    second = State().with_facts(literal(two_towers.b).support == two_towers.c)
+    second = State().add_facts(literal(two_towers.b).support == two_towers.c)
 
     assert (first, hash(first)) == (second, hash(second))
 
 
 def test_states_with_different_facts_differ(two_towers):
-    assert two_towers.b_on_c != State().with_facts(
+    """
+    States that assign different values are different.
+    """
+    assert two_towers.b_on_c != State().add_facts(
         literal(two_towers.b).support == two_towers.a
     )

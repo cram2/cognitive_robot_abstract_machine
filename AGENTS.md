@@ -62,6 +62,7 @@
 - Keep every statement in a method on the same level of abstraction: a method either strings together named steps or carries out one step's detail, never both
 - Never write a method that only forwards to or renames another call. A one-line method is allowed only when it implements an abstract method or a `classproperty`, caches its result, or removes duplication - and in the last case, first try to abstract the duplicated code itself
 - A method with a single caller must earn its place under these rules; otherwise inline it
+- Never make a caller, a test included, reach a value through a chain of steps - reading another object's internals, then feeding them back into it to rebuild what it already knows. Give the class that owns the value one direct accessor for it, and where the steps cannot be shortened, take them there once
 - Reduce nesting and complexity with guard clauses: handle alternative outputs first by inverting conditions and returning early, so the main branch holds the main output and the biggest compute. A single level of abstraction never justifies deep nesting; split the method instead
 - Never put an `else` after a branch that returns or raises, nest an `if` whose condition could join its parent's, or nest blocks more than five deep (checked by `krrood check`)
 
@@ -212,9 +213,9 @@
 
 # Krrood isolation
 <!-- from KrroodIsolationRules in agent_rules.py -->
-- `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events` and `probabilistic_model`, which `krrood`'s source already depends on
+- `krrood`, including its tests under `test/krrood_test`, never imports another workspace package - in particular not `coraplex`, `semantic_digital_twin`, `giskardpy`, `physics_simulators`, `robokudo` or `experiments`. The only exceptions are `random_events`, `probabilistic_model` and `krrood_compute_resources`, which `krrood`'s source already depends on
 - When a `krrood` test needs behaviour another package triggers, mimic the relevant classes and patterns in `test/krrood_test/dataset` and test against the mimics. Keep the test in `krrood` and do not depend on another package to reproduce the scenario
-- Those mimic classes import only `krrood`, `random_events` and `probabilistic_model`
+- Those mimic classes import only `krrood`, `random_events`, `probabilistic_model` and `krrood_compute_resources`
 
 # Pull request labels
 <!-- from PullRequestLabelsRules in agent_rules.py -->

@@ -15,7 +15,6 @@ from rclpy.task import Future
 
 from cramph.data_types import ObservationStateValue
 from cramph.node import StatechartNode
-from krrood.patterns.called_positionally import called_positionally
 from giskardpy.motion_statechart.tasks.gripper import (
     MoveFingers,
     MovesGripperToConfiguration,
@@ -87,8 +86,8 @@ class RobotiqGripperActionServerTask(
         cls,
         *,
         configuration: GripperConfiguration,
-        stall_minimum_time: float | None = None,
-        tolerate_stall: bool = False,
+        finger_stall_minimum_time: float | None = None,
+        tolerate_finger_stall: bool = False,
     ) -> StatechartNode:
         """
         Differs from :meth:`MovesGripperToConfiguration.create_gripper_goal` in driving
@@ -107,8 +106,8 @@ class RobotiqGripperActionServerTask(
         if not isinstance(end_effector, HasParallelGripperCommandServer):
             return MoveFingers.create_gripper_goal(
                 configuration=configuration,
-                stall_minimum_time=stall_minimum_time,
-                tolerate_stall=tolerate_stall,
+                finger_stall_minimum_time=finger_stall_minimum_time,
+                tolerate_finger_stall=tolerate_finger_stall,
             )
         return cls(
             action_topic=end_effector.action_topic_serving(
@@ -124,30 +123,26 @@ class RobotiqGripperActionServerTask(
         self._action_goal.command.position = [float(self.target_position)]
         self._action_goal.command.velocity = [float(self.target_velocity)]
         self._action_goal.command.effort = [float(self.target_effort)]
+
+    def send_goal(self) -> None:
+        """
+        Differs from :meth:`ActionServerTask.send_goal` in forgetting whether the server
+        accepted and answered the goal sent before.
+        """
         self._goal_accepted = False
         self._done = False
+        super().send_goal()
 
-    @called_positionally
-    def goal_response_callback(self, future: Future) -> None:
+    def record_goal_response(self, *, accepted: bool) -> None:
         """
-        Differs from :meth:`ActionServerTask.goal_response_callback` in recording
-        whether the server accepted the goal.
+        Differs from :meth:`ActionServerTask.record_goal_response` in keeping whether
+        the server accepted the goal, and counting a rejected goal as answered.
         """
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            logger.error("Gripper goal rejected by action server")
-            self._goal_accepted = False
-            self._done = True
-            return
+        super().record_goal_response(accepted=accepted)
+        self._goal_accepted = accepted
+        self._done = not accepted
 
-        self._goal_accepted = True
-        logger.info("Gripper goal accepted, waiting for result...")
-
-        result_future = goal_handle.get_result_async()
-        result_future.add_done_callback(self.result_callback)
-
-    @called_positionally
-    def result_callback(self, future: Future) -> None:
+    def result_callback(self, *, future: Future) -> None:
         """
         Differs from :meth:`ActionServerTask.result_callback` in marking the goal as
         answered.

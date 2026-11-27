@@ -1,12 +1,18 @@
+"""
+Tests for :class:`~krrood.class_diagrams.wrapped_field.WrappedField`: what a field's
+annotation declares, and which values and elements it admits.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, Field
+import numbers
 
 import pytest
 from types import NoneType
 
 from sortedcontainers import SortedSet
-from typing_extensions import List, Type, TypeVar
+from typing_extensions import Any, List, Type, TypeVar
 
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import common_base_class
@@ -292,3 +298,106 @@ def test_holds_collection(field_name: str, holds_collection: bool):
         field=get_field_by_name(FieldsOfEveryValueShape, field_name),
     )
     assert wrapped_field.holds_collection is holds_collection
+
+
+# %% WrappedField.accepts_value and WrappedField.accepts_element
+
+
+@dataclass(kw_only=True)
+class FieldsOfNumbersAndCollections:
+    """
+    Fields typed as numbers, by builtin class and by numeric abstract base class, and as
+    collections of values.
+    """
+
+    real: numbers.Real
+    """
+    Any real number.
+    """
+
+    integral: numbers.Integral
+    """
+    Any integral number.
+    """
+
+    ratio: float
+    """
+    A floating point number.
+    """
+
+    count: int
+    """
+    An integer.
+    """
+
+    labels: list[str]
+    """
+    A collection of strings.
+    """
+
+    optional_labels: list[str] | None
+    """
+    A collection of strings that may be missing.
+    """
+
+    anything: Any
+    """
+    A value of a type no instance check decides.
+    """
+
+
+def wrapped_field_of_numbers_and_collections(*, field_name: str) -> WrappedField:
+    """
+    :param field_name: The name of a field of :class:`FieldsOfNumbersAndCollections`.
+    :return: The wrapped field of that name.
+    """
+    return WrappedField(
+        clazz=WrappedClass(clazz=FieldsOfNumbersAndCollections),
+        field=get_field_by_name(FieldsOfNumbersAndCollections, field_name),
+    )
+
+
+@pytest.mark.parametrize(
+    "field_name, value, accepted",
+    [
+        ("real", 1, True),
+        ("real", 1.5, True),
+        ("real", "1.5", False),
+        ("integral", 1, True),
+        ("integral", 1.5, False),
+        ("ratio", 1, True),
+        ("count", 1.5, False),
+        ("anything", "1.5", True),
+    ],
+)
+def test_field_accepts_values_of_its_declared_type(
+    field_name: str, value: Any, accepted: bool
+):
+    """
+    A numeric abstract base class and its builtin class admit the same numbers; a field
+    of a type no instance check decides admits every value.
+    """
+    wrapped_field = wrapped_field_of_numbers_and_collections(field_name=field_name)
+    assert wrapped_field.accepts_value(value=value) is accepted
+
+
+@pytest.mark.parametrize(
+    "field_name, element, accepted",
+    [
+        ("labels", "a", True),
+        ("labels", 1, False),
+        ("optional_labels", "a", True),
+        ("optional_labels", 1, False),
+        ("real", 1.0, False),
+        ("anything", 1, True),
+    ],
+)
+def test_field_accepts_elements_of_the_collection_it_declares(
+    field_name: str, element: Any, accepted: bool
+):
+    """
+    Only a collection admits an element, and only one of its declared element type; a
+    field of a type no instance check decides admits every element.
+    """
+    wrapped_field = wrapped_field_of_numbers_and_collections(field_name=field_name)
+    assert wrapped_field.accepts_element(element=element) is accepted

@@ -1,17 +1,26 @@
+"""
+Monitors of the positions of joints.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 import krrood.symbolic_math.symbolic_math as sm
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
 )
 from cramph.node import EndedByOwner
 from giskardpy.motion_statechart.graph_node import MotionStatechartNode
+from giskardpy.motion_statechart.mixins import HasThresholdParameter
 from cramph.node import NodeArtifacts
+
+# %% joint monitors
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class JointPositionReached(EndedByOwner, MotionStatechartNode):
+class JointPositionReached(EndedByOwner, MotionStatechartNode, HasThresholdParameter):
     """
     Monitors if a joint position is reached within a certain threshold.
     """
@@ -26,17 +35,17 @@ class JointPositionReached(EndedByOwner, MotionStatechartNode):
     Target position to monitor.
     """
 
-    threshold: float = 0.01
-    """
-    Threshold for position error.
-    """
-
     def build_artifacts(self) -> NodeArtifacts:
+        """
+        :return: The observation that the connection is within the threshold of the
+            target position, measured along the shortest angle for a revolute connection
+            without position limits.
+        """
         current = self.connection.dof.variables.position
         if (
-            isinstance(self.connection, RevoluteConnection)
-            and not self.connection.dof.has_position_limits()
-        ):
+            isinstance(self.connection, ScrewAxisConnection)
+            and self.connection.behaves_like_a_revolute_connection
+        ) and not self.connection.dof.has_position_limits():
             error = sm.shortest_angular_distance(current, self.position)
         else:
             error = self.position - current

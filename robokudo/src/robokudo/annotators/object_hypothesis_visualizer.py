@@ -6,6 +6,7 @@ This module provides an annotator for visualizing object hypotheses in both
 
 from __future__ import annotations
 
+import logging
 import copy
 from pathlib import Path
 from timeit import default_timer
@@ -41,6 +42,8 @@ from robokudo.utils.type_conversion import (
 if TYPE_CHECKING:
     import numpy as np
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ObjectHypothesisVisualizer(BaseAnnotator):
@@ -80,14 +83,14 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
         self._mesh_cache: dict[tuple[object, ...], o3d.geometry.TriangleMesh] = {}
 
-    def _iter_mesh_visuals(self, body: Body) -> list[Mesh]:
+    def _iter_mesh_visuals(self, *, body: Body) -> list[Mesh]:
         """Return mesh-based visual shapes for a body."""
         return [shape for shape in body.visual if isinstance(shape, Mesh)]
 
-    def _mesh_cache_key(self, shape: Mesh) -> tuple[object, ...]:
+    def _mesh_cache_key(self, *, shape: Mesh) -> tuple[object, ...]:
         """Create a stable cache key for mesh conversion results."""
         filename = shape.filename
         if filename:
@@ -98,10 +101,10 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
             return ("filemesh", filename)
         return ("mesh", id(shape.mesh))
 
-    def _mesh_shape_to_o3d(self, shape: Mesh) -> o3d.geometry.TriangleMesh:
+    def _mesh_shape_to_o3d(self, *, shape: Mesh) -> o3d.geometry.TriangleMesh:
         """Convert a mesh shape to Open3D, cache the result, and apply its local origin."""
         tm: trimesh.Trimesh = shape.mesh
-        cache_key = self._mesh_cache_key(shape)
+        cache_key = self._mesh_cache_key(shape=shape)
         if cache_key not in self._mesh_cache:
             self._mesh_cache[cache_key] = trimesh_to_o3d_mesh(tm)
         mesh_instance = copy.deepcopy(self._mesh_cache[cache_key])
@@ -110,6 +113,7 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
 
     def draw_text_middle(
         self,
+        *,
         image: npt.NDArray[np.uint8],
         text: str,
         color: tuple[int, int, int] = (0, 0, 255),
@@ -150,17 +154,19 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
         """
         start_timer = default_timer()
 
-        visualization_img = self.get_cas().get_copy(CASViews.COLOR_IMAGE)
+        visualization_img = self.get_cas().get_copy(view_name=CASViews.COLOR_IMAGE)
         visualized_geometries = []
 
         if self.descriptor.parameters.query_aware:
             query = None  # type: Query.Goal | None
-            if self.get_cas().contains(CASViews.QUERY):
-                query = self.get_cas().get(CASViews.QUERY)
+            if self.get_cas().contains(view_name=CASViews.QUERY):
+                query = self.get_cas().get(view_name=CASViews.QUERY)
 
-        object_hypotheses = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+        object_hypotheses = self.get_cas().filter_annotations_by_type(
+            type_to_include=ObjectHypothesis
+        )
         if len(object_hypotheses) == 0:
-            self.draw_text_middle(visualization_img, "No Object Hypotheses")
+            self.draw_text_middle(image=visualization_img, text="No Object Hypotheses")
         else:
 
             def get_box_text(oh):
@@ -186,8 +192,8 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
                 matching_object_hypotheses = []
                 for oh in object_hypotheses:
                     classifications = self.get_cas().filter_by_type_and_criteria(
-                        Classification,
-                        oh.annotations,
+                        type_to_include=Classification,
+                        input_list=oh.annotations,
                         criteria={"classname": ("==", f"{query.obj.type}")},
                     )
 
@@ -230,8 +236,8 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
 
                 body = object_hypothesis.object_knowledge
                 if body is not None:
-                    for mesh_shape in self._iter_mesh_visuals(body):
-                        mesh_instance = self._mesh_shape_to_o3d(mesh_shape)
+                    for mesh_shape in self._iter_mesh_visuals(body=body):
+                        mesh_instance = self._mesh_shape_to_o3d(shape=mesh_shape)
                         mesh_instance.transform(transform)
                         visualized_geometries.append(mesh_instance)
                         draw_mesh_wireframe_on_image(
@@ -239,10 +245,12 @@ class ObjectHypothesisVisualizer(BaseAnnotator):
                         )
 
         if self.descriptor.parameters.visualize_full_cloud:
-            visualized_geometries.append(self.get_cas().get(CASViews.CLOUD))
+            visualized_geometries.append(self.get_cas().get(view_name=CASViews.CLOUD))
 
-        self.get_annotator_output_struct().set_image(visualization_img)
-        self.get_annotator_output_struct().set_geometries(visualized_geometries)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
+        self.get_annotator_output_struct().set_geometries(
+            geometries=visualized_geometries
+        )
 
         end_timer = default_timer()
         self.feedback_message = f"Processing took {(end_timer - start_timer):.4f}s"

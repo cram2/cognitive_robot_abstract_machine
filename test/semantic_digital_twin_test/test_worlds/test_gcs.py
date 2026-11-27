@@ -90,9 +90,9 @@ def graph_of_convex_sets_unit_box() -> VolumetricGraphOfBoundingBoxesFixture:
 
     obstacle = VolumetricBoundingBox(0, 0, 0, 1, 1, 1, world.root.global_pose)
 
-    z_lim = SimpleInterval.from_data(0.45, 0.55)
-    x_lim = SimpleInterval.from_data(-2, 3)
-    y_lim = SimpleInterval.from_data(-2, 3)
+    z_lim = SimpleInterval.from_data(lower=0.45, upper=0.55)
+    x_lim = SimpleInterval.from_data(lower=-2, upper=3)
+    y_lim = SimpleInterval.from_data(lower=-2, upper=3)
     limiting_event = SimpleEvent.from_data(
         {
             SpatialVariables.x.value: x_lim,
@@ -721,6 +721,30 @@ def test_planar_free_space_computes_a_missing_supporting_surface():
     assert search_box.min_y == pytest.approx(surface_box.min_y)
     assert search_box.max_y == pytest.approx(surface_box.max_y)
     assert len(graph.graph.nodes()) > 0
+
+
+def test_planar_free_space_lays_its_path_on_the_surface_top():
+    """
+    The free space starts at the top of the surface, so the path laid out through it
+    lies on that top rather than inside the slab the surface belongs to.
+    """
+    floor = _floor_with_an_obstacle_standing_on_it()
+    world = floor._world
+    floor_top = (
+        floor.root.collision.as_bounding_box_collection_in_frame(world.root)
+        .bounding_box()
+        .max_z
+    )
+
+    graph = floor.planar_free_space(max_height=2.0)
+    path = graph.path_from_to(
+        Point2(-1.5, 0.0, reference_frame=world.root),
+        Point2(1.5, 0.0, reference_frame=world.root),
+    )
+
+    for waypoint in path:
+        world_P_waypoint = world.transform(waypoint.to_point3(), world.root)
+        assert float(world_P_waypoint.z) == pytest.approx(float(floor_top))
 
 
 def test_planar_free_space_rejects_an_annotation_without_any_surface():

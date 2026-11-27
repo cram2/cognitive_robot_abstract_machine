@@ -1,3 +1,9 @@
+"""
+Analysis engine detecting objects with YOLO in camera data replayed from MongoDB.
+"""
+
+from __future__ import annotations
+
 from robokudo.analysis_engine import AnalysisEngineInterface
 from robokudo.annotators.cluster_color import ClusterColorAnnotator
 from robokudo.annotators.collection_reader import CollectionReaderAnnotator
@@ -8,6 +14,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -29,7 +36,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         yolo_descriptor = YoloAnnotator.Descriptor()
         yolo_descriptor.parameters.pretrained_model = "yolov8m.pt"
@@ -44,6 +53,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 YoloAnnotator(descriptor=yolo_descriptor),
                 ClusterColorAnnotator(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

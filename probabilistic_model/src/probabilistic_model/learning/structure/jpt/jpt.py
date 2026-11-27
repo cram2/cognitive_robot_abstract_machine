@@ -1,0 +1,643 @@
+"""
+Joint probability trees, learned by splitting the data where the variables become most
+independent.
+"""
+
+from __future__ import annotations
+
+import math
+from collections import deque
+from dataclasses import dataclass, field
+from typing_extensions import Self, Iterable, Any
+
+import numpy as np
+import pandas as pd
+from jpt.learning.impurity import Impurity
+
+from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from random_events.interval import closed, Bound, SimpleInterval
+from random_events.product_algebra import VariableMap
+from random_events.variable import Variable, Continuous, Integer, Symbolic
+
+from probabilistic_model.learning.structure.jpt.variables import (
+    AnnotatedVariable,
+    infer_variables_from_dataframe,
+)
+from probabilistic_model.learning.learning_method import LearningMethod
+from probabilistic_model.learning.structure.nyga_induction import NygaInduction
+from probabilistic_model.distributions.distributions import (
+    DiracDeltaDistribution,
+    SymbolicDistribution,
+    IntegerDistribution,
+)
+from probabilistic_model.distributions.uniform import UniformDistribution
+from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
+    SumUnit,
+    ProductUnit,
+    ProbabilisticCircuit,
+    UnivariateDiscreteLeaf,
+    UnivariateContinuousLeaf,
+)
+from probabilistic_model.utils import MissingDict
+
+
+@dataclass
+class JointProbabilityTree(LearningMethod, SubclassJSONSerializer):
+    """
+    Class that implements the JPT learning algorithm for probabilistic circuits.
+    """
+
+    annotated_variables: tuple[AnnotatedVariable, ...] = field(default_factory=tuple)
+    """
+    The variables from initialization, sorted.
+
+    Since variables will be overwritten as soon as the model is learned, we need to
+    store the variables from initialization here.
+
+    Left empty when the variables are only known at :meth:`fit` time.
+    """
+
+    targets: Iterable[Variable] | None = field(default=None)
+    """
+    The variables to optimize for.
+    """
+
+    features: Iterable[Variable] | None = field(default=None)
+    """
+    The variables that are used to craft criteria.
+    """
+
+    minimum_samples_per_leaf: int | float = field(default=1)
+    """
+    The minimum number of samples to create another sum node.
+
+    If this is smaller than one, it will be reinterpreted as fraction w. r. t. the
+    number of samples total.
+    """
+
+    minimum_impurity_improvement: float = field(default=0.0)
+    """
+    The minimum impurity improvement to create another sum node.
+    """
+
+    maximum_leaves: int | float = field(default=float("inf"))
+    """
+    The maximum number of leaves.
+    """
+
+    maximum_depth: int | float = field(default=float("inf"))
+    """
+    The maximum depth of the tree.
+    """
+
+    dependencies: VariableMap | None = field(default=None)
+    """
+    The dependencies between the variables.
+    """
+
+    probabilistic_circuit: ProbabilisticCircuit = field(init=False)
+    """
+    The probabilistic circuit the result will appear in.
+    """
+
+    total_samples: int = field(default=1)
+    """
+    The total amount of samples that were used to fit the model.
+    """
+
+    indices: np.ndarray | None = field(default=None)
+    """
+    The indices of the samples that were used to fit the model.
+    """
+
+    impurity: Impurity | None = field(default=None)
+    """
+    The impurity object that is used to calculate the best split.
+    """
+
+    c45queue: deque = field(default_factory=deque)
+    """
+    The queue used to store the data to be processed by the C4.5 algorithm.
+    """
+
+    keep_sample_indices: bool = field(default=False)
+    """
+    Rather to store the sample indices in the leaves or not.
+    """
+
+    root: SumUnit | None = field(default=None)
+    """
+    The root of the circuit that will be learned.
+    """
+
+    def __post_init__(self):
+        self.annotated_variables = tuple(sorted(self.annotated_variables))
+        self.set_targets_and_features(self.targets, self.features)
+
+        if self.dependencies is None:
+            self.dependencies = VariableMap(
+                {var: list(self.targets) for var in self.features}
+            )
+
+        self.probabilistic_circuit = ProbabilisticCircuit()
+
+    @property
+    def variables(self) -> tuple[Variable, ...]:
+        return tuple(
+            annotated_variable.variable
+            for annotated_variable in self.annotated_variables
+        )
+
+    def set_targets_and_features(
+        self,
+        targets: Iterable[Variable] | None,
+        features: Iterable[Variable] | None,
+    ) -> None:
+        """
+        Set the targets and features of the model.
+
+        If only one of them is provided, the other is set as the complement of the
+        provided one. If none are provided, both of them are set as the variables of the
+        model. If both are provided, they are taken as given.
+
+        :param targets: The targets of the model.
+        :param features: The features of the model.
+        :return: None
+        """
+        # if targets are not specified
+        if targets is None:
+            # and features are not specified
+            if features is None:
+                self.targets = self.variables
+                self.features = self.variables
+            # and features are specified
+            else:
+                self.targets = tuple(sorted(set(self.variables) - set(features)))
+                self.features = tuple(sorted(features))
+        # if targets are specified
+        else:
+            # and features are not specified
+            if features is None:
+                self.targets = tuple(sorted(set(targets)))
+                self.features = tuple(sorted(set(self.variables) - set(targets)))
+
+            # and features are specified
+            else:
+                self.targets = tuple(sorted(set(targets)))
+                self.features = tuple(sorted(set(features)))
+
+    @property
+    def minimum_samples_leaf(self):
+        """
+        The minimum number of samples to create another sum node.
+        """
+        if self.minimum_samples_per_leaf < 1.0:
+            return math.ceil(self.minimum_samples_per_leaf * self.total_samples)
+        else:
+            return self.minimum_samples_per_leaf
+
+    @property
+    def numeric_variables(self):
+        return [
+            variable
+            for variable in self.variables
+            if isinstance(variable, (Continuous, Integer))
+        ]
+
+    @property
+    def numeric_targets(self):
+        return [
+            variable
+            for variable in self.targets
+            if isinstance(variable, (Continuous, Integer))
+        ]
+
+    @property
+    def numeric_features(self):
+        return [
+            variable
+            for variable in self.features
+            if isinstance(variable, (Continuous, Integer))
+        ]
+
+    @property
+    def symbolic_variables(self):
+        return [
+            variable for variable in self.variables if isinstance(variable, Symbolic)
+        ]
+
+    @property
+    def symbolic_targets(self):
+        return [variable for variable in self.targets if isinstance(variable, Symbolic)]
+
+    @property
+    def symbolic_features(self):
+        return [
+            variable for variable in self.features if isinstance(variable, Symbolic)
+        ]
+
+    def preprocess_data(self, data: pd.DataFrame) -> np.ndarray:
+        """
+        Preprocess the data to be used in the model.
+
+        :param data: The data to preprocess.
+        :return: The preprocessed data.
+        """
+        result = np.zeros(data.shape)
+
+        for variable_index, variable in enumerate(self.variables):
+            column = data[variable.name]
+            if isinstance(variable, Symbolic):
+                all_elements = {
+                    element: index
+                    for index, element in enumerate(variable.domain.all_elements)
+                }
+                column = column.apply(lambda x: all_elements[x])
+            result[:, variable_index] = column
+
+        return result
+
+    def fit(
+        self,
+        data: pd.DataFrame,
+        variables: Iterable[AnnotatedVariable] | None = None,
+    ) -> ProbabilisticCircuit:
+        """
+        Fit the model to the data, into a circuit of its own.
+
+        :param data: The data to fit the model to.
+        :param variables: The annotated variables to fit over, replacing the ones given
+            at initialization, with all of them as targets and features. ``None`` keeps
+            the initialized ones, or infers them from the data if none were given at
+            initialization either.
+        :return: The fitted model.
+        """
+        if variables is None and not self.annotated_variables:
+            variables = infer_variables_from_dataframe(data)
+        if variables is not None:
+            self.annotated_variables = tuple(sorted(variables))
+            self.set_targets_and_features(None, None)
+            self.dependencies = VariableMap(
+                {var: list(self.targets) for var in self.features}
+            )
+        self.probabilistic_circuit = ProbabilisticCircuit()
+        self.root = SumUnit(probabilistic_circuit=self.probabilistic_circuit)
+        preprocessed_data = self.preprocess_data(data)
+
+        self.total_samples = len(preprocessed_data)
+
+        self.indices = np.ascontiguousarray(
+            np.arange(preprocessed_data.shape[0], dtype=np.int64)
+        )
+        self.impurity = self.construct_impurity()
+        self.impurity.setup(preprocessed_data, self.indices)
+
+        self.c45queue.append((preprocessed_data, 0, len(preprocessed_data), 0))
+
+        while self.c45queue:
+            self.c45(*self.c45queue.popleft())
+
+        return self.probabilistic_circuit
+
+    def c45(self, data: np.ndarray, start: int, end: int, depth: int):
+        """
+        Construct a DecisionNode or DecomposableProductNode from the data.
+
+        :param data: The data to calculate the impurity from.
+        :param start: Starting index in the data.
+        :param end: Ending index in the data.
+        :param depth: The current depth of the induction
+        :return: The constructed decision tree node
+        """
+        number_of_samples = end - start
+        # if the inducing in this step results in inadmissible nodes, skip the impurity calculation
+        if (
+            depth >= self.maximum_depth
+            or number_of_samples < 2 * self.minimum_samples_leaf
+        ):
+            maximum_gain = -float("inf")
+        else:
+            maximum_gain = self.impurity.compute_best_split(start, end)
+
+        # if the max gain is insufficient
+        if maximum_gain <= self.minimum_impurity_improvement:
+            # create decomposable product node
+            other_rows = np.concatenate([self.indices[:start], self.indices[end:]])
+            leaf_node = self.create_leaf_node(
+                data[self.indices[start:end]], data[other_rows]
+            )
+            weight = number_of_samples / len(data)
+            self.root.add_subcircuit(leaf_node, np.log(weight))
+
+            if self.keep_sample_indices:
+                leaf_node.sample_indices = self.indices[start:end]
+
+            # terminate the induction
+            return
+
+        # if the max gain is sufficient
+        split_pos = self.impurity.best_split_pos
+
+        # increase the depth
+        new_depth = depth + 1
+
+        # append the new induction steps
+        self.c45queue.append((data, start, start + split_pos + 1, new_depth))
+        self.c45queue.append((data, start + split_pos + 1, end, new_depth))
+
+    @staticmethod
+    def leaf_support(
+        own_values: np.ndarray, other_values: np.ndarray, tolerance_at_extremes: float
+    ) -> SimpleInterval:
+        """
+        The largest span around the range of `own_values` that stays clear of
+        `other_values`, widened by at most `tolerance_at_extremes` on each side.
+
+        Passed as the `support` of the :class:`NygaInduction` fit for a leaf, so that
+        widening that leaf's support for a variable to account for float
+        instabilities cannot cross into a sibling leaf's raw data for the same
+        variable - which would break the determinism of the tree the leaves are
+        mounted into. Considering only the nearest point on each side, rather than
+        every point in `other_values`, is sufficient because the widening cannot
+        reach further than `tolerance_at_extremes` in the first place.
+
+        :param own_values: The values of one continuous variable, for the rows of the
+            leaf under construction.
+        :param other_values: The values of that variable, for every row outside that
+            leaf.
+        :param tolerance_at_extremes: The widening to apply where `other_values`
+            leaves enough room for it.
+        :return: The allowed support.
+        """
+        own_lower, own_upper = own_values.min(), own_values.max()
+
+        lower, left = own_lower - tolerance_at_extremes, Bound.CLOSED
+        below = other_values[other_values < own_lower]
+        if len(below) > 0 and below.max() > lower:
+            lower, left = float(below.max()), Bound.OPEN
+
+        upper, right = own_upper + tolerance_at_extremes, Bound.CLOSED
+        above = other_values[other_values > own_upper]
+        if len(above) > 0 and above.min() < upper:
+            upper, right = float(above.min()), Bound.OPEN
+
+        return SimpleInterval.from_data(
+            lower=lower, upper=upper, left=left, right=right
+        )
+
+    def create_leaf_node(
+        self, data: np.ndarray, other_data: np.ndarray | None = None
+    ) -> ProductUnit:
+        """
+        Create a fully decomposable product node from a 2D data array.
+
+        :param data: The preprocessed data to use for training.
+        :param other_data: The preprocessed data of every row that does not belong to
+            this leaf, used to keep continuous variables' fitted supports from
+            overlapping a sibling leaf's data. If not given, no such reservation is
+            made.
+        :return: The leaf node.
+        """
+        result = ProductUnit(probabilistic_circuit=self.probabilistic_circuit)
+        result.total_samples = len(data)
+
+        for index, annotated_variable in enumerate(self.annotated_variables):
+            if isinstance(annotated_variable.variable, Continuous):
+                distribution = NygaInduction(
+                    annotated_variable.variable,
+                    split_penalty_factor=annotated_variable.split_penalty_factor,
+                    minimum_samples_per_quantile=annotated_variable.minimum_samples_per_quantile,
+                )
+                if other_data is not None:
+                    distribution.support = self.leaf_support(
+                        data[:, index],
+                        other_data[:, index],
+                        distribution.tolerance_at_extremes,
+                    )
+                distribution = distribution.fit(data=data[:, index])
+
+                if isinstance(
+                    distribution.root, UnivariateContinuousLeaf
+                ) and isinstance(
+                    distribution.root.distribution, DiracDeltaDistribution
+                ):
+                    distribution.root.distribution.density_cap = (
+                        1 / annotated_variable.minimal_distance
+                    )
+                    distribution.root.distribution.tolerance = 1e-4
+                nyga_root = distribution.root
+                new_nodes = self.probabilistic_circuit.mount(nyga_root)
+                result.add_subcircuit(new_nodes[nyga_root.index])
+
+            elif isinstance(annotated_variable.variable, Symbolic):
+                distribution = SymbolicDistribution(
+                    variable=annotated_variable.variable,
+                    probabilities=MissingDict(float),
+                )
+                distribution.fit_from_indices(data[:, index].astype(int))
+                distribution = UnivariateDiscreteLeaf(
+                    distribution, probabilistic_circuit=self.probabilistic_circuit
+                )
+                result.add_subcircuit(distribution)
+
+            elif isinstance(annotated_variable.variable, Integer):
+                distribution = IntegerDistribution(
+                    variable=annotated_variable.variable,
+                    probabilities=MissingDict(float),
+                )
+                distribution.fit(data=data[:, index])
+                distribution = UnivariateDiscreteLeaf(
+                    distribution, probabilistic_circuit=self.probabilistic_circuit
+                )
+                result.add_subcircuit(distribution)
+
+            else:
+                raise ValueError(f"Variable {annotated_variable} is not supported.")
+
+        return result
+
+    def construct_impurity(self) -> Impurity:
+        """
+        Construct the impurity object to be used in the model.
+
+        An impurity object is used to calculate the best split.
+        """
+        minimum_samples_leaf = self.minimum_samples_leaf
+
+        numeric_vars = np.array(
+            [
+                index
+                for index, variable in enumerate(self.variables)
+                if variable in self.numeric_targets
+            ],
+            dtype=np.int64,
+        )
+        symbolic_vars = np.array(
+            [
+                index
+                for index, variable in enumerate(self.variables)
+                if variable in self.symbolic_targets
+            ],
+            dtype=np.int64,
+        )
+
+        invert_impurity = np.array([0] * len(self.symbolic_targets), dtype=np.int64)
+
+        n_sym_vars_total = len(self.symbolic_variables)
+        n_num_vars_total = len(self.numeric_variables)
+
+        numeric_features = np.array(
+            [
+                index
+                for index, variable in enumerate(self.variables)
+                if variable in self.numeric_features
+            ],
+            dtype=np.int64,
+        )
+        symbolic_features = np.array(
+            [
+                index
+                for index, variable in enumerate(self.variables)
+                if variable in self.symbolic_features
+            ],
+            dtype=np.int64,
+        )
+
+        symbols = np.array(
+            [len(variable.domain.simple_sets) for variable in self.symbolic_variables],
+            dtype=np.int64,
+        )
+        maximum_variances = np.array(
+            [
+                (annotated_variable.maximum_standard_deviation or 0.0) ** 2
+                for annotated_variable in self.annotated_variables
+                if annotated_variable.variable in self.numeric_targets
+            ],
+            dtype=np.float64,
+        )
+
+        minimum_impurity_improvement = np.array(
+            [
+                annotated_variable.minimum_impurity_improvement
+                for annotated_variable in self.annotated_variables
+                if annotated_variable.variable in self.numeric_features
+            ]
+            + [
+                annotated_variable.minimum_impurity_improvement
+                for annotated_variable in self.annotated_variables
+                if annotated_variable.variable in self.symbolic_features
+            ],
+            dtype=np.float64,
+        )
+
+        dependency_indices = dict()
+
+        for variable, dep_vars in self.dependencies.items():
+            # get the index version of the dependent variables and store them
+            idx_var = self.variables.index(variable)
+            idc_dep = [self.variables.index(var) for var in dep_vars]
+            dependency_indices[idx_var] = idc_dep
+
+        return Impurity(
+            minimum_samples_leaf,
+            numeric_vars,
+            symbolic_vars,
+            invert_impurity,
+            n_sym_vars_total,
+            n_num_vars_total,
+            numeric_features,
+            symbolic_features,
+            symbols,
+            maximum_variances,
+            minimum_impurity_improvement,
+            dependency_indices,
+        )
+
+    def _variable_dependencies_to_json(self) -> dict[str, list[str]]:
+        """
+        Convert the variable dependencies to a json compatible format.
+
+        The result maps variable names to lists of variable names.
+        """
+        return {
+            variable.name: [dependency.name for dependency in dependencies]
+            for variable, dependencies in self.dependencies.items()
+        }
+
+    def empty_copy(self):
+        result = self.__class__(
+            annotated_variables=self.annotated_variables,
+            targets=self.targets,
+            features=self.features,
+            minimum_samples_per_leaf=self.minimum_samples_leaf,
+            minimum_impurity_improvement=self.minimum_impurity_improvement,
+            maximum_depth=self.maximum_depth,
+            dependencies=self.dependencies,
+        )
+        return result
+
+    def to_json(self) -> dict[str, Any]:
+        result = super().to_json()
+        result["annotated_variables_from_init"] = [
+            to_json(variable) for variable in self.annotated_variables
+        ]
+        result["targets"] = [variable.name for variable in self.targets]
+        result["features"] = [variable.name for variable in self.features]
+        result["minimum_samples_per_leaf"] = self.minimum_samples_per_leaf
+        result["minimum_impurity_improvement"] = self.minimum_impurity_improvement
+        result["maximum_leaves"] = self.maximum_leaves
+        result["maximum_depth"] = self.maximum_depth
+        result["dependencies"] = self._variable_dependencies_to_json()
+        result["total_samples"] = self.total_samples
+        result["probabilistic_circuit"] = to_json(self.probabilistic_circuit)
+        return result
+
+    @classmethod
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
+        annotated_variable_from_init: list[AnnotatedVariable] = [
+            from_json(annotated_variable)
+            for annotated_variable in data["annotated_variables_from_init"]
+        ]
+        name_to_variable_map: dict[str, Variable] = {
+            annotated_variable.variable.name: annotated_variable.variable
+            for annotated_variable in annotated_variable_from_init
+        }
+        targets: list[Variable] = [
+            name_to_variable_map[name] for name in data["targets"]
+        ]
+        features: list[Variable] = [
+            name_to_variable_map[name] for name in data["features"]
+        ]
+        minimum_samples_per_leaf = data["minimum_samples_per_leaf"]
+        minimum_impurity_improvement = data["minimum_impurity_improvement"]
+        maximum_leaves = data["maximum_leaves"]
+        maximum_depth = data["maximum_depth"]
+        dependencies = VariableMap(
+            {
+                name_to_variable_map[name]: [
+                    name_to_variable_map[dep_name] for dep_name in dep_names
+                ]
+                for name, dep_names in data["dependencies"].items()
+            }
+        )
+        result = cls(
+            annotated_variables=annotated_variable_from_init,
+            targets=targets,
+            features=features,
+            minimum_samples_per_leaf=minimum_samples_per_leaf,
+            minimum_impurity_improvement=minimum_impurity_improvement,
+            maximum_leaves=maximum_leaves,
+            maximum_depth=maximum_depth,
+            dependencies=dependencies,
+        )
+        result.total_samples = data["total_samples"]
+        result.probabilistic_circuit = from_json(data["probabilistic_circuit"])
+        return result
+
+    def __eq__(self, other: Self):
+        return (
+            isinstance(other, self.__class__)
+            and self.variables == other.variables
+            and self.targets == other.targets
+            and self.features == other.features
+        )

@@ -1,3 +1,7 @@
+"""
+Tests of the layered circuits of the uniform measure over an event.
+"""
+
 from __future__ import annotations
 
 from enum import Enum
@@ -20,20 +24,23 @@ from probabilistic_model.probabilistic_circuit.tensorized.factories import (
 
 # %% events over intervals
 def test_the_uniform_measure_of_a_box_has_its_volume_as_inverse_density() -> None:
-    x, y = Continuous("x"), Continuous("y")
+    """
+    The uniform measure of a box has the inverse of its volume as its density.
+    """
+    x, y = Continuous(name="x"), Continuous(name="y")
     event = SimpleEvent.from_data(
         {x: closed(0.0, 2.0), y: closed(1.0, 5.0)}
     ).as_composite_set()
 
     model = uniform_measure_of_event(event)
 
-    assert np.exp(model.log_likelihood(np.array([[1.0, 2.0]]))) == pytest.approx(
+    assert np.exp(model.log_likelihood(events=np.array([[1.0, 2.0]]))) == pytest.approx(
         [1 / 8]
     )
 
 
 def test_the_uniform_measure_of_separate_regions_samples_inside_them() -> None:
-    x, y = Continuous("x"), Continuous("y")
+    x, y = Continuous(name="x"), Continuous(name="y")
     event = (
         SimpleEvent.from_data(
             {x: closed(0.0, 1.0), y: closed(0.0, 1.0)}
@@ -45,11 +52,11 @@ def test_the_uniform_measure_of_separate_regions_samples_inside_them() -> None:
 
     samples = uniform_measure_of_event(event).sample(200)
 
-    assert all(event.contains(sample) for sample in samples)
+    assert all(event.contains(item=sample) for sample in samples)
 
 
 def test_pieces_are_drawn_in_proportion_to_their_width() -> None:
-    x = Continuous("x")
+    x = Continuous(name="x")
     event = SimpleEvent.from_data(
         {x: closed(0.0, 1.0) | closed(2.0, 5.0)}
     ).as_composite_set()
@@ -61,7 +68,7 @@ def test_pieces_are_drawn_in_proportion_to_their_width() -> None:
 
 
 def test_a_variable_without_an_upper_bound_is_rejected() -> None:
-    x = Continuous("x")
+    x = Continuous(name="x")
     event = SimpleEvent.from_data({x: closed(0.0, float("inf"))}).as_composite_set()
 
     with pytest.raises(UnboundedEventError):
@@ -70,7 +77,7 @@ def test_a_variable_without_an_upper_bound_is_rejected() -> None:
 
 # %% events pinning variables to points
 def test_the_uniform_measure_of_an_event_with_points_samples_inside_it() -> None:
-    x, y = Continuous("x"), Continuous("y")
+    x, y = Continuous(name="x"), Continuous(name="y")
     event = (
         SimpleEvent.from_data(
             {x: singleton(0.5), y: closed(0.0, 1.0)}
@@ -83,11 +90,11 @@ def test_the_uniform_measure_of_an_event_with_points_samples_inside_it() -> None
     samples = uniform_measure_of_event(event).sample(50)
 
     assert np.all(samples[:, 0] == 0.5)
-    assert all(event.contains(sample) for sample in samples)
+    assert all(event.contains(item=sample) for sample in samples)
 
 
 def test_the_uniform_measure_of_pieces_sharing_a_point_samples_inside_them() -> None:
-    x, y, yaw = Continuous("x"), Continuous("y"), Continuous("yaw")
+    x, y, yaw = Continuous(name="x"), Continuous(name="y"), Continuous(name="yaw")
     event = (
         SimpleEvent.from_data(
             {x: closed_open(-0.3, -0.03), y: closed(-0.26, -0.22), yaw: singleton(0.0)}
@@ -100,11 +107,11 @@ def test_the_uniform_measure_of_pieces_sharing_a_point_samples_inside_them() -> 
     samples = uniform_measure_of_event(event).sample(50)
 
     assert np.all(samples[:, 2] == 0.0)
-    assert all(event.contains(sample) for sample in samples)
+    assert all(event.contains(item=sample) for sample in samples)
 
 
 def test_a_set_of_only_points_draws_each_point_equally_often() -> None:
-    x = Continuous("x")
+    x = Continuous(name="x")
     points = [0.25, 0.5, 0.75]
     event = SimpleEvent.from_data(
         {x: singleton(points[0]) | singleton(points[1]) | singleton(points[2])}
@@ -120,7 +127,7 @@ def test_a_set_of_only_points_draws_each_point_equally_often() -> None:
 
 
 def test_a_variable_that_is_a_point_beside_an_interval_is_rejected() -> None:
-    x = Continuous("x")
+    x = Continuous(name="x")
     event = SimpleEvent.from_data(
         {x: closed(0.0, 1.0) | singleton(5.0)}
     ).as_composite_set()
@@ -137,7 +144,11 @@ class Colour(Enum):
 
 
 def test_the_uniform_measure_draws_every_allowed_integer_equally_often() -> None:
-    number = Integer("number")
+    """
+    The uniform measure of an event over an integer draws every integer the event allows
+    about equally often.
+    """
+    number = Integer(name="number")
     allowed = [1, 3, 4]
     event = SimpleEvent.from_data(
         {number: singleton(1) | singleton(3) | singleton(4)}
@@ -146,14 +157,14 @@ def test_the_uniform_measure_draws_every_allowed_integer_equally_often() -> None
     model = uniform_measure_of_event(event)
 
     for value in allowed:
-        assert np.exp(model.log_likelihood(np.array([[value]]))) == pytest.approx(
-            [1 / len(allowed)]
-        )
-    assert np.exp(model.log_likelihood(np.array([[2]]))) == pytest.approx([0.0])
+        assert np.exp(
+            model.log_likelihood(events=np.array([[value]]))
+        ) == pytest.approx([1 / len(allowed)])
+    assert np.exp(model.log_likelihood(events=np.array([[2]]))) == pytest.approx([0.0])
 
 
 def test_the_uniform_measure_draws_every_allowed_symbol_equally_often() -> None:
-    colour = Symbolic(name="colour", domain=Set.from_iterable(Colour))
+    colour = Symbolic(name="colour", domain=Set.from_iterable(iterable=Colour))
     event = SimpleEvent.from_data(
         {colour: (Colour.RED, Colour.BLUE)}
     ).as_composite_set()

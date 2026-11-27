@@ -28,14 +28,14 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 # %% ROS camera information
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RosCameraModelAdapter:
     """
     Convert pinhole calibration at the ROS message boundary.
     """
 
     @staticmethod
-    def from_camera_info(camera_info: CameraInfo) -> PinholeCameraModel:
+    def from_camera_info(*, camera_info: CameraInfo) -> PinholeCameraModel:
         """
         Return a semantic model parsed from a ROS camera-info message.
 
@@ -77,6 +77,7 @@ class RosCameraModelAdapter:
 
     @staticmethod
     def to_camera_info(
+        *,
         camera_model: PinholeCameraModel,
         frame_id: str,
     ) -> CameraInfo:
@@ -119,7 +120,7 @@ class RosCameraModelAdapter:
 # %% Open3D camera information
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Open3DCameraModelAdapter:
     """
     Convert pinhole calibration at the Open3D boundary.
@@ -127,6 +128,7 @@ class Open3DCameraModelAdapter:
 
     @staticmethod
     def to_intrinsic(
+        *,
         camera_model: PinholeCameraModel,
     ) -> open3d.camera.PinholeCameraIntrinsic:
         """

@@ -15,7 +15,7 @@ from random_events.variable import Variable
 from krrood.patterns.classproperty import classproperty
 from scipy.stats import norm, truncnorm
 from sortedcontainers import SortedSet
-from typing_extensions import Self
+from typing_extensions import TYPE_CHECKING, Self
 
 from probabilistic_model.distributions.gaussian import (
     GaussianDistribution,
@@ -59,21 +59,32 @@ class HasLocationAndScale:
     The mean of the Gaussian of every node.
     """
 
-    scale: NodeValues
+    log_scale: NodeValues
     """
-    The standard deviation of the Gaussian of every node.
+    The natural logarithm of the standard deviation of the Gaussian of every node.
     """
+
+    @property
+    def scale(self) -> NodeValues:
+        """
+        :return: The standard deviation of the Gaussian of every node.
+        """
+        return self.namespace.exp(self.log_scale)
 
     @property
     def parameters(self) -> list[BackendArray]:
         """
-        :return: The location and the scale of every node.
+        :return: The location and the logarithm of the scale of every node.
         """
-        return [self.location, self.scale]
+        return [self.location, self.log_scale]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
-        location, scale = parameters
-        return dataclasses.replace(self, location=location, scale=scale)
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
+        """
+        Replace the locations and the logarithms of the scales, see
+        :meth:`Layer.copy_with_parameters`.
+        """
+        location, log_scale = parameters
+        return dataclasses.replace(self, location=location, log_scale=log_scale)
 
     @classproperty
     def minimum_scale(cls) -> float:
@@ -84,18 +95,25 @@ class HasLocationAndScale:
         return 1e-3
 
     def projected_parameters(
-        self, parameters: list[BackendArray]
+        self, *, parameters: list[BackendArray]
     ) -> list[BackendArray]:
-        *others, scale = parameters
-        return others + [self.namespace.maximum(scale, self.minimum_scale)]
+        """
+        Keep the logarithm of every scale at least the logarithm of
+        :attr:`minimum_scale`, see :meth:`Layer.projected_parameters`.
+        """
+        *others, log_scale = parameters
+        return others + [
+            self.namespace.clip(log_scale, min=math.log(self.minimum_scale))
+        ]
 
     def validate_own(self):
         """
         :raises ShapeMismatchError: If there is not one scale per location.
         :raises NonPositiveScaleError: If a scale is not positive.
         """
-        if self.location.shape != self.scale.shape:
-            raise ShapeMismatchError(self.location.shape, self.scale.shape)
+        super().validate_own()
+        if self.location.shape != self.log_scale.shape:
+            raise ShapeMismatchError(self.location.shape, self.log_scale.shape)
         # the negated comparison also catches a scale that is nan
         non_positive = ~(self.scale > 0)
         if non_positive.any():
@@ -122,13 +140,13 @@ class HasLocationAndScale:
             self.location, self.scale
         ).cumulative_distribution(values, self.location, self.scale)
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
         """
         :param other: A layer that :meth:`LeafLayer.concatenate` may join with this one.
         :return: Whether every node of both layers has the same location and scale.
         """
         return np.array_equal(self.location, other.location) and np.array_equal(
-            self.scale, other.scale
+            self.log_scale, other.log_scale
         )
 
 
@@ -145,6 +163,13 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
     @property
     def number_of_own_parameters(self) -> int:
         return 2 * self.number_of_nodes
+
+    @property
+    def trains_without_host_copies(self) -> bool:
+        """
+        :attr:`Layer.trains_without_host_copies` for Gaussian layers, which do.
+        """
+        return True
 
     def log_likelihood_of_nodes_from_column(
         self, values: SampleColumn
@@ -183,7 +208,7 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         return result
 
     def moment_of_nodes_own(
-        self, order: int, center: float, variable: Variable
+        self, *, order: int, center: float, variable: Variable
     ) -> NodeValues:
         """
         Like :meth:`~probabilistic_model.probabilistic_circuit.tensorized.input_layer.ba
@@ -200,7 +225,9 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
             )
         return result
 
-    def node_distribution(self, index: int, variable: Variable) -> GaussianDistribution:
+    def node_distribution(
+        self, *, index: int, variable: Variable
+    ) -> GaussianDistribution:
         return GaussianDistribution(
             variable=variable,
             location=float(self.location[index]),
@@ -209,34 +236,50 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: list[GaussianDistribution]
+        cls, *, variable_index: int, distributions: list[GaussianDistribution]
     ) -> Self:
         return cls(
-            variable_index,
+            np.full(len(distributions), variable_index, dtype=np.int64),
             np.array([distribution.location for distribution in distributions]),
-            np.array([distribution.scale for distribution in distributions]),
+            np.log([distribution.scale for distribution in distributions]),
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
-        return self.__class__(self.variable, self.location[mask], self.scale[mask])
+    def select_nodes(self, *, mask: NodeMask) -> Self:
+        return self.__class__(
+            self.node_variables[mask], self.location[mask], self.log_scale[mask]
+        )
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
         return cls(
-            layers[0].variable,
+            np.concatenate([layer.node_variables for layer in layers]),
             np.concatenate([layer.location for layer in layers]),
-            np.concatenate([layer.scale for layer in layers]),
+            np.concatenate([layer.log_scale for layer in layers]),
         )
 
-    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+    def sample_of_nodes(
+        self, *, nodes: NodeIndices, variables: SortedSet
+    ) -> SampleColumn:
+        """
+        Like :meth:`UnivariateInputLayer.sample_of_nodes`, drawing from the Gaussians of
+        all nodes at once.
+        """
         return norm.rvs(loc=self.location[nodes], scale=self.scale[nodes])
 
-    def apply_translation_own(self, translation: VariableValues):
-        self.location = self.location + translation[self.variable]
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
+        """
+        Translate the locations of the nodes, see :meth:`Layer.apply_translation_own`.
+        """
+        self.location = self.location + self.node_variable_values(values=translation)
 
-    def apply_scaling_own(self, scaling: VariableValues):
-        self.location = self.location * scaling[self.variable]
-        self.scale = self.scale * scaling[self.variable]
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
+        """
+        Scale the locations and the scales of the nodes, see
+        :meth:`Layer.apply_scaling_own`.
+        """
+        node_scaling = self.node_variable_values(values=scaling)
+        self.location = self.location * node_scaling
+        self.log_scale = self.log_scale + self.namespace.log(node_scaling)
 
     def type_of_layer_truncated_to_interval(
         self, interval: SimpleInterval
@@ -278,11 +321,11 @@ class GaussianLayer(HasLocationAndScale, ContinuousLayerWithDensity):
         )
         return LayerWithLogProbabilities(
             TruncatedGaussianLayer(
-                self.variable,
+                self.node_variables.copy(),
                 interval_of_nodes,
                 bounds_of_nodes,
                 self.location.copy(),
-                self.scale.copy(),
+                self.log_scale.copy(),
             ),
             log_probabilities,
         )
@@ -304,24 +347,35 @@ class TruncatedGaussianLayer(
     @property
     def parameters(self) -> list[BackendArray]:
         """
-        :return: The supports, the locations and the scales of the nodes.
+        :return: The supports, the locations and the logarithms of the scales of the
+            nodes.
         """
-        return [self.interval, self.location, self.scale]
+        return [self.interval, self.location, self.log_scale]
 
-    def copy_with_parameters(self, parameters: list[BackendArray]) -> Self:
-        interval, location, scale = parameters
+    def copy_with_parameters(self, *, parameters: list[BackendArray]) -> Self:
+        """
+        Replace the supports, the locations and the logarithms of the scales, see
+        :meth:`Layer.copy_with_parameters`.
+        """
+        interval, location, log_scale = parameters
         return dataclasses.replace(
-            self, interval=interval, location=location, scale=scale
+            self, interval=interval, location=location, log_scale=log_scale
         )
 
     def validate_own(self):
         HasLocationAndScale.validate_own(self)
         ContinuousLayerWithConstrainedSupport.validate_own(self)
 
-    def has_equal_parameters(self, other: Self) -> bool:
+    def has_equal_parameters(self, *, other: Self) -> bool:
+        """
+        Like :meth:`HasLocationAndScale.has_equal_parameters`, comparing the supports of
+        the nodes too.
+        """
         return HasLocationAndScale.has_equal_parameters(
-            self, other
-        ) and ContinuousLayerWithConstrainedSupport.has_equal_parameters(self, other)
+            self, other=other
+        ) and ContinuousLayerWithConstrainedSupport.has_equal_parameters(
+            self, other=other
+        )
 
     @property
     def number_of_own_parameters(self) -> int:
@@ -374,7 +428,13 @@ class TruncatedGaussianLayer(
             0.0,
         )
 
-    def sample_of_nodes(self, nodes: NodeIndices, variables: SortedSet) -> SampleColumn:
+    def sample_of_nodes(
+        self, *, nodes: NodeIndices, variables: SortedSet
+    ) -> SampleColumn:
+        """
+        Like :meth:`UnivariateInputLayer.sample_of_nodes`, drawing from the truncated
+        Gaussians of all nodes at once.
+        """
         location, scale = self.location[nodes], self.scale[nodes]
         return truncnorm.rvs(
             a=(self.lower[nodes] - location) / scale,
@@ -384,7 +444,7 @@ class TruncatedGaussianLayer(
         )
 
     def node_distribution(
-        self, index: int, variable: Variable
+        self, *, index: int, variable: Variable
     ) -> TruncatedGaussianDistribution:
         return TruncatedGaussianDistribution(
             variable=variable,
@@ -395,10 +455,10 @@ class TruncatedGaussianLayer(
 
     @classmethod
     def from_distributions(
-        cls, variable_index: int, distributions: list[TruncatedGaussianDistribution]
+        cls, *, variable_index: int, distributions: list[TruncatedGaussianDistribution]
     ) -> Self:
         return cls(
-            variable_index,
+            np.full(len(distributions), variable_index, dtype=np.int64),
             np.array(
                 [
                     [distribution.interval.lower, distribution.interval.upper]
@@ -414,33 +474,50 @@ class TruncatedGaussianLayer(
                 dtype=np.int64,
             ),
             np.array([distribution.location for distribution in distributions]),
-            np.array([distribution.scale for distribution in distributions]),
+            np.log([distribution.scale for distribution in distributions]),
         )
 
-    def select_nodes(self, mask: NodeMask) -> Self:
+    def select_nodes(self, *, mask: NodeMask) -> Self:
+        """
+        Keep the supports, locations and scales of the selected nodes, see
+        :meth:`UnivariateInputLayer.select_nodes`.
+        """
         return self.__class__(
-            self.variable,
+            self.node_variables[mask],
             self.interval[mask],
             self.bounds[mask],
             self.location[mask],
-            self.scale[mask],
+            self.log_scale[mask],
         )
 
     @classmethod
-    def concatenate(cls, layers: list[Self]) -> Self:
+    def concatenate(cls, *, layers: list[Self]) -> Self:
+        """
+        Concatenate the supports, locations and scales of the layers, see
+        :meth:`LeafLayer.concatenate`.
+        """
         return cls(
-            layers[0].variable,
+            np.concatenate([layer.node_variables for layer in layers]),
             np.concatenate([layer.interval for layer in layers]),
             np.concatenate([layer.bounds for layer in layers]),
             np.concatenate([layer.location for layer in layers]),
-            np.concatenate([layer.scale for layer in layers]),
+            np.concatenate([layer.log_scale for layer in layers]),
         )
 
-    def apply_translation_own(self, translation: VariableValues):
-        super().apply_translation_own(translation)
-        self.location = self.location + translation[self.variable]
+    def apply_translation_own(self, *, translation: VariableValues) -> None:
+        """
+        Translate the supports and the locations of the nodes, see
+        :meth:`Layer.apply_translation_own`.
+        """
+        super().apply_translation_own(translation=translation)
+        self.location = self.location + self.node_variable_values(values=translation)
 
-    def apply_scaling_own(self, scaling: VariableValues):
-        super().apply_scaling_own(scaling)
-        self.location = self.location * scaling[self.variable]
-        self.scale = self.scale * scaling[self.variable]
+    def apply_scaling_own(self, *, scaling: VariableValues) -> None:
+        """
+        Scale the supports, the locations and the scales of the nodes, see
+        :meth:`Layer.apply_scaling_own`.
+        """
+        super().apply_scaling_own(scaling=scaling)
+        node_scaling = self.node_variable_values(values=scaling)
+        self.location = self.location * node_scaling
+        self.log_scale = self.log_scale + self.namespace.log(node_scaling)

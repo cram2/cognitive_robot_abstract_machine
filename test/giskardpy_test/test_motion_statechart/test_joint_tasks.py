@@ -31,10 +31,13 @@ from krrood.symbolic_math.symbolic_math import (
 )
 from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -142,8 +145,11 @@ def test_joint_goal(tmp_path):
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
-        root_C_tip = RevoluteConnection(
-            parent=root, child=tip, axis=Vector3.Z(), raw_dof=dof
+        root_C_tip = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            parent=root,
+            child=tip,
+            raw_dof=dof,
         )
         world.add_connection(root_C_tip)
 
@@ -152,8 +158,11 @@ def test_joint_goal(tmp_path):
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
-        root_C_tip2 = RevoluteConnection(
-            parent=root, child=tip2, axis=Vector3.Z(), raw_dof=dof
+        root_C_tip2 = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            parent=root,
+            child=tip2,
+            raw_dof=dof,
         )
         world.add_connection(root_C_tip2)
 
@@ -296,7 +305,9 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
             ),
-            JointVelocityLimit(connections=[head_pan_joint], max_velocity=max_velocity),
+            JointVelocityLimit(
+                connections=[head_pan_joint], max_joint_velocity=max_velocity
+            ),
         ]
     )
 
@@ -381,8 +392,11 @@ def test_daisy_arm_reaches_its_park_state(
 def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_the_joint(
     pr2_world_state_reset,
 ):
+    """
+    A joint velocity limit scales its constraint by the velocity limit of the joint.
+    """
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
-    limit = JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.05)
+    limit = JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.05)
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
         extensions=[MotionControl()],
@@ -400,6 +414,10 @@ def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_th
 def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     pr2_world_state_reset,
 ):
+    """
+    A joint velocity limit of zero keeps the joint where it is, although a joint goal
+    pulls it away.
+    """
     head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
     start_position = head_pan_joint.position
     executor = StatechartExecutor(
@@ -412,7 +430,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_mapping({head_pan_joint: 0.5})
             ),
-            JointVelocityLimit(connections=[head_pan_joint], max_velocity=0.0),
+            JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.0),
         ]
     )
     executor.compile(statechart=statechart)
@@ -428,7 +446,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
 
 def world_with_revolute_joints(
     maximum_speeds: list[float],
-) -> tuple[World, list[RevoluteConnection]]:
+) -> tuple[World, list[ScrewAxisConnection]]:
     """
     :return: A world with one revolute joint per maximum speed, all children of one root,
         and those joints.
@@ -445,10 +463,12 @@ def world_with_revolute_joints(
                 ),
             )
             world.add_degree_of_freedom(dof)
-            joint = RevoluteConnection(
+            joint = ScrewAxisConnection(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3.Z()
+                ),
                 parent=root,
                 child=Body(name=PrefixedName(f"tip_{index}")),
-                axis=Vector3.Z(),
                 raw_dof=dof,
             )
             world.add_connection(joint)

@@ -26,15 +26,26 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
+    """
+    Segments the tabletop objects in images rendered from the
+    ``world_semdt_raytracer_tabletop`` world descriptor and puts them into the world.
+    """
+
     def name(self) -> str:
         return "semdt_raytracer_demo"
 
     def implementation(self) -> Pipeline:
+        """
+        :return: A pipeline that renders the tabletop world, segments the objects on the
+            table
+            plane, estimates their color and pose and puts them into the world.
+        """
         raytracer_config = CollectionReaderDescriptorFactory.create_descriptor(
-            RayTracingCameraConfiguration.registry_name,
+            camera=RayTracingCameraConfiguration.registry_name,
             source=WorldDescriptorSource(
                 descriptor_name="world_semdt_raytracer_tabletop"
             ),
@@ -53,6 +64,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PointCloudClusterExtractor(),
                 ClusterColorAnnotator(),
                 ClusterPoseBBAnnotator(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

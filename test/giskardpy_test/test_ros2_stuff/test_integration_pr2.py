@@ -22,9 +22,22 @@ from cramph.exceptions import EmptyStatechartError
 from giskardpy.motion_statechart.graph_node import EndMotion
 from cramph.monitors import CountSeconds
 from cramph.statechart import Statechart
+from giskardpy.motion_statechart.monitors.monitors import LocalMinimumReached
 from giskardpy.motion_statechart.tasks.cartesian_tasks import (
     CartesianPose,
+    CartesianPosition,
 )
+from giskardpy.motion_statechart.tasks.collision_avoidance import (
+    ExternalCollisionAvoidance,
+    LinearBufferZoneScaling,
+    UpdateTemporaryCollisionRules,
+)
+from semantic_digital_twin.collision_checking.collision_detector import ClosestPoints
+from semantic_digital_twin.collision_checking.collision_rules import (
+    AvoidCollisionBetweenGroups,
+)
+from semantic_digital_twin.world import World
+from semantic_digital_twin.world_description.world_entity import Body
 from giskardpy.motion_statechart.tasks.joint_tasks import (
     JointPositionList,
     JointState,
@@ -37,10 +50,8 @@ from giskardpy.middleware.ros2.exceptions import (
 )
 from krrood.symbolic_math import symbolic_math as sm
 from semantic_digital_twin.robots.pr2 import PR2Joint
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-)
+from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Point3
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
@@ -49,6 +60,7 @@ from .test_client_presence import wait_until
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 from semantic_digital_twin.specifications.robots import RobotSpecification
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 
 @dataclass(kw_only=True)
@@ -154,9 +166,9 @@ class TestJointGoals:
             connection = giskard.api.world.get_connection_by_name(joint)
             actual = giskard.api.world.state[connection.dof.id].position
             if (
-                isinstance(connection, RevoluteConnection)
-                and not connection.dof.has_position_limits()
-            ):
+                isinstance(connection, ScrewAxisConnection)
+                and connection.behaves_like_a_revolute_connection
+            ) and not connection.dof.has_position_limits():
                 assert sm.shortest_angular_distance(actual, goal).to_np()[0] < 0.01
             else:
                 assert np.isclose(
@@ -172,6 +184,9 @@ class TestCartGoals:
     """
 
     def test_cart_goal_1eef(self, *, giskard: PR2Tester):
+        """
+        A pose goal of the PR2's right gripper runs through the ROS 2 interface.
+        """
         tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=-0.2, reference_frame=giskard.right_tip
         )
@@ -180,8 +195,9 @@ class TestCartGoals:
         statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=giskard.base_footprint,
-                    tip_link=giskard.right_tip,
+                    kinematic_chain=KinematicChain(
+                        root=giskard.base_footprint, tip=giskard.right_tip
+                    ),
                     goal_pose=tip_goal,
                 )
             )
@@ -242,6 +258,96 @@ def test_bodies_added_relative_to_the_gripper_are_placed_there_on_the_server(
         assert np.allclose(r_tip_T_body.position, pose.position, atol=1e-4)
 
 
+# %% collision avoidance through the action server
+
+
+def _closest_contact_with(*, world: World, body: Body) -> ClosestPoints:
+    """
+    :param world: A world holding the PR2 and `body`.
+    :param body: The body whose contact with the robot is measured.
+    :return: The closest contact between any body of the robot and `body`.
+    """
+    robot = world.get_semantic_annotations_by_type(PR2)[0]
+    world.collision_manager.put_temporary_rules_in_force(
+        [
+            AvoidCollisionBetweenGroups(
+                buffer_zone_distance=1.0,
+                violated_distance=0.0,
+                body_group_a=robot.bodies_with_collision,
+                body_group_b=[body],
+            )
+        ]
+    )
+    contacts = world.collision_manager.compute_collisions().contacts
+    return min(
+        (contact for contact in contacts if body in (contact.body_a, contact.body_b)),
+        key=lambda contact: contact.distance,
+    )
+
+
+def test_buffer_zone_scaling_sent_to_the_server_shrinks_the_buffer_zone_near_the_goal(
+    pocky_pose_setup: PR2Tester,
+) -> None:
+    """
+    A scaled collision avoidance goal whose goal point lies in a body the client added
+    reaches the server, which resolves that body in its own world and lets the gripper
+    come closer to it than the configured buffer zone.
+    """
+    giskard = pocky_pose_setup
+    giskard.add_box_to_world(
+        name="wall",
+        size=(0.1, 0.4, 0.4),
+        pose=HomogeneousTransformationMatrix.from_xyz_rpy(
+            x=0.3, reference_frame=giskard.right_tip
+        ),
+    )
+    world = giskard.api.world
+    wall = world.get_kinematic_structure_entity_by_name("wall")
+    robot = world.get_semantic_annotations_by_type(PR2)[0]
+    scaling = LinearBufferZoneScaling(
+        goal_point=Point3(reference_frame=wall), full_scale_goal_distance=0.5
+    )
+    buffer_zone_distance = 0.1
+    statechart = Statechart(context=giskard.api.context)
+    statechart.add_nodes(
+        nodes=[
+            UpdateTemporaryCollisionRules(
+                temporary_rules=[
+                    AvoidCollisionBetweenGroups(
+                        buffer_zone_distance=buffer_zone_distance,
+                        violated_distance=0.0,
+                        body_group_a=robot.bodies_with_collision,
+                        body_group_b=[wall],
+                    )
+                ]
+            ),
+            CartesianPosition(
+                kinematic_chain=KinematicChain(
+                    root=giskard.base_footprint, tip=giskard.right_tip
+                ),
+                goal_point=scaling.goal_point,
+            ),
+            ExternalCollisionAvoidance(robot=robot, buffer_zone_scaling=scaling),
+            local_minimum := LocalMinimumReached(),
+        ]
+    )
+    statechart.add_node(node=EndMotion.when_true(node=local_minimum))
+    giskard.api.compile(statechart=statechart)
+
+    giskard.api.execute()
+    giskard.wait_for_cycles()
+
+    contact = _closest_contact_with(world=world, body=wall)
+    factor = scaling.scale_factor(
+        world=world,
+        root_P_contact_point=Point3.from_iterable(
+            contact.root_P_point_on_body_a[:3], reference_frame=world.root
+        ),
+    ).evaluate()[0]
+    assert 0 < contact.distance < buffer_zone_distance / 2
+    assert contact.distance == pytest.approx(factor * buffer_zone_distance, abs=5e-3)
+
+
 # %% action server events
 
 
@@ -280,11 +386,15 @@ class TestActionServerEvents:
 
     @pytest.mark.asyncio
     async def test_cancel_with_new_goal(self, *, giskard: PR2Tester) -> None:
+        """
+        A goal sent while another still runs replaces it.
+        """
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=100, reference_frame=giskard.base_footprint
                 ),
@@ -301,8 +411,9 @@ class TestActionServerEvents:
         statechart.add_node(
             node=(
                 cart_goal := CartesianPose(
-                    root_link=giskard.map,
-                    tip_link=giskard.base_footprint,
+                    kinematic_chain=KinematicChain(
+                        root=giskard.map, tip=giskard.base_footprint
+                    ),
                     goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                         y=1, reference_frame=giskard.base_footprint
                     ),
@@ -319,11 +430,15 @@ class TestActionServerEvents:
 
     @pytest.mark.asyncio
     async def test_interrupt(self, *, giskard: PR2Tester) -> None:
+        """
+        Cancelling a running goal ends it with an :class:`ExecutionCanceledException`.
+        """
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
@@ -354,8 +469,9 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),
@@ -395,8 +511,9 @@ class TestActionServerEvents:
         statechart = Statechart(context=giskard.api.context)
         statechart.add_node(
             node=CartesianPose(
-                root_link=giskard.map,
-                tip_link=giskard.base_footprint,
+                kinematic_chain=KinematicChain(
+                    root=giskard.map, tip=giskard.base_footprint
+                ),
                 goal_pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.5, reference_frame=giskard.base_footprint
                 ),

@@ -45,7 +45,9 @@ from semantic_digital_twin.part_finding.locating import (
 from semantic_digital_twin.part_finding.vision_language import (
     VisionLanguagePartLocator,
 )
-from semantic_digital_twin.semantic_annotations.mixins import PartWholeRelationship
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
+)
 from semantic_digital_twin.utils import create_cache_dir
 
 logger = logging.getLogger(__name__)
@@ -267,12 +269,14 @@ class PartFindingServer:
             return False
         if not (
             isinstance(query.whole_type, type)
-            and issubclass(query.whole_type, PartWholeRelationship)
+            and issubclass(query.whole_type, HasParts)
         ):
             return False
         known = {
             relationship.name
-            for relationship in PartRelationshipInspector.all_of_type(query.whole_type)
+            for relationship in PartRelationshipInspector.all_of_type(
+                whole_type=query.whole_type
+            )
         }
         return set(query.relationship_names) <= known
 

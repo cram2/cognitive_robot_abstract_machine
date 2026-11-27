@@ -21,7 +21,7 @@ from coraplex.robot_plans.actions.core.robot_body import MoveTorsoAction, ParkAr
 from cramph.composites import Sequence
 from cramph.node import StatechartNode
 from semantic_digital_twin.datastructures.definitions import TorsoState
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from ...plan_running import context_of, simulated_executor, statechart_of
 from cramph.context import ContextExtension
@@ -29,13 +29,17 @@ from cramph.context import ContextExtension
 
 @pytest.fixture()
 def simple_plan(pr2_apartment_context):
+    """
+    A plan that navigates, raises the torso and parks the arms, to be stored in the
+    database.
+    """
     world, robot_view, extensions = pr2_apartment_context
 
     plan = Sequence(
         nodes=[
             NavigateAction(
-                target_location=Pose.from_xyz_quaternion(
-                    1.6, 1.9, 0, 0, 0, 0, 1, reference_frame=world.root
+                planar_goal_pose=Pose2D.from_xy_yaw(
+                    1.6, 1.9, reference_frame=world.root
                 )
             ),
             MoveTorsoAction(torso_state=TorsoState.HIGH),
@@ -112,20 +116,20 @@ def complex_plan(pr2_apartment_context):
 
     plan = TransportAction(
         pick_up=MoveAndPickUpAction.from_standing_position(
-            standing_position=Pose.from_xyz_rpy(
-                1.63, 1.98, 0.0, reference_frame=world.root
+            standing_position=Pose2D.from_xy_yaw(
+                x=1.63, y=1.98, reference_frame=world.root
             ),
             grasp=milk.grasp_candidates()[0],
             arm=robot_view.left_arm,
         ),
         place=MoveAndPlaceAction.from_standing_position(
-            standing_position=Pose.from_xyz_rpy(
-                1.8, 2.54, 0.0, reference_frame=world.root
+            standing_position=Pose2D.from_xy_yaw(
+                x=1.8, y=2.54, reference_frame=world.root
             ),
-            target_location=Pose.from_xyz_quaternion(
+            graspable=milk,
+            goal_pose=Pose.from_xyz_quaternion(
                 2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
             ),
-            object_designator=milk,
             arm=robot_view.left_arm,
         ),
     )
@@ -158,10 +162,12 @@ def test_a_plan_whose_transport_still_holds_queries_cannot_be_stored(
     """
     world, robot_view, extensions = pr2_apartment_context
     transport = TransportAction.from_graspable_by_closest_grasps(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Pose.from_xyz_quaternion(2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root),
-        robot_view.left_arm,
-        context_of(extensions),
+        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+        goal_pose=Pose.from_xyz_quaternion(
+            2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
+        ),
+        arm=robot_view.left_arm,
+        context=context_of(extensions),
     )
 
     with pytest.raises(QueryCannotBePersisted) as failure:

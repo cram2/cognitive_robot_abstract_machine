@@ -33,12 +33,14 @@ def graph_of(
         {name for edge in directed + undirected for name in edge} | set(isolated or [])
     )
     node_of = {
-        name: GraphNode(variable=Continuous(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        name: GraphNode(
+            variable=Continuous(name=name), level=NodeLevel.EXAMPLE_ATTRIBUTE
+        )
         for name in names
     }
     return CausalGraph.from_edges(
-        node_of.values(),
-        [
+        nodes=node_of.values(),
+        edges=[
             GraphEdge.directed_edge(node_of[parent], node_of[child])
             for parent, child in directed
         ]

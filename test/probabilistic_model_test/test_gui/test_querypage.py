@@ -103,8 +103,8 @@ def test_probability_of_a_query_given_evidence(
         SimpleEvent.from_data({continuous_variable: closed(0, 0.5)})
     )
     evidence = Event.from_simple_sets(
-        SimpleEvent.from_data({symbolic_variable: Set.from_iterable(["a"])})
+        SimpleEvent.from_data({symbolic_variable: Set.from_iterable(iterable=["a"])})
     )
-    query.fill_missing_variables([symbolic_variable])
-    evidence.fill_missing_variables([continuous_variable])
+    query.fill_missing_variables(variables=[symbolic_variable])
+    evidence.fill_missing_variables(variables=[continuous_variable])
     assert controller.calculate_probability(query, evidence) == pytest.approx(0.5)

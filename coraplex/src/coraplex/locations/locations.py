@@ -1,3 +1,8 @@
+"""
+Where the robot can stand to reach or to see a target, sampled from costmaps of the
+world as it is when they are sampled.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -17,10 +22,10 @@ from coraplex.locations.costmaps import (
 from coraplex.plans.context_extensions import RobotAccess, StatementGrounding
 from cramph.context import StatechartContext
 from semantic_digital_twin.robots.robot_parts import AbstractRobot, Arm
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CostmapLocation(Location, ABC):
     """
     A location whose candidates are sampled from a costmap of the world as it is when
@@ -67,10 +72,12 @@ class CostmapLocation(Location, ABC):
             is now.
         """
 
-    def candidates(self) -> Iterator[Pose]:
-        return self.costmap().sample(self.number_of_samples, self.sampling_seed)
+    def candidates(self) -> Iterator[Pose2D]:
+        return self.costmap().sample(
+            number_of_samples=self.number_of_samples, seed=self.sampling_seed
+        )
 
-    def _in_world(self, pose: Pose) -> Pose:
+    def _in_world(self, *, pose: Pose) -> Pose:
         """
         :param pose: A pose in any frame of the world.
         :return: Where `pose` is in the world frame now, so a pose given relative to a
@@ -80,7 +87,7 @@ class CostmapLocation(Location, ABC):
         return world.transform(pose, world.root)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReachabilityLocation(CostmapLocation):
     """
     Where the robot can stand to reach a target with one arm.
@@ -113,7 +120,7 @@ class ReachabilityLocation(CostmapLocation):
         :return: Standing poses clear of the surroundings, at the arm's reach distance
             around the target.
         """
-        target_pose = self._in_world(self.target_pose)
+        target_pose = self._in_world(pose=self.target_pose)
         occupancy = OccupancyCostmap.default_map(
             robot=self.robot,
             target=target_pose,
@@ -130,13 +137,13 @@ class ReachabilityLocation(CostmapLocation):
         )
         return occupancy & ring
 
-    def candidates(self) -> Iterator[Pose]:
+    def candidates(self) -> Iterator[Pose2D]:
         """
         :return: The poses sampled from the costmap, in the order they were sampled,
             leaving out those farther from the target along the floor than the arm is
             long, since the target cannot be reached from there.
         """
-        target = self._in_world(self.target_pose).position
+        target = self._in_world(pose=self.target_pose).position
         arm_length = float(self.arm.approximate_length())
         for candidate in super().candidates():
             offset = candidate.position.to_np()[:2] - target.to_np()[:2]
@@ -144,7 +151,7 @@ class ReachabilityLocation(CostmapLocation):
                 yield candidate
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisibilityLocation(CostmapLocation):
     """
     Where the robot can stand to see a target with its camera.
@@ -162,7 +169,7 @@ class VisibilityLocation(CostmapLocation):
         :return: Standing poses clear of the surroundings from which the target is in
             view.
         """
-        target_pose = self._in_world(self.target_pose)
+        target_pose = self._in_world(pose=self.target_pose)
         camera = self.robot.get_default_camera()
         occupancy = OccupancyCostmap.default_map(
             robot=self.robot,

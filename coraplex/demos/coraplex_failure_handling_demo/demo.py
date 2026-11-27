@@ -16,7 +16,6 @@ Lower :attr:`FailureHandlingDemonstration.maximum_attempts` below
 from dataclasses import dataclass, field
 from enum import StrEnum
 from itertools import groupby
-from pathlib import Path
 
 from coraplex.datastructures.enums import InsertionPosition
 from coraplex.demonstrations import RobotDemonstration
@@ -46,7 +45,6 @@ from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
-from krrood.patterns.path_enumeration import PathEnumeration
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix,
     Pose2D,
@@ -71,19 +69,17 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% what the scene is built from
 
 
-class SceneFile(PathEnumeration):
+class SceneFile(StrEnum):
     """
-    The files the demonstration builds its scene from, under the coraplex resources.
+    The files the demonstration builds its scene from, as ``package://`` URIs.
     """
 
-    APARTMENT = (
-        Path(__file__).resolve().parents[2] / "resources" / "worlds" / "apartment.urdf"
-    )
+    APARTMENT = "package://iai_apartment/urdf/apartment.urdf"
     """
     The apartment the PR2 works in.
     """
 
-    MILK = Path(__file__).resolve().parents[2] / "resources" / "objects" / "milk.stl"
+    MILK = "package://iai_objects/objects/milk.stl"
     """
     The mesh of the milk carton.
     """
@@ -231,10 +227,10 @@ class CheckGraspBeforeAttaching(SequentialInsertion[PickUpAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.AFTER
 
-    def is_applicable(self, plan_node: PickUpAction) -> bool:
+    def is_applicable(self, *, plan_node: PickUpAction) -> bool:
         return True
 
-    def anchor(self, plan_node: PickUpAction) -> StatechartNode:
+    def anchor(self, *, plan_node: PickUpAction) -> StatechartNode:
         """
         :return: The grasp of the pick-up.
         """
@@ -242,11 +238,11 @@ class CheckGraspBeforeAttaching(SequentialInsertion[PickUpAction]):
             node for node in plan_node.nodes if isinstance(node, GraspingAction)
         )
 
-    def nodes_to_insert(self, plan_node: PickUpAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: PickUpAction) -> list[StatechartNode]:
         return [
             GraspCheck(
                 name="grasp check",
-                body=plan_node.grasp.graspable.root,
+                body=plan_node.grasp_candidate.graspable.root,
                 gripper=plan_node.arm.end_effector,
             )
         ]
@@ -269,10 +265,10 @@ class NudgeWhileClosing(ParallelInsertion[GraspingAction]):
     How far the object is pushed, in meters.
     """
 
-    def is_applicable(self, plan_node: GraspingAction) -> bool:
+    def is_applicable(self, *, plan_node: GraspingAction) -> bool:
         return True
 
-    def anchor(self, plan_node: GraspingAction) -> StatechartNode:
+    def anchor(self, *, plan_node: GraspingAction) -> StatechartNode:
         """
         :return: The goal closing the gripper, the last finger goal of the grasp.
         """
@@ -280,9 +276,9 @@ class NudgeWhileClosing(ParallelInsertion[GraspingAction]):
             node for node in plan_node.descendants if isinstance(node, MoveFingers)
         ][-1]
 
-    def nodes_to_insert(self, plan_node: GraspingAction) -> list[StatechartNode]:
-        approach = plan_node.grasp.world_T_grasp.to_np()[:3, 0]
-        body = plan_node.grasp.graspable.root
+    def nodes_to_insert(self, *, plan_node: GraspingAction) -> list[StatechartNode]:
+        approach = plan_node.grasp_candidate.world_T_grasp.to_np()[:3, 0]
+        body = plan_node.grasp_candidate.graspable.root
         return [
             Nudge(
                 name="nudge",
@@ -311,17 +307,17 @@ class OpenGripperBeforeReading(SequentialInsertion[JointReading]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: JointReading) -> bool:
+    def is_applicable(self, *, plan_node: JointReading) -> bool:
         return True
 
-    def anchor(self, plan_node: JointReading) -> StatechartNode:
+    def anchor(self, *, plan_node: JointReading) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: JointReading) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: JointReading) -> list[StatechartNode]:
         return [
             SetGripperAction(
                 name="open gripper",
-                configuration=self.end_effector.default_configuration(
+                gripper_configuration=self.end_effector.default_configuration(
                     GripperState.OPEN
                 ),
             )
@@ -397,7 +393,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
         """
         :return: The apartment.
         """
-        return WorldSpecification.from_urdf(str(SceneFile.APARTMENT))
+        return WorldSpecification.from_urdf(SceneFile.APARTMENT)
 
     def robot_specification(self) -> RobotSpecification:
         """
@@ -407,10 +403,10 @@ class FailureHandlingDemonstration(RobotDemonstration):
             semantic_annotation_type=self.used_robot, localization_pose=self.robot_start
         )
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(ApartmentBody.ROOT)
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         """
         Put the milk on the counter, free to be pushed.
         """
@@ -420,12 +416,12 @@ class FailureHandlingDemonstration(RobotDemonstration):
             semantic_annotation_type=Milk,
             root_specification=BodySpecification.mesh(
                 name,
-                str(SceneFile.MILK),
+                SceneFile.MILK,
                 connection_specification=Connection6DoFSpecification(),
             ),
         ).spawn(world, parent=None, parent_T_self=self.milk_start)
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
                 robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
@@ -439,7 +435,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
             ),
         ]
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Walk up to the counter with a closed gripper, make sure the gripper is open, and
         pick up the milk.
@@ -454,15 +450,15 @@ class FailureHandlingDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 MoveTorsoAction(torso_state=TorsoState.HIGH),
                 NavigateAction(
-                    target_location=Pose2D(
+                    planar_goal_pose=Pose2D(
                         position=self.counter_stand.position,
                         yaw=self.counter_stand.yaw,
                         reference_frame=world.root,
-                    ).pose
+                    )
                 ),
                 SetGripperAction(
                     name="close gripper",
-                    configuration=end_effector.default_configuration(
+                    gripper_configuration=end_effector.default_configuration(
                         GripperState.CLOSE
                     ),
                 ),
@@ -485,7 +481,7 @@ class FailureHandlingDemonstration(RobotDemonstration):
                     name="milk is picked up",
                     handled_node=PickUpAction(
                         name="pick up milk",
-                        grasp=milk.grasp_candidates()[0],
+                        grasp_candidate=milk.grasp_candidates()[0],
                         arm=arm,
                     ),
                     failure_handling_strategy=RetryFailedNode(

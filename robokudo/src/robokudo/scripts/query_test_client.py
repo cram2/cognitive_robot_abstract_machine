@@ -1,3 +1,7 @@
+"""
+Action client that sends test queries to the RoboKudo query action server.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -18,8 +22,8 @@ from rosidl_runtime_py.convert import message_to_ordereddict
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 
 from robokudo_msgs.action import Query
+from krrood.patterns.called_positionally import called_positionally
 
-from robokudo.defs import PACKAGE_NAME
 
 if TYPE_CHECKING:
     from rclpy.action.client import ClientGoalHandle
@@ -27,12 +31,15 @@ if TYPE_CHECKING:
     from rclpy.timer import Timer
     from robokudo_msgs.action._query import Query_FeedbackMessage, Query_Result
 
+logger = logging.getLogger(__name__)
+
 
 class ResultQueue(Protocol):
     """
     Queue-like object receiving the action client's final result dictionary.
     """
 
+    @called_positionally
     def put(self, item: dict[str, Any]) -> None:
         """
         Store one result dictionary.
@@ -53,12 +60,19 @@ class ReadinessSignal(Protocol):
 
 
 class PrettyResultPrinter:
-    def pretty_print_result(self, result: Query_Result) -> str:
+    """
+    Formats a query result for the console.
+    """
+
+    def pretty_print_result(self, *, result: Query_Result) -> str:
+        """
+        :return: *result* as indented JSON.
+        """
         result_dict = message_to_ordereddict(result)
         return json.dumps(result_dict, indent=2)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RoboKudoActionClient:
     """
     Send dynamic goals to the RoboKudo query action server.
@@ -74,13 +88,6 @@ class RoboKudoActionClient:
     preempt_timer: float | None = None
     """
     Delay before automatically cancelling an active goal.
-    """
-
-    rk_logger: logging.Logger = field(
-        init=False, default_factory=lambda: logging.getLogger(PACKAGE_NAME)
-    )
-    """
-    Logger receiving action progress and result messages.
     """
 
     _action_client: ActionClient = field(init=False)
@@ -127,18 +134,20 @@ class RoboKudoActionClient:
         """
         Create the ROS action client associated with the supplied node.
         """
-        self._action_client = ActionClient(self.node, Query, "/robokudo/query")
+        self._action_client = ActionClient(
+            node=self.node, action_type=Query, action_name="/robokudo/query"
+        )
 
-    def send_goal(self, goal_type: str) -> None:
+    def send_goal(self, *, goal_type: str) -> None:
         """
         Waits for the action server and sends a dynamic goal.
 
         :param goal_type: Content of the type field in the goal sent to the action
             server.
         """
-        self.rk_logger.info("Waiting for action server...")
+        logger.info("Waiting for action server...")
         if not self._action_client.wait_for_server(timeout_sec=5.0):
-            self.rk_logger.error("Action server not available!")
+            logger.error("Action server not available!")
             self.done = True
             return
 
@@ -146,12 +155,13 @@ class RoboKudoActionClient:
         goal_msg = Query.Goal()
         goal_msg.obj.type = goal_type
 
-        self.rk_logger.info(f"Sending goal request with type: '{goal_type}'")
+        logger.info(f"Sending goal request with type: '{goal_type}'")
         send_goal_future = self._action_client.send_goal_async(
             goal_msg, feedback_callback=self.feedback_callback
         )
         send_goal_future.add_done_callback(self.goal_response_callback)
 
+    @called_positionally
     def goal_response_callback(self, future: Future) -> None:
         """
         Handles the response from the action server regarding goal acceptance.
@@ -161,11 +171,11 @@ class RoboKudoActionClient:
         """
         self._goal_handle = future.result()
         if not self._goal_handle.accepted:
-            self.rk_logger.error("Goal rejected by the action server.")
+            logger.error("Goal rejected by the action server.")
             self.done = True
             return
 
-        self.rk_logger.info("Goal accepted by the action server.")
+        logger.info("Goal accepted by the action server.")
 
         # Scheduling of cancellation after X seconds
         if self.preempt_timer is not None:
@@ -177,6 +187,7 @@ class RoboKudoActionClient:
         result_future = self._goal_handle.get_result_async()
         result_future.add_done_callback(self.result_callback)
 
+    @called_positionally
     def feedback_callback(self, feedback_msg: Query_FeedbackMessage) -> None:
         """
         Processes feedback messages from the action server.
@@ -185,17 +196,17 @@ class RoboKudoActionClient:
         """
         feedback = feedback_msg.feedback
         self.last_feedback = feedback
-        self.rk_logger.info(f"Received feedback: {feedback.feedback}")
+        logger.info(f"Received feedback: {feedback.feedback}")
 
     def cancel_goal(self) -> None:
         """
         Sends a cancel request for the active goal.
         """
         if not self._goal_handle:
-            self.rk_logger.error("No active goal to cancel.")
+            logger.error("No active goal to cancel.")
             return
 
-        self.rk_logger.info("Sending cancel request...")
+        logger.info("Sending cancel request...")
         cancel_future = self._goal_handle.cancel_goal_async()
         cancel_future.add_done_callback(self.cancel_done_callback)
 
@@ -203,6 +214,7 @@ class RoboKudoActionClient:
         if self._cancel_timer:
             self._cancel_timer.cancel()
 
+    @called_positionally
     def cancel_done_callback(self, future: Future) -> None:
         """
         Handles the response from the action server regarding goal cancellation.
@@ -213,10 +225,11 @@ class RoboKudoActionClient:
         cancel_response = future.result()
         self.cancel_response = cancel_response
         if len(cancel_response.goals_canceling) > 0:
-            self.rk_logger.info("Goal cancellation accepted by the server.")
+            logger.info("Goal cancellation accepted by the server.")
         else:
-            self.rk_logger.warning("Goal cancellation was not successful.")
+            logger.warning("Goal cancellation was not successful.")
 
+    @called_positionally
     def result_callback(self, future: Future) -> None:
         """
         Processes the result from the action server.
@@ -230,23 +243,23 @@ class RoboKudoActionClient:
             result = result_future.result
 
             prp = PrettyResultPrinter()
-            pretty_result_str = prp.pretty_print_result(result)
+            pretty_result_str = prp.pretty_print_result(result=result)
 
             self.goal_status = status
             self.goal_result = result
 
             if status == GoalStatus.STATUS_CANCELED:
-                self.rk_logger.info("Goal was successfully canceled by the server.")
+                logger.info("Goal was successfully canceled by the server.")
             elif status == GoalStatus.STATUS_SUCCEEDED:
-                self.rk_logger.info("Goal succeeded.")
+                logger.info("Goal succeeded.")
             else:
-                self.rk_logger.info(f"Goal finished with status code: {status}")
+                logger.info(f"Goal finished with status code: {status}")
 
-            self.rk_logger.info(f"Formatted Result: \n{pretty_result_str}")
+            logger.info(f"Formatted Result: \n{pretty_result_str}")
         except Exception as e:
-            self.rk_logger.error(f"Error receiving result: {e}")
+            logger.error(f"Error receiving result: {e}")
         finally:
-            self.rk_logger.info("Shutting down after receiving the final result.")
+            logger.info("Shutting down after receiving the final result.")
             self.done = True
 
     def close(self) -> None:

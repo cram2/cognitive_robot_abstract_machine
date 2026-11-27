@@ -55,7 +55,7 @@ Your goal:
 # with world.modify_world():
 #     drawer = Drawer.create_with_new_body_in_world(...)
 #     handle = Handle.create_with_new_body_in_world(...)
-#     drawer.add(handle)
+#     drawer.add(part=handle)
 ```
 
 ```{code-cell} ipython3
@@ -71,7 +71,7 @@ with world.modify_world():
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1),
         scale=Scale(0.05, 0.02, 0.1),
     )
-    drawer.add(handle)
+    drawer.add(part=handle)
 ```
 
 ```{code-cell} ipython3

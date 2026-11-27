@@ -5,6 +5,7 @@ This module provides annotators for writing and publishing annotations.
 
 from __future__ import annotations
 
+import logging
 import json
 import os
 import shutil
@@ -17,6 +18,8 @@ from std_msgs.msg import String
 from robokudo.annotators.core import BaseAnnotator
 from robokudo.io.cas_annotation_codecs import serialize_annotations
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class AnnotationStorageWriter(BaseAnnotator):
@@ -53,7 +56,7 @@ class AnnotationStorageWriter(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.counter: int = -1
         """Counter for generating sequential filenames"""
@@ -123,17 +126,17 @@ class AnnotationPublisherWriter(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.pub: Publisher | None = None
         """ROS publisher for annotations"""
 
-    def setup(self, timeout: float) -> None:
+    def setup(self, *, timeout: float) -> None:
         """Set up the ROS2 publisher for annotation messages.
 
         :param timeout: Maximum time to wait for setup completion
         """
-        self.rk_logger.debug("%s.setup()" % self.__class__.__name__)
+        logger.debug("%s.setup()" % self.__class__.__name__)
 
         node = ROSNodeRegistry().get()
         self.pub = node.create_publisher(

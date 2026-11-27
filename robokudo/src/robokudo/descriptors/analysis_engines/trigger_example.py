@@ -26,6 +26,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -75,7 +76,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline with trigger mechanism
         """
-        kinect_config = CollectionReaderDescriptorFactory.create_descriptor("kinect")
+        kinect_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="kinect"
+        )
 
         seq = Pipeline("RWPipeline")
 
@@ -85,6 +88,7 @@ class AnalysisEngine(AnalysisEngineInterface):
             CollectionReaderAnnotator(descriptor=kinect_config),
             ImagePreprocessorAnnotator("ImagePreprocessor"),
             SlowAnnotator("SlowAnnotator"),
+            WorldUpdatingAnnotator(),
         ]:
             seq.add_child(annotator)
 

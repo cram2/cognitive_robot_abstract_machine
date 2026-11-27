@@ -25,11 +25,13 @@ from experiments.experiment_definitions import (
     ExperimentsTable,
     TypstRenderer,
 )
-from probabilistic_model.learning.gaussian_mixture.gaussian_mixture_model import (
+from probabilistic_model.learning.structure.gaussian_mixture.gaussian_mixture_model import (
     GaussianMixtureModel,
 )
-from probabilistic_model.learning.gaussian_mixture.step_mix_model import StepMixModel
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.gaussian_mixture.step_mix_model import (
+    StepMixModel,
+)
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from probabilistic_model.learning.learning_method import LearningMethod
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
     ProbabilisticCircuit,
@@ -294,7 +296,7 @@ def log_likelihood(circuit: ProbabilisticCircuit, data: pd.DataFrame) -> np.ndar
     :return: The log-likelihood of every row under the circuit.
     """
     columns = [variable.name for variable in circuit.variables]
-    return circuit.log_likelihood(data[columns].to_numpy())
+    return circuit.log_likelihood(events=data[columns].to_numpy())
 
 
 def benchmark(

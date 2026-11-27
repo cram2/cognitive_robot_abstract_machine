@@ -9,10 +9,76 @@ from dataclasses import dataclass, field
 from robokudo.exceptions import InvalidCameraObservation, RoboKudoError
 from robokudo.types.image import ImageRotation
 from semantic_digital_twin.datastructures.camera_model import CameraDistortionModel
+from robokudo.datastructures.ros_image_encoding import ROSImageEncoding
+
+
+# %% Compressed depth
+
+
+@dataclass(kw_only=True)
+class UnsupportedDepthCompression(RoboKudoError, ValueError):
+    """
+    A depth message declares a transport other than compressed depth.
+    """
+
+    compression: str
+    """
+    Transport description supplied by the message.
+    """
+
+    def error_message(self) -> str:
+        return f"Unsupported depth compression: {self.compression!r}."
+
+    def suggest_correction(self) -> str:
+        return "Subscribe to a compressedDepth image topic."
+
+
+@dataclass(kw_only=True)
+class CompressedDepthDecodingFailed(RoboKudoError, ValueError):
+    """
+    A compressed-depth image payload cannot be decoded.
+    """
+
+    def error_message(self) -> str:
+        return "Could not decode the compressed depth image."
+
+    def suggest_correction(self) -> str:
+        return (
+            "Provide a valid compressedDepth header followed by an encoded depth image."
+        )
+
+
+@dataclass(kw_only=True)
+class UnsupportedDepthEncoding(RoboKudoError, ValueError):
+    """
+    A compressed depth message declares an unsupported sample representation.
+    """
+
+    encoding: str
+    """
+    Depth representation declared by the message.
+    """
+
+    def error_message(self) -> str:
+        return f"Unsupported compressed depth encoding: {self.encoding!r}."
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Use {ROSImageEncoding.UINT16_SINGLE_CHANNEL} or "
+            f"{ROSImageEncoding.FLOAT32_SINGLE_CHANNEL} depth."
+        )
+
+
+# %% Stereo configuration
+@dataclass(kw_only=True)
+class InvalidStereoCameraConfiguration(RoboKudoError, ValueError):
+    """
+    Base for stereo settings that contradict the camera input contract.
+    """
 
 
 # %% Image rotation
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedImageRotation(RoboKudoError, ValueError):
     """
     A requested image rotation is outside the supported orientations.
@@ -38,7 +104,7 @@ class UnsupportedImageRotation(RoboKudoError, ValueError):
 
 
 # %% Camera distortion metadata
-@dataclass
+@dataclass(kw_only=True)
 class CameraDistortionModelMissing(InvalidCameraObservation):
     """
     Nonzero distortion coefficients have no declared distortion model.
@@ -67,7 +133,7 @@ class CameraDistortionModelMissing(InvalidCameraObservation):
         return "Declare the distortion model matching the supplied camera coefficients."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedCameraDistortionModel(InvalidCameraObservation):
     """
     Camera calibration declares a distortion model the adapter cannot interpret.
@@ -101,10 +167,78 @@ class UnsupportedCameraDistortionModel(InvalidCameraObservation):
         return f"Supply calibration using one of the supported distortion models: {choices}."
 
 
+# %% Camera frames
+
+
+@dataclass(kw_only=True)
+class CameraFrameIsReferenceFrame(InvalidCameraObservation):
+    """
+    A camera pose is measured against the frame of the camera itself.
+    """
+
+    reason: str = field(init=False)
+    """
+    Description of the frame measured against itself.
+    """
+
+    frame: str
+    """
+    The name of the camera frame and of the frame its pose is measured against.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Name the camera frame the pose is measured against.
+        """
+        self.reason = (
+            f"the camera pose is measured against its own frame '{self.frame}'"
+        )
+
+    def suggest_correction(self) -> str:
+        """
+        Point to the frames of the world to measure the camera pose against.
+        """
+        return "Measure the camera pose against a frame of the world, such as its root."
+
+
+@dataclass(kw_only=True)
+class FrameNamesSeveralBodies(InvalidCameraObservation):
+    """
+    A frame of a camera pose names more than one body of the world.
+    """
+
+    reason: str = field(init=False)
+    """
+    Description of the ambiguous frame.
+    """
+
+    frame: str
+    """
+    The name of the frame.
+    """
+
+    body_names: tuple[str, ...]
+    """
+    The names of the bodies the frame names.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        Name the ambiguous frame and the bodies it names.
+        """
+        self.reason = f"the frame '{self.frame}' names the bodies {self.body_names}"
+
+    def suggest_correction(self) -> str:
+        """
+        Ask for unique or full body names.
+        """
+        return "Give the bodies of the world unique names, or use their full names."
+
+
 # %% Semantic robot selection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotAnnotationMissing(RoboKudoError):
     """
     Raised when no semantic robot matches the runtime-world selection.
@@ -132,7 +266,7 @@ class RobotAnnotationMissing(RoboKudoError):
         return "synchronize a robot into the runtime world or select an existing robot."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotAnnotationAmbiguous(RoboKudoError):
     """
     Raised when runtime-world robot selection has multiple valid results.
@@ -159,7 +293,7 @@ class RobotAnnotationAmbiguous(RoboKudoError):
 # %% Semantic camera selection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraAnnotationMissing(RoboKudoError):
     """
     Raised when no semantic camera matches the configured selection.
@@ -179,7 +313,7 @@ class CameraAnnotationMissing(RoboKudoError):
         return "add a Camera annotation to the world or select an existing camera."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraAnnotationAmbiguous(RoboKudoError):
     """
     Raised when camera selection has more than one valid result.
@@ -197,7 +331,7 @@ class CameraAnnotationAmbiguous(RoboKudoError):
         return "configure the name of the camera that should provide perception data."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraPoseOverrideUnavailable(RoboKudoError):
     """
     Raised when the selected camera attachment cannot accept a pose override.
@@ -232,7 +366,7 @@ class CameraPoseOverrideUnavailable(RoboKudoError):
 
 
 # %% Recorded storage
-@dataclass
+@dataclass(kw_only=True)
 class RecordedViewMissing(RoboKudoError):
     """
     A recorded CAS references a view absent from storage.
@@ -255,7 +389,23 @@ class RecordedViewMissing(RoboKudoError):
         return "Restore the referenced view or select a complete recording."
 
 
-@dataclass
+@dataclass(kw_only=True)
+class ReplayWorldShared(RoboKudoError, RuntimeError):
+    """
+    A recording is replayed into a world other processes share.
+    """
+
+    def error_message(self) -> str:
+        return (
+            "A recording can only be replayed into a world of RoboKudo's own, but "
+            "RoboKudo joined a world another process shares."
+        )
+
+    def suggest_correction(self) -> str:
+        return "Stop the process serving the shared world before replaying a recording."
+
+
+@dataclass(kw_only=True)
 class CASViewCodecMissing(RoboKudoError, TypeError):
     """
     A CAS view has no registered codec.
@@ -278,7 +428,7 @@ class CASViewCodecMissing(RoboKudoError, TypeError):
         return "Register a codec for this view type."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnknownViewSerializer(RoboKudoError, ValueError):
     """
     A recorded serializer identifier has no registered decoder.
@@ -296,7 +446,7 @@ class UnknownViewSerializer(RoboKudoError, ValueError):
         return "Register the recorded serializer before playback."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ViewStorageFailed(RoboKudoError, RuntimeError):
     """
     Storage did not acknowledge a CAS view write.
@@ -314,7 +464,7 @@ class ViewStorageFailed(RoboKudoError, RuntimeError):
         return "Check the storage connection and write acknowledgement settings."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedViewNameMismatch(RoboKudoError, RuntimeError):
     """
     A stored view has a different name than its reference.
@@ -337,7 +487,7 @@ class RecordedViewNameMismatch(RoboKudoError, RuntimeError):
         return "Select a recording with consistent CAS view references."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidFileSequence(RoboKudoError, ValueError):
     """
     File playback keys do not match its data.
@@ -362,7 +512,7 @@ class InvalidFileSequence(RoboKudoError, ValueError):
         return "Supply one playback key for each data entry."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InvalidFileSource(RoboKudoError, ValueError):
     """
     The configured file source cannot be read.

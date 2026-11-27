@@ -64,9 +64,9 @@ def plan(
     """
     context = StatechartContext.with_extensions(
         world=demonstration_world,
-        extensions=demonstration.build_context_extensions(demonstration_world),
+        extensions=demonstration.build_context_extensions(world=demonstration_world),
     )
-    [plan] = demonstration.build_statechart(context).top_level_nodes
+    [plan] = demonstration.build_statechart(context=context).top_level_nodes
     return plan
 
 
@@ -99,7 +99,7 @@ def test_the_simulated_world_holds_daisy(demonstration_world: World) -> None:
 def test_the_scene_needs_no_population(
     demonstration: DAiSyGripperDemonstration, demonstration_world: World
 ) -> None:
-    assert demonstration.is_scene_populated(demonstration_world)
+    assert demonstration.is_scene_populated(world=demonstration_world)
 
 
 # %% where it runs
@@ -140,10 +140,14 @@ def test_every_gripper_step_announces_its_motion_and_waits_after_it(
 def test_each_gripper_moves_alone_then_both_together_presets_before_flex(
     plan: Sequence,
 ) -> None:
+    """
+    The demo moves each gripper alone and then both together, through the preset states
+    before the flexible ones.
+    """
     commands = [
         (
-            type(action.configuration.end_effector),
-            action.configuration.joint_state.state_type,
+            type(action.gripper_configuration.end_effector),
+            action.gripper_configuration.joint_state.state_type,
             isinstance(motion, Parallel),
         )
         for _, motion, _ in gripper_steps(plan)

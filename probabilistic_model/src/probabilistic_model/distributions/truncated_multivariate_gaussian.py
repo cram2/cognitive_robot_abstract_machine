@@ -1,3 +1,7 @@
+"""
+The multivariate Gaussian distribution restricted to a box and renormalized.
+"""
+
 from __future__ import annotations
 
 import copy
@@ -30,7 +34,6 @@ from probabilistic_model.probabilistic_model import (
 from probabilistic_model.query_results import LogConditioning, LogMode, LogTruncation
 
 if TYPE_CHECKING:
-
     from probabilistic_model.distributions.multivariate_gaussian import (
         MultivariateGaussianDistribution,
     )
@@ -167,13 +170,13 @@ class TruncatedMultivariateGaussianDistribution(
         :return: Whether the box allows the point.
         """
         return self.box.contains(
-            tuple(
+            item=tuple(
                 point[self.untruncated.index_of(variable)]
                 for variable in self.box.variables
             )
         )
 
-    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
+    def log_likelihood(self, *, events: npt.NDArray) -> npt.NDArray:
         return np.where(
             [self.box_contains(event) for event in events],
             np.atleast_1d(self.untruncated.scipy_distribution.logpdf(events))
@@ -206,7 +209,7 @@ class TruncatedMultivariateGaussianDistribution(
         return max(float(probability), 0.0) / self.normalizing_constant
 
     def probability_of_simple_event(self, event: SimpleEvent) -> float:
-        surviving = event.intersection_with(self.box)
+        surviving = event.intersection_with(other=self.box)
         if surviving.is_empty():
             return 0.0
         scipy_distribution = self.untruncated.scipy_distribution
@@ -234,7 +237,9 @@ class TruncatedMultivariateGaussianDistribution(
                 for variable, value in zip(self.variables, most_likely)
             }
         ).as_composite_set()
-        return LogMode(mode, float(self.log_likelihood(most_likely.reshape(1, -1))[0]))
+        return LogMode(
+            mode, float(self.log_likelihood(events=most_likely.reshape(1, -1))[0])
+        )
 
     def _most_likely_point(self, precision: npt.NDArray) -> npt.NDArray:
         """
@@ -263,7 +268,7 @@ class TruncatedMultivariateGaussianDistribution(
         ).x
         return np.array(
             [
-                interval.nearest_contained_value(float(value))
+                interval.nearest_contained_value(value=float(value))
                 for value, interval in zip(found, intervals)
             ]
         )
@@ -284,11 +289,11 @@ class TruncatedMultivariateGaussianDistribution(
         :raises EventIsNotABoxError: If the event is not one simple interval per
             variable.
         """
-        event.fill_missing_variables(set(self.variables))
+        event.fill_missing_variables(variables=set(self.variables))
         if not event.is_box():
             raise EventIsNotABoxError(model=self, event=event)
         [box] = event.simple_sets
-        surviving = box.intersection_with(self.box)
+        surviving = box.intersection_with(other=self.box)
         probability = self.probability_of_simple_event(surviving)
         if probability == 0.0:
             return LogTruncation.impossible()
@@ -319,7 +324,7 @@ class TruncatedMultivariateGaussianDistribution(
         confinement = conditioning.distribution.log_truncated(slice_of_the_box)
 
         inside = all(
-            self.box[variable].contains(value) for variable, value in point.items()
+            self.box[variable].contains(item=value) for variable, value in point.items()
         )
         log_likelihood = (
             conditioning.log_likelihood

@@ -407,7 +407,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         :returns: True if any pair overlaps.
         """
         return any(
-            first.intersection_with(second).size > 0
+            first.intersection_with(other=second).size > 0
             for first, second in itertools.combinations(component_supports, 2)
         )
 
@@ -549,7 +549,9 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         return (
             copy.deepcopy(self.probabilistic_circuit)
             .log_truncated_in_place(
-                event.fill_missing_variables_pure(self.probabilistic_circuit.variables)
+                event.fill_missing_variables_pure(
+                    variables=self.probabilistic_circuit.variables
+                )
             )
             .distribution
         )
@@ -573,7 +575,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             copy.deepcopy(cause_marginal_circuit)
             .log_truncated_in_place(
                 cause_region.event.fill_missing_variables_pure(
-                    cause_marginal_circuit.variables
+                    variables=cause_marginal_circuit.variables
                 )
             )
             .distribution
@@ -701,10 +703,10 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         for adjustment_partition in adjustment_partitions:
             # fill first: intersection_with keeps only the left operand's variables.
             joint_event = adjustment_partition.event.fill_missing_variables_pure(
-                self.probabilistic_circuit.variables
+                variables=self.probabilistic_circuit.variables
             ).intersection_with(
-                cause_region.event.fill_missing_variables_pure(
-                    self.probabilistic_circuit.variables
+                other=cause_region.event.fill_missing_variables_pure(
+                    variables=self.probabilistic_circuit.variables
                 )
             )
             truncated = self._circuit_truncated_to(joint_event)
@@ -733,13 +735,13 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             base_circuit if base_circuit is not None else self.probabilistic_circuit
         )
         regions: list[SupportRegion] = []
-        variable_support = circuit.support.marginal([variable])
+        variable_support = circuit.support.marginal(variables=[variable])
         for simple_region in variable_support.simple_sets:
             region_event = SimpleEvent.from_data(
                 {variable: simple_region[variable]}
             ).as_composite_set()
             probability = circuit.probability(
-                region_event.fill_missing_variables_pure(circuit.variables)
+                region_event.fill_missing_variables_pure(variables=circuit.variables)
             )
             if probability > 0.0:
                 regions.append(SupportRegion(region_event, float(probability)))
@@ -782,7 +784,9 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
                     {variable: value}
                 ).as_composite_set()
                 probability = circuit.probability(
-                    region_event.fill_missing_variables_pure(circuit.variables)
+                    region_event.fill_missing_variables_pure(
+                        variables=circuit.variables
+                    )
                 )
                 if probability > 0.0:
                     regions_by_value[value] = SupportRegion(
@@ -833,7 +837,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             region_probability = float(
                 interventional_circuit.probability(
                     region.event.fill_missing_variables_pure(
-                        interventional_circuit.variables
+                        variables=interventional_circuit.variables
                     )
                 )
             )
@@ -862,7 +866,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             in the order of their values.
         """
         regions_by_values: dict[Any, SupportRegion] = {}
-        joint_support = self.probabilistic_circuit.support.marginal(variables)
+        joint_support = self.probabilistic_circuit.support.marginal(variables=variables)
         for simple_region in joint_support.simple_sets:
             atomic_values_per_variable = [
                 self._split_into_atomic_values(simple_region[variable])
@@ -876,7 +880,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
                 ).as_composite_set()
                 probability = self.probabilistic_circuit.probability(
                     region_event.fill_missing_variables_pure(
-                        self.probabilistic_circuit.variables
+                        variables=self.probabilistic_circuit.variables
                     )
                 )
                 if probability > 0.0:
@@ -906,7 +910,9 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
         ).as_composite_set()
         return float(
             interventional_circuit.probability(
-                event.fill_missing_variables_pure(interventional_circuit.variables)
+                event.fill_missing_variables_pure(
+                    variables=interventional_circuit.variables
+                )
             )
         )
 
@@ -932,7 +938,7 @@ class CausalCircuit(Generic[RepresentationType], SubClassSafeGeneric):
             region_probability = float(
                 interventional_circuit.probability(
                     region.event.fill_missing_variables_pure(
-                        interventional_circuit.variables
+                        variables=interventional_circuit.variables
                     )
                 )
             )

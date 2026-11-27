@@ -34,7 +34,7 @@ from probabilistic_model.distributions.truncated_multivariate_gaussian import (
     MomentIntegration,
 )
 from probabilistic_model.exceptions import NoClosedFormError
-from probabilistic_model.learning.gaussian_mixture.gaussian_mixture_model import (
+from probabilistic_model.learning.structure.gaussian_mixture.gaussian_mixture_model import (
     GaussianMixtureModel,
 )
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
@@ -209,16 +209,23 @@ def test_the_parameters_are_laid_out_by_the_variables_of_the_circuit(
 
 
 def test_round_trip_through_rustworkx_keeps_the_likelihood(any_circuit):
+    """
+    A circuit converted into a layered circuit and back has its likelihood.
+    """
     samples = any_circuit.sample(200)
     np.testing.assert_allclose(
         LayeredCircuitToRustworkxCircuitConverter.convert(
             RustworkxCircuitToLayeredCircuitConverter.convert(any_circuit)
-        ).log_likelihood(samples),
-        any_circuit.log_likelihood(samples),
+        ).log_likelihood(events=samples),
+        any_circuit.log_likelihood(events=samples),
     )
 
 
 def test_a_learned_gaussian_mixture_converts():
+    """
+    A Gaussian mixture learned from data converts into a layered circuit with its
+    likelihood.
+    """
     generator = np.random.default_rng(0)
     data = pd.DataFrame(
         np.concatenate(
@@ -237,9 +244,9 @@ def test_a_learned_gaussian_mixture_converts():
     samples = rx_circuit.sample(300)
     np.testing.assert_allclose(
         RustworkxCircuitToLayeredCircuitConverter.convert(rx_circuit).log_likelihood(
-            samples
+            events=samples
         ),
-        rx_circuit.log_likelihood(samples),
+        rx_circuit.log_likelihood(events=samples),
     )
 
 
@@ -247,12 +254,15 @@ def test_a_learned_gaussian_mixture_converts():
 
 
 def test_log_likelihood(any_circuit):
+    """
+    A layered circuit has the likelihood of the rustworkx circuit it was converted from.
+    """
     samples = any_circuit.sample(500)
     np.testing.assert_allclose(
         RustworkxCircuitToLayeredCircuitConverter.convert(any_circuit).log_likelihood(
-            samples
+            events=samples
         ),
-        any_circuit.log_likelihood(samples),
+        any_circuit.log_likelihood(events=samples),
     )
 
 
@@ -271,7 +281,7 @@ def test_probability_of_a_box(any_circuit, numerical_integration_tolerance, x, y
     event = SimpleEvent.from_data(
         {x: closed(-1.0, 2.0), y: closed(0.0, 1.5), z: closed(0.2, 2.0)}
     )
-    event.fill_missing_variables(set(any_circuit.variables))
+    event.fill_missing_variables(variables=set(any_circuit.variables))
     assert RustworkxCircuitToLayeredCircuitConverter.convert(
         any_circuit
     ).probability_of_simple_event(event) == pytest.approx(
@@ -341,6 +351,10 @@ def test_expectation_next_to_another_leaf(
     ids=lambda names: "".join(names),
 )
 def test_marginal(three_variable_gaussian, kept_names):
+    """
+    The marginal of a layered circuit over some of the variables has the likelihood of
+    the rustworkx marginal.
+    """
     kept = [
         variable
         for variable in three_variable_gaussian.variables
@@ -351,8 +365,10 @@ def test_marginal(three_variable_gaussian, kept_names):
     np.testing.assert_allclose(
         RustworkxCircuitToLayeredCircuitConverter.convert(three_variable_gaussian)
         .marginal(kept)
-        .log_likelihood(samples[:, columns]),
-        three_variable_gaussian.marginal(kept).log_likelihood(samples[:, columns]),
+        .log_likelihood(events=samples[:, columns]),
+        three_variable_gaussian.marginal(kept).log_likelihood(
+            events=samples[:, columns]
+        ),
     )
 
 
@@ -408,6 +424,10 @@ def test_the_support_is_the_whole_space(gaussian_mixture):
 def test_truncation_to_a_box(
     circuit_fixture, request, box_of_x_and_y, numerical_integration_tolerance
 ):
+    """
+    Truncated to a box, a layered circuit has the probability and the likelihood of the
+    truncated rustworkx circuit.
+    """
     rx_circuit = request.getfixturevalue(circuit_fixture)
     rx_truncation = rx_circuit.truncated(box_of_x_and_y.__deepcopy__())
     truncation = RustworkxCircuitToLayeredCircuitConverter.convert(
@@ -422,13 +442,16 @@ def test_truncation_to_a_box(
     )
     samples = rx_truncation.distribution.sample(200)
     np.testing.assert_allclose(
-        truncation.distribution.log_likelihood(samples),
-        rx_truncation.distribution.log_likelihood(samples),
+        truncation.distribution.log_likelihood(events=samples),
+        rx_truncation.distribution.log_likelihood(events=samples),
         atol=1e-3,
     )
 
 
 def test_likelihood_outside_the_box_is_minus_infinity(gaussian_mixture, x, y):
+    """
+    Truncated to a box, a layered circuit gives every point outside of it no likelihood.
+    """
     truncated = (
         RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_mixture)
         .truncated(
@@ -439,7 +462,7 @@ def test_likelihood_outside_the_box_is_minus_infinity(gaussian_mixture, x, y):
         .distribution
     )
     outside = np.array([[3.0, 1.0], [0.0, 1.5], [0.0, 0.0]])
-    assert np.all(np.isneginf(truncated.log_likelihood(outside)))
+    assert np.all(np.isneginf(truncated.log_likelihood(events=outside)))
 
 
 def test_truncation_to_the_whole_space_keeps_the_gaussians(gaussian_mixture, x, y):
@@ -498,8 +521,8 @@ def assert_truncation_agrees_with_rustworkx(
     )
     samples = rx_truncation.distribution.sample(200)
     np.testing.assert_allclose(
-        truncation.distribution.log_likelihood(samples),
-        rx_truncation.distribution.log_likelihood(samples),
+        truncation.distribution.log_likelihood(events=samples),
+        rx_truncation.distribution.log_likelihood(events=samples),
         atol=1e-3,
     )
 
@@ -606,6 +629,9 @@ def test_mode_of_a_truncated_gaussian(single_gaussian, x, y):
 def test_samples_of_a_truncated_circuit_lie_in_the_box(
     gaussian_mixture, box_of_x_and_y
 ):
+    """
+    Every sample of a circuit truncated to a box lies in the box.
+    """
     rx_truncated = gaussian_mixture.truncated(
         box_of_x_and_y.__deepcopy__()
     ).distribution
@@ -616,7 +642,7 @@ def test_samples_of_a_truncated_circuit_lie_in_the_box(
     )
     samples = truncated.sample(5000)
     assert samples.shape == (5000, 2)
-    assert np.all(np.isfinite(truncated.log_likelihood(samples)))
+    assert np.all(np.isfinite(truncated.log_likelihood(events=samples)))
     np.testing.assert_allclose(
         samples.mean(axis=0), rx_truncated.sample(5000).mean(axis=0), atol=0.05
     )
@@ -725,6 +751,10 @@ def test_the_way_to_integrate_moments_follows_the_distributions_through_the_laye
     ],
 )
 def test_conditioning_on_some_of_the_variables(circuit_fixture, request, x):
+    """
+    Conditioned on some of the variables, a layered circuit agrees with the conditioned
+    rustworkx circuit.
+    """
     rx_circuit = request.getfixturevalue(circuit_fixture)
     point = {x: 0.5}
     rx_conditioning = rx_circuit.log_conditional(point)
@@ -738,16 +768,20 @@ def test_conditioning_on_some_of_the_variables(circuit_fixture, request, x):
     free = [variable for variable in rx_circuit.variables if variable != x]
     samples = rx_conditioning.distribution.marginal(free).sample(200)
     np.testing.assert_allclose(
-        log_conditioning.distribution.marginal(free).log_likelihood(samples),
-        rx_conditioning.distribution.marginal(free).log_likelihood(samples),
+        log_conditioning.distribution.marginal(free).log_likelihood(events=samples),
+        rx_conditioning.distribution.marginal(free).log_likelihood(events=samples),
     )
 
 
 def test_conditioning_on_every_variable_is_the_likelihood(gaussian_mixture, x, y):
+    """
+    Conditioned on every variable, the probability of the condition is the likelihood of
+    the point, and every sample is the point.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_mixture)
     log_conditioning = layered.log_conditional({x: 0.5, y: -0.25})
     assert log_conditioning.log_likelihood == pytest.approx(
-        float(layered.log_likelihood(np.array([[0.5, -0.25]]))[0])
+        float(layered.log_likelihood(events=np.array([[0.5, -0.25]]))[0])
     )
     assert log_conditioning.distribution.sample(3).tolist() == [[0.5, -0.25]] * 3
 
@@ -756,6 +790,10 @@ def test_conditioning_on_every_variable_is_the_likelihood(gaussian_mixture, x, y
 def test_conditioning_a_truncated_circuit_agrees_with_rustworkx(
     circuit_fixture, request, box_of_x_and_y, x, y
 ):
+    """
+    Conditioning a truncated layered circuit agrees with conditioning the truncated
+    rustworkx circuit.
+    """
     rx_circuit = request.getfixturevalue(circuit_fixture)
     point = {x: 0.5}
     values = np.array([[0.1], [0.7], [1.4]])
@@ -772,8 +810,8 @@ def test_conditioning_a_truncated_circuit_agrees_with_rustworkx(
         expected_conditioning.log_likelihood, abs=1e-3
     )
     np.testing.assert_allclose(
-        log_conditioning.distribution.marginal([y]).log_likelihood(values),
-        expected_conditioning.distribution.marginal([y]).log_likelihood(values),
+        log_conditioning.distribution.marginal([y]).log_likelihood(events=values),
+        expected_conditioning.distribution.marginal([y]).log_likelihood(events=values),
         atol=1e-3,
     )
 
@@ -781,6 +819,10 @@ def test_conditioning_a_truncated_circuit_agrees_with_rustworkx(
 def test_conditioning_a_truncated_mixture_is_the_density_of_the_marginal(
     gaussian_mixture, box_of_x_and_y, x
 ):
+    """
+    The probability of conditioning a truncated mixture on a value is the density of the
+    marginal at the value.
+    """
     truncated = (
         RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_mixture)
         .truncated(box_of_x_and_y)
@@ -791,7 +833,9 @@ def test_conditioning_a_truncated_mixture_is_the_density_of_the_marginal(
     # the density of x at 0.5 integrates the joint density over the slice of y
     grid = np.linspace(0.0, 1.5, 20001)
     density = np.exp(
-        truncated.log_likelihood(np.column_stack([np.full_like(grid, 0.5), grid]))
+        truncated.log_likelihood(
+            events=np.column_stack([np.full_like(grid, 0.5), grid])
+        )
     )
     assert np.exp(log_probability) == pytest.approx(
         np.trapezoid(density, grid), abs=1e-3
@@ -830,43 +874,60 @@ def layered_mixture(
 
 
 def test_translation_moves_the_density(layered_mixture, x, y):
+    """
+    Translated, a layered circuit gives the translated points the likelihood of the
+    original ones.
+    """
     samples = layered_mixture.sample(50)
-    expected = layered_mixture.log_likelihood(samples)
-    layered_mixture.apply_translation({x: 1.0, y: -2.0})
+    expected = layered_mixture.log_likelihood(events=samples)
+    layered_mixture.apply_translation(translation={x: 1.0, y: -2.0})
     np.testing.assert_allclose(
-        layered_mixture.log_likelihood(samples + np.array([1.0, -2.0])), expected
+        layered_mixture.log_likelihood(events=samples + np.array([1.0, -2.0])), expected
     )
 
 
 def test_scaling_scales_the_density(layered_mixture, x, y):
+    """
+    Scaled, a layered circuit gives the scaled points the likelihood of the original
+    ones divided by the scaling.
+    """
     samples = layered_mixture.sample(50)
-    expected = layered_mixture.log_likelihood(samples) - np.log(2.0 * 3.0)
-    layered_mixture.apply_scaling({x: 2.0, y: 3.0})
+    expected = layered_mixture.log_likelihood(events=samples) - np.log(2.0 * 3.0)
+    layered_mixture.apply_scaling(scaling={x: 2.0, y: 3.0})
     np.testing.assert_allclose(
-        layered_mixture.log_likelihood(samples * np.array([2.0, 3.0])), expected
+        layered_mixture.log_likelihood(events=samples * np.array([2.0, 3.0])), expected
     )
 
 
 def test_renaming_that_reorders_the_variables(gaussian_mixture, x, y):
+    """
+    Renaming a variable so that the variables sort differently keeps the likelihood of
+    every point.
+    """
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_mixture)
     samples = gaussian_mixture.sample(50)
-    expected = layered.log_likelihood(samples)
+    expected = layered.log_likelihood(events=samples)
 
     # a name that sorts after y moves x to the last column
-    renamed_x = Continuous("z_x")
+    renamed_x = Continuous(name="z_x")
     layered.update_variables(VariableMap({x: renamed_x}))
     assert list(layered.variables) == [y, renamed_x]
-    np.testing.assert_allclose(layered.log_likelihood(samples[:, ::-1]), expected)
+    np.testing.assert_allclose(
+        layered.log_likelihood(events=samples[:, ::-1]), expected
+    )
 
 
 # %% serialization
 
 
 def test_json_round_trip(layered_mixture):
+    """
+    The root layer of a circuit restored from JSON has the likelihood of the circuit.
+    """
     points = np.array([[0.5, 0.5], [1.5, 1.0]])
     restored = from_json(to_json(layered_mixture.root))
     assert isinstance(restored, SumLayer)
     np.testing.assert_allclose(
-        restored.log_likelihood_of_nodes(points)[:, 0],
-        layered_mixture.log_likelihood(points),
+        restored.log_likelihood_of_nodes(events=points)[:, 0],
+        layered_mixture.log_likelihood(events=points),
     )

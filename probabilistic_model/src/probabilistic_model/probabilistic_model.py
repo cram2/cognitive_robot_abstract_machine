@@ -1,3 +1,7 @@
+"""
+The interface of probabilistic models and the queries every model answers.
+"""
+
 from __future__ import annotations
 
 import itertools
@@ -116,10 +120,10 @@ class ProbabilisticModel(ABC):
         The shape of the array has to be (n, len(self.variables)).
         :return: The likelihood of the events as an array with shape (n,).
         """
-        return np.exp(self.log_likelihood(events))
+        return np.exp(self.log_likelihood(events=events))
 
     @abstractmethod
-    def log_likelihood(self, events: npt.NDArray) -> npt.NDArray:
+    def log_likelihood(self, *, events: npt.NDArray) -> npt.NDArray:
         """
         Calculate the log-likelihood of an event.
 
@@ -152,7 +156,7 @@ class ProbabilisticModel(ABC):
         :param event: The event.
         :return: The probability of the event.
         """
-        event.fill_missing_variables(set(self.variables))
+        event.fill_missing_variables(variables=set(self.variables))
         return sum(
             self.probability_of_simple_event(simple_set)
             for simple_set in event.simple_sets
@@ -228,7 +232,7 @@ class ProbabilisticModel(ABC):
             utils module.
         :return: The truncated distribution and the probability of the event.
         """
-        event.fill_missing_variables(set(self.variables))
+        event.fill_missing_variables(variables=set(self.variables))
         return self.log_truncated(event, singleton_allowed).exponentiated()
 
     @abstractmethod
@@ -337,7 +341,7 @@ class ProbabilisticModel(ABC):
             {variable: variable.domain for variable in self.variables}
         )
 
-    def apply_translation(self, translation: dict[Variable, float]):
+    def apply_translation(self, *, translation: dict[Variable, float]) -> None:
         """
         Translate the model in-place.
 
@@ -349,7 +353,7 @@ class ProbabilisticModel(ABC):
         """
         raise NotImplementedError
 
-    def apply_scaling(self, scaling: dict[Variable, float]):
+    def apply_scaling(self, *, scaling: dict[Variable, float]) -> None:
         """
         Scale the model in-place.
 
@@ -609,7 +613,9 @@ class ProbabilisticModel(ABC):
         )
         limited_complement_of_support = complement_of_support & limiting_interval
         traces = SimpleEventPlotter(
-            SimpleEvent.from_data({self.variables[0]: limited_complement_of_support})
+            event=SimpleEvent.from_data(
+                {self.variables[0]: limited_complement_of_support}
+            )
         ).plot()
         for trace in traces:
             trace.update(name=PDF_TRACE_NAME, marker=dict(color=PDF_TRACE_COLOR))
@@ -740,7 +746,7 @@ class ProbabilisticModel(ABC):
         self, simple_event: SimpleEvent, samples: npt.NDArray
     ):
         # filter samples by this event
-        samples_of_this_event = [s for s in samples if simple_event.contains(s)]
+        samples_of_this_event = [s for s in samples if simple_event.contains(item=s)]
 
         if len(samples_of_this_event) == 0:
             return go.Surface()
@@ -834,7 +840,9 @@ class ProbabilisticModel(ABC):
         :return: traces for the mode of a multivariate model.
         """
         try:
-            mode_traces = EventPlotter(self.mode().event).plot(color=MODE_TRACE_COLOR)
+            mode_traces = EventPlotter(event=self.mode().event).plot(
+                color=MODE_TRACE_COLOR
+            )
             for trace in mode_traces:
                 trace.update(name=MODE_TRACE_NAME, mode="lines+markers")
         except IntractableError:

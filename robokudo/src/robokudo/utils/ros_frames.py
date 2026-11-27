@@ -35,7 +35,9 @@ def normalize_ros_frame_id(frame_id: str) -> str:
 
 def find_bodies_for_ros_frame(world: World, frame_id: str) -> list[Body]:
     """
-    Find bodies whose full names identify the same ROS frame.
+    Find the bodies a ROS frame identifies: those whose full name, prefix included, is
+    the frame, or else those whose name without prefix is, as a robot driver publishes
+    the frames of a robot whose bodies carry its name as prefix.
 
     :param world: World containing the bodies to search.
     :param frame_id: ROS frame identifier, with or without leading slashes.
@@ -43,8 +45,11 @@ def find_bodies_for_ros_frame(world: World, frame_id: str) -> list[Body]:
     :raises InvalidROSFrameId: If the frame identifier is empty.
     """
     normalized = normalize_ros_frame_id(frame_id)
-    return [
+    bodies_of_full_name = [
         body
         for body in world.bodies
         if normalize_ros_frame_id(str(body.name)) == normalized
     ]
+    if bodies_of_full_name:
+        return bodies_of_full_name
+    return [body for body in world.bodies if body.name.name == normalized]

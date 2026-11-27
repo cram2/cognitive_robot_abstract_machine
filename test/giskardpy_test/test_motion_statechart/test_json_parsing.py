@@ -37,13 +37,14 @@ from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
 )
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
-from krrood_spatial_math.spatial_types import Vector3, HomogeneousTransformationMatrix
+from krrood_spatial_math.spatial_types import (
+    Vector3,
+    HomogeneousTransformationMatrix,
+)
 from krrood_spatial_math.spatial_types import Point3, Pose
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-)
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
     DegreeOfFreedomLimits,
@@ -52,6 +53,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
 # %% motion nodes in JSON
 
@@ -87,10 +89,12 @@ def test_to_json_joint_position_list(mini_world):
 
 
 def test_default_weight_survives_a_json_round_trip(mini_world: World) -> None:
+    """
+    A node keeps its default weight through a JSON round trip.
+    """
     root, tip = mini_world.bodies
     node = CartesianPositionStraight(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=Point3(1, 0, 0, reference_frame=root),
     )
     new_json_data = json.loads(json.dumps(to_json(node)))
@@ -115,8 +119,11 @@ def test_executing_json_parsed_statechart(tmp_path):
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
-        root_C_tip = RevoluteConnection(
-            parent=root, child=tip, axis=Vector3.Z(), raw_dof=dof
+        root_C_tip = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            parent=root,
+            child=tip,
+            raw_dof=dof,
         )
         world.add_connection(root_C_tip)
 
@@ -125,8 +132,11 @@ def test_executing_json_parsed_statechart(tmp_path):
             limits=limits,
         )
         world.add_degree_of_freedom(dof)
-        root_C_tip2 = RevoluteConnection(
-            parent=root, child=tip2, axis=Vector3.Z(), raw_dof=dof
+        root_C_tip2 = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            parent=root,
+            child=tip2,
+            raw_dof=dof,
         )
         world.add_connection(root_C_tip2)
 
@@ -169,6 +179,9 @@ def test_executing_json_parsed_statechart(tmp_path):
 
 
 def test_cart_goal_simple(pr2_world_state_reset: World):
+    """
+    A pose goal read back from JSON still brings the PR2's base to the goal pose.
+    """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name("base_footprint")
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
     tip_goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -177,8 +190,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
 
     statechart = Statechart(context=_create_executor(pr2_world_state_reset).context)
     cart_goal = CartesianPose(
-        root_link=root,
-        tip_link=tip,
+        kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_pose=tip_goal,
     )
     statechart.add_node(node=cart_goal)
@@ -201,7 +213,7 @@ def test_cart_goal_simple(pr2_world_state_reset: World):
     executor.tick_until_end()
 
     fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
-    assert np.allclose(fk, tip_goal, atol=cart_goal.translation_threshold)
+    assert np.allclose(fk, tip_goal, atol=cart_goal.position_threshold)
 
 
 def test_structure_copy_of_a_plain_statechart_keeps_the_motion_node_kinds(

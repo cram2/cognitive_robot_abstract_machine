@@ -1,3 +1,9 @@
+"""
+Tests of rustworkx leaves of distributions over several variables.
+"""
+
+from __future__ import annotations
+
 import copy
 
 import numpy as np
@@ -24,17 +30,17 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 @pytest.fixture
 def first() -> Continuous:
-    return Continuous("a")
+    return Continuous(name="a")
 
 
 @pytest.fixture
 def second() -> Continuous:
-    return Continuous("b")
+    return Continuous(name="b")
 
 
 @pytest.fixture
 def other() -> Continuous:
-    return Continuous("c")
+    return Continuous(name="c")
 
 
 @pytest.fixture
@@ -82,6 +88,10 @@ def columns_of(
 
 
 class TestBuildingAMultivariateLeaf:
+    """
+    Building a leaf of a distribution over several variables.
+    """
+
     def test_the_factory_builds_a_multivariate_leaf(self, correlated):
         assert isinstance(leaf(correlated, ProbabilisticCircuit()), MultivariateLeaf)
 
@@ -94,8 +104,8 @@ class TestBuildingAMultivariateLeaf:
         copied = copy.deepcopy(circuit)
         assert copied.root is not circuit.root
         points = np.array([[0.0, 1.0, 2.0]])
-        assert copied.log_likelihood(points) == pytest.approx(
-            circuit.log_likelihood(points)
+        assert copied.log_likelihood(events=points) == pytest.approx(
+            circuit.log_likelihood(events=points)
         )
 
 
@@ -103,14 +113,18 @@ class TestBuildingAMultivariateLeaf:
 
 
 class TestReadingTheColumnsOfTheLeaf:
+    """
+    Reading the columns of the variables of a leaf from the events of its circuit.
+    """
+
     def test_the_likelihood_reads_the_leaf_s_variables_in_its_own_order(
         self, circuit, correlated, independent_of_it, first, second, other
     ):
         points = np.array([[-9.0, 11.0, 3.2], [-10.5, 9.0, 2.5]])
         expected = correlated.log_likelihood(
-            columns_of(circuit, points, second, first)
-        ) + independent_of_it.log_likelihood(columns_of(circuit, points, other))
-        assert circuit.log_likelihood(points) == pytest.approx(expected)
+            events=columns_of(circuit, points, second, first)
+        ) + independent_of_it.log_likelihood(events=columns_of(circuit, points, other))
+        assert circuit.log_likelihood(events=points) == pytest.approx(expected)
 
     def test_samples_land_in_the_columns_of_their_own_variables(
         self, circuit, correlated, first, second
@@ -132,6 +146,10 @@ class TestReadingTheColumnsOfTheLeaf:
 
 
 class TestConditioningTheLeaf:
+    """
+    Truncating and conditioning a leaf of a distribution over several variables.
+    """
+
     def test_a_circuit_of_only_the_leaf_answers_what_the_distribution_cannot(
         self, correlated, first, second
     ):
@@ -144,7 +162,9 @@ class TestConditioningTheLeaf:
         point = {first: -9.5, second: 10.5}
         conditioning = circuit.log_conditional(point)
         assert conditioning.log_likelihood == pytest.approx(
-            correlated.log_likelihood(np.array([[point[second], point[first]]]))[0]
+            correlated.log_likelihood(events=np.array([[point[second], point[first]]]))[
+                0
+            ]
         )
         assert {
             unit.distribution.variable: unit.distribution.location
@@ -169,8 +189,8 @@ class TestConditioningTheLeaf:
         conditional = circuit.log_conditional({first: -9.5, second: 10.5}).distribution
         marginal = conditional.marginal([other])
         points = np.array([[2.0], [3.5]])
-        assert marginal.log_likelihood(points) == pytest.approx(
-            independent_of_it.log_likelihood(points)
+        assert marginal.log_likelihood(events=points) == pytest.approx(
+            independent_of_it.log_likelihood(events=points)
         )
 
     def test_fixing_every_variable_while_keeping_the_structure_leaves_diracs(
@@ -181,7 +201,9 @@ class TestConditioningTheLeaf:
             point, preserve_structure=True
         )
         assert conditioning.log_likelihood == pytest.approx(
-            correlated.log_likelihood(np.array([[point[second], point[first]]]))[0]
+            correlated.log_likelihood(events=np.array([[point[second], point[first]]]))[
+                0
+            ]
         )
         assert not any(
             isinstance(unit, MultivariateLeaf)
@@ -196,8 +218,8 @@ class TestConditioningTheLeaf:
         assert conditioning.log_likelihood == pytest.approx(expected.log_likelihood)
         remaining = conditioning.distribution.marginal([second])
         points = np.array([[9.0], [10.0]])
-        assert remaining.log_likelihood(points) == pytest.approx(
-            expected.distribution.log_likelihood(points)
+        assert remaining.log_likelihood(events=points) == pytest.approx(
+            expected.distribution.log_likelihood(events=points)
         )
 
     def test_fixing_only_other_variables_leaves_the_leaf_alone(
@@ -206,8 +228,8 @@ class TestConditioningTheLeaf:
         conditional = circuit.log_conditional({other: 3.0}).distribution
         remaining = conditional.marginal([first, second])
         points = np.array([[-10.0, 10.0]])
-        assert remaining.log_likelihood(points) == pytest.approx(
-            correlated.log_likelihood(np.array([[10.0, -10.0]]))
+        assert remaining.log_likelihood(events=points) == pytest.approx(
+            correlated.log_likelihood(events=np.array([[10.0, -10.0]]))
         )
 
 
@@ -241,12 +263,12 @@ class TestConditioningATruncatedLeaf:
         ]
         conditioning = truncated_circuit.log_conditional({other: 3.0})
         assert conditioning.log_likelihood == pytest.approx(
-            independent_of_it.log_likelihood(np.array([[3.0]]))[0]
+            independent_of_it.log_likelihood(events=np.array([[3.0]]))[0]
         )
         points = np.array([[-10.0, 10.0], [-9.5, 9.2]])
         assert conditioning.distribution.marginal([first, second]).log_likelihood(
-            points
-        ) == pytest.approx(truncated.log_likelihood(points[:, ::-1]))
+            events=points
+        ) == pytest.approx(truncated.log_likelihood(events=points[:, ::-1]))
 
     def test_fixing_a_variable_of_the_truncated_leaf(
         self, truncated_circuit, first, second, other
@@ -261,8 +283,8 @@ class TestConditioningATruncatedLeaf:
         assert conditioning.log_likelihood == pytest.approx(expected.log_likelihood)
         points = np.array([[9.5], [10.5]])
         assert conditioning.distribution.marginal([second]).log_likelihood(
-            points
-        ) == pytest.approx(expected.distribution.log_likelihood(points))
+            events=points
+        ) == pytest.approx(expected.distribution.log_likelihood(events=points))
 
 
 # %% moments of the leaf
@@ -304,7 +326,7 @@ class TestTruncatingTheLeaf:
         ).as_composite_set()
         truncation = circuit.log_truncated(event)
         assert truncation.log_probability == pytest.approx(
-            np.log(correlated.probability(event.marginal([first, second])))
+            np.log(correlated.probability(event.marginal(variables=[first, second])))
         )
         assert truncation.distribution.probability(
             truncation.distribution.support
@@ -331,7 +353,7 @@ class TestTruncatingTheLeaf:
         ).as_composite_set()
         truncation = circuit.log_truncated(event)
         assert truncation.log_probability == pytest.approx(
-            np.log(correlated.probability(event.marginal([first, second])))
+            np.log(correlated.probability(event.marginal(variables=[first, second])))
         )
         assert truncation.distribution.probability(
             truncation.distribution.support
@@ -342,6 +364,10 @@ class TestTruncatingTheLeaf:
 
 
 class TestMarginalAndTranslation:
+    """
+    The marginal and the translation of a leaf of several variables.
+    """
+
     def test_a_marginal_without_the_leaf_s_variables_drops_the_leaf(
         self, circuit, other
     ):
@@ -351,7 +377,7 @@ class TestMarginalAndTranslation:
     def test_translating_the_circuit_moves_the_leaf(
         self, circuit, correlated, first, second, other
     ):
-        circuit.apply_translation({first: 1.0, second: 2.0, other: 0.0})
+        circuit.apply_translation(translation={first: 1.0, second: 2.0, other: 0.0})
         [moved] = [
             unit for unit in circuit.leaves if isinstance(unit, MultivariateLeaf)
         ]

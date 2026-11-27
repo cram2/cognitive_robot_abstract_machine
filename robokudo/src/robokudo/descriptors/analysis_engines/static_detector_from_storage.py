@@ -28,6 +28,7 @@ from robokudo.descriptors.factories.cr_descriptor_factory import (
 )
 from robokudo.idioms import pipeline_init
 from robokudo.pipeline import Pipeline
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -74,7 +75,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for static object detection
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         sod = StaticObjectDetectorAnnotator.Descriptor()
         sod.parameters.bounding_box_x = 40
@@ -90,6 +93,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 StaticObjectDetectorAnnotator(descriptor=sod),
                 ObjectHypothesisVisualizer(),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

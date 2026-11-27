@@ -1,19 +1,12 @@
 """
-Pipeline implementation for RoboKudo.
-
-This module provides the Pipeline class, which is a specialized version of py_trees'
-Sequence behavior. A Pipeline manages its own Common Analysis Structure (CAS) and
-provides visualization capabilities for its annotators.
-
-Key features:
-
-* Automatic CAS management for each pipeline iteration
-* Visualization support through annotator outputs
-* Helper methods for accessing annotators and CAS
-* Nested pipeline support with proper scoping
+The RoboKudo :class:`Pipeline`, a py_trees sequence of annotators that owns a Common
+Analysis Structure (CAS) for each iteration and the world its annotators perceive into,
+visualizes the outputs of its annotators and can be nested.
 """
 
 from __future__ import annotations
+
+# %% Imports
 
 import logging
 import timeit
@@ -22,13 +15,19 @@ from py_trees.behaviour import Behaviour
 from py_trees.blackboard import Blackboard
 from py_trees.common import Status
 from py_trees.composites import Sequence
+from semantic_digital_twin.world import World
 from typing_extensions import Any
 
 import robokudo.annotators.core
 import robokudo.annotators.outputs
 import robokudo.cas as cas
-import robokudo.defs as defs
 import robokudo.utils.tree
+from krrood.patterns.called_positionally import called_positionally
+
+logger = logging.getLogger(__name__)
+
+
+# %% Pipeline lifecycle
 
 
 class Pipeline(Sequence):
@@ -44,17 +43,21 @@ class Pipeline(Sequence):
         self,
         name: str = "Sequence",
         children: list[Behaviour] | None = None,
-        *args: Any,
         **kwargs: Any,
     ) -> None:
-        super().__init__(name, memory=True, children=children)
         """
         Initialize the pipeline.
 
         :param name: Name of the pipeline, defaults to "Sequence"
         :param children: List of child behaviors, defaults to None
         """
-        self.cas: cas.CAS = None
+        super().__init__(name, memory=True, children=children)
+        self._world: World = World()
+        """
+        The world of this pipeline, used unless it is nested in another pipeline; an
+        empty world of its own until another is set through :attr:`world`.
+        """
+        self.cas: cas.CAS | None = None
         """
         The Common Analysis Structure for this pipeline.
         """
@@ -62,28 +65,23 @@ class Pipeline(Sequence):
         """
         Monotonic CAS counter that is local to this pipeline instance.
         """
-        self.cas_start_timer: timeit.default_timer = None
+        self.processing_start_time: float = timeit.default_timer()
         """
-        Timer for measuring pipeline execution time.
-        """
-        self.rk_logger = logging.getLogger(defs.PACKAGE_NAME)
-        """
-        Logger instance for this pipeline.
+        Reading of :func:`timeit.default_timer`, in seconds, when processing of the
+        current CAS started; the processing duration that is logged is measured from it.
         """
         self.create_new_cas()
-        # self.update_gui_for_this_pipeline = False
-        # self.annotator_outputs = AnnotatorOutputs()
 
-    def create_new_cas(self) -> None:
+    def create_new_cas(self, *, acquired_cas: cas.CAS | None = None) -> None:
         """
-        Create a new Common Analysis Structure (CAS) for this pipeline.
+        Begin a processing cycle with a fresh or successfully acquired CAS.
 
-        Also resets the execution timer.
+        Also restarts the measurement of the processing duration.
         """
         self._cas_counter += 1
-        self.cas = cas.CAS()
+        self.cas = acquired_cas if acquired_cas is not None else cas.CAS()
         self.cas.cas_id = self._cas_counter
-        self.cas_start_timer = timeit.default_timer()
+        self.processing_start_time = timeit.default_timer()
 
     def setup(self, **kwargs: Any) -> bool:
         """
@@ -106,6 +104,22 @@ class Pipeline(Sequence):
             a.add_self_to_annotator_output_struct()
         annotator_output_pipeline_map_buffer.map[self.name].redraw = True
         return True
+
+    @property
+    def world(self) -> World:
+        """
+        The world the annotators of this pipeline perceive into.
+
+        A pipeline nested in another one perceives into the world of the outer pipeline.
+        """
+        outer_pipeline = robokudo.utils.tree.find_parent_of_type(self, Pipeline)
+        if outer_pipeline is not None:
+            return outer_pipeline.world
+        return self._world
+
+    @world.setter
+    def world(self, world: World) -> None:
+        self._world = world
 
     def get_cas(self) -> cas.CAS:
         """
@@ -153,9 +167,9 @@ class Pipeline(Sequence):
         Handles pipeline execution status and triggers GUI updates on failure.
         """
         super().update()
-        self.rk_logger.debug("%s.update()" % self.__class__.__name__)
+        logger.debug("%s.update()" % self.__class__.__name__)
         if self.status == Status.FAILURE:
-            self.rk_logger.debug(
+            logger.debug(
                 "%s: Previous execution was a failure. Update GUI." % self.status
             )
             blackboard = Blackboard()
@@ -164,6 +178,7 @@ class Pipeline(Sequence):
             )
             annotator_output_pipeline_map_buffer.map[self.name].redraw = True
 
+    @called_positionally
     def terminate(self, new_status: Status) -> None:
         """
         Handle pipeline termination.
@@ -173,7 +188,7 @@ class Pipeline(Sequence):
 
         :param new_status: New execution status
         """
-        self.rk_logger.debug(
+        logger.debug(
             "%s.terminate()[%s->%s]"
             % (self.__class__.__name__, self.status, new_status)
         )
@@ -186,8 +201,8 @@ class Pipeline(Sequence):
             annotator_output_pipeline_map_buffer.map[self.name].redraw = True
 
         if new_status == Status.SUCCESS or new_status == Status.FAILURE:
-            self.feedback_message = f"Processing took {(timeit.default_timer() - self.cas_start_timer):.4f}s"
-            self.rk_logger.debug(
-                f"Pipeline Processing took in total {(timeit.default_timer() - self.cas_start_timer):.4f}s"
+            self.feedback_message = f"Processing took {(timeit.default_timer() - self.processing_start_time):.4f}s"
+            logger.debug(
+                f"Pipeline Processing took in total {(timeit.default_timer() - self.processing_start_time):.4f}s"
             )
-            self.cas_start_timer = timeit.default_timer()
+            self.processing_start_time = timeit.default_timer()

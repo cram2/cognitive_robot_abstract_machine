@@ -10,12 +10,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from pathlib import Path
 
 import mujoco
 import numpy as np
 
-from krrood.patterns.path_enumeration import PathEnumeration
 
 from coraplex.demonstrations import RobotDemonstration
 from coraplex.plans.context_extensions import RobotAccess
@@ -35,7 +33,7 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.robot_parts import AbstractRobot
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
-from krrood_spatial_math.spatial_types import Pose
+from krrood_spatial_math.spatial_types import Pose, Pose2D
 from semantic_digital_twin.specifications.connections import (
     Connection6DoFSpecification,
 )
@@ -55,12 +53,12 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% the scene
 
 
-class SceneFile(PathEnumeration):
+class SceneFile(StrEnum):
     """
-    The files the scene is built from, under the coraplex resources.
+    The files the scene is built from, as ``package://`` URIs.
     """
 
-    MILK = Path(__file__).resolve().parents[2] / "resources" / "objects" / "milk.stl"
+    MILK = "package://iai_objects/objects/milk.stl"
     """
     The mesh of the milk carton.
     """
@@ -80,7 +78,7 @@ class SceneBody(StrEnum):
 # %% the demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MilkTransportDemonstration(RobotDemonstration):
     """
     The HSR carries the milk from the counter in front of it to the table behind it.
@@ -167,10 +165,10 @@ class MilkTransportDemonstration(RobotDemonstration):
     def robot_specification(self) -> RobotSpecification:
         return RobotSpecification(self.used_robot)
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(SceneBody.MILK)
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         """
         Stand the milk on the counter, free to be picked up.
         """
@@ -179,23 +177,23 @@ class MilkTransportDemonstration(RobotDemonstration):
             semantic_annotation_type=Milk,
             root_specification=BodySpecification.mesh(
                 SceneBody.MILK,
-                str(SceneFile.MILK),
+                SceneFile.MILK,
                 connection_specification=Connection6DoFSpecification(),
             ),
         ).spawn(world)
         ContactParameters.create_for_grasped_object().apply_to([milk.root])
         milk.root.parent_connection.origin = self._milk_pose_on(
-            world.get_body_by_name(SceneBody.COUNTER), milk
+            surface=world.get_body_by_name(SceneBody.COUNTER), milk=milk
         ).homogeneous_matrix
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
                 robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
             )
         ]
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Raise the torso, park the arm, take the milk from the counter, carry it to the
         table and set it down there.
@@ -205,28 +203,37 @@ class MilkTransportDemonstration(RobotDemonstration):
         [milk] = world.get_semantic_annotations_by_type(Milk)
         [arm] = hsrb.all_arms
         taking_pose = self._standing_pose_facing(
-            self._milk_pose_on(world.get_body_by_name(SceneBody.COUNTER), milk)
+            milk_pose=self._milk_pose_on(
+                surface=world.get_body_by_name(SceneBody.COUNTER), milk=milk
+            )
         )
-        target = self._milk_pose_on(world.get_body_by_name(SceneBody.TABLE), milk)
+        target = self._milk_pose_on(
+            surface=world.get_body_by_name(SceneBody.TABLE), milk=milk
+        )
         statechart = Statechart(context=context)
         statechart.add_node(
             node=Sequence(
                 nodes=[
                     MoveTorsoAction(torso_state=TorsoState.HIGH),
                     ParkArmsAction(arms=hsrb.all_arms),
-                    NavigateAction(target_location=taking_pose),
-                    PickUpAction(grasp=self._grasp_from(taking_pose, milk), arm=arm),
-                    NavigateAction(target_location=self._standing_pose_facing(target)),
-                    PlaceAction(
-                        arm=arm, object_designator=milk, target_location=target
+                    NavigateAction(planar_goal_pose=taking_pose),
+                    PickUpAction(
+                        grasp_candidate=self._grasp_from(
+                            standing_pose=taking_pose, milk=milk
+                        ),
+                        arm=arm,
                     ),
+                    NavigateAction(
+                        planar_goal_pose=self._standing_pose_facing(milk_pose=target)
+                    ),
+                    PlaceAction(arm=arm, graspable=milk, goal_pose=target),
                     ParkArmsAction(arms=hsrb.all_arms),
                 ]
             )
         )
         return statechart
 
-    def build_simulation(self, world: World) -> MujocoSim:
+    def build_simulation(self, *, world: World) -> MujocoSim:
         return MujocoSim(
             world=world,
             headless=self.headless,
@@ -235,7 +242,7 @@ class MilkTransportDemonstration(RobotDemonstration):
             noslip_iterations=self.no_slip_iterations,
         )
 
-    def _milk_pose_on(self, surface: Body, milk: Milk) -> Pose:
+    def _milk_pose_on(self, *, surface: Body, milk: Milk) -> Pose:
         """
         :param surface: The counter or the table.
         :param milk: The milk.
@@ -260,20 +267,22 @@ class MilkTransportDemonstration(RobotDemonstration):
             reference_frame=world.root,
         )
 
-    def _standing_pose_facing(self, milk_pose: Pose) -> Pose:
+    def _standing_pose_facing(self, *, milk_pose: Pose) -> Pose2D:
         """
         :param milk_pose: Where the milk stands or is set down.
         :return: Where the robot's base stands on the floor to reach the milk there,
             :attr:`standing_distance` before it and facing it.
         """
-        return (
-            milk_pose.homogeneous_matrix
-            @ HomogeneousTransformationMatrix.from_xyz_rpy(
-                x=-self.standing_distance, z=-float(milk_pose.z)
-            )
-        ).pose
+        return Pose2D.from_pose(
+            (
+                milk_pose.homogeneous_matrix
+                @ HomogeneousTransformationMatrix.from_xyz_rpy(
+                    x=-self.standing_distance
+                )
+            ).pose
+        )
 
-    def _grasp_from(self, standing_pose: Pose, milk: Milk) -> GraspCandidate:
+    def _grasp_from(self, *, standing_pose: Pose2D, milk: Milk) -> GraspCandidate:
         """
         :param standing_pose: Where the robot stands to take the milk.
         :param milk: The milk.

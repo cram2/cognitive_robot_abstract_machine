@@ -1,3 +1,10 @@
+"""
+Analysis engine detecting the objects a world descriptor places in camera data replayed
+from MongoDB.
+"""
+
+from __future__ import annotations
+
 import robokudo.analysis_engine
 import robokudo.behaviours.clear_errors
 import robokudo.descriptors.camera_configs.config_mongodb_playback
@@ -17,14 +24,26 @@ from robokudo.annotators.world_descriptor_bootstrap import (
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
+    """
+    Detects the cereal and milk the ``world_iai_kitchen20`` world descriptor places in
+    camera data replayed from MongoDB, and puts them into the world.
+    """
+
     def name(self):
         return "static_detector_world_descriptor_from_storage"
 
     def implementation(self):
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        """
+        :return: A pipeline that replays camera data from MongoDB, loads the
+            ``world_iai_kitchen20`` world descriptor and detects its cereal and milk.
+        """
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         bootstrap = WorldDescriptorBootstrapAnnotator.Descriptor()
         bootstrap.parameters.world_descriptor_name = "world_iai_kitchen20"
@@ -47,6 +66,7 @@ class AnalysisEngine(robokudo.analysis_engine.AnalysisEngineInterface):
                 ImagePreprocessorAnnotator("ImagePreprocessor"),
                 StaticObjectDetectorAnnotator(descriptor=sod),
                 ObjectHypothesisVisualizer(descriptor=oh_vis),
+                WorldUpdatingAnnotator(),
             ]
         )
         return seq

@@ -35,6 +35,7 @@ from robokudo.behaviours.action_server_checks import ActionServerCheck
 from robokudo.descriptors.factories.cr_descriptor_factory import (
     CollectionReaderDescriptorFactory,
 )
+from robokudo.annotators.world_updating import WorldUpdatingAnnotator
 
 
 class AnalysisEngine(AnalysisEngineInterface):
@@ -90,7 +91,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline for query processing
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         seq = Pipeline("StoragePipeline")
         seq.add_children(
@@ -103,6 +106,7 @@ class AnalysisEngine(AnalysisEngineInterface):
                 PlaneAnnotator(),
                 PointCloudClusterExtractor(),
                 ClusterColorAnnotator(),
+                WorldUpdatingAnnotator(),
                 QueryReply(),
                 ActionServerCheck(),
             ]

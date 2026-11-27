@@ -20,7 +20,7 @@ MIN_INLIER_GAIN_TO_ACCEPT_LARGER_RADIUS = 0.03
 MIN_ACCEPTABLE_CYLINDER_SCORE = 0.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SphereFit:
     """
     Fitted sphere model with inlier and quality information.
@@ -34,7 +34,7 @@ class SphereFit:
     score: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CylinderFit:
     """
     Fitted cylinder model with inlier and quality information.
@@ -50,7 +50,7 @@ class CylinderFit:
     score: float
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CuboidFit:
     """
     Fitted cuboid model with inlier and quality information.
@@ -68,7 +68,7 @@ class CuboidFit:
 FittedShape = Union[SphereFit, CylinderFit, CuboidFit]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CylinderFitConstraints:
     """
     Numerical constraints used during cylinder fitting and validation.
@@ -83,7 +83,7 @@ class CylinderFitConstraints:
     max_axis_center_distance_to_bbox_diagonal_ratio: float
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CylinderInitializationSettings:
     """
     Search settings controlling cylinder multi-start initialization.
@@ -94,7 +94,7 @@ class CylinderInitializationSettings:
     inlier_polishing_iterations: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FixedAxisCylinderRadiusFit:
     """
     Radius, residuals, and inliers for a fixed-axis cylinder refit.
@@ -105,7 +105,7 @@ class FixedAxisCylinderRadiusFit:
     inlier_indices: np.ndarray
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FixedAxisCylinderExtent:
     """
     Finite cylinder extent for a fixed-axis cylinder refit.

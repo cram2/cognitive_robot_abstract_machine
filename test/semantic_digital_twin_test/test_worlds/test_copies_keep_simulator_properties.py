@@ -17,7 +17,10 @@ from typing_extensions import Any, Callable
 
 from krrood.adapters.json_serializer import from_json, to_json
 from krrood.symbolic_math.symbolic_math import SymbolicMathType
-from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix, Vector3
+from krrood_spatial_math.spatial_types import (
+    HomogeneousTransformationMatrix,
+    Vector3,
+)
 from semantic_digital_twin.adapters.multi_sim import MujocoJoint, MujocoTendon
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.soft_trunk import SoftTrunk, SoftTrunkSection
@@ -28,9 +31,7 @@ from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     FixedConnection,
     OmniDrive,
-    PrismaticConnection,
-    RevoluteConnection,
-    ScrewConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.soft_connections import (
@@ -64,8 +65,11 @@ def simulated_world() -> World:
     arm.add_simulator_property(GravityCompensation(fraction=0.5))
     with world.modify_world():
         world.add_simulator_property(MujocoTendon(name="coupling"))
-        hinge = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=arm, axis=Vector3.Z()
+        hinge = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+            world=world,
+            parent=root,
+            child=arm,
         )
         hinge.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
         world.add_connection(hinge)
@@ -232,6 +236,10 @@ def test_merge_records_moving_the_world_properties(simulated_world: World):
 
 
 def test_world_property_addition_survives_json(simulated_world: World):
+    """
+    The addition of a simulator property to a world, sent through JSON, adds the
+    property to the receiving world.
+    """
     world = World()
     with world.modify_world():
         world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
@@ -241,7 +249,7 @@ def test_world_property_addition_survives_json(simulated_world: World):
 
     received = from_json(json.loads(json.dumps(to_json(sent))))
     with world.modify_world():
-        received.apply(world)
+        received.apply(world=world)
 
     assert world.simulator_additional_properties == [MujocoTendon(name="coupling")]
 
@@ -367,9 +375,22 @@ def connect_with_dofs(
     "connect",
     [
         lambda world, parent, child: FixedConnection(parent=parent, child=child),
-        connect_with_dofs(RevoluteConnection, axis=Vector3.Z()),
-        connect_with_dofs(PrismaticConnection, axis=Vector3.X()),
-        connect_with_dofs(ScrewConnection, axis=Vector3.Z(), screw_pitch=0.01),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
+        ),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3.X()
+            ),
+        ),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3.Z(), pitch=0.01
+            ),
+        ),
         connect_with_dofs(Connection6DoF),
         connect_with_dofs(OmniDrive),
         connect_with_dofs(DifferentialDrive),

@@ -133,7 +133,7 @@ def split_handle(annotation: Mug) -> Handle:
     """
     :return: The handle split off the mug's shape.
     """
-    return handle_splitter().split(annotation)
+    return handle_splitter().split(whole=annotation)
 
 
 def handle_splitter() -> PartSplitter:
@@ -144,13 +144,16 @@ def handle_splitter() -> PartSplitter:
 
 
 def test_a_part_is_split_off_only_the_first_time_it_is_asked_for():
+    """
+    Ensuring a part splits it off the first time and returns the same part afterwards.
+    """
     annotation = annotated_mug()
     splitter = handle_splitter()
 
-    handle = splitter.part_of(annotation)
+    handle = splitter.ensure_part(whole=annotation)
 
     assert annotation.handle is handle
-    assert splitter.part_of(annotation) is handle
+    assert splitter.ensure_part(whole=annotation) is handle
     assert len(annotation._world.bodies) == 2
 
 
@@ -166,6 +169,9 @@ def test_a_set_handle_field_is_not_split_again():
 
 
 def test_a_field_of_many_handles_gets_every_handle_split_off():
+    """
+    Splitting twice into a field of many handles adds both handles.
+    """
     annotation = annotated_mug()
     world = annotation._world
     pot = Pot(root=annotation.root)
@@ -174,10 +180,10 @@ def test_a_field_of_many_handles_gets_every_handle_split_off():
         world.add_semantic_annotation(pot)
     bottom = mug().triangles_center[:, 2] < 0.0
 
-    first = handle_splitter().split(pot)
+    first = handle_splitter().split(whole=pot)
     second = PartSplitter(
         part_type=Handle, finder=located(bottom & ~handle_faces())
-    ).split(pot)
+    ).split(whole=pot)
 
     assert pot.handles == [first, second]
 
@@ -211,6 +217,10 @@ def test_rolling_back_a_split_restores_the_whole_shape():
 
 
 def test_a_split_is_reproduced_in_a_synchronized_world():
+    """
+    The modifications of a split, sent through JSON, split the copy of the world the
+    same way.
+    """
     annotation = annotated_mug()
     world = annotation._world
     split_handle(annotation)
@@ -219,7 +229,7 @@ def test_a_split_is_reproduced_in_a_synchronized_world():
     for block in world.modification_history:
         kwargs = WorldEntityWithIDKwargsTracker.from_world(copy).create_kwargs()
         with copy.modify_world():
-            from_json(to_json(block), **kwargs).apply(copy)
+            from_json(to_json(block), **kwargs).apply(world=copy)
 
     root = copy.get_kinematic_structure_entity_by_id(annotation.root.id)
     assert len(copy.bodies) == 2
@@ -397,6 +407,10 @@ def test_a_body_whose_collision_differs_from_how_it_looks_is_not_split():
 
 
 def test_a_decomposer_gives_the_pieces_new_collision_shapes():
+    """
+    With a convex hull decomposer, the part and the rest of the body get new, convex
+    collision shapes.
+    """
     annotation = mug_with_own_collision()
     splitter = PartSplitter(
         part_type=Handle,
@@ -404,7 +418,7 @@ def test_a_decomposer_gives_the_pieces_new_collision_shapes():
         decomposer=ConvexHullDecomposer(),
     )
 
-    handle = splitter.split(annotation)
+    handle = splitter.split(whole=annotation)
 
     for body in (handle.root, annotation.root):
         assert body.collision.combined_mesh.is_convex

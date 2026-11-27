@@ -5,7 +5,7 @@ The exceptions raised across the semantic digital twin.
 from __future__ import annotations, absolute_import
 
 # %% Imports
-from dataclasses import dataclass, field, Field
+from dataclasses import dataclass, field
 from datetime import timedelta
 from http import HTTPStatus
 from pathlib import Path
@@ -21,12 +21,16 @@ from semantic_digital_twin.datastructures.definitions import JointStateType
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 
 if TYPE_CHECKING:
+    from krrood_spatial_math.spatial_types import ScrewAxis
+    from semantic_digital_twin.semantic_annotations.semantic_relationship import (
+        IsSemanticRelationship,
+    )
     from semantic_digital_twin.input_synchronization import InputSynchronizer
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootBody,
         HasSupportingSurface,
     )
-    from semantic_digital_twin.semantic_annotations.mixins import HasGraspCandidates
+    from semantic_digital_twin.semantic_annotations.mixins import IsGraspable
     from semantic_digital_twin.grasping.object_relative_grasp import (
         ObjectRelativeGrasp,
     )
@@ -815,22 +819,53 @@ class MissingConnectionParentError(UsageError):
         )
 
 
-@dataclass
-class MissingConnectionAxisError(UsageError):
+@dataclass(kw_only=True)
+class UnnormalizedScrewAxisError(UsageError):
     """
-    Raised when an active connection is created without a movement axis.
+    Raised when the screw axis of a screw axis connection is not normalized: one that
+    rotates must rotate one radian per unit of position, and one that does not rotate
+    must translate one meter per unit of position.
     """
 
-    connection_type_name: str
+    screw_axis: ScrewAxis
     """
-    The name of the active connection type that was created without an axis.
+    The screw axis the connection was given.
     """
 
     def error_message(self) -> str:
-        return f"'{self.connection_type_name}' is an active connection and requires an axis."
+        return (
+            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} is not "
+            f"normalized."
+        )
 
     def suggest_correction(self) -> str:
-        return "pass a movement axis via the 'axis' keyword argument."
+        return (
+            "give a rotating screw axis a unit rotation per unit of position, and one "
+            "that only translates a unit translation; use the multiplier to scale the "
+            "position."
+        )
+
+
+@dataclass(kw_only=True)
+class ScrewAxisWithoutTranslationError(UsageError):
+    """
+    Raised when a translation is asked of a screw axis connection that only rotates its
+    child, so that no position advances the child along the axis.
+    """
+
+    screw_axis: ScrewAxis
+    """
+    The screw axis of the connection.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"the screw axis (ω, v) = {self.screw_axis.to_np().tolist()} has no "
+            f"translation, so the child never translates along it."
+        )
+
+    def suggest_correction(self) -> str:
+        return "give the rotation as a position in radians instead."
 
 
 @dataclass
@@ -927,105 +962,120 @@ class MismatchingWorld(UsageError):
         )
 
 
-@dataclass
-class CannotBeAPartOf(UsageError):
+@dataclass(kw_only=True)
+class UnknownSemanticRelationshipField(UsageError):
     """
-    Raised when ``add`` is called with a part that no part-whole relationship field of
-    the annotation accepts.
-    """
-
-    annotation: SemanticAnnotation
-    """
-    The annotation the part was being added to.
+    Raised when a field name is given that is not a field of the annotation for the kind
+    of semantic relationship asked about.
     """
 
-    part: SemanticAnnotation
+    annotation: type[SemanticAnnotation]
     """
-    The part that could not be added.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{type(self.part).__name__} cannot be added as a part of "
-            f"{type(self.annotation).__name__}: no part-whole relationship field accepts it."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            f"Check out the superclasses of {type(self.annotation).__name__}, to find the currently valid part-whole "
-            f"relationships, and if you think its currently incomplete, feel free to adjust it and make a PR for it"
-        )
-
-
-@dataclass
-class AmbiguousPart(UsageError):
-    """
-    Raised when ``add`` is called with a part whose type matches more than one part-
-    whole relationship field of the annotation, so the target field is ambiguous.
-    """
-
-    annotation: SemanticAnnotation
-    """
-    The annotation the part was being added to.
-    """
-
-    part: SemanticAnnotation
-    """
-    The part that could not be unambiguously added.
-    """
-
-    fields: list[Field]
-    """
-    The names of the part-whole relationship fields whose element type accepts the part.
-    """
-
-    def error_message(self) -> str:
-        return (
-            f"{type(self.part).__name__} cannot be unambiguously added as a part of "
-            f"{type(self.annotation).__name__}: it matches multiple part-whole relationship fields "
-            f"({', '.join([field_.name for field_ in self.fields])})."
-        )
-
-    def suggest_correction(self) -> str:
-        return (
-            "consider if its practical to use the 'field_name' keyword argument for the `add` method to"
-            " disambiguate the matching cases."
-        )
-
-
-@dataclass
-class UnknownPartWholeRelationshipField(UsageError):
-    """
-    Raised when ``add`` is called with a ``field_name`` that is not a part-whole
-    relationship field of the annotation.
-    """
-
-    annotation: type[HasRootBody]
-    """
-    The annotation type the part was being added to.
+    The annotation type whose field was asked for.
     """
 
     field_name: str
     """
-    The field name that was requested but does not exist as a part-whole relationship
-    field.
+    The field name that is not a field of the kind of relationship.
+    """
+
+    relationship_type: type[IsSemanticRelationship]
+    """
+    The kind of semantic relationship the field was asked for.
     """
 
     available_fields: list[str]
     """
-    The names of the annotation's part-whole relationship fields.
+    The names of the annotation's fields of that kind of relationship.
     """
 
     def error_message(self) -> str:
         return (
-            f"{self.annotation.__name__} has no part-whole relationship field "
-            f"'{self.field_name}."
+            f"{self.annotation.__name__} has no field '{self.field_name}' marked "
+            f"{self.relationship_type.__name__}."
         )
 
     def suggest_correction(self) -> str:
         return (
-            f"the available fields are: {', '.join(self.available_fields) or '(none)'}"
+            f"The fields marked {self.relationship_type.__name__} are: "
+            f"{', '.join(self.available_fields) or '(none)'}."
         )
+
+
+@dataclass(kw_only=True)
+class NoFieldAcceptsEntity(UsageError):
+    """
+    Raised when an entity is to be related to an annotation, but no field of the
+    annotation for that kind of semantic relationship accepts its type.
+    """
+
+    annotation: SemanticAnnotation
+    """
+    The annotation the entity was to be related to.
+    """
+
+    entity: Any
+    """
+    The entity no field accepts.
+    """
+
+    relationship_type: type[IsSemanticRelationship]
+    """
+    The kind of semantic relationship the entity was to be related by.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.entity).__name__} cannot be related to "
+            f"{type(self.annotation).__name__}: none of its fields marked "
+            f"{self.relationship_type.__name__} accepts it."
+        )
+
+    def suggest_correction(self) -> str:
+        return (
+            f"Check the mixins of {type(self.annotation).__name__} for its fields marked "
+            f"{self.relationship_type.__name__}, and add a mixin for "
+            f"{type(self.entity).__name__} where it belongs."
+        )
+
+
+@dataclass(kw_only=True)
+class SeveralFieldsAcceptEntity(UsageError):
+    """
+    Raised when an entity is to be related to an annotation, but several fields of the
+    annotation for that kind of semantic relationship accept its type.
+    """
+
+    annotation: SemanticAnnotation
+    """
+    The annotation the entity was to be related to.
+    """
+
+    entity: Any
+    """
+    The entity several fields accept.
+    """
+
+    relationship_type: type[IsSemanticRelationship]
+    """
+    The kind of semantic relationship the entity was to be related by.
+    """
+
+    field_names: list[str]
+    """
+    The names of the fields that accept the entity.
+    """
+
+    def error_message(self) -> str:
+        return (
+            f"{type(self.entity).__name__} cannot be related to "
+            f"{type(self.annotation).__name__} unambiguously: its fields "
+            f"{', '.join(self.field_names)}, marked {self.relationship_type.__name__}, "
+            f"all accept it."
+        )
+
+    def suggest_correction(self) -> str:
+        return f"Pass field_name to choose one of {', '.join(self.field_names)}."
 
 
 @dataclass
@@ -2449,7 +2499,7 @@ class NoGraspGeometry(UsageError):
     shape to derive them from.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The annotation whose grasps were asked for.
     """
@@ -2478,7 +2528,7 @@ class GraspNotOnObjectError(UsageError):
     The grasp that missed.
     """
 
-    graspable: HasGraspCandidates
+    graspable: IsGraspable
     """
     The object it was meant for.
     """

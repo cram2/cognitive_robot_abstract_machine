@@ -1,3 +1,9 @@
+"""
+Tests of progressive circuits, which learn one column of weights per task.
+"""
+
+from __future__ import annotations
+
 from enum import IntEnum
 
 import numpy as np
@@ -12,19 +18,22 @@ from probabilistic_model.distributions.gaussian import (
     TruncatedGaussianDistribution,
 )
 from probabilistic_model.distributions.uniform import UniformDistribution
-from probabilistic_model.learning.exceptions import UnsupportedLeafDistributionError
-from probabilistic_model.learning.expectation_maximization import (
-    ExpectationMaximization,
+from probabilistic_model.learning.parameters.expectation_maximization.exceptions import (
+    UnsupportedLeafDistributionError,
 )
-from probabilistic_model.learning.progressive.exceptions import (
+from probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization import (
+    ExpectationMaximization,
+    MaximizationRegularization,
+)
+from probabilistic_model.learning.structure.progressive.exceptions import (
     ColumnStructureMismatchError,
     EarlierColumnShareOutOfRangeError,
     UnregisteredColumnError,
 )
-from probabilistic_model.learning.progressive.expectation_maximization import (
+from probabilistic_model.learning.structure.progressive.expectation_maximization import (
     ProgressiveExpectationMaximization,
 )
-from probabilistic_model.learning.progressive.progressive_circuit import (
+from probabilistic_model.learning.structure.progressive.progressive_circuit import (
     AlignedUnits,
     CircuitColumn,
     ProgressiveProbabilisticCircuit,
@@ -54,7 +63,7 @@ def _make_factorized_template(*variable_names: str) -> ProbabilisticCircuit:
     """
     A product of one standard Gaussian leaf per variable.
     """
-    return fully_factorized([Continuous(name) for name in variable_names])
+    return fully_factorized([Continuous(name=name) for name in variable_names])
 
 
 def _make_mixture_template(*variable_names: str) -> ProbabilisticCircuit:
@@ -106,7 +115,7 @@ def _column_log_likelihood(
     """
     The per-sample log-likelihood computed at the root of a column.
     """
-    progressive_circuit.circuit.log_likelihood(data)
+    progressive_circuit.circuit.log_likelihood(events=data)
     return np.array(column.root.result_of_current_query)
 
 
@@ -450,11 +459,17 @@ def test_learn_fits_gaussian_leaf_to_data_of_single_column():
 
 
 def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
+    """
+    A column learned on constant data keeps the Gaussian variance of its leaf at the
+    minimum the regularization of the expectation maximization sets.
+    """
     progressive_circuit = ProgressiveProbabilisticCircuit(
         template=_make_factorized_template("x")
     )
     column = progressive_circuit.add_column(task_name="task-a")
-    expectation_maximization = ExpectationMaximization(minimum_gaussian_variance=0.25)
+    expectation_maximization = ExpectationMaximization(
+        regularization=MaximizationRegularization(minimum_gaussian_variance=0.25)
+    )
     learner = ProgressiveExpectationMaximization(
         progressive_circuit, expectation_maximization=expectation_maximization
     )
@@ -463,12 +478,12 @@ def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
 
     [gaussian_leaf] = _gaussian_leaves(progressive_circuit, column)
     assert gaussian_leaf.distribution.scale == pytest.approx(
-        np.sqrt(expectation_maximization.minimum_gaussian_variance)
+        np.sqrt(expectation_maximization.regularization.minimum_gaussian_variance)
     )
 
 
 def test_learn_fits_symbolic_leaf_to_data_of_single_column():
-    color = Symbolic("color", domain=Set.from_iterable(Color))
+    color = Symbolic(name="color", domain=Set.from_iterable(iterable=Color))
     template = ProbabilisticCircuit()
     leaf(
         SymbolicDistribution(
@@ -647,18 +662,22 @@ def test_add_column_shares_root_equally_before_any_column_is_learned():
 
 
 def test_adding_unlearned_column_leaves_likelihood_of_circuit_unchanged():
+    """
+    Adding a column that has not been learned yet leaves the likelihood of the circuit
+    as it was.
+    """
     progressive_circuit = ProgressiveProbabilisticCircuit(
         template=_make_mixture_template("x", "y")
     )
     data = np.random.default_rng(0).normal(size=(30, 2))
     earlier_column = progressive_circuit.add_column(task_name="task-a")
     ProgressiveExpectationMaximization(progressive_circuit).learn(data, earlier_column)
-    likelihood_before = progressive_circuit.circuit.log_likelihood(data)
+    likelihood_before = progressive_circuit.circuit.log_likelihood(events=data)
 
     progressive_circuit.add_column(task_name="task-b")
 
     np.testing.assert_array_equal(
-        progressive_circuit.circuit.log_likelihood(data), likelihood_before
+        progressive_circuit.circuit.log_likelihood(events=data), likelihood_before
     )
 
 
@@ -677,7 +696,7 @@ def test_learn_rejects_unsupported_leaf_distribution():
     template = ProbabilisticCircuit()
     leaf(
         UniformDistribution(
-            variable=Continuous("x"), interval=closed(0.0, 1.0).simple_sets[0]
+            variable=Continuous(name="x"), interval=closed(0.0, 1.0).simple_sets[0]
         ),
         template,
     )
@@ -692,7 +711,7 @@ def test_learn_rejects_unsupported_leaf_distribution():
 
 def test_learn_rejects_truncated_gaussian_leaf():
     truncated_gaussian = TruncatedGaussianDistribution(
-        variable=Continuous("x"),
+        variable=Continuous(name="x"),
         interval=closed(0.0, np.inf).simple_sets[0],
         location=0.0,
         scale=1.0,
@@ -729,9 +748,9 @@ def _make_indicator_variable(name: str, branch_count: int) -> Symbolic:
     A symbolic variable with one unique domain element per mixture branch.
     """
     return Symbolic(
-        name,
+        name=name,
         domain=Set.from_iterable(
-            [f"{name}-{branch_index}" for branch_index in range(branch_count)]
+            iterable=[f"{name}-{branch_index}" for branch_index in range(branch_count)]
         ),
     )
 
@@ -769,7 +788,9 @@ def _make_wide_layout() -> ProbabilisticCircuit:
     A single 5-branch mixture spread over 6 continuous variables.
     """
     branch = _make_indicator_variable("wide_branch", branch_count=5)
-    variables = [Continuous(f"wide_x{variable_index}") for variable_index in range(6)]
+    variables = [
+        Continuous(name=f"wide_x{variable_index}") for variable_index in range(6)
+    ]
     return _make_indicator_mixture(branch, variables)
 
 
@@ -779,14 +800,14 @@ def _make_nested_layout() -> ProbabilisticCircuit:
     """
     circuit = ProbabilisticCircuit()
     top_branch = Symbolic(
-        "nested_top", domain=Set.from_iterable(["outer-0", "outer-1"])
+        name="nested_top", domain=Set.from_iterable(iterable=["outer-0", "outer-1"])
     )
     outer_variables = [
-        Continuous(f"nested_x{variable_index}") for variable_index in range(3)
+        Continuous(name=f"nested_x{variable_index}") for variable_index in range(3)
     ]
     inner_branch = _make_indicator_variable("nested_inner", branch_count=3)
     inner_variables = [
-        Continuous(f"nested_y{variable_index}") for variable_index in range(3)
+        Continuous(name=f"nested_y{variable_index}") for variable_index in range(3)
     ]
 
     sum_root = SumUnit(probabilistic_circuit=circuit)
@@ -828,7 +849,10 @@ def _make_split_layout() -> ProbabilisticCircuit:
     for name, branch_count in [("split_left", 2), ("split_right", 3)]:
         mixture = _make_indicator_mixture(
             _make_indicator_variable(name, branch_count=branch_count),
-            [Continuous(f"{name}_x{variable_index}") for variable_index in range(3)],
+            [
+                Continuous(name=f"{name}_x{variable_index}")
+                for variable_index in range(3)
+            ],
         )
         mounted_units = circuit.mount(mixture.root)
         root.add_subcircuit(mounted_units[mixture.root.index])

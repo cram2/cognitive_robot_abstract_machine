@@ -56,7 +56,7 @@ def graph_of(
     :return: The graph learned from them.
     """
     nodes = [
-        GraphNode(variable=variable_type(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        GraphNode(variable=variable_type(name=name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
         for name in rows.columns
     ]
     return learner.learn(rows, nodes, domain_knowledge or DomainCausalKnowledge())
@@ -194,7 +194,7 @@ def test_edge_is_reversed_only_where_the_tiers_say_so(
 ):
     domain_knowledge = DomainCausalKnowledge(tiers=[["A"], ["B", "C"]])
     node_of = {
-        name: GraphNode(variable=Integer(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        name: GraphNode(variable=Integer(name=name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
         for name in (cause, adjacent)
     }
 

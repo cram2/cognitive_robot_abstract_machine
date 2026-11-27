@@ -1,3 +1,7 @@
+"""
+Tests of the Gaussian and truncated Gaussian distributions.
+"""
+
 from __future__ import annotations
 
 import numpy as np
@@ -32,7 +36,9 @@ def truncated_gaussian(x) -> TruncatedGaussianDistribution:
     """
     return TruncatedGaussianDistribution(
         variable=x,
-        interval=SimpleInterval.from_data(-2, 2, Bound.CLOSED, Bound.CLOSED),
+        interval=SimpleInterval.from_data(
+            lower=-2, upper=2, left=Bound.CLOSED, right=Bound.CLOSED
+        ),
         location=2,
         scale=2.0,
     )
@@ -128,6 +134,10 @@ def test_gaussian_variance(gaussian, x):
 
 
 def test_gaussian_truncation_to_a_singleton(standard_gaussian, x):
+    """
+    A Gaussian truncated to a singleton is impossible, unless singletons are allowed, in
+    which case it becomes a Dirac delta at the singleton.
+    """
     event = SimpleEvent.from_data({x: singleton(0)}).as_composite_set()
 
     conditional = standard_gaussian.truncated(event).distribution
@@ -137,7 +147,7 @@ def test_gaussian_truncation_to_a_singleton(standard_gaussian, x):
     assert isinstance(truncation.distribution, DiracDeltaDistribution)
     assert truncation.distribution.location == 0.0
     assert truncation.probability == pytest.approx(
-        np.exp(standard_gaussian.log_likelihood(np.array([[0]]))[0])
+        np.exp(standard_gaussian.log_likelihood(events=np.array([[0]]))[0])
     )
 
 
@@ -256,7 +266,10 @@ def test_truncated_standard_gaussian_raw_moments(
 
 def test_truncated_variance_is_precise_far_in_the_tail(x):
     distribution = TruncatedGaussianDistribution(
-        variable=x, interval=SimpleInterval.from_data(5, 6), location=0, scale=1
+        variable=x,
+        interval=SimpleInterval.from_data(lower=5, upper=6),
+        location=0,
+        scale=1,
     )
     # a standard normal, so the interval already is in scipy's standardized units
     lower, upper = distribution.lower, distribution.upper
@@ -282,7 +295,7 @@ def test_truncated_variance_is_precise_far_in_the_tail(x):
 def test_truncated_samples_average_to_the_expectation(x, lower, upper, scale):
     distribution = TruncatedGaussianDistribution(
         variable=x,
-        interval=SimpleInterval.from_data(lower, upper),
+        interval=SimpleInterval.from_data(lower=lower, upper=upper),
         location=0,
         scale=scale,
     )

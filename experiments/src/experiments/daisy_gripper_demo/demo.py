@@ -98,7 +98,7 @@ class ExecutionChoice(StrEnum):
 # %% demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DAiSyGripperDemonstration(RobotDemonstration):
     """
     DAiSy opens and closes its grippers through the full preset/flex and alone/together
@@ -128,10 +128,10 @@ class DAiSyGripperDemonstration(RobotDemonstration):
             localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(1, 1),
         )
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return True
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         """
         Give the plan the DAiSy in ``world``.
         """
@@ -141,7 +141,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
             )
         ]
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Open and close both grippers: each one alone, then both together, with the
         preset states first and the flex states afterwards.
@@ -181,7 +181,7 @@ class DAiSyGripperDemonstration(RobotDemonstration):
             configuration of `state`, and waiting :attr:`pause_after_motion` after it.
         """
         moves = [
-            SetGripperAction(configuration=gripper.default_configuration(state))
+            SetGripperAction(gripper_configuration=gripper.default_configuration(state))
             for gripper in grippers
         ]
         return [

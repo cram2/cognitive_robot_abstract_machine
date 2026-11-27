@@ -38,15 +38,15 @@ earlier columns can model the same rows.
 
 Columns align because they are copies of the same template. If the template is changed
 after columns were added, the new column no longer matches the earlier ones, and adding
-it raises a {py:class}`~probabilistic_model.learning.progressive.exceptions.ColumnStructureMismatchError`.
+it raises a {py:class}`~probabilistic_model.learning.structure.progressive.exceptions.ColumnStructureMismatchError`.
 
 ## Learning
 
-{py:class}`~probabilistic_model.learning.progressive.expectation_maximization.ProgressiveExpectationMaximization`
+{py:class}`~probabilistic_model.learning.structure.progressive.expectation_maximization.ProgressiveExpectationMaximization`
 learns one column at a time with the ordinary
-{py:class}`~probabilistic_model.learning.expectation_maximization.ExpectationMaximization`
+{py:class}`~probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization.ExpectationMaximization`
 that also fits classic circuits through
-{py:class}`~probabilistic_model.learning.expectation_maximization.ExpectationMaximizationLearning`.
+{py:class}`~probabilistic_model.learning.parameters.expectation_maximization.expectation_maximization.ExpectationMaximizationLearning`.
 What is progressive:
 
 - While a column is learned, the root gives it the whole weight, so it is trained as the
@@ -57,7 +57,7 @@ What is progressive:
   learned from.
 
 Untruncated Gaussian, discrete and symbolic leaves can be learned; any other leaf raises
-an {py:class}`~probabilistic_model.learning.exceptions.UnsupportedLeafDistributionError`.
+an {py:class}`~probabilistic_model.learning.parameters.expectation_maximization.exceptions.UnsupportedLeafDistributionError`.
 
 ```{warning}
 Later columns read from earlier ones, so learning an earlier column again also changes

@@ -18,9 +18,9 @@ from semantic_digital_twin.part_finding.locating import (
     PartQuery,
 )
 from semantic_digital_twin.part_finding.splitting import PartSplitter
-from semantic_digital_twin.semantic_annotations.mixins import (
-    HasRootBody,
-    PartWholeRelationship,
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
 )
 
 
@@ -56,7 +56,7 @@ class AnnotationPartFinder:
     :attr:`~semantic_digital_twin.part_finding.splitting.PartSplitter.decomposer`.
     """
 
-    def find_parts(self, whole: PartWholeRelationship) -> list[HasRootBody]:
+    def find_parts(self, *, whole: HasParts) -> list[HasRootBody]:
         """
         Find the parts the annotation lacks in the shape of its root body, split each
         off into a body of its own, and add it to the annotation.
@@ -67,8 +67,10 @@ class AnnotationPartFinder:
         """
         missing = [
             relationship.name
-            for relationship in PartRelationshipInspector.all_of_type(type(whole))
-            if not relationship.is_filled_in(whole)
+            for relationship in PartRelationshipInspector.all_of_type(
+                whole_type=type(whole)
+            )
+            if not relationship.is_filled_in(whole=whole)
         ]
         shapes = whole.root.visual or whole.root.collision
         if not missing or not shapes:
@@ -82,7 +84,7 @@ class AnnotationPartFinder:
         return parts
 
     def _add(
-        self, whole: PartWholeRelationship, query: PartQuery, located: LocatedPart
+        self, whole: HasParts, query: PartQuery, located: LocatedPart
     ) -> HasRootBody | None:
         """
         :param whole: The annotation the part was located in.
@@ -93,7 +95,7 @@ class AnnotationPartFinder:
             sure enough of it, or nothing of it is left in the body's shape.
         """
         relationship = PartRelationshipInspector.named(
-            query.whole_type, located.relationship_name
+            whole_type=query.whole_type, name=located.relationship_name
         )
         if relationship.may_be_empty and located.confidence < self.minimum_confidence:
             return None
@@ -104,4 +106,4 @@ class AnnotationPartFinder:
                 face_centers=query.mesh.triangles_center[located.faces]
             ),
         )
-        return splitter.split(whole, field_name=relationship.name)
+        return splitter.split(whole=whole, field_name=relationship.name)

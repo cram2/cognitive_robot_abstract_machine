@@ -34,17 +34,17 @@ from semantic_digital_twin.robots.pr2 import (
     PR2RightGripperRightFinger,
     PR2KinectV1,
 )
-from semantic_digital_twin.robots.robot_parts import KinematicChain
+from semantic_digital_twin.robots.robot_parts import RobotKinematicChain
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.world_description.derivatives import Derivatives
+from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     OmniDrive,
     DifferentialDrive,
-    PrismaticConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
     ActiveConnection1DOF,
 )
 
@@ -346,7 +346,13 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         "base_footprint"
     )
 
-    connections = pr2_world_state_reset.get_connections_by_type(PrismaticConnection)
+    connections = [
+        connection
+        for connection in pr2_world_state_reset.get_connections_by_type(
+            ScrewAxisConnection
+        )
+        if connection.behaves_like_a_prismatic_connection
+    ]
     assert len(connections) == 5
     assert connections[0].name == PrefixedName(name=PR2Joint.TORSO_LIFT, prefix="pr2")
     assert connections[
@@ -384,7 +390,13 @@ def test_search_for_connections_of_type(pr2_world_state_reset: World):
         "r_gripper_l_finger_tip_frame"
     )
 
-    connections = pr2_world_state_reset.get_connections_by_type(RevoluteConnection)
+    connections = [
+        connection
+        for connection in pr2_world_state_reset.get_connections_by_type(
+            ScrewAxisConnection
+        )
+        if connection.behaves_like_a_revolute_connection
+    ]
     assert len(connections) == 40
 
 
@@ -438,12 +450,26 @@ def test_an_arm_covers_the_chain_down_to_its_end_effector(pr2_world_state_reset)
 
 
 def test_kinematic_chains(pr2_world_state_reset):
-    semantic_kinematic_chain_annotation: list[KinematicChain] = (
-        pr2_world_state_reset.get_semantic_annotations_by_type(KinematicChain)
+    """
+    Every kinematic chain of the PR2 has a root and a tip.
+    """
+    semantic_kinematic_chain_annotation: list[RobotKinematicChain] = (
+        pr2_world_state_reset.get_semantic_annotations_by_type(RobotKinematicChain)
     )
     for chain in semantic_kinematic_chain_annotation:
         assert chain.root
         assert chain.tip
+
+
+def test_a_robot_kinematic_chain_is_a_kinematic_chain(pr2_world_state_reset):
+    """
+    An arm stands wherever a chain from a root to a tip is taken, and stays usable as a
+    key while doing so.
+    """
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+
+    assert isinstance(pr2.left_arm, KinematicChain)
+    assert {pr2.left_arm, pr2.right_arm} == {pr2.right_arm, pr2.left_arm}
 
 
 def test_tracy_semantic_annotation(tracy_world):
