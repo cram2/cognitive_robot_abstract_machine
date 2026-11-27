@@ -145,10 +145,12 @@ class PouringEquation:
         """
         :param tilt: Tilt of the container from the vertical, in radians.
         :param fill: Normalized fill level in ``[0, 1]``.
-        :return: Symbolic rate of the normalized fill level, negative while pouring.
+        :return: Symbolic rate of the normalized fill level, negative while pouring and
+            zero once the container is empty.
         """
-        return (
+        drain = (
             -self.outflow_rate_constant
             * self.head_above_lip(tilt=tilt, fill=fill)
             / self.container_scale.z
         )
+        return sm.if_greater_zero(fill, drain, sm.Scalar(0.0))

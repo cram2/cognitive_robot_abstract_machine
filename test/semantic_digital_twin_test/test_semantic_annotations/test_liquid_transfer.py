@@ -26,6 +26,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.physics.equations.pouring_equations import (
     PouringEquation,
 )
+from semantic_digital_twin.semantic_annotations.exceptions import SelfPouringError
 from semantic_digital_twin.semantic_annotations.mixins import HasFillLevel
 from semantic_digital_twin.specifications.connections import (
     ScrewAxisConnectionSpecification,
@@ -140,12 +141,17 @@ def _lone_tilting_cup(
 def _build_world(
     *,
     receiver_class: type[HasFillLevel] = _Container,
+    source_fill: float = 1.0,
+    initialize_source_first: bool = False,
 ) -> tuple[World, HasFillLevel, HasFillLevel]:
     """
-    Builds an empty receiver at the origin and a full source 0.3 m above it, tilting
-    about y and pouring into the receiver.
+    Builds an empty receiver at the origin and a source 0.3 m above it, tilting about y
+    and pouring into the receiver.
 
     :param receiver_class: The container annotation type used for the receiver.
+    :param source_fill: The initial fill level of the source.
+    :param initialize_source_first: Whether the source's fill level connection is
+        created, and therefore stepped, before the receiver's.
     :return: The world, the source, and the receiver.
     """
     world = _world_with_root()
@@ -162,18 +168,31 @@ def _build_world(
         axis=Vector3(0, 1, 0),
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.3),
     )
-    receiver.initialize_fill_level(initial_fill=0.0)
-    source.initialize_fill_level(initial_fill=1.0)
+    containers = [(receiver, 0.0), (source, source_fill)]
+    if initialize_source_first:
+        containers.reverse()
+    for container, initial_fill in containers:
+        container.initialize_fill_level(initial_fill=initial_fill)
     receiver.receive_outflow_from(source=source)
     return world, source, receiver
 
 
-def _partly_open_transfer() -> tuple[World, HasFillLevel, HasFillLevel]:
+def _partly_open_transfer(
+    *, source_fill: float = 1.0, initialize_source_first: bool = False
+) -> tuple[World, HasFillLevel, HasFillLevel]:
     """
     A tilted source pouring into a receiver with soft gates, so both gate factors lie
     inside their transitions.
+
+    :param source_fill: The initial fill level of the source.
+    :param initialize_source_first: Whether the source's fill level is stepped before
+        the receiver's.
     """
-    world, source, receiver = _build_world(receiver_class=_SoftGateContainer)
+    world, source, receiver = _build_world(
+        receiver_class=_SoftGateContainer,
+        source_fill=source_fill,
+        initialize_source_first=initialize_source_first,
+    )
     _tilt(world, source, 0.5)
     return world, source, receiver
 
@@ -251,6 +270,35 @@ class TestFillVelocity:
         ] * receiver.capacity == pytest.approx(
             -source.fill_velocity().evaluate()[0] * source.capacity
         )
+
+    def test_an_empty_source_fills_nothing(self) -> None:
+        """
+        A source tilted past the angle at which its bare bottom rises above the lip
+        passes no volume on once it is empty.
+        """
+        world, source, receiver = _partly_open_transfer(source_fill=0.0)
+        _tilt(world, source, 1.5)
+
+        assert receiver.fill_velocity().evaluate()[0] == 0.0
+
+
+# %% coupling
+
+
+class TestCoupling:
+    """
+    Which container pours into which.
+    """
+
+    def test_a_container_cannot_pour_into_itself(self) -> None:
+        """
+        Coupling a container's outflow to its own opening is refused.
+        """
+        _, cup = _lone_tilting_cup()
+        cup.initialize_fill_level(initial_fill=0.5)
+
+        with pytest.raises(SelfPouringError):
+            cup.receive_outflow_from(source=cup)
 
 
 # %% geometric transfer gate
@@ -448,6 +496,53 @@ class TestFillLevelIntegration:
         _step_passive_state(world, dt)
 
         assert cup.fill_level == pytest.approx(0.8 + fill_velocity * dt)
+
+    @pytest.mark.parametrize("initialize_source_first", [False, True])
+    def test_a_step_conserves_volume_whichever_container_steps_first(
+        self, *, initialize_source_first: bool
+    ) -> None:
+        """
+        One step moves both fill levels by their velocities at the state before the
+        step, so the receiver gains the volume the source loses.
+        """
+        world, source, receiver = _partly_open_transfer(
+            initialize_source_first=initialize_source_first
+        )
+        source_velocity = source.fill_velocity().evaluate()[0]
+        receiver_velocity = receiver.fill_velocity().evaluate()[0]
+        dt = 0.05
+
+        _step_passive_state(world, dt)
+
+        assert source.fill_level == pytest.approx(1.0 + source_velocity * dt)
+        assert receiver.fill_level == pytest.approx(receiver_velocity * dt)
+        assert receiver.fill_level * receiver.capacity == pytest.approx(
+            (1.0 - source.fill_level) * source.capacity
+        )
+
+    def test_a_connection_registered_in_another_world_compiles_for_it(self) -> None:
+        """
+        A connection taken out of its world and registered in another at the same model
+        revision reads the other world, not the function compiled for the first.
+        """
+        world, cup = _lone_tilting_cup()
+        cup.initialize_fill_level(initial_fill=0.8)
+        _tilt(world, cup, 1.0)
+        other_world, other_cup = _lone_tilting_cup()
+        other_cup.initialize_fill_level(initial_fill=0.8)
+        connection = cup.fill_connection
+        connection.current_fill_velocity()
+        assert (
+            other_world.get_world_model_manager().revision
+            == connection.compiled_revision
+        ), "the setup must give both worlds the same revision"
+
+        connection.remove_from_world()
+        connection.add_to_world(world=other_world)
+
+        assert connection.current_fill_velocity() == pytest.approx(
+            connection.symbolic_fill_velocity().evaluate()[0]
+        )
 
     def test_a_draining_container_stops_at_empty(self) -> None:
         """

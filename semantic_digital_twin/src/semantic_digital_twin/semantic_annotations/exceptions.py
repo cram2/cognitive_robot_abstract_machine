@@ -39,6 +39,24 @@ class MissingFillEquationError(UsageError):
 
 
 @dataclass(kw_only=True)
+class SelfPouringError(UsageError):
+    """
+    Raised when a container's outflow is coupled to its own opening.
+    """
+
+    container: HasRootBody
+    """
+    The container that was to pour into itself.
+    """
+
+    def error_message(self) -> str:
+        return f"'{self.container.root.name}' cannot pour into itself."
+
+    def suggest_correction(self) -> str:
+        return "couple the source to a different receiver."
+
+
+@dataclass(kw_only=True)
 class SourceAlreadyCoupledError(UsageError):
     """
     Raised when a liquid source whose outflow is already coupled to a receiver is

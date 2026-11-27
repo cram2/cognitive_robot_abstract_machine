@@ -111,6 +111,7 @@ from semantic_digital_twin.semantic_annotations.exceptions import (
     MissingFillEquationError,
     ReceiverAlreadyCoupledError,
     ReceiverNotInitializedError,
+    SelfPouringError,
     SourceAlreadyCoupledError,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
@@ -1894,12 +1895,15 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
         container's opening, so the transfer spills nothing.
 
         :param source: The container whose outflow pours into this one.
+        :raises SelfPouringError: If the source is this container.
         :raises MissingFillEquationError: If the source has no fill level.
         :raises SourceAlreadyCoupledError: If the source already pours into a container.
         :raises ReceiverNotInitializedError: If this container has no fill level.
         :raises ReceiverAlreadyCoupledError: If another container already pours into
             this one.
         """
+        if source is self:
+            raise SelfPouringError(container=self)
         if source.fill_connection is None:
             raise MissingFillEquationError(source=source)
         if source.pours_into is not None:

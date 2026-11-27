@@ -2932,10 +2932,13 @@ class World(HasSimulatorProperties):
             applied.
         """
         self.state._apply_control_commands(commands, dt, derivative)
-        for connection in self.connections:
-            match connection:
-                case HasUpdateState():
-                    connection.update_state(dt)
-                case _:
-                    pass
+        connections_with_state = [
+            connection
+            for connection in self.connections
+            if isinstance(connection, HasUpdateState)
+        ]
+        for connection in connections_with_state:
+            connection.prepare_state_update()
+        for connection in connections_with_state:
+            connection.update_state(dt)
         self.notify_state_change()

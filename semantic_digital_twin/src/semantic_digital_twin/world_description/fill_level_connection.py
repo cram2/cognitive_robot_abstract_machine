@@ -82,12 +82,37 @@ class FillLevelConnection(Connection, HasUpdateState):
     reading them in place.
     """
 
+    compiled_world: World | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    """
+    The world whose positions :attr:`compiled_fill_velocity` reads.
+    """
+
     compiled_revision: ModelRevision | None = field(
         default=None, init=False, repr=False, compare=False
     )
     """
     The world model revision :attr:`compiled_fill_velocity` was compiled against.
     """
+
+    step_fill_velocity: float = field(
+        default=0.0, init=False, repr=False, compare=False
+    )
+    """
+    The fill velocity :meth:`update_state` integrates, read by
+    :meth:`prepare_state_update` before any connection of the step changes the state.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        :raises MissingFillLevelLimitsError: If the fill degree of freedom has no
+            position limits to clamp the fill level to.
+        """
+        super().__post_init__()
+        limits = self.fill_dof.limits
+        if limits.lower.position is None or limits.upper.position is None:
+            raise MissingFillLevelLimitsError(connection_name=self.name)
 
     @classmethod
     def create_with_dofs(
@@ -166,10 +191,10 @@ class FillLevelConnection(Connection, HasUpdateState):
     def current_fill_velocity(self) -> float:
         """
         :return: The fill velocity at the world's current positions, compiling it only
-            when the world model changed since the last call.
+            when the connection's world or its model changed since the last call.
         """
         revision = self._world.get_world_model_manager().revision
-        if self.compiled_revision != revision:
+        if self.compiled_world is not self._world or self.compiled_revision != revision:
             self.compiled_fill_velocity = self.symbolic_fill_velocity().compile(
                 parameters=VariableParameters.from_lists(
                     self._world.state.position_float_variables
@@ -179,25 +204,34 @@ class FillLevelConnection(Connection, HasUpdateState):
             self.compiled_fill_velocity.bind_args_to_memory_view(
                 arg_idx=0, numpy_array=self._world.state.positions
             )
+            self.compiled_world = self._world
             self.compiled_revision = revision
         return float(self.compiled_fill_velocity.evaluate()[0])
+
+    def prepare_state_update(self) -> None:
+        """
+        Reads the fill velocity at the state before the step.
+        """
+        self.step_fill_velocity = self.current_fill_velocity()
 
     @called_positionally
     def update_state(self, dt: float) -> None:
         """
-        Advances the fill level by one physics step, clamped to the fill degree of
-        freedom's limits, which the fill velocity does not guard itself.
+        Advances the fill level by the fill velocity read in
+        :meth:`prepare_state_update`, clamped to the fill degree of freedom's limits,
+        which the fill velocity does not guard itself.
+
+        .. warning::
+            The clamp discards what passes a limit: liquid poured into a full receiver
+            is lost, and the source still loses it.
 
         :param dt: Time elapsed since the previous step, in seconds.
-        :raises MissingFillLevelLimitsError: If the fill degree of freedom has no
-            position limits to clamp to.
         """
         limits = self.fill_dof.limits
-        if limits.lower.position is None or limits.upper.position is None:
-            raise MissingFillLevelLimitsError(connection_name=self.name)
         state = self._world.state
-        velocity = self.current_fill_velocity()
-        integrated_position = state[self.fill_dof.id].position + velocity * dt
+        integrated_position = (
+            state[self.fill_dof.id].position + self.step_fill_velocity * dt
+        )
         state[self.fill_dof.id].position = min(
             max(integrated_position, limits.lower.position), limits.upper.position
         )

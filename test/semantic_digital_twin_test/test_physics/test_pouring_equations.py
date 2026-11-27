@@ -142,6 +142,17 @@ def test_the_drain_follows_the_closed_form(cup: PouringCup) -> None:
     )
 
 
+def test_an_empty_cup_drains_nothing_at_any_tilt(cup: PouringCup) -> None:
+    """
+    Past the tilt at which the bare bottom rises above the lip, an empty cup still has
+    no drain.
+    """
+    equation = cup.equation()
+    onset_when_empty = float(equation.onset_tilt(fill=0.0).evaluate()[0])
+
+    assert _drain(equation=equation, tilt=onset_when_empty + 0.3, fill=0.0) == 0.0
+
+
 # %% exit speed
 
 

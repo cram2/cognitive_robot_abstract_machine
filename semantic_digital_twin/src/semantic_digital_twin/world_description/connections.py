@@ -55,6 +55,12 @@ class HasUpdateState(ABC):
     Look at OmniDrive for an example usage.
     """
 
+    def prepare_state_update(self) -> None:
+        """
+        Reads from the world state what :meth:`update_state` needs, before any
+        connection of the same step updates its degrees of freedom; nothing by default.
+        """
+
     @abstractmethod
     def update_state(self, dt: float) -> None:
         """
