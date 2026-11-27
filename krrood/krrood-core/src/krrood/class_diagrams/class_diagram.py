@@ -5,10 +5,12 @@ association relations between them.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import logging
 import inspect
 import os
+import types
 from abc import ABC
 from copy import copy
 from dataclasses import dataclass, is_dataclass
@@ -19,7 +21,11 @@ from typing_extensions import get_args, get_origin, get_original_bases, Any
 
 import rustworkx as rx
 
-from krrood.class_diagrams.utils import resolve_type, get_type_hints_of_object
+from krrood.class_diagrams.utils import (
+    get_type_hints_of_object,
+    loaded_package_modules,
+    resolve_type,
+)
 from krrood.patterns.caching import clear_memoization_cache, memoize
 from krrood.utils import (
     module_and_class_name,
@@ -415,6 +421,62 @@ class WrappedClass(Generic[T], SubClassSafeGeneric):
     @property
     def name_with_entire_path(self) -> str:
         return module_and_class_name(self.clazz)
+
+    # %% names that aliases of other modules refer to
+
+    @staticmethod
+    def names_in_postponed_annotations(*, clazz: type) -> set[str]:
+        """
+        :param clazz: The class whose own annotations are read, not those of its bases.
+        :return: The names that the postponed annotations of the class use, such as
+            ``shapes`` and ``Polygon`` for an annotation ``list[shapes.Polygon]``.
+        """
+        return {
+            node.id
+            for annotation in vars(clazz).get("__annotations__", {}).values()
+            if isinstance(annotation, str)
+            for node in ast.walk(ast.parse(annotation, mode="eval"))
+            if isinstance(node, ast.Name)
+        }
+
+    @cached_property
+    def modules_named_in_annotations(self) -> tuple[types.ModuleType, ...]:
+        """
+        :return: The modules that the postponed annotations of the wrapped class and of
+            its bases name, such as the module ``shapes`` for an annotation
+            ``shapes.Polygon``.
+        """
+        modules = {}
+        for base in self.clazz.__mro__:
+            owner_module = inspect.getmodule(base)
+            if owner_module is None:
+                continue
+            for name in self.names_in_postponed_annotations(clazz=base):
+                named = vars(owner_module).get(name)
+                if isinstance(named, types.ModuleType):
+                    modules[named.__name__] = named
+        return tuple(modules.values())
+
+    def resolve_name_in_annotated_modules(self, *, name: str) -> Any | None:
+        """
+        Resolve a name that an alias of another module refers to, but that the module of
+        the wrapped class never binds: an annotation ``shapes.Tree`` reaches a recursive
+        alias ``Tree = Union[Polygon, list["Tree"]]`` whose name only ``shapes`` binds.
+
+        :param name: The name to resolve.
+        :return: The one object of that name in a loaded module among
+            :attr:`modules_named_in_annotations` and their submodules, or None if there is
+            none or more than one.
+        """
+        candidates = {
+            id(vars(module)[name]): vars(module)[name]
+            for named_module in self.modules_named_in_annotations
+            for module in loaded_package_modules(package=named_module)
+            if name in vars(module)
+        }
+        if len(candidates) != 1:
+            return None
+        return next(iter(candidates.values()))
 
 
 @dataclass(kw_only=True, unsafe_hash=True)

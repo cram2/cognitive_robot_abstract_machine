@@ -140,6 +140,7 @@ class WrappedField:
             type_hint = get_type_hints_of_object(
                 self.clazz.class_to_introspect,
                 namespace=tuple(self._build_initial_namespace().items()),
+                wrapped_class=self.clazz,
             )[self.field.name]
 
         if get_origin(type_hint) is Annotated:

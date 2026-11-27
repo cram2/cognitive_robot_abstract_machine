@@ -4,7 +4,6 @@ Resolution of the type hints of a class from the source files it is defined in.
 
 from __future__ import annotations
 
-import ast
 import builtins
 import importlib
 import inspect
@@ -19,7 +18,14 @@ from functools import lru_cache
 from uuid import UUID
 
 import typing_extensions
-from typing_extensions import Any, Callable, TypeVar, TypeVarTuple, get_origin
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    TypeVar,
+    TypeVarTuple,
+    get_origin,
+)
 
 import logging
 from krrood.class_diagrams.exceptions import CouldNotResolveType
@@ -33,6 +39,9 @@ from krrood.utils import (
     get_full_class_name,
     is_builtin_type,
 )
+
+if TYPE_CHECKING:
+    from krrood.class_diagrams.class_diagram import WrappedClass
 
 logger = logging.getLogger(__name__)
 
@@ -214,12 +223,17 @@ def is_external_module(module) -> bool:
     return False
 
 
-def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
+def resolve_name_in_hierarchy(
+    name: str, start_object: Any, *, wrapped_class: WrappedClass | None = None
+) -> Any:
     """
     Resolve a name by searching through the hierarchy of the start_object.
 
     :param name: The name to resolve.
     :param start_object: The object to start searching from.
+    :param wrapped_class: The class diagram node of the object, whose
+        :meth:`~krrood.class_diagrams.class_diagram.WrappedClass.resolve_name_in_annotated_modules`
+        is asked once the hierarchy does not bind the name.
     :return: The resolved object.
     :raises CouldNotResolveType: If the name cannot be resolved.
     """
@@ -238,8 +252,10 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
         except CouldNotResolveType:
             continue
 
-    object_of_an_annotated_module = resolve_name_in_annotated_modules(
-        name=name, clazz=start_object
+    object_of_an_annotated_module = (
+        None
+        if wrapped_class is None
+        else wrapped_class.resolve_name_in_annotated_modules(name=name)
     )
     if object_of_an_annotated_module is not None:
         return object_of_an_annotated_module
@@ -250,39 +266,6 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
         type_name=name,
         extra_information=f"Could not find {name} in the hierarchy of {start_object} (starting from {source_path}).",
     )
-
-
-def names_in_postponed_annotations(*, clazz: type) -> set[str]:
-    """
-    :param clazz: The class whose own annotations are read, not those of its bases.
-    :return: The names that the postponed annotations of the class use, such as
-        ``shapes`` and ``Polygon`` for an annotation ``list[shapes.Polygon]``.
-    """
-    return {
-        node.id
-        for annotation in vars(clazz).get("__annotations__", {}).values()
-        if isinstance(annotation, str)
-        for node in ast.walk(ast.parse(annotation, mode="eval"))
-        if isinstance(node, ast.Name)
-    }
-
-
-def modules_named_in_annotations(*, clazz: type) -> list[types.ModuleType]:
-    """
-    :param clazz: The class whose annotations are read.
-    :return: The modules that the postponed annotations of the class and of its bases
-        name, such as the module ``shapes`` for an annotation ``shapes.Polygon``.
-    """
-    modules = {}
-    for base in clazz.__mro__:
-        owner_module = inspect.getmodule(base)
-        if owner_module is None:
-            continue
-        for name in names_in_postponed_annotations(clazz=base):
-            named = vars(owner_module).get(name)
-            if isinstance(named, types.ModuleType):
-                modules[named.__name__] = named
-    return list(modules.values())
 
 
 def loaded_package_modules(*, package: types.ModuleType) -> list[types.ModuleType]:
@@ -297,29 +280,6 @@ def loaded_package_modules(*, package: types.ModuleType) -> list[types.ModuleTyp
         if module is not None
         and (module_name == package.__name__ or module_name.startswith(prefix))
     ]
-
-
-def resolve_name_in_annotated_modules(*, name: str, clazz: type) -> Any | None:
-    """
-    Resolve a name that an alias of another module refers to, but that the module of
-    the class never binds: an annotation ``shapes.Tree`` reaches a recursive alias
-    ``Tree = Union[Polygon, list["Tree"]]`` whose name ``Tree`` only ``shapes`` binds.
-
-    :param name: The name to resolve.
-    :param clazz: The class whose annotations reach the alias.
-    :return: The one object of that name in a loaded module among
-        :func:`modules_named_in_annotations` and their submodules, or None if there is
-        none or more than one.
-    """
-    candidates = {
-        id(vars(module)[name]): vars(module)[name]
-        for named_module in modules_named_in_annotations(clazz=clazz)
-        for module in loaded_package_modules(package=named_module)
-        if name in vars(module)
-    }
-    if len(candidates) != 1:
-        return None
-    return next(iter(candidates.values()))
 
 
 T = TypeVar("T")
@@ -422,7 +382,10 @@ def resolve_type(
 
 @lru_cache
 def get_type_hints_of_object(
-    object_: Any, namespace: tuple[tuple[str, Any], ...] = ()
+    object_: Any,
+    namespace: tuple[tuple[str, Any], ...] = (),
+    *,
+    wrapped_class: WrappedClass | None = None,
 ) -> dict[str, Any]:
     """
     Get the type hints of an object.
@@ -432,6 +395,8 @@ def get_type_hints_of_object(
 
     :param object_: The object to get the type hints of.
     :param namespace: A starting namespace to use for resolving type hints.
+    :param wrapped_class: The class diagram node of the object, passed on to
+        :func:`resolve_name_in_hierarchy`.
     :return: The type hints of the object as a dictionary.
     :raises CouldNotResolveType: If a type hint cannot be resolved.
     """
@@ -446,7 +411,9 @@ def get_type_hints_of_object(
             )
             break
         except NameError as name_error:
-            object_from_name = resolve_name_in_hierarchy(name_error.name, object_)
+            object_from_name = resolve_name_in_hierarchy(
+                name_error.name, object_, wrapped_class=wrapped_class
+            )
             local_namespace[name_error.name] = object_from_name
         except TypeError as type_error:
             logger.warning(
