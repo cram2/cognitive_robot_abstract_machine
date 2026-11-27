@@ -210,7 +210,7 @@ class TruncatedGaussianDistribution(
         return self.truncated_normal.cdf(x[:, 0])
 
     def univariate_log_mode(self) -> UnivariateLogMode:
-        if self.interval.contains(self.location):
+        if self.interval.contains(item=self.location):
             value = self.location
         elif self.location < self.lower:
             value = self.lower
@@ -258,7 +258,7 @@ class TruncatedGaussianDistribution(
         :param interval: The simple interval, which is not a singleton.
         :return: The truncated distribution and the log-probability of the interval.
         """
-        intersection = self.interval.intersection_with(interval)
+        intersection = self.interval.intersection_with(other=interval)
         if intersection.is_empty():
             return LogTruncation.impossible()
 

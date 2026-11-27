@@ -34,9 +34,9 @@ def build_three_independent_variables_circuit() -> tuple:
     on `c`, and vice versa -- used throughout test_probabilistic_queries/ to check EQL
     results against the same operation called directly on the circuit.
     """
-    var_a = Continuous("Coin.a")
-    var_b = Continuous("Coin.b")
-    var_c = Continuous("Coin.c")
+    var_a = Continuous(name="Coin.a")
+    var_b = Continuous(name="Coin.b")
+    var_c = Continuous(name="Coin.c")
 
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)

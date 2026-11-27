@@ -135,7 +135,7 @@ def test_a_product_over_symbolic_and_continuous_variables_reads_domain_elements(
     Rows that hold a domain element for the symbolic variable and a number for the
     continuous one have the likelihood of both factors.
     """
-    animal = Symbolic(name="animal", domain=Set.from_iterable(["cat", "dog"]))
+    animal = Symbolic(name="animal", domain=Set.from_iterable(iterable=["cat", "dog"]))
     circuit = ProbabilisticCircuit()
     product_unit = ProductUnit(probabilistic_circuit=circuit)
     gaussian = GaussianDistribution(variable=x, location=0.0, scale=1.0)

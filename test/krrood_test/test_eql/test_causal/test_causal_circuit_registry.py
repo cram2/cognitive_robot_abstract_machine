@@ -30,8 +30,8 @@ class Place:
 
 
 def _build_pick_causal_circuit() -> CausalCircuit:
-    arm = Continuous("Pick.arm")
-    success = Continuous("Pick.success")
+    arm = Continuous(name="Pick.arm")
+    success = Continuous(name="Pick.success")
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)
     root.add_subcircuit(

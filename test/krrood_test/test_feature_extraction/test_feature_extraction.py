@@ -49,7 +49,7 @@ def test_an_entity_carrying_an_enum_keeps_that_enums_members_as_its_domain():
         for name, variable in parameters.variables.items()
         if name.endswith(".type")
     ]
-    assert kind.domain == Set.from_iterable(SceneObjectType)
+    assert kind.domain == Set.from_iterable(iterable=SceneObjectType)
 
 
 @pytest.fixture

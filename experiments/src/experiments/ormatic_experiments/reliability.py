@@ -29,7 +29,7 @@ from experiments.experiment_definitions import (
 )
 from krrood.parametrization.probabilistic_backend import ProbabilisticBackend
 from krrood.entity_query_language.factories import a, an
-from krrood.ormatic.data_access_objects.dao import selectin_loading
+from krrood.ormatic.data_access_objects.relationship_loading import selectin_loading
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.utils import create_engine, drop_database
 from semantic_digital_twin.adapters.urdf import URDFParser

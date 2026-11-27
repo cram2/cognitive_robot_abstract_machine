@@ -414,7 +414,7 @@ class InstantiatedVariable(
     MultiArityExpressionThatPerformsACartesianProduct,
     CanHaveDomainSource[T],
     HasFactoryAndKwargs[T],
-    GroundTermExpression[CallTerm],
+    GroundTermExpression[CallTerm, T],
 ):
     """
     A variable which does not have an explicit domain, but builds its values by calling

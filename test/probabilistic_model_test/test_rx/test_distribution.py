@@ -118,7 +118,7 @@ def animal_circuit() -> ProbabilisticCircuit:
     """
     A circuit of a single leaf over :class:`Animal`.
     """
-    variable = Symbolic(name="animal", domain=Set.from_iterable(Animal))
+    variable = Symbolic(name="animal", domain=Set.from_iterable(iterable=Animal))
     probabilities = MissingDict(
         float, {hash(Animal.CAT): 0.1, hash(Animal.DOG): 0.2, hash(Animal.FISH): 0.7}
     )
@@ -135,7 +135,7 @@ def integer_circuit() -> ProbabilisticCircuit:
     """
     probabilities = MissingDict(float, {0: 0.1, 1: 0.2, 2: 0.7})
     return leaf(
-        IntegerDistribution(variable=Integer("x"), probabilities=probabilities),
+        IntegerDistribution(variable=Integer(name="x"), probabilities=probabilities),
         ProbabilisticCircuit(),
     ).probabilistic_circuit
 

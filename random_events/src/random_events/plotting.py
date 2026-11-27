@@ -28,7 +28,7 @@ class EventContainsSymbolicVariableError(Exception):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SimpleEventPlotter:
     """
     Plots a single :class:`~random_events.product_algebra.SimpleEvent`.
@@ -216,7 +216,7 @@ class SimpleEventPlotter:
         ).reshape(-1, 8, 3)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EventPlotter:
     """
     Plots a composite :class:`~random_events.product_algebra.Event`, delegating to a
@@ -266,7 +266,7 @@ class EventPlotter:
     per box.
     """
 
-    def plot(self, color: str = "#636EFA") -> list[go.Scatter] | list[go.Mesh3d]:
+    def plot(self, *, color: str = "#636EFA") -> list[go.Scatter] | list[go.Mesh3d]:
         """
         :param color: The color to use for the event.
         :return: The traces of every simple set the event is the union of.
@@ -274,7 +274,7 @@ class EventPlotter:
         traces = []
         show_legend = True
         for simple_event in self.event.simple_sets:
-            for trace in SimpleEventPlotter(simple_event).plot():
+            for trace in SimpleEventPlotter(event=simple_event).plot():
                 if len(simple_event.keys()) == 2:
                     trace.update(
                         name="Event",
@@ -297,7 +297,7 @@ class EventPlotter:
         """
         :return: The layout of the event's plot.
         """
-        return SimpleEventPlotter(self.event.simple_sets[0]).plotly_layout()
+        return SimpleEventPlotter(event=self.event.simple_sets[0]).plotly_layout()
 
     def corners_3d(self) -> np.ndarray:
         """
@@ -308,14 +308,14 @@ class EventPlotter:
             return np.empty((0, 8, 3))
         return np.concatenate(
             [
-                SimpleEventPlotter(simple_set).corners_3d()
+                SimpleEventPlotter(event=simple_set).corners_3d()
                 for simple_set in self.event.simple_sets
             ],
             axis=0,
         )
 
     def plot_3d_mesh(
-        self, color: str, opacity: float = 1.0, name: str = "Event"
+        self, *, color: str, opacity: float = 1.0, name: str = "Event"
     ) -> go.Mesh3d:
         """
         Draw every box the event decomposes into as one solid mesh, so that any number
@@ -347,7 +347,7 @@ class EventPlotter:
         )
 
     def plot_3d_wireframe(
-        self, color: str, width: float = 1.0, name: str = "Event"
+        self, *, color: str, width: float = 1.0, name: str = "Event"
     ) -> go.Scatter3d:
         """
         Draw the edges of every box the event decomposes into as one line trace, which

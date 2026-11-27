@@ -37,7 +37,7 @@ def main() -> None:
     where the arrays lived.
     """
     np.random.seed(0)
-    host = MixtureOfProductsCase(Continuous("x"), Continuous("y")).circuit(
+    host = MixtureOfProductsCase(Continuous(name="x"), Continuous(name="y")).circuit(
         np, BlockEdgeMatrix
     )
     circuit = host.to_namespace(jnp)

@@ -30,7 +30,7 @@ class Polytope(polytope.Polytope):
     """
 
     @classmethod
-    def from_polytope(cls, polytope_: polytope.Polytope) -> Self:
+    def from_polytope(cls, *, polytope_: polytope.Polytope) -> Self:
         """
         Create a polytope from a polytope object.
 
@@ -39,7 +39,7 @@ class Polytope(polytope.Polytope):
         return cls(polytope_.A, polytope_.b)
 
     @classmethod
-    def from_points(cls, points: npt.NDArray[np.float64]) -> Self:
+    def from_points(cls, *, points: npt.NDArray[np.float64]) -> Self:
         """
         Create a polytope from a set of points, by computing the convex hull of the
         points and using the hull's facet equations as the polytope's inequalities.
@@ -51,7 +51,7 @@ class Polytope(polytope.Polytope):
         b = -convex_hull.equations[:, -1]
         return cls(a, b)
 
-    def inner_box_approximation(self, minimum_volume: float = 0.1) -> Event:
+    def inner_box_approximation(self, *, minimum_volume: float = 0.1) -> Event:
         """
         Compute an inner box approximation of the polytope.
 
@@ -78,7 +78,7 @@ class Polytope(polytope.Polytope):
             # append the polytope without the inner box to the queue
             diff = polytope.mldivide(current_polytope, inner_box)
             working_queue.extend(
-                [self.__class__.from_polytope(p) for p in diff.list_poly]
+                [self.__class__.from_polytope(polytope_=p) for p in diff.list_poly]
             )
 
         return Event.from_simple_sets(
@@ -87,17 +87,17 @@ class Polytope(polytope.Polytope):
 
     @classmethod
     def _box_polytope_from_bounds(
-        cls, lower: npt.NDArray[np.float64], upper: npt.NDArray[np.float64]
+        cls, *, lower: npt.NDArray[np.float64], upper: npt.NDArray[np.float64]
     ) -> Self:
         """
-        Build a box-shaped polytope from already-known per-dimension bounds, and
-        pre-populate its bounding-box and volume caches (`bbox`/`_volume`, read by the
+        Build a box-shaped polytope from already-known per-dimension bounds, and pre-
+        populate its bounding-box and volume caches (`bbox`/`_volume`, read by the
         `bounding_box`/`volume` properties inherited from the `polytope` library).
 
-        Without this, a box built via `from_box` still recomputes its bounding box
-        via `2 * n_dimensions` LP solves and its volume via randomized Monte-Carlo
-        sampling the first time either is accessed, even though both are already known
-        exactly at construction time here.
+        Without this, a box built via `from_box` still recomputes its bounding box via
+        `2 * n_dimensions` LP solves and its volume via randomized Monte-Carlo sampling
+        the first time either is accessed, even though both are already known exactly at
+        construction time here.
 
         :param lower: The lower bound per dimension.
         :param upper: The upper bound per dimension.
@@ -115,10 +115,11 @@ class Polytope(polytope.Polytope):
         :return: The polytope as box polytope.
         """
         lower, upper = self.bounding_box
-        return self._box_polytope_from_bounds(lower, upper)
+        return self._box_polytope_from_bounds(lower=lower, upper=upper)
 
     def is_box(
         self,
+        *,
         lower: npt.NDArray[np.float64],
         upper: npt.NDArray[np.float64],
         tolerance: float = 1e-7,
@@ -126,12 +127,12 @@ class Polytope(polytope.Polytope):
         """
         Check whether this polytope is exactly its own axis-aligned bounding box.
 
-        The bounding box always contains the polytope, so it is a subset of the
-        polytope too (making the two equal) exactly when every one of the box's
-        2**n_dimensions corners already satisfies this polytope's inequalities. This
-        answers the same question as ``self.as_box_polytope() <= self``, but with a
-        single matrix multiplication instead of polytope's LP-based set-difference
-        machinery, which dominates the runtime of `outer_box_approximation`.
+        The bounding box always contains the polytope, so it is a subset of the polytope
+        too (making the two equal) exactly when every one of the box's 2**n_dimensions
+        corners already satisfies this polytope's inequalities. This answers the same
+        question as ``self.as_box_polytope() <= self``, but with a single matrix
+        multiplication instead of polytope's LP-based set-difference machinery, which
+        dominates the runtime of `outer_box_approximation`.
 
         :param lower: The lower bounds of the polytope's bounding box.
         :param upper: The upper bounds of the polytope's bounding box.
@@ -144,9 +145,9 @@ class Polytope(polytope.Polytope):
         return bool(np.all(self.A @ corners.T <= self.b[:, None] + tolerance))
 
     def copy(self):
-        return self.from_polytope(self.__copy__())
+        return self.from_polytope(polytope_=self.__copy__())
 
-    def split_on_axis_value(self, axis: int, value: np.ndarray) -> tuple[Self, Self]:
+    def split_on_axis_value(self, *, axis: int, value: np.ndarray) -> tuple[Self, Self]:
         """
         Split the polytope on a specific axis and value.
 
@@ -170,7 +171,7 @@ class Polytope(polytope.Polytope):
 
         return left, right
 
-    def outer_box_approximation(self, minimum_volume: float = 0.1) -> Event:
+    def outer_box_approximation(self, *, minimum_volume: float = 0.1) -> Event:
         """
         Compute an outer box approximation of the polytope.
         This implements Algorithm 6 in https://cse.lab.imtlucca.it/~bemporad/publications/papers/compgeom-boxes.pdf
@@ -188,7 +189,9 @@ class Polytope(polytope.Polytope):
             volume = np.prod(upper - lower)
 
             # if the box is too small, or the polytope is already box-shaped, skip
-            if volume < minimum_volume or current_polytope.is_box(lower, upper):
+            if volume < minimum_volume or current_polytope.is_box(
+                lower=lower, upper=upper
+            ):
                 resulting_boxes.append(current_polytope)
                 continue
 
@@ -199,7 +202,7 @@ class Polytope(polytope.Polytope):
             # split the box in half along the longest side
             splitting_point = (lower[longest_side] + upper[longest_side]) / 2
             left, right = current_polytope.split_on_axis_value(
-                longest_side, splitting_point
+                axis=longest_side, value=splitting_point
             )
             polytopes_to_split.extend([left, right])
 
@@ -209,6 +212,7 @@ class Polytope(polytope.Polytope):
 
     def _create_maximum_inner_box_constraints(
         self,
+        *,
         solver: pywraplp.Solver,
         dimension_variables: list[pywraplp.Variable],
         scale: pywraplp.Variable,
@@ -244,7 +248,9 @@ class Polytope(polytope.Polytope):
             constraint = solver.Constraint(-infinity, float(b))
             for j, coefficient in enumerate(row):
                 if coefficient != 0.0:
-                    constraint.SetCoefficient(dimension_variables[j], float(coefficient))
+                    constraint.SetCoefficient(
+                        dimension_variables[j], float(coefficient)
+                    )
             constraint.SetCoefficient(scale, float(scale_coefficient))
 
     def maximum_inner_box(self) -> Self:
@@ -281,7 +287,10 @@ class Polytope(polytope.Polytope):
         scale_of_box = maxima - minima
 
         self._create_maximum_inner_box_constraints(
-            solver, dimension_variables, scale, scale_of_box
+            solver=solver,
+            dimension_variables=dimension_variables,
+            scale=scale,
+            scale_of_box=scale_of_box,
         )
 
         # solve the problem
@@ -293,9 +302,13 @@ class Polytope(polytope.Polytope):
             )
 
         # calculate the inner box
-        box_lower = np.array([dimension.solution_value() for dimension in dimension_variables])
+        box_lower = np.array(
+            [dimension.solution_value() for dimension in dimension_variables]
+        )
         box_upper = box_lower + scale_of_box * scale.solution_value()
-        return self.__class__._box_polytope_from_bounds(box_lower, box_upper)
+        return self.__class__._box_polytope_from_bounds(
+            lower=box_lower, upper=box_upper
+        )
 
     def to_simple_event(self) -> SimpleEvent:
         """
@@ -306,7 +319,7 @@ class Polytope(polytope.Polytope):
         maxima = maxima.flatten()
         return SimpleEvent.from_data(
             {
-                Continuous(f"x_{i}"): closed_open(minimum, maximum)
+                Continuous(name=f"x_{i}"): closed_open(minimum, maximum)
                 for i, (minimum, maximum) in enumerate(zip(minima, maxima))
             }
         )

@@ -93,7 +93,7 @@ def disjoint_clause_event(number_of_clauses: int) -> Event:
     :return: The event whose complement is exponential in ``number_of_clauses``.
     """
     variables = [
-        Symbolic(name=f"x{index}", domain=Set.from_iterable([0, 1]))
+        Symbolic(name=f"x{index}", domain=Set.from_iterable(iterable=[0, 1]))
         for index in range(2 * number_of_clauses)
     ]
     simple_events = [
@@ -118,10 +118,11 @@ def shared_dimension_event(number_of_clauses: int) -> Event:
     :param number_of_clauses: Number of clauses to construct, all sharing dimensions.
     :return: The event whose complement stays linear in ``number_of_clauses``.
     """
-    x = Symbolic(name="x", domain=Set.from_iterable(range(number_of_clauses)))
-    y = Symbolic(name="y", domain=Set.from_iterable(range(number_of_clauses)))
+    x = Symbolic(name="x", domain=Set.from_iterable(iterable=range(number_of_clauses)))
+    y = Symbolic(name="y", domain=Set.from_iterable(iterable=range(number_of_clauses)))
     simple_events = [
-        SimpleEvent.from_data({x: index, y: index}) for index in range(number_of_clauses)
+        SimpleEvent.from_data({x: index, y: index})
+        for index in range(number_of_clauses)
     ]
     return Event.from_simple_sets(*simple_events)
 

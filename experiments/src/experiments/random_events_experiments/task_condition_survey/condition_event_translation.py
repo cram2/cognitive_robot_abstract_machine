@@ -129,7 +129,8 @@ class ConditionEventTranslator:
             if proposition.variable_name not in names:
                 names.append(proposition.variable_name)
         return [
-            Symbolic(name, domain=Set.from_iterable([True, False])) for name in names
+            Symbolic(name=name, domain=Set.from_iterable(iterable=[True, False]))
+            for name in names
         ]
 
     def event_of(
@@ -177,7 +178,7 @@ class ConditionEventTranslator:
         return SimpleEvent.from_data(
             {
                 variable: (
-                    variable.make_value(True)
+                    variable.make_value(value=True)
                     if variable.name == variable_name
                     else variable.domain
                 )

@@ -204,7 +204,7 @@ class QueryWidget(QWidget):
                 # In components.py div_to_event intersections were used.
                 if var in simple_event:
                     # Treat multiple constraints on the same variable as a union
-                    simple_event[var] = simple_event[var].union_with(val)
+                    simple_event[var] = simple_event[var].union_with(other=val)
                 else:
                     simple_event[var] = val
 

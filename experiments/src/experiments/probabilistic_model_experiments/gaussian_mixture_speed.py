@@ -308,7 +308,7 @@ class GaussianMixtureBenchmark:
 
         [box] = self.central_box().simple_sets
         box = box.__deepcopy__()
-        box.fill_missing_variables(set(self.variables))
+        box.fill_missing_variables(variables=set(self.variables))
         rustworkx_call = TimedCall.of(
             lambda: rustworkx_circuit.probability_of_simple_event(box)
         )

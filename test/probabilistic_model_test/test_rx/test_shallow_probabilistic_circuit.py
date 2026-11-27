@@ -18,7 +18,7 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 @pytest.fixture
 def variable() -> Continuous:
-    return Continuous("x")
+    return Continuous(name="x")
 
 
 def shallow_uniform_mixture(
@@ -43,8 +43,12 @@ def shallow_uniform_mixture(
 
 
 def test_total_variation_distance_of_overlapping_models(variable: Continuous):
-    model = shallow_uniform_mixture(variable, [SimpleInterval.from_data(0, 2)])
-    other = shallow_uniform_mixture(variable, [SimpleInterval.from_data(1, 3)])
+    model = shallow_uniform_mixture(
+        variable, [SimpleInterval.from_data(lower=0, upper=2)]
+    )
+    other = shallow_uniform_mixture(
+        variable, [SimpleInterval.from_data(lower=1, upper=3)]
+    )
 
     # Both densities are 1/2 and overlap on [1, 2), so half of the mass differs.
     assert model.total_variation_distance(other) == pytest.approx(0.5)
@@ -52,23 +56,35 @@ def test_total_variation_distance_of_overlapping_models(variable: Continuous):
 
 def test_total_variation_distance_of_mixtures(variable: Continuous):
     model = shallow_uniform_mixture(
-        variable, [SimpleInterval.from_data(0, 1), SimpleInterval.from_data(1, 2)]
+        variable,
+        [
+            SimpleInterval.from_data(lower=0, upper=1),
+            SimpleInterval.from_data(lower=1, upper=2),
+        ],
     )
-    other = shallow_uniform_mixture(variable, [SimpleInterval.from_data(0, 4)])
+    other = shallow_uniform_mixture(
+        variable, [SimpleInterval.from_data(lower=0, upper=4)]
+    )
 
     # The model has density 1/2 on [0, 2), the other 1/4 on [0, 4).
     assert model.total_variation_distance(other) == pytest.approx(0.5)
 
 
 def test_total_variation_distance_of_disjoint_models_is_one(variable: Continuous):
-    model = shallow_uniform_mixture(variable, [SimpleInterval.from_data(0, 1)])
-    other = shallow_uniform_mixture(variable, [SimpleInterval.from_data(2, 3)])
+    model = shallow_uniform_mixture(
+        variable, [SimpleInterval.from_data(lower=0, upper=1)]
+    )
+    other = shallow_uniform_mixture(
+        variable, [SimpleInterval.from_data(lower=2, upper=3)]
+    )
 
     assert model.total_variation_distance(other) == pytest.approx(1)
 
 
 def test_total_variation_distance_of_identical_models_is_zero(variable: Continuous):
-    model = shallow_uniform_mixture(variable, [SimpleInterval.from_data(0, 1)])
+    model = shallow_uniform_mixture(
+        variable, [SimpleInterval.from_data(lower=0, upper=1)]
+    )
 
     assert model.total_variation_distance(model) == pytest.approx(0)
 
@@ -77,9 +93,15 @@ def test_total_variation_distance_where_a_component_boundary_splits_an_overlap(
     variable: Continuous,
 ):
     model = shallow_uniform_mixture(
-        variable, [SimpleInterval.from_data(0, 2), SimpleInterval.from_data(1, 3)]
+        variable,
+        [
+            SimpleInterval.from_data(lower=0, upper=2),
+            SimpleInterval.from_data(lower=1, upper=3),
+        ],
     )
-    other = shallow_uniform_mixture(variable, [SimpleInterval.from_data(0, 3)])
+    other = shallow_uniform_mixture(
+        variable, [SimpleInterval.from_data(lower=0, upper=3)]
+    )
 
     # The model has density 1/4, 1/2, 1/4 on [0, 1), [1, 2), [2, 3); the other has 1/3.
     assert model.total_variation_distance(other) == pytest.approx(1 / 6)

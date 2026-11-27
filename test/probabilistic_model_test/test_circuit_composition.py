@@ -83,7 +83,7 @@ def event_of(**ranges: tuple) -> Event:
     """
     return SimpleEvent.from_data(
         {
-            Continuous(name): closed(lower, upper)
+            Continuous(name=name): closed(lower, upper)
             for name, (lower, upper) in ranges.items()
         }
     ).as_composite_set()

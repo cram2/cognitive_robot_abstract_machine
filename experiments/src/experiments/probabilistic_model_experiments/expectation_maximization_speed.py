@@ -183,7 +183,7 @@ class ExpectationMaximizationSpeedComparison:
 
         learning = ExpectationMaximizationLearning(
             factorized_gaussian_mixture(
-                [Continuous(name) for name in data.columns],
+                [Continuous(name=name) for name in data.columns],
                 starting_parameters.means,
                 starting_parameters.scales,
             ),

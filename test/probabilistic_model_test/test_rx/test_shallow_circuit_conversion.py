@@ -34,7 +34,10 @@ def product_of_mixture_and_leaf(
     mixture = SumUnit(probabilistic_circuit=circuit)
     for weight, interval in zip(
         mixture_weights,
-        [SimpleInterval.from_data(0, 1), SimpleInterval.from_data(1, 3)],
+        [
+            SimpleInterval.from_data(lower=0, upper=1),
+            SimpleInterval.from_data(lower=1, upper=3),
+        ],
     ):
         mixture.add_subcircuit(
             leaf(UniformDistribution(variable=x, interval=interval), circuit),
@@ -43,7 +46,9 @@ def product_of_mixture_and_leaf(
     root.add_subcircuit(mixture)
     root.add_subcircuit(
         leaf(
-            UniformDistribution(variable=y, interval=SimpleInterval.from_data(0, 1)),
+            UniformDistribution(
+                variable=y, interval=SimpleInterval.from_data(lower=0, upper=1)
+            ),
             circuit,
         )
     )
@@ -69,7 +74,7 @@ def mixture_of_products_of_mixtures(
                         UniformDistribution(
                             variable=variable,
                             interval=SimpleInterval.from_data(
-                                lower + offset, upper + offset
+                                lower=lower + offset, upper=upper + offset
                             ),
                         ),
                         circuit,

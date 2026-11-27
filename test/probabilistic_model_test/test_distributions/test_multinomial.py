@@ -41,7 +41,7 @@ def symbolic_x() -> Symbolic:
     """
     A variable over :class:`TwoCategories`.
     """
-    return Symbolic(name="X", domain=Set.from_iterable(TwoCategories))
+    return Symbolic(name="X", domain=Set.from_iterable(iterable=TwoCategories))
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def symbolic_y() -> Symbolic:
     """
     A variable over :class:`ThreeCategories`.
     """
-    return Symbolic(name="Y", domain=Set.from_iterable(ThreeCategories))
+    return Symbolic(name="Y", domain=Set.from_iterable(iterable=ThreeCategories))
 
 
 @pytest.fixture
@@ -57,7 +57,7 @@ def symbolic_z() -> Symbolic:
     """
     A variable over :class:`FourCategories`.
     """
-    return Symbolic(name="Z", domain=Set.from_iterable(FourCategories))
+    return Symbolic(name="Z", domain=Set.from_iterable(iterable=FourCategories))
 
 
 @pytest.fixture
@@ -221,7 +221,7 @@ def test_truncation(crafted_distribution, symbolic_y):
     assert conditional.probability(event.as_composite_set()) == pytest.approx(1)
 
     excluded = SimpleEvent.from_data({symbolic_y: ThreeCategories.C})
-    excluded.fill_missing_variables(crafted_distribution.variables)
+    excluded.fill_missing_variables(variables=crafted_distribution.variables)
     assert conditional.probability(excluded.as_composite_set()) == 0.0
 
 

@@ -30,17 +30,17 @@ from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import (
 
 @pytest.fixture
 def first() -> Continuous:
-    return Continuous("a")
+    return Continuous(name="a")
 
 
 @pytest.fixture
 def second() -> Continuous:
-    return Continuous("b")
+    return Continuous(name="b")
 
 
 @pytest.fixture
 def other() -> Continuous:
-    return Continuous("c")
+    return Continuous(name="c")
 
 
 @pytest.fixture
@@ -326,7 +326,7 @@ class TestTruncatingTheLeaf:
         ).as_composite_set()
         truncation = circuit.log_truncated(event)
         assert truncation.log_probability == pytest.approx(
-            np.log(correlated.probability(event.marginal([first, second])))
+            np.log(correlated.probability(event.marginal(variables=[first, second])))
         )
         assert truncation.distribution.probability(
             truncation.distribution.support
@@ -353,7 +353,7 @@ class TestTruncatingTheLeaf:
         ).as_composite_set()
         truncation = circuit.log_truncated(event)
         assert truncation.log_probability == pytest.approx(
-            np.log(correlated.probability(event.marginal([first, second])))
+            np.log(correlated.probability(event.marginal(variables=[first, second])))
         )
         assert truncation.distribution.probability(
             truncation.distribution.support

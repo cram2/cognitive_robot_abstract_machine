@@ -17,7 +17,7 @@ from semantic_digital_twin.exceptions import (
     SeveralFieldsAcceptEntity,
 )
 from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
-    RipenessOutsideScale,
+    QualityOutsideScale,
     RipenessInNoSingleStage,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
@@ -74,7 +74,9 @@ def test_measured_ripeness_lies_in_the_stage_containing_it() -> None:
     ripe_interval = RipenessStage.RIPE.value
     centre = (ripe_interval.lower + ripe_interval.upper) / 2
     ripeness = Ripeness(
-        value=SimpleInterval.from_data(centre, centre, Bound.CLOSED, Bound.CLOSED)
+        value=SimpleInterval.from_data(
+            lower=centre, upper=centre, left=Bound.CLOSED, right=Bound.CLOSED
+        )
     )
 
     assert ripeness.stage == RipenessStage.RIPE
@@ -86,10 +88,10 @@ def test_ripeness_straddling_two_stages_has_no_single_stage() -> None:
     """
     ripeness = Ripeness(
         value=SimpleInterval.from_data(
-            RipenessStage.UNRIPE.value.lower,
-            RipenessStage.RIPE.value.upper,
-            Bound.CLOSED,
-            Bound.OPEN,
+            lower=RipenessStage.UNRIPE.value.lower,
+            upper=RipenessStage.RIPE.value.upper,
+            left=Bound.CLOSED,
+            right=Bound.OPEN,
         )
     )
 
@@ -101,10 +103,13 @@ def test_ripeness_beyond_the_scale_is_rejected() -> None:
     """
     A ripeness value beyond the ripeness scale is refused when it is made.
     """
-    with pytest.raises(RipenessOutsideScale):
+    with pytest.raises(QualityOutsideScale):
         Ripeness(
             value=SimpleInterval.from_data(
-                Ripeness.scale.upper, Ripeness.scale.upper + 1, Bound.OPEN, Bound.CLOSED
+                lower=Ripeness.scale.upper,
+                upper=Ripeness.scale.upper + 1,
+                left=Bound.OPEN,
+                right=Bound.CLOSED,
             )
         )
 
@@ -116,8 +121,8 @@ def test_stages_cover_the_ripeness_scale_without_overlap() -> None:
     stage_intervals = [stage.value.as_composite_set() for stage in RipenessStage]
     covered = stage_intervals[0]
     for stage_interval in stage_intervals[1:]:
-        assert covered.intersection_with(stage_interval).is_empty()
-        covered = covered.union_with(stage_interval)
+        assert covered.intersection_with(other=stage_interval).is_empty()
+        covered = covered.union_with(other=stage_interval)
 
     assert covered == Ripeness.scale.as_composite_set()
 

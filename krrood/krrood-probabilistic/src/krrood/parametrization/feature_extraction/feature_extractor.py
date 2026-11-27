@@ -1,3 +1,7 @@
+"""
+The extraction of symbolic features from the object graphs of domain classes.
+"""
+
 from __future__ import annotations
 
 import enum
@@ -11,12 +15,12 @@ from typing_extensions import Any
 from krrood.entity_query_language.core.mapped_variable import MappedVariable
 from krrood.entity_query_language.core.variable import Variable
 from krrood.entity_query_language.factories import variable
-from krrood.ormatic.data_access_objects.dao import (
+from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.ormatic.data_access_objects.relationships import (
     CollectionRelationship,
     SingleRelationship,
-    DataAccessObject,
-    get_dao_schema,
 )
+from krrood.ormatic.data_access_objects.schema import get_dao_schema
 from krrood.ormatic.data_access_objects.helper import get_data_access_object_class
 from krrood.ormatic.exceptions import NoDAOFoundForTypeError
 from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column

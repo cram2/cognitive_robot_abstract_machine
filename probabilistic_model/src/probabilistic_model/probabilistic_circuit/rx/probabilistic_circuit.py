@@ -637,7 +637,7 @@ class SumUnit(InnerUnit):
                 for index, subcircuit in enumerate(self.subcircuits)
             },
         )
-        result = Symbolic(name=name, domain=Set.from_iterable(subcircuit_enum))
+        result = Symbolic(name=name, domain=Set.from_iterable(iterable=subcircuit_enum))
         self._latent_variable = result
         return result
 
@@ -904,7 +904,7 @@ class SumUnit(InnerUnit):
         for subcircuit_a, subcircuit_b in itertools.combinations(self.subcircuits, 2):
             # check if they intersect
             if not subcircuit_a.result_of_current_query.intersection_with(
-                subcircuit_b.result_of_current_query
+                other=subcircuit_b.result_of_current_query
             ).is_empty():
                 return False
 
@@ -975,7 +975,7 @@ class ProductUnit(InnerUnit):
 
     def support(self):
         support: Event = self.subcircuits[0].result_of_current_query
-        support.fill_missing_variables(self.variables)
+        support.fill_missing_variables(variables=self.variables)
 
         for subcircuit in self.subcircuits[1:]:
             support &= subcircuit.result_of_current_query
@@ -1007,10 +1007,10 @@ class ProductUnit(InnerUnit):
     def log_mode(self):
         first_mode = self.subcircuits[0].result_of_current_query
         arg_log_max, log_max = first_mode.event, first_mode.log_likelihood
-        arg_log_max.fill_missing_variables(self.variables)
+        arg_log_max.fill_missing_variables(variables=self.variables)
         for subcircuit in self.subcircuits[1:]:
             arg_log_max = arg_log_max.intersection_with(
-                subcircuit.result_of_current_query.event
+                other=subcircuit.result_of_current_query.event
             )
             log_max += subcircuit.result_of_current_query.log_likelihood
         self.result_of_current_query = LogMode(arg_log_max, log_max)
@@ -1770,7 +1770,7 @@ class ProbabilisticCircuit(GroundableCircuit[Unit], SubclassJSONSerializer):
                 unit,
                 variable,
                 [
-                    component.result_of_current_query.marginal([variable])
+                    component.result_of_current_query.marginal(variables=[variable])
                     for component in components
                 ],
             )
@@ -1990,7 +1990,7 @@ class ProbabilisticCircuit(GroundableCircuit[Unit], SubclassJSONSerializer):
         """
         variable_renames = {
             variable: type(variable)(
-                f"{prefix}.{variable.name}", domain=variable.domain
+                name=f"{prefix}.{variable.name}", domain=variable.domain
             )
             for variable in self.variables
             if variable not in excluded_variables

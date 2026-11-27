@@ -61,6 +61,9 @@ from semantic_digital_twin.grasping.grasp_strategies import (
 )
 from semantic_digital_twin.grasping.object_relative_grasp import draw_grasps
 from semantic_digital_twin.reasoning.predicates import SupportedBy
+from semantic_digital_twin.semantic_annotations.qualities.mixins import (
+    HasMaterialElasticity,
+)
 from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
@@ -320,7 +323,7 @@ class HasRootKinematicStructureEntity(
 
 
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
+class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, Mixin):
     """
     Abstract base class for all objects which have a unambiguous root reference frame.
 
@@ -970,14 +973,14 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         area_of_self.transform_all_shapes_to_own_frame()
         event = area_of_self.event
 
-        event_2d = event.marginal(SpatialVariables.xy)
+        event_2d = event.marginal(variables=SpatialVariables.xy)
         for obj in self.objects:
             bounding_box = obj.root.collision.as_bounding_box_collection_in_frame(
                 self.supporting_surface
             ).bounding_box()
             bounding_box.enlarge_all(object_bloat)
             object_event = bounding_box.simple_event.as_composite_set()
-            object_event_2d = object_event.marginal(SpatialVariables.xy)
+            object_event_2d = object_event.marginal(variables=SpatialVariables.xy)
             event_2d = event_2d - object_event_2d
         return event_2d
 
@@ -1002,7 +1005,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
             objects_of_interest=objects_of_interest,
             variance=variance,
         )
-        sample_space.fill_missing_variables(surface_circuit.variables)
+        sample_space.fill_missing_variables(variables=surface_circuit.variables)
         surface_circuit.log_truncated_in_place(sample_space)
 
         return surface_circuit
@@ -1024,7 +1027,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
         objects_of_interest_variable = Symbolic(
             name="objects_of_interest",
-            domain=EventSet.from_iterable(objects_of_interest),
+            domain=EventSet.from_iterable(iterable=objects_of_interest),
         )
 
         for object_of_interest in objects_of_interest:

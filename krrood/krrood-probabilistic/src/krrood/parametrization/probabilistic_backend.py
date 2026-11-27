@@ -639,13 +639,13 @@ class ProbabilisticBackend(GenerativeBackend):
         """
         if region is not None:
             circuit = circuit.truncated(
-                region.fill_missing_variables_pure(circuit.variables)
+                region.fill_missing_variables_pure(variables=circuit.variables)
             ).distribution
             if circuit is None:
                 return 0.0
         return float(
             circuit.probability(
-                effect_event.fill_missing_variables_pure(circuit.variables)
+                effect_event.fill_missing_variables_pure(variables=circuit.variables)
             )
         )
 
@@ -869,7 +869,7 @@ class ProbabilisticBackend(GenerativeBackend):
             return None
 
         region = interventional.truncated(
-            best_region.fill_missing_variables_pure(interventional.variables)
+            best_region.fill_missing_variables_pure(variables=interventional.variables)
         )
         if region.distribution is None or region.probability <= 0.0:
             return None

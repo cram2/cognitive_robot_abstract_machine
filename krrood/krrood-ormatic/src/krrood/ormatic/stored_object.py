@@ -8,7 +8,7 @@ from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from krrood.ormatic.base import Base
-from krrood.ormatic.data_access_objects.dao import StoredObjectRow
+from krrood.ormatic.data_access_objects.stored_object_row import StoredObjectRow
 
 # %% the table of every stored object
 

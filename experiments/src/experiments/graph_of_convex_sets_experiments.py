@@ -388,7 +388,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
                 obstacle = bounding_box.simple_event.as_composite_set() & search_event
                 if not obstacle.is_empty():
                     free_space_accumulator = free_space_accumulator.subtract_disjoint(
-                        obstacle
+                        other=obstacle
                     )
             return free_space_accumulator
 
