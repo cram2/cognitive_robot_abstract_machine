@@ -112,14 +112,9 @@ class WorldDescriptorBootstrapAnnotator(
     """Identity of the world most recently augmented with descriptor entities."""
 
     _merged_descriptor_entities: _MergedDescriptorEntities = field(
-        init=False, repr=False
+        default_factory=_MergedDescriptorEntities, init=False, repr=False
     )
     """Descriptor entities retained for replacing a previous augmentation."""
-
-    def __post_init__(self) -> None:
-        """Initialize annotator resources after :meth:`robokudo.annotators.core.BaseAnnotator.__post_init__`."""
-        super().__post_init__()
-        self._merged_descriptor_entities = _MergedDescriptorEntities()
 
     def _update_tracker_if_active(self) -> None:
         """
