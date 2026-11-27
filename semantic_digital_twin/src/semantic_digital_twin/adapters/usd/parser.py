@@ -719,8 +719,18 @@ class USDStageParser(WorldModelParser, ABC):
             world=world, parent=world.root, child=body
         )
         world.add_connection(connection)
+        connection.origin = self._world_root_T_prim(world=world, prim=prim)
+
+    def _world_root_T_prim(
+        self, *, world: World, prim: Usd.Prim
+    ) -> HomogeneousTransformationMatrix:
+        """
+        :param world: The world, whose root body's frame is the stage's world frame.
+        :param prim: A prim of the stage.
+        :return: The prim's pose without its scale, relative to ``world``'s root body.
+        """
         # Gf matrices act on row vectors, so the transpose is the pose.
-        connection.origin = HomogeneousTransformationMatrix(
+        return HomogeneousTransformationMatrix(
             data=np.array(self._pose_in_world(prim=prim)).T,
             reference_frame=world.root,
         )

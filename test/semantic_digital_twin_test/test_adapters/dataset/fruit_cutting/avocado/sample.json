@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "fruit": "avocado",
+  "seed": 2026,
+  "index": 0,
+  "stage": "ripe",
+  "texture": "avocado_dark",
+  "stage_note": "Hass mesocarp endpoint. Peel tint is an appearance proxy, source cultivar unverified.",
+  "profile_sha256": "a48a6fed1e28857ba2294a52f021917e7de3e294b419c2880811d2051ae5c4dc",
+  "units": "metre, kilogram, second; E_MPa in MPa",
+  "frame": "USD Z-up",
+  "material_order": [
+    "Peel",
+    "Pulp",
+    "Pit"
+  ],
+  "materials": {
+    "Peel": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 960.0,
+      "E_MPa": 1.3,
+      "nu": 0.32
+    },
+    "Pulp": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 980.0,
+      "E_MPa": 0.2261632659241985,
+      "nu": 0.33
+    },
+    "Pit": {
+      "mode": "fixed_rigid"
+    }
+  },
+  "rigid_bodies": [
+    {
+      "material": "Pit",
+      "path": "/World/CulinaryCut/RigidPit",
+      "mode": "fixed_rigid"
+    }
+  ]
+}

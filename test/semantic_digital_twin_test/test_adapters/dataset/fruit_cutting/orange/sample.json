@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "fruit": "orange",
+  "seed": 2026,
+  "index": 0,
+  "stage": "reference",
+  "texture": "original",
+  "stage_note": "One appearance class from the source asset. No maturity trend inferred.",
+  "profile_sha256": "86567e4613f2c234bfe076a2d92281d6c4bc10aba1e610d813d6c5cc8d7eb782",
+  "units": "metre, kilogram, second; E_MPa in MPa",
+  "frame": "USD Z-up",
+  "material_order": [
+    "Rind",
+    "Pulp",
+    "Membrane"
+  ],
+  "materials": {
+    "Rind": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 740.0,
+      "E_MPa": 1.55,
+      "nu": 0.445
+    },
+    "Pulp": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 1030.0,
+      "E_MPa": 0.06017018918630945,
+      "nu": 0.46
+    },
+    "Membrane": {
+      "mode": "soft_mpm",
+      "density_kg_m3": 980.0,
+      "E_MPa": 0.74,
+      "nu": 0.32
+    }
+  },
+  "rigid_bodies": []
+}
