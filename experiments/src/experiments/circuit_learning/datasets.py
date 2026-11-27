@@ -93,14 +93,16 @@ class BenchmarkDataset:
         variables: list[Variable] = []
         for column in self.train.columns:
             if pd.api.types.is_float_dtype(self.train[column]):
-                variables.append(Continuous(column))
+                variables.append(Continuous(name=column))
                 continue
             values = sorted(
                 set(self.train[column])
                 | set(self.validation[column])
                 | set(self.test[column])
             )
-            variables.append(Symbolic(name=column, domain=Set.from_iterable(values)))
+            variables.append(
+                Symbolic(name=column, domain=Set.from_iterable(iterable=values))
+            )
         self.variables = SortedSet(variables)
 
     @property

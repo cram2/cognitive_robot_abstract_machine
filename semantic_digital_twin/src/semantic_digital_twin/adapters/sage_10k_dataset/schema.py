@@ -691,8 +691,8 @@ class Sage10kDoor(Sage10kWithID):
             world.root.global_pose
         )
         is_handle_in_room = floor_bounding_box.event.marginal(
-            SpatialVariables.xy
-        ).contains((door_T_world.x, door_T_world.y))
+            variables=SpatialVariables.xy
+        ).contains(item=(door_T_world.x, door_T_world.y))
 
         if is_handle_in_room and self.opens_inward:
             door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(

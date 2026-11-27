@@ -1498,7 +1498,9 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
             t_max = min(t_max, t_exit)
             if t_min > t_max:
                 return None
-        return SimpleInterval.from_data(t_min, t_max, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            lower=t_min, upper=t_max, left=Bound.CLOSED, right=Bound.CLOSED
+        )
 
 
 PointT = TypeVar("PointT", bound=Point)
@@ -1533,10 +1535,10 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :return: The absolute interval this axis spans.
         """
         return SimpleInterval.from_data(
-            float(origin_component + minimum),
-            float(origin_component + maximum),
-            Bound.CLOSED,
-            Bound.CLOSED,
+            lower=float(origin_component + minimum),
+            upper=float(origin_component + maximum),
+            left=Bound.CLOSED,
+            right=Bound.CLOSED,
         )
 
     @classmethod
@@ -1715,7 +1717,9 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
             intersect.
         """
         other_in_same_frame = other.transform_to_origin(self.origin)
-        result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
+        result = self.simple_event.intersection_with(
+            other=other_in_same_frame.simple_event
+        )
         if result.is_empty():
             return None
         return self.__class__.from_simple_event(result, self.origin)[0]
@@ -1871,7 +1875,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
             point, self.origin.reference_frame
         )
         x, y, z = (float(point_in_bb.x), float(point_in_bb.y), float(point_in_bb.z))
-        return self.simple_event.contains((x, y, z))
+        return self.simple_event.contains(item=(x, y, z))
 
     @classmethod
     def from_simple_event(
@@ -2128,7 +2132,7 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             point, self.origin.reference_frame
         )
         x, y = float(point_in_box_frame.x), float(point_in_box_frame.y)
-        return self.simple_event.contains((x, y))
+        return self.simple_event.contains(item=(x, y))
 
     def extrude(self, half_height: float) -> VolumetricBoundingBox:
         """

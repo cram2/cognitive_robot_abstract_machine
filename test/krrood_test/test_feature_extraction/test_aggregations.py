@@ -57,8 +57,12 @@ def test_single_aggregation(example_scenario):
     assert len(aggregations) == 3
     closed = Bound.CLOSED
     assert values == {
-        "chair_count": SimpleInterval.from_data(1, 4, closed, closed),
-        "table_count": SimpleInterval.from_data(1, 4, closed, closed),
+        "chair_count": SimpleInterval.from_data(
+            lower=1, upper=4, left=closed, right=closed
+        ),
+        "table_count": SimpleInterval.from_data(
+            lower=1, upper=4, left=closed, right=closed
+        ),
         "total_count": 5,
     }
 
@@ -104,7 +108,7 @@ def test_aggregation_count_values(example_scenario):
     aggregation_instance = aggregation_cls(role_taker=room, field_name="objects")
     values = aggregation_instance.apply_mapping()
     assert values["chair_count"] == SimpleInterval.from_data(
-        1, 4, Bound.CLOSED, Bound.CLOSED
+        lower=1, upper=4, left=Bound.CLOSED, right=Bound.CLOSED
     )
 
 

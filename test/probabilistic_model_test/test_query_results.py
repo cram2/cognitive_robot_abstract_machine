@@ -28,7 +28,7 @@ from probabilistic_model.query_results import (
 
 @pytest.fixture
 def x() -> Continuous:
-    return Continuous("x")
+    return Continuous(name="x")
 
 
 @pytest.fixture

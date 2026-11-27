@@ -56,9 +56,9 @@ from random_events.variable import Continuous
 # Stand-in for the fleet's already-fitted model: over a shift, in isolation, each
 # reading varies uniformly across its own range. (Named "Robot.<field>" so
 # DictRegistry -- see below -- can look each field up by name.)
-var_temperature = Continuous("Robot.temperature")
-var_speed = Continuous("Robot.speed")
-var_charge = Continuous("Robot.charge")
+var_temperature = Continuous(name="Robot.temperature")
+var_speed = Continuous(name="Robot.speed")
+var_charge = Continuous(name="Robot.charge")
 
 circuit = ProbabilisticCircuit()
 root = ProductUnit(probabilistic_circuit=circuit)

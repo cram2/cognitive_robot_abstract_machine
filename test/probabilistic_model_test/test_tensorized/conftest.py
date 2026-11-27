@@ -55,7 +55,7 @@ def mixture_of_products_case() -> MixtureOfProductsCase:
     """
     The circuit whose queries are compared across backends.
     """
-    return MixtureOfProductsCase(Continuous("x"), Continuous("y"))
+    return MixtureOfProductsCase(Continuous(name="x"), Continuous(name="y"))
 
 
 # %% sparsity

@@ -54,7 +54,9 @@ def point(value: float) -> SimpleInterval:
     :param value: A measured value.
     :return: The interval holding only ``value``.
     """
-    return SimpleInterval.from_data(value, value, Bound.CLOSED, Bound.CLOSED)
+    return SimpleInterval.from_data(
+        lower=value, upper=value, left=Bound.CLOSED, right=Bound.CLOSED
+    )
 
 
 def measured_material_elasticity() -> MaterialElasticity:

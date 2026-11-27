@@ -50,7 +50,7 @@ def symbolic_variable() -> Symbolic:
     """
     A symbolic variable over *a* and *b*.
     """
-    return Symbolic(name="v2", domain=Set.from_iterable(["a", "b"]))
+    return Symbolic(name="v2", domain=Set.from_iterable(iterable=["a", "b"]))
 
 
 @pytest.fixture

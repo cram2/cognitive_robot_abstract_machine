@@ -176,7 +176,7 @@ def test_probabilistic_backend_with_symbolic_expression():
     prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
     parameters = UnderspecifiedParameters(statement=prob_q)
     assert parameters.variables["KRROODPosition.z"] == Symbolic(
-        name="KRROODPosition.z", domain=Set.from_iterable([1, 2, 3])
+        name="KRROODPosition.z", domain=Set.from_iterable(iterable=[1, 2, 3])
     )
 
 
@@ -380,8 +380,8 @@ def rectangle_model() -> ProbabilisticCircuit:
         :data:`RECTANGLE_SIDES` with equal probability, and knows nothing about the area
         those sides enclose.
     """
-    width = Continuous("Rectangle.width")
-    height = Continuous("Rectangle.height")
+    width = Continuous(name="Rectangle.width")
+    height = Continuous(name="Rectangle.height")
     model = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=model)
     for rectangle_width, rectangle_height in RECTANGLE_SIDES:

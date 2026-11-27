@@ -44,7 +44,7 @@ class Quality(ABC):
         :param scale: The scale ``value`` has to lie within.
         :raises QualityOutsideScale: If ``value`` reaches beyond ``scale``.
         """
-        if scale.intersection_with(value) != value:
+        if scale.intersection_with(other=value) != value:
             raise QualityOutsideScale(quality=self, value=value, scale=scale)
 
 
@@ -59,17 +59,23 @@ class RipenessStage(Enum):
         ontology or horticultural source fixes them.
     """
 
-    UNRIPE = SimpleInterval.from_data(0.0, 1 / 3, Bound.CLOSED, Bound.OPEN)
+    UNRIPE = SimpleInterval.from_data(
+        lower=0.0, upper=1 / 3, left=Bound.CLOSED, right=Bound.OPEN
+    )
     """
     The first third of ripening, such as a green banana or a firm avocado.
     """
 
-    RIPE = SimpleInterval.from_data(1 / 3, 2 / 3, Bound.CLOSED, Bound.OPEN)
+    RIPE = SimpleInterval.from_data(
+        lower=1 / 3, upper=2 / 3, left=Bound.CLOSED, right=Bound.OPEN
+    )
     """
     The middle third of ripening, in which a fruit is usually eaten.
     """
 
-    OVERRIPE = SimpleInterval.from_data(2 / 3, 1.0, Bound.CLOSED, Bound.CLOSED)
+    OVERRIPE = SimpleInterval.from_data(
+        lower=2 / 3, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
+    )
     """
     The last third of ripening, in which a fruit softens and starts to spoil.
     """
@@ -101,7 +107,9 @@ class Ripeness(Quality):
         """
         :return: The ripeness scale, from 0 at the start of ripening to 1 at its end.
         """
-        return SimpleInterval.from_data(0.0, 1.0, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            lower=0.0, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
+        )
 
     @classmethod
     def from_stage(cls, *, stage: RipenessStage) -> Self:
@@ -118,7 +126,7 @@ class Ripeness(Quality):
         :raises RipenessInNoSingleStage: If no single stage holds the whole value.
         """
         for stage in RipenessStage:
-            if stage.value.intersection_with(self.value) == self.value:
+            if stage.value.intersection_with(other=self.value) == self.value:
                 return stage
         raise RipenessInNoSingleStage(ripeness=self)
 
@@ -150,7 +158,9 @@ class MassDensity(Quality):
         """
         :return: The mass density scale: every positive mass density.
         """
-        return SimpleInterval.from_data(0.0, float("inf"), Bound.OPEN, Bound.OPEN)
+        return SimpleInterval.from_data(
+            lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
+        )
 
 
 @dataclass(kw_only=True)
@@ -196,7 +206,9 @@ class MaterialElasticity(Quality):
         """
         :return: The scale of Young's modulus: every positive stiffness.
         """
-        return SimpleInterval.from_data(0.0, float("inf"), Bound.OPEN, Bound.OPEN)
+        return SimpleInterval.from_data(
+            lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
+        )
 
     @classproperty
     def poissons_ratio_scale(cls) -> SimpleInterval:
@@ -204,4 +216,6 @@ class MaterialElasticity(Quality):
         :return: The scale of Poisson's ratio: the range, from -1 to 1/2, in which an
             isotropic linear elastic material is stable :cite:`mott2009limits`.
         """
-        return SimpleInterval.from_data(-1.0, 0.5, Bound.OPEN, Bound.OPEN)
+        return SimpleInterval.from_data(
+            lower=-1.0, upper=0.5, left=Bound.OPEN, right=Bound.OPEN
+        )

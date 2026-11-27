@@ -288,7 +288,7 @@ def compute_aggregation_statistics(
         )
         latent_variable = latent_variable_by_name[feature_name]
         try:
-            latent_variable.make_value(value)
+            latent_variable.make_value(value=value)
         except (ValueError, TypeError):
             logger.info(
                 "Could not determine value for the aggregation statistic. Falling back to Monte-Carlo integration",

@@ -45,7 +45,9 @@ class DependentBits:
         The binary symbolic variables, over the domain {"0", "1"}.
         """
         return SortedSet(
-            Symbolic(name=f"x{index:02d}", domain=Set.from_iterable(["0", "1"]))
+            Symbolic(
+                name=f"x{index:02d}", domain=Set.from_iterable(iterable=["0", "1"])
+            )
             for index in range(self.number_of_variables)
         )
 

@@ -97,16 +97,18 @@ def test_apple_peel_keeps_its_density_and_elasticity(
         apple.add(part=peel)
         peel.set_quality(
             quality=MassDensity(
-                value=SimpleInterval.from_data(840.0, 860.0, Bound.CLOSED, Bound.CLOSED)
+                value=SimpleInterval.from_data(
+                    lower=840.0, upper=860.0, left=Bound.CLOSED, right=Bound.CLOSED
+                )
             )
         )
         peel.set_quality(
             quality=MaterialElasticity(
                 youngs_modulus=SimpleInterval.from_data(
-                    11.6e6, 11.6e6, Bound.CLOSED, Bound.CLOSED
+                    lower=11.6e6, upper=11.6e6, left=Bound.CLOSED, right=Bound.CLOSED
                 ),
                 poissons_ratio=SimpleInterval.from_data(
-                    0.33, 0.33, Bound.CLOSED, Bound.CLOSED
+                    lower=0.33, upper=0.33, left=Bound.CLOSED, right=Bound.CLOSED
                 ),
             )
         )
