@@ -252,35 +252,58 @@ def resolve_name_in_hierarchy(name: str, start_object: Any) -> Any:
     )
 
 
+def names_in_postponed_annotations(*, clazz: type) -> set[str]:
+    """
+    :param clazz: The class whose own annotations are read, not those of its bases.
+    :return: The names that the postponed annotations of the class use, such as
+        ``shapes`` and ``Polygon`` for an annotation ``list[shapes.Polygon]``.
+    """
+    return {
+        node.id
+        for annotation in vars(clazz).get("__annotations__", {}).values()
+        if isinstance(annotation, str)
+        for node in ast.walk(ast.parse(annotation, mode="eval"))
+        if isinstance(node, ast.Name)
+    }
+
+
 def modules_named_in_annotations(*, clazz: type) -> list[types.ModuleType]:
     """
     :param clazz: The class whose annotations are read.
     :return: The modules that the postponed annotations of the class and of its bases
-        name, such as :mod:`optax` for an annotation ``optax.OptState``.
+        name, such as the module ``shapes`` for an annotation ``shapes.Polygon``.
     """
     modules = {}
     for base in clazz.__mro__:
         owner_module = inspect.getmodule(base)
         if owner_module is None:
             continue
-        for annotation in vars(base).get("__annotations__", {}).values():
-            if not isinstance(annotation, str):
-                continue
-            for node in ast.walk(ast.parse(annotation, mode="eval")):
-                named = (
-                    vars(owner_module).get(node.id)
-                    if isinstance(node, ast.Name)
-                    else None
-                )
-                if isinstance(named, types.ModuleType):
-                    modules[named.__name__] = named
+        for name in names_in_postponed_annotations(clazz=base):
+            named = vars(owner_module).get(name)
+            if isinstance(named, types.ModuleType):
+                modules[named.__name__] = named
     return list(modules.values())
+
+
+def loaded_package_modules(*, package: types.ModuleType) -> list[types.ModuleType]:
+    """
+    :param package: The module to start from.
+    :return: The module and every module inside it that is loaded.
+    """
+    prefix = f"{package.__name__}."
+    return [
+        module
+        for module_name, module in list(sys.modules.items())
+        if module is not None
+        and (module_name == package.__name__ or module_name.startswith(prefix))
+    ]
 
 
 def resolve_name_in_annotated_modules(*, name: str, clazz: type) -> Any | None:
     """
-    Resolve a name that an alias defined in another module refers to, such as
-    ``ArrayTree`` in the recursive alias that ``optax.OptState`` is.
+    Resolve a name that an alias of another module refers to, but that the module of
+    the class never binds: an annotation ``shapes.Tree`` reaches a recursive alias
+    ``Tree = Union[Polygon, list["Tree"]]`` whose name ``Tree`` only ``shapes`` binds.
 
     :param name: The name to resolve.
     :param clazz: The class whose annotations reach the alias.
@@ -288,16 +311,12 @@ def resolve_name_in_annotated_modules(*, name: str, clazz: type) -> Any | None:
         :func:`modules_named_in_annotations` and their submodules, or None if there is
         none or more than one.
     """
-    candidates = {}
-    for named_module in modules_named_in_annotations(clazz=clazz):
-        prefix = f"{named_module.__name__}."
-        for module_name, module in list(sys.modules.items()):
-            if module is None or not (
-                module_name == named_module.__name__ or module_name.startswith(prefix)
-            ):
-                continue
-            if name in vars(module):
-                candidates[id(vars(module)[name])] = vars(module)[name]
+    candidates = {
+        id(vars(module)[name]): vars(module)[name]
+        for named_module in modules_named_in_annotations(clazz=clazz)
+        for module in loaded_package_modules(package=named_module)
+        if name in vars(module)
+    }
     if len(candidates) != 1:
         return None
     return next(iter(candidates.values()))
