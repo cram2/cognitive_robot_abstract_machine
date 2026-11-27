@@ -10,7 +10,7 @@ import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from functools import reduce
+from functools import lru_cache, reduce
 from types import NoneType, UnionType
 
 from typing_extensions import (
@@ -24,6 +24,7 @@ from typing_extensions import (
 
 from krrood.class_diagrams.collection_kind import AnyCollection, CollectionKind
 from krrood.class_diagrams.utils import common_base_class
+from krrood.ormatic.utils import _get_type_hints_cached
 from krrood.patterns.classproperty import classproperty
 
 
@@ -79,6 +80,23 @@ class AssociationLeafAttribute(StrEnum):
 
 
 @dataclass(kw_only=True, frozen=True)
+class CollectionEntry:
+    """
+    An element of a container, with the key the container holds it by.
+    """
+
+    key: Any = None
+    """
+    The key of the element, None for a container without keys.
+    """
+
+    element: Any
+    """
+    The element.
+    """
+
+
+@dataclass(kw_only=True, frozen=True)
 class CollectionLevel(ABC):
     """
     One container in the nesting of a collection.
@@ -115,11 +133,10 @@ class CollectionLevel(ABC):
         """
 
     @abstractmethod
-    def entries(self, *, container: AnyCollection) -> Iterable[tuple[Any, Any]]:
+    def entries(self, *, container: AnyCollection) -> Iterable[CollectionEntry]:
         """
         :param container: A container of this level.
-        :return: The key of every element, None for an unkeyed container, with the
-            element, in the container's order.
+        :return: Every element of the container with its key, in the container's order.
         """
 
     @abstractmethod
@@ -149,7 +166,7 @@ class CollectionLevel(ABC):
         """
 
     @abstractmethod
-    def restore_container_type(self, *, elements: list | dict) -> Any:
+    def restore_container_type(self, *, elements: list | dict) -> AnyCollection:
         """
         :param elements: A finished container, its elements already restored.
         :return: The container as :attr:`container_type`.
@@ -167,8 +184,8 @@ class SequenceLevel(CollectionLevel):
     def finished_type(self) -> type:
         return list
 
-    def entries(self, *, container: AnyCollection) -> Iterable[tuple[Any, Any]]:
-        return ((None, element) for element in container)
+    def entries(self, *, container: AnyCollection) -> Iterable[CollectionEntry]:
+        return (CollectionEntry(element=element) for element in container)
 
     def add_loaded_element(self, *, container: list, key: Any, element: Any) -> int:
         container.append(element)
@@ -180,7 +197,7 @@ class SequenceLevel(CollectionLevel):
     def finish_loaded_container(self, *, container: list) -> list:
         return container
 
-    def restore_container_type(self, *, elements: list) -> Any:
+    def restore_container_type(self, *, elements: list) -> AnyCollection:
         if self.container_type is list:
             return elements
         return self.container_type(elements)
@@ -204,8 +221,11 @@ class MappingLevel(CollectionLevel):
     def finished_type(self) -> type:
         return dict
 
-    def entries(self, *, container: AnyCollection) -> Iterable[tuple[Any, Any]]:
-        return container.items()
+    def entries(self, *, container: AnyCollection) -> Iterable[CollectionEntry]:
+        return (
+            CollectionEntry(key=key, element=element)
+            for key, element in container.items()
+        )
 
     def add_loaded_element(self, *, container: list, key: Any, element: Any) -> int:
         container.append([key, element])
@@ -224,7 +244,7 @@ class MappingLevel(CollectionLevel):
     def finish_loaded_container(self, *, container: list) -> dict:
         return {key: element for key, element in container}
 
-    def restore_container_type(self, *, elements: dict) -> Any:
+    def restore_container_type(self, *, elements: dict) -> AnyCollection:
         if self.container_type is dict:
             return elements
         return self.container_type(elements)
@@ -364,6 +384,25 @@ class CollectionShape:
             return types[0]
         return common_base_class(types) or reduce(operator.or_, types)
 
+    @classmethod
+    @lru_cache(maxsize=None)
+    def fields_with_containers_to_restore(
+        cls, *, clazz: type
+    ) -> tuple[CollectionField, ...]:
+        """
+        :param clazz: A domain class.
+        :return: Every field of the class annotated with a collection that holds a
+            container read back as another class, such as a set or a tuple.
+        """
+        result = []
+        for attribute_name, hint in _get_type_hints_cached(clazz).items():
+            shape = cls.from_annotation(annotation=hint)
+            if shape is not None and shape.has_containers_to_restore:
+                result.append(
+                    CollectionField(attribute_name=attribute_name, shape=shape)
+                )
+        return tuple(result)
+
     @property
     def leaf_types(self) -> tuple[Any, ...]:
         """
@@ -470,3 +509,20 @@ class CollectionShape:
                 for element in value
             ]
         return level.restore_container_type(elements=elements)
+
+
+@dataclass(kw_only=True, frozen=True)
+class CollectionField:
+    """
+    A field of a class annotated with a collection, and the shape of that collection.
+    """
+
+    attribute_name: str
+    """
+    The name of the field.
+    """
+
+    shape: CollectionShape
+    """
+    The shape of the collection the field holds.
+    """

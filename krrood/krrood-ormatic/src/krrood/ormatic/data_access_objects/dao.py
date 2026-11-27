@@ -64,7 +64,7 @@ from krrood.ormatic.exceptions import (
 from krrood.patterns.called_positionally import called_positionally
 from krrood.patterns.exceptions import NoGenericError
 from krrood.patterns.has_generic import HasGeneric
-from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
+from krrood.ormatic.utils import is_data_column
 
 logger = logging.getLogger(__name__)
 
@@ -261,6 +261,14 @@ class CollectionRelationship:
         """
         return any(level.is_keyed for level in self.levels)
 
+    def is_innermost(self, *, level: AssociationLevel) -> bool:
+        """
+        :param level: One of :attr:`levels`.
+        :return: Whether the containers of the level hold the values of the collection
+            rather than other containers.
+        """
+        return level is self.levels[-1]
+
 
 @dataclass(kw_only=True, frozen=True)
 class LoadedContainerPlace:
@@ -338,12 +346,11 @@ class AssociationRowReader:
             container=self.collection,
             reference=Attribute(_attribute_name_=self.relationship.key, _child_=None),
         )
-        innermost_level = self.relationship.levels[-1]
         for level in self.relationship.levels:
             index = getattr(row, level.column_names.index)
             if index is None:
                 return
-            if level is innermost_level:
+            if self.relationship.is_innermost(level=level):
                 self._add_element(
                     row=row, level=level, place=place, element=self._value(row=row)
                 )
@@ -909,23 +916,6 @@ def _read_single_relationship(
     return value
 
 
-@lru_cache(maxsize=None)
-def _get_collection_shapes_to_restore(
-    clazz: type,
-) -> tuple[tuple[str, CollectionShape], ...]:
-    """
-    :param clazz: The domain class to inspect.
-    :return: The name and shape of every field annotated with a collection that holds a
-        container read back as another class, such as a set or a tuple.
-    """
-    result = []
-    for attribute_name, hint in _get_type_hints_cached(clazz).items():
-        shape = CollectionShape.from_annotation(annotation=hint)
-        if shape is not None and shape.has_containers_to_restore:
-            result.append((attribute_name, shape))
-    return tuple(result)
-
-
 class DataAccessObject(HasGeneric[T]):
     """
     Base class for Data Access Objects (DAOs) providing bidirectional conversion between
@@ -1353,19 +1343,19 @@ class DataAccessObject(HasGeneric[T]):
             of the containers it holds, a row without value marking an empty container.
         """
         level = relationship.levels[len(positions)]
-        is_innermost = len(positions) + 1 == len(relationship.levels)
+        is_innermost = relationship.is_innermost(level=level)
         rows = []
-        for index, (key, element) in enumerate(
+        for index, entry in enumerate(
             level.collection_level.entries(container=container)
         ):
             element_positions = (
                 *positions,
-                AssociationRowPosition(level=level, index=index, key=key),
+                AssociationRowPosition(level=level, index=index, key=entry.key),
             )
-            if not is_innermost and element:
+            if not is_innermost and entry.element:
                 rows.extend(
                     self._association_rows(
-                        container=element,
+                        container=entry.element,
                         relationship=relationship,
                         positions=element_positions,
                         state=state,
@@ -1377,7 +1367,7 @@ class DataAccessObject(HasGeneric[T]):
             )
             if is_innermost:
                 self._set_association_row_value(
-                    row=row, relationship=relationship, value=element, state=state
+                    row=row, relationship=relationship, value=entry.element, state=state
                 )
             rows.append(row)
         return rows
@@ -1685,14 +1675,16 @@ class DataAccessObject(HasGeneric[T]):
         Convert the lists of every collection field, nested ones included, to the sets,
         tuples and other classes its type hint declares.
         """
-        for attribute_name, shape in _get_collection_shapes_to_restore(
-            type(domain_object)
+        for collection_field in CollectionShape.fields_with_containers_to_restore(
+            clazz=type(domain_object)
         ):
-            value = getattr(domain_object, attribute_name, None)
-            restored = shape.restore_container_types(value=value)
+            value = getattr(domain_object, collection_field.attribute_name, None)
+            restored = collection_field.shape.restore_container_types(value=value)
             if restored is not value:
                 # object.__setattr__ (not setattr) so this also works on frozen dataclasses.
-                object.__setattr__(domain_object, attribute_name, restored)
+                object.__setattr__(
+                    domain_object, collection_field.attribute_name, restored
+                )
 
     def _call_post_inits(
         self,
