@@ -28,6 +28,7 @@ from experiments.circuit_learning.settings import (
 from probabilistic_model.learning.parameters.training_schedule import Convergence
 from probabilistic_model.learning.structure.latent_variable_distillation.latent_variable_distillation import (
     MaskedAutoencoderTraining,
+    TransformerArchitecture,
 )
 
 
@@ -50,7 +51,10 @@ def small_method() -> LatentVariableDistillationByExpectationMaximization:
     return LatentVariableDistillationByExpectationMaximization(
         hidden_states=4,
         autoencoder=MaskedAutoencoderTraining(
-            width=16, layers=1, heads=2, feedforward_width=32, epochs=2
+            architecture=TransformerArchitecture(
+                width=16, layers=1, heads=2, feedforward_width=32
+            ),
+            epochs=2,
         ),
     )
 

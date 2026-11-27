@@ -6,6 +6,8 @@ of a hidden Chow-Liu tree circuit, whose parameters are counted from them.
 from __future__ import annotations
 
 # %% imports
+import dataclasses
+
 import numpy as np
 import pytest
 import torch
@@ -21,6 +23,7 @@ from probabilistic_model.learning.structure.latent_variable_distillation.latent_
     LatentVariableDistillation,
     MaskedAutoencoderTraining,
     TabularMaskedAutoencoder,
+    TransformerArchitecture,
 )
 from probabilistic_model.learning.parameters.torch_circuit_parameter_learning import (
     TorchDeviceType,
@@ -42,7 +45,10 @@ def short_training() -> MaskedAutoencoderTraining:
     A small autoencoder trained for a few epochs.
     """
     return MaskedAutoencoderTraining(
-        width=16, layers=1, heads=2, feedforward_width=32, epochs=3
+        architecture=TransformerArchitecture(
+            width=16, layers=1, heads=2, feedforward_width=32
+        ),
+        epochs=3,
     )
 
 
@@ -71,7 +77,10 @@ def test_autoencoder_encodes_one_token_per_variable():
     The encoder gives every variable of every row one token of the embedding width.
     """
     autoencoder = TabularMaskedAutoencoder(
-        number_of_states=[2, 0, 3], width=8, layers=1, heads=2, feedforward_width=16
+        number_of_states=[2, 0, 3],
+        architecture=TransformerArchitecture(
+            width=8, layers=1, heads=2, feedforward_width=16
+        ),
     )
     values = torch.tensor([[0.0, 0.5, 2.0], [1.0, -1.0, 0.0]])
 
@@ -89,19 +98,36 @@ def test_training_lowers_the_reconstruction_loss(bits, short_training):
     distillation = distillation_of(bits=bits, training=short_training)
     values = distillation.autoencoder_inputs(data=bits.rows())
     masked = torch.rand(values.shape, generator=torch.Generator().manual_seed(1)) < 0.5
-    untrained = short_training.untrained_autoencoder(
-        number_of_states=distillation.number_of_states, seed=0
+    untrained = dataclasses.replace(short_training, epochs=0).trained_autoencoder(
+        values=values, number_of_states=distillation.number_of_states, seed=0
     )
-    untrained_loss = untrained.reconstruction_loss(values=values, masked=masked).item()
-
     trained = short_training.trained_autoencoder(
         values=values, number_of_states=distillation.number_of_states, seed=0
     )
 
+    untrained.eval()
     trained.eval()
     with torch.no_grad():
+        untrained_loss = untrained.reconstruction_loss(
+            values=values, masked=masked
+        ).item()
         trained_loss = trained.reconstruction_loss(values=values, masked=masked).item()
     assert trained_loss < untrained_loss
+
+
+def test_training_leaves_the_global_random_state_unchanged(bits, short_training):
+    """
+    Seeding the autoencoder's training does not reseed torch's global random state.
+    """
+    distillation = distillation_of(bits=bits, training=short_training)
+    values = distillation.autoencoder_inputs(data=bits.rows())
+    state_before = torch.random.get_rng_state()
+
+    short_training.trained_autoencoder(
+        values=values, number_of_states=distillation.number_of_states, seed=0
+    )
+
+    assert torch.equal(torch.random.get_rng_state(), state_before)
 
 
 # %% devices

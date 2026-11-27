@@ -38,6 +38,33 @@ from probabilistic_model.probabilistic_circuit.tensorized.symbolic_encoding impo
 # %% masked autoencoder
 
 
+@dataclass(kw_only=True)
+class TransformerArchitecture:
+    """
+    The size of the transformer encoder of a :class:`TabularMaskedAutoencoder`.
+    """
+
+    width: int = 64
+    """
+    The size of a token.
+    """
+
+    layers: int = 2
+    """
+    The number of transformer layers.
+    """
+
+    heads: int = 4
+    """
+    The number of attention heads.
+    """
+
+    feedforward_width: int = 128
+    """
+    The size of the hidden layer of every transformer layer's feed-forward network.
+    """
+
+
 @dataclass(kw_only=True, eq=False, repr=False)
 class TabularMaskedAutoencoder(torch.nn.Module):
     """
@@ -51,24 +78,9 @@ class TabularMaskedAutoencoder(torch.nn.Module):
     The number of states of every symbolic variable, zero for a continuous one.
     """
 
-    width: int
+    architecture: TransformerArchitecture
     """
-    The size of a token.
-    """
-
-    layers: int
-    """
-    The number of transformer layers.
-    """
-
-    heads: int
-    """
-    The number of attention heads.
-    """
-
-    feedforward_width: int
-    """
-    The size of the hidden layer of every transformer layer's feed-forward network.
+    The size of the transformer encoder.
     """
 
     initial_position_scale: float = 0.02
@@ -81,31 +93,27 @@ class TabularMaskedAutoencoder(torch.nn.Module):
         Creates the embeddings, the encoder and the reconstruction heads.
         """
         super().__init__()
+        width = self.architecture.width
         self.value_embeddings = torch.nn.ModuleList(
-            (
-                torch.nn.Embedding(states, self.width)
-                if states
-                else torch.nn.Linear(1, self.width)
-            )
+            (torch.nn.Embedding(states, width) if states else torch.nn.Linear(1, width))
             for states in self.number_of_states
         )
         self.position_embedding = torch.nn.Parameter(
-            torch.randn(len(self.number_of_states), self.width)
-            * self.initial_position_scale
+            torch.randn(len(self.number_of_states), width) * self.initial_position_scale
         )
-        self.mask_embedding = torch.nn.Parameter(torch.zeros(self.width))
+        self.mask_embedding = torch.nn.Parameter(torch.zeros(width))
         self.encoder = torch.nn.TransformerEncoder(
             torch.nn.TransformerEncoderLayer(
-                d_model=self.width,
-                nhead=self.heads,
-                dim_feedforward=self.feedforward_width,
+                d_model=width,
+                nhead=self.architecture.heads,
+                dim_feedforward=self.architecture.feedforward_width,
                 batch_first=True,
             ),
-            num_layers=self.layers,
+            num_layers=self.architecture.layers,
             enable_nested_tensor=False,
         )
         self.reconstruction_heads = torch.nn.ModuleList(
-            torch.nn.Linear(self.width, states if states else 1)
+            torch.nn.Linear(width, states if states else 1)
             for states in self.number_of_states
         )
 
@@ -160,28 +168,15 @@ class TabularMaskedAutoencoder(torch.nn.Module):
 @dataclass(kw_only=True)
 class MaskedAutoencoderTraining:
     """
-    The size of a :class:`TabularMaskedAutoencoder` and how it is trained to reconstruct
-    randomly hidden values.
+    The architecture of a :class:`TabularMaskedAutoencoder` and how it is trained to
+    reconstruct randomly hidden values.
     """
 
-    width: int = 64
+    architecture: TransformerArchitecture = field(
+        default_factory=TransformerArchitecture
+    )
     """
-    The size of a token.
-    """
-
-    layers: int = 2
-    """
-    The number of transformer layers.
-    """
-
-    heads: int = 4
-    """
-    The number of attention heads.
-    """
-
-    feedforward_width: int = 128
-    """
-    The size of the hidden layer of every transformer layer's feed-forward network.
+    The size of the autoencoder's transformer encoder.
     """
 
     mask_probability: float = 0.5
@@ -204,24 +199,6 @@ class MaskedAutoencoderTraining:
     The learning rate of the Adam optimizer.
     """
 
-    def untrained_autoencoder(
-        self, *, number_of_states: list[int], seed: int
-    ) -> TabularMaskedAutoencoder:
-        """
-        :param number_of_states: The number of states of every symbolic variable, zero
-            for a continuous one.
-        :param seed: The seed of the initial weights.
-        :return: The autoencoder with random initial weights, on the central processor.
-        """
-        torch.manual_seed(seed)
-        return TabularMaskedAutoencoder(
-            number_of_states=number_of_states,
-            width=self.width,
-            layers=self.layers,
-            heads=self.heads,
-            feedforward_width=self.feedforward_width,
-        )
-
     def trained_autoencoder(
         self, *, values: torch.Tensor, number_of_states: list[int], seed: int
     ) -> TabularMaskedAutoencoder:
@@ -230,30 +207,47 @@ class MaskedAutoencoderTraining:
             every row, on the device to train on.
         :param number_of_states: The number of states of every symbolic variable, zero
             for a continuous one.
-        :param seed: The seed of the initial weights, the order of the rows and the
-            hidden values.
+        :param seed: The seed of the initial weights, the dropout, the order of the rows
+            and the hidden values; torch's global random state is left as it was.
         :return: The trained autoencoder, on the device of the values.
         """
-        model = self.untrained_autoencoder(
-            number_of_states=number_of_states, seed=seed
-        ).to(values.device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
-        generator = torch.Generator(device=values.device).manual_seed(seed)
-        model.train()
-        for _ in range(self.epochs):
-            order = torch.randperm(
-                len(values), device=values.device, generator=generator
-            )
-            for start in range(0, len(values), self.batch_size):
-                batch = values[order[start : start + self.batch_size]]
-                masked = (
-                    torch.rand(batch.shape, device=values.device, generator=generator)
-                    < self.mask_probability
-                )
-                optimizer.zero_grad()
-                model.reconstruction_loss(values=batch, masked=masked).backward()
-                optimizer.step()
+        with torch.random.fork_rng(devices=[values.device] if values.is_cuda else []):
+            torch.manual_seed(seed)
+            model = TabularMaskedAutoencoder(
+                number_of_states=number_of_states, architecture=self.architecture
+            ).to(values.device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
+            model.train()
+            for _ in range(self.epochs):
+                order = torch.randperm(len(values), device=values.device)
+                for start in range(0, len(values), self.batch_size):
+                    batch = values[order[start : start + self.batch_size]]
+                    masked = (
+                        torch.rand(batch.shape, device=values.device)
+                        < self.mask_probability
+                    )
+                    optimizer.zero_grad()
+                    model.reconstruction_loss(values=batch, masked=masked).backward()
+                    optimizer.step()
         return model
+
+
+@dataclass(kw_only=True)
+class EmbeddingBatch:
+    """
+    The embeddings of consecutive rows with all values visible.
+    """
+
+    first_row: int
+    """
+    The index of the batch's first row among all rows.
+    """
+
+    embeddings: npt.NDArray[np.float32]
+    """
+    The encoded token of every variable of every row in the batch, shape (#rows in the
+    batch, #variables, width).
+    """
 
 
 # %% latent variable distillation
@@ -353,8 +347,8 @@ class LatentVariableDistillation:
         )
         sample_embeddings = np.concatenate(
             [
-                embeddings
-                for _, embeddings in self.batch_embeddings(
+                batch.embeddings
+                for batch in self.batch_embeddings(
                     model=model, values=values[torch.as_tensor(sample)]
                 )
             ]
@@ -366,29 +360,29 @@ class LatentVariableDistillation:
             for index in range(len(self.structure.variables))
         ]
         latent_states = np.empty(values.shape, dtype=np.int64)
-        for start, embeddings in self.batch_embeddings(model=model, values=values):
+        for batch in self.batch_embeddings(model=model, values=values):
+            rows = slice(batch.first_row, batch.first_row + len(batch.embeddings))
             for index, clustering in enumerate(clusterings):
-                latent_states[start : start + len(embeddings), index] = (
-                    clustering.predict(embeddings[:, index])
+                latent_states[rows, index] = clustering.predict(
+                    batch.embeddings[:, index]
                 )
         return latent_states
 
     def batch_embeddings(
         self, *, model: TabularMaskedAutoencoder, values: torch.Tensor
-    ) -> Iterator[tuple[int, npt.NDArray[np.float32]]]:
+    ) -> Iterator[EmbeddingBatch]:
         """
         :param model: The trained autoencoder.
         :param values: The state index or the standardized value of every variable of
             every row.
-        :return: The first row of every batch and the embeddings of its rows with all
-            values visible, shape (#rows in the batch, #variables, width).
+        :return: The embeddings of the rows, in batches of the autoencoder's batch size.
         """
         with torch.no_grad():
             for start in range(0, len(values), self.autoencoder.batch_size):
                 batch = values[start : start + self.autoencoder.batch_size]
-                yield (
-                    start,
-                    model.embeddings(
+                yield EmbeddingBatch(
+                    first_row=start,
+                    embeddings=model.embeddings(
                         values=batch, masked=torch.zeros_like(batch, dtype=torch.bool)
                     )
                     .cpu()
