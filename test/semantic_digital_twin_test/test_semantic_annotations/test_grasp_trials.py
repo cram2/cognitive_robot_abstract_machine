@@ -87,6 +87,9 @@ def carton() -> Milk:
 
 @pytest.fixture
 def mug_with_handle() -> Mug:
+    """
+    A mug in a world whose box-shaped handle is split off its shape into a handle part.
+    """
     handle_shape = trimesh.creation.box(extents=[0.03, 0.01, 0.04])
     handle_shape.apply_translation([0.055, 0.0, 0.0])
     mug = in_world(
@@ -102,7 +105,7 @@ def mug_with_handle() -> Mug:
     PartSplitter(
         part_type=Handle,
         finder=LocatedFacesFinder(face_centers=handle_shape.triangles_center),
-    ).split(mug)
+    ).split(whole=mug)
     return mug
 
 

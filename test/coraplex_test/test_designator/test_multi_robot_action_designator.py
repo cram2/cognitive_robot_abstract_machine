@@ -1055,6 +1055,9 @@ class ElevatorOperator(ModelChangeCallback):
 
 
 def test_elevator_navigation_needs_doors_that_can_open():
+    """
+    Navigating with an elevator whose door has no movable joint is refused.
+    """
     world = World.create_with_root_body("root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
@@ -1063,7 +1066,7 @@ def test_elevator_navigation_needs_doors_that_can_open():
         door = Door.create_with_new_body_in_world(
             name="door", world=world, scale=Scale(0.05, 1, 2)
         )
-        elevator.add(door)
+        elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
             name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
         )
@@ -1074,6 +1077,9 @@ def test_elevator_navigation_needs_doors_that_can_open():
 
 
 def test_elevator_navigation_needs_a_cabin_that_can_move():
+    """
+    Navigating with an elevator whose cabin has no movable joint is refused.
+    """
     world = World.create_with_root_body("root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
@@ -1089,7 +1095,7 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
                 ),
             ),
         )
-        elevator.add(door)
+        elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
             name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
         )

@@ -31,8 +31,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from krrood_spatial_math.spatial_types import ScrewAxis
-from semantic_digital_twin.semantic_annotations.mixins import HasHandle, HasRootBody
-from semantic_digital_twin.semantic_annotations.part_whole import IsPartWholeRelationship
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import IsPartWholeRelationship
+from semantic_digital_twin.semantic_annotations.part_whole.furniture_parts import HasHandle
 from semantic_digital_twin.specifications.connections import ScrewAxisConnectionSpecification
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Drawer, Dresser, Handle
 from semantic_digital_twin.world_description.connections import ScrewAxisConnection
@@ -62,8 +63,8 @@ Your goal:
 #     dresser = Dresser.create_with_new_body_in_world(name="dresser", scale=Scale(0.31, 0.31, 0.21), world=world)
 #     drawer = ...  # pass parent_connection_specification=ScrewAxisConnectionSpecification(screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X()))
 #     handle = ...
-#     drawer.add(...)
-#     dresser.add(...)
+#     drawer.add(part=...)
+#     dresser.add(part=...)
 ```
 
 ```{code-cell} ipython3
@@ -85,9 +86,9 @@ with world.modify_world():
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
     )
     # One method, routed by type: handle -> drawer.handle
-    drawer.add(handle)
+    drawer.add(part=handle)
     # drawer -> dresser.drawers (a list field, so it is appended)
-    dresser.add(drawer)
+    dresser.add(part=drawer)
 ```
 
 ```{code-cell} ipython3
@@ -131,8 +132,8 @@ Your goal:
 #     rack = ToolRack.create_with_new_body_in_world(...)
 #     rack_handle = Handle.create_with_new_body_in_world(...)
 #     rack_latch = SafetyLatch.create_with_new_body_in_world(...)
-#     rack.add(rack_handle)
-#     rack.add(rack_latch)
+#     rack.add(part=rack_handle)
+#     rack.add(part=rack_latch)
 ```
 
 ```{code-cell} ipython3
@@ -164,8 +165,8 @@ with world.modify_world():
     rack_latch = SafetyLatch.create_with_new_body_in_world(
         name="rack_latch", world=world, scale=Scale(0.02, 0.02, 0.02)
     )
-    rack.add(rack_handle)
-    rack.add(rack_latch)
+    rack.add(part=rack_handle)
+    rack.add(part=rack_latch)
 ```
 
 ```{code-cell} ipython3

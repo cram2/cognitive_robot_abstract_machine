@@ -266,7 +266,7 @@ class WindowRecess:
             ),
             scale=Scale(depth * 2, width, opening_height),
         )
-        wall.add(aperture)
+        wall.add(part=aperture)
         window_panel = WallPanel.create_with_new_body_in_world(
             name=f"{self.name}_panel",
             world=world,
@@ -1104,7 +1104,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in fridge_door.root.visual.shapes:
                 shape.color = Color.WHITE()
-            refrigerator.add(fridge_door)
+            refrigerator.add(part=fridge_door)
 
             drawer_depth = 0.5
             drawer_world_pose = (
@@ -1134,7 +1134,7 @@ class KitchenEnvironment(WorldSource):
 
             for shape in fridge_drawer.root.visual.shapes:
                 shape.color = Color.WHITE()
-            refrigerator.add(fridge_drawer)
+            refrigerator.add(part=fridge_drawer)
 
             fridge_base_facing = WallPanel.create_with_new_body_in_world(
                 world=world,
@@ -1182,7 +1182,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in fridge_door_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
-            fridge_door.add(fridge_door_handle)
+            fridge_door.add(part=fridge_door_handle)
 
             drawer_handle_world_pose = (
                 drawer_world_pose
@@ -1208,7 +1208,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in fridge_drawer_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
-            fridge_drawer.add(fridge_drawer_handle)
+            fridge_drawer.add(part=fridge_drawer_handle)
 
             # %% Kitchen counter
             counter_top_length = 2.044
@@ -1287,7 +1287,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in sink.root.visual.shapes:
                 shape.color = Color.BLACK()
-            counter_top.add(sink)
+            counter_top.add(part=sink)
 
             module_1_width, module_2_width = 0.60, 0.60
             module_3_width = counter_top_length - module_1_width - module_2_width
@@ -1371,7 +1371,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in module_1_door.root.visual.shapes:
                 shape.color = Color.WHITE()
-            module_1_cabinet.add(module_1_door)
+            module_1_cabinet.add(part=module_1_door)
 
             module_1_handle = Handle.get_annotation_specification(
                 "module_1_handle",
@@ -1399,7 +1399,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in module_1_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
-            module_1_door.add(module_1_handle)
+            module_1_door.add(part=module_1_handle)
 
             # Module 2: Dishwasher
             module_2_door_thickness = 0.02
@@ -1448,7 +1448,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in module_2_door.root.visual.shapes:
                 shape.color = Color.WHITE()
-            dishwasher.add(module_2_door)
+            dishwasher.add(part=module_2_door)
 
             module_2_handle = Handle.get_annotation_specification(
                 "dishwasher_handle",
@@ -1471,7 +1471,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in module_2_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
-            module_2_door.add(module_2_handle)
+            module_2_door.add(part=module_2_handle)
 
             # Module 3: Cabinet with Drawers
             module_3_pose = (
@@ -1530,7 +1530,7 @@ class KitchenEnvironment(WorldSource):
 
                 for shape in drawer.root.visual.shapes:
                     shape.color = Color.WHITE()
-                module_3_cabinet.add(drawer)
+                module_3_cabinet.add(part=drawer)
 
                 handle_pose = (
                     drawer_pose
@@ -1553,7 +1553,7 @@ class KitchenEnvironment(WorldSource):
                 ).spawn(world, parent_T_self=handle_pose)
                 for shape in handle.root.visual.shapes:
                     shape.color = Color.GRAY()
-                drawer.add(handle)
+                drawer.add(part=handle)
                 drawer_bottom_height += height
 
             # %% Oven tower
@@ -1707,7 +1707,7 @@ class KitchenEnvironment(WorldSource):
 
                 for shape in drawer.root.visual.shapes:
                     shape.color = Color.WHITE()
-                tower.add(drawer)
+                tower.add(part=drawer)
 
                 handle_pose = (
                     side_drawer_pose
@@ -1729,7 +1729,7 @@ class KitchenEnvironment(WorldSource):
                 ).spawn(world, parent_T_self=handle_pose)
                 for shape in handle.root.visual.shapes:
                     shape.color = Color.GRAY()
-                drawer.add(handle)
+                drawer.add(part=handle)
 
             # Center: Bottom Cabinet
             cabinet_pose = tower_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -1764,7 +1764,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_cabinet_door.root.visual.shapes:
                 shape.color = Color.WHITE()
-            tower.add(oven_cabinet_door)
+            tower.add(part=oven_cabinet_door)
 
             oven_cabinet_handle = Handle.get_annotation_specification(
                 "oven_cabinet_handle",
@@ -1788,7 +1788,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_cabinet_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
-            oven_cabinet_door.add(oven_cabinet_handle)
+            oven_cabinet_door.add(part=oven_cabinet_handle)
 
             # Center: Middle Drawer
             drawer_pose = tower_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -1821,7 +1821,7 @@ class KitchenEnvironment(WorldSource):
 
             for shape in drawer.root.visual.shapes:
                 shape.color = Color.WHITE()
-            tower.add(drawer)
+            tower.add(part=drawer)
 
             oven_center_drawer_handle = Handle.get_annotation_specification(
                 "oven_center_drawer_handle",
@@ -1844,7 +1844,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_center_drawer_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
-            drawer.add(oven_center_drawer_handle)
+            drawer.add(part=oven_center_drawer_handle)
 
             # Center: Oven (Top)
             oven_pose = tower_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -1887,7 +1887,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_door.root.visual.shapes:
                 shape.color = Color.WHITE()
-            oven.add(oven_door)
+            oven.add(part=oven_door)
 
             oven_handle_width = 0.025
             oven_handle_top_inset = 0.13  # Measured from the top edge of the oven.
@@ -1916,7 +1916,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_handle.root.visual.shapes:
                 shape.color = Color.GRAY()
-            oven_door.add(oven_handle)
+            oven_door.add(part=oven_handle)
 
             # %% Sideboard / kitchen island
             sideboard_length, sideboard_width, sideboard_height = 2.250, 0.597, 0.825
@@ -2031,8 +2031,8 @@ class KitchenEnvironment(WorldSource):
             for shape in sideboard_cabinet.root.visual.shapes:
                 shape.color = Color.WHITE()
 
-            kitchen_island.add(sideboard_cabinet)
-            kitchen_island.add(sideboard)
+            kitchen_island.add(part=sideboard_cabinet)
+            kitchen_island.add(part=sideboard)
 
             sideboard_base_facing = WallPanel.create_with_new_body_in_world(
                 world=world,
@@ -2136,7 +2136,7 @@ class KitchenEnvironment(WorldSource):
 
                     for shape in drawer.root.visual.shapes:
                         shape.color = Color.WHITE()
-                    sideboard_cabinet.add(drawer)
+                    sideboard_cabinet.add(part=drawer)
 
                     handle_pose = (
                         drawer_pose
@@ -2162,7 +2162,7 @@ class KitchenEnvironment(WorldSource):
                     ).spawn(world, parent_T_self=handle_pose)
                     for shape in handle.root.visual.shapes:
                         shape.color = Color.GRAY()
-                    drawer.add(handle)
+                    drawer.add(part=handle)
 
             # %% Sofa
             self.measurements.sofa_shape.create_in_world(
@@ -2236,7 +2236,7 @@ class KitchenEnvironment(WorldSource):
                 )
                 for shape in door.root.visual.shapes:
                     shape.color = Color.WHITE()
-                cupboard.add(door)
+                cupboard.add(part=door)
 
                 handle = Handle.get_annotation_specification(
                     f"cupboard_handle_{side}",
@@ -2255,7 +2255,7 @@ class KitchenEnvironment(WorldSource):
                 )
                 for shape in handle.root.visual.shapes:
                     shape.color = Color.GRAY()
-                door.add(handle)
+                door.add(part=handle)
 
             # %% Desk
             desk_length, desk_width, desk_height = 0.60, 1.20, 0.75
@@ -2291,7 +2291,7 @@ class KitchenEnvironment(WorldSource):
                 )
                 for shape in leg.root.visual.shapes:
                     shape.color = desk_color
-                desk.add(leg)
+                desk.add(part=leg)
 
             # %% Modular cooking table
             (
@@ -2382,7 +2382,7 @@ class KitchenEnvironment(WorldSource):
 
                 for shape in drawer.root.visual.shapes:
                     shape.color = Color.BEIGE()
-                mod.add(drawer)
+                mod.add(part=drawer)
 
                 handle_pose = (
                     drawer_pose
@@ -2399,7 +2399,7 @@ class KitchenEnvironment(WorldSource):
                 ).spawn(world, parent_T_self=handle_pose)
                 for shape in handle.root.visual.shapes:
                     shape.color = Color.GRAY()
-                drawer.add(handle)
+                drawer.add(part=handle)
 
             # %% Dining table
             (
@@ -2444,7 +2444,7 @@ class KitchenEnvironment(WorldSource):
                 )
                 for shape in leg.root.visual.shapes:
                     shape.color = Color.BEIGE()
-                dining_table.add(leg)
+                dining_table.add(part=leg)
 
     def _build_coffee_table(self, world: World) -> None:
         """

@@ -21,7 +21,9 @@ from scipy.spatial import cKDTree
 
 from semantic_digital_twin.part_finding.relationships import PartRelationshipInspector
 from semantic_digital_twin.part_finding.splitting import PartFinder, MeshSplit
-from semantic_digital_twin.semantic_annotations.mixins import PartWholeRelationship
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
+)
 
 # %% the question and its answer
 
@@ -44,7 +46,7 @@ class PartQuery:
     The mesh's triangles, as rows of three indices into :attr:`vertices`.
     """
 
-    whole_type: type[PartWholeRelationship]
+    whole_type: type[HasParts]
     """
     The type of annotation the mesh belongs to.
     """
@@ -58,7 +60,7 @@ class PartQuery:
     def from_mesh(
         cls,
         mesh: trimesh.Trimesh,
-        whole_type: type[PartWholeRelationship],
+        whole_type: type[HasParts],
         relationship_names: list[str],
     ) -> PartQuery:
         """
@@ -87,7 +89,7 @@ class PartQuery:
         :return: The part-whole relationships whose parts are wanted.
         """
         return [
-            PartRelationshipInspector.named(self.whole_type, name)
+            PartRelationshipInspector.named(whole_type=self.whole_type, name=name)
             for name in self.relationship_names
         ]
 

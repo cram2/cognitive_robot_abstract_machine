@@ -233,7 +233,7 @@ def test_fetched_world_accepts_new_specification_spawns(rclpy_node):
             ),
         )
         shelf.add(
-            ShelfLayer.create_with_new_body_in_world(
+            part=ShelfLayer.create_with_new_body_in_world(
                 world=fetched_world,
                 name="shelf_layer1",
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(

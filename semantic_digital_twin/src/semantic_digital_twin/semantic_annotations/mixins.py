@@ -13,7 +13,6 @@ from typing_extensions import TYPE_CHECKING, Callable, Generic, Self, TypeVar
 import numpy as np
 import trimesh
 from trimesh.util import concatenate
-from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.entity_query_language.factories import variable_from, entity, variable, an
 from krrood.patterns.classproperty import classproperty
 from krrood.parametrization.model_registries import ModelRegistry
@@ -50,23 +49,19 @@ from semantic_digital_twin.specifications.semantic_annotations import (
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.exceptions import (
-    AmbiguousPart,
-    CannotBeAPartOf,
     MissingMovableJointError,
     NoGraspGeometry,
     NoSupportingSurfaceError,
-    UnknownPartWholeRelationshipField,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from krrood.entity_query_language.query.match import Match
 from semantic_digital_twin.grasping.grasp_strategies import (
     GraspFromAnySide,
     GraspStrategy,
-    PinchTheTopOfAWall,
 )
 from semantic_digital_twin.grasping.object_relative_grasp import draw_grasps
 from semantic_digital_twin.reasoning.predicates import SupportedBy
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from krrood_spatial_math.spatial_types import (
@@ -104,17 +99,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.grasping.object_relative_grasp import GraspResult
     from semantic_digital_twin.world import World
     from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-        Drawer,
-        Door,
-        Handle,
-        Rim,
-        Aperture,
-        Leg,
-        Sink,
-        ShelfLayer,
         Wall,
-        CounterTop,
-        Cabinet,
     )
     from semantic_digital_twin.world import World
     from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import (
@@ -623,114 +608,6 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
 
 
 @dataclass(eq=False)
-class PartWholeRelationship(HasRootKinematicStructureEntity, Mixin):
-    """
-    Base for annotations that have structural *parts* (the part-whole relation).
-
-    Each part mixin (``HasHandle``, ``HasDoors``, ...) declares a typed part-whole relationship
-    field. The unified :meth:`add` routes a part to the field whose element type matches it and lets
-    the part mount itself (:meth:`HasRootKinematicStructureEntity._mount_strategy`).
-    """
-
-    @synchronized_attribute_modification
-    def add(
-        self, part: HasRootKinematicStructureEntity, *, field_name: str = ""
-    ) -> None:
-        """
-        Add ``part`` as a structural part, routing it to the matching part-whole
-        relationship field by type.
-
-        :param part: The part to add.
-        :param field_name: Optional name of the target part-whole relationship field.
-            When given, only that field is considered (and ``part`` must still match its
-            element type), which resolves the ambiguity when ``type(part)`` matches
-            several fields. When empty (default), the field is resolved by type alone.
-        :raises UnknownPartWholeRelationshipField: If ``field_name`` is given but is not
-            a part-whole relationship field of this annotation.
-        :raises CannotBeAPartOf: If no part-whole relationship field of this annotation
-            accepts ``type(part)``.
-        :raises AmbiguousPart: If ``type(part)`` matches more than one part-whole
-            relationship field.
-        """
-        candidate_fields = WrappedClass(clazz=type(self)).fields_with_metadata(
-            metadata_type=IsPartWholeRelationship
-        )
-        if field_name:
-            named_fields = [
-                wrapped_part_whole_relationship_field
-                for wrapped_part_whole_relationship_field in candidate_fields
-                if wrapped_part_whole_relationship_field.field.name == field_name
-            ]
-            if not named_fields:
-                raise UnknownPartWholeRelationshipField(
-                    type(self),
-                    field_name,
-                    [
-                        wrapped_part_whole_relationship_field.field.name
-                        for wrapped_part_whole_relationship_field in candidate_fields
-                    ],
-                )
-            candidate_fields = named_fields
-        matches = [
-            wrapped_part_whole_relationship_field
-            for wrapped_part_whole_relationship_field in candidate_fields
-            if isinstance(part, wrapped_part_whole_relationship_field.type_endpoint)
-        ]
-        if not matches:
-            raise CannotBeAPartOf(self, part)
-        if len(matches) > 1:
-            raise AmbiguousPart(self, part, [match.field for match in matches])
-
-        [match] = matches
-        part._mount_strategy(
-            self, IsPartWholeRelationship.of_wrapped_field(wrapped_field=match)
-        )
-        if match.is_many_to_many_relationship:
-            getattr(self, match.field.name).append(part)
-        else:
-            setattr(self, match.field.name, part)
-
-    @property
-    def parts(self) -> list[HasRootKinematicStructureEntity]:
-        """
-        :return: The structural parts of this annotation, from all of its part-whole
-            relationship fields.
-        """
-        parts = []
-        for wrapped_part_whole_relationship_field in WrappedClass(
-            clazz=type(self)
-        ).fields_with_metadata(metadata_type=IsPartWholeRelationship):
-            value = getattr(self, wrapped_part_whole_relationship_field.field.name)
-            if wrapped_part_whole_relationship_field.is_many_to_many_relationship:
-                parts.extend(value)
-            elif value is not None:
-                parts.append(value)
-        return parts
-
-
-@dataclass(eq=False)
-class HasApertures(HasRootBody, PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have apertures.
-
-    An aperture is an opening through this annotation's material, so mounting one
-    removes its volume from the annotation's collision and visual geometry.
-    """
-
-    apertures: list[Aperture] = field(
-        default_factory=list,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship(
-            removes_part_geometry_from_whole=True
-        ).as_dict(),
-    )
-    """
-    The apertures of the semantic annotation.
-    """
-
-
-@dataclass(eq=False)
 class HasMovableJoint(HasRootBody, Mixin, ABC):
     """
     A mixin class for semantic annotations whose root moves relative to its parent, such
@@ -799,167 +676,10 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         return placed_specification.reconnect(self._world, self.root)
 
 
-@dataclass(eq=False)
-class HasDrawers(PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have drawers.
-    """
-
-    drawers: list[Drawer] = field(
-        default_factory=list,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The drawers of the semantic annotation.
-    """
-
-
-@dataclass(eq=False)
-class HasShelfLayers(PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have shelf layers.
-    """
-
-    shelf_layers: list[ShelfLayer] = field(
-        default_factory=list,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The shelf layers of the semantic annotation.
-    """
-
-
-@dataclass(eq=False)
-class HasDoors(PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have doors.
-    """
-
-    doors: list[Door] = field(
-        default_factory=list,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The doors of the semantic annotation.
-    """
-
-
-@dataclass(eq=False)
-class HasHandle(IsGraspable, PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have a handle, and are grasped at it
-    when they have one.
-    """
-
-    handle: Handle | None = field(
-        default=None,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The handle of the semantic annotation.
-    """
-
-    def grasped_part(self) -> IsGraspable:
-        """
-        :return: The handle; without a handle, the part the annotation is grasped at
-            otherwise.
-        """
-        if self.handle is None:
-            return super().grasped_part()
-        return self.handle
-
-
-@dataclass(eq=False)
-class HasRim(HasDrawnGraspsByDefault, PartWholeRelationship, Mixin):
-    """
-    A mixin class for open containers that have a rim, and are grasped at it when they
-    have one.
-    """
-
-    rim: Rim | None = field(
-        default=None,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The rim of the container.
-    """
-
-    def grasped_part(self) -> IsGraspable:
-        """
-        :return: The rim; without a rim, the part the annotation is grasped at
-            otherwise.
-        """
-        if self.rim is None:
-            return super().grasped_part()
-        return self.rim
-
-    @classproperty
-    def grasp_strategy(cls) -> GraspStrategy:
-        """
-        :return: Pinching the top of the container's own wall, as its rim would be.
-        """
-        return PinchTheTopOfAWall()
-
-
-@dataclass(eq=False)
-class HasHandles(HasRootBody, PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that may have more than one handle.
-    """
-
-    handles: list[Handle] = field(
-        default_factory=list,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The handles of the semantic annotation.
-    """
-
-
 THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
 """
 A type variable for HasRootBody.
 """
-
-
-@dataclass(eq=False)
-class HasLegs(PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have legs.
-    """
-
-    legs: list[Leg] = field(
-        default_factory=list,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The legs of the semantic annotation.
-    """
-
-
-@dataclass(eq=False)
-class HasSink(PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that have a sink.
-    """
-
-    sink: Sink | None = field(
-        default=None,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The sink of the semantic annotation.
-    """
 
 
 @dataclass(eq=False)
@@ -1534,44 +1254,3 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
             cls._create_container_event(scale, wall_thickness),
             connection_specification=connection_specification,
         )
-
-
-# %% furniture built from other furniture
-
-
-@dataclass(eq=False)
-class HasCabinets(PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations built from cabinets.
-    """
-
-    cabinets: list[Cabinet] = field(
-        default_factory=list,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The cabinets the semantic annotation is built from.
-    """
-
-
-@dataclass(eq=False)
-class HasCounterTop(PartWholeRelationship, Mixin):
-    """
-    A mixin class for semantic annotations that carry a counter top.
-
-    Distinct from :class:`HasSupportingSurface`, which is the bare region something can
-    be put on: this is the worktop as a thing in its own right, which is what a scan
-    sees and what in turn carries the sink.
-    """
-
-    counter_top: CounterTop = field(
-        default=None,
-        hash=False,
-        kw_only=True,
-        metadata=IsPartWholeRelationship().as_dict(),
-    )
-    """
-    The counter top of the semantic annotation.
-    """

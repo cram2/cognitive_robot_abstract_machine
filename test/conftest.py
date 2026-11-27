@@ -727,7 +727,10 @@ def _apartment_world_setup():
 
 @pytest.fixture(scope="session")
 def _elevator_world_setup():
-
+    """
+    Build, once per session, a world with an elevator and its door, which other fixtures
+    copy before use.
+    """
     world = World()
 
     with world.modify_world():
@@ -771,7 +774,7 @@ def _elevator_world_setup():
                 ),
                 scale=door_scale,
             )
-            elevator.add(door)
+            elevator.add(part=door)
 
         world.add_semantic_annotation(elevator)
     return world

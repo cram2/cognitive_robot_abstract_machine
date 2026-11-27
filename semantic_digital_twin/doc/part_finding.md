@@ -9,7 +9,7 @@ own.
 ```python
 from semantic_digital_twin.part_finding.annotation_part_finder import AnnotationPartFinder
 
-parts = AnnotationPartFinder().find_parts(mug)
+parts = AnnotationPartFinder().find_parts(whole=mug)
 mug.handle  # the handle that was found, or still None
 ```
 
@@ -36,14 +36,14 @@ on each piece:
 ```python
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
 
-AnnotationPartFinder().find_parts(mug)
+AnnotationPartFinder().find_parts(whole=mug)
 COACDMeshDecomposer().apply(mug._world)
 ```
 
 or let the finder decompose the pieces again:
 
 ```python
-AnnotationPartFinder(decomposer=COACDMeshDecomposer()).find_parts(mug)
+AnnotationPartFinder(decomposer=COACDMeshDecomposer()).find_parts(whole=mug)
 ```
 
 ## How the parts are found
