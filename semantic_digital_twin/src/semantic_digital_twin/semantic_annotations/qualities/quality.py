@@ -1,6 +1,6 @@
 """
 Qualities of semantic annotations: aspects of a single bearer, such as the ripeness of a
-fruit or the density of its flesh, that can change while the bearer stays the same.
+fruit or the mass density of its flesh, that can change while the bearer stays the same.
 
 Follows DUL and SOMA: a quality has a value in a region of its quality space, and named
 regions of that space, such as :attr:`RipenessStage.RIPE`, classify the value.
@@ -44,7 +44,7 @@ class Quality(ABC):
         :param scale: The scale ``value`` has to lie within.
         :raises QualityOutsideScale: If ``value`` reaches beyond ``scale``.
         """
-        if scale.intersection_with(value) != value:
+        if scale.intersection_with(other=value) != value:
             raise QualityOutsideScale(quality=self, value=value, scale=scale)
 
 
@@ -59,17 +59,23 @@ class RipenessStage(Enum):
         ontology or horticultural source fixes them.
     """
 
-    UNRIPE = SimpleInterval.from_data(0.0, 1 / 3, Bound.CLOSED, Bound.OPEN)
+    UNRIPE = SimpleInterval.from_data(
+        lower=0.0, upper=1 / 3, left=Bound.CLOSED, right=Bound.OPEN
+    )
     """
     The first third of ripening, such as a green banana or a firm avocado.
     """
 
-    RIPE = SimpleInterval.from_data(1 / 3, 2 / 3, Bound.CLOSED, Bound.OPEN)
+    RIPE = SimpleInterval.from_data(
+        lower=1 / 3, upper=2 / 3, left=Bound.CLOSED, right=Bound.OPEN
+    )
     """
     The middle third of ripening, in which a fruit is usually eaten.
     """
 
-    OVERRIPE = SimpleInterval.from_data(2 / 3, 1.0, Bound.CLOSED, Bound.CLOSED)
+    OVERRIPE = SimpleInterval.from_data(
+        lower=2 / 3, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
+    )
     """
     The last third of ripening, in which a fruit softens and starts to spoil.
     """
@@ -101,7 +107,9 @@ class Ripeness(Quality):
         """
         :return: The ripeness scale, from 0 at the start of ripening to 1 at its end.
         """
-        return SimpleInterval.from_data(0.0, 1.0, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            lower=0.0, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
+        )
 
     @classmethod
     def from_stage(cls, *, stage: RipenessStage) -> Self:
@@ -118,7 +126,7 @@ class Ripeness(Quality):
         :raises RipenessInNoSingleStage: If no single stage holds the whole value.
         """
         for stage in RipenessStage:
-            if stage.value.intersection_with(self.value) == self.value:
+            if stage.value.intersection_with(other=self.value) == self.value:
                 return stage
         raise RipenessInNoSingleStage(ripeness=self)
 
@@ -127,16 +135,15 @@ class Ripeness(Quality):
 
 
 @dataclass(kw_only=True)
-class Density(Quality):
+class MassDensity(Quality):
     """
-    The mass per volume of its bearer's material, in kilograms per cubic metre.
-
-    .. seealso:: `Density <https://en.wikipedia.org/wiki/Density>`_ (Wikipedia)
+    The mass per volume of its bearer's material, in kilograms per cubic metre
+    :cite:`wikipedia_density`.
     """
 
     value: SimpleInterval
     """
-    The density on :attr:`scale`: a single point when it was measured, or the range its
+    The mass density on :attr:`scale`: a single point when it was measured, or the range its
     measurements spread over.
     """
 
@@ -149,44 +156,38 @@ class Density(Quality):
     @classproperty
     def scale(cls) -> SimpleInterval:
         """
-        :return: The density scale: every positive density.
+        :return: The mass density scale: every positive mass density.
         """
-        return SimpleInterval.from_data(0.0, float("inf"), Bound.OPEN, Bound.OPEN)
+        return SimpleInterval.from_data(
+            lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
+        )
 
 
 @dataclass(kw_only=True)
-class Elasticity(Quality):
+class MaterialElasticity(Quality):
     """
     How its bearer's material deforms under load and springs back, given by the two
-    constants that describe an isotropic linear elastic material.
+    constants that describe an isotropic linear elastic material
+    :cite:`wikipedia_linear_elasticity`.
 
     .. note:: Plant tissue is neither isotropic nor linear; the constants approximate it.
 
-    .. seealso::
-        - `Linear elasticity <https://en.wikipedia.org/wiki/Linear_elasticity>`_
-          (Wikipedia)
-        - N. N. Mohsenin, `Physical Properties of Plant and Animal Materials, vol. 1
-          <https://www.routledge.com/Physical-Properties-of-Plant-and-Animal-Materials-v-1-Physical-Characteristics-and-Mechanical-Properties/Mohsenin/p/book/9780677023007>`_,
-          ISBN 978-0-677-02300-7: §4.5 on ideal elastic behaviour, §4.9 on
-          viscoelasticity, §5.4 on Poisson's ratio
+    .. seealso:: :cite:t:`mohsenin1971physical`, §4.5 on ideal elastic behaviour, §4.9
+        on viscoelasticity and §5.4 on Poisson's ratio.
     """
 
     youngs_modulus: SimpleInterval
     """
     The stiffness of the material when stretched or compressed along one axis, in pascals,
-    on :attr:`youngs_modulus_scale`: a single point when measured, or a range.
-
-    .. seealso:: `Young's modulus <https://en.wikipedia.org/wiki/Young%27s_modulus>`_
-        (Wikipedia)
+    on :attr:`youngs_modulus_scale`: a single point when measured, or a range
+    :cite:`wikipedia_youngs_modulus`.
     """
 
     poissons_ratio: SimpleInterval
     """
     How much the material narrows across a stretch relative to how much it lengthens, on
-    :attr:`poissons_ratio_scale`: a single point when measured, or a range.
-
-    .. seealso:: `Poisson's ratio <https://en.wikipedia.org/wiki/Poisson%27s_ratio>`_
-        (Wikipedia)
+    :attr:`poissons_ratio_scale`: a single point when measured, or a range
+    :cite:`wikipedia_poissons_ratio`.
     """
 
     def __post_init__(self) -> None:
@@ -205,16 +206,16 @@ class Elasticity(Quality):
         """
         :return: The scale of Young's modulus: every positive stiffness.
         """
-        return SimpleInterval.from_data(0.0, float("inf"), Bound.OPEN, Bound.OPEN)
+        return SimpleInterval.from_data(
+            lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
+        )
 
     @classproperty
     def poissons_ratio_scale(cls) -> SimpleInterval:
         """
         :return: The scale of Poisson's ratio: the range, from -1 to 1/2, in which an
-            isotropic linear elastic material is stable.
-
-        .. seealso:: P. H. Mott and C. M. Roland, `Limits to Poisson's ratio in isotropic
-            materials <https://doi.org/10.1103/PhysRevB.80.132104>`_, Physical Review B
-            80, 132104
+            isotropic linear elastic material is stable :cite:`mott2009limits`.
         """
-        return SimpleInterval.from_data(-1.0, 0.5, Bound.OPEN, Bound.OPEN)
+        return SimpleInterval.from_data(
+            lower=-1.0, upper=0.5, left=Bound.OPEN, right=Bound.OPEN
+        )

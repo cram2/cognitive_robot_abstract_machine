@@ -675,7 +675,7 @@ class SumLayer(HasParameterArrays, InnerLayer):
         :return: Whether no two of the events intersect.
         """
         return all(
-            event.intersection_with(other).is_empty()
+            event.intersection_with(other=other).is_empty()
             for index, event in enumerate(events)
             for other in events[index + 1 :]
         )

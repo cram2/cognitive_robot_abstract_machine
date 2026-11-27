@@ -35,7 +35,7 @@ def node_named(name: str) -> GraphNode:
     :param name: The name of a variable.
     :return: The example attribute node of a continuous variable of that name.
     """
-    return GraphNode(variable=Continuous(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+    return GraphNode(variable=Continuous(name=name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
 
 
 # %% a true graph with hidden nodes

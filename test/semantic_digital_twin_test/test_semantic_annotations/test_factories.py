@@ -803,8 +803,8 @@ class TestFactories(unittest.TestCase):
             cereal.root.global_transform, table.supporting_surface
         ).position
 
-        assert not surface_event.contains(surface_P_milk[:2])
-        assert not surface_event.contains(surface_P_cereal[:2])
+        assert not surface_event.contains(item=surface_P_milk[:2])
+        assert not surface_event.contains(item=surface_P_cereal[:2])
 
     def test_sample_points_from_surface_with_object_and_category_of_interest(self):
         world = World.create_with_root_body("root")
@@ -1521,7 +1521,7 @@ def door_with_handle_at(*, y: float, z: float) -> tuple[World, Door]:
             world_root_T_self=world_T_door
             @ HomogeneousTransformationMatrix.from_xyz_rpy(y=y, z=z),
         )
-        door.add(handle)
+        door.add(part=handle)
     return world, door
 
 

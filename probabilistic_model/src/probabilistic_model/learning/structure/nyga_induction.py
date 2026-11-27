@@ -168,9 +168,12 @@ class InductionStep:
         )
 
         interval = SimpleInterval.from_data(
-            lower, upper, Bound.CLOSED, Bound.CLOSED if is_last_piece else Bound.OPEN
+            lower=lower,
+            upper=upper,
+            left=Bound.CLOSED,
+            right=Bound.CLOSED if is_last_piece else Bound.OPEN,
         )
-        interval = interval.intersection_with(self.nyga_induction.support)
+        interval = interval.intersection_with(other=self.nyga_induction.support)
         return UniformDistribution(variable=self.variable, interval=interval)
 
     def sum_weights_from_indices(
@@ -524,11 +527,11 @@ class NygaInduction:
 
         # narrow the support to at most the data's own range widened by tolerance_at_extremes
         self.support = self.support.intersection_with(
-            SimpleInterval.from_data(
-                sorted_unique_data[0] - self.tolerance_at_extremes,
-                sorted_unique_data[-1] + self.tolerance_at_extremes,
-                Bound.CLOSED,
-                Bound.CLOSED,
+            other=SimpleInterval.from_data(
+                lower=sorted_unique_data[0] - self.tolerance_at_extremes,
+                upper=sorted_unique_data[-1] + self.tolerance_at_extremes,
+                left=Bound.CLOSED,
+                right=Bound.CLOSED,
             )
         )
 

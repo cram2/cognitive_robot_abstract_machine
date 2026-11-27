@@ -339,7 +339,10 @@ class BoardGeometry:
         )
         return [
             SimpleInterval.from_data(
-                upper_of_left, lower_of_right, Bound.CLOSED, Bound.CLOSED
+                lower=upper_of_left,
+                upper=lower_of_right,
+                left=Bound.CLOSED,
+                right=Bound.CLOSED,
             )
             for (_, upper_of_left), (lower_of_right, _) in zip(dividers, dividers[1:])
         ]
@@ -476,7 +479,7 @@ class ShapeSortingBoard:
             for cell in cells
             if not any(
                 hole.bounds.simple_event.contains(
-                    (float(cell.center.x), float(cell.center.y))
+                    item=(float(cell.center.x), float(cell.center.y))
                 )
                 for hole in holes
             )

@@ -250,10 +250,10 @@ class CountRange(Count[T]):
 
             yield {
                 self._id_: SimpleInterval.from_data(
-                    concrete_count,
-                    concrete_count + ellipsis_count,
-                    Bound.CLOSED,
-                    Bound.CLOSED,
+                    lower=concrete_count,
+                    upper=concrete_count + ellipsis_count,
+                    left=Bound.CLOSED,
+                    right=Bound.CLOSED,
                 )
             }
 

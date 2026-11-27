@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
-    Density,
-    Elasticity,
+    MassDensity,
+    MaterialElasticity,
     Ripeness,
     RipenessStage,
 )
@@ -96,17 +96,19 @@ def test_apple_peel_keeps_its_density_and_elasticity(
         peel = Peel.create_with_new_body_in_world(name="peel", world=world)
         apple.add(part=peel)
         peel.set_quality(
-            quality=Density(
-                value=SimpleInterval.from_data(840.0, 860.0, Bound.CLOSED, Bound.CLOSED)
+            quality=MassDensity(
+                value=SimpleInterval.from_data(
+                    lower=840.0, upper=860.0, left=Bound.CLOSED, right=Bound.CLOSED
+                )
             )
         )
         peel.set_quality(
-            quality=Elasticity(
+            quality=MaterialElasticity(
                 youngs_modulus=SimpleInterval.from_data(
-                    11.6e6, 11.6e6, Bound.CLOSED, Bound.CLOSED
+                    lower=11.6e6, upper=11.6e6, left=Bound.CLOSED, right=Bound.CLOSED
                 ),
                 poissons_ratio=SimpleInterval.from_data(
-                    0.33, 0.33, Bound.CLOSED, Bound.CLOSED
+                    lower=0.33, upper=0.33, left=Bound.CLOSED, right=Bound.CLOSED
                 ),
             )
         )
@@ -115,9 +117,15 @@ def test_apple_peel_keeps_its_density_and_elasticity(
 
     single_precision = 1e-6
     for loaded, stored in (
-        (loaded_peel.density.value, peel.density.value),
-        (loaded_peel.elasticity.youngs_modulus, peel.elasticity.youngs_modulus),
-        (loaded_peel.elasticity.poissons_ratio, peel.elasticity.poissons_ratio),
+        (loaded_peel.mass_density.value, peel.mass_density.value),
+        (
+            loaded_peel.material_elasticity.youngs_modulus,
+            peel.material_elasticity.youngs_modulus,
+        ),
+        (
+            loaded_peel.material_elasticity.poissons_ratio,
+            peel.material_elasticity.poissons_ratio,
+        ),
     ):
         assert (loaded.lower, loaded.upper) == pytest.approx(
             (stored.lower, stored.upper), rel=single_precision

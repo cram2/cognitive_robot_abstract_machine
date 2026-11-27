@@ -106,7 +106,9 @@ class UnivariateDistribution(ProbabilisticModel, DataclassDeepcopyMixin):
         :param event: The event
         :return: The composite set
         """
-        return event.marginal(set(self.variables)).simple_sets[0][self.variable]
+        return event.marginal(variables=set(self.variables)).simple_sets[0][
+            self.variable
+        ]
 
     @property
     def abbreviated_symbol(self) -> str:
@@ -298,10 +300,10 @@ class ContinuousDistributionWithConstrainedSupport(ContinuousDistribution):
         Moves the :attr:`interval` by the translation of the variable.
         """
         new_interval = SimpleInterval.from_data(
-            self.interval.lower + translation[self.variable],
-            self.interval.upper + translation[self.variable],
-            self.interval.left,
-            self.interval.right,
+            lower=self.interval.lower + translation[self.variable],
+            upper=self.interval.upper + translation[self.variable],
+            left=self.interval.left,
+            right=self.interval.right,
         )
         self.interval = new_interval
 
@@ -310,10 +312,10 @@ class ContinuousDistributionWithConstrainedSupport(ContinuousDistribution):
         Multiplies the bounds of the :attr:`interval` by the scaling of the variable.
         """
         new_interval = SimpleInterval.from_data(
-            self.interval.lower * scaling[self.variable],
-            self.interval.upper * scaling[self.variable],
-            self.interval.left,
-            self.interval.right,
+            lower=self.interval.lower * scaling[self.variable],
+            upper=self.interval.upper * scaling[self.variable],
+            left=self.interval.left,
+            right=self.interval.right,
         )
         self.interval = new_interval
 
@@ -478,7 +480,7 @@ class SymbolicDistribution(DiscreteDistribution):
         domain_hash_map = self.variable.domain.hash_map
 
         mode_symbols = {domain_hash_map[hash_value] for hash_value in mode_hashes}
-        mode = self.variable.make_value(mode_symbols)
+        mode = self.variable.make_value(value=mode_symbols)
         return UnivariateLogMode(mode, np.log(max_likelihood))
 
     def log_conditional_of_composite_set(
@@ -513,7 +515,9 @@ class SymbolicDistribution(DiscreteDistribution):
     def univariate_support(self) -> Set:
         hash_map = self.variable.domain.hash_map
         return self.variable.make_value(
-            [hash_map[key] for key, value in self.probabilities.items() if value > 0]
+            value=[
+                hash_map[key] for key, value in self.probabilities.items() if value > 0
+            ]
         )
 
     def probability_of_simple_event(self, event: SimpleEvent) -> float:

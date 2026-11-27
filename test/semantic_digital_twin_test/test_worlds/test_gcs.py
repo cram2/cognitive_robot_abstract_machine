@@ -90,9 +90,9 @@ def graph_of_convex_sets_unit_box() -> VolumetricGraphOfBoundingBoxesFixture:
 
     obstacle = VolumetricBoundingBox(0, 0, 0, 1, 1, 1, world.root.global_pose)
 
-    z_lim = SimpleInterval.from_data(0.45, 0.55)
-    x_lim = SimpleInterval.from_data(-2, 3)
-    y_lim = SimpleInterval.from_data(-2, 3)
+    z_lim = SimpleInterval.from_data(lower=0.45, upper=0.55)
+    x_lim = SimpleInterval.from_data(lower=-2, upper=3)
+    y_lim = SimpleInterval.from_data(lower=-2, upper=3)
     limiting_event = SimpleEvent.from_data(
         {
             SpatialVariables.x.value: x_lim,

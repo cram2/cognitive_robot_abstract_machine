@@ -13,9 +13,9 @@ class TestSpatialVariables(unittest.TestCase):
         self.assertTrue(hasattr(SpatialVariables, "y"))
         self.assertTrue(hasattr(SpatialVariables, "z"))
 
-        self.assertEqual(SpatialVariables.x.value, Continuous("x"))
-        self.assertEqual(SpatialVariables.y.value, Continuous("y"))
-        self.assertEqual(SpatialVariables.z.value, Continuous("z"))
+        self.assertEqual(SpatialVariables.x.value, Continuous(name="x"))
+        self.assertEqual(SpatialVariables.y.value, Continuous(name="y"))
+        self.assertEqual(SpatialVariables.z.value, Continuous(name="z"))
 
         # Distinct members and distinct underlying values
         self.assertNotEqual(SpatialVariables.x, SpatialVariables.y)

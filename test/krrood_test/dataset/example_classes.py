@@ -718,7 +718,7 @@ class HolderOfSimpleInterval:
 
     bounds: SimpleInterval = field(
         default_factory=lambda: SimpleInterval.from_data(
-            0.0, 1.0, Bound.CLOSED, Bound.CLOSED
+            lower=0.0, upper=1.0, left=Bound.CLOSED, right=Bound.CLOSED
         )
     )
 

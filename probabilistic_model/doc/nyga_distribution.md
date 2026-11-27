@@ -274,7 +274,7 @@ import plotly
 plotly.offline.init_notebook_mode()
 import plotly.graph_objects as go
 
-distribution = NygaInduction(Continuous("x"), minimum_samples_per_quantile=100)
+distribution = NygaInduction(Continuous(name="x"), minimum_samples_per_quantile=100)
 distribution = distribution.fit(dataset)
 fig = go.Figure(distribution.plot(), distribution.plotly_layout())
 fig.show()
@@ -287,8 +287,8 @@ from probabilistic_model.distributions.gaussian import GaussianDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import *
 
 mixture = ProbabilisticCircuit()
-gaussian_1 = leaf(GaussianDistribution(variable=Continuous("x"), location=0, scale=1), mixture)
-gaussian_2 = leaf(GaussianDistribution(variable=Continuous("x"), location=5, scale=0.5), mixture)
+gaussian_1 = leaf(GaussianDistribution(variable=Continuous(name="x"), location=0, scale=1), mixture)
+gaussian_2 = leaf(GaussianDistribution(variable=Continuous(name="x"), location=5, scale=0.5), mixture)
 s1 = SumUnit(probabilistic_circuit = mixture)
 s1.add_subcircuit(gaussian_1, np.log(0.5))
 s1.add_subcircuit(gaussian_2, np.log(0.5))

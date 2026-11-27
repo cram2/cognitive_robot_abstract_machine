@@ -16,16 +16,16 @@ class PolytopeTestCase(unittest.TestCase):
     points = points @ rotation_matrix(0.3)
 
     def test_from_points(self):
-        polytope = Polytope.from_points(self.points)
+        polytope = Polytope.from_points(points=self.points)
         self.assertTrue(polytope.contains(self.points.T).all())
 
     def test_from_points_3d(self):
         points_3d = np.random.uniform(-1, 1, (100, 3))
-        polytope = Polytope.from_points(points_3d)
+        polytope = Polytope.from_points(points=points_3d)
         self.assertTrue(polytope.contains(points_3d.T).all())
 
     def test_maximum_inner_box(self):
-        polytope = Polytope.from_points(self.points)
+        polytope = Polytope.from_points(points=self.points)
         box = polytope.maximum_inner_box()
         # event = box.to_simple_event().as_composite_set()
         # fig = go.Figure()
@@ -35,8 +35,8 @@ class PolytopeTestCase(unittest.TestCase):
         self.assertTrue(box <= polytope)
 
     def test_inner_box_approximation(self):
-        polytope = Polytope.from_points(self.points)
-        result = polytope.inner_box_approximation(0.1)
+        polytope = Polytope.from_points(points=self.points)
+        result = polytope.inner_box_approximation(minimum_volume=0.1)
         self.assertTrue(result.is_disjoint())
         # fig = go.Figure()
         # fig.add_trace(go.Scatter(x=self.points[:, 0], y=self.points[:, 1], mode='markers', name='points'))
@@ -45,8 +45,8 @@ class PolytopeTestCase(unittest.TestCase):
         # fig.show()
 
     def test_outer_box_approximation(self):
-        polytope = Polytope.from_points(self.points)
-        result = polytope.outer_box_approximation(0.1)
+        polytope = Polytope.from_points(points=self.points)
+        result = polytope.outer_box_approximation(minimum_volume=0.1)
         self.assertTrue(result.is_disjoint())
         # fig = go.Figure()
         # fig.add_trace(go.Scatter(x=self.points[:, 0], y=self.points[:, 1], mode='markers', name='points'))

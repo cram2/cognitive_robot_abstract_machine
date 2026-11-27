@@ -1,6 +1,6 @@
 """
 Mixins for each kind of quality an annotation can have, such as the ripeness of a fruit
-or the density of its flesh.
+or the mass density of its flesh.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from semantic_digital_twin.semantic_annotations.qualities.relationship_marker im
     IsQualityRelationship,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
-    Density,
-    Elasticity,
+    MassDensity,
+    MaterialElasticity,
     Ripeness,
 )
 from semantic_digital_twin.semantic_annotations.qualities.relationship import (
@@ -45,29 +45,29 @@ class HasRipeness(HasQualities, Mixin):
 
 
 @dataclass(eq=False, kw_only=True)
-class HasDensity(HasQualities, Mixin):
+class HasMassDensity(HasQualities, Mixin):
     """
-    A mixin class for semantic annotations made of a material with a density.
+    A mixin class for semantic annotations made of a material with a mass density.
     """
 
-    density: Density | None = field(
+    mass_density: MassDensity | None = field(
         default=None,
         hash=False,
         metadata=IsQualityRelationship().as_dict(),
     )
     """
-    The density of the semantic annotation's material, or ``None`` when that is unknown.
+    The mass density of the semantic annotation's material, or ``None`` when that is unknown.
     """
 
 
 @dataclass(eq=False, kw_only=True)
-class HasElasticity(HasDensity, Mixin):
+class HasMaterialElasticity(HasMassDensity, Mixin):
     """
     A mixin class for semantic annotations made of an elastic material, which, being
-    matter, also has a density.
+    matter, also has a mass density.
     """
 
-    elasticity: Elasticity | None = field(
+    material_elasticity: MaterialElasticity | None = field(
         default=None,
         hash=False,
         metadata=IsQualityRelationship().as_dict(),

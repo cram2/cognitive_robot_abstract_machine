@@ -434,7 +434,7 @@ class MultivariateGaussianDistribution(ProbabilisticModel, DataclassDeepcopyMixi
         :raises EventIsNotABoxError: If the event is not one simple interval per
             variable.
         """
-        event.fill_missing_variables(set(self.variables))
+        event.fill_missing_variables(variables=set(self.variables))
         if not event.is_box():
             raise EventIsNotABoxError(model=self, event=event)
         [box] = event.simple_sets

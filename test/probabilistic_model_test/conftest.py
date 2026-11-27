@@ -28,7 +28,7 @@ def x() -> Continuous:
     """
     A continuous variable.
     """
-    return Continuous("x")
+    return Continuous(name="x")
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def y() -> Continuous:
     """
     A second continuous variable.
     """
-    return Continuous("y")
+    return Continuous(name="y")
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def z() -> Continuous:
     """
     A third continuous variable.
     """
-    return Continuous("z")
+    return Continuous(name="z")
 
 
 @pytest.fixture
@@ -52,4 +52,4 @@ def count() -> Integer:
     """
     An integer variable.
     """
-    return Integer("n")
+    return Integer(name="n")

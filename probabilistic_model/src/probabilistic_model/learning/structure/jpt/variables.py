@@ -107,11 +107,11 @@ def infer_variables_from_dataframe(
             standard_deviation = data[column].std()
         elif is_bool_dtype(datatype):
             variable_class = Symbolic
-            domain = Set.from_iterable([True, False])
+            domain = Set.from_iterable(iterable=[True, False])
         elif data[column].dtype == object or is_string_dtype(datatype):
             unique_values = data[column].unique()
             variable_class = Symbolic
-            domain = Set.from_iterable(unique_values)
+            domain = Set.from_iterable(iterable=unique_values)
         else:
             raise ValueError(f"Unsupported datatype: {datatype}")
 

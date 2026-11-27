@@ -339,13 +339,22 @@ class PlacementRegionFidelityMeasurer:
         simple_event = SimpleEvent.from_data(
             {
                 SpatialVariables.x.value: SimpleInterval.from_data(
-                    min(x_values), max(x_values), Bound.CLOSED, Bound.CLOSED
+                    lower=min(x_values),
+                    upper=max(x_values),
+                    left=Bound.CLOSED,
+                    right=Bound.CLOSED,
                 ),
                 SpatialVariables.y.value: SimpleInterval.from_data(
-                    min(y_values), max(y_values), Bound.CLOSED, Bound.CLOSED
+                    lower=min(y_values),
+                    upper=max(y_values),
+                    left=Bound.CLOSED,
+                    right=Bound.CLOSED,
                 ),
                 SpatialVariables.z.value: SimpleInterval.from_data(
-                    min(z_values), max(z_values), Bound.CLOSED, Bound.CLOSED
+                    lower=min(z_values),
+                    upper=max(z_values),
+                    left=Bound.CLOSED,
+                    right=Bound.CLOSED,
                 ),
             }
         )

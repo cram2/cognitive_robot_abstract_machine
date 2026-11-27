@@ -44,7 +44,7 @@ def learned_graph(
     :return: The ancestral graph fast causal inference learns from them.
     """
     nodes = [
-        GraphNode(variable=Integer(name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        GraphNode(variable=Integer(name=name), level=NodeLevel.EXAMPLE_ATTRIBUTE)
         for name in rows.columns
     ]
     return FastCausalInferenceStructureLearner().learn(
