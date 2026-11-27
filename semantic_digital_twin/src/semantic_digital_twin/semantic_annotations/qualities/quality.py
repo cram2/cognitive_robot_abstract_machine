@@ -227,7 +227,7 @@ class MaterialElasticity(Quality):
 
 
 @dataclass(kw_only=True)
-class Thickness(Quality):
+class LayerThickness(Quality):
     """
     How thick its bearer is across its surface, such as the skin of a fruit, in metres.
     """

@@ -80,7 +80,7 @@ from semantic_digital_twin.semantic_annotations.qualities.measured_material impo
 )
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
     HasRipeness,
-    HasThickness,
+    HasLayerThickness,
 )
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (
@@ -1257,7 +1257,7 @@ class FruitPart(HasRootBody):
 
 
 @dataclass(eq=False, kw_only=True)
-class Peel(FruitPart, HasThickness):
+class Peel(FruitPart, HasLayerThickness):
     """
     The outer layer of a fruit, its skin or rind (botanically the exocarp, Plant
     Ontology PO:0009085).
@@ -1573,7 +1573,7 @@ class EggPart(HasRootBody):
 
 
 @dataclass(eq=False, kw_only=True)
-class Eggshell(EggPart, HasThickness):
+class Eggshell(EggPart, HasLayerThickness):
     """
     The hard, mineral outer layer of an egg.
     """

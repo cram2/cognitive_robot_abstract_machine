@@ -17,7 +17,7 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
     Ripeness,
-    Thickness,
+    LayerThickness,
 )
 from semantic_digital_twin.semantic_annotations.qualities.relationship import (
     HasQualities,
@@ -83,13 +83,13 @@ class HasMaterialElasticity(HasMassDensity, Mixin):
 
 
 @dataclass(eq=False, kw_only=True)
-class HasThickness(HasQualities, Mixin):
+class HasLayerThickness(HasQualities, Mixin):
     """
     A mixin class for semantic annotations that are a layer with a thickness, such as
     the peel of a fruit.
     """
 
-    thickness: Thickness | None = field(
+    layer_thickness: LayerThickness | None = field(
         default=None,
         hash=False,
         metadata=IsQualityRelationship().as_dict(),

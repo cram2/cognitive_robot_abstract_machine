@@ -15,7 +15,7 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
     Quality,
-    Thickness,
+    LayerThickness,
 )
 
 # %% A measurement
@@ -82,7 +82,7 @@ class MaterialMeasurement:
     The elastic constants.
     """
 
-    thickness: MeasuredRange | None = None
+    layer_thickness: MeasuredRange | None = None
     """
     The thickness of a layer of the material, in metres.
     """
@@ -105,8 +105,8 @@ class MaterialMeasurement:
                     ),
                 )
             )
-        if self.thickness is not None:
-            qualities.append(Thickness(value=self.thickness.to_interval()))
+        if self.layer_thickness is not None:
+            qualities.append(LayerThickness(value=self.layer_thickness.to_interval()))
         return qualities
 
 
@@ -138,7 +138,7 @@ class MeasuredMaterial(Enum):
         material_elasticity=MeasuredElasticity(
             youngs_modulus=MeasuredRange(lower=17.79e6, upper=24.00e6)
         ),
-        thickness=MeasuredRange(lower=33.3e-6, upper=78.3e-6),
+        layer_thickness=MeasuredRange(lower=33.3e-6, upper=78.3e-6),
     )
     """
     Apple skin: tensile strips of Fuji and Starkrimson peel in both directions
@@ -157,7 +157,7 @@ class MeasuredMaterial(Enum):
     """
 
     AVOCADO_PEEL = MaterialMeasurement(
-        thickness=MeasuredRange(lower=1.6e-3, upper=1.6e-3),
+        layer_thickness=MeasuredRange(lower=1.6e-3, upper=1.6e-3),
     )
     """
     The skin of Hass avocados, from a plant-patent comparison of cultivars
@@ -175,7 +175,7 @@ class MeasuredMaterial(Enum):
     """
 
     BANANA_PEEL = MaterialMeasurement(
-        thickness=MeasuredRange(lower=2.95e-3, upper=3.65e-3),
+        layer_thickness=MeasuredRange(lower=2.95e-3, upper=3.65e-3),
     )
     """
     The peel of green Nendran and Dwarf Cavendish bananas, measured with calipers
@@ -227,7 +227,7 @@ class MeasuredMaterial(Enum):
             youngs_modulus=MeasuredRange(lower=1.985e4, upper=1.985e4),
             poissons_ratio=MeasuredRange(lower=-0.05, upper=-0.05),
         ),
-        thickness=MeasuredRange(lower=5.4e-3, upper=7.0e-3),
+        layer_thickness=MeasuredRange(lower=5.4e-3, upper=7.0e-3),
     )
     """
     Orange peel in quasi-static compression with digital image correlation; the
@@ -312,7 +312,7 @@ class MeasuredMaterial(Enum):
         material_elasticity=MeasuredElasticity(
             youngs_modulus=MeasuredRange(lower=4.937e6, upper=5.357e6)
         ),
-        thickness=MeasuredRange(lower=12.11e-3, upper=20.28e-3),
+        layer_thickness=MeasuredRange(lower=12.11e-3, upper=20.28e-3),
     )
     """
     The green outer rind of Crimson Sweet and Charleston Gray watermelons
@@ -397,7 +397,7 @@ class MeasuredMaterial(Enum):
         material_elasticity=MeasuredElasticity(
             youngs_modulus=MeasuredRange(lower=19.0e9, upper=19.0e9)
         ),
-        thickness=MeasuredRange(lower=0.403e-3, upper=0.444e-3),
+        layer_thickness=MeasuredRange(lower=0.403e-3, upper=0.444e-3),
     )
     """
     Eggshell: full rings in compression, around the egg :cite:`lin1995eggshell`, and the
