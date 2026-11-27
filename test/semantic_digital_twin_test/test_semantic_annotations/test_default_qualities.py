@@ -1,12 +1,13 @@
 """
-Tests for the qualities an annotation starts with, taken from the literature, which its
-parts take when they are added to it and which a fresher source, such as perception,
-replaces.
+Tests for the qualities annotations start with, taken from the literature: defaults of
+their quality fields, which a fresher source, such as perception, replaces.
 """
 
 from __future__ import annotations
 
 # %% Imports
+
+from dataclasses import MISSING
 
 import pytest
 from sqlalchemy import select
@@ -14,24 +15,25 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from krrood.ormatic.data_access_objects.helper import to_dao
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
-from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
-    HasParts,
-)
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
+    MaterialElasticity,
     Quality,
 )
-from semantic_digital_twin.semantic_annotations.qualities.relationship import (
-    HasQualities,
+from semantic_digital_twin.semantic_annotations.qualities.relationship_marker import (
+    IsQualityRelationship,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
-    Avocado,
+    AppleFlesh,
+    ApplePeel,
     Cereal,
-    Core,
     Egg,
+    EggShell,
+    Flesh,
     Peel,
-    Pit,
+    Yolk,
+    Albumen,
 )
 from semantic_digital_twin.world import World
 
@@ -49,12 +51,18 @@ def every_subclass_of(cls: type) -> set[type]:
     return subclasses
 
 
-def by_name(classes: set[type]) -> list[type]:
+def default_qualities_of(annotation_type: type[HasRootBody]) -> list[Quality]:
     """
-    :param classes: Classes.
-    :return: The classes sorted by name, so that test parameters are stable.
+    :param annotation_type: A kind of annotation.
+    :return: New qualities from the defaults of its quality fields, in field order.
     """
-    return sorted(classes, key=lambda cls: cls.__name__)
+    return [
+        wrapped_field.field.default_factory()
+        for wrapped_field in annotation_type.semantic_relationship_fields(
+            relationship_type=IsQualityRelationship
+        )
+        if wrapped_field.field.default_factory is not MISSING
+    ]
 
 
 def by_type(qualities: list[Quality]) -> list[Quality]:
@@ -80,65 +88,16 @@ def interval_ends(qualities: list[Quality]) -> list[float]:
     ]
 
 
-def whole_with_its_parts(world: World, whole_type: type[HasParts]) -> HasParts:
-    """
-    :param world: The world to create the whole in, inside its modification.
-    :param whole_type: A kind of whole, such as a kind of fruit.
-    :return: A whole of ``whole_type`` with one part of each kind it has default
-        qualities for.
-    """
-    whole = whole_type.create_with_new_body_in_world(name="whole", world=world)
-    for part_type in whole_type.default_part_qualities:
-        whole.add(
-            part=part_type.create_with_new_body_in_world(
-                name=part_type.__name__, world=world
-            )
-        )
-    return whole
-
-
-ANNOTATIONS_WITH_DEFAULTS = by_name(
-    {
+ANNOTATIONS_WITH_DEFAULTS = sorted(
+    (
         annotation_type
         for annotation_type in every_subclass_of(HasRootBody)
-        if annotation_type.default_qualities
-    }
+        if default_qualities_of(annotation_type)
+    ),
+    key=lambda annotation_type: annotation_type.__name__,
 )
 
-WHOLES_WITH_PART_DEFAULTS = by_name(
-    {
-        whole_type
-        for whole_type in every_subclass_of(HasParts)
-        if whole_type.default_part_qualities
-    }
-)
-
-# %% The default qualities
-
-
-@pytest.mark.parametrize(
-    "annotation_type",
-    ANNOTATIONS_WITH_DEFAULTS,
-    ids=lambda annotation_type: annotation_type.__name__,
-)
-def test_the_defaults_of_an_annotation_are_new_on_each_call(
-    annotation_type: type[HasQualities],
-) -> None:
-    """
-    Every default lies on the scale of its quality, since creating it raises no :class:`
-    ~semantic_digital_twin.semantic_annotations.qualities.exceptions.QualityOutsideScale
-    `, and each call creates new qualities, so that no two annotations share one.
-    """
-    first, second = (
-        annotation_type.default_qualities,
-        annotation_type.default_qualities,
-    )
-
-    assert first == second
-    assert all(
-        first_quality is not second_quality
-        for first_quality, second_quality in zip(first, second)
-    )
+# %% Defaults of the quality fields
 
 
 @pytest.mark.parametrize(
@@ -150,7 +109,8 @@ def test_a_new_annotation_has_the_defaults_of_its_kind(
     annotation_type: type[HasRootBody],
 ) -> None:
     """
-    A new annotation starts with the default qualities of its kind.
+    A new annotation starts with the defaults of its quality fields, each of which lies
+    on the scale of its quality.
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
@@ -158,7 +118,22 @@ def test_a_new_annotation_has_the_defaults_of_its_kind(
             name="annotation", world=world
         )
 
-    assert by_type(annotation.qualities) == by_type(annotation_type.default_qualities)
+    assert by_type(annotation.qualities) == by_type(
+        default_qualities_of(annotation_type)
+    )
+
+
+def test_two_annotations_share_no_default_quality() -> None:
+    """
+    Every annotation gets its own default qualities, so changing one changes no other.
+    """
+    world = World.create_with_root_body("root")
+    with world.modify_world():
+        first = Apple.create_with_new_body_in_world(name="first", world=world)
+        second = Apple.create_with_new_body_in_world(name="second", world=world)
+
+    assert first.mass_density == second.mass_density
+    assert first.mass_density is not second.mass_density
 
 
 def test_an_annotation_without_defaults_starts_without_qualities() -> None:
@@ -187,89 +162,78 @@ def test_a_perceived_quality_replaces_the_default() -> None:
     assert apple.mass_density is perceived
 
 
-# %% The default qualities of parts
+# %% Parts of a particular kind of whole
 
 
 @pytest.mark.parametrize(
-    "whole_type",
-    WHOLES_WITH_PART_DEFAULTS,
-    ids=lambda whole_type: whole_type.__name__,
+    "part_type, generic_part_type",
+    [(ApplePeel, Peel), (AppleFlesh, Flesh)],
+    ids=["peel", "flesh"],
 )
-def test_every_added_part_takes_the_defaults_of_its_whole(
-    whole_type: type[HasParts],
+def test_the_part_of_an_apple_has_defaults_a_generic_part_does_not(
+    part_type: type[HasRootBody], generic_part_type: type[HasRootBody]
 ) -> None:
     """
-    A part added to a whole, such as a peel to an apple, takes the qualities the whole
-    has for its kind of part.
+    A peel serves many fruits and has no defaults, while an apple's peel has those
+    measured on apples, and either can be added to an apple.
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
-        whole = whole_with_its_parts(world, whole_type)
-
-    assert {type(part): by_type(part.qualities) for part in whole.parts} == {
-        part_type: by_type(qualities)
-        for part_type, qualities in whole_type.default_part_qualities.items()
-    }
-
-
-def test_a_part_keeps_a_quality_it_already_has() -> None:
-    """
-    A part that already has a quality, such as a perceived density, keeps it when it is
-    added to a whole whose default is of the same type.
-    """
-    perceived = MassDensity(value=Quality.closed_range(lower=700.0, upper=700.0))
-    world = World.create_with_root_body("root")
-    with world.modify_world():
-        egg = Egg.create_with_new_body_in_world(name="egg", world=world)
-        part_type = next(
-            part_type
-            for part_type, qualities in Egg.default_part_qualities.items()
-            if any(isinstance(quality, MassDensity) for quality in qualities)
-        )
+        apple = Apple.create_with_new_body_in_world(name="apple", world=world)
         part = part_type.create_with_new_body_in_world(name="part", world=world)
-        part.set_quality(quality=perceived)
-        egg.add(part=part)
+        apple.add(part=part)
 
-    assert part.mass_density is perceived
+    assert issubclass(part_type, generic_part_type)
+    assert default_qualities_of(generic_part_type) == []
+    assert by_type(part.qualities) == by_type(default_qualities_of(part_type))
+
+
+# %% Materials
 
 
 @pytest.mark.parametrize(
-    "whole_type, part_type",
-    [(Apple, Core), (Avocado, Pit)],
+    "material",
+    [
+        lambda: MassDensity.steel,
+        lambda: MassDensity.glass,
+        lambda: MassDensity.polyurethane_foam,
+        lambda: MassDensity.paper,
+        lambda: MassDensity.cardboard,
+        lambda: MaterialElasticity.steel,
+        lambda: MaterialElasticity.glass,
+    ],
+    ids=[
+        "density of steel",
+        "density of glass",
+        "density of polyurethane foam",
+        "density of paper",
+        "density of cardboard",
+        "elasticity of steel",
+        "elasticity of glass",
+    ],
 )
-def test_a_part_without_defaults_starts_without_qualities(
-    whole_type: type[HasParts], part_type: type[HasRootBody]
-) -> None:
+def test_a_material_gives_a_new_quality_on_each_access(material) -> None:
     """
-    A part of a kind the whole has no defaults for, such as an apple's core, starts
-    without qualities.
+    The quality of a material lies on its scale and is new on each access, so that no
+    two annotations made of it share one.
     """
-    world = World.create_with_root_body("root")
-    with world.modify_world():
-        whole = whole_type.create_with_new_body_in_world(name="whole", world=world)
-        part = part_type.create_with_new_body_in_world(name="part", world=world)
-        whole.add(part=part)
+    first, second = material(), material()
 
-    assert part.qualities == []
-
-
-def test_a_part_alone_has_no_defaults() -> None:
-    """
-    A peel serves many fruits, so a peel that belongs to no fruit has no qualities.
-    """
-    world = World.create_with_root_body("root")
-    with world.modify_world():
-        peel = Peel.create_with_new_body_in_world(name="peel", world=world)
-
-    assert peel.qualities == []
+    assert first == second
+    assert first is not second
 
 
 # %% Persistence
 
 
-@pytest.mark.parametrize("whole_type", [Apple, Egg], ids=["Apple", "Egg"])
+@pytest.mark.parametrize(
+    "whole_type, part_types",
+    [(Apple, [ApplePeel, AppleFlesh]), (Egg, [EggShell, Albumen, Yolk])],
+    ids=["Apple", "Egg"],
+)
 def test_the_defaults_of_a_whole_and_its_parts_survive_the_database(
-    whole_type: type[HasParts],
+    whole_type: type[HasRootBody],
+    part_types: list[type[HasRootBody]],
     in_memory_session_maker: sessionmaker[Session],
 ) -> None:
     """
@@ -278,7 +242,13 @@ def test_the_defaults_of_a_whole_and_its_parts_survive_the_database(
     """
     world = World.create_with_root_body("root")
     with world.modify_world():
-        whole = whole_with_its_parts(world, whole_type)
+        whole = whole_type.create_with_new_body_in_world(name="whole", world=world)
+        for part_type in part_types:
+            whole.add(
+                part=part_type.create_with_new_body_in_world(
+                    name=part_type.__name__, world=world
+                )
+            )
     stored_world = to_dao(world)
     with in_memory_session_maker() as session:
         session.add(stored_world)

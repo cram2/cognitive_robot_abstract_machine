@@ -186,6 +186,46 @@ class MassDensity(PhysicsQuality):
             lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
         )
 
+    @classproperty
+    def steel(cls) -> MassDensity:
+        """
+        :return: The mass density of steel, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=7820.0, upper=7820.0))
+
+    @classproperty
+    def glass(cls) -> MassDensity:
+        """
+        :return: The mass density of glass, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=2400.0, upper=2800.0))
+
+    @classproperty
+    def polyurethane_foam(cls) -> MassDensity:
+        """
+        :return: The mass density of polyurethane foam, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=30.0, upper=30.0))
+
+    @classproperty
+    def paper(cls) -> MassDensity:
+        """
+        :return: The mass density of paper, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=700.0, upper=1150.0))
+
+    @classproperty
+    def cardboard(cls) -> MassDensity:
+        """
+        :return: The mass density of cardboard, from a handbook compilation
+            :cite:`engineeringtoolbox_density_solids`.
+        """
+        return cls(value=Quality.closed_range(lower=700.0, upper=700.0))
+
 
 @dataclass(kw_only=True)
 class MaterialElasticity(PhysicsQuality):
@@ -244,6 +284,30 @@ class MaterialElasticity(PhysicsQuality):
         """
         return SimpleInterval.from_data(
             lower=-1.0, upper=0.5, left=Bound.OPEN, right=Bound.OPEN
+        )
+
+    @classproperty
+    def steel(cls) -> MaterialElasticity:
+        """
+        :return: The elastic constants of steel, from handbook compilations; the Poisson's
+            ratio is that of 18-8 stainless steel
+            :cite:`wikipedia_youngs_modulus,engineeringtoolbox_poissons_ratio`.
+        """
+        return cls(
+            youngs_modulus=Quality.closed_range(lower=200e9, upper=200e9),
+            poissons_ratio=Quality.closed_range(lower=0.305, upper=0.305),
+        )
+
+    @classproperty
+    def glass(cls) -> MaterialElasticity:
+        """
+        :return: The elastic constants of glass, from handbook compilations: the Young's
+            modulus of float glass and the Poisson's ratio of soda glass
+            :cite:`wikipedia_youngs_modulus,engineeringtoolbox_poissons_ratio`.
+        """
+        return cls(
+            youngs_modulus=Quality.closed_range(lower=47.7e9, upper=83.6e9),
+            poissons_ratio=Quality.closed_range(lower=0.22, upper=0.22),
         )
 
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from krrood.patterns.classproperty import classproperty
 from krrood.patterns.mixin import Mixin
 from semantic_digital_twin.semantic_annotations.qualities.relationship_marker import (
     IsQualityRelationship,
@@ -34,41 +33,7 @@ class HasQualities(HasSemanticRelationships, Mixin):
     declares a field holding a :class:`Quality`, marked with
     :class:`IsQualityRelationship`. :meth:`set_quality` routes a quality to the field
     whose type matches it.
-
-    A new annotation starts with the :attr:`default_qualities` of its kind, which a
-    fresher source, such as perception, replaces through :meth:`set_quality`.
     """
-
-    def __post_init__(self) -> None:
-        """
-        Start with each of :attr:`default_qualities` whose type no quality given at
-        construction has.
-        """
-        super().__post_init__()
-        for quality in self.qualities_not_yet_set(among=self.default_qualities):
-            self._store_in_field(
-                entity=quality,
-                wrapped_field=self._choose_field_for_entity(
-                    entity=quality, relationship_type=IsQualityRelationship
-                ),
-            )
-
-    @classproperty
-    def default_qualities(cls) -> list[Quality]:
-        """
-        :return: The qualities an annotation of this kind has until a fresher source
-            replaces them, new ones on each call so that no two annotations share one;
-            none by default.
-        """
-        return []
-
-    def qualities_not_yet_set(self, *, among: list[Quality]) -> list[Quality]:
-        """
-        :param among: Qualities, at most one of each type.
-        :return: Those whose type no quality of this annotation has yet.
-        """
-        known_types = {type(quality) for quality in self.qualities}
-        return [quality for quality in among if type(quality) not in known_types]
 
     @synchronized_attribute_modification
     def set_quality(self, *, quality: Quality, field_name: str = "") -> None:

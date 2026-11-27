@@ -154,7 +154,7 @@ def test_fruit_without_a_ripeness_has_only_its_default_qualities(world: World) -
     with world.modify_world():
         apple = Apple.create_with_new_body_in_world(name="apple", world=world)
 
-    assert apple.qualities == Apple.default_qualities
+    assert apple.qualities == [apple.mass_density, apple.material_elasticity]
 
 
 def test_ripeness_of_a_fruit_is_its_quality(world: World) -> None:
@@ -167,7 +167,11 @@ def test_ripeness_of_a_fruit_is_its_quality(world: World) -> None:
         apple.set_quality(quality=ripeness)
 
     assert apple.ripeness is ripeness
-    assert apple.qualities == [ripeness, *Apple.default_qualities]
+    assert apple.qualities == [
+        ripeness,
+        apple.mass_density,
+        apple.material_elasticity,
+    ]
 
 
 # %% Setting qualities

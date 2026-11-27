@@ -30,7 +30,6 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
-    Albumen,
     CitrusSegment,
     Core,
     Shell,
@@ -233,22 +232,19 @@ def test_a_flesh_has_no_thickness(world: World) -> None:
             flesh.set_quality(quality=SkinThickness(value=point(50.0e-6)))
 
 
-# %% Material qualities of egg parts
+# %% Material qualities of shells
 
 
-@pytest.mark.parametrize("part_type", [Shell, Albumen, Yolk])
-def test_every_egg_part_starts_without_density_and_elasticity(
-    world: World, part_type: type[HasRootBody]
-) -> None:
+def test_a_shell_starts_without_density_and_elasticity(world: World) -> None:
     """
-    Every part of an egg has a density and an elasticity field, empty until they are
-    set.
+    A shell covers eggs and nuts alike, so it has a density and an elasticity field,
+    empty until they are set.
     """
     with world.modify_world():
-        part = part_type.create_with_new_body_in_world(name="part", world=world)
+        shell = Shell.create_with_new_body_in_world(name="shell", world=world)
 
-    assert part.mass_density is None
-    assert part.material_elasticity is None
+    assert shell.mass_density is None
+    assert shell.material_elasticity is None
 
 
 def test_a_shell_starts_without_a_thickness(world: World) -> None:

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from krrood.patterns.classproperty import classproperty
 from krrood.patterns.mixin import Mixin
 from semantic_digital_twin.semantic_annotations.qualities.relationship_marker import (
     IsQualityRelationship,
@@ -17,7 +16,6 @@ from semantic_digital_twin.semantic_annotations.qualities.relationship_marker im
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
-    Quality,
     Ripeness,
     SkinThickness,
 )
@@ -99,28 +97,3 @@ class HasSkinThickness(HasQualities, Mixin):
     """
     How thick the semantic annotation is, or ``None`` when that is unknown.
     """
-
-
-# %% Materials
-
-
-@dataclass(eq=False, kw_only=True)
-class MadeOfSteel(HasQualities, Mixin):
-    """
-    A mixin class for semantic annotations made of steel, such as cutlery.
-    """
-
-    @classproperty
-    def default_qualities(cls) -> list[Quality]:
-        """
-        :return: The qualities of steel from handbook compilations; the Poisson's ratio
-            is that of 18-8 stainless steel
-            :cite:`engineeringtoolbox_density_solids,wikipedia_youngs_modulus,engineeringtoolbox_poissons_ratio`.
-        """
-        return [
-            MassDensity(value=Quality.closed_range(lower=7820.0, upper=7820.0)),
-            MaterialElasticity(
-                youngs_modulus=Quality.closed_range(lower=200e9, upper=200e9),
-                poissons_ratio=Quality.closed_range(lower=0.305, upper=0.305),
-            ),
-        ]
