@@ -555,7 +555,7 @@ class OrmPackage(StrEnum):
 
     SEMANTIC_DIGITAL_TWIN = "semantic_digital_twin"
     """
-    Its interface builds on no other one.
+    Its interface builds on :attr:`PROBABILISTIC_MODEL`'s.
     """
 
     SEGMIND = "segmind"

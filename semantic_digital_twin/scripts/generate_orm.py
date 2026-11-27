@@ -12,6 +12,7 @@ from pathlib import Path
 
 import trimesh
 
+import probabilistic_model.orm.ormatic_interface
 import semantic_digital_twin
 import semantic_digital_twin.orm.model
 
@@ -75,7 +76,7 @@ def generate_orm():
 
     ormatic = ORMatic.from_package(
         packages=[semantic_digital_twin],
-        ormatic_interface_dependencies=[],
+        ormatic_interface_dependencies=[probabilistic_model.orm.ormatic_interface],
         ignored_classes=ignore_classes,
         type_mappings={
             trimesh.Trimesh: semantic_digital_twin.orm.model.TrimeshType,
