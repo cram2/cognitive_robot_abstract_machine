@@ -61,6 +61,9 @@ from semantic_digital_twin.grasping.grasp_strategies import (
 )
 from semantic_digital_twin.grasping.object_relative_grasp import draw_grasps
 from semantic_digital_twin.reasoning.predicates import SupportedBy
+from semantic_digital_twin.semantic_annotations.qualities.mixins import (
+    HasMaterialElasticity,
+)
 from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
@@ -320,7 +323,7 @@ class HasRootKinematicStructureEntity(
 
 
 @dataclass(eq=False)
-class HasRootBody(HasRootKinematicStructureEntity[Body], Mixin):
+class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, Mixin):
     """
     Abstract base class for all objects which have a unambiguous root reference frame.
 

@@ -1,5 +1,7 @@
 """
-Tests for the material qualities of fruit tissues: their density and elasticity.
+Tests for the material qualities of annotations with a root body, such as fruit tissues:
+
+their mass density and elasticity.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
 )
+from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     CitrusSegment,
     Core,
@@ -31,6 +34,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Seed,
     SeedChamber,
     Stem,
+    Table,
 )
 from semantic_digital_twin.world import World
 
@@ -91,6 +95,29 @@ def test_poissons_ratio_at_the_upper_end_of_its_scale_is_rejected() -> None:
             youngs_modulus=measured_material_elasticity().youngs_modulus,
             poissons_ratio=point(MaterialElasticity.poissons_ratio_scale.upper),
         )
+
+
+# %% Material qualities of annotations with a root body
+
+
+def test_every_annotation_with_a_root_body_has_material_qualities() -> None:
+    """
+    An annotation with a root body is made of a material, so it has a mass density and
+    an elasticity, whatever kind of annotation it is.
+    """
+    assert issubclass(HasRootBody, HasMaterialElasticity)
+    assert issubclass(HasRootBody, HasMassDensity)
+
+
+def test_furniture_starts_without_mass_density_and_elasticity(world: World) -> None:
+    """
+    A table, no fruit part, has mass density and elasticity fields too, empty until set.
+    """
+    with world.modify_world():
+        table = Table.create_with_new_body_in_world(name="table", world=world)
+
+    assert table.mass_density is None
+    assert table.material_elasticity is None
 
 
 # %% Material qualities of fruit parts
