@@ -1,3 +1,7 @@
+"""
+Classes that declare what their subclasses provide without providing it.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
