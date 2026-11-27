@@ -82,9 +82,10 @@ class PR2Topic(StrEnum):
     conventional name.
     """
 
-    ODOMETRY = "odom"
+    ODOMETRY = "odometry/filtered"
     """
-    The topic the mobile base reports its odometry on.
+    The topic the pose of the mobile base in ``odom_combined`` is reported on, the
+    output of the localization filter that fuses the wheel odometry.
     """
 
 
