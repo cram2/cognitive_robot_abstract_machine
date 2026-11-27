@@ -74,7 +74,7 @@ class CollectionKind(Enum):
         )
 
 
-AnyCollection: TypeAlias = Union[CollectionKind.all_classes()]
+AnyCollection: TypeAlias = Union[CollectionKind.all_classes()]  # noqa: UP007
 """
 A collection of any :class:`CollectionKind`.
 """
