@@ -224,6 +224,34 @@ def test_no_epoch_has_no_average_duration():
     )
 
 
+def test_consecutive_histories_join_their_epochs_in_order():
+    """
+    Trainings run one after another give the history of all their epochs, converged only
+    if each of them converged.
+    """
+    first = ConvergenceHistory(
+        epoch_losses=[3.0, 2.0],
+        converged=True,
+        duration=timedelta(seconds=3),
+        epoch_durations=[timedelta(seconds=1), timedelta(seconds=2)],
+    )
+    second = ConvergenceHistory(
+        epoch_losses=[1.5],
+        converged=False,
+        duration=timedelta(seconds=4),
+        epoch_durations=[timedelta(seconds=4)],
+    )
+
+    joined = ConvergenceHistory.from_consecutive(histories=[first, second])
+
+    assert joined == ConvergenceHistory(
+        epoch_losses=first.epoch_losses + second.epoch_losses,
+        converged=False,
+        duration=first.duration + second.duration,
+        epoch_durations=first.epoch_durations + second.epoch_durations,
+    )
+
+
 # %% learning rate plateau
 
 

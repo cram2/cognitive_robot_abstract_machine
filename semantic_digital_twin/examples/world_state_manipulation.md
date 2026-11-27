@@ -61,7 +61,7 @@ with world.modify_world():
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.15),
         world=world,
     )
-    drawer.add(handle)
+    drawer.add(part=handle)
 
     dresser = Dresser.create_with_new_body_in_world(
         name="dresser",
@@ -69,7 +69,7 @@ with world.modify_world():
         world=world,
     )
 
-    dresser.add(drawer)
+    dresser.add(part=drawer)
 
 rt = RayTracer(world)
 rt.update_scene()

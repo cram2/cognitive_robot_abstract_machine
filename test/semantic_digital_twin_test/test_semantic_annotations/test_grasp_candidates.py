@@ -148,7 +148,7 @@ def bowl(tmp_path) -> Bowl:
     PartSplitter(
         part_type=Rim,
         finder=LocatedFacesFinder(face_centers=rim.triangles_center[rim_faces]),
-    ).split(annotation)
+    ).split(whole=annotation)
     return annotation
 
 
@@ -541,7 +541,7 @@ def _mug(with_handle: bool, handle_type: type = Handle) -> Mug:
         PartSplitter(
             part_type=handle_type,
             finder=LocatedFacesFinder(face_centers=handle_shape.triangles_center),
-        ).split(mug)
+        ).split(whole=mug)
     return mug
 
 

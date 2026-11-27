@@ -54,6 +54,26 @@ class ConvergenceHistory:
     The wall-clock time of each epoch, in the order they ran.
     """
 
+    @classmethod
+    def from_consecutive(cls, *, histories: list[ConvergenceHistory]) -> Self:
+        """
+        :param histories: The histories of trainings that ran one after another.
+        :return: The history of all their epochs in order, converged if every training
+            converged.
+        """
+        return cls(
+            epoch_losses=[
+                loss for history in histories for loss in history.epoch_losses
+            ],
+            converged=all(history.converged for history in histories),
+            duration=sum((history.duration for history in histories), timedelta()),
+            epoch_durations=[
+                duration
+                for history in histories
+                for duration in history.epoch_durations
+            ],
+        )
+
     @property
     def epochs(self) -> int:
         """

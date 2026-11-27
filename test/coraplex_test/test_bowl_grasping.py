@@ -52,7 +52,7 @@ def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
     rim_centers = centers[centers[:, 2] > mesh.bounds[1][2] - rim_depth]
     return PartSplitter(
         part_type=Rim, finder=LocatedFacesFinder(face_centers=rim_centers)
-    ).split(bowl)
+    ).split(whole=bowl)
 
 
 @pytest.fixture

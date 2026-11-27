@@ -27,9 +27,9 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body
 
 if TYPE_CHECKING:
-    from semantic_digital_twin.semantic_annotations.mixins import (
-        HasRootBody,
-        PartWholeRelationship,
+    from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
+    from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+        HasParts,
     )
 
 T = TypeVar("T")
@@ -144,7 +144,7 @@ class PartSplitter:
     bodies whose collision shapes differ from their visual shapes.
     """
 
-    def part_of(self, whole: PartWholeRelationship) -> HasRootBody | None:
+    def ensure_part(self, *, whole: HasParts) -> HasRootBody | None:
         """
         The part of one annotation, split off its shape the first time it is asked for.
 
@@ -153,15 +153,15 @@ class PartSplitter:
             :attr:`part_type`, if any; otherwise the part split off its shape, ``None``
             if there is none to split off.
         """
-        relationship = PartRelationshipInspector.for_part(type(whole), self.part_type)
-        existing = relationship.parts_of(whole)
+        relationship = PartRelationshipInspector.from_part_type(
+            whole_type=type(whole), part_type=self.part_type
+        )
+        existing = relationship.held_parts(whole=whole)
         if existing:
             return existing[0]
-        return self.split(whole)
+        return self.split(whole=whole)
 
-    def split(
-        self, whole: PartWholeRelationship, field_name: str = ""
-    ) -> HasRootBody | None:
+    def split(self, *, whole: HasParts, field_name: str = "") -> HasRootBody | None:
         """
         Split the part off the shape of one annotation's root body and add it to the
         annotation, unless the relationship field holds a single part and is set
@@ -173,10 +173,10 @@ class PartSplitter:
         :return: The part, added to the annotation and its world; ``None`` if the field
             is set already, the finder finds none or the root body has no shape.
         """
-        relationship = PartRelationshipInspector.for_part(
-            type(whole), self.part_type, field_name
+        relationship = PartRelationshipInspector.from_part_type(
+            whole_type=type(whole), part_type=self.part_type, name=field_name
         )
-        if relationship.is_filled_in(whole) and not relationship.holds_many:
+        if relationship.is_filled_in(whole=whole) and not relationship.holds_many:
             return None
         cut = self._cut(whole.root)
         if cut is None:
@@ -185,7 +185,7 @@ class PartSplitter:
         with world.modify_world():
             part = self.part_type(root=cut.apply())
             world.add_semantic_annotation(part)
-            whole.add(part, field_name=relationship.name)
+            whole.add(part=part, field_name=relationship.name)
         return part
 
     def split_body(self, body: Body) -> Body | None:

@@ -5,10 +5,12 @@ between them.
 
 from __future__ import annotations
 
+import gc
 import os
 import sys
 import weakref
 from collections import defaultdict
+from contextlib import AbstractContextManager
 from dataclasses import InitVar, dataclass, field
 from enum import StrEnum, auto
 
@@ -542,3 +544,30 @@ class SymbolGraph(metaclass=SingletonMeta):
         else:
             graph = self._instance_graph
         ClassDiagram.graph_to_dot(filepath=filepath, graph=graph, format_=format_)
+
+
+# %% pausing the garbage collector
+
+
+@dataclass(kw_only=True)
+class GarbageCollectionPause(AbstractContextManager):
+    """
+    Keeps Python's cyclic garbage collector from running inside a ``with`` block.
+    """
+
+    collector_was_running: bool = False
+    """
+    Whether the collector ran when the block was entered, so it runs again after it.
+    """
+
+    def __enter__(self) -> GarbageCollectionPause:
+        """
+        Pauses the collector, unlike :meth:`contextlib.AbstractContextManager.__enter__`.
+        """
+        self.collector_was_running = gc.isenabled()
+        gc.disable()
+        return self
+
+    def __exit__(self, *exception_information: Any) -> None:
+        if self.collector_was_running:
+            gc.enable()
