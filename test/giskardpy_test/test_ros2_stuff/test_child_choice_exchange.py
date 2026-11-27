@@ -48,7 +48,7 @@ from krrood_synchronization.messages import MessageOrigin, Sender, StreamPositio
 from semantic_digital_twin.world import World
 
 from .test_client_presence import SteppingClock
-from .test_motion_server import PublicationProgressMimic
+from .test_motion_server import PublicationProgressMimic, giskard_node_states_publisher
 from .test_world_updates import PublishingSynchronizerMimic
 
 # %% mimics
@@ -278,6 +278,23 @@ class TwoChoosingNodes:
             delay=delay,
         )
 
+    def copy_in_context(self, *, context: StatechartContext) -> TwoChoosingNodes:
+        """
+        :param context: The context the copy is read in.
+        :return: A copy of these nodes, read from the structure of :attr:`statechart`
+            after a trip through a JSON string, as the other end of a goal reads it.
+        """
+        statechart = Statechart.from_json(
+            data=json.loads(json.dumps(self.statechart.to_json())), context=context
+        )
+        copied_by_name = {node.name: node for node in statechart.nodes}
+        return TwoChoosingNodes(
+            statechart=statechart,
+            starting_late=copied_by_name[self.starting_late.name],
+            starting_first=copied_by_name[self.starting_first.name],
+            delay=copied_by_name[self.delay.name],
+        )
+
 
 @dataclass(kw_only=True)
 class ClientAndRunningStatechart:
@@ -376,13 +393,14 @@ class ClientAndRunningStatechart:
             executor=self.executor,
             action_server=self.action_server,
             outgoing_world_updates=self.outgoing_world_updates,
+            node_states_publisher=giskard_node_states_publisher(),
         )
 
         client_context = StatechartContext(world=World())
         client_context.add_extension(
             extension=ChildChooserAccess(choosers=[self.client_chooser])
         )
-        self.copy = TwoChoosingNodes.in_context(context=client_context)
+        self.copy = self.running.copy_in_context(context=client_context)
         self.client = ChildChoiceClient(
             statechart=self.copy.statechart,
             child_chooser_access=ChildChooserAccess(choosers=[self.client_chooser]),
@@ -434,10 +452,10 @@ class ClientAndRunningStatechart:
         choices = self.let_the_client_answer()
         self.executor.tick()
         choices += self.let_the_client_answer()
-        answered_nodes = [choice.node_index for choice in choices]
+        answered_nodes = [choice.node_id for choice in choices]
         assert answered_nodes == [
-            self.copy.starting_first.index,
-            self.copy.starting_late.index,
+            self.copy.starting_first._node_id,
+            self.copy.starting_late._node_id,
         ]
         self.world_updates.caught_up = True
 
@@ -500,11 +518,15 @@ def test_a_choice_made_later_waits_for_the_one_made_before_it(
 def test_a_choice_skipping_nodes_the_statechart_never_got_is_rejected(
     exchange: ClientAndRunningStatechart,
 ) -> None:
+    """
+    A choice whose first node would not join right after the nodes the running side
+    holds stops the running side.
+    """
     waiting_node = exchange.running.starting_first
     exchange.receiving_chooser.receive(
         message=ChildChoiceMessage(
             goal_id=exchange.action_server.goal_id,
-            node_index=waiting_node.index,
+            node_id=waiting_node._node_id,
             first_node_index=len(exchange.running.statechart.nodes) + 1,
             nodes={},
         )
@@ -567,7 +589,7 @@ def test_the_client_chooses_only_once_its_world_holds_the_changes_of_the_goal(
     [answer] = exchange.let_the_client_answer()
 
     assert answered_before_catching_up == []
-    assert answer.node_index == exchange.copy.starting_first.index
+    assert answer.node_id == exchange.copy.starting_first._node_id
 
 
 def test_the_client_does_not_wait_for_changes_published_before_the_goal(
@@ -583,7 +605,7 @@ def test_the_client_does_not_wait_for_changes_published_before_the_goal(
 
     [answer] = exchange.let_the_client_answer()
 
-    assert answer.node_index == exchange.copy.starting_first.index
+    assert answer.node_id == exchange.copy.starting_first._node_id
 
 
 def test_a_client_whose_world_does_not_catch_up_reports_it(
@@ -617,7 +639,7 @@ def test_a_client_catching_up_just_behind_the_running_side_keeps_waiting(
 
     [answer] = exchange.let_the_client_answer()
 
-    assert answer.node_index == exchange.copy.starting_first.index
+    assert answer.node_id == exchange.copy.starting_first._node_id
 
 
 def test_a_change_that_never_reaches_the_client_is_reported_while_later_ones_follow(
@@ -738,6 +760,9 @@ def test_the_statechart_rebuilt_from_the_feedback_reads_the_conditions_of_the_ru
 
 
 def test_the_running_side_repeats_nothing_while_no_node_waits_for_a_child() -> None:
+    """
+    Without a node waiting for a child, unchanged states are reported only once.
+    """
     action_server = ActionServerRunningOneGoal()
     executor = StatechartExecutor(context=StatechartContext(world=World()))
     statechart = Statechart(context=executor.context)
@@ -753,6 +778,7 @@ def test_the_running_side_repeats_nothing_while_no_node_waits_for_a_child() -> N
         outgoing_world_updates=OutgoingWorldUpdates(
             world_synchronizer=PublicationProgressMimic()
         ),
+        node_states_publisher=giskard_node_states_publisher(),
         child_request_repeat_period=0.0,
     )
 
@@ -778,8 +804,8 @@ def _run_reporting_the_waiting_nodes(
     for _ in range(ticks):
         feedback = exchange.feedback_publisher.create_states()
         reported |= {
-            exchange.running.statechart.get_node_by_index(index=int(index)).name
-            for index in feedback[MotionStatechartPayloadKey.WAITING_FOR_CHILD]
+            exchange.running.statechart.get_node_by_id(node_id=node_id).name
+            for node_id in feedback[MotionStatechartPayloadKey.WAITING_FOR_CHILD]
         }
         exchange.let_the_client_answer()
         exchange.executor.tick()

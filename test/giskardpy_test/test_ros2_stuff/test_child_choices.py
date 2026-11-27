@@ -264,6 +264,9 @@ def test_a_child_the_client_chooses_runs_and_the_goal_succeeds(
 def test_the_feedback_names_the_nodes_waiting_for_a_child(
     choosing_motion_server: MotionServerFixture,
 ) -> None:
+    """
+    The feedback names every waiting node by its id, with the children it holds.
+    """
     server = choosing_motion_server
     goal = ChoosingGoal.ending_when(end_node_factory=EndMotion.when_true)
     _cancel_after(server, ticks=3)
@@ -274,7 +277,7 @@ def test_the_feedback_names_the_nodes_waiting_for_a_child(
     waiting = feedback_data(server.action_server.feedback_messages[-1])[
         MotionStatechartPayloadKey.WAITING_FOR_CHILD
     ]
-    assert waiting == {str(goal.choosing_node.index): 0}
+    assert waiting == {goal.choosing_node._node_id: 0}
 
 
 def test_no_child_left_fails_the_node(
@@ -296,6 +299,10 @@ def test_no_child_left_fails_the_node(
 def test_a_child_out_of_step_with_the_statechart_aborts_the_goal(
     choosing_motion_server: MotionServerFixture,
 ) -> None:
+    """
+    A choice whose first node would not join right after the nodes Giskard holds aborts
+    the goal.
+    """
     server = choosing_motion_server
     goal = ChoosingGoal.ending_when(end_node_factory=EndMotion.when_true)
     _cancel_after(server, ticks=10)
@@ -304,7 +311,7 @@ def test_a_child_out_of_step_with_the_statechart_aborts_the_goal(
     chooser.receive(
         message=ChildChoiceMessage(
             goal_id=0,
-            node_index=goal.choosing_node.index,
+            node_id=goal.choosing_node._node_id,
             first_node_index=len(goal.statechart.nodes) + 1,
             nodes={},
         )
@@ -320,6 +327,10 @@ def test_a_child_out_of_step_with_the_statechart_aborts_the_goal(
 def test_a_choice_for_another_goal_is_not_taken(
     choosing_motion_server: MotionServerFixture,
 ) -> None:
+    """
+    A choice naming another goal leaves the waiting node running until the goal is
+    cancelled.
+    """
     server = choosing_motion_server
     goal = ChoosingGoal.ending_when(end_node_factory=EndMotion.when_true)
     _cancel_after(server, ticks=3)
@@ -327,7 +338,7 @@ def test_a_choice_for_another_goal_is_not_taken(
     _server_chooser(server).receive(
         message=ChildChoiceMessage(
             goal_id=7,
-            node_index=goal.choosing_node.index,
+            node_id=goal.choosing_node._node_id,
             first_node_index=len(goal.statechart.nodes),
             nodes=None,
         )
@@ -363,9 +374,7 @@ def test_the_client_answers_a_waiting_node_once_per_child_it_holds() -> None:
     )
     feedback = {
         StatechartPayloadKey.GOAL_ID: 3,
-        MotionStatechartPayloadKey.WAITING_FOR_CHILD: {
-            str(goal.choosing_node.index): 0
-        },
+        MotionStatechartPayloadKey.WAITING_FOR_CHILD: {goal.choosing_node._node_id: 0},
     }
 
     first_answers = client.answer(feedback=feedback)
@@ -374,6 +383,6 @@ def test_the_client_answers_a_waiting_node_once_per_child_it_holds() -> None:
     [message] = first_answers
     assert repeated_answers == []
     assert message.goal_id == 3
-    assert message.node_index == goal.choosing_node.index
+    assert message.node_id == goal.choosing_node._node_id
     assert message.first_node_index == len(goal.statechart.nodes) - 1
     assert goal.choosing_node.children == [goal.statechart.nodes[-1]]

@@ -37,6 +37,7 @@ from cramph.exceptions import (
     PrerequisiteNotExpandedError,
     StatechartAlreadyCompiledError,
     NotHeldByControlStructureNodeError,
+    NodeWithIdNotFoundError,
     NotInStatechartError,
     RemovedNodeStillReferencedError,
     StatechartBrokenByFailedModificationError,
@@ -288,6 +289,13 @@ class Statechart(SubclassJSONSerializer):
 
     Reading this instead of rebuilding the list from `rx_graph` on every access is what
     keeps :meth:`tick` cheap.
+    """
+
+    _nodes_by_id: dict[str, StatechartNode] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """
+    The nodes of :attr:`_nodes` by their :attr:`~cramph.node.StatechartNode._node_id`.
     """
 
     _choosing_nodes: list[CompositeNodeChoosingItsChild] = field(
@@ -568,6 +576,7 @@ class Statechart(SubclassJSONSerializer):
         self.observation_state.append_default_value()
         self.last_observation_state.append_default_value()
         self._nodes.append(node)
+        self._nodes_by_id[node._node_id] = node
         self.compiler.changed_since_compile = True
         if isinstance(node, CancelStatechart):
             self._cancel_nodes.append(node)
@@ -742,6 +751,7 @@ class Statechart(SubclassJSONSerializer):
         for node in nodes:
             node.index = self.rx_graph.add_node(node)
         self._nodes = nodes
+        self._nodes_by_id = {node._node_id: node for node in nodes}
         self._cancel_nodes = [
             cancel_node
             for cancel_node in nodes
@@ -773,6 +783,24 @@ class Statechart(SubclassJSONSerializer):
         :return: The node with the given index.
         """
         return self.rx_graph.get_node_data(index)
+
+    def get_node_by_id(self, *, node_id: str) -> StatechartNode:
+        """
+        :param node_id: The :attr:`~StatechartNode._node_id` of the node to look up.
+        :return: The node with the given id.
+        :raises NodeWithIdNotFoundError: If this statechart holds no node with that id.
+        """
+        node = self.find_node_by_id(node_id=node_id)
+        if node is None:
+            raise NodeWithIdNotFoundError(node_id=node_id)
+        return node
+
+    def find_node_by_id(self, *, node_id: str) -> StatechartNode | None:
+        """
+        :param node_id: The :attr:`~StatechartNode._node_id` of the node to look up.
+        :return: The node with the given id, or None if this statechart holds none.
+        """
+        return self._nodes_by_id.get(node_id)
 
     def check_context_holds(
         self,

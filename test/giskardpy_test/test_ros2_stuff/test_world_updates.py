@@ -52,6 +52,8 @@ from giskardpy.motion_control import MotionControl
 from cramph.context import StatechartContext
 from cramph.executor import StatechartExecutor
 
+from .test_motion_server import giskard_node_states_publisher
+
 # %% mimics of the synchronizers
 
 
@@ -454,6 +456,10 @@ def add_moving_connection(world: World) -> None:
 
 @pytest.fixture()
 def control_loop(init_background_node) -> ControlLoopFixture:
+    """
+    :return: A control loop running a motion goal in a world that follows a remote
+        world and defers the updates it receives from it.
+    """
     controlled_world = World(name="controlled")
     remote_world = World(name="remote")
     controlled_synchronizer = WorldSynchronizer(
@@ -511,6 +517,7 @@ def control_loop(init_background_node) -> ControlLoopFixture:
                 outgoing_world_updates=OutgoingWorldUpdates(
                     world_synchronizer=controlled_synchronizer
                 ),
+                node_states_publisher=giskard_node_states_publisher(),
             ),
             inputs=WorldStateInputs(world=controlled_world),
             cycle_counter=CycleCounter(),
@@ -654,6 +661,7 @@ def local_control_loop(init_background_node) -> ControlLoop:
             outgoing_world_updates=OutgoingWorldUpdates(
                 world_synchronizer=PublishingSynchronizerMimic()
             ),
+            node_states_publisher=giskard_node_states_publisher(),
         ),
         inputs=WorldStateInputs(world=world),
         cycle_counter=CycleCounter(),

@@ -28,6 +28,7 @@ from giskardpy.middleware.ros2.child_choices import (
 )
 from giskardpy.middleware.ros2.client_presence import ClientWatchdog, HeartbeatPresence
 from giskardpy.middleware.ros2.control_loop import ControlLoop
+from cramph.reported_statechart import NodeStatesPublisher
 from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from giskardpy.middleware.ros2.graceful_shutdown import GracefulShutdownSignals
 from giskardpy.middleware.ros2.cycle_counter import CycleCounter
@@ -248,6 +249,9 @@ class Giskard:
             executor=self.executor,
             action_server=action_server,
             outgoing_world_updates=outgoing_world_updates,
+            node_states_publisher=NodeStatesPublisher(
+                sender=self.world_synchronizer.origin.sender
+            ),
         )
         cycle_counter = CycleCounter()
         world_updates = IncomingWorldUpdates(

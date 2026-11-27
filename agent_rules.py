@@ -108,9 +108,10 @@ class CramphIsolationRules(Section):
     The rules keeping cramph independent of the motion and plan packages built on it.
     """
 
-    CRAMPH_IMPORTS_ONLY_KRROOD_AND_SEMANTIC_DIGITAL_TWIN = (
+    CRAMPH_IMPORTS_ONLY_KRROOD_SYNCHRONIZATION_AND_SEMANTIC_DIGITAL_TWIN = (
         "`cramph`, including its tests under `test/cramph_test`, imports only "
-        "`krrood` and `semantic_digital_twin` among the workspace packages - in "
+        "`krrood`, `krrood_synchronization` and `semantic_digital_twin` among the "
+        "workspace packages - in "
         "particular not `giskardpy`, `coraplex`, `segmind`, `physics_simulators`, "
         "`robokudo` or `experiments`"
     )

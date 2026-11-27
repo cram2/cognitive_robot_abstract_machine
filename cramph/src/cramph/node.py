@@ -2441,10 +2441,7 @@ class DeserializedNodeTracker(DeserializedObjectTracker[str, StatechartNode]):
         """
         if self._statechart is None:
             return None
-        for node in self._statechart.nodes:
-            if node._node_id == node_id:
-                return node
-        return None
+        return self._statechart.find_node_by_id(node_id=node_id)
 
 
 def expanded_child_field(default: Any = MISSING) -> Any:

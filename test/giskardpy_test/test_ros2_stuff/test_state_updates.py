@@ -11,9 +11,9 @@ import pytest
 from cramph.composites import ChildChooserAccess
 from cramph.context import StatechartContext
 from cramph.data_types import LifeCycleValue
-from cramph.executor import NoPacing, StatechartExecutor
-from cramph.monitors import CountSimulationTimeSeconds, CountTicks
+from cramph.monitors import CountSimulationTimeSeconds
 from cramph.node import StatechartNode
+from cramph.reported_statechart import NodeStatesReceiver, StatechartPayloadKey
 from cramph.state_history import StateHistory, StateHistoryObserver
 from cramph.statechart import Statechart
 from giskardpy.middleware.ros2.action_server import GoalOutcome
@@ -22,12 +22,9 @@ from giskardpy.middleware.ros2.child_choices import (
     ChildChoiceMessage,
     ChildSentByClient,
 )
-from giskardpy.middleware.ros2.exceptions import StateUpdateAheadOfStatechartError
-from giskardpy.middleware.ros2.feedback_publisher import ActionFeedbackPublisher
 from giskardpy.middleware.ros2.motion_goal import MotionGoal
-from giskardpy.middleware.ros2.state_updates import StatechartStateUpdate
-from giskardpy.middleware.ros2.world_updates import OutgoingWorldUpdates
 from giskardpy.motion_statechart.graph_node import EndMotion
+from krrood.adapters.json_serializer import from_json
 from krrood_synchronization.messages import Sender
 from semantic_digital_twin.input_synchronization import InputSynchronizer
 from semantic_digital_twin.world import World
@@ -39,28 +36,12 @@ from .test_child_choices import (
 )
 from .test_motion_server import (
     GoalQueueMimic,
-    PublicationProgressMimic,
     MotionServerFixture,
     feedback_data,
     motion_server,
 )
 
 # %% mimics
-
-
-@dataclass(kw_only=True)
-class ObserverRecordingTicks(StateHistoryObserver):
-    """
-    Records the tick of every snapshot a history tells it about.
-    """
-
-    ticks: list[int] = field(default_factory=list)
-    """
-    The ticks of the snapshots, in the order they were recorded.
-    """
-
-    def on_state_change(self, *, history: StateHistory) -> None:
-        self.ticks.append(history.latest_item.tick_count)
 
 
 @dataclass(kw_only=True)
@@ -120,6 +101,13 @@ class ClientFollowingTheStates(InputSynchronizer):
     The server side the choices are sent to.
     """
 
+    node_states_receiver: NodeStatesReceiver = field(
+        default_factory=NodeStatesReceiver, init=False
+    )
+    """
+    Takes over the node states of the feedback, as the client of Giskard does.
+    """
+
     _read_feedback_count: int = field(default=0, init=False)
     """
     How many feedback messages were followed so far.
@@ -136,9 +124,10 @@ class ClientFollowingTheStates(InputSynchronizer):
         """
         :param feedback: One feedback of the running goal.
         """
-        StatechartStateUpdate.from_json(
-            payload=feedback, statechart=self.statechart
-        ).apply()
+        self.node_states_receiver.take_over(
+            report=from_json(feedback[StatechartPayloadKey.NODE_STATES]),
+            statechart=self.statechart,
+        )
         if self.child_choice_client is None:
             return
         for choice in self.child_choice_client.answer(feedback=feedback):
@@ -147,134 +136,6 @@ class ClientFollowingTheStates(InputSynchronizer):
                     data=json.loads(json.dumps(choice.to_json()))
                 )
             )
-
-
-# %% helpers
-
-
-def _statechart_counting_ticks(context: StatechartContext) -> Statechart:
-    """
-    :return: A statechart in `context` whose two nodes succeed after different numbers
-        of ticks, built the same way for Giskard's copy and the client's.
-    """
-    statechart = Statechart(context=context)
-    statechart.add_nodes(nodes=[CountTicks(ticks=1), CountTicks(ticks=5)])
-    return statechart
-
-
-def _reported_states(ticks: int) -> dict:
-    """
-    :param ticks: How often Giskard's copy is ticked before its states are reported.
-    :return: The states Giskard reports after `ticks` ticks.
-    """
-    executor = StatechartExecutor(
-        context=StatechartContext(world=World()), pacer=NoPacing()
-    )
-    executor.compile(statechart=_statechart_counting_ticks(executor.context))
-    for _ in range(ticks):
-        executor.tick()
-    return ActionFeedbackPublisher(
-        executor=executor,
-        action_server=GoalQueueMimic(),
-        outgoing_world_updates=OutgoingWorldUpdates(
-            world_synchronizer=PublicationProgressMimic()
-        ),
-    ).create_states()
-
-
-@pytest.fixture()
-def client_statechart() -> Statechart:
-    """
-    :return: The client's copy of the statechart Giskard runs.
-    """
-    return _statechart_counting_ticks(StatechartContext(world=World()))
-
-
-# %% applying reported states
-
-
-def test_the_reported_states_are_written_into_the_client_statechart(
-    client_statechart: Statechart,
-) -> None:
-    payload = _reported_states(ticks=2)
-    update = StatechartStateUpdate.from_json(
-        payload=payload, statechart=client_statechart
-    )
-
-    update.apply()
-
-    assert np.array_equal(
-        client_statechart.life_cycle_state.data, update.life_cycle_state.data
-    )
-    assert np.array_equal(
-        client_statechart.observation_state.data, update.observation_state.data
-    )
-    assert np.array_equal(
-        client_statechart.last_observation_state.data,
-        update.last_observation_state.data,
-    )
-
-
-def test_a_node_giskard_has_not_added_yet_keeps_its_state(
-    client_statechart: Statechart,
-) -> None:
-    """
-    A node the client added that Giskard does not report yet keeps its life cycle state.
-    """
-    payload = _reported_states(ticks=2)
-    client_statechart.add_node(node=(chosen := CountTicks(ticks=1)))
-
-    StatechartStateUpdate.from_json(
-        payload=payload, statechart=client_statechart
-    ).apply()
-
-    assert chosen.life_cycle_state == LifeCycleValue.NOT_STARTED
-
-
-def test_states_of_more_nodes_than_the_client_holds_are_rejected() -> None:
-    """
-    A report covering nodes the client statechart does not have raises.
-    """
-    payload = _reported_states(ticks=2)
-    client_statechart = Statechart(context=StatechartContext(world=World()))
-    client_statechart.add_node(node=CountTicks(ticks=1))
-
-    with pytest.raises(StateUpdateAheadOfStatechartError):
-        StatechartStateUpdate.from_json(
-            payload=payload, statechart=client_statechart
-        ).apply()
-
-
-def test_the_observers_of_the_client_statechart_learn_the_reported_tick(
-    client_statechart: Statechart,
-) -> None:
-    """
-    Applying a report tells the observers of the state history the tick it reports.
-    """
-    observer = ObserverRecordingTicks()
-    client_statechart.state_history.add_observer(observer=observer)
-    update = StatechartStateUpdate.from_json(
-        payload=_reported_states(ticks=3), statechart=client_statechart
-    )
-
-    update.apply()
-
-    assert observer.ticks == [update.tick_count]
-
-
-def test_the_same_states_reported_twice_are_recorded_once(
-    client_statechart: Statechart,
-) -> None:
-    payload = _reported_states(ticks=3)
-
-    StatechartStateUpdate.from_json(
-        payload=payload, statechart=client_statechart
-    ).apply()
-    StatechartStateUpdate.from_json(
-        payload=payload, statechart=client_statechart
-    ).apply()
-
-    assert len(client_statechart.state_history.items) == 1
 
 
 # %% following a running goal
