@@ -17,7 +17,6 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
 
-from sortedcontainers import SortedSet
 
 # Only this class matches the aliases a ``type`` statement makes before Python 3.14.
 from typing import TypeAliasType  # noqa: TID251
@@ -95,9 +94,11 @@ class WrappedField:
     @classproperty
     def container_types(cls) -> tuple[type, ...]:
         """
-        :return: The container types that are supported by the parser.
+        :return: The container types that are supported by the parser: the
+            :attr:`~krrood.class_diagrams.collection_kind.CollectionKind.ELEMENT_SEQUENCE`
+            collections, ``type`` for ``type[X]`` and ``Sequence`` for ``Sequence[X]``.
         """
-        return list, set, tuple, type, Sequence, SortedSet
+        return *CollectionKind.ELEMENT_SEQUENCE.value, type, Sequence
 
     def __post_init__(self):
         self.public_name = self.public_name or self.field.name

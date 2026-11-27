@@ -656,7 +656,7 @@ class DataAccessObject(HasGeneric[T]):
             collection of a relationship, so that a relationship holds them as a list
             and loading an object rebuilds them from it.
         """
-        return tuple, SortedSet
+        return tuple, frozenset, SortedSet
 
     @classproperty
     def containers_that_sort_their_elements(cls) -> tuple[type, ...]:
