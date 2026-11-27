@@ -183,11 +183,11 @@ class MaterialElasticity(Quality):
     :cite:`wikipedia_youngs_modulus`.
     """
 
-    poissons_ratio: SimpleInterval
+    poissons_ratio: SimpleInterval | None = None
     """
     How much the material narrows across a stretch relative to how much it lengthens, on
-    :attr:`poissons_ratio_scale`: a single point when measured, or a range
-    :cite:`wikipedia_poissons_ratio`.
+    :attr:`poissons_ratio_scale`: a single point when measured, a range, or ``None`` when
+    it was not measured :cite:`wikipedia_poissons_ratio`.
     """
 
     def __post_init__(self) -> None:
@@ -197,6 +197,8 @@ class MaterialElasticity(Quality):
         self._reject_value_outside_scale(
             value=self.youngs_modulus, scale=self.youngs_modulus_scale
         )
+        if self.poissons_ratio is None:
+            return
         self._reject_value_outside_scale(
             value=self.poissons_ratio, scale=self.poissons_ratio_scale
         )
@@ -218,4 +220,35 @@ class MaterialElasticity(Quality):
         """
         return SimpleInterval.from_data(
             lower=-1.0, upper=0.5, left=Bound.OPEN, right=Bound.OPEN
+        )
+
+
+# %% Layers
+
+
+@dataclass(kw_only=True)
+class Thickness(Quality):
+    """
+    How thick its bearer is across its surface, such as the skin of a fruit, in metres.
+    """
+
+    value: SimpleInterval
+    """
+    The thickness on :attr:`scale`: a single point when it was measured, or the range its
+    measurements spread over.
+    """
+
+    def __post_init__(self) -> None:
+        """
+        :raises QualityOutsideScale: If the value reaches beyond :attr:`scale`.
+        """
+        self._reject_value_outside_scale(value=self.value, scale=self.scale)
+
+    @classproperty
+    def scale(cls) -> SimpleInterval:
+        """
+        :return: The thickness scale: every positive thickness.
+        """
+        return SimpleInterval.from_data(
+            lower=0.0, upper=float("inf"), left=Bound.OPEN, right=Bound.OPEN
         )

@@ -11,16 +11,19 @@ from __future__ import annotations
 import pytest
 from random_events.interval import Bound, SimpleInterval
 
+from semantic_digital_twin.exceptions import NoFieldAcceptsEntity
 from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
     QualityOutsideScale,
 )
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
     HasMassDensity,
     HasMaterialElasticity,
+    HasThickness,
 )
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
+    Thickness,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -159,3 +162,66 @@ def test_density_and_elasticity_of_a_peel_are_its_qualities(world: World) -> Non
     assert peel.mass_density is mass_density
     assert peel.material_elasticity is material_elasticity
     assert peel.qualities == [mass_density, material_elasticity]
+
+
+# %% An elasticity whose Poisson's ratio was not measured
+
+
+def test_an_elasticity_without_a_poissons_ratio_is_accepted() -> None:
+    """
+    A Young's modulus can be given alone, since most measurements do not report a
+    Poisson's ratio; the ratio is then unknown.
+    """
+    youngs_modulus = measured_material_elasticity().youngs_modulus
+
+    elasticity = MaterialElasticity(youngs_modulus=youngs_modulus)
+
+    assert (elasticity.youngs_modulus, elasticity.poissons_ratio) == (
+        youngs_modulus,
+        None,
+    )
+
+
+# %% Thickness of a peel
+
+
+def test_thickness_at_the_lower_end_of_its_scale_is_rejected() -> None:
+    """
+    A thickness of zero, the open lower end of the thickness scale, is refused.
+    """
+    with pytest.raises(QualityOutsideScale):
+        Thickness(value=point(Thickness.scale.lower))
+
+
+def test_a_peel_starts_without_a_thickness(world: World) -> None:
+    """
+    A peel has a thickness field, empty until it is set.
+    """
+    with world.modify_world():
+        peel = Peel.create_with_new_body_in_world(name="peel", world=world)
+
+    assert isinstance(peel, HasThickness)
+    assert peel.thickness is None
+
+
+def test_the_thickness_of_a_peel_is_its_quality(world: World) -> None:
+    """
+    Setting a thickness on a peel fills its field and lists it among its qualities.
+    """
+    thickness = Thickness(value=point(50.0e-6))
+    with world.modify_world():
+        peel = Peel.create_with_new_body_in_world(name="peel", world=world)
+        peel.set_quality(quality=thickness)
+
+    assert peel.thickness is thickness
+    assert peel.qualities == [thickness]
+
+
+def test_a_flesh_has_no_thickness(world: World) -> None:
+    """
+    Only a peel has a thickness, so setting one on the flesh is refused.
+    """
+    with world.modify_world():
+        flesh = Flesh.create_with_new_body_in_world(name="flesh", world=world)
+        with pytest.raises(NoFieldAcceptsEntity):
+            flesh.set_quality(quality=Thickness(value=point(50.0e-6)))

@@ -18,6 +18,7 @@ from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MaterialElasticity,
     Ripeness,
     RipenessStage,
+    Thickness,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Apple,
@@ -130,3 +131,58 @@ def test_apple_peel_keeps_its_density_and_elasticity(
         assert (loaded.lower, loaded.upper) == pytest.approx(
             (stored.lower, stored.upper), rel=single_precision
         )
+
+
+def stored_and_loaded_peel_with(
+    quality: Thickness | MaterialElasticity, session_maker: sessionmaker[Session]
+) -> Peel:
+    """
+    :param quality: A quality of an apple's peel.
+    :param session_maker: Opens sessions on the database to store the world in.
+    :return: The peel, given ``quality``, after storing its world and loading it back.
+    """
+    world = World.create_with_root_body("root")
+    with world.modify_world():
+        apple = Apple.create_with_new_body_in_world(name="apple", world=world)
+        peel = Peel.create_with_new_body_in_world(name="peel", world=world)
+        apple.add(part=peel)
+        peel.set_quality(quality=quality)
+    return stored_and_loaded_apple(world, session_maker).peel
+
+
+def test_apple_peel_keeps_its_thickness(
+    in_memory_session_maker: sessionmaker[Session],
+) -> None:
+    """
+    The thickness of an apple's peel survives storing its world and loading it back, up
+    to the single precision the interval ends are stored in.
+    """
+    thickness = Thickness(
+        value=SimpleInterval.from_data(
+            lower=33.3e-6, upper=78.3e-6, left=Bound.CLOSED, right=Bound.CLOSED
+        )
+    )
+
+    loaded = stored_and_loaded_peel_with(thickness, in_memory_session_maker).thickness
+
+    assert (loaded.value.lower, loaded.value.upper) == pytest.approx(
+        (thickness.value.lower, thickness.value.upper), rel=1e-6
+    )
+
+
+def test_an_unknown_poissons_ratio_stays_unknown_in_the_database(
+    in_memory_session_maker: sessionmaker[Session],
+) -> None:
+    """
+    An elasticity whose Poisson's ratio was not measured still has none after storing
+    its world and loading it back.
+    """
+    elasticity = MaterialElasticity(
+        youngs_modulus=SimpleInterval.from_data(
+            lower=17.79e6, upper=24.0e6, left=Bound.CLOSED, right=Bound.CLOSED
+        )
+    )
+
+    loaded = stored_and_loaded_peel_with(elasticity, in_memory_session_maker)
+
+    assert loaded.material_elasticity.poissons_ratio is None

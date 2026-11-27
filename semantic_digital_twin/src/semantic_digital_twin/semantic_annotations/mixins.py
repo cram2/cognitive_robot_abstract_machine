@@ -61,6 +61,9 @@ from semantic_digital_twin.grasping.grasp_strategies import (
 )
 from semantic_digital_twin.grasping.object_relative_grasp import draw_grasps
 from semantic_digital_twin.reasoning.predicates import SupportedBy
+from semantic_digital_twin.semantic_annotations.qualities.measured_material import (
+    MeasuredMaterial,
+)
 from semantic_digital_twin.semantic_annotations.qualities.mixins import (
     HasMaterialElasticity,
 )
@@ -394,6 +397,32 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, 
             scale.to_simple_event().as_composite_set(),
             connection_specification=connection_specification,
         )
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: The material annotations of this kind are made of, with the qualities
+            the literature reports for it, or ``None`` if none was measured.
+        """
+        return None
+
+    def set_measured_qualities(self) -> None:
+        """
+        Set the qualities the literature reports for :attr:`measured_material`; nothing
+        if it is ``None``. Call it inside :meth:`~semantic_digital_twin.world.World.modify_world`.
+        """
+        if self.measured_material is None:
+            return
+        self.set_qualities_measured_for(material=self.measured_material)
+
+    def set_qualities_measured_for(self, *, material: MeasuredMaterial) -> None:
+        """
+        Set a new quality for each quantity the literature reports for ``material``.
+
+        :param material: A material this annotation is made of.
+        """
+        for quality in material.value.create_qualities():
+            self.set_quality(quality=quality)
 
 
 @dataclass(eq=False)

@@ -67,7 +67,16 @@ from semantic_digital_twin.semantic_annotations.part_whole.fruit_parts import (
     HasSeeds,
     HasStem,
 )
-from semantic_digital_twin.semantic_annotations.qualities.mixins import HasRipeness
+from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+    HasParts,
+)
+from semantic_digital_twin.semantic_annotations.qualities.measured_material import (
+    MeasuredMaterial,
+)
+from semantic_digital_twin.semantic_annotations.qualities.mixins import (
+    HasRipeness,
+    HasThickness,
+)
 from semantic_digital_twin.grasping.grasp_candidates import GraspCandidate
 from semantic_digital_twin.grasping.grasp_strategies import (
     GraspABar,
@@ -1003,6 +1012,13 @@ class WineBottle(Bottle):
     A wine bottle.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a wine bottle is made of, as measured.
+        """
+        return MeasuredMaterial.GLASS
+
 
 @dataclass(eq=False)
 class MustardBottle(Bottle):
@@ -1120,6 +1136,13 @@ class Bread(Food):
         "grainbread",
     }
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What bread is made of, as measured.
+        """
+        return MeasuredMaterial.BREAD
+
 
 @dataclass(eq=False)
 class CheezeIt(Food, IsPerceivable):
@@ -1182,6 +1205,13 @@ class Milk(Food, IsPerceivable):
     A container of milk.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What fills a container of milk, as measured.
+        """
+        return MeasuredMaterial.MILK
+
 
 @dataclass(eq=False)
 class SaltContainer(Container, IsPerceivable):
@@ -1208,10 +1238,30 @@ class Produce(Food):
 
 
 @dataclass(eq=False, kw_only=True)
-class Fruit(Produce, HasRipeness):
+class Fruit(Produce, HasRipeness, HasParts):
     """
     Fruit.
     """
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: For each kind of part of this kind of fruit whose material was measured,
+            that material.
+        """
+        return {}
+
+    def set_measured_qualities(self) -> None:
+        """
+        Differs from :meth:`~semantic_digital_twin.semantic_annotations.mixins.HasRootBody.set_measured_qualities`
+        in also setting, on each part whose exact type :attr:`measured_part_materials`
+        maps, the qualities reported for its material.
+        """
+        super().set_measured_qualities()
+        for part in self.parts:
+            material = self.measured_part_materials.get(type(part))
+            if material is not None:
+                part.set_qualities_measured_for(material=material)
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1222,7 +1272,7 @@ class FruitPart(HasRootBody):
 
 
 @dataclass(eq=False, kw_only=True)
-class Peel(FruitPart):
+class Peel(FruitPart, HasThickness):
     """
     The outer layer of a fruit, its skin or rind (botanically the exocarp, Plant
     Ontology PO:0009085).
@@ -1299,11 +1349,22 @@ class Vegetable(Produce):
     """
 
 
-@dataclass(eq=False)
-class Tomato(Fruit):
+@dataclass(eq=False, kw_only=True)
+class Tomato(Fruit, HasPeel, HasFlesh, HasSeedChamber):
     """
-    A tomato.
+    A tomato, whose seeds sit in a locular gel, its seed chamber.
     """
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the peel, flesh and seed chamber of a tomato.
+        """
+        return {
+            Peel: MeasuredMaterial.TOMATO_PEEL,
+            Flesh: MeasuredMaterial.TOMATO_FLESH,
+            SeedChamber: MeasuredMaterial.TOMATO_SEED_CHAMBER,
+        }
 
 
 @dataclass(eq=False)
@@ -1312,12 +1373,26 @@ class Lettuce(Vegetable):
     Lettuce.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What lettuce is made of, as measured.
+        """
+        return MeasuredMaterial.LETTUCE
+
 
 @dataclass(eq=False)
 class Carrot(Vegetable):
     """
     A carrot.
     """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a carrot is made of, as measured.
+        """
+        return MeasuredMaterial.CARROT
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1326,12 +1401,39 @@ class Apple(Fruit, HasPeel, HasFlesh, HasCore, HasSeeds, HasStem):
     An apple.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a whole apple is made of, as measured.
+        """
+        return MeasuredMaterial.APPLE
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the peel and flesh of an apple.
+        """
+        return {
+            Peel: MeasuredMaterial.APPLE_PEEL,
+            Flesh: MeasuredMaterial.APPLE_FLESH,
+        }
+
 
 @dataclass(eq=False, kw_only=True)
 class Avocado(Fruit, HasPeel, HasFlesh, HasPit):
     """
     An avocado.
     """
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the peel and flesh of an avocado.
+        """
+        return {
+            Peel: MeasuredMaterial.AVOCADO_PEEL,
+            Flesh: MeasuredMaterial.AVOCADO_FLESH,
+        }
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1340,12 +1442,38 @@ class Banana(Fruit, HasPeel, HasFlesh):
     A banana.
     """
 
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the peel and flesh of a banana.
+        """
+        return {
+            Peel: MeasuredMaterial.BANANA_PEEL,
+            Flesh: MeasuredMaterial.BANANA_FLESH,
+        }
+
 
 @dataclass(eq=False, kw_only=True)
 class Cucumber(Fruit, HasPeel, HasFlesh, HasSeedChamber):
     """
     A cucumber, a fruit in the botanical sense.
     """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a whole cucumber is made of, as measured.
+        """
+        return MeasuredMaterial.CUCUMBER
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the flesh of a cucumber.
+        """
+        return {
+            Flesh: MeasuredMaterial.CUCUMBER_FLESH,
+        }
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1371,12 +1499,44 @@ class Orange(CitrusFruit):
     An orange.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a whole orange is made of, as measured.
+        """
+        return MeasuredMaterial.ORANGE
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the peel of an orange.
+        """
+        return {
+            Peel: MeasuredMaterial.ORANGE_PEEL,
+        }
+
 
 @dataclass(eq=False, kw_only=True)
 class Peach(Fruit, HasPeel, HasFlesh, HasPit, HasStem):
     """
     A peach.
     """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a whole peach is made of, as measured.
+        """
+        return MeasuredMaterial.PEACH
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the peel of a peach.
+        """
+        return {
+            Peel: MeasuredMaterial.PEACH_PEEL,
+        }
 
 
 @dataclass(eq=False, kw_only=True)
@@ -1385,12 +1545,39 @@ class Strawberry(Fruit, HasPeel, HasFlesh, HasPith):
     A strawberry.
     """
 
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the flesh and pith of a strawberry.
+        """
+        return {
+            Flesh: MeasuredMaterial.STRAWBERRY_FLESH,
+            Pith: MeasuredMaterial.STRAWBERRY_PITH,
+        }
+
 
 @dataclass(eq=False, kw_only=True)
 class Watermelon(Fruit, HasPeel, HasFlesh, HasSeeds):
     """
     A watermelon.
     """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a whole watermelon is made of, as measured.
+        """
+        return MeasuredMaterial.WATERMELON
+
+    @classproperty
+    def measured_part_materials(cls) -> dict[type[FruitPart], MeasuredMaterial]:
+        """
+        :return: The measured materials of the peel and flesh of a watermelon.
+        """
+        return {
+            Peel: MeasuredMaterial.WATERMELON_PEEL,
+            Flesh: MeasuredMaterial.WATERMELON_FLESH,
+        }
 
 
 @dataclass(eq=False)
@@ -1530,7 +1717,17 @@ class WallPanel(HasRootBody):
 
 
 @dataclass(eq=False)
-class Potato(Vegetable): ...
+class Potato(Vegetable):
+    """
+    A potato.
+    """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a potato is made of, as measured.
+        """
+        return MeasuredMaterial.POTATO
 
 
 @dataclass(eq=False)
@@ -1576,6 +1773,13 @@ class Book(IsGraspable):
     """
 
     book_front: BookFront | None = None
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a book is made of, as measured.
+        """
+        return MeasuredMaterial.PAPER
 
 
 @dataclass(eq=False)
@@ -1632,6 +1836,13 @@ class Fork(Cutlery):
     A fork.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a fork is made of, as measured.
+        """
+        return MeasuredMaterial.STEEL
+
 
 @dataclass(eq=False)
 class Knife(Cutlery):
@@ -1639,9 +1850,26 @@ class Knife(Cutlery):
     A butter knife.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a knife is made of, as measured.
+        """
+        return MeasuredMaterial.STEEL
+
 
 @dataclass(eq=False)
-class Spoon(Cutlery, IsPerceivable): ...
+class Spoon(Cutlery, IsPerceivable):
+    """
+    A spoon.
+    """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a spoon is made of, as measured.
+        """
+        return MeasuredMaterial.STEEL
 
 
 @dataclass(eq=False)
@@ -1761,6 +1989,13 @@ class Parcel(IsGraspable):
     """
     A parcel, as handled in a warehouse.
     """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a parcel is made of, as measured.
+        """
+        return MeasuredMaterial.CARDBOARD
 
 
 @dataclass(eq=False)
@@ -2003,6 +2238,13 @@ class CuttingKnife(ToolWithHandle):
     A knife for cutting food objects.
     """
 
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a cutting knife is made of, as measured.
+        """
+        return MeasuredMaterial.STEEL
+
     def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
@@ -2039,6 +2281,13 @@ class Sponge(Tool):
     .. note:: The sponge is grasped so its local Z axis points away from the gripper,
         which is why its alignments use negative Z normals unlike the other tools.
     """
+
+    @classproperty
+    def measured_material(cls) -> MeasuredMaterial | None:
+        """
+        :return: What a sponge is made of, as measured.
+        """
+        return MeasuredMaterial.POLYURETHANE_FOAM
 
     def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
         if isinstance(target, Body):
