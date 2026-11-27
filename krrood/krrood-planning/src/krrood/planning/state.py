@@ -6,12 +6,13 @@ live objects.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, reduce
 
-from typing_extensions import Any, Iterable, Iterator
+from typing_extensions import TYPE_CHECKING, Any, Iterable, Iterator
 
 from krrood.class_diagrams.collection_kind import CollectionKind
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
+from krrood.entity_query_language.evaluation import ConditionEvaluation
 from krrood.entity_query_language.ground_term import (
     FunctionKey,
     GroundTerm,
@@ -19,7 +20,20 @@ from krrood.entity_query_language.ground_term import (
     TermValue,
 )
 from krrood.entity_query_language.utils import T
-from krrood.planning.fact import Fact
+from krrood.planning.effect import (
+    Assignment,
+    CollectionInsertion,
+    Effect,
+    StateChange,
+)
+from krrood.planning.exceptions import (
+    KnowledgeActionIsNotApplicable,
+    KnowledgeActionParameterIsRemoved,
+    ConflictingAssignments,
+)
+
+if TYPE_CHECKING:
+    from krrood.planning.assertive_knowledge_action import AssertiveKnowledgeAction
 
 # %% states
 
@@ -27,14 +41,10 @@ from krrood.planning.fact import Fact
 @dataclass(kw_only=True, frozen=True)
 class State(TermReader):
     """
-    A valuation of ground terms that differs from the live objects only where it assigns a
-    value.
-
-    A *fluent* is a ground term
-    (:class:`~krrood.entity_query_language.ground_term.GroundTerm`) whose value a state
-    can change, and the :class:`~krrood.entity_query_language.ground_term.FunctionKey` it
-    applies is its fluent symbol. A query evaluated with this state reads the assigned
-    value of every assigned fluent and the live value of every other.
+    A valuation of *fluents*: ground terms whose value a state can change, each with its
+    :class:`~krrood.entity_query_language.ground_term.FunctionKey` as fluent symbol. A
+    derived fluent, such as a predicate, follows the state only where its body is EQL;
+    once assigned, it keeps the assigned value and no longer follows its inputs.
 
     >>> from dataclasses import dataclass
     >>> from krrood.entity_query_language.factories import a, literal
@@ -42,20 +52,11 @@ class State(TermReader):
     ... class Box:
     ...     color: str
     >>> box = Box("red")
-    >>> state = State().with_facts(literal(box).color == "blue")
+    >>> state = State().add_facts(literal(box).color == "blue")
     >>> a(Box).from_(domain=[box]).color.tolist(state=state)
     ['blue']
     >>> box.color
     'red'
-
-    .. note:: An unassigned derived ground term follows the state only where its value comes
-        from EQL: a body that is itself an EQL query, or inputs passed to it as EQL
-        arguments, as in ``is_table(block.support)``. A Python body that reads an
-        attribute directly, such as ``self.block.support``, reads the live value.
-
-    .. warning:: An assigned ground term keeps its value even where it is derived from other
-        ground terms, so assigning a predicate overrides what it would compute from the
-        ground terms it reads, also after those change.
     """
 
     assignments: dict[GroundTerm, Any] = field(default_factory=dict)
@@ -73,6 +74,14 @@ class State(TermReader):
     Never mutated; a changed state is a new :class:`State`.
     """
 
+    insertions: dict[GroundTerm, CollectionInsertion] = field(default_factory=dict)
+    """
+    The elements this state inserts into the collection each ground term holds, on top
+    of its assigned or live value.
+
+    Never mutated; a changed state is a new :class:`State`.
+    """
+
     removed_objects: dict[int, Any] = field(default_factory=dict)
     """
     The objects this state removes from the live symbol graph's instances, keyed by
@@ -83,9 +92,13 @@ class State(TermReader):
     """
 
     def __hash__(self) -> int:
+        """
+        :return: A hash of what this state changes, so equal states hash alike.
+        """
         return hash(
             (
                 frozenset(self.assignments),
+                frozenset(self.insertions),
                 frozenset(self.added_objects),
                 frozenset(self.removed_objects),
             )
@@ -95,28 +108,123 @@ class State(TermReader):
     def assigned_functions(self) -> frozenset[FunctionKey]:
         """
         :return: The :attr:`~krrood.entity_query_language.ground_term.GroundTerm.function_key`
-            of every ground term this state assigns.
+            of every ground term this state assigns or inserts into.
         """
-        return frozenset(term.function_key for term in self.assignments)
+        return frozenset(
+            term.function_key for term in (*self.assignments, *self.insertions)
+        )
 
-    def with_facts(self, *facts: SymbolicExpression) -> State:
+    def add_facts(self, *facts: SymbolicExpression) -> State:
         """
         :param facts: Conditions that each fix the value of ground terms, as
             :meth:`~krrood.planning.fact.Fact.from_condition` reads them. A fact whose
             expression has variables fixes the ground term for every binding of them.
         :return: A new state that assigns the values *facts* state on top of this
             state's own assignments, a later value winning where two assign a ground term.
+            Each fact reads its bindings and values in the state the facts before it
+            build.
         """
-        assignments = dict(self.assignments)
-        for fact in facts:
-            assignments |= Fact.from_condition(condition=fact).assignments()
-        return State(
-            assignments=assignments,
-            added_objects=self.added_objects,
-            removed_objects=self.removed_objects,
+        return reduce(
+            lambda state, fact: state.apply_effects(Assignment(fact=fact)), facts, self
         )
 
-    def with_objects_added(self, *objects: Any) -> State:
+    def apply_effects(self, *effects: Effect) -> State:
+        """
+        :param effects: The effects to apply.
+        :return: A new state that makes the change of every effect, each read in this
+            state, a later effect winning where two assign a ground term.
+        :raises ConflictingAssignments: If one effect gives a ground term two different
+            values.
+        """
+        changes = [
+            change
+            for effect in effects
+            for change in self._changes_of_effect_(effect=effect)
+        ]
+        return reduce(
+            lambda state, change: state._apply_change_(change=change), changes, self
+        )
+
+    def _changes_of_effect_(self, *, effect: Effect) -> list[StateChange]:
+        """
+        :param effect: An effect read in this state.
+        :return: The change of *effect* for each of its bindings.
+        :raises ConflictingAssignments: If two of these changes give a ground term
+            different values.
+        """
+        changes = [
+            effect.change_of_binding(binding=binding)
+            for binding in effect.get_change_to_state_query().evaluate(state=self)
+        ]
+        assigned = {}
+        for change in changes:
+            for term, value in change.assignments.items():
+                if term in assigned and assigned[term] != value:
+                    raise ConflictingAssignments(
+                        term=term, first_value=assigned[term], second_value=value
+                    )
+                assigned[term] = value
+        return changes
+
+    def apply_action(self, *, action: AssertiveKnowledgeAction) -> State:
+        """
+        :param action: A ground action.
+        :return: A new state that makes the change of every effect of *action*, as
+            :meth:`apply_effects` does.
+        :raises KnowledgeActionParameterIsRemoved: If this state removes an object a parameter of
+            *action* holds.
+        :raises KnowledgeActionIsNotApplicable: If this state does not satisfy the precondition
+            of *action*.
+        """
+        removed_objects = [
+            value
+            for value in action.parameter_values.values()
+            if id(value) in self.removed_objects
+        ]
+        if removed_objects:
+            raise KnowledgeActionParameterIsRemoved(
+                action=action, removed_objects=removed_objects
+            )
+        symbolic_action = action.to_symbolic()
+        evaluation = ConditionEvaluation.from_condition(
+            condition=symbolic_action.precondition(), state=self
+        )
+        if not evaluation.is_satisfied:
+            raise KnowledgeActionIsNotApplicable(
+                action=action, failed_conditions=evaluation.false_statements
+            )
+        return self.apply_effects(*symbolic_action.effects())
+
+    def _apply_change_(self, *, change: StateChange) -> State:
+        """
+        :param change: What an effect changes.
+        :return: A new state that makes *change* on top of this state; an assignment
+            drops what this state inserted into its ground term.
+        """
+        insertions = {
+            term: insertion
+            for term, insertion in self.insertions.items()
+            if term not in change.assignments
+        }
+        for term, insertion in change.insertions.items():
+            earlier = insertions.get(term)
+            insertions[term] = (
+                insertion
+                if earlier is None
+                else earlier.extend(later_insertion=insertion)
+            )
+        return (
+            State(
+                assignments=self.assignments | change.assignments,
+                insertions=insertions,
+                added_objects=self.added_objects,
+                removed_objects=self.removed_objects,
+            )
+            .add_objects(*change.added_objects)
+            .remove_objects(*change.removed_objects)
+        )
+
+    def add_objects(self, *objects: Any) -> State:
         """
         :param objects: The objects to add.
         :return: A new state in which *objects* exist, whether this state removed them
@@ -125,6 +233,7 @@ class State(TermReader):
         added_ids = {id(added) for added in objects}
         return State(
             assignments=self.assignments,
+            insertions=self.insertions,
             added_objects=self.added_objects | {id(added): added for added in objects},
             removed_objects={
                 identifier: removed
@@ -133,7 +242,7 @@ class State(TermReader):
             },
         )
 
-    def with_objects_removed(self, *objects: Any) -> State:
+    def remove_objects(self, *objects: Any) -> State:
         """
         :param objects: The objects to remove.
         :return: A new state in which *objects* do not exist, whether they are live or
@@ -142,6 +251,7 @@ class State(TermReader):
         removed_ids = {id(removed) for removed in objects}
         return State(
             assignments=self.assignments,
+            insertions=self.insertions,
             added_objects={
                 identifier: added
                 for identifier, added in self.added_objects.items()
@@ -152,16 +262,29 @@ class State(TermReader):
         )
 
     def value_of_term(self, *, term: GroundTerm) -> TermValue | None:
-        if term.function_key in self.assigned_functions and term in self.assignments:
-            return TermValue(
-                value=self.without_removed_objects(value=self.assignments[term])
+        if term.function_key not in self.assigned_functions:
+            return self._without_removed_objects_(term_value=term.live_term_value())
+        if term in self.assignments:
+            term_value = TermValue(value=self.assignments[term])
+        else:
+            term_value = term.live_term_value()
+        insertion = self.insertions.get(term)
+        if term_value is not None and insertion is not None:
+            term_value = TermValue(
+                value=insertion.insert_into(collection=term_value.value)
             )
-        live_term_value = term.live_term_value()
-        if live_term_value is None:
+        return self._without_removed_objects_(term_value=term_value)
+
+    def _without_removed_objects_(
+        self, *, term_value: TermValue | None
+    ) -> TermValue | None:
+        """
+        :param term_value: The value of a ground term, or ``None`` where it has none.
+        :return: *term_value* as :meth:`without_removed_objects` reads its value.
+        """
+        if term_value is None:
             return None
-        return TermValue(
-            value=self.without_removed_objects(value=live_term_value.value)
-        )
+        return TermValue(value=self.without_removed_objects(value=term_value.value))
 
     def without_removed_objects(self, *, value: Any) -> Any:
         """

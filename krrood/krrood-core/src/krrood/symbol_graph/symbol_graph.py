@@ -68,15 +68,28 @@ class Symbol(DataclassFieldDescriptorOwner):
     """If this symbol was inferred, this field can contain an explanation of how it
      was inferred.
     """
+    _persist_instance_: bool = field(default=True, repr=False, compare=False)
+    """
+    Whether the symbol graph holds this instance, where its class caches instances.
+    ``False`` builds an object that exists only where it is used, such as in a state.
+    """
 
     def __new__(cls, *args, **kwargs):
         """
-        Updates the cache with the given instance of a symbolic type.
+        Updates the cache with the given instance of a symbolic type, unless it is built
+        with ``_persist_instance_=False``.
         """
         instance = super().__new__(cls)
-        if cls._cache_instances_:
+        if cls._cache_instances_ and kwargs.get("_persist_instance_", True):
             SymbolGraph().add_node(wrapped_instance=WrappedInstance(instance=instance))
         return instance
+
+    def __getnewargs_ex__(self) -> tuple[tuple[Any, ...], dict[str, Any]]:
+        """
+        :return: The arguments a copy or an unpickled instance is created with, which
+            keep it out of the symbol graph where this instance is kept out of it.
+        """
+        return (), {"_persist_instance_": self._persist_instance_}
 
 
 TSymbol = TypeVar("TSymbol", bound=Symbol)
