@@ -61,7 +61,8 @@ class DocumentationRules(Section):
 
     SHORT_PROSE = (
         f"A docstring holds at most {ProseLengthChecker.docstring_lines} lines of "
-        "prose, field lists and literal blocks aside, and a comment block at most "
+        "prose, field lists, literal blocks and doctest examples aside, and a "
+        "comment block at most "
         f"{ProseLengthChecker.comment_lines} lines",
         (),
         ProseLengthChecker(),

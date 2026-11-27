@@ -113,7 +113,7 @@
   - the current callers or consumers ("used by X and Y") - that goes stale and reads as exhaustive
   - justification of design decisions, comparison with rejected or hypothetical designs, or review and implementation history
   - type information - the type hints carry it
-- A docstring holds at most 4 lines of prose, field lists and literal blocks aside, and a comment block at most 3 lines (checked by `krrood check`)
+- A docstring holds at most 4 lines of prose, field lists, literal blocks and doctest examples aside, and a comment block at most 3 lines (checked by `krrood check`)
 - Comments are meaningful and DRY; remove comments that restate the code
 - Never leave code commented out; delete it (checked by `krrood check`)
 - Reference code with Sphinx roles (`:func:`, `:class:`, `:attr:`, `:meth:`), never with plain backticks, and use directives such as `.. note::` and `.. warning::` for notes and warnings

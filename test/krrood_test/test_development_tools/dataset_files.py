@@ -20,6 +20,7 @@ from .dataset.missing_docstrings import (
 from .dataset.positional_parameters import positional_definitions
 from .dataset.prose_length import (
     comment_blocks,
+    doctest_examples,
     fields_and_literal_blocks,
     overlong_attribute_docstring,
     overlong_module_docstring,
@@ -189,6 +190,12 @@ class ProseSnippet(PathEnumeration):
     COMMENT_BLOCKS = Path(comment_blocks.__file__)
     """
     A three-line and a four-line comment block, and a section header above the first.
+    """
+
+    DOCTEST_EXAMPLES = Path(doctest_examples.__file__)
+    """
+    A docstring of one prose line, two doctest examples and a field list, and one of
+    five prose lines around a doctest example.
     """
 
 
