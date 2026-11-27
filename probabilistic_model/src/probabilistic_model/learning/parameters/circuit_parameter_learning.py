@@ -164,22 +164,39 @@ class CircuitParameterLearning(Generic[LayerType], SubClassSafeGeneric, ABC):
     def step_memory(self, *arguments: BackendArray, probe_rows: int = 64) -> StepMemory:
         """
         :param arguments: The training arrays, one row per training example each.
-        :param probe_rows: The rows of the smaller of the two batches a step is measured
-            on; the larger has twice as many.
-        :return: The memory one step allocates.
+        :param probe_rows: The rows of the smallest batch a step is measured on; every
+            further batch has twice the rows of the one before.
+        :return: The line through the first two consecutive batches whose larger one
+            needs more memory.
+        :raises UnmeasurableStepMemoryError: If no batch of up to all rows needs more
+            memory than the one before it.
         """
-        smaller_rows = max(1, min(probe_rows, arguments[0].shape[0] // 2))
-        return StepMemory.from_two_probes(
-            smaller=ProbeMeasurement(
-                rows=smaller_rows,
-                step_bytes=self.probe_step_bytes(
-                    batch=tuple(argument[:smaller_rows] for argument in arguments)
-                ),
-            ),
-            larger=ProbeMeasurement(
-                rows=2 * smaller_rows,
-                step_bytes=self.probe_step_bytes(
-                    batch=tuple(argument[: 2 * smaller_rows] for argument in arguments)
-                ),
+        number_of_rows = arguments[0].shape[0]
+        smaller = self.measure_step(
+            arguments=arguments, rows=max(1, min(probe_rows, number_of_rows // 2))
+        )
+        larger = self.measure_step(arguments=arguments, rows=2 * smaller.rows)
+        while (
+            larger.step_bytes <= smaller.step_bytes
+            and 2 * larger.rows <= number_of_rows
+        ):
+            smaller, larger = (
+                larger,
+                self.measure_step(arguments=arguments, rows=2 * larger.rows),
+            )
+        return StepMemory.from_two_probes(smaller=smaller, larger=larger)
+
+    def measure_step(
+        self, *, arguments: tuple[BackendArray, ...], rows: int
+    ) -> ProbeMeasurement:
+        """
+        :param arguments: The training arrays, one row per training example each.
+        :param rows: The number of leading rows of every array the step is measured on.
+        :return: The memory of a step on those rows.
+        """
+        return ProbeMeasurement(
+            rows=rows,
+            step_bytes=self.probe_step_bytes(
+                batch=tuple(argument[:rows] for argument in arguments)
             ),
         )
