@@ -1284,8 +1284,8 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
 @dataclass(eq=False, kw_only=True)
 class HasContainerOpening(HasRootBody, Mixin):
     """
-    Mixin for a container open at the top of its collision bounding box, which liquid
-    enters through and leaves over the lip of its wall.
+    Mixin for a container open at the top of its collision bounding box, which a
+    substance enters through and leaves over the lip of its wall.
     """
 
     upright_softening: ClassVar[float] = 1e-2
@@ -1337,7 +1337,7 @@ class HasContainerOpening(HasRootBody, Mixin):
 
     def opening_point(self) -> Point3:
         """
-        :return: Symbolic world-frame centre of this container's opening, where liquid
+        :return: Symbolic world-frame centre of this container's opening, where a substance
             enters and leaves: the horizontal centre of the collision bounding box's top
             face.
         """
@@ -1356,9 +1356,9 @@ class HasContainerOpening(HasRootBody, Mixin):
         world_P_opening.reference_frame = self._world.root
         return world_P_opening
 
-    def liquid_exit_point(self) -> Point3:
+    def substance_exit_point(self) -> Point3:
         """
-        :return: Symbolic world-frame point on the rim over which liquid pours: the rim
+        :return: Symbolic world-frame point on the rim over which the substance pours: the rim
             centre while upright, the rim edge on the pour side once tilted.
         """
         world_T_container = self._world.compose_forward_kinematics_expression(
@@ -1396,15 +1396,15 @@ class HasContainerOpening(HasRootBody, Mixin):
             reference_frame=self.root,
         )
 
-    def liquid_exit_velocity(self, *, exit_speed: sm.ScalarData) -> Vector3:
+    def substance_exit_velocity(self, *, exit_speed: sm.ScalarData) -> Vector3:
         """
-        Liquid leaving over a rim slides off without a vertical launch, so the exit
+        A substance leaving over a rim slides off without a vertical launch, so the exit
         speed acts along the horizontal part of the opening direction only: the stream
         is the faster the further the opening leans from vertical.
 
-        :param exit_speed: Speed of the liquid leaving the container, in metres per
+        :param exit_speed: Speed of the substance leaving the container, in metres per
             second.
-        :return: Symbolic world-frame velocity the departing liquid travels with.
+        :return: Symbolic world-frame velocity the departing substance travels with.
         """
         world_V_opening = self.opening_direction()
         return Vector3(
@@ -1578,7 +1578,11 @@ class HasFillLevel(HasContainerOpening, FillLevelSource, Mixin):
         """
         Let ``source`` pour into this container: from now on this container fills by
         the volume ``source`` loses, and both flow only while the stream lands in this
-        container's opening, so the transfer spills nothing.
+        container's opening, so the transfer spills nothing over the rim.
+
+        .. warning::
+            Pouring on into a full container loses volume: this container stays full
+            while ``source`` keeps draining.
 
         :param source: The container whose outflow pours into this one.
         :raises SelfPouringError: If the source is this container.

@@ -43,8 +43,8 @@ class PouringStream(SemanticAnnotation):
             lip at its exit speed, crosses the receiver's opening plane.
         """
         return ProjectileMotion(
-            launch_point=self.source.liquid_exit_point(),
-            launch_velocity=self.source.liquid_exit_velocity(
+            launch_point=self.source.substance_exit_point(),
+            launch_velocity=self.source.substance_exit_velocity(
                 exit_speed=self.source.exit_speed()
             ),
         ).landing_point(plane_height=self.receiver.opening_point().z)
@@ -61,7 +61,9 @@ class PouringStream(SemanticAnnotation):
         :return: Symbolic factor of the gate closing as the source's lip sinks to the
             receiver's opening, measured in receiver heights.
         """
-        clearance = self.source.liquid_exit_point().z - self.receiver.opening_point().z
+        clearance = (
+            self.source.substance_exit_point().z - self.receiver.opening_point().z
+        )
         return self._logistic(
             value=clearance / self.receiver.root.collision.scale.z,
             sharpness=self.receiver.height_gate_sharpness,

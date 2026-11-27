@@ -334,7 +334,7 @@ class TestTransferGate:
         """
         _, source, receiver = _partly_open_transfer()
         clearance = (
-            source.liquid_exit_point().z.evaluate()[0]
+            source.substance_exit_point().z.evaluate()[0]
             - receiver.opening_point().z.evaluate()[0]
         )
         sharpness = receiver.height_gate_sharpness
@@ -425,9 +425,9 @@ class TestPourDirection:
 # %% liquid exit point
 
 
-class TestLiquidExitPoint:
+class TestSubstanceExitPoint:
     """
-    Liquid leaves from the rim edge on the pour side, not the rim centre.
+    The substance leaves from the rim edge on the pour side, not the rim centre.
     """
 
     def test_exit_point_at_rim_edge_along_pour_direction_when_tilted(self) -> None:
@@ -439,7 +439,7 @@ class TestLiquidExitPoint:
         _tilt(world, source, 1.2)
 
         offset = (
-            source.liquid_exit_point().evaluate()[:3]
+            source.substance_exit_point().evaluate()[:3]
             - source.opening_point().evaluate()[:3]
         )
 
@@ -453,9 +453,9 @@ class TestLiquidExitPoint:
 # %% liquid exit velocity
 
 
-class TestLiquidExitVelocity:
+class TestSubstanceExitVelocity:
     """
-    Liquid leaves over the rim with the horizontal share of the exit speed.
+    The substance leaves over the rim with the horizontal share of the exit speed.
     """
 
     def test_a_rim_source_launches_at_the_horizontal_share_of_the_exit_speed(
@@ -469,9 +469,9 @@ class TestLiquidExitVelocity:
         _tilt(world, source, 0.6)
         exit_speed = 0.2
 
-        exit_velocity = source.liquid_exit_velocity(exit_speed=exit_speed).evaluate()[
-            :3
-        ]
+        exit_velocity = source.substance_exit_velocity(
+            exit_speed=exit_speed
+        ).evaluate()[:3]
 
         assert exit_velocity[:2] == pytest.approx(
             exit_speed * source.opening_direction().evaluate()[:2]
