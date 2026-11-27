@@ -23,7 +23,10 @@ from krrood.ormatic.helper import (
 from sortedcontainers import SortedSet
 from typing_extensions import Optional, TextIO
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer
+from krrood.adapters.json_serializer import (
+    ExternalClassJSONSerializer,
+    SubclassJSONSerializer,
+)
 from krrood.ormatic.default_type_mappings import DefaultTypeMapping
 from krrood.ormatic.field_storage import FieldClassifier
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
@@ -541,10 +544,14 @@ class ORMatic:
     def default_ignored_classes(cls) -> set[type]:
         """
         :return: The classes :meth:`from_package` never maps, whatever it is told to
-            ignore: mixins that give their subclasses behaviour but describe nothing to
-            store.
+            ignore: classes that give behaviour but describe nothing to store, such as
+            the serializer mixin and every serializer of a class outside our control.
         """
-        return {SubclassJSONSerializer}
+        return {
+            SubclassJSONSerializer,
+            ExternalClassJSONSerializer,
+            *recursive_subclasses(ExternalClassJSONSerializer),
+        }
 
     @classmethod
     def from_package(
