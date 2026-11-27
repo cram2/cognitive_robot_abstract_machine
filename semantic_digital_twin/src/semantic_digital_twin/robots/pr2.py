@@ -6,7 +6,7 @@ from __future__ import annotations
 
 # %% Imports
 import os
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import StrEnum
@@ -27,11 +27,15 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 )
 from semantic_digital_twin.datastructures.definitions import (
     JointName,
+    JointStateType,
     StaticJointState,
     GripperState,
     TorsoState,
 )
 from semantic_digital_twin.datastructures.camera_model import FieldOfViewCameraModel
+from semantic_digital_twin.datastructures.exceptions import (
+    ConnectionNotInJointStateError,
+)
 from semantic_digital_twin.datastructures.field_of_view import FieldOfView
 from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
@@ -57,6 +61,7 @@ from semantic_digital_twin.robots.robot_parts import (
     RobotCamera,
     AbstractRobot,
     EndEffector,
+    HasGripperActionServers,
 )
 from krrood_spatial_math.spatial_types import Vector3
 from semantic_digital_twin.world_description.connection_properties import (
@@ -67,6 +72,7 @@ from semantic_digital_twin.world_description.connection_properties import (
 )
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection,
+    ActiveConnection1DOF,
     OmniDrive,
 )
 from semantic_digital_twin.world_description.world_entity import (
@@ -123,6 +129,33 @@ class PR2Joint(JointName):
     RIGHT_WRIST_ROLL = "r_wrist_roll_joint"
     RIGHT_GRIPPER_LEFT_FINGER = "r_gripper_l_finger_joint"
     RIGHT_GRIPPER_RIGHT_FINGER = "r_gripper_r_finger_joint"
+
+    LEFT_GRIPPER_GAP = "l_gripper_joint"
+    """
+    The distance between the left gripper's fingertips, which its controller commands.
+    """
+
+    RIGHT_GRIPPER_GAP = "r_gripper_joint"
+    """
+    The distance between the right gripper's fingertips, which its controller commands.
+    """
+
+
+class PR2GripperAction(StrEnum):
+    """
+    The names the drivers of the PR2's grippers serve their
+    ``pr2_controllers_msgs/Pr2GripperCommand`` actions under.
+    """
+
+    LEFT = "/l_gripper_controller/gripper_action"
+    """
+    The action moving the left gripper.
+    """
+
+    RIGHT = "/r_gripper_controller/gripper_action"
+    """
+    The action moving the right gripper.
+    """
 
 
 @dataclass(eq=False)
@@ -280,13 +313,71 @@ class PR2Gripper(
     EndEffector,
     HasTwoFingers[TGenericLeftFinger, TGenericRightFinger],
     ServoedRobotPart,
+    HasGripperActionServers,
     Generic[TGenericLeftFinger, TGenericRightFinger],
     ABC,
 ):
     """
     A gripper of the PR2: two fingers coupled by a mimic linkage, driven through the
-    joint of the thumb.
+    joint of the thumb. Its driver brings the real gripper into every state through a
+    ``pr2_controllers_msgs/Pr2GripperCommand`` action, which takes the gap between the
+    fingertips.
     """
+
+    @classproperty
+    def gap_per_finger_angle(cls) -> float:
+        """
+        How far the fingertips move apart per radian the fingers open, in m/rad, as
+        measured on the real PR2 over its whole opening.
+        """
+        return 0.175
+
+    @classproperty
+    @abstractmethod
+    def gap_joint_name(cls) -> PR2Joint:
+        """
+        The joint whose position is the gap between the fingertips.
+        """
+
+    @classproperty
+    @abstractmethod
+    def gripper_action_name(cls) -> PR2GripperAction:
+        """
+        The name the driver serves this gripper's action under.
+        """
+
+    @property
+    def gap_connection(self) -> ActiveConnection1DOF:
+        """
+        The connection whose position is the gap between the fingertips, in metres.
+        """
+        return self._world.get_connection_by_name(self.gap_joint_name)
+
+    def target_gap(self, *, joint_state: JointState) -> float:
+        """
+        :param joint_state: A state of this gripper, which sets the angle of the
+            fingers through any connection the thumb's joint drives.
+        :return: The gap between the fingertips that angle gives, in metres, within the
+            limits of :attr:`gap_connection`.
+        :raises ConnectionNotInJointStateError: If `joint_state` sets no connection the
+            thumb's joint drives.
+        """
+        thumb_connection = self.thumb.root.parent_connection
+        for connection, target_value in joint_state.items():
+            if connection.raw_dof is not thumb_connection.raw_dof:
+                continue
+            finger_angle = (target_value - connection.offset) / connection.multiplier
+            limits = self.gap_connection.dof.limits
+            return min(
+                max(finger_angle * self.gap_per_finger_angle, limits.lower.position),
+                limits.upper.position,
+            )
+        raise ConnectionNotInJointStateError(
+            joint_state=joint_state, connection=thumb_connection
+        )
+
+    def action_topic_serving(self, state_type: JointStateType | None) -> str:
+        return self.gripper_action_name
 
     @property
     def drive_of_each_joint(self) -> dict[str, JointDrive]:
@@ -309,6 +400,14 @@ class PR2Gripper(
 class PR2RightGripper(
     PR2Gripper[PR2RightGripperLeftFinger, PR2RightGripperRightFinger]
 ):
+    @classproperty
+    def gap_joint_name(cls) -> PR2Joint:
+        return PR2Joint.RIGHT_GRIPPER_GAP
+
+    @classproperty
+    def gripper_action_name(cls) -> PR2GripperAction:
+        return PR2GripperAction.RIGHT
+
     def setup_joint_states(self) -> list[JointState]:
         right_gripper_joints = self.active_connections
 
@@ -353,6 +452,14 @@ class PR2RightGripper(
 
 @dataclass(eq=False)
 class PR2LeftGripper(PR2Gripper[PR2LeftGripperLeftFinger, PR2LeftGripperRightFinger]):
+    @classproperty
+    def gap_joint_name(cls) -> PR2Joint:
+        return PR2Joint.LEFT_GRIPPER_GAP
+
+    @classproperty
+    def gripper_action_name(cls) -> PR2GripperAction:
+        return PR2GripperAction.LEFT
+
     def setup_joint_states(self) -> list[JointState]:
         left_gripper_joints = self.active_connections
         left_gripper_open = JointState.from_mapping(

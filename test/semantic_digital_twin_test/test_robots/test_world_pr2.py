@@ -10,7 +10,14 @@ import numpy as np
 import pytest
 
 from semantic_digital_twin.adapters.urdf import URDFParser
-from semantic_digital_twin.datastructures.definitions import StaticJointState
+from semantic_digital_twin.datastructures.definitions import (
+    GripperState,
+    StaticJointState,
+)
+from semantic_digital_twin.datastructures.exceptions import (
+    ConnectionNotInJointStateError,
+)
+from semantic_digital_twin.datastructures.joint_state import JointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     DuplicateRobotAssignmentsError,
@@ -21,6 +28,8 @@ from semantic_digital_twin.robots.hsrb import HSRB
 from semantic_digital_twin.robots.pr2 import (
     PR2,
     PR2BaseLidar,
+    PR2Gripper,
+    PR2GripperAction,
     PR2Joint,
     PR2MobileBase,
     PR2Torso,
@@ -847,3 +856,61 @@ def test_the_park_poses_lie_within_the_joint_limits(pr2_world_state_reset):
                 assert target >= limits.lower.position, connection.name
             if limits.upper.position is not None:
                 assert target <= limits.upper.position, connection.name
+
+
+# %% gripper gaps
+
+
+@pytest.fixture()
+def pr2_grippers(pr2_world_state_reset) -> list[PR2Gripper]:
+    """
+    Both grippers of the PR2.
+    """
+    [pr2] = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)
+    return [arm.end_effector for arm in pr2.all_arms]
+
+
+def test_an_open_gripper_is_sent_to_its_widest_gap(pr2_grippers):
+    """
+    The finger angle of the open state lies beyond the widest gap the gripper reaches,
+    so its gap is that widest one.
+    """
+    for gripper in pr2_grippers:
+        joint_state = gripper.get_joint_state_by_type(GripperState.OPEN)
+        assert (
+            gripper.target_gap(joint_state=joint_state)
+            == gripper.gap_connection.dof.limits.upper.position
+        )
+
+
+def test_a_closed_gripper_is_sent_to_its_narrowest_gap(pr2_grippers):
+    for gripper in pr2_grippers:
+        joint_state = gripper.get_joint_state_by_type(GripperState.CLOSE)
+        assert (
+            gripper.target_gap(joint_state=joint_state)
+            == gripper.gap_connection.dof.limits.lower.position
+        )
+
+
+def test_the_gap_grows_with_the_finger_angle(pr2_grippers):
+    for gripper in pr2_grippers:
+        finger_angle = 0.2
+        joint_state = JointState.from_mapping(
+            {gripper.thumb.root.parent_connection: finger_angle}
+        )
+        assert gripper.target_gap(joint_state=joint_state) == pytest.approx(
+            finger_angle * PR2Gripper.gap_per_finger_angle
+        )
+
+
+def test_a_state_setting_no_finger_has_no_gap(pr2_grippers):
+    for gripper in pr2_grippers:
+        joint_state = JointState.from_mapping({gripper.gap_connection: 0.05})
+        with pytest.raises(ConnectionNotInJointStateError):
+            gripper.target_gap(joint_state=joint_state)
+
+
+def test_each_gripper_is_driven_through_an_action_of_its_own(pr2_grippers):
+    assert {
+        gripper.action_topic_serving(GripperState.OPEN) for gripper in pr2_grippers
+    } == set(PR2GripperAction)

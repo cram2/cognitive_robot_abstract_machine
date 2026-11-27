@@ -13,6 +13,7 @@ from control_msgs.action import ParallelGripperCommand
 from geometry_msgs.msg import WrenchStamped
 from griplink_interfaces.action import Flexgrip, Grip
 from nav2_msgs.action import NavigateToPose
+from pr2_controllers_msgs.action import Pr2GripperCommand
 from rclpy.action import ActionServer
 from rclpy.action.server import ServerGoalHandle
 from rclpy.node import Node
@@ -33,6 +34,9 @@ from giskardpy.motion_statechart.ros2_nodes.griplink import (
 )
 from giskardpy.motion_statechart.ros2_nodes.action_servers import (
     NavigateActionServerTask,
+)
+from giskardpy.motion_statechart.ros2_nodes.pr2_gripper import (
+    PR2GripperActionServerTask,
 )
 from giskardpy.motion_statechart.ros2_nodes.robotiq import (
     RobotiqGripperActionServerTask,
@@ -67,6 +71,7 @@ class RosName(StrEnum):
     GRIP_ACTION = "grip"
     FLEXGRIP_ACTION = "flexgrip"
     ROBOTIQ_GRIPPER_ACTION = "robotiq_gripper"
+    PR2_GRIPPER_ACTION = "pr2_gripper"
 
 
 def _cases() -> list[NodeRoundTripCase]:
@@ -133,6 +138,14 @@ def _cases() -> list[NodeRoundTripCase]:
                 )
             ],
         ),
+        NodeRoundTripCase(
+            PR2GripperActionServerTask,
+            lambda world: [
+                PR2GripperActionServerTask(
+                    action_topic=RosName.PR2_GRIPPER_ACTION, target_gap=0.03
+                )
+            ],
+        ),
     ]
 
 
@@ -184,6 +197,7 @@ def gripper_action_servers(rclpy_node: Node) -> Iterator[list[ActionServer]]:
             (Grip, RosName.GRIP_ACTION),
             (Flexgrip, RosName.FLEXGRIP_ACTION),
             (ParallelGripperCommand, RosName.ROBOTIQ_GRIPPER_ACTION),
+            (Pr2GripperCommand, RosName.PR2_GRIPPER_ACTION),
         )
     ]
     yield servers
