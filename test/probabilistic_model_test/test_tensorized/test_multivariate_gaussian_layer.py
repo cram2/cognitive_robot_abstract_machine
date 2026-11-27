@@ -281,7 +281,7 @@ def test_probability_of_a_box(any_circuit, numerical_integration_tolerance, x, y
     event = SimpleEvent.from_data(
         {x: closed(-1.0, 2.0), y: closed(0.0, 1.5), z: closed(0.2, 2.0)}
     )
-    event.fill_missing_variables(set(any_circuit.variables))
+    event.fill_missing_variables(variables=set(any_circuit.variables))
     assert RustworkxCircuitToLayeredCircuitConverter.convert(
         any_circuit
     ).probability_of_simple_event(event) == pytest.approx(

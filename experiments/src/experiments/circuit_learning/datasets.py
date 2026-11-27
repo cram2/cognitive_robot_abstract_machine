@@ -100,7 +100,9 @@ class BenchmarkDataset:
                 | set(self.validation[column])
                 | set(self.test[column])
             )
-            variables.append(Symbolic(name=column, domain=Set.from_iterable(values)))
+            variables.append(
+                Symbolic(name=column, domain=Set.from_iterable(iterable=values))
+            )
         self.variables = SortedSet(variables)
 
     @property

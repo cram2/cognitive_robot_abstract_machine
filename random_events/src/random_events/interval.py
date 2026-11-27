@@ -45,6 +45,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
     @classmethod
     def from_data(
         cls,
+        *,
         lower: float = 0,
         upper: float = 0,
         left: Bound = Bound.OPEN,
@@ -99,9 +100,12 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         self.cpp_object.right = rl.BorderType(value.value)
 
     @classmethod
-    def _from_cpp(cls, cpp_object: rl.SimpleInterval) -> Self:
+    def _from_cpp(cls, *, cpp_object: rl.SimpleInterval) -> Self:
         return cls.from_data(
-            cpp_object.lower, cpp_object.upper, cpp_object.left, cpp_object.right
+            lower=cpp_object.lower,
+            upper=cpp_object.upper,
+            left=cpp_object.left,
+            right=cpp_object.right,
         )
 
     def as_composite_set(self) -> Interval:
@@ -118,7 +122,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
             and self.right == Bound.CLOSED
         )
 
-    def contains(self, item: float) -> bool:
+    def contains(self, *, item: float) -> bool:
         return (
             self.lower < item < self.upper
             or (self.lower == item and self.left == Bound.CLOSED)
@@ -152,7 +156,10 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls.from_data(
-            data["lower"], data["upper"], Bound[data["left"]], Bound[data["right"]]
+            lower=data["lower"],
+            upper=data["upper"],
+            left=Bound[data["left"]],
+            right=Bound[data["right"]],
         )
 
     def center(self) -> float:
@@ -161,7 +168,7 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         """
         return (self.lower + self.upper) / 2
 
-    def nearest_contained_value(self, value: float) -> float:
+    def nearest_contained_value(self, *, value: float) -> float:
         """
         :param value: Any value.
         :return: The value of this interval nearest to the given one. An excluded end
@@ -193,7 +200,9 @@ class SimpleInterval(sigma_algebra.AbstractSimpleSet):
         yield from range(rounded_lower, rounded_upper + 1)
 
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
-        return SimpleInterval.from_data(self.lower, self.upper, self.left, self.right)
+        return SimpleInterval.from_data(
+            lower=self.lower, upper=self.upper, left=self.left, right=self.right
+        )
 
 
 @dataclass(eq=False, kw_only=True)
@@ -231,10 +240,10 @@ class Interval(sigma_algebra.AbstractCompositeSet):
         return instance
 
     @classmethod
-    def _from_cpp(cls, cpp_object: rl.Interval) -> Self:
+    def _from_cpp(cls, *, cpp_object: rl.Interval) -> Self:
         return cls.from_simple_sets(
             *[
-                SimpleInterval._from_cpp(cpp_simple_interval)
+                SimpleInterval._from_cpp(cpp_object=cpp_simple_interval)
                 for cpp_simple_interval in cpp_object.simple_sets
             ]
         )
@@ -261,7 +270,7 @@ def open(left: float, right: float) -> Interval:
     :param right: The right bound of the interval.
     :return: The open interval.
     """
-    return Interval._from_cpp(rl.open(left, right))
+    return Interval._from_cpp(cpp_object=rl.open(left, right))
 
 
 def closed(left: float, right: float) -> Interval:
@@ -272,7 +281,7 @@ def closed(left: float, right: float) -> Interval:
     :param right: The right bound of the interval.
     :return: The closed interval.
     """
-    return Interval._from_cpp(rl.closed(left, right))
+    return Interval._from_cpp(cpp_object=rl.closed(left, right))
 
 
 def open_closed(left: float, right: float) -> Interval:
@@ -283,7 +292,7 @@ def open_closed(left: float, right: float) -> Interval:
     :param right: The right bound of the interval.
     :return: The open-closed interval.
     """
-    return Interval._from_cpp(rl.open_closed(left, right))
+    return Interval._from_cpp(cpp_object=rl.open_closed(left, right))
 
 
 def closed_open(left: float, right: float) -> Interval:
@@ -294,7 +303,7 @@ def closed_open(left: float, right: float) -> Interval:
     :param right: The right bound of the interval.
     :return: The closed-open interval.
     """
-    return Interval._from_cpp(rl.closed_open(left, right))
+    return Interval._from_cpp(cpp_object=rl.closed_open(left, right))
 
 
 def singleton(value: float) -> Interval:
@@ -304,7 +313,7 @@ def singleton(value: float) -> Interval:
     :param value: The value of the interval.
     :return: The singleton interval.
     """
-    return Interval._from_cpp(rl.singleton(value))
+    return Interval._from_cpp(cpp_object=rl.singleton(value))
 
 
 def reals() -> Interval:
@@ -313,4 +322,4 @@ def reals() -> Interval:
 
     :return: The set of real numbers.
     """
-    return Interval._from_cpp(rl.reals())
+    return Interval._from_cpp(cpp_object=rl.reals())

@@ -144,7 +144,9 @@ def test_hidden_chow_liu_tree_over_continuous_variables_has_finite_likelihoods(
         ],
         axis=1,
     )
-    variables = SortedSet([Continuous("a"), Continuous("b"), Continuous("c")])
+    variables = SortedSet(
+        [Continuous(name="a"), Continuous(name="b"), Continuous(name="c")]
+    )
 
     circuit = HiddenChowLiuTree(
         variables=variables, hidden_states=4, mutual_information=estimator
@@ -191,7 +193,7 @@ def test_variable_without_input_distribution_is_refused():
     """
     A variable that is neither symbolic nor continuous has no input distribution.
     """
-    variables = SortedSet([Continuous("a"), Integer("b")])
+    variables = SortedSet([Continuous(name="a"), Integer(name="b")])
     rows = np.random.default_rng(0).integers(0, 3, size=(50, 2)).astype(float)
 
     with pytest.raises(UnsupportedStructureVariableError):

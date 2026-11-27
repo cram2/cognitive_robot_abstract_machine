@@ -16,7 +16,7 @@ class CPPWrapper(ABC):
     """
 
     @abstractmethod
-    def _from_cpp(self, cpp_object: Any) -> Self:
+    def _from_cpp(self, *, cpp_object: Any) -> Self:
         """
         Create a new instance of this class from a C++ object.
 

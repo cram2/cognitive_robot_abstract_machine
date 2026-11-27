@@ -35,7 +35,9 @@ def correlated_gaussians() -> tuple[SortedSet, np.ndarray, float]:
         cov=[[1.0, correlation, 0.0], [correlation, 1.0, 0.0], [0.0, 0.0, 1.0]],
         size=5000,
     )
-    variables = SortedSet([Continuous("a"), Continuous("b"), Continuous("c")])
+    variables = SortedSet(
+        [Continuous(name="a"), Continuous(name="b"), Continuous(name="c")]
+    )
     return variables, rows, -0.5 * np.log(1.0 - correlation**2)
 
 
@@ -68,7 +70,7 @@ def test_continuous_column_with_many_values_is_cut_into_equally_populated_bins()
     A continuous column of distinct values falls into bins of equally many rows.
     """
     levels = BinnedMutualInformation(number_of_bins=4).discretize_rows(
-        variables=SortedSet([Continuous("a")]), data=np.arange(100.0)[:, None]
+        variables=SortedSet([Continuous(name="a")]), data=np.arange(100.0)[:, None]
     )
 
     assert np.bincount(levels[:, 0]).tolist() == [25, 25, 25, 25]
@@ -79,7 +81,7 @@ def test_symbolic_column_keeps_a_level_per_state_however_many_states_it_has():
     Every state of a symbolic variable is a level of its own, never a bin.
     """
     states = [str(index) for index in range(12)]
-    variable = Symbolic(name="a", domain=Set.from_iterable(states))
+    variable = Symbolic(name="a", domain=Set.from_iterable(iterable=states))
     data = np.array([hash(state) for state in states], dtype=float)[:, None]
 
     levels = BinnedMutualInformation(number_of_bins=4).discretize_rows(
@@ -94,7 +96,9 @@ def test_binned_mutual_information_of_a_copy_is_its_entropy_and_of_noise_is_smal
     A column shares its entropy with its copy and nearly nothing with noise.
     """
     rows, entropy = copy_and_noise()
-    variables = SortedSet([Continuous("a"), Continuous("b"), Continuous("c")])
+    variables = SortedSet(
+        [Continuous(name="a"), Continuous(name="b"), Continuous(name="c")]
+    )
 
     mutual_information = BinnedMutualInformation(number_of_bins=2).estimate(
         variables=variables, data=rows
@@ -142,7 +146,7 @@ def test_gaussian_mutual_information_of_a_perfect_correlation_is_finite():
     A column and its copy share the largest finite information, not an infinite one.
     """
     column = np.random.default_rng(0).normal(size=100)
-    variables = SortedSet([Continuous("a"), Continuous("b")])
+    variables = SortedSet([Continuous(name="a"), Continuous(name="b")])
 
     mutual_information = GaussianMutualInformation().estimate(
         variables=variables, data=np.stack([column, column], axis=1)

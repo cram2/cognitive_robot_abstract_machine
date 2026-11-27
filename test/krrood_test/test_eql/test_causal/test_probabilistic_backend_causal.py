@@ -67,7 +67,7 @@ def _build_two_region_causal_circuit() -> tuple:
     therefore only ever return instances with `arm` in `[2, 3]`.
     """
     arm = Continuous(name="Pick.arm")
-    outcome = Symbolic(name="Pick.outcome", domain=Set.from_iterable(Outcome))
+    outcome = Symbolic(name="Pick.outcome", domain=Set.from_iterable(iterable=Outcome))
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for arm_range, outcome_value in [
@@ -142,7 +142,7 @@ def _build_two_cause_candidates_circuit() -> TwoCauseCandidatesCircuit:
     """
     decisive = Continuous(name="Pick.arm")
     uninformative = Continuous(name="Pick.grip")
-    outcome = Symbolic(name="Pick.outcome", domain=Set.from_iterable(Outcome))
+    outcome = Symbolic(name="Pick.outcome", domain=Set.from_iterable(iterable=Outcome))
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for decisive_range, outcome_value in [
@@ -288,7 +288,9 @@ def test_pipeline_reproduces_directly_computed_backdoor_adjustment_and_best_regi
         cause_variable, effect_truncated
     )
     expected_narrowed = effect_truncated.truncated(
-        expected_best_region.fill_missing_variables_pure(effect_truncated.variables)
+        expected_best_region.fill_missing_variables_pure(
+            variables=effect_truncated.variables
+        )
     ).distribution
 
     backend = ProbabilisticBackend(
@@ -305,11 +307,13 @@ def test_pipeline_reproduces_directly_computed_backdoor_adjustment_and_best_regi
     assert scored.cause_variable == cause_variable
     assert scored.narrowed_circuit.probability(
         expected_best_region.fill_missing_variables_pure(
-            scored.narrowed_circuit.variables
+            variables=scored.narrowed_circuit.variables
         )
     ) == pytest.approx(1.0)
     assert expected_narrowed.probability(
-        expected_best_region.fill_missing_variables_pure(expected_narrowed.variables)
+        expected_best_region.fill_missing_variables_pure(
+            variables=expected_narrowed.variables
+        )
     ) == pytest.approx(1.0)
 
 
@@ -404,7 +408,9 @@ def _build_pick_attempt_ranking_circuit() -> TwoCauseCandidatesCircuit:
     """
     decisive = Continuous(name="PickAttempt.arm")
     uninformative = Continuous(name="PickAttempt.grip")
-    outcome = Symbolic(name="PickAttempt.outcome", domain=Set.from_iterable(Outcome))
+    outcome = Symbolic(
+        name="PickAttempt.outcome", domain=Set.from_iterable(iterable=Outcome)
+    )
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     for decisive_range, outcome_value in [
@@ -593,9 +599,11 @@ def _build_confounded_trial_circuit() -> CausalCircuit:
             for season; equal for treatment=LOW too, since treatment has no real
             effect on outcome.
     """
-    season = Symbolic(name="Trial.season", domain=Set.from_iterable(Season))
-    treatment = Symbolic(name="Trial.treatment", domain=Set.from_iterable(Treatment))
-    outcome = Symbolic(name="Trial.outcome", domain=Set.from_iterable(Outcome))
+    season = Symbolic(name="Trial.season", domain=Set.from_iterable(iterable=Season))
+    treatment = Symbolic(
+        name="Trial.treatment", domain=Set.from_iterable(iterable=Treatment)
+    )
+    outcome = Symbolic(name="Trial.outcome", domain=Set.from_iterable(iterable=Outcome))
 
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)

@@ -67,7 +67,7 @@ def interval_probability(
     event = (
         SimpleEvent.from_data({variable: closed(lower, upper)})
         .as_composite_set()
-        .fill_missing_variables_pure(circuit.variables)
+        .fill_missing_variables_pure(variables=circuit.variables)
     )
     return float(circuit.probability(event))
 
@@ -89,9 +89,9 @@ def value_event(
         circuit.
     """
     return (
-        SimpleEvent.from_data({variable: Set.from_iterable([value])})
+        SimpleEvent.from_data({variable: Set.from_iterable(iterable=[value])})
         .as_composite_set()
-        .fill_missing_variables_pure(circuit.variables)
+        .fill_missing_variables_pure(variables=circuit.variables)
     )
 
 
@@ -563,7 +563,7 @@ def truncated_to(
     """
     event = SimpleEvent.from_data({variable: closed(lower, upper)}).as_composite_set()
     truncated = circuit.truncated(
-        event.fill_missing_variables_pure(circuit.variables)
+        event.fill_missing_variables_pure(variables=circuit.variables)
     ).distribution
     return truncated
 
@@ -575,7 +575,7 @@ def test_the_best_region_is_near_certain_once_truncated_to_one_branch(
     truncated = truncated_to(interventional_correlated, y, 9.6, 10)
     best_region = causal_circuit._best_disjoint_region(x, truncated)
     assert truncated.probability(
-        best_region.fill_missing_variables_pure(truncated.variables)
+        best_region.fill_missing_variables_pure(variables=truncated.variables)
     ) == pytest.approx(1.0, abs=0.01)
 
 

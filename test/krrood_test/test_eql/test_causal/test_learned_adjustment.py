@@ -460,11 +460,11 @@ def effect_probability_within(
     :return: The effect's probability within one region of the cause.
     """
     truncated = interventional.truncated(
-        region.fill_missing_variables_pure(interventional.variables)
+        region.fill_missing_variables_pure(variables=interventional.variables)
     ).distribution
     return float(
         truncated.probability(
-            effect_event.fill_missing_variables_pure(truncated.variables)
+            effect_event.fill_missing_variables_pure(variables=truncated.variables)
         )
     )
 

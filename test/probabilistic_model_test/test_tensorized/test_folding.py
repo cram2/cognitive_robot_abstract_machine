@@ -47,9 +47,12 @@ def variables() -> SortedSet:
         [Continuous(name=f"x{index}") for index in range(3)]
         + [
             Symbolic(
-                name="y_colour", domain=Set.from_iterable(["red", "green", "blue"])
+                name="y_colour",
+                domain=Set.from_iterable(iterable=["red", "green", "blue"]),
             ),
-            Symbolic(name="y_size", domain=Set.from_iterable(["small", "large"])),
+            Symbolic(
+                name="y_size", domain=Set.from_iterable(iterable=["small", "large"])
+            ),
         ]
     )
 
@@ -77,8 +80,12 @@ def mixture_over_four_variables() -> MixtureOverFourVariables:
             [
                 Continuous(name="x"),
                 Continuous(name="y"),
-                Symbolic(name="z_letter", domain=Set.from_iterable(["a", "b", "c"])),
-                Symbolic(name="z_mark", domain=Set.from_iterable(["off", "on"])),
+                Symbolic(
+                    name="z_letter", domain=Set.from_iterable(iterable=["a", "b", "c"])
+                ),
+                Symbolic(
+                    name="z_mark", domain=Set.from_iterable(iterable=["off", "on"])
+                ),
             ]
         )
     )
@@ -131,9 +138,9 @@ def event(circuit: LayeredProbabilisticCircuit) -> SimpleEvent:
     return SimpleEvent.from_data(
         {
             continuous: closed(-1.0, 0.5),
-            symbolic: Set.from_iterable([elements[0], elements[-1]]),
+            symbolic: Set.from_iterable(iterable=[elements[0], elements[-1]]),
         }
-    ).fill_missing_variables_pure(circuit.variables)
+    ).fill_missing_variables_pure(variables=circuit.variables)
 
 
 # %% structure

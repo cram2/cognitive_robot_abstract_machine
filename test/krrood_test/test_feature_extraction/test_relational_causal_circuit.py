@@ -328,7 +328,7 @@ def test_fit_stratifies_the_class_circuit_by_the_given_variable(many_chair_count
         event = SimpleEvent.from_data({resolved_chair_count: value}).as_composite_set()
         probability = model.class_probabilistic_circuit.probability(
             event.fill_missing_variables_pure(
-                model.class_probabilistic_circuit.variables
+                variables=model.class_probabilistic_circuit.variables
             )
         )
         assert probability == pytest.approx(0.5, abs=0.01)
@@ -557,7 +557,7 @@ def test_sampled_grounding_gives_every_stratum_its_own_latent_value(
         event = SimpleEvent.from_data({resolved_chair_count: value}).as_composite_set()
         probability = causal_circuit.probabilistic_circuit.probability(
             event.fill_missing_variables_pure(
-                causal_circuit.probabilistic_circuit.variables
+                variables=causal_circuit.probabilistic_circuit.variables
             )
         )
         assert probability == pytest.approx(0.5, abs=0.01)

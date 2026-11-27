@@ -47,7 +47,7 @@ class SetElement(AbstractSimpleSet):
     """
 
     @classmethod
-    def from_data(cls, element: Hashable, all_elements: AllElements) -> Self:
+    def from_data(cls, *, element: Hashable, all_elements: AllElements) -> Self:
         """
         Create a set element from data.
 
@@ -81,14 +81,15 @@ class SetElement(AbstractSimpleSet):
         """
         return {hash(elem): elem for elem in self.all_elements}
 
-    def _from_cpp(self, cpp_object):
+    def _from_cpp(self, *, cpp_object):
         if cpp_object.element_index == -1:
-            return SetElement.from_data(None, set())
+            return SetElement.from_data(element=None, all_elements=set())
         return SetElement.from_data(
-            self.all_elements[cpp_object.element_index], self.all_elements
+            element=self.all_elements[cpp_object.element_index],
+            all_elements=self.all_elements,
         )
 
-    def contains(self, item: Self) -> bool:
+    def contains(self, *, item: Self) -> bool:
         return self == item
 
     @property
@@ -117,13 +118,17 @@ class SetElement(AbstractSimpleSet):
 
     @classmethod
     def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        return cls.from_data(from_json(data["value"]), from_json(data["content"]))
+        return cls.from_data(
+            element=from_json(data["value"]), all_elements=from_json(data["content"])
+        )
 
     def as_composite_set(self) -> AbstractCompositeSet:
         return Set.from_simple_sets(self)
 
     def __deepcopy__(self, memo: dict[int, Any] | None = None) -> Self:
-        return SetElement.from_data(self.element, self.all_elements)
+        return SetElement.from_data(
+            element=self.element, all_elements=self.all_elements
+        )
 
 
 @dataclass(eq=False, kw_only=True)
@@ -164,19 +169,22 @@ class Set(AbstractCompositeSet):
             instance.all_elements = tuple()
         return instance
 
-    def _from_cpp(self, cpp_object):
+    def _from_cpp(self, *, cpp_object):
         return Set.from_simple_sets(
             *[
-                self.simple_set_example._from_cpp(cpp_simple_set)
+                self.simple_set_example._from_cpp(cpp_object=cpp_simple_set)
                 for cpp_simple_set in cpp_object.simple_sets
             ]
         )
 
     @classmethod
-    def from_iterable(cls, iterable: Iterable) -> Self:
+    def from_iterable(cls, *, iterable: Iterable) -> Self:
         all_elements = tuple(iterable)
         return cls.from_simple_sets(
-            *[SetElement.from_data(elem, all_elements) for elem in all_elements]
+            *[
+                SetElement.from_data(element=elem, all_elements=all_elements)
+                for elem in all_elements
+            ]
         )
 
     @cached_property

@@ -64,10 +64,10 @@ class DrowningLevel(Enum):
 # Named "SummerStatistics.<field>" up front so this same circuit can later be handed
 # to a DictRegistry keyed on the SummerStatistics class defined below -- DictRegistry
 # looks a query's fields up by this qualified name, unlike CausalCircuitRegistry.
-season = Symbolic(name="SummerStatistics.season", domain=Set.from_iterable(Season))
+season = Symbolic(name="SummerStatistics.season", domain=Set.from_iterable(iterable=Season))
 ice_cream_sales = Continuous(name="SummerStatistics.ice_cream_sales")
 drowning_incidents = Symbolic(
-    name="SummerStatistics.drowning_incidents", domain=Set.from_iterable(DrowningLevel)
+    name="SummerStatistics.drowning_incidents", domain=Set.from_iterable(iterable=DrowningLevel)
 )
 
 circuit = ProbabilisticCircuit()
@@ -105,12 +105,12 @@ causal_circuit = CausalCircuit.from_probabilistic_circuit(
 )
 
 high_ice_cream = SimpleEvent.from_data({ice_cream_sales: closed(9, 10).simple_sets[0]}).as_composite_set()
-high_drowning = SimpleEvent.from_data({drowning_incidents: Set.from_iterable([DrowningLevel.HIGH])}).as_composite_set()
+high_drowning = SimpleEvent.from_data({drowning_incidents: Set.from_iterable(iterable=[DrowningLevel.HIGH])}).as_composite_set()
 
 # Conditioning: observe high ice cream sales, ask about drowning incidents.
-conditioned = circuit.truncated(high_ice_cream.fill_missing_variables_pure(circuit.variables)).distribution
+conditioned = circuit.truncated(high_ice_cream.fill_missing_variables_pure(variables=circuit.variables)).distribution
 
-conditioned.probability(high_drowning.fill_missing_variables_pure(conditioned.variables))
+conditioned.probability(high_drowning.fill_missing_variables_pure(variables=conditioned.variables))
 # 0.7 -- conditioning picks up the confound: high sales lean warm, which leans toward
 # high drowning incidents.
 
@@ -118,7 +118,7 @@ conditioned.probability(high_drowning.fill_missing_variables_pure(conditioned.va
 # every v at once, as one joint circuit -- probability() over the whole thing (not
 # narrowed to any one v) reads off its average over every possible intervention.
 interventional = causal_circuit.backdoor_adjustment(ice_cream_sales, drowning_incidents)
-interventional.probability(high_drowning.fill_missing_variables_pure(interventional.variables))
+interventional.probability(high_drowning.fill_missing_variables_pure(variables=interventional.variables))
 # 0.5 -- back to the unconfounded baseline: unlike conditioning, this number does not
 # shift toward "high" just because ice cream sales does.
 ```

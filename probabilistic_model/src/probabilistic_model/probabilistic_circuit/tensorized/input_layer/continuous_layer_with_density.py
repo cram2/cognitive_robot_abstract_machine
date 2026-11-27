@@ -198,10 +198,10 @@ class ContinuousLayerWithConstrainedSupport(ContinuousLayerWithDensity, ABC):
         :return: The support of that node as simple interval.
         """
         return SimpleInterval.from_data(
-            float(self.interval[index, 0]),
-            float(self.interval[index, 1]),
-            Bound(int(self.bounds[index, 0])),
-            Bound(int(self.bounds[index, 1])),
+            lower=float(self.interval[index, 0]),
+            upper=float(self.interval[index, 1]),
+            left=Bound(int(self.bounds[index, 0])),
+            right=Bound(int(self.bounds[index, 1])),
         )
 
     def validate_own(self):

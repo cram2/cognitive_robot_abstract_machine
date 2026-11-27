@@ -147,8 +147,12 @@ def mixture() -> MixtureOverFourVariables:
             [
                 Continuous(name="x"),
                 Continuous(name="y"),
-                Symbolic(name="z_letter", domain=Set.from_iterable(["a", "b", "c"])),
-                Symbolic(name="z_mark", domain=Set.from_iterable(["off", "on"])),
+                Symbolic(
+                    name="z_letter", domain=Set.from_iterable(iterable=["a", "b", "c"])
+                ),
+                Symbolic(
+                    name="z_mark", domain=Set.from_iterable(iterable=["off", "on"])
+                ),
             ]
         )
     )
@@ -172,9 +176,11 @@ def event(mixture: MixtureOverFourVariables) -> SimpleEvent:
     return SimpleEvent.from_data(
         {
             x: closed(-1.5, 0.5),
-            letter: Set.from_iterable([letter.domain.simple_sets[0].element, "c"]),
+            letter: Set.from_iterable(
+                iterable=[letter.domain.simple_sets[0].element, "c"]
+            ),
         }
-    ).fill_missing_variables_pure(mixture.variables)
+    ).fill_missing_variables_pure(variables=mixture.variables)
 
 
 # %% the layer

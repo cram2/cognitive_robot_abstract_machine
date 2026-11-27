@@ -605,7 +605,7 @@ class VolumetricGraphOfBoundingBoxes(
             obstacle = bounding_box.simple_event.as_composite_set()
             obstacle_in_search = obstacle & search_space_event
             if not obstacle_in_search.is_empty():
-                free_space = free_space.subtract_disjoint(obstacle_in_search)
+                free_space = free_space.subtract_disjoint(other=obstacle_in_search)
             if free_space.is_empty():
                 break
         return free_space
@@ -783,16 +783,18 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
             always a subset of its floor footprint.
         :return: The floor-plan free space as a disjoint, two-dimensional Event.
         """
-        free_space = search_space_event.marginal(SpatialVariables.xy)
+        free_space = search_space_event.marginal(variables=SpatialVariables.xy)
         for bounding_box in bounding_boxes:
             obstacle_in_search_space = (
                 bounding_box.simple_event.as_composite_set() & search_space_event
             )
             if obstacle_in_search_space.is_empty():
                 continue
-            obstacle_in_search = obstacle_in_search_space.marginal(SpatialVariables.xy)
+            obstacle_in_search = obstacle_in_search_space.marginal(
+                variables=SpatialVariables.xy
+            )
             if not obstacle_in_search.is_empty():
-                free_space = free_space.subtract_disjoint(obstacle_in_search)
+                free_space = free_space.subtract_disjoint(other=obstacle_in_search)
             if free_space.is_empty():
                 break
         return free_space
@@ -840,7 +842,7 @@ class PlanarGraphOfBoundingBoxes(GraphOfBoundingBoxes[PlanarBoundingBox, Point2]
         floor_search_space = BoundingBoxCollection.from_event(
             cls.box_type(),
             search_space.reference_frame,
-            search_space.event.marginal(SpatialVariables.xy),
+            search_space.event.marginal(variables=SpatialVariables.xy),
         )
 
         nav_obstacles = semantic_obstacle_annotation.build_bloated_obstacle_collection(

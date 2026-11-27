@@ -61,8 +61,8 @@ First, create two simple intervals:
 ```{code-cell} ipython3
 :tags: []
 
-si1 = SimpleInterval.from_data(0, 1)
-si2 = SimpleInterval.from_data(0.5, 1.5)
+si1 = SimpleInterval.from_data(lower=0, upper=1)
+si2 = SimpleInterval.from_data(lower=0.5, upper=1.5)
 si1, si2
 ```
 
@@ -82,9 +82,9 @@ All set operations automatically return simple and disjoint representations of t
 ```{code-cell} ipython3
 :tags: []
 
-print(i1.intersection_with(i2))
-print(i1.union_with(i2))
-print(i1.difference_with(i2))
+print(i1.intersection_with(other=i2))
+print(i1.union_with(other=i2))
+print(i1.difference_with(other=i2))
 print(i1.complement())
 ```
 
@@ -132,8 +132,8 @@ Now you can interact with sets and set elements.
 ```{code-cell} ipython3
 :tags: []
 
-s1 = SetElement.from_data(Symbol.APPLE, Symbol).as_composite_set()
-s2 = SetElement.from_data(Symbol.DOG, Symbol).as_composite_set()
+s1 = SetElement.from_data(element=Symbol.APPLE, all_elements=Symbol).as_composite_set()
+s2 = SetElement.from_data(element=Symbol.DOG, all_elements=Symbol).as_composite_set()
 print(s1)
 print(~s1)
 print(s1 & s2)
@@ -150,7 +150,7 @@ Integer and Continuous variables need no specification of their domain.
 ```{code-cell} ipython3
 :tags: []
 
-a = Symbolic(name="a", domain=Set.from_iterable(Symbol))
+a = Symbolic(name="a", domain=Set.from_iterable(iterable=Symbol))
 x = Continuous(name="x")
 y = Continuous(name="y")
 z = Integer(name="z")

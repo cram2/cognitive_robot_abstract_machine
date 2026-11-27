@@ -191,7 +191,7 @@ def letter() -> Symbolic:
     """
     A symbolic variable over :class:`Letter`.
     """
-    return Symbolic(name="s", domain=Set.from_iterable(Letter))
+    return Symbolic(name="s", domain=Set.from_iterable(iterable=Letter))
 
 
 @pytest.fixture
@@ -199,7 +199,7 @@ def sparse_letter() -> Symbolic:
     """
     A symbolic variable over :class:`SparseLetter`.
     """
-    return Symbolic(name="sparse", domain=Set.from_iterable(SparseLetter))
+    return Symbolic(name="sparse", domain=Set.from_iterable(iterable=SparseLetter))
 
 
 # %% circuits
@@ -581,7 +581,7 @@ def test_probability_of_a_mixed_event(mixed_circuit, x, count, letter):
         {
             x: closed(0.5, 2.5),
             count: closed(0, 0),
-            letter: Set.from_iterable([Letter.A, Letter.C]),
+            letter: Set.from_iterable(iterable=[Letter.A, Letter.C]),
         }
     )
     assert RustworkxCircuitToLayeredCircuitConverter.convert(
@@ -795,7 +795,7 @@ def test_truncation_of_a_mixed_circuit(mixed_circuit, x, count, letter):
         {
             x: closed(0.5, 3.0),
             count: closed(0, 0),
-            letter: Set.from_iterable([Letter.A, Letter.B]),
+            letter: Set.from_iterable(iterable=[Letter.A, Letter.B]),
         }
     ).as_composite_set()
     rx_truncation = mixed_circuit.truncated(event.__deepcopy__())
@@ -886,7 +886,7 @@ def test_a_batch_whose_simple_sets_disagree_on_the_layer_type_reports_it(
         | SimpleEvent.from_data({y: closed(2.0, 3.0)}).as_composite_set()
     )
     layered = RustworkxCircuitToLayeredCircuitConverter.convert(gaussian_circuit)
-    event.fill_missing_variables(set(layered.variables))
+    event.fill_missing_variables(variables=set(layered.variables))
     assert not layered.can_truncate_in_one_batch(list(event.simple_sets))
     assert_same_truncation(gaussian_circuit, event, grid_of(-4, 6, 25))
 
@@ -1035,7 +1035,7 @@ def test_conditioning_on_an_integer_variable(mixed_circuit, x, count, letter):
         {
             x: closed(1.5, 3.0),
             count: closed(1, 3),
-            letter: Set.from_iterable([Letter.A]),
+            letter: Set.from_iterable(iterable=[Letter.A]),
         }
     )
     assert conditioning.distribution.probability_of_simple_event(
@@ -1312,7 +1312,7 @@ def test_a_distribution_over_elements_with_large_hashes_keeps_its_probabilities(
     A symbolic distribution over elements with large hashes keeps its probabilities in a
     layered circuit.
     """
-    variable = Symbolic(name="large_hash", domain=Set.from_iterable(domain))
+    variable = Symbolic(name="large_hash", domain=Set.from_iterable(iterable=domain))
     distribution = symbolic_distribution(
         variable, {domain.FIRST: 0.25, domain.SECOND: 0.75}
     )
@@ -1327,7 +1327,7 @@ def test_a_distribution_over_elements_with_large_hashes_keeps_its_probabilities(
 def test_the_support_of_a_symbolic_circuit_agrees_with_rustworkx():
     variable = Symbolic(
         name="beyond_float_precision",
-        domain=Set.from_iterable(SymbolWithHashBeyondFloatPrecision),
+        domain=Set.from_iterable(iterable=SymbolWithHashBeyondFloatPrecision),
     )
     circuit = RxCircuit()
     leaf(
@@ -1399,7 +1399,9 @@ def test_probability_of_an_event_of_a_sparse_symbolic_circuit_agrees_with_rustwo
     event = SimpleEvent.from_data(
         {
             x: closed(0.5, 2.5),
-            sparse_letter: Set.from_iterable([SparseLetter.LOW, SparseLetter.MIDDLE]),
+            sparse_letter: Set.from_iterable(
+                iterable=[SparseLetter.LOW, SparseLetter.MIDDLE]
+            ),
         }
     )
     assert RustworkxCircuitToLayeredCircuitConverter.convert(
@@ -1466,7 +1468,7 @@ def test_sparse_and_dense_tables_answer_queries_alike(discrete_circuit, x):
         sparse.log_likelihood(events=samples), dense.log_likelihood(events=samples)
     )
     event = SimpleEvent.from_data({x: closed(0.5, 2.5)})
-    event.fill_missing_variables(dense.variables)
+    event.fill_missing_variables(variables=dense.variables)
     assert sparse.probability_of_simple_event(event) == pytest.approx(
         dense.probability_of_simple_event(event)
     )

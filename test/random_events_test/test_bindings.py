@@ -8,7 +8,6 @@ import random_events_lib as rl
 
 @skip
 class BindingsTestCase(unittest.TestCase):
-
     def test_intervals_with_bindings_but_in_old_class(self):
         """
         Using bindings, but in the old structure.
@@ -21,10 +20,10 @@ class BindingsTestCase(unittest.TestCase):
             for a in range(50):
                 b.append(
                     SimpleInterval.from_data(
-                        random.randint(0, 100),
-                        random.randint(0, 100),
-                        Bound.OPEN,
-                        Bound.CLOSED,
+                        lower=random.randint(0, 100),
+                        upper=random.randint(0, 100),
+                        left=Bound.OPEN,
+                        right=Bound.CLOSED,
                     )
                 )
             z = Interval.from_simple_sets(*b)

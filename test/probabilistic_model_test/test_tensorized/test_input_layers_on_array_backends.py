@@ -320,7 +320,7 @@ def symbolic_case() -> InputLayerQueryCase:
     """
     Two categorical distributions over :class:`Letter`.
     """
-    letter = Symbolic(name="s", domain=Set.from_iterable(Letter))
+    letter = Symbolic(name="s", domain=Set.from_iterable(iterable=Letter))
     distributions = [
         SymbolicDistribution(
             variable=letter,
@@ -342,7 +342,7 @@ def symbolic_case() -> InputLayerQueryCase:
         build=lambda namespace: convert_table_to_namespace(layer, namespace),
         variable=letter,
         values=[0.0, 1.0, 2.0],
-        assignment=Set.from_iterable([Letter.A, Letter.C]),
+        assignment=Set.from_iterable(iterable=[Letter.A, Letter.C]),
     )
 
 

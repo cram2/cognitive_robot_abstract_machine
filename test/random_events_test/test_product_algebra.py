@@ -16,7 +16,7 @@ from random_events.sigma_algebra import AbstractSimpleSet
 from random_events.variable import Continuous, Symbolic
 
 str_set = {"a", "c", "b"}
-str_set_domain = Set.from_iterable(str_set)
+str_set_domain = Set.from_iterable(iterable=str_set)
 
 
 class EventTestCase(unittest.TestCase):
@@ -37,68 +37,86 @@ class EventTestCase(unittest.TestCase):
     #     print("=" * 80)
 
     def test_constructor(self):
-        sa = SetElement.from_data("a", str_set)
-        sb = SetElement.from_data("b", str_set)
+        sa = SetElement.from_data(element="a", all_elements=str_set)
+        sb = SetElement.from_data(element="b", all_elements=str_set)
         event = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sa),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
 
         self.assertEqual(
-            event[self.x], Interval.from_simple_sets(SimpleInterval.from_data(0, 1))
+            event[self.x],
+            Interval.from_simple_sets(SimpleInterval.from_data(lower=0, upper=1)),
         )
         self.assertEqual(
-            event[self.y], Interval.from_simple_sets(SimpleInterval.from_data(0, 1))
+            event[self.y],
+            Interval.from_simple_sets(SimpleInterval.from_data(lower=0, upper=1)),
         )
         self.assertEqual(event[self.a], Set.from_simple_sets(sa))
 
         self.assertFalse(event.is_empty())
 
     def test_intersection_with(self):
-        sa = SetElement.from_data("a", str_set)
-        sb = SetElement.from_data("b", str_set)
-        sc = SetElement.from_data("c", str_set)
+        sa = SetElement.from_data(element="a", all_elements=str_set)
+        sb = SetElement.from_data(element="b", all_elements=str_set)
+        sc = SetElement.from_data(element="c", all_elements=str_set)
         event_1 = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sa, sb),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
         event_2 = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sa),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0.5, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0.5, upper=1)
+                ),
             }
         )
         event_3 = SimpleEvent.from_data({self.a: Set.from_simple_sets(sc)})
-        intersection = event_1.intersection_with(event_2)
+        intersection = event_1.intersection_with(other=event_2)
 
         intersection_ = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sa),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0.5, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0.5, upper=1)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
 
         self.assertEqual(intersection, intersection_)
         self.assertNotEqual(intersection, event_1)
 
-        second_intersection = event_1.intersection_with(event_3)
+        second_intersection = event_1.intersection_with(other=event_3)
         self.assertTrue(second_intersection.is_empty())
 
     def test_complement(self):
-        sa = SetElement.from_data("a", str_set)
-        sb = SetElement.from_data("b", str_set)
-        sc = SetElement.from_data("c", str_set)
+        sa = SetElement.from_data(element="a", all_elements=str_set)
+        sb = SetElement.from_data(element="b", all_elements=str_set)
+        sc = SetElement.from_data(element="c", all_elements=str_set)
         event = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sa, sb),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
                 self.y: self.y.domain,
             }
         )
@@ -122,21 +140,29 @@ class EventTestCase(unittest.TestCase):
         self.assertEqual(e_c, Event.from_simple_sets(*complement))
 
     def test_simplify(self):
-        sa = SetElement.from_data("a", str_set)
-        sb = SetElement.from_data("b", str_set)
-        sc = SetElement.from_data("c", str_set)
+        sa = SetElement.from_data(element="a", all_elements=str_set)
+        sb = SetElement.from_data(element="b", all_elements=str_set)
+        sc = SetElement.from_data(element="c", all_elements=str_set)
         event_1 = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sa, sb),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
         event_2 = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sc),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
         event = Event.from_simple_sets(event_1, event_2)
@@ -147,30 +173,38 @@ class EventTestCase(unittest.TestCase):
             SimpleEvent.from_data(
                 {
                     self.a: self.a.domain,
-                    self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                    self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                    self.x: Interval.from_simple_sets(
+                        SimpleInterval.from_data(lower=0, upper=1)
+                    ),
+                    self.y: Interval.from_simple_sets(
+                        SimpleInterval.from_data(lower=0, upper=1)
+                    ),
                 }
             )
         )
         self.assertEqual(simplified, result)
 
     def test_to_json(self):
-        sa = SetElement.from_data("a", str_set)
-        sb = SetElement.from_data("b", str_set)
+        sa = SetElement.from_data(element="a", all_elements=str_set)
+        sb = SetElement.from_data(element="b", all_elements=str_set)
         event = SimpleEvent.from_data(
             {
                 self.a: Set.from_simple_sets(sa, sb),
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
         event_ = from_json(to_json(event))
         self.assertEqual(event_, event)
 
     def test_union(self):
-        sa = SetElement.from_data("a", str_set)
-        sb = SetElement.from_data("b", str_set)
-        sc = SetElement.from_data("c", str_set)
+        sa = SetElement.from_data(element="a", all_elements=str_set)
+        sb = SetElement.from_data(element="b", all_elements=str_set)
+        sc = SetElement.from_data(element="c", all_elements=str_set)
         event = Event.from_simple_sets(
             SimpleEvent.from_data({self.a: sa, self.x: open(-float("inf"), 2)})
         )
@@ -188,23 +222,29 @@ class EventTestCase(unittest.TestCase):
         event_1 = SimpleEvent.from_data(
             {
                 self.x: closed(0, 1),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
         event_2 = SimpleEvent.from_data(
             {
                 self.x: closed(1, 2),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(3, 4)),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=3, upper=4)
+                ),
             }
         )
         event_3 = SimpleEvent.from_data(
             {
                 self.x: closed(5, 6),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(5, 6)),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=5, upper=6)
+                ),
             }
         )
         event = Event.from_simple_sets(event_1, event_2, event_3)
-        marginal = event.marginal({self.x})
+        marginal = event.marginal(variables={self.x})
         self.assertEqual(
             marginal,
             SimpleEvent.from_data(
@@ -218,7 +258,7 @@ class EventTestCase(unittest.TestCase):
             SimpleEvent.from_data({self.a: "a", self.b: "b"}).as_composite_set()
             | SimpleEvent.from_data({self.a: "b", self.b: "b"}).as_composite_set()
         )
-        e_a = event.marginal({a})
+        e_a = event.marginal(variables={a})
         self.assertEqual(
             e_a, SimpleEvent.from_data({self.a: ("a", "b")}).as_composite_set()
         )
@@ -230,13 +270,13 @@ class EventTestCase(unittest.TestCase):
         self.assertEqual(a1.cpp_object, a2.cpp_object)
 
     def test_to_json_multiple_events(self):
-        sa = SetElement.from_data("a", str_set)
-        sb = SetElement.from_data("b", str_set)
+        sa = SetElement.from_data(element="a", all_elements=str_set)
+        sb = SetElement.from_data(element="b", all_elements=str_set)
         # sc = SetElement.from_data("c", str_set)
         event = SimpleEvent.from_data(
             {
                 self.x: closed(0, 1),
-                self.y: SimpleInterval.from_data(3, 5),
+                self.y: SimpleInterval.from_data(lower=3, upper=5),
                 self.a: Set.from_simple_sets(sa, sb),
             }
         ).as_composite_set()
@@ -245,12 +285,14 @@ class EventTestCase(unittest.TestCase):
 
     def test_bounding_box(self):
         event_1 = SimpleEvent.from_data(
-            {self.x: closed(0, 1), self.y: SimpleInterval.from_data(0, 1)}
+            {self.x: closed(0, 1), self.y: SimpleInterval.from_data(lower=0, upper=1)}
         ).as_composite_set()
         event_2 = SimpleEvent.from_data(
             {
                 self.x: closed(1, 2),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(3, 4)),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=3, upper=4)
+                ),
             }
         ).as_composite_set()
         event = event_1 | event_2
@@ -260,8 +302,8 @@ class EventTestCase(unittest.TestCase):
         result = SimpleEvent.from_data(
             {
                 self.x: closed(0, 2),
-                self.y: SimpleInterval.from_data(0, 1).as_composite_set()
-                | SimpleInterval.from_data(3, 4).as_composite_set(),
+                self.y: SimpleInterval.from_data(lower=0, upper=1).as_composite_set()
+                | SimpleInterval.from_data(lower=3, upper=4).as_composite_set(),
             }
         )
         self.assertEqual(bounding_box, result)
@@ -287,7 +329,9 @@ class EventTestCase(unittest.TestCase):
         self.assertFalse(event.is_box())
 
     def test_one_value_per_variable_is_a_singleton(self):
-        a_set = Set.from_simple_sets(SetElement.from_data("a", str_set))
+        a_set = Set.from_simple_sets(
+            SetElement.from_data(element="a", all_elements=str_set)
+        )
         event = SimpleEvent.from_data(
             {self.x: singleton(1), self.a: a_set}
         ).as_composite_set()
@@ -322,13 +366,16 @@ class EventTestCase(unittest.TestCase):
         event = SimpleEvent.from_data()
         event[self.a] = "a"
         self.assertEqual(
-            event[self.a], SetElement.from_data("a", str_set).as_composite_set()
+            event[self.a],
+            SetElement.from_data(element="a", all_elements=str_set).as_composite_set(),
         )
         event[self.a] = ("a", "b")
         self.assertEqual(
             event[self.a],
-            SetElement.from_data("a", str_set).as_composite_set()
-            | SetElement.from_data("b", str_set).as_composite_set(),
+            SetElement.from_data(element="a", all_elements=str_set).as_composite_set()
+            | SetElement.from_data(
+                element="b", all_elements=str_set
+            ).as_composite_set(),
         )
 
         with self.assertRaises(ValueError):
@@ -339,7 +386,7 @@ class EventTestCase(unittest.TestCase):
             {self.x: closed(0, 1) | closed(3, 4)}
         ).as_composite_set()
         y = Continuous(name="y")
-        e.fill_missing_variables((y,))
+        e.fill_missing_variables(variables=(y,))
         self.assertTrue(y in e.variables)
 
     def test_fill_missing_variables_pure(self):
@@ -347,7 +394,7 @@ class EventTestCase(unittest.TestCase):
             {self.x: closed(0, 1) | closed(3, 4)}
         ).as_composite_set()
         y = Continuous(name="y")
-        e = e.fill_missing_variables_pure((y,))
+        e = e.fill_missing_variables_pure(variables=(y,))
         self.assertTrue(y in e.variables)
 
     def test_update_variables(self):
@@ -357,7 +404,7 @@ class EventTestCase(unittest.TestCase):
             .complement()
         )
         y2 = Continuous(name="y2")
-        e2 = e.update_variables({self.y: y2})
+        e2 = e.update_variables(new_variables={self.y: y2})
         self.assertEqual(e2.variables, SortedSet([self.x, y2]))
 
     def test_size_multiplies_the_assignments(self):
@@ -415,18 +462,18 @@ class OperationsWithEmptySetsTestCase(unittest.TestCase):
     def test_empty_union(self):
         empty_event = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(0, 0),
-                self.y: SimpleInterval.from_data(0, 0),
+                self.x: SimpleInterval.from_data(lower=0, upper=0),
+                self.y: SimpleInterval.from_data(lower=0, upper=0),
             }
         ).as_composite_set()
         event = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(0, 1),
-                self.y: SimpleInterval.from_data(0, 1),
+                self.x: SimpleInterval.from_data(lower=0, upper=1),
+                self.y: SimpleInterval.from_data(lower=0, upper=1),
             }
         ).as_composite_set()
-        union = empty_event.union_with(event)
-        union2 = event.union_with(empty_event)
+        union = empty_event.union_with(other=event)
+        union2 = event.union_with(other=empty_event)
         self.assertEqual(union, event)
         self.assertEqual(union2, event)
 
@@ -436,10 +483,10 @@ class OperationsWithEmptySetsTestCase(unittest.TestCase):
         event_1 = Event.from_simple_sets(simple_event1)
         event_2 = Event.from_simple_sets(simple_event2)
 
-        event_1.fill_missing_variables(event_2.variables)
-        event_2.fill_missing_variables(event_1.variables)
+        event_1.fill_missing_variables(variables=event_2.variables)
+        event_2.fill_missing_variables(variables=event_1.variables)
 
-        union = event_1.union_with(event_2)
+        union = event_1.union_with(other=event_2)
 
         exp_se1 = SimpleEvent.from_data(
             {self.x: closed(0, 1), self.y: open(float("-inf"), float("inf"))}
@@ -454,12 +501,12 @@ class OperationsWithEmptySetsTestCase(unittest.TestCase):
     def test_difference_with_empty_set(self):
         event = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(0, 1),
-                self.y: SimpleInterval.from_data(0, 1),
+                self.x: SimpleInterval.from_data(lower=0, upper=1),
+                self.y: SimpleInterval.from_data(lower=0, upper=1),
             }
         ).as_composite_set()
         empty_event = Event()
-        diff = event.difference_with(empty_event)
+        diff = event.difference_with(other=empty_event)
         self.assertEqual(diff, event)
 
 
@@ -474,7 +521,7 @@ def test_fill_missing_variables_updates_simple_sets_read_before():
     y = Continuous(name="y")
     event = SimpleEvent.from_data({x: closed(0, 1)}).as_composite_set()
     event.simple_sets
-    event.fill_missing_variables((y,))
+    event.fill_missing_variables(variables=(y,))
     assert event.simple_sets[0][y] == y.domain
 
 

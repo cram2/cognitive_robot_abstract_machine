@@ -22,7 +22,8 @@ def _product_circuit(*variables: Continuous) -> ProbabilisticCircuit:
         product.add_subcircuit(
             leaf(
                 UniformDistribution(
-                    variable=variable, interval=SimpleInterval.from_data(0, 1)
+                    variable=variable,
+                    interval=SimpleInterval.from_data(lower=0, upper=1),
                 ),
                 probabilistic_circuit=circuit,
             )

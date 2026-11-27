@@ -259,9 +259,9 @@ def symbolic_variables() -> tuple[Symbolic, Symbolic, Symbolic]:
     :return: The treatment, season and outcome variables.
     """
     return (
-        Symbolic(name="treatment", domain=Set.from_iterable(Treatment)),
-        Symbolic(name="season", domain=Set.from_iterable(Season)),
-        Symbolic(name="outcome", domain=Set.from_iterable(Outcome)),
+        Symbolic(name="treatment", domain=Set.from_iterable(iterable=Treatment)),
+        Symbolic(name="season", domain=Set.from_iterable(iterable=Season)),
+        Symbolic(name="outcome", domain=Set.from_iterable(iterable=Outcome)),
     )
 
 

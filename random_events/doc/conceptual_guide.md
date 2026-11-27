@@ -166,9 +166,9 @@ The intersection of two simple intervals is a simple interval.
 from random_events.interval import SimpleInterval, Interval, Bound
 from random_events.plotting import EventPlotter
 
-i1 = SimpleInterval.from_data(1, 3, Bound.CLOSED, Bound.CLOSED)
-i2 = SimpleInterval.from_data(2, 4, Bound.OPEN, Bound.CLOSED)
-i2.intersection_with(i1)
+i1 = SimpleInterval.from_data(lower=1, upper=3, left=Bound.CLOSED, right=Bound.CLOSED)
+i2 = SimpleInterval.from_data(lower=2, upper=4, left=Bound.OPEN, right=Bound.CLOSED)
+i2.intersection_with(other=i1)
 ````
 
 The complement of a simple interval is an interval.
@@ -435,7 +435,7 @@ you can calculate the complement of the occupied space with the kitchen.
 ```{code-cell} ipython3
 :tags: []
 
-free_space = kitchen.difference_with(occupied_spaces)
+free_space = kitchen.difference_with(other=occupied_spaces)
 fig = go.Figure(EventPlotter(event=free_space).plot(), EventPlotter(event=free_space).plotly_layout())
 fig.show()
 ```

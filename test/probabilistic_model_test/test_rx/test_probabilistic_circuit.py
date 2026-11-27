@@ -121,7 +121,7 @@ def test_plot_structure_with_inference_results(mixture_of_products):
 
 
 def test_plot_of_a_symbolic_leaf_has_traces():
-    variable = Symbolic(name="x", domain=Set.from_iterable(Letter))
+    variable = Symbolic(name="x", domain=Set.from_iterable(iterable=Letter))
     probabilities = MissingDict(float, {int(Letter.A): 7 / 20, int(Letter.B): 13 / 20})
     circuit = ProbabilisticCircuit()
     circuit.add_node(
@@ -232,7 +232,7 @@ def test_conditioning_on_a_point_moves_mass_towards_the_smaller_square(
 
 def test_conditioning_on_a_symbolic_point(mixture_of_nested_squares):
     circuit = copy.deepcopy(mixture_of_nested_squares)
-    letter = Symbolic(name="s", domain=Set.from_iterable(Letter))
+    letter = Symbolic(name="s", domain=Set.from_iterable(iterable=Letter))
     probabilities = MissingDict(
         float, {hash(Letter.A): 7 / 20, hash(Letter.B): 13 / 20}
     )
@@ -269,7 +269,7 @@ def test_probability_of_a_point_that_only_one_component_supports(
 
 @pytest.mark.parametrize("variable_type", [Continuous, Integer])
 def test_expectation_of_a_subset_of_the_variables(variable_type):
-    first, second = variable_type("x"), variable_type("y")
+    first, second = variable_type(name="x"), variable_type(name="y")
     circuit = ProbabilisticCircuit()
     root = SumUnit(probabilistic_circuit=circuit)
     product = ProductUnit(probabilistic_circuit=circuit)

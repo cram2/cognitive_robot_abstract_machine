@@ -24,22 +24,30 @@ class PlotTestCase(unittest.TestCase):
         A symbolic variable has no numeric axis to plot along, so plotting an event that
         constrains one must raise rather than attempt to draw it.
         """
-        a = Symbolic(name="a", domain=Set.from_iterable({"a", "b"}))
-        event = SimpleEvent.from_data({a: Set.from_iterable({"a"})})
+        a = Symbolic(name="a", domain=Set.from_iterable(iterable={"a", "b"}))
+        event = SimpleEvent.from_data({a: Set.from_iterable(iterable={"a"})})
         with self.assertRaises(EventContainsSymbolicVariableError):
             SimpleEventPlotter(event=event).plot()
 
     def test_plot_2d(self):
         event_1 = SimpleEvent.from_data(
             {
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(0, 1)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=0, upper=1)
+                ),
             }
         )
         event_2 = SimpleEvent.from_data(
             {
-                self.x: Interval.from_simple_sets(SimpleInterval.from_data(1, 2)),
-                self.y: Interval.from_simple_sets(SimpleInterval.from_data(1, 2)),
+                self.x: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=1, upper=2)
+                ),
+                self.y: Interval.from_simple_sets(
+                    SimpleInterval.from_data(lower=1, upper=2)
+                ),
             }
         )
         plotter = EventPlotter(event=Event.from_simple_sets(event_1, event_2))
@@ -49,16 +57,16 @@ class PlotTestCase(unittest.TestCase):
     def test_plot_3d(self):
         event_1 = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(0, 1),
-                self.y: SimpleInterval.from_data(0, 1),
-                self.z: SimpleInterval.from_data(0, 1),
+                self.x: SimpleInterval.from_data(lower=0, upper=1),
+                self.y: SimpleInterval.from_data(lower=0, upper=1),
+                self.z: SimpleInterval.from_data(lower=0, upper=1),
             }
         )
         event_2 = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(1, 2),
-                self.y: SimpleInterval.from_data(1, 2),
-                self.z: SimpleInterval.from_data(1, 2),
+                self.x: SimpleInterval.from_data(lower=1, upper=2),
+                self.y: SimpleInterval.from_data(lower=1, upper=2),
+                self.z: SimpleInterval.from_data(lower=1, upper=2),
             }
         )
         plotter = EventPlotter(event=Event.from_simple_sets(event_1, event_2))
@@ -72,9 +80,9 @@ class PlotTestCase(unittest.TestCase):
         """
         event = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(0, 1),
-                self.y: SimpleInterval.from_data(0, 2),
-                self.z: SimpleInterval.from_data(0, 3),
+                self.x: SimpleInterval.from_data(lower=0, upper=1),
+                self.y: SimpleInterval.from_data(lower=0, upper=2),
+                self.z: SimpleInterval.from_data(lower=0, upper=3),
             }
         )
         corners = SimpleEventPlotter(event=event).corners_3d()
@@ -91,21 +99,21 @@ class PlotTestCase(unittest.TestCase):
         """
         event_1 = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(0, 1),
-                self.y: SimpleInterval.from_data(0, 1),
-                self.z: SimpleInterval.from_data(0, 1),
+                self.x: SimpleInterval.from_data(lower=0, upper=1),
+                self.y: SimpleInterval.from_data(lower=0, upper=1),
+                self.z: SimpleInterval.from_data(lower=0, upper=1),
             }
         )
         event_2 = SimpleEvent.from_data(
             {
-                self.x: SimpleInterval.from_data(5, 6),
-                self.y: SimpleInterval.from_data(0, 1),
-                self.z: SimpleInterval.from_data(0, 1),
+                self.x: SimpleInterval.from_data(lower=5, upper=6),
+                self.y: SimpleInterval.from_data(lower=0, upper=1),
+                self.z: SimpleInterval.from_data(lower=0, upper=1),
             }
         )
         plotter = EventPlotter(event=Event.from_simple_sets(event_1, event_2))
 
-        mesh = plotter.plot_3d_mesh("#000000", 1.0, "boxes")
+        mesh = plotter.plot_3d_mesh(color="#000000", opacity=1.0, name="boxes")
         faces = np.stack([mesh.i, mesh.j, mesh.k], axis=-1)
 
         face_count = len(EventPlotter.BOX_FACES)
@@ -122,15 +130,15 @@ class PlotTestCase(unittest.TestCase):
             event=Event.from_simple_sets(
                 SimpleEvent.from_data(
                     {
-                        self.x: SimpleInterval.from_data(0, 1),
-                        self.y: SimpleInterval.from_data(0, 1),
-                        self.z: SimpleInterval.from_data(0, 1),
+                        self.x: SimpleInterval.from_data(lower=0, upper=1),
+                        self.y: SimpleInterval.from_data(lower=0, upper=1),
+                        self.z: SimpleInterval.from_data(lower=0, upper=1),
                     }
                 )
             )
         )
 
-        wireframe = plotter.plot_3d_wireframe("#000000", 1.0, "boxes")
+        wireframe = plotter.plot_3d_wireframe(color="#000000", width=1.0, name="boxes")
         points = np.stack([wireframe.x, wireframe.y, wireframe.z], axis=-1)
 
         edge_count = len(EventPlotter.BOX_EDGES)
@@ -144,7 +152,9 @@ class IntegerVariablePlotTestCase(unittest.TestCase):
 
     def test_plot_1d_with_integer_variable(self):
         plotter = SimpleEventPlotter(
-            event=SimpleEvent.from_data({self.count: SimpleInterval.from_data(0, 5)})
+            event=SimpleEvent.from_data(
+                {self.count: SimpleInterval.from_data(lower=0, upper=5)}
+            )
         )
         traces = plotter.plot()
         self.assertIsNotNone(traces)

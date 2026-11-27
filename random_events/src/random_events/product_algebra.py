@@ -52,7 +52,7 @@ class VariableMap(VariableMapSuperClassType):
     def assignments(self) -> SortedValuesView:
         return self.values()
 
-    def get_variable(self, key: VariableMapKey) -> Variable:
+    def get_variable(self, *, key: VariableMapKey) -> Variable:
         """
         Get the variable matching the key.
 
@@ -68,10 +68,10 @@ class VariableMap(VariableMapSuperClassType):
         return variable[0]
 
     def __getitem__(self, key: str | Variable):
-        return super().__getitem__(self.get_variable(key))
+        return super().__getitem__(self.get_variable(key=key))
 
     def __setitem__(self, key: str | Variable, value: Any):
-        super().__setitem__(self.get_variable(key), value)
+        super().__setitem__(self.get_variable(key=key), value)
 
     def __copy__(self):
         return self.__class__({variable: value for variable, value in self.items()})
@@ -95,7 +95,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         instance = cls.__new__(cls)
         VariableMap.__init__(instance, *args, **kwargs)
         for key, value in instance.items():
-            instance._setitem_without_cpp(key, value)
+            instance._setitem_without_cpp(key=key, value=value)
         instance._update_cpp_object()
         return instance
 
@@ -104,15 +104,15 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
             {variable.cpp_object: value.cpp_object for variable, value in self.items()}
         )
 
-    def _setitem_without_cpp(self, key: VariableMapKey, value: Any):
+    def _setitem_without_cpp(self, *, key: VariableMapKey, value: Any):
         """
         See __setitem__ for more information.
         """
-        key = self.get_variable(key)
-        value = key.make_value(value)
+        key = self.get_variable(key=key)
+        value = key.make_value(value=value)
         super().__setitem__(key, value)
 
-    def _from_cpp(self, cpp_object: rl.SimpleEvent):
+    def _from_cpp(self, *, cpp_object: rl.SimpleEvent):
         variables = [
             variable
             for variable in self.variables
@@ -120,7 +120,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         ]
         result = {
             variable: self[variable]._from_cpp(
-                cpp_object.variable_map[variable.cpp_object]
+                cpp_object=cpp_object.variable_map[variable.cpp_object]
             )
             for variable in variables
         }
@@ -129,9 +129,9 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
     def as_composite_set(self) -> Event:
         return Event.from_simple_sets(self)
 
-    def contains(self, item: tuple) -> bool:
+    def contains(self, *, item: tuple) -> bool:
         for assignment, value in zip(self.assignments, item):
-            if not assignment.contains(value):
+            if not assignment.contains(item=value):
                 return False
         return True
 
@@ -172,8 +172,8 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         :param key: The variable (or its name) to set the value for
         :param value: The value to set
         """
-        key = self.get_variable(key)
-        self._setitem_without_cpp(key, value)
+        key = self.get_variable(key=key)
+        self._setitem_without_cpp(key=key, value=value)
         self._update_cpp_object()
 
     def __or__(self, other):
@@ -182,7 +182,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         items = itertools.chain(self.items(), other.items())
         return self.__class__.from_data({variable: value for variable, value in items})
 
-    def marginal(self, variables: VariableSet) -> SimpleEvent:
+    def marginal(self, *, variables: VariableSet) -> SimpleEvent:
         """
         Create the marginal event, that only contains the variables given.
 
@@ -190,7 +190,9 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         :return: The marginal event
         """
         return self._from_cpp(
-            self.cpp_object.marginal({variable.cpp_object for variable in variables})
+            cpp_object=self.cpp_object.marginal(
+                {variable.cpp_object for variable in variables}
+            )
         )
 
     def non_empty_to_string(self) -> str:
@@ -238,7 +240,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
 
     @classmethod
     def from_json_given_variables(
-        cls, data: dict[str, Any], variables: list[Variable]
+        cls, *, data: dict[str, Any], variables: list[Variable]
     ) -> Self:
         assignments = [
             AbstractCompositeSet.from_json(data=assignment)
@@ -251,7 +253,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
             }
         )
 
-    def update_variables(self, new_variables: dict[Variable, Variable]) -> Self:
+    def update_variables(self, *, new_variables: dict[Variable, Variable]) -> Self:
         """
         Construct a new simple event where the own variables are replaced with the new
         variables. If the new variables are missing mappings, the old variables are kept
@@ -267,7 +269,7 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
             }
         )
 
-    def fill_missing_variables(self, variables: Iterable[Variable]):
+    def fill_missing_variables(self, *, variables: Iterable[Variable]):
         """
         Fill this with the variables that are not in self but in `variables` in-place.
         The variables are mapped to their domain.
@@ -278,10 +280,10 @@ class SimpleEvent(AbstractSimpleSet, VariableMap):
         if not missing:
             return
         for variable in missing:
-            self._setitem_without_cpp(variable, variable.domain)
+            self._setitem_without_cpp(key=variable, value=variable.domain)
         self._update_cpp_object()
 
-    def fill_missing_variables_pure(self, variables: Iterable[Variable]):
+    def fill_missing_variables_pure(self, *, variables: Iterable[Variable]):
         """
         Fill this with the variables that are not in self but in `variables`.
 
@@ -341,7 +343,7 @@ class Event(AbstractCompositeSet):
         # Fill missing variables in each input SimpleEvent before building the C++ Event,
         # so every cpp_object is up-to-date when we pass it to rl.Event.
         for simple_set in simple_sets:
-            simple_set.fill_missing_variables(all_variables)
+            simple_set.fill_missing_variables(variables=all_variables)
 
         instance.simple_set_example = simple_sets[0]
         instance.cpp_object = rl.Event(
@@ -350,7 +352,7 @@ class Event(AbstractCompositeSet):
         instance._variables = all_variables
         return instance
 
-    def _from_cpp(self, cpp_object: rl.Event) -> Event:
+    def _from_cpp(self, *, cpp_object: rl.Event) -> Event:
         # O(1) fast path: reuse the existing simple_set_example and variable cache.
         # Correct for all operations that preserve the variable set (make_disjoint,
         # simplify, difference_with, complement, intersection_with).
@@ -377,7 +379,7 @@ class Event(AbstractCompositeSet):
         self._variables = variables_set
         return variables_set
 
-    def get_variable(self, key: VariableMapKey) -> Variable:
+    def get_variable(self, *, key: VariableMapKey) -> Variable:
         """
         Get the variable matching the key.
 
@@ -403,7 +405,7 @@ class Event(AbstractCompositeSet):
             simple_sets[0] if simple_sets else SimpleEvent.from_data()
         )
 
-    def fill_missing_variables(self, variables: Iterable[Variable] | None = None):
+    def fill_missing_variables(self, *, variables: Iterable[Variable] | None = None):
         """
         Fill all simple sets with the missing variables in-place.
 
@@ -420,7 +422,7 @@ class Event(AbstractCompositeSet):
         else:
             all_variables = self.variables | SortedSet(variables)
 
-        self.simple_set_example.fill_missing_variables(all_variables)
+        self.simple_set_example.fill_missing_variables(variables=all_variables)
         self.simple_set_example.cpp_object.fill_missing_variables(
             {variable.cpp_object for variable in all_variables}
         )
@@ -430,7 +432,9 @@ class Event(AbstractCompositeSet):
         self._variables = SortedSet(all_variables)
         self._simple_sets_cache = None
 
-    def fill_missing_variables_pure(self, variables: Iterable[Variable] | None = None):
+    def fill_missing_variables_pure(
+        self, *, variables: Iterable[Variable] | None = None
+    ):
         """
         Fill all simple sets with the missing variables.
 
@@ -443,17 +447,17 @@ class Event(AbstractCompositeSet):
 
         return Event.from_simple_sets(
             *[
-                simple_set.fill_missing_variables_pure(all_variables)
+                simple_set.fill_missing_variables_pure(variables=all_variables)
                 for simple_set in self.simple_sets
             ]
         )
 
-    def union_with(self, other: Self) -> Self:
+    def union_with(self, *, other: Self) -> Self:
         """
         :param other: The other event
         :return: The union of this event with the other event
         """
-        result = self._from_cpp(self.cpp_object.union_with(other.cpp_object))
+        result = self._from_cpp(cpp_object=self.cpp_object.union_with(other.cpp_object))
         # If the two events have different variable sets, update _variables to the union.
         if (
             other._variables is not None
@@ -463,7 +467,7 @@ class Event(AbstractCompositeSet):
             result._variables = self._variables | other._variables
         return result
 
-    def marginal(self, variables: VariableSet) -> Event:
+    def marginal(self, *, variables: VariableSet) -> Event:
         """
         Create the marginal event, that only contains the variables given.
 
@@ -471,13 +475,15 @@ class Event(AbstractCompositeSet):
         :return: The marginal event
         """
         result_cpp = self.cpp_object.marginal(
-            {self.get_variable(v.name).cpp_object for v in variables}
+            {self.get_variable(key=v.name).cpp_object for v in variables}
         )
         instance = Event.__new__(Event)
         instance.cpp_object = result_cpp
         instance.simple_set_example = self.simple_set_example
         # Resolve variable names to Python Variable objects from our cached set.
-        instance._variables = SortedSet(self.get_variable(v.name) for v in variables)
+        instance._variables = SortedSet(
+            self.get_variable(key=v.name) for v in variables
+        )
         return instance
 
     def is_box(self) -> bool:
@@ -517,27 +523,29 @@ class Event(AbstractCompositeSet):
                 if variable not in result:
                     result[variable] = simple_set[variable]
                 else:
-                    result[variable] = result[variable].union_with(simple_set[variable])
+                    result[variable] = result[variable].union_with(
+                        other=simple_set[variable]
+                    )
         return SimpleEvent.from_data(result)
 
-    def update_variables(self, new_variables: dict[Variable, Variable]) -> Event:
+    def update_variables(self, *, new_variables: dict[Variable, Variable]) -> Event:
         """
         See :func:`~random_events.product_algebra.SimpleEvent.update_variables`
         """
         return Event.from_simple_sets(
             *[
-                simple_event.update_variables(new_variables)
+                simple_event.update_variables(new_variables=new_variables)
                 for simple_event in self.simple_sets
             ]
         )
 
-    def add_simple_set(self, simple_set: AbstractSimpleSet):
+    def add_simple_set(self, *, simple_set: AbstractSimpleSet):
         """
         Add a simple set to this event.
 
         :param simple_set: The simple set to add
         """
-        super().add_simple_set(simple_set)
+        super().add_simple_set(simple_set=simple_set)
         self._variables = None  # Invalidate cache; new simple set may add variables
         self.fill_missing_variables()
 
@@ -553,10 +561,10 @@ class Event(AbstractCompositeSet):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         variables = [from_json(variable) for variable in data["variables"]]
         simple_sets = [
-            SimpleEvent.from_json_given_variables(simple_set, variables)
+            SimpleEvent.from_json_given_variables(data=simple_set, variables=variables)
             for simple_set in data["simple_sets"]
         ]
         return cls.from_simple_sets(*simple_sets)

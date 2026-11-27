@@ -258,7 +258,9 @@ def probabilities_of(
     return [
         float(
             circuit.probability(
-                event.__deepcopy__().fill_missing_variables_pure(circuit.variables)
+                event.__deepcopy__().fill_missing_variables_pure(
+                    variables=circuit.variables
+                )
             )
         )
         for event in events

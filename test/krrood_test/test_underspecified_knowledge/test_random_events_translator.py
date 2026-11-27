@@ -121,16 +121,16 @@ def test_disjunction_of_conjunctions():
     [position_x, position_y, position_z, orientation_z] = variables
 
     fixed_x = SimpleEvent.from_data({position_x: singleton(0.0)})
-    fixed_x.fill_missing_variables(variables)
+    fixed_x.fill_missing_variables(variables=variables)
     bounded_y_and_z = SimpleEvent.from_data(
         {
             position_z: closed(-1.0, 1.0),
             position_y: closed_open(-np.inf, 10.0),
         }
     )
-    bounded_y_and_z.fill_missing_variables(variables)
+    bounded_y_and_z.fill_missing_variables(variables=variables)
     positive_orientation_z = SimpleEvent.from_data({orientation_z: open(0.0, np.inf)})
-    positive_orientation_z.fill_missing_variables(variables)
+    positive_orientation_z.fill_missing_variables(variables=variables)
 
     assert_equal_events(
         translated,
@@ -158,14 +158,14 @@ def test_where_condition_outside_disjunctive_normal_form():
     variables = [position_x, position_y]
 
     bounded_x = SimpleEvent.from_data({position_x: open(0.0, 10.0)})
-    bounded_x.fill_missing_variables(variables)
+    bounded_x.fill_missing_variables(variables=variables)
     positive_y = SimpleEvent.from_data(
         {
             position_x: closed_open(-np.inf, 10.0),
             position_y: open(0.0, np.inf),
         }
     )
-    positive_y.fill_missing_variables(variables)
+    positive_y.fill_missing_variables(variables=variables)
 
     assert_equal_events(translated, Event.from_simple_sets(bounded_x, positive_y))
 

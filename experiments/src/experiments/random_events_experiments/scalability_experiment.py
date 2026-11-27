@@ -104,7 +104,7 @@ class RandomEventFactory:
 
     continuous_variable_bounds: SimpleInterval = field(
         default_factory=lambda: SimpleInterval.from_data(
-            0.0, 100.0, Bound.CLOSED, Bound.CLOSED
+            lower=0.0, upper=100.0, left=Bound.CLOSED, right=Bound.CLOSED
         )
     )
     """
@@ -123,7 +123,7 @@ class RandomEventFactory:
                 variables.append(
                     Symbolic(
                         name=f"symbolic_variable_{index}",
-                        domain=Set.from_iterable(range(self.domain_size)),
+                        domain=Set.from_iterable(iterable=range(self.domain_size)),
                     )
                 )
             else:
@@ -139,7 +139,10 @@ class RandomEventFactory:
             events.
         """
         return Event.from_simple_sets(
-            *[self._make_simple_event(variables) for _ in range(self.number_of_simple_sets)]
+            *[
+                self._make_simple_event(variables)
+                for _ in range(self.number_of_simple_sets)
+            ]
         )
 
     def _make_simple_event(self, variables: list[Variable]) -> SimpleEvent:
@@ -268,7 +271,8 @@ class ProductAlgebraScalabilityExperimentResult(ExperimentResult):
     def total_duration(self) -> float:
         """:return: Sum of every operation's duration for this run."""
         return sum(
-            getattr(self, operation.duration_field) for operation in ProductAlgebraOperation
+            getattr(self, operation.duration_field)
+            for operation in ProductAlgebraOperation
         )
 
     @property
@@ -391,8 +395,7 @@ class ProductAlgebraScalabilityAggregateResult(ExperimentResult):
 @dataclass
 class CompositeSetOperationMeasurement:
     """
-    Wall-clock duration and resulting simple set count of a single algebraic
-    operation.
+    Wall-clock duration and resulting simple set count of a single algebraic operation.
     """
 
     duration: float
@@ -407,7 +410,7 @@ class CompositeSetOperationMeasurement:
 
 
 def time_composite_set_operation(
-    operation: Callable[[], AbstractCompositeSet]
+    operation: Callable[[], AbstractCompositeSet],
 ) -> CompositeSetOperationMeasurement:
     """
     Measure the wall-clock duration and resulting simple set count of an operation.
@@ -434,16 +437,20 @@ def product_algebra_scalability_experiment(
     :param number_of_simple_sets: Number of simple sets requested for each event.
     :return: Timing and structural measurements for this single run.
     """
-    factory = RandomEventFactory(number_of_variables, domain_size, number_of_simple_sets)
+    factory = RandomEventFactory(
+        number_of_variables, domain_size, number_of_simple_sets
+    )
     variables = factory.make_variables()
     event_a = factory.make_event(variables)
     event_b = factory.make_event(variables)
 
     measurements = {}
     for operation in ProductAlgebraOperation:
-        arguments = (event_a, event_b) if operation.is_binary else (event_a,)
+        operation_on_event_a = functools.partial(operation.value, event_a)
         measurement = time_composite_set_operation(
-            functools.partial(operation.value, *arguments)
+            functools.partial(operation_on_event_a, other=event_b)
+            if operation.is_binary
+            else operation_on_event_a
         )
         measurements[operation.duration_field] = measurement.duration
         measurements[operation.resulting_simple_sets_field] = (
@@ -534,11 +541,17 @@ class ScalabilityFactor(enum.Enum):
 
     def __init__(self, x_attribute: str, label: str, color: str):
         self.x_attribute = x_attribute
-        """Name of the configuration field that this factor varies."""
+        """
+        Name of the configuration field that this factor varies.
+        """
         self.label = label
-        """Human-readable name of this factor, used as its legend entry."""
+        """
+        Human-readable name of this factor, used as its legend entry.
+        """
         self.color = color
-        """Plot color used for this factor's line and markers."""
+        """
+        Plot color used for this factor's line and markers.
+        """
 
 
 @dataclass
@@ -587,7 +600,9 @@ class ScalabilitySummaryPlot:
     """
 
     marker_size_range: SimpleInterval = field(
-        default_factory=lambda: SimpleInterval.from_data(8, 40, Bound.CLOSED, Bound.CLOSED)
+        default_factory=lambda: SimpleInterval.from_data(
+            lower=8, upper=40, left=Bound.CLOSED, right=Bound.CLOSED
+        )
     )
     """
     Minimum and maximum marker diameter (px) used to encode resulting simple set counts.
@@ -673,7 +688,9 @@ def main():
     variable_table = ExperimentsTable(
         [
             run_scalability_experiment(
-                number_of_variables, baseline_domain_size, baseline_number_of_simple_sets
+                number_of_variables,
+                baseline_domain_size,
+                baseline_number_of_simple_sets,
             )
             for number_of_variables in tqdm.tqdm(
                 variable_counts, desc="Number of Variables"
@@ -683,7 +700,9 @@ def main():
     domain_size_table = ExperimentsTable(
         [
             run_scalability_experiment(
-                baseline_number_of_variables, domain_size, baseline_number_of_simple_sets
+                baseline_number_of_variables,
+                domain_size,
+                baseline_number_of_simple_sets,
             )
             for domain_size in tqdm.tqdm(domain_sizes, desc="Domain Size")
         ]
@@ -691,7 +710,9 @@ def main():
     simple_set_table = ExperimentsTable(
         [
             run_scalability_experiment(
-                baseline_number_of_variables, baseline_domain_size, number_of_simple_sets
+                baseline_number_of_variables,
+                baseline_domain_size,
+                number_of_simple_sets,
             )
             for number_of_simple_sets in tqdm.tqdm(
                 simple_set_counts, desc="Number of Simple Sets"

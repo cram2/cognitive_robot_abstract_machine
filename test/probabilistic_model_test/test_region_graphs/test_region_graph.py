@@ -63,7 +63,7 @@ def target() -> Symbolic:
     """
     The variable a classification circuit predicts.
     """
-    return Symbolic(name="target", domain=Set.from_iterable(Target))
+    return Symbolic(name="target", domain=Set.from_iterable(iterable=Target))
 
 
 def continuous_variables(number_of_variables: int, prefix: str = "") -> SortedSet:

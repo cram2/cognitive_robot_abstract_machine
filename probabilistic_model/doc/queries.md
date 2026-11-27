@@ -56,8 +56,8 @@ class Shape(IntEnum):
     TRIANGLE = 2
 
 
-color = Symbolic(name="color", domain=Set.from_iterable(Color))
-shape = Symbolic(name="shape", domain=Set.from_iterable(Shape))
+color = Symbolic(name="color", domain=Set.from_iterable(iterable=Color))
+shape = Symbolic(name="shape", domain=Set.from_iterable(iterable=Shape))
 
 probabilities = np.array([[2 / 15, 1 / 15, 1 / 5],
                           [1 / 5, 1 / 10, 3 / 10]])
@@ -431,7 +431,7 @@ We can now calculate the probability that $x_1 \in (0.5, 1.)
 
 ```{code-cell} ipython3
 event = SimpleEvent.from_data({x1: closed(0.25, 1.), x2: closed(0., 1.)}).as_composite_set()
-monte_carlo_probability = sum([event.contains(sample) for sample in samples]) / len(samples)
+monte_carlo_probability = sum([event.contains(item=sample) for sample in samples]) / len(samples)
 
 fig.add_traces(EventPlotter(event=event).plot())
 fig.show()

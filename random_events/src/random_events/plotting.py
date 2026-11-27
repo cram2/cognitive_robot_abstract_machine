@@ -266,7 +266,7 @@ class EventPlotter:
     per box.
     """
 
-    def plot(self, color: str = "#636EFA") -> list[go.Scatter] | list[go.Mesh3d]:
+    def plot(self, *, color: str = "#636EFA") -> list[go.Scatter] | list[go.Mesh3d]:
         """
         :param color: The color to use for the event.
         :return: The traces of every simple set the event is the union of.
@@ -315,7 +315,7 @@ class EventPlotter:
         )
 
     def plot_3d_mesh(
-        self, color: str, opacity: float = 1.0, name: str = "Event"
+        self, *, color: str, opacity: float = 1.0, name: str = "Event"
     ) -> go.Mesh3d:
         """
         Draw every box the event decomposes into as one solid mesh, so that any number
@@ -347,7 +347,7 @@ class EventPlotter:
         )
 
     def plot_3d_wireframe(
-        self, color: str, width: float = 1.0, name: str = "Event"
+        self, *, color: str, width: float = 1.0, name: str = "Event"
     ) -> go.Scatter3d:
         """
         Draw the edges of every box the event decomposes into as one line trace, which

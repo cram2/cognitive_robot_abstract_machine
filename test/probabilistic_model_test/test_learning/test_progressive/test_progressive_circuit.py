@@ -483,7 +483,7 @@ def test_learn_floors_gaussian_variance_at_minimum_gaussian_variance():
 
 
 def test_learn_fits_symbolic_leaf_to_data_of_single_column():
-    color = Symbolic(name="color", domain=Set.from_iterable(Color))
+    color = Symbolic(name="color", domain=Set.from_iterable(iterable=Color))
     template = ProbabilisticCircuit()
     leaf(
         SymbolicDistribution(
@@ -750,7 +750,7 @@ def _make_indicator_variable(name: str, branch_count: int) -> Symbolic:
     return Symbolic(
         name=name,
         domain=Set.from_iterable(
-            [f"{name}-{branch_index}" for branch_index in range(branch_count)]
+            iterable=[f"{name}-{branch_index}" for branch_index in range(branch_count)]
         ),
     )
 
@@ -800,7 +800,7 @@ def _make_nested_layout() -> ProbabilisticCircuit:
     """
     circuit = ProbabilisticCircuit()
     top_branch = Symbolic(
-        name="nested_top", domain=Set.from_iterable(["outer-0", "outer-1"])
+        name="nested_top", domain=Set.from_iterable(iterable=["outer-0", "outer-1"])
     )
     outer_variables = [
         Continuous(name=f"nested_x{variable_index}") for variable_index in range(3)

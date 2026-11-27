@@ -156,7 +156,7 @@ class ProbabilisticModel(ABC):
         :param event: The event.
         :return: The probability of the event.
         """
-        event.fill_missing_variables(set(self.variables))
+        event.fill_missing_variables(variables=set(self.variables))
         return sum(
             self.probability_of_simple_event(simple_set)
             for simple_set in event.simple_sets
@@ -232,7 +232,7 @@ class ProbabilisticModel(ABC):
             utils module.
         :return: The truncated distribution and the probability of the event.
         """
-        event.fill_missing_variables(set(self.variables))
+        event.fill_missing_variables(variables=set(self.variables))
         return self.log_truncated(event, singleton_allowed).exponentiated()
 
     @abstractmethod
@@ -746,7 +746,7 @@ class ProbabilisticModel(ABC):
         self, simple_event: SimpleEvent, samples: npt.NDArray
     ):
         # filter samples by this event
-        samples_of_this_event = [s for s in samples if simple_event.contains(s)]
+        samples_of_this_event = [s for s in samples if simple_event.contains(item=s)]
 
         if len(samples_of_this_event) == 0:
             return go.Surface()

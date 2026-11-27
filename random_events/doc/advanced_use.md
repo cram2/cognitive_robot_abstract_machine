@@ -67,7 +67,7 @@ for color in colors:
     pixel_indices = np.transpose(np.nonzero(np.all(image == color, axis=-1)))
     complex_event = indices_to_complex_event(pixel_indices)
     complex_events.append(complex_event)
-    traces = EventPlotter(event=complex_event).plot(f"rgb({color[0]},{color[1]},{color[2]})")
+    traces = EventPlotter(event=complex_event).plot(color=f"rgb({color[0]},{color[1]},{color[2]})")
     fig.update_layout(EventPlotter(event=complex_event).plotly_layout())
     fig.add_traces(traces)
 

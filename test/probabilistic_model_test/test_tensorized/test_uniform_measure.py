@@ -52,7 +52,7 @@ def test_the_uniform_measure_of_separate_regions_samples_inside_them() -> None:
 
     samples = uniform_measure_of_event(event).sample(200)
 
-    assert all(event.contains(sample) for sample in samples)
+    assert all(event.contains(item=sample) for sample in samples)
 
 
 def test_pieces_are_drawn_in_proportion_to_their_width() -> None:
@@ -90,7 +90,7 @@ def test_the_uniform_measure_of_an_event_with_points_samples_inside_it() -> None
     samples = uniform_measure_of_event(event).sample(50)
 
     assert np.all(samples[:, 0] == 0.5)
-    assert all(event.contains(sample) for sample in samples)
+    assert all(event.contains(item=sample) for sample in samples)
 
 
 def test_the_uniform_measure_of_pieces_sharing_a_point_samples_inside_them() -> None:
@@ -107,7 +107,7 @@ def test_the_uniform_measure_of_pieces_sharing_a_point_samples_inside_them() -> 
     samples = uniform_measure_of_event(event).sample(50)
 
     assert np.all(samples[:, 2] == 0.0)
-    assert all(event.contains(sample) for sample in samples)
+    assert all(event.contains(item=sample) for sample in samples)
 
 
 def test_a_set_of_only_points_draws_each_point_equally_often() -> None:
@@ -164,7 +164,7 @@ def test_the_uniform_measure_draws_every_allowed_integer_equally_often() -> None
 
 
 def test_the_uniform_measure_draws_every_allowed_symbol_equally_often() -> None:
-    colour = Symbolic(name="colour", domain=Set.from_iterable(Colour))
+    colour = Symbolic(name="colour", domain=Set.from_iterable(iterable=Colour))
     event = SimpleEvent.from_data(
         {colour: (Colour.RED, Colour.BLUE)}
     ).as_composite_set()

@@ -326,7 +326,7 @@ class TestTruncatingTheLeaf:
         ).as_composite_set()
         truncation = circuit.log_truncated(event)
         assert truncation.log_probability == pytest.approx(
-            np.log(correlated.probability(event.marginal([first, second])))
+            np.log(correlated.probability(event.marginal(variables=[first, second])))
         )
         assert truncation.distribution.probability(
             truncation.distribution.support
@@ -353,7 +353,7 @@ class TestTruncatingTheLeaf:
         ).as_composite_set()
         truncation = circuit.log_truncated(event)
         assert truncation.log_probability == pytest.approx(
-            np.log(correlated.probability(event.marginal([first, second])))
+            np.log(correlated.probability(event.marginal(variables=[first, second])))
         )
         assert truncation.distribution.probability(
             truncation.distribution.support

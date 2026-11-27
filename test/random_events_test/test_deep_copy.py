@@ -19,7 +19,7 @@ def horizontal() -> Continuous:
 
 @pytest.fixture
 def color() -> Symbolic:
-    return Symbolic(name="color", domain=Set.from_iterable(["red", "green"]))
+    return Symbolic(name="color", domain=Set.from_iterable(iterable=["red", "green"]))
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def event(horizontal: Continuous, color: Symbolic) -> Event:
     [
         Continuous(name="horizontal"),
         Integer(name="count"),
-        Symbolic(name="color", domain=Set.from_iterable(["red", "green"])),
+        Symbolic(name="color", domain=Set.from_iterable(iterable=["red", "green"])),
     ],
 )
 def test_a_deep_copy_of_a_variable_is_the_variable(variable: Variable):
@@ -48,7 +48,9 @@ def test_a_deep_copy_of_a_variable_is_the_variable(variable: Variable):
 
 
 def test_a_deep_copy_of_a_simple_interval_is_an_equal_simple_interval():
-    simple_interval = SimpleInterval.from_data(0, 1, Bound.CLOSED, Bound.OPEN)
+    simple_interval = SimpleInterval.from_data(
+        lower=0, upper=1, left=Bound.CLOSED, right=Bound.OPEN
+    )
     copied = copy.deepcopy(simple_interval)
     assert copied == simple_interval
     assert copied is not simple_interval
@@ -62,7 +64,9 @@ def test_a_deep_copy_of_an_interval_is_an_equal_interval():
 
 
 def test_a_deep_copy_of_a_set_element_is_an_equal_set_element(color: Symbolic):
-    element = SetElement.from_data("red", color.domain.all_elements)
+    element = SetElement.from_data(
+        element="red", all_elements=color.domain.all_elements
+    )
     copied = copy.deepcopy(element)
     assert copied == element
     assert copied is not element

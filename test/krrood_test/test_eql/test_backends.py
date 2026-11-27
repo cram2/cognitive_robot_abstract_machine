@@ -176,7 +176,7 @@ def test_probabilistic_backend_with_symbolic_expression():
     prob_q = a(KRROODPosition)(x=..., y=..., z=variable(int, domain=[1, 2, 3]))
     parameters = UnderspecifiedParameters(statement=prob_q)
     assert parameters.variables["KRROODPosition.z"] == Symbolic(
-        name="KRROODPosition.z", domain=Set.from_iterable([1, 2, 3])
+        name="KRROODPosition.z", domain=Set.from_iterable(iterable=[1, 2, 3])
     )
 
 

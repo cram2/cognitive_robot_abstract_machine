@@ -249,7 +249,7 @@ for index, (x_interval, y_interval) in enumerate(itertools.product([closed(-0.25
     sub_event = SimpleEvent.from_data({x: x_interval, y: y_interval})
     sub_event_trace = event_trace(sub_event, f"A_{index + 1}")
     fig.add_trace(sub_event_trace)
-    intersection_trace = event_trace(sub_event.intersection_with(x_event), f"A_{index + 1} and X")
+    intersection_trace = event_trace(sub_event.intersection_with(other=x_event), f"A_{index + 1} and X")
     fig.add_trace(intersection_trace)
 fig.update_layout(title="Visualization of the law of total probability and Bayes theorem")
 fig.show()
@@ -341,8 +341,8 @@ class Shape(IntEnum):
     TRIANGLE = 2
 
 
-color = Symbolic(name="color", domain=Set.from_iterable(Color))
-shape = Symbolic(name="shape", domain=Set.from_iterable(Shape))
+color = Symbolic(name="color", domain=Set.from_iterable(iterable=Color))
+shape = Symbolic(name="shape", domain=Set.from_iterable(iterable=Shape))
 
 probabilities = np.array([[2 / 15, 1 / 15, 1 / 5],
                           [1 / 5, 1 / 10, 3 / 10]])
@@ -405,7 +405,7 @@ class Size(IntEnum):
     SMALL = 0
     LARGE = 1
     
-size = Symbolic(name="size", domain=Set.from_iterable(Size))
+size = Symbolic(name="size", domain=Set.from_iterable(iterable=Size))
 
 probabilities = np.array([[[2 / 30, 1 / 30, 1 / 10], [0, 0.3, 0.05]],
                           [[1 / 10, 1 / 20, 3 / 20], [ 0.15, 0, 0.,]]])

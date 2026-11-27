@@ -51,7 +51,7 @@ def test_constraint_widget_returns_the_constraint_it_was_set_to(
     assert constraint.simple_sets[0].lower == pytest.approx(0.2, abs=1e-3)
     assert constraint.simple_sets[0].upper == pytest.approx(0.8, abs=1e-3)
 
-    widget.set_constraint(symbolic_variable, Set.from_iterable(["b"]))
+    widget.set_constraint(symbolic_variable, Set.from_iterable(iterable=["b"]))
     variable, constraint = widget.get_constraint()
     assert variable == symbolic_variable
     assert [str(element.element) for element in constraint.simple_sets] == ["b"]

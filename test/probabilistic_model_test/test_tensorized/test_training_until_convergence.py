@@ -727,7 +727,7 @@ def circuit_with_symbolic_leaves() -> LayeredProbabilisticCircuit:
     """
     variables = SortedSet(
         [
-            Symbolic(name=f"bit_{index}", domain=Set.from_iterable(Bit))
+            Symbolic(name=f"bit_{index}", domain=Set.from_iterable(iterable=Bit))
             for index in range(4)
         ]
         + [Continuous(name=f"x_{index}") for index in range(4)]

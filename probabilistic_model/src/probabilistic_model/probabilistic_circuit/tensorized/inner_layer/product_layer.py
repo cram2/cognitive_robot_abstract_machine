@@ -325,7 +325,9 @@ class ProductLayer(InnerLayer):
         for edge in self.iterate_edges():
             support = child_supports[edge.child_layer_index][edge.child_node]
             if result[edge.node] is None:
-                result[edge.node] = support.fill_missing_variables_pure(own_variables)
+                result[edge.node] = support.fill_missing_variables_pure(
+                    variables=own_variables
+                )
             else:
                 result[edge.node] = result[edge.node] & support
 
@@ -349,10 +351,12 @@ class ProductLayer(InnerLayer):
             values[edge.node] += child_modes[edge.child_layer_index][1][edge.child_node]
             if events[edge.node] is None:
                 events[edge.node] = child_event.fill_missing_variables_pure(
-                    own_variables
+                    variables=own_variables
                 )
             else:
-                events[edge.node] = events[edge.node].intersection_with(child_event)
+                events[edge.node] = events[edge.node].intersection_with(
+                    other=child_event
+                )
 
         return [Event() if event is None else event for event in events], values
 

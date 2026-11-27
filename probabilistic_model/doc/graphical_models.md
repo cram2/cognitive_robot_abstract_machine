@@ -84,9 +84,9 @@ class Mood(IntEnum):
     HAPPY = 0
     SAD = 1
 
-success = Symbolic(name="Success", domain=Set.from_iterable(Success))
-object_position = Symbolic(name="ObjectPosition", domain=Set.from_iterable(ObjectPosition))
-mood = Symbolic(name="Mood", domain=Set.from_iterable(Mood))
+success = Symbolic(name="Success", domain=Set.from_iterable(iterable=Success))
+object_position = Symbolic(name="ObjectPosition", domain=Set.from_iterable(iterable=ObjectPosition))
+mood = Symbolic(name="Mood", domain=Set.from_iterable(iterable=Mood))
 x = Continuous(name="x")
 y = Continuous(name="y")
 

@@ -175,7 +175,7 @@ def test_overlapping_components_are_reported_with_their_overlap(circuit_type, x)
         as_type(circuit, circuit_type), SortedSet([x])
     )
     first, second = supports
-    assert first.intersection_with(second).size > 0
+    assert first.intersection_with(other=second).size > 0
 
 
 def test_both_circuit_types_report_the_same_mixtures(two_independent_mixtures, x, y):
@@ -216,7 +216,9 @@ def test_restriction_keeps_the_distribution_of_the_variables_it_keeps(
     restricted = circuit.restrict_to_variables([x])
     assert restricted.probability(interval_event(x, 0.0, 1.0)) == pytest.approx(
         circuit.probability(
-            interval_event(x, 0.0, 1.0).fill_missing_variables_pure(circuit.variables)
+            interval_event(x, 0.0, 1.0).fill_missing_variables_pure(
+                variables=circuit.variables
+            )
         )
     )
 

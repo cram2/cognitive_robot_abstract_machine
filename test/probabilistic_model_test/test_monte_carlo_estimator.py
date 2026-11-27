@@ -36,11 +36,15 @@ def test_total_variation_distance_of_nearly_identical_models_is_accurate(
 def test_total_variation_distance_of_disjoint_models_is_one(x: Continuous):
     model = UniformDistribution(
         variable=x,
-        interval=SimpleInterval.from_data(0, 1, Bound.CLOSED, Bound.OPEN),
+        interval=SimpleInterval.from_data(
+            lower=0, upper=1, left=Bound.CLOSED, right=Bound.OPEN
+        ),
     )
     other = UniformDistribution(
         variable=x,
-        interval=SimpleInterval.from_data(2, 3, Bound.CLOSED, Bound.OPEN),
+        interval=SimpleInterval.from_data(
+            lower=2, upper=3, left=Bound.CLOSED, right=Bound.OPEN
+        ),
     )
 
     assert MonteCarloEstimator(model).total_variation_distance(other) == 1

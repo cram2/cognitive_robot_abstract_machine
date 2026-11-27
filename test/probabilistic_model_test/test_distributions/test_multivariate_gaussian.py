@@ -377,7 +377,7 @@ class TestPrecision:
 class TestMode:
     def test_the_mode_is_the_mean(self, independent, horizontal, vertical):
         mode = independent.mode()
-        assert mode.event.contains(np.array([1.0, -2.0]))
+        assert mode.event.contains(item=np.array([1.0, -2.0]))
         assert mode.likelihood == pytest.approx(
             independent.likelihood(np.array([[1.0, -2.0]]))[0]
         )
@@ -913,7 +913,7 @@ class TestTruncation:
         box = box_over(horizontal, vertical, -1.0, 1.0).as_composite_set()
         truncated = correlated.truncated(box).distribution
         mode = truncated.mode().event
-        assert mode.contains(np.array([0.0, 0.0]))
+        assert mode.contains(item=np.array([0.0, 0.0]))
 
     def test_the_mode_of_variables_that_do_not_co_vary_is_the_mean_pulled_into_the_box(
         self, independent, horizontal, vertical
@@ -1026,7 +1026,7 @@ class TestTruncation:
         truncated = correlated.truncated(box).distribution
         samples = truncated.sample(200)
         assert samples.shape == (200, 2)
-        assert all(truncated.support.contains(sample) for sample in samples)
+        assert all(truncated.support.contains(item=sample) for sample in samples)
 
     def test_samples_of_correlated_variables_follow_the_truncated_distribution(
         self, horizontal, vertical
@@ -1065,7 +1065,7 @@ class TestTruncation:
         truncated = correlated.truncated(unlikely).distribution
         samples = truncated.sample(50)
         assert samples.shape == (50, 2)
-        assert all(truncated.support.contains(sample) for sample in samples)
+        assert all(truncated.support.contains(item=sample) for sample in samples)
 
     def test_variables_that_do_not_co_vary_are_sampled_in_a_distant_box(
         self, independent, horizontal, vertical
@@ -1077,7 +1077,7 @@ class TestTruncation:
         truncated = independent.truncated(unlikely).distribution
         samples = truncated.sample(50)
         assert samples.shape == (50, 2)
-        assert all(truncated.support.contains(sample) for sample in samples)
+        assert all(truncated.support.contains(item=sample) for sample in samples)
 
 
 # %% fixing a variable of a distribution that has already been confined

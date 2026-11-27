@@ -71,19 +71,19 @@ class Variable(CPPWrapper):
 
     @classmethod
     @abstractmethod
-    def _from_cpp(cls, cpp_object):
+    def _from_cpp(cls, *, cpp_object):
         """
         Create a variable from a C++ object.
         """
         if type(cpp_object) == rl.Symbolic:
-            return Symbolic._from_cpp(cpp_object)
+            return Symbolic._from_cpp(cpp_object=cpp_object)
         elif type(cpp_object) == rl.Continuous:
-            return Continuous._from_cpp(cpp_object)
+            return Continuous._from_cpp(cpp_object=cpp_object)
         elif type(cpp_object) == rl.Integer:
-            return Integer._from_cpp(cpp_object)
+            return Integer._from_cpp(cpp_object=cpp_object)
 
     @abstractmethod
-    def make_value(self, value: Any) -> AbstractCompositeSet:
+    def make_value(self, *, value: Any) -> AbstractCompositeSet:
         """
         Create a value of the domain from an arbitrary value.
 
@@ -113,10 +113,10 @@ class Continuous(Variable):
         return True
 
     @classmethod
-    def _from_cpp(cls, cpp_object):
+    def _from_cpp(cls, *, cpp_object):
         return cls(name=cpp_object.name)
 
-    def make_value(self, value: Any) -> Interval:
+    def make_value(self, *, value: Any) -> Interval:
         if isinstance(value, (int, float)):
             return singleton(value)
         elif isinstance(value, SimpleInterval):
@@ -148,13 +148,14 @@ class Symbolic(Variable):
         return False
 
     @classmethod
-    def _from_cpp(cls, cpp_object):
+    def _from_cpp(cls, *, cpp_object):
         return cls(
-            name=cpp_object.name, domain=cpp_object.domain._from_cpp(cpp_object.domain)
+            name=cpp_object.name,
+            domain=cpp_object.domain._from_cpp(cpp_object=cpp_object.domain),
         )
 
-    def make_value(self, value) -> Set:
-        if self.names_one_element(value):
+    def make_value(self, *, value) -> Set:
+        if self.names_one_element(value=value):
             value = [value]
 
         parsed_value = []
@@ -180,7 +181,7 @@ class Symbolic(Variable):
         return Set.from_simple_sets(*parsed_value)
 
     @staticmethod
-    def names_one_element(value: Any) -> bool:
+    def names_one_element(*, value: Any) -> bool:
         """
         Whether a value stands for one element of this variable's domain rather than for
         a collection of them.
@@ -213,11 +214,11 @@ class Integer(Variable):
         return True
 
     @classmethod
-    def _from_cpp(cls, cpp_object):
+    def _from_cpp(cls, *, cpp_object):
         return cls(name=cpp_object.name)
 
-    def make_value(self, value: Any) -> Interval:
-        return Continuous.make_value(self, value)
+    def make_value(self, *, value: Any) -> Interval:
+        return Continuous.make_value(self, value=value)
 
 
 def variable_from_name_and_type(name: str, type_: type) -> Variable:
@@ -229,9 +230,9 @@ def variable_from_name_and_type(name: str, type_: type) -> Variable:
     :return: The created variable
     """
     if issubclass(type_, enum.Enum):
-        result = Symbolic(name=name, domain=Set.from_iterable(type_))
+        result = Symbolic(name=name, domain=Set.from_iterable(iterable=type_))
     elif issubclass(type_, bool):
-        result = Symbolic(name=name, domain=Set.from_iterable([True, False]))
+        result = Symbolic(name=name, domain=Set.from_iterable(iterable=[True, False]))
     elif issubclass(type_, int):
         result = Integer(name=name)
     elif issubclass(type_, float):

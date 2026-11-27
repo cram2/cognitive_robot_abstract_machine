@@ -38,17 +38,17 @@ class IntegerTestCase(unittest.TestCase):
 
 class SymbolicTestCase(unittest.TestCase):
     def test_creation(self):
-        a = SetElement.from_data("a", str_set)
-        b = SetElement.from_data("b", str_set)
-        c = SetElement.from_data("c", str_set)
+        a = SetElement.from_data(element="a", all_elements=str_set)
+        b = SetElement.from_data(element="b", all_elements=str_set)
+        c = SetElement.from_data(element="c", all_elements=str_set)
         x = Symbolic(name="x", domain=Set.from_simple_sets(a, b, c))
         self.assertEqual(x.name, "x")
         self.assertEqual(x.domain, Set.from_simple_sets(a, b, c))
 
     def test_to_json(self):
-        a = SetElement.from_data("a", str_set)
-        b = SetElement.from_data("b", str_set)
-        c = SetElement.from_data("c", str_set)
+        a = SetElement.from_data(element="a", all_elements=str_set)
+        b = SetElement.from_data(element="b", all_elements=str_set)
+        c = SetElement.from_data(element="c", all_elements=str_set)
         x = Symbolic(name="x", domain=Set.from_simple_sets(a, b, c))
         x_ = from_json(to_json(x))
         self.assertEqual(x, x_)
@@ -58,11 +58,11 @@ class SymbolicTestCase(unittest.TestCase):
         A string is one value: it is iterable, but the elements it stands for are its
         whole self rather than each of its characters.
         """
-        cube = SetElement.from_data("cube", shape_set)
-        disk = SetElement.from_data("disk", shape_set)
+        cube = SetElement.from_data(element="cube", all_elements=shape_set)
+        disk = SetElement.from_data(element="disk", all_elements=shape_set)
         x = Symbolic(name="x", domain=Set.from_simple_sets(cube, disk))
 
-        self.assertEqual(x.make_value("cube"), Set.from_simple_sets(cube))
+        self.assertEqual(x.make_value(value="cube"), Set.from_simple_sets(cube))
 
     def test_a_member_of_a_string_valued_enum_names_one_element(self):
         """
@@ -70,27 +70,27 @@ class SymbolicTestCase(unittest.TestCase):
         that element and not the letters of its name.
         """
         shapes = StrEnum("Shape", {"CUBE": "cube", "DISK": "disk"})
-        x = Symbolic(name="x", domain=Set.from_iterable(shapes))
+        x = Symbolic(name="x", domain=Set.from_iterable(iterable=shapes))
 
-        self.assertEqual(x.make_value(shapes.CUBE), x.make_value("cube"))
+        self.assertEqual(x.make_value(value=shapes.CUBE), x.make_value(value="cube"))
 
     def test_several_values_are_still_taken_as_several(self):
         """
         A collection of values stands for each of them, which is what makes an iterable
         value ambiguous in the first place.
         """
-        cube = SetElement.from_data("cube", shape_set)
-        disk = SetElement.from_data("disk", shape_set)
+        cube = SetElement.from_data(element="cube", all_elements=shape_set)
+        disk = SetElement.from_data(element="disk", all_elements=shape_set)
         x = Symbolic(name="x", domain=Set.from_simple_sets(cube, disk))
 
         self.assertEqual(
-            x.make_value(["cube", "disk"]), Set.from_simple_sets(cube, disk)
+            x.make_value(value=["cube", "disk"]), Set.from_simple_sets(cube, disk)
         )
 
     def test_empty_domain(self):
         def make_variable():
             domain_cls = IntEnum("Domain", {"A": 1, "B": 2})
-            x = Symbolic(name="x", domain=Set.from_iterable(domain_cls))
+            x = Symbolic(name="x", domain=Set.from_iterable(iterable=domain_cls))
             return x
 
         result = make_variable()
@@ -126,7 +126,7 @@ class CustomObjectSetTestCase(unittest.TestCase):
         e1 = HashableTestClass(1)
         e2 = HashableTestClass(2)
         e3 = HashableTestClass(3)
-        x = Symbolic(name="x", domain=Set.from_iterable({e1, e2, e3}))
+        x = Symbolic(name="x", domain=Set.from_iterable(iterable={e1, e2, e3}))
         self.assertEqual(x.name, "x")
         se = SimpleEvent.from_data({x: e1}).as_composite_set()
         self.assertFalse(se.is_empty())

@@ -102,7 +102,11 @@ class SearchSpaceVolumeLayer(VolumeLayer):
             *(box.simple_event for box in scene.search_space)
         )
         plotter = EventPlotter(event=event)
-        return [plotter.plot_3d_wireframe(palette.text_secondary, 2.0, "search space")]
+        return [
+            plotter.plot_3d_wireframe(
+                color=palette.text_secondary, width=2.0, name="search space"
+            )
+        ]
 
 
 class ObstacleEmphasis(float, enum.Enum):
@@ -136,8 +140,12 @@ class ObstacleVolumeLayer(VolumeLayer):
         event = Event.from_simple_sets(*(box.simple_event for box in scene.obstacles))
         plotter = EventPlotter(event=event)
         return [
-            plotter.plot_3d_mesh(palette.obstacle, self.emphasis.value, "obstacle"),
-            plotter.plot_3d_wireframe(palette.obstacle_edge, 1.0, "obstacle"),
+            plotter.plot_3d_mesh(
+                color=palette.obstacle, opacity=self.emphasis.value, name="obstacle"
+            ),
+            plotter.plot_3d_wireframe(
+                color=palette.obstacle_edge, width=1.0, name="obstacle"
+            ),
         ]
 
 
@@ -160,8 +168,12 @@ class ConvexSetVolumeLayer(VolumeLayer):
         event = Event.from_simple_sets(*(box.simple_event for box in scene.convex_sets))
         plotter = EventPlotter(event=event)
         return [
-            plotter.plot_3d_mesh(palette.convex_set, self.fill_opacity, "convex set"),
-            plotter.plot_3d_wireframe(palette.convex_set_edge, 1.0, "convex set"),
+            plotter.plot_3d_mesh(
+                color=palette.convex_set, opacity=self.fill_opacity, name="convex set"
+            ),
+            plotter.plot_3d_wireframe(
+                color=palette.convex_set_edge, width=1.0, name="convex set"
+            ),
         ]
 
 

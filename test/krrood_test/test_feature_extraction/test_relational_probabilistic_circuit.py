@@ -769,12 +769,12 @@ def test_exact_grounding_preserves_correlation_with_the_retained_latent(
         cause_event = (
             SimpleEvent.from_data({chair_count_variable: chair_count})
             .as_composite_set()
-            .fill_missing_variables_pure(interventional_circuit.variables)
+            .fill_missing_variables_pure(variables=interventional_circuit.variables)
         )
         chair_event = (
             SimpleEvent.from_data({object_type_variable: SceneObjectType.CHAIR})
             .as_composite_set()
-            .fill_missing_variables_pure(interventional_circuit.variables)
+            .fill_missing_variables_pure(variables=interventional_circuit.variables)
         )
         cause_probability = interventional_circuit.probability(cause_event)
         assert cause_probability > 0

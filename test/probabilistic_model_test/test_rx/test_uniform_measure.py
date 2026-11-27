@@ -64,7 +64,7 @@ def test_the_uniform_measure_of_pieces_sharing_a_point_samples_inside_them() -> 
     samples = uniform_measure_of_event(event).sample(50)
 
     assert np.all(samples[:, 2] == 0.0)
-    assert all(event.contains(sample) for sample in samples)
+    assert all(event.contains(item=sample) for sample in samples)
 
 
 # %% weights of pieces

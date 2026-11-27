@@ -50,7 +50,7 @@ def vertical() -> Continuous:
 
 @pytest.fixture
 def color() -> Symbolic:
-    return Symbolic(name="color", domain=Set.from_iterable(["red", "green"]))
+    return Symbolic(name="color", domain=Set.from_iterable(iterable=["red", "green"]))
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def circuit(horizontal: Continuous, vertical: Continuous) -> ProbabilisticCircui
             leaf(
                 UniformDistribution(
                     variable=horizontal,
-                    interval=SimpleInterval.from_data(lower, lower + 1),
+                    interval=SimpleInterval.from_data(lower=lower, upper=lower + 1),
                 ),
                 result,
             )
@@ -109,13 +109,13 @@ def model(
     if request.param == ModelKind.TRUNCATED_GAUSSIAN:
         return TruncatedGaussianDistribution(
             variable=horizontal,
-            interval=SimpleInterval.from_data(-1, 1),
+            interval=SimpleInterval.from_data(lower=-1, upper=1),
             location=0.0,
             scale=1.0,
         )
     if request.param == ModelKind.UNIFORM:
         return UniformDistribution(
-            variable=horizontal, interval=SimpleInterval.from_data(0, 1)
+            variable=horizontal, interval=SimpleInterval.from_data(lower=0, upper=1)
         )
     if request.param == ModelKind.DIRAC_DELTA:
         return DiracDeltaDistribution(
