@@ -1,3 +1,7 @@
+"""
+The work items and states the conversions between DAOs and domain objects share.
+"""
+
 from __future__ import annotations
 
 import abc
@@ -8,6 +12,7 @@ from typing_extensions import (
     TYPE_CHECKING,
     Generic,
     Any,
+    TypeAlias,
     TypeVar,
 )
 
@@ -15,6 +20,11 @@ if TYPE_CHECKING:
     from krrood.ormatic.data_access_objects.dao import (
         DataAccessObject,
     )
+
+DomainObject: TypeAlias = Any
+"""
+An object of a domain class that a DAO maps.
+"""
 
 InstanceDict = Dict[int, Any]  # Dictionary that maps object ids to objects
 WorkItemT = TypeVar("WorkItemT", bound="DataAccessObjectWorkItem")

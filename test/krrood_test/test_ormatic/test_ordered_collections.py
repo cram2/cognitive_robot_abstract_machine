@@ -9,7 +9,7 @@ from sqlalchemy import event, select
 
 from krrood.entity_query_language.factories import an, entity, variable
 from krrood.ormatic.collection_shape import LevelColumnNames
-from krrood.ormatic.data_access_objects.dao import AssociationDataAccessObject
+from krrood.ormatic.data_access_objects.relationships import AssociationDataAccessObject
 from krrood.ormatic.data_access_objects.helper import to_dao
 from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.ormatic.result_loading import RelationshipLoading, ResultLoading

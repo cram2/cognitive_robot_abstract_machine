@@ -56,11 +56,11 @@ from krrood.entity_query_language.operators.aggregators import (
 
 from krrood.entity_query_language.operators.conditionals import CaseWhen
 from krrood.exceptions import DataclassException
-from krrood.ormatic.data_access_objects.dao import (
+from krrood.ormatic.data_access_objects.relationships import (
     RelationshipInformationKey,
-    StoredObjectColumn,
-    get_dao_schema,
 )
+from krrood.ormatic.data_access_objects.schema import get_dao_schema
+from krrood.ormatic.data_access_objects.stored_object_row import StoredObjectColumn
 from krrood.ormatic.stored_object import StoredObjectDAO
 from krrood.ormatic.data_access_objects.helper import (
     get_data_access_object_class,

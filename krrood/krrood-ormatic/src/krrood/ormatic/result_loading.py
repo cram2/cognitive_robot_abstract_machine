@@ -18,11 +18,11 @@ from typing_extensions import Any, Iterable, Iterator, Sequence, get_origin
 
 from krrood.entity_query_language.core.base_expressions import HasExpression
 from krrood.entity_query_language.query.query import Entity
-from krrood.ormatic.data_access_objects.dao import (
-    DataAccessObject,
+from krrood.ormatic.data_access_objects.dao import DataAccessObject
+from krrood.ormatic.data_access_objects.relationship_loading import selectin_loading
+from krrood.ormatic.data_access_objects.stored_object_row import (
     StoredObjectColumn,
     StoredObjectRow,
-    selectin_loading,
 )
 from krrood.symbol_graph.symbol_graph import GarbageCollectionPause
 from krrood.ormatic.data_access_objects.helper import (
@@ -53,7 +53,7 @@ class RelationshipLoading(StrEnum):
     FOR_CONVERSION = "for_conversion"
     """
     Every relationship of the selected objects loads with them, as inside
-    :func:`~krrood.ormatic.data_access_objects.dao.selectin_loading`. Use it when the
+    :func:`~krrood.ormatic.data_access_objects.relationship_loading.selectin_loading`. Use it when the
     results are converted to domain objects.
     """
 

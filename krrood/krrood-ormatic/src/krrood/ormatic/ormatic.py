@@ -29,6 +29,8 @@ from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeM
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
     PartDataAccessObject,
+)
+from krrood.ormatic.data_access_objects.relationships import (
     RelationshipInformationKey,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO

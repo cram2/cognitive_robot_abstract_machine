@@ -12,7 +12,7 @@ from sqlalchemy import event, func, inspect, select, update
 from sqlalchemy.orm import ORMExecuteState
 
 from krrood.entity_query_language.factories import an, entity, set_of, variable
-from krrood.ormatic.data_access_objects.dao import StoredObjectRow
+from krrood.ormatic.data_access_objects.stored_object_row import StoredObjectRow
 from krrood.ormatic.exceptions import (
     PartOfDetachedObjectNotLoadedError,
     UnsupportedResultLoadingError,

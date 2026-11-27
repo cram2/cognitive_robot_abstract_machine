@@ -22,7 +22,7 @@ from krrood.ormatic.collection_shape import (
 )
 from krrood.ormatic.field_storage import FieldStorage, FieldToStore, ValueStorage
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
-from krrood.ormatic.data_access_objects.dao import (
+from krrood.ormatic.data_access_objects.relationships import (
     RelationshipInformationKey,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
