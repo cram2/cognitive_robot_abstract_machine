@@ -23,6 +23,9 @@ from semantic_digital_twin.semantic_annotations.qualities.mixins import (
 from semantic_digital_twin.semantic_annotations.qualities.quality import (
     MassDensity,
     MaterialElasticity,
+    PhysicsQuality,
+    Quality,
+    Ripeness,
     SkinThickness,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
@@ -267,3 +270,25 @@ def test_a_yolk_has_no_thickness(world: World) -> None:
         yolk = Yolk.create_with_new_body_in_world(name="yolk", world=world)
         with pytest.raises(NoFieldAcceptsEntity):
             yolk.set_quality(quality=SkinThickness(value=point(0.4e-3)))
+
+
+# %% Physics qualities
+
+
+@pytest.mark.parametrize(
+    "quality_type, is_physics_quality",
+    [
+        (MassDensity, True),
+        (MaterialElasticity, True),
+        (SkinThickness, True),
+        (Ripeness, False),
+    ],
+)
+def test_only_qualities_physics_acts_on_are_physics_qualities(
+    quality_type: type[Quality], is_physics_quality: bool
+) -> None:
+    """
+    Density, elasticity and skin thickness are what a physics simulation reads; the
+    ripeness of a fruit is a quality, but not one physics acts on.
+    """
+    assert issubclass(quality_type, PhysicsQuality) == is_physics_quality

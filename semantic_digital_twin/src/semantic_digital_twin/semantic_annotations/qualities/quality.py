@@ -142,11 +142,24 @@ class Ripeness(Quality):
         raise RipenessInNoSingleStage(ripeness=self)
 
 
+# %% Physics
+
+
+@dataclass(kw_only=True)
+class PhysicsQuality(Quality, ABC):
+    """
+    A quality of its bearer's matter that physics acts on, such as its mass density or
+    its elasticity, which a physics simulation of the bearer reads.
+
+    .. note:: Not every quality is one: the ripeness of a fruit is not.
+    """
+
+
 # %% Material
 
 
 @dataclass(kw_only=True)
-class MassDensity(Quality):
+class MassDensity(PhysicsQuality):
     """
     The mass per volume of its bearer's material, in kilograms per cubic metre
     :cite:`wikipedia_density`.
@@ -175,7 +188,7 @@ class MassDensity(Quality):
 
 
 @dataclass(kw_only=True)
-class MaterialElasticity(Quality):
+class MaterialElasticity(PhysicsQuality):
     """
     How its bearer's material deforms under load and springs back, given by the two
     constants that describe an isotropic linear elastic material
@@ -238,7 +251,7 @@ class MaterialElasticity(Quality):
 
 
 @dataclass(kw_only=True)
-class SkinThickness(Quality):
+class SkinThickness(PhysicsQuality):
     """
     How thick its bearer, the outer covering of an object such as the peel of a fruit or
     the shell of an egg, is across its surface, in metres.
