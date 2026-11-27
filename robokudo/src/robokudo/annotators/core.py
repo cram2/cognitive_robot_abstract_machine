@@ -449,7 +449,7 @@ class Worker(object):
 
 # %% Threaded annotator
 @dataclass(kw_only=True, eq=False)
-class ThreadedAnnotator(BaseAnnotator[DescriptorType], Generic[DescriptorType]):
+class ThreadedAnnotator(BaseAnnotator[DescriptorType]):
     """
     Base class for annotators that perform long-running operations.
 
