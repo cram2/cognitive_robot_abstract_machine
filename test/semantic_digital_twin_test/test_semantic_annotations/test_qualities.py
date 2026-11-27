@@ -17,7 +17,7 @@ from semantic_digital_twin.exceptions import (
     SeveralFieldsAcceptEntity,
 )
 from semantic_digital_twin.semantic_annotations.qualities.exceptions import (
-    RipenessOutsideScale,
+    QualityOutsideScale,
     RipenessInNoSingleStage,
 )
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
@@ -103,7 +103,7 @@ def test_ripeness_beyond_the_scale_is_rejected() -> None:
     """
     A ripeness value beyond the ripeness scale is refused when it is made.
     """
-    with pytest.raises(RipenessOutsideScale):
+    with pytest.raises(QualityOutsideScale):
         Ripeness(
             value=SimpleInterval.from_data(
                 lower=Ripeness.scale.upper,

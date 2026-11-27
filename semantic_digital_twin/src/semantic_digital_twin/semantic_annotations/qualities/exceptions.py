@@ -13,33 +13,51 @@ from typing_extensions import TYPE_CHECKING
 from krrood.exceptions import DataclassException
 
 if TYPE_CHECKING:
+    from random_events.interval import SimpleInterval
     from semantic_digital_twin.semantic_annotations.qualities.quality import (
+        Quality,
         Ripeness,
     )
 
 
-# %% Ripeness
+# %% Scales
 
 
 @dataclass(kw_only=True)
-class RipenessOutsideScale(DataclassException):
+class QualityOutsideScale(DataclassException):
     """
-    Raised when a ripeness is given a value that reaches beyond the ripeness scale.
+    Raised when a quality is given a value that reaches beyond the scale it lies on.
     """
 
-    ripeness: Ripeness
+    quality: Quality
     """
-    The ripeness with the value outside the scale.
+    The quality with the value outside the scale.
+    """
+
+    value: SimpleInterval
+    """
+    The value that reaches beyond :attr:`scale`.
+    """
+
+    scale: SimpleInterval
+    """
+    The scale the value has to lie within.
     """
 
     def error_message(self) -> str:
         return (
-            f"The ripeness {self.ripeness.value} reaches beyond the ripeness scale "
-            f"{self.ripeness.scale}."
+            f"The {type(self.quality).__name__} value {self.value} reaches beyond its "
+            f"scale {self.scale}."
         )
 
     def suggest_correction(self) -> str:
-        return "Give the ripeness a value within the ripeness scale, from 0 to 1."
+        return (
+            f"Give the {type(self.quality).__name__} a value within {self.scale}, in the "
+            f"unit its docstring states."
+        )
+
+
+# %% Ripeness
 
 
 @dataclass(kw_only=True)
