@@ -1,10 +1,10 @@
-# ----------------------------------------------------------------------------------------------------------------------
-# This script generates the ORM classes for the semantic_digital_twin package.
-# Dataclasses can be mapped automatically to the ORM model
-# using the ORMatic library, they just have to be registered in the classes list.
-# Classes that are self_mapped and explicitly_mapped are already mapped in the model.py file. Look there for more
-# information on how to map them.
-# ----------------------------------------------------------------------------------------------------------------------
+"""
+Generate the ORM interface of semantic_digital_twin, built on the one of
+probabilistic_model.
+
+Classes that :mod:`semantic_digital_twin.orm.model` maps itself are mapped there.
+"""
+
 from __future__ import annotations
 
 import logging
