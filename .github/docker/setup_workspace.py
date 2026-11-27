@@ -337,6 +337,23 @@ def main():
             "robokudo_msgs",
         ),
         Repository(
+            "https://github.com/pr2-config-iai/pr2_controllers.git",
+            "ros-jazzy-main",
+            "pr2_controllers",
+            # only pr2_controllers_msgs, the gripper action of the PR2
+            [
+                "ethercat_trigger_controllers",
+                "joint_trajectory_action",
+                "pr2_calibration_controllers",
+                "pr2_controllers",
+                "pr2_gripper_action",
+                "pr2_head_action",
+                "pr2_mechanism_controllers",
+                "robot_mechanism_controllers",
+                "single_joint_position_action",
+            ],
+        ),
+        Repository(
             "https://github.com/cram2/cram_ros2_packages.git",
             "main",
             "cram_ros2_packages",
