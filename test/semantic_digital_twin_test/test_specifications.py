@@ -57,7 +57,7 @@ from semantic_digital_twin.exceptions import (
     ParsingError,
     PartWholeCardinalityError,
     PartWholeFieldInAnnotationKwargs,
-    UnknownPartWholeRelationshipField,
+    UnknownSemanticRelationshipField,
     UselessConceptError,
 )
 from semantic_digital_twin.robots.exceptions import (
@@ -90,11 +90,13 @@ from krrood_spatial_math.spatial_types import (
     ScrewAxis,
 )
 from semantic_digital_twin.semantic_annotations.mixins import (
-    HasApertures,
     HasRootBody,
     HasRootRegion,
 )
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.furniture_parts import (
+    HasApertures,
+)
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from semantic_digital_twin.world import World
@@ -263,7 +265,11 @@ def test_screw_axis_connection_specification_requires_screw_axis():
 def test_nested_annotation_on_non_part_whole_field_raises():
     # Milk has no part-whole field, so a nested annotation spec cannot be mounted onto it.
     # Part bindings are validated at construction.
-    with pytest.raises(UnknownPartWholeRelationshipField):
+    """
+    A nested part specification for a field that is not a part-whole relationship field
+    raises.
+    """
+    with pytest.raises(UnknownSemanticRelationshipField):
         Milk.get_annotation_specification(
             "milk",
             BodySpecification.box("milk", Scale(0.1, 0.1, 0.2)),
@@ -304,16 +310,22 @@ def test_create_world_is_repeatable():
 
 
 def test_world_specification_from_urdf_environment():
+    """
+    A world specification from a URDF creates a non-empty world.
+    """
     world = WorldSpecification.from_urdf(
-        os.path.join(RESOURCES, "urdf", "table.urdf")
+        "package://iai_objects/urdf/table.urdf"
     ).create_world()
     assert not world.is_empty()
     assert world.root is not None
 
 
 def test_materialized_environments_share_no_entity_ids():
+    """
+    Two worlds created from one specification share no entity IDs.
+    """
     specification = WorldSpecification.from_urdf(
-        os.path.join(RESOURCES, "urdf", "table.urdf")
+        "package://iai_objects/urdf/table.urdf"
     )
     first = specification.create_world()
     second = specification.create_world()
@@ -412,10 +424,15 @@ def test_world_specification_from_gazebo_environment():
         lambda: BodySpecification.box("shape", Scale(1, 1, 1)),
         lambda: BodySpecification.sphere("shape", 0.5),
         lambda: BodySpecification.cylinder("shape", 0.4, 1.0),
-        lambda: BodySpecification.mesh("shape", str(RESOURCES / "stl" / "milk.stl")),
+        lambda: BodySpecification.mesh(
+            "shape", "package://iai_objects/objects/milk.stl"
+        ),
     ],
 )
 def test_shape_constructors_spawn(empty_world, make_spec):
+    """
+    Each shape constructor spawns a body with collision on a fixed connection.
+    """
     body = make_spec().spawn(empty_world)
     assert isinstance(body, Body)
     assert len(body.collision.shapes) >= 1
@@ -436,7 +453,7 @@ def test_from_event_constructor_spawns(empty_world):
         lambda pose: BodySpecification.sphere("shape", 0.5, parent_T_self=pose),
         lambda pose: BodySpecification.cylinder("shape", 0.4, 1.0, parent_T_self=pose),
         lambda pose: BodySpecification.mesh(
-            "shape", str(RESOURCES / "stl" / "milk.stl"), parent_T_self=pose
+            "shape", "package://iai_objects/objects/milk.stl", parent_T_self=pose
         ),
         lambda pose: BodySpecification.from_event(
             "shape",
@@ -454,6 +471,9 @@ def test_from_event_constructor_spawns(empty_world):
     ],
 )
 def test_shape_constructors_apply_parent_T_self(empty_world, make_spec):
+    """
+    Each shape constructor places its entity at the pose it is given.
+    """
     pose = HomogeneousTransformationMatrix.from_xyz_rpy(x=1, y=2, z=3)
     entity = make_spec(pose).spawn(empty_world)
     root_T_entity = empty_world.compute_forward_kinematics(empty_world.root, entity)
@@ -715,9 +735,12 @@ def test_a_robot_is_spawned_from_the_description_it_reads_itself(empty_world):
 
 
 def test_world_specification_from_urdf_with_robot():
+    """
+    A robot specification places the PR2 on an omnidirectional drive below the world root.
+    """
     try:
         world = WorldSpecification.from_urdf(
-            os.path.join(RESOURCES, "urdf", "table.urdf"),
+            "package://iai_objects/urdf/table.urdf",
             robots=[RobotSpecification(semantic_annotation_type=PR2)],
         ).create_world()
     except ParsingError as error:
@@ -2016,7 +2039,10 @@ def test_part_whole_field_in_annotation_kwargs_raises():
 def test_non_part_whole_field_in_part_specifications_raises():
     # supporting_surface is not a part-whole relationship, so it cannot hold a nested part spec.
     # part_specifications are validated at construction.
-    with pytest.raises(UnknownPartWholeRelationshipField):
+    """
+    A part specification for a supporting surface, which is not a part, raises.
+    """
+    with pytest.raises(UnknownSemanticRelationshipField):
         Table.get_annotation_specification(
             "table",
             Table.get_default_root_kinematic_structure_entity_specification(
@@ -2032,7 +2058,11 @@ def test_non_part_whole_field_in_part_specifications_raises():
 
 def test_storage_objects_in_part_specifications_raises():
     # IsStorageSpace.objects is not a part-whole relationship, so spec-based occupants are unsupported.
-    with pytest.raises(UnknownPartWholeRelationshipField):
+    """
+    A part specification for the objects of a storage space, which are not parts,
+    raises.
+    """
+    with pytest.raises(UnknownSemanticRelationshipField):
         Table.get_annotation_specification(
             "table",
             Table.get_default_root_kinematic_structure_entity_specification(
@@ -2104,6 +2134,10 @@ def test_complex_spawned_world_is_deepcopyable(empty_world):
 
 
 def test_nested_composite_matches_manual_construction(empty_world):
+    """
+    A drawer with its handle built from nested specifications matches one built part by
+    part.
+    """
     scale = Scale(0.4, 0.5, 0.6)
     handle_scale = Scale(0.1, 0.05, 0.05)
 
@@ -2146,7 +2180,7 @@ def test_nested_composite_matches_manual_construction(empty_world):
             world=manual_world,
             scale=handle_scale,
         )
-        manual_drawer.add(manual_handle)
+        manual_drawer.add(part=manual_handle)
 
     _assert_same_geometry(drawer.root.collision, manual_drawer.root.collision)
     _assert_same_geometry(drawer.handle.root.collision, manual_handle.root.collision)
@@ -2266,6 +2300,9 @@ def test_door_keeps_geometry_when_entry_way_is_mounted(empty_world):
 
 
 def test_entry_way_still_cuts_a_wall(empty_world):
+    """
+    Adding a door entry way to a wall as a part still cuts the wall geometry.
+    """
     with empty_world.modify_world():
         wall = Wall.create_with_new_body_in_world(
             name="wall", world=empty_world, scale=Scale(0.1, 4, 3)
@@ -2276,7 +2313,7 @@ def test_entry_way_still_cuts_a_wall(empty_world):
     shape_count_before = len(wall.root.collision.shapes)
 
     with empty_world.modify_world():
-        wall.add(door.entry_way)
+        wall.add(part=door.entry_way)
 
     assert door.entry_way in wall.apertures
     assert len(wall.root.collision.shapes) != shape_count_before

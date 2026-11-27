@@ -60,7 +60,7 @@ with world.modify_world():
         world=world,
         scale=Scale(0.05, 0.02, 0.1)
     )
-    drawer.add(handle)
+    drawer.add(part=handle)
 
 assert drawer.handle is handle
 assert drawer in world.semantic_annotations

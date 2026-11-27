@@ -46,7 +46,7 @@ def train_on_split_batches() -> SplitBatchTrainingResult:
     of every epoch has a number of rows no number of devices above two divides.
     """
     np.random.seed(0)
-    host = MixtureOfProductsCase(Continuous("x"), Continuous("y")).circuit(
+    host = MixtureOfProductsCase(Continuous(name="x"), Continuous(name="y")).circuit(
         np, BlockEdgeMatrix
     )
     circuit = host.to_namespace(jnp)

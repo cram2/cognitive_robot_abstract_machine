@@ -66,7 +66,7 @@ class RegionGraphNode(ABC):
 
 
 @dataclass(eq=False, kw_only=True)
-class Region(RegionGraphNode):
+class VariableRegion(RegionGraphNode):
     """
     A region in a region graph.
 
@@ -92,7 +92,9 @@ class Region(RegionGraphNode):
         """
         indices = random_number_generator.permutation(len(self.variables))
         return [
-            Region(variables=SortedSet([self.variables[index] for index in split]))
+            VariableRegion(
+                variables=SortedSet([self.variables[index] for index in split])
+            )
             for split in np.array_split(
                 indices, min(number_of_parts, len(self.variables))
             )
@@ -102,7 +104,7 @@ class Region(RegionGraphNode):
         """
         :return: The names of the variables of this region as a set.
         """
-        return "{" + ", ".join([v.name for v in self.variables]) + "}"
+        return "{" + ", ".join([variable.name for variable in self.variables]) + "}"
 
 
 @dataclass(eq=False, kw_only=True)
@@ -202,18 +204,18 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
 
         :return: This region graph.
         """
-        root = Region(variables=self.variables)
+        root = VariableRegion(variables=self.variables)
         self.add_node(root)
         for repetition in range(self.repetitions):
             self.random_split(region=root, depth=self.depth)
         return self
 
-    def regions(self) -> Iterable[Region]:
+    def regions(self) -> Iterable[VariableRegion]:
         """
         :return: An iterator over all regions.
         """
         for node in self.nodes():
-            if isinstance(node, Region):
+            if isinstance(node, VariableRegion):
                 yield node
 
     def partition_nodes(self) -> Iterable[Partition]:
@@ -224,7 +226,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             if isinstance(node, Partition):
                 yield node
 
-    def random_split(self, *, region: Region, depth: int) -> None:
+    def random_split(self, *, region: VariableRegion, depth: int) -> None:
         """
         Add a random partition of a region and split its regions again, until
         ``depth`` splits are made or a region holds a single variable, which stays a
@@ -245,7 +247,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
             self.random_split(region=part, depth=depth - 1)
 
     @property
-    def root(self) -> Region:
+    def root(self) -> VariableRegion:
         """
         :return: The root of the region graph.
         """
@@ -353,7 +355,7 @@ class RegionGraph(DirectedAcyclicGraph[RegionGraphNode]):
     def fully_factorized_input_layer(
         self,
         *,
-        region: Region,
+        region: VariableRegion,
         variables: SortedSet,
         input_units: int,
     ) -> Layer:

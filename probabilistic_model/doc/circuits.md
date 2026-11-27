@@ -217,7 +217,7 @@ import numpy as np
 
 ```{code-cell} ipython3
 
-x = Continuous("X")
+x = Continuous(name="X")
 
 model = ProbabilisticCircuit()
 s1 = SumUnit(probabilistic_circuit = model)

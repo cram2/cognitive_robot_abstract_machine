@@ -71,7 +71,7 @@ def test_a_segment_through_the_bounds_is_clipped_to_the_part_inside():
     start = np.array([-1.0, 0.5])
     direction = np.array([4.0, 0.0])
     assert bounds.clip_segment(start, direction) == SimpleInterval.from_data(
-        0.25, 0.5, Bound.CLOSED, Bound.CLOSED
+        lower=0.25, upper=0.5, left=Bound.CLOSED, right=Bound.CLOSED
     )
 
 

@@ -96,7 +96,7 @@ class Variables:
 
 @pytest.fixture
 def variables() -> Variables:
-    return Variables(Continuous("x"), Continuous("y"), Integer("count"))
+    return Variables(Continuous(name="x"), Continuous(name="y"), Integer(name="count"))
 
 
 # %% stacking conditioned copies

@@ -1,3 +1,8 @@
+"""
+The input of a QP solver in the formats the solvers take, and the filters that remove
+unused variables and constraints from it.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -10,6 +15,8 @@ from numpy.typing import NDArray
 import scipy.sparse as sp
 from scipy.sparse import issparse
 from typing_extensions import Self
+
+from giskardpy.qp.submatrix_cache import SubmatrixCache, SubmatrixSelection
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +40,16 @@ class QPData(ABC):
         return self.num_inequality_slack_variables + self.num_equality_slack_variables
 
     @abstractmethod
-    def apply_filters(self) -> Self:
+    def apply_filters(self, *, submatrix_cache: SubmatrixCache | None = None) -> Self:
         """
         Applies filters to the QP data to remove constraints that have slack-variables
         with 0 weight.
+
+        :param submatrix_cache: May remember the filtered constraint matrices across
+            calls; ``None`` filters them from scratch.
+
+        .. warning:: With a `submatrix_cache`, the constraint matrices of the returned
+            problem are valid only until the next call with the same cache.
         """
 
 
@@ -159,7 +172,9 @@ class QPDataExplicit(QPData):
             num_inequality_slack_variables=self.num_inequality_slack_variables,
         )
 
-    def apply_filters(self) -> Self:
+    def apply_filters(self, *, submatrix_cache: SubmatrixCache | None = None) -> Self:
+        if submatrix_cache is None:
+            submatrix_cache = SubmatrixCache()
         zero_quadratic_weight_filter: np.ndarray = self.quadratic_weights != 0
         number_non_slack_variables = (
             zero_quadratic_weight_filter.shape[0] - self.num_slack_variables
@@ -187,13 +202,13 @@ class QPDataExplicit(QPData):
             box_upper_constraints=self.box_upper_constraints[
                 zero_quadratic_weight_filter
             ],
-            equality_matrix=self._submatrix(
+            equality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.equality_matrix,
                 kept_rows=bE_filter,
                 kept_columns=zero_quadratic_weight_filter,
             ),
             equality_bounds=self.equality_bounds[bE_filter],
-            inequality_matrix=self._submatrix(
+            inequality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.inequality_matrix,
                 kept_rows=bA_filter,
                 kept_columns=zero_quadratic_weight_filter,
@@ -205,13 +220,23 @@ class QPDataExplicit(QPData):
         )
 
     def without_variables(
-        self, *, removed_variables: NDArray[np.bool_]
+        self,
+        *,
+        removed_variables: NDArray[np.bool_],
+        submatrix_cache: SubmatrixCache | None = None,
     ) -> QPDataExplicit:
         """
         :param removed_variables: Which variables to leave out, one flag per variable.
+        :param submatrix_cache: Remembers the reduced constraint matrices across calls;
+            ``None`` reduces them from scratch.
         :return: This problem without the flagged variables and without the
             constraints that have no coefficient left once they are gone.
+
+        .. warning:: With a `submatrix_cache`, the constraint matrices of the returned
+            problem are valid only until the next call with the same cache.
         """
+        if submatrix_cache is None:
+            submatrix_cache = SubmatrixCache()
         kept_variables = ~removed_variables
         kept_equalities = self._rows_keeping_coefficients(
             matrix=self.equality_matrix, kept_variables=kept_variables
@@ -224,13 +249,13 @@ class QPDataExplicit(QPData):
             linear_weights=self.linear_weights[kept_variables],
             box_lower_constraints=self.box_lower_constraints[kept_variables],
             box_upper_constraints=self.box_upper_constraints[kept_variables],
-            equality_matrix=self._submatrix(
+            equality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.equality_matrix,
                 kept_rows=kept_equalities,
                 kept_columns=kept_variables,
             ),
             equality_bounds=self.equality_bounds[kept_equalities],
-            inequality_matrix=self._submatrix(
+            inequality_matrix=submatrix_cache.take_submatrix(
                 matrix=self.inequality_matrix,
                 kept_rows=kept_inequalities,
                 kept_columns=kept_variables,
@@ -262,9 +287,9 @@ class QPDataExplicit(QPData):
         )
         return ~with_coefficients
 
-    @classmethod
+    @staticmethod
     def _columns_with_coefficients(
-        cls, *, matrix: sp.csc_matrix, first_row: int, number_of_columns: int
+        *, matrix: sp.csc_matrix, first_row: int, number_of_columns: int
     ) -> NDArray[np.bool_]:
         """
         :param matrix: A constraint matrix.
@@ -282,15 +307,15 @@ class QPDataExplicit(QPData):
         coefficients = (matrix.data[:entries_in_checked_columns] != 0) & (
             matrix.indices[:entries_in_checked_columns] >= first_row
         )
-        column_of_entry = cls._column_of_each_entry(matrix=matrix)
+        column_of_entry = SubmatrixSelection.find_column_of_each_entry(matrix=matrix)
         with_coefficients[
             column_of_entry[:entries_in_checked_columns][coefficients]
         ] = True
         return with_coefficients
 
-    @classmethod
+    @staticmethod
     def _rows_keeping_coefficients(
-        cls, *, matrix: sp.csc_matrix, kept_variables: np.ndarray
+        *, matrix: sp.csc_matrix, kept_variables: np.ndarray
     ) -> np.ndarray:
         """
         :param matrix: A constraint matrix.
@@ -300,51 +325,14 @@ class QPDataExplicit(QPData):
         """
         if matrix.shape[0] == 0:
             return np.ones(0, dtype=bool)
-        kept_entries = kept_variables[cls._column_of_each_entry(matrix=matrix)]
+        kept_entries = kept_variables[
+            SubmatrixSelection.find_column_of_each_entry(matrix=matrix)
+        ]
         had_entries = np.bincount(matrix.indices, minlength=matrix.shape[0]) > 0
         has_entries = (
             np.bincount(matrix.indices[kept_entries], minlength=matrix.shape[0]) > 0
         )
         return has_entries | ~had_entries
-
-    @classmethod
-    def _submatrix(
-        cls, *, matrix: sp.csc_matrix, kept_rows: np.ndarray, kept_columns: np.ndarray
-    ) -> sp.csc_matrix:
-        """
-        :param matrix: A constraint matrix.
-        :param kept_rows: Which rows of `matrix` are kept, one flag per row.
-        :param kept_columns: Which columns of `matrix` are kept, one flag per column.
-        :return: `matrix` with only the kept rows and columns, or `matrix` itself if it
-            has no rows or columns.
-        """
-        if matrix.shape[0] * matrix.shape[1] == 0:
-            return matrix
-        column_of_entry = cls._column_of_each_entry(matrix=matrix)
-        kept_entries = kept_columns[column_of_entry] & kept_rows[matrix.indices]
-        new_row_of_row = np.cumsum(kept_rows) - 1
-        new_column_of_column = np.cumsum(kept_columns) - 1
-        number_of_kept_columns = int(new_column_of_column[-1]) + 1
-        entries_per_kept_column = np.bincount(
-            new_column_of_column[column_of_entry[kept_entries]],
-            minlength=number_of_kept_columns,
-        )
-        return sp.csc_matrix(
-            (
-                matrix.data[kept_entries],
-                new_row_of_row[matrix.indices[kept_entries]],
-                np.concatenate(([0], np.cumsum(entries_per_kept_column))),
-            ),
-            shape=(int(new_row_of_row[-1]) + 1, number_of_kept_columns),
-        )
-
-    @staticmethod
-    def _column_of_each_entry(*, matrix: sp.csc_matrix) -> np.ndarray:
-        """
-        :param matrix: A matrix in compressed sparse column format.
-        :return: The column of every stored entry of `matrix`, in storage order.
-        """
-        return np.repeat(np.arange(matrix.shape[1]), np.diff(matrix.indptr))
 
     def pretty_print_problem(self):
         """
@@ -380,13 +368,13 @@ class QPDataExplicit(QPData):
         """
         return (
             f"sp.csc_matrix(\n"
-            f"{' '*spaces}(\n"
-            f"{' '*spaces}    {self._np_array_to_str(array=matrix.data)},\n"
-            f"{' '*spaces}    {self._np_array_to_str(array=matrix.indices, dtype='int')},\n"
-            f"{' '*spaces}    {self._np_array_to_str(array=matrix.indptr, dtype='int')},\n"
-            f"{' '*spaces}),\n"
-            f"{' '*spaces}shape={matrix.shape},\n"
-            f"{' '*spaces})"
+            f"{' ' * spaces}(\n"
+            f"{' ' * spaces}    {self._np_array_to_str(array=matrix.data)},\n"
+            f"{' ' * spaces}    {self._np_array_to_str(array=matrix.indices, dtype='int')},\n"
+            f"{' ' * spaces}    {self._np_array_to_str(array=matrix.indptr, dtype='int')},\n"
+            f"{' ' * spaces}),\n"
+            f"{' ' * spaces}shape={matrix.shape},\n"
+            f"{' ' * spaces})"
         )
 
     def analyze_well_posedness(self):
@@ -525,7 +513,7 @@ class QPDataTwoSidedInequality(QPData):
             self.inequality_lower_bounds.shape[0] - self.num_inequality_slack_variables
         )
 
-    def apply_filters(self) -> Self:
+    def apply_filters(self, *, submatrix_cache: SubmatrixCache | None = None) -> Self:
         combined_constraint_filter = np.ones(
             self.inequality_lower_bounds.shape[0],
             dtype=bool,

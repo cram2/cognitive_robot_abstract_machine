@@ -43,6 +43,6 @@ def test_posterior_holds_all_mass_inside_the_evidence(
     evidence = Event.from_simple_sets(
         SimpleEvent.from_data({continuous_variable: closed(0, 0.5)})
     )
-    evidence.fill_missing_variables(model.variables)
+    evidence.fill_missing_variables(variables=model.variables)
     posterior = controller.calculate_posterior(evidence)
     assert posterior.probability(evidence) == pytest.approx(1.0)

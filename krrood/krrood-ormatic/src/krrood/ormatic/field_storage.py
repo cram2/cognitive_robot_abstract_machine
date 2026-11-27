@@ -18,13 +18,16 @@ from dataclasses import dataclass, field
 from inspect import isclass
 from types import NoneType
 
-from typing_extensions import TYPE_CHECKING, ClassVar
+from typing_extensions import TYPE_CHECKING, ClassVar, get_origin
 
 from krrood.adapters.json_serializer import (
     DataclassJSONSerializer,
     JSONSerializableTypeRegistry,
 )
+from krrood.class_diagrams.utils import behaves_like_a_built_in_type
 from krrood.class_diagrams.wrapped_field import WrappedField
+from krrood.ormatic.collection_shape import CollectionShape
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.specificity_ranking import SpecificityRule
 
 if TYPE_CHECKING:
@@ -60,7 +63,8 @@ class FieldStorage(enum.Enum):
 
     MANY_TO_MANY = enum.auto()
     """
-    An association table to the table of a mapped class.
+    An association table with a row per value of a collection that holds a mapped
+    class, as its values or as its keys.
     """
 
     CUSTOM_TYPE = enum.auto()
@@ -159,11 +163,33 @@ class FieldToStore:
         )
 
     @property
+    def collection_shape(self) -> CollectionShape | None:
+        """
+        :return: The shape of the collection the field holds, or None if it holds none.
+        """
+        return CollectionShape.from_annotation(
+            annotation=self.wrapped_field.resolved_type
+        )
+
+    def value_storage(self, *, value_type: type) -> ValueStorage:
+        """
+        :param value_type: The type of a key or value of the collection the field holds.
+        :return: How keys or values of the type are stored, as the
+            :class:`ValueStorageRule` family decides.
+        """
+        rule = ValueStorageRule.most_applicable(
+            value_to_store=ValueToStore(value_type=value_type, field_to_store=self)
+        )
+        if rule is None:
+            return ValueStorage.NOT_STORED
+        return rule.storage
+
+    @property
     def cannot_be_stored(self) -> bool:
         """
-        Whether the field's type leaves ORMatic no way to store it: a dictionary, or a
-        generic class with free type parameters that nothing in the class diagram could
-        fill.
+        Whether the field's type leaves ORMatic no way to store it: a dictionary without
+        key and value types, or a generic class with free type parameters that nothing
+        in the class diagram could fill.
         """
         type_endpoint = self.type_endpoint
         if isclass(type_endpoint) and issubclass(type_endpoint, dict):
@@ -186,6 +212,146 @@ class FieldToStore:
             store them.
         """
         return not self.wrapped_field.is_type_type and not self.cannot_be_stored
+
+
+# %% the keys and values of a collection
+
+
+class ValueStorage(enum.Enum):
+    """
+    The ways ORMatic can store a key or a value of a collection.
+    """
+
+    REFERENCE = enum.auto()
+    """
+    A foreign key to the row of a mapped class.
+    """
+
+    COLUMN = enum.auto()
+    """
+    A column of the value's own type.
+    """
+
+    JSON = enum.auto()
+    """
+    A JSON column written by krrood's JSON serializer.
+    """
+
+    NOT_STORED = enum.auto()
+    """
+    No way to store the value.
+    """
+
+
+@dataclass(kw_only=True)
+class ValueToStore:
+    """
+    The type of a key or value of a collection a field holds.
+    """
+
+    value_type: type
+    """
+    The type.
+    """
+
+    field_to_store: FieldToStore
+    """
+    The field holding the collection.
+    """
+
+    @property
+    def is_mapped(self) -> bool:
+        """
+        :return: True if a table maps the type.
+        """
+        return self.field_to_store.is_mapped(clazz=self.value_type)
+
+    @property
+    def has_column_type(self) -> bool:
+        """
+        :return: True if a column type exists for the type: a builtin SQLAlchemy maps by
+            itself, an enum, or a type with a type mapping.
+        """
+        return (
+            self.value_type in FieldToStore.sqlalchemy_builtins
+            or (isclass(self.value_type) and issubclass(self.value_type, enum.Enum))
+            or self.field_to_store.has_type_mapping(clazz=self.value_type)
+        )
+
+
+class ValueStorageRule(SpecificityRule, ABC):
+    """
+    The condition under which a key or value of a collection is stored in one
+    particular way.
+    """
+
+    @classproperty
+    @abstractmethod
+    def storage(cls) -> ValueStorage:
+        """
+        :return: The way of storing a value that this rule decides on.
+        """
+
+    @classmethod
+    @abstractmethod
+    def applies(cls, *, value_to_store: ValueToStore) -> bool:
+        """
+        :param value_to_store: The type of the key or value to decide on.
+        :return: True if the value is stored the way this rule stands for.
+        """
+
+
+class ReferenceRule(ValueStorageRule):
+    """
+    Instances of a mapped class.
+    """
+
+    @classproperty
+    def storage(cls) -> ValueStorage:
+        return ValueStorage.REFERENCE
+
+    @classmethod
+    def applies(cls, *, value_to_store: ValueToStore) -> bool:
+        return value_to_store.is_mapped
+
+
+class ColumnRule(ValueStorageRule):
+    """
+    Values of a type no table maps, but a column type exists for.
+    """
+
+    @classproperty
+    def storage(cls) -> ValueStorage:
+        return ValueStorage.COLUMN
+
+    @classmethod
+    def applies(cls, *, value_to_store: ValueToStore) -> bool:
+        return not value_to_store.is_mapped and value_to_store.has_column_type
+
+
+class JSONValueRule(ValueStorageRule):
+    """
+    Values of a type that krrood's JSON serializer writes and no column type exists
+    for: other builtins, classes, and types with a JSON serializer.
+    """
+
+    @classproperty
+    def storage(cls) -> ValueStorage:
+        return ValueStorage.JSON
+
+    @classmethod
+    def applies(cls, *, value_to_store: ValueToStore) -> bool:
+        value_type = value_to_store.value_type
+        return (
+            not value_to_store.is_mapped
+            and not value_to_store.has_column_type
+            and (
+                behaves_like_a_built_in_type(value_type)
+                or value_type is type
+                or get_origin(value_type) is type
+                or value_to_store.field_to_store.has_json_serializer(clazz=value_type)
+            )
+        )
 
 
 # %% rules
@@ -232,7 +398,7 @@ class NotStoredRule(FieldStorageRule):
     @classmethod
     def describe(cls, *, field_to_store: FieldToStore) -> str:
         if issubclass(field_to_store.type_endpoint, dict):
-            return "Not storing, since dictionaries cannot be stored."
+            return "Not storing, since the dictionary declares no key and value types."
         return "Not storing the underspecified generic field."
 
 
@@ -297,18 +463,33 @@ class ManyToOneRule(FieldStorageRule):
 
 class ManyToManyRule(FieldStorageRule):
     """
-    Collections of instances of a mapped class.
+    Collections, nested ones and dictionaries included, that hold instances of a mapped
+    class as their values or keys.
     """
 
     storage = FieldStorage.MANY_TO_MANY
 
     @classmethod
     def applies(cls, *, field_to_store: FieldToStore) -> bool:
+        shape = field_to_store.collection_shape
+        if (
+            not field_to_store.holds_a_storable_value
+            or shape is None
+            or len(shape.leaf_types) != 1
+        ):
+            return False
+        key_storages = [
+            field_to_store.value_storage(value_type=key_type)
+            for key_type in shape.key_types
+        ]
+        leaf_storage = field_to_store.value_storage(value_type=shape.leaf_type)
         return (
-            field_to_store.holds_a_storable_value
-            and field_to_store.wrapped_field.is_container
-            and not field_to_store.wrapped_field.is_optional
-            and field_to_store.is_mapped(clazz=field_to_store.type_endpoint)
+            ValueStorage.REFERENCE in (*key_storages, leaf_storage)
+            and all(
+                storage in (ValueStorage.REFERENCE, ValueStorage.COLUMN)
+                for storage in key_storages
+            )
+            and leaf_storage is not ValueStorage.NOT_STORED
         )
 
     @classmethod
@@ -342,9 +523,9 @@ class CustomTypeRule(FieldStorageRule):
 
 class JSONRule(FieldStorageRule):
     """
-    Values that krrood's JSON serializer writes: collections of builtins, of classes or
-    of mapped types, and values or collections of a type with a JSON serializer of its
-    own.
+    Values that krrood's JSON serializer writes: collections, nested ones and
+    dictionaries included, whose keys and values hold no mapped class, and values of a
+    type with a JSON serializer of its own.
     """
 
     storage = FieldStorage.JSON
@@ -356,12 +537,12 @@ class JSONRule(FieldStorageRule):
             clazz=type_endpoint
         ):
             return False
-        if field_to_store.wrapped_field.is_container:
-            return (
-                field_to_store.wrapped_field.is_collection_of_builtins
-                or field_to_store.wrapped_field.is_collection_of_types
-                or field_to_store.has_type_mapping(clazz=type_endpoint)
-                or field_to_store.has_json_serializer(clazz=type_endpoint)
+        shape = field_to_store.collection_shape
+        if shape is not None:
+            return all(
+                field_to_store.value_storage(value_type=value_type)
+                in (ValueStorage.COLUMN, ValueStorage.JSON)
+                for value_type in (*shape.key_types, *shape.leaf_types)
             )
         return (
             not field_to_store.holds_a_sqlalchemy_builtin

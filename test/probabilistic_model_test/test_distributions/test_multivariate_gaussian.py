@@ -40,12 +40,12 @@ from probabilistic_model.probabilistic_model import ProbabilisticModel
 
 @pytest.fixture
 def horizontal() -> Continuous:
-    return Continuous("horizontal")
+    return Continuous(name="horizontal")
 
 
 @pytest.fixture
 def vertical() -> Continuous:
-    return Continuous("vertical")
+    return Continuous(name="vertical")
 
 
 @pytest.fixture
@@ -221,7 +221,7 @@ class TestBuildingADistribution:
     def test_reading_a_variable_the_distribution_is_not_about_is_rejected(
         self, independent
     ):
-        absent = Continuous("absent")
+        absent = Continuous(name="absent")
         with pytest.raises(VariableNotInDistributionError) as error:
             mean_of(independent, absent)
         assert error.value.variable == absent
@@ -377,7 +377,7 @@ class TestPrecision:
 class TestMode:
     def test_the_mode_is_the_mean(self, independent, horizontal, vertical):
         mode = independent.mode()
-        assert mode.event.contains(np.array([1.0, -2.0]))
+        assert mode.event.contains(item=np.array([1.0, -2.0]))
         assert mode.likelihood == pytest.approx(
             independent.likelihood(np.array([[1.0, -2.0]]))[0]
         )
@@ -444,7 +444,11 @@ class TestConditioningOnAValue:
         Badly scaled entries make the conditioning arithmetic round differently on the
         two sides of the diagonal, which must not leave the covariance asymmetric.
         """
-        first, second, given = horizontal, Continuous("second"), Continuous("given")
+        first, second, given = (
+            horizontal,
+            Continuous(name="second"),
+            Continuous(name="given"),
+        )
         distribution = MultivariateGaussianDistribution(
             variables=(first, second, given),
             mean=np.zeros(3),
@@ -475,7 +479,7 @@ class TestConditioningOnAValue:
         assert error.value.model is independent
 
     def test_conditioning_on_an_unknown_variable_is_rejected(self, independent):
-        absent = Continuous("absent")
+        absent = Continuous(name="absent")
         with pytest.raises(VariableNotInDistributionError) as error:
             independent.conditional({absent: 0.0})
         assert error.value.variable == absent
@@ -582,7 +586,7 @@ class TestProductWithAGaussianLikelihood:
         assert mean_of(independent, horizontal) == before
 
     def test_a_density_over_a_variable_it_is_not_over_is_rejected(self, independent):
-        absent = Continuous("absent")
+        absent = Continuous(name="absent")
         with pytest.raises(VariableNotInDistributionError) as error:
             independent.product_with_gaussian_likelihood(one_variable(absent, 0.0, 1.0))
         assert error.value.variable == absent
@@ -601,7 +605,7 @@ class TestMarginal:
         assert variance_of(marginal, horizontal) == variance_of(correlated, horizontal)
 
     def test_a_marginal_over_none_of_its_variables_is_nothing(self, correlated):
-        assert correlated.marginal([Continuous("absent")]) is None
+        assert correlated.marginal([Continuous(name="absent")]) is None
 
     def test_a_marginal_is_laid_out_in_the_distribution_s_own_order(
         self, correlated, horizontal, vertical
@@ -672,14 +676,16 @@ class TestTranslationAndScaling:
         self, independent, horizontal
     ):
         independent.apply_translation(
-            translation={horizontal: 3.0, Continuous("absent"): 5.0}
+            translation={horizontal: 3.0, Continuous(name="absent"): 5.0}
         )
         assert independent.mean.tolist() == [4.0, -2.0]
 
     def test_a_scaling_of_a_variable_it_is_not_over_is_ignored(
         self, independent, horizontal
     ):
-        independent.apply_scaling(scaling={horizontal: 2.0, Continuous("absent"): 5.0})
+        independent.apply_scaling(
+            scaling={horizontal: 2.0, Continuous(name="absent"): 5.0}
+        )
         assert independent.covariance.matrix.tolist() == [[16.0, 0.0], [0.0, 9.0]]
 
     def test_a_variable_left_out_of_a_scaling_keeps_its_size(
@@ -907,7 +913,7 @@ class TestTruncation:
         box = box_over(horizontal, vertical, -1.0, 1.0).as_composite_set()
         truncated = correlated.truncated(box).distribution
         mode = truncated.mode().event
-        assert mode.contains(np.array([0.0, 0.0]))
+        assert mode.contains(item=np.array([0.0, 0.0]))
 
     def test_the_mode_of_variables_that_do_not_co_vary_is_the_mean_pulled_into_the_box(
         self, independent, horizontal, vertical
@@ -1020,7 +1026,7 @@ class TestTruncation:
         truncated = correlated.truncated(box).distribution
         samples = truncated.sample(200)
         assert samples.shape == (200, 2)
-        assert all(truncated.support.contains(sample) for sample in samples)
+        assert all(truncated.support.contains(item=sample) for sample in samples)
 
     def test_samples_of_correlated_variables_follow_the_truncated_distribution(
         self, horizontal, vertical
@@ -1059,7 +1065,7 @@ class TestTruncation:
         truncated = correlated.truncated(unlikely).distribution
         samples = truncated.sample(50)
         assert samples.shape == (50, 2)
-        assert all(truncated.support.contains(sample) for sample in samples)
+        assert all(truncated.support.contains(item=sample) for sample in samples)
 
     def test_variables_that_do_not_co_vary_are_sampled_in_a_distant_box(
         self, independent, horizontal, vertical
@@ -1071,7 +1077,7 @@ class TestTruncation:
         truncated = independent.truncated(unlikely).distribution
         samples = truncated.sample(50)
         assert samples.shape == (50, 2)
-        assert all(truncated.support.contains(sample) for sample in samples)
+        assert all(truncated.support.contains(item=sample) for sample in samples)
 
 
 # %% fixing a variable of a distribution that has already been confined
@@ -1208,7 +1214,7 @@ class TestMarginalOfATruncatedDistribution:
     ):
         box = box_over(horizontal, vertical, 0.0, 1.0).as_composite_set()
         truncated = correlated.truncated(box).distribution
-        assert truncated.marginal([Continuous("absent")]) is None
+        assert truncated.marginal([Continuous(name="absent")]) is None
 
 
 class TestMomentsOfATruncatedDistribution:
@@ -1274,7 +1280,9 @@ class TestMomentsOfATruncatedDistribution:
             assert variance_of(truncated, variable) == pytest.approx(variance, abs=1e-6)
 
     def test_three_correlated_variables_have_the_moments_of_their_samples(self):
-        variables = tuple(Continuous(name) for name in ("first", "second", "third"))
+        variables = tuple(
+            Continuous(name=name) for name in ("first", "second", "third")
+        )
         covariance = np.array([[1.0, 0.5, 0.3], [0.5, 1.0, 0.4], [0.3, 0.4, 1.0]])
         gaussian = MultivariateGaussianDistribution(
             variables=variables,

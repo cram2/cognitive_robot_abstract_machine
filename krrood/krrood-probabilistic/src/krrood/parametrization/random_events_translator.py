@@ -233,7 +233,7 @@ class WhereExpressionToRandomEventTranslator:
         result: SimpleEvent,
     ) -> None:
         result[parametrization_variable] &= parametrization_variable.make_value(
-            comparator.right._value_
+            value=comparator.right._value_
         )
 
     def _translate_not_equal(
@@ -244,7 +244,7 @@ class WhereExpressionToRandomEventTranslator:
         result: SimpleEvent,
     ) -> None:
         result[parametrization_variable] &= parametrization_variable.make_value(
-            comparator.right._value_
+            value=comparator.right._value_
         ).complement()
 
     def _translate_greater_than(

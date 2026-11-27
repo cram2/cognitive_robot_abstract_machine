@@ -9,7 +9,8 @@ import {{ import }}
 {% endfor %}
 
 
-from krrood.ormatic.data_access_objects.dao import DataAccessObject, AssociationDataAccessObject, PartDataAccessObject, RelationshipInformationKey
+from krrood.ormatic.data_access_objects.dao import DataAccessObject, PartDataAccessObject
+from krrood.ormatic.data_access_objects.relationships import AssociationDataAccessObject, RelationshipInformationKey
 from krrood.ormatic.custom_types import TypeType
 
 Base = krrood.ormatic.base.Base

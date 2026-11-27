@@ -819,8 +819,8 @@ class Mesh(Shape):
     @classmethod
     def _serialized_fields(cls) -> list[Field]:
         """
-        A mesh carries its geometry, in its own frame, rather than the file it was read
-        from, which the process reading the json may not have.
+        A mesh carries its package URI or its geometry, in its own frame, rather than the
+        file it was read from, which the process reading the json may not have.
         """
         return [
             field_
@@ -829,6 +829,17 @@ class Mesh(Shape):
         ]
 
     def to_json(self, **kwargs) -> dict[str, Any]:
+        """
+        A mesh whose file lies in a ROS package is written as its :attr:`package_uri`
+        and without its geometry, which the reader resolves in its own install.
+        """
+        package_uri = self.package_uri
+        if package_uri is not None:
+            return {
+                **super().to_json(**kwargs),
+                "package_uri": package_uri,
+                "file_T_mesh": to_json(self.file_T_mesh, **kwargs),
+            }
         # Serialize the unscaled geometry and the scale separately. This is the same
         # mesh :attr:`mesh` exposes, so a deserialized mesh reproduces the original
         # rather than a differently tessellated version of the same file.
@@ -849,7 +860,16 @@ class Mesh(Shape):
         return {**super().to_json(**kwargs), "mesh": to_json(geometry, **kwargs)}
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Mesh:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Mesh:
+        """
+        Overrides :meth:`Shape._from_json` to read a mesh either from its package URI or
+        from its serialized geometry.
+        """
+        if "package_uri" in data:
+            mesh = super()._from_json(data=data, **kwargs)
+            mesh.filename = data["package_uri"]
+            mesh.file_T_mesh = from_json(data["file_T_mesh"], **kwargs)
+            return mesh
         geometry = from_json(data["mesh"], **kwargs)
         # Recreate the trimesh without processing to preserve exact topology
         mesh = trimesh.Trimesh(
@@ -911,6 +931,20 @@ class Mesh(Shape):
         and texture files the mesh refers to by name sit beside the answer.
         """
         return MeshFileSources().resolve(self.filename)
+
+    @property
+    def package_uri(self) -> str | None:
+        """
+        The ``package://`` URI of the mesh's file, which every machine resolves in its
+        own install, or ``None`` when the file lies in no package's share directory.
+        """
+        if self.filename.startswith("package://"):
+            return self.filename
+        parts = self.local_file.parts
+        if "share" not in parts[:-2]:
+            return None
+        share_index = len(parts) - 1 - parts[::-1].index("share")
+        return "package://" + "/".join(parts[share_index + 1 :])
 
     @property
     def stored_mesh(self) -> trimesh.Trimesh:
@@ -1475,7 +1509,9 @@ class CoordinateBounds(Bounds[npt.NDArray[np.float64]]):
             t_max = min(t_max, t_exit)
             if t_min > t_max:
                 return None
-        return SimpleInterval.from_data(t_min, t_max, Bound.CLOSED, Bound.CLOSED)
+        return SimpleInterval.from_data(
+            lower=t_min, upper=t_max, left=Bound.CLOSED, right=Bound.CLOSED
+        )
 
 
 PointT = TypeVar("PointT", bound=Point)
@@ -1510,10 +1546,10 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
         :return: The absolute interval this axis spans.
         """
         return SimpleInterval.from_data(
-            float(origin_component + minimum),
-            float(origin_component + maximum),
-            Bound.CLOSED,
-            Bound.CLOSED,
+            lower=float(origin_component + minimum),
+            upper=float(origin_component + maximum),
+            left=Bound.CLOSED,
+            right=Bound.CLOSED,
         )
 
     @classmethod
@@ -1692,7 +1728,9 @@ class AxisAlignedBox(BoundsInterface[PointT], ABC):
             intersect.
         """
         other_in_same_frame = other.transform_to_origin(self.origin)
-        result = self.simple_event.intersection_with(other_in_same_frame.simple_event)
+        result = self.simple_event.intersection_with(
+            other=other_in_same_frame.simple_event
+        )
         if result.is_empty():
             return None
         return self.__class__.from_simple_event(result, self.origin)[0]
@@ -1848,7 +1886,7 @@ class VolumetricBoundingBox(AxisAlignedBox[Point3]):
             point, self.origin.reference_frame
         )
         x, y, z = (float(point_in_bb.x), float(point_in_bb.y), float(point_in_bb.z))
-        return self.simple_event.contains((x, y, z))
+        return self.simple_event.contains(item=(x, y, z))
 
     @classmethod
     def from_simple_event(
@@ -2108,7 +2146,7 @@ class PlanarBoundingBox(AxisAlignedBox[Point2]):
             point, self.origin.reference_frame
         )
         x, y = float(point_in_box_frame.x), float(point_in_box_frame.y)
-        return self.simple_event.contains((x, y))
+        return self.simple_event.contains(item=(x, y))
 
     def extrude(self, half_height: float) -> VolumetricBoundingBox:
         """

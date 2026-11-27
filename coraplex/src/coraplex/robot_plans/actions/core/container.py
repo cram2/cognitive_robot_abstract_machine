@@ -67,7 +67,7 @@ class MovesContainerByItsHandle(
     """
 
     @classmethod
-    def from_handle(cls, handle: Handle, arm: Arm) -> Match:
+    def from_handle(cls, *, handle: Handle, arm: Arm) -> Match:
         """
         :param handle: The handle of the container.
         :param arm: The arm that takes hold of the handle.
@@ -106,7 +106,7 @@ class MovesContainerByItsHandle(
             ActiveConnection1DOF
         )
 
-    def back_off_pose(self, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
+    def back_off_pose(self, *, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
         """
         The tool frame goal that clears the released handle and the container, back
         along the way the gripper came in, so an open gripper still straddling the
@@ -147,7 +147,8 @@ class MovesContainerByItsHandle(
             ),
             self.tool_center_point_goal(
                 target=self.back_off_pose(
-                    self.grasp_candidate.grasp_pose, end_effector
+                    grasp_pose=self.grasp_candidate.grasp_pose,
+                    end_effector=end_effector,
                 ),
                 arm=self.arm,
             ),

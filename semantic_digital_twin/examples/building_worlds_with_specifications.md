@@ -193,9 +193,9 @@ resources = Path(files("semantic_digital_twin")).parent.parent / "resources"
 
 world = World.create_with_root_body()
 
-# A mesh body, loaded from file.
+# A mesh body, loaded from a ROS package.
 milk_mesh = BodySpecification.mesh(
-    name="milk_mesh", filename=str(resources / "stl" / "milk.stl")
+    name="milk_mesh", filename="package://iai_objects/objects/milk.stl"
 ).spawn(world)
 
 # A hollow crate: the outer box minus the carved-out interior, expressed as one event.
@@ -610,15 +610,12 @@ time, so one specification can produce many independent worlds and no two of the
 identifier.
 
 ```{code-cell} ipython3
-import os
 from importlib.resources import files
 from pathlib import Path
 
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
-table_urdf = os.path.join(
-    Path(files("semantic_digital_twin")).parent.parent, "resources", "urdf", "table.urdf"
-)
+table_urdf = "package://iai_objects/urdf/table.urdf"
 
 specification = WorldSpecification.from_urdf(
     table_urdf,

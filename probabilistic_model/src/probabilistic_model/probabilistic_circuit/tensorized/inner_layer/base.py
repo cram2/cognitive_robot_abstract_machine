@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
+from krrood.patterns.interface import Interface
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
@@ -66,7 +67,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
-class Layer(DataclassDeepcopyMixin, ABC):
+class Layer(DataclassDeepcopyMixin, Interface):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
 

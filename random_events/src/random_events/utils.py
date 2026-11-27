@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing_extensions import Dict, Any, Self
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CPPWrapper(ABC):
     """
     Class for wrapping C++ objects.
@@ -16,7 +16,7 @@ class CPPWrapper(ABC):
     """
 
     @abstractmethod
-    def _from_cpp(self, cpp_object: Any) -> Self:
+    def _from_cpp(self, *, cpp_object: Any) -> Self:
         """
         Create a new instance of this class from a C++ object.
 

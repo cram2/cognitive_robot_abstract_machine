@@ -67,7 +67,7 @@ def iris_starting_circuit(iris) -> ProbabilisticCircuit:
     """
     means = _iris_starting_means(iris)
     return factorized_gaussian_mixture(
-        [Continuous(name) for name in iris.columns],
+        [Continuous(name=name) for name in iris.columns],
         means=means,
         scales=np.ones_like(means),
     )
@@ -87,7 +87,8 @@ def _make_gaussian_leaf_circuit() -> ProbabilisticCircuit:
     """
     circuit = ProbabilisticCircuit()
     leaf(
-        GaussianDistribution(variable=Continuous("x"), location=0.0, scale=1.0), circuit
+        GaussianDistribution(variable=Continuous(name="x"), location=0.0, scale=1.0),
+        circuit,
     )
     return circuit
 
@@ -97,7 +98,7 @@ def _make_mixture_circuit() -> ProbabilisticCircuit:
     A uniform mixture of two Gaussian leaves over ``x``, centered at -1 and 1.
     """
     circuit = ProbabilisticCircuit()
-    variable = Continuous("x")
+    variable = Continuous(name="x")
     sum_root = SumUnit(probabilistic_circuit=circuit)
     for location in (-1.0, 1.0):
         component = leaf(
@@ -145,7 +146,7 @@ def test_learn_fits_gaussian_leaf_to_data():
 
 
 def test_learn_updates_only_learnable_units():
-    circuit = fully_factorized([Continuous("x"), Continuous("y")])
+    circuit = fully_factorized([Continuous(name="x"), Continuous(name="y")])
     learned_leaf = _leaf_of(circuit, "x")
     frozen_leaf = _leaf_of(circuit, "y")
     frozen_location = frozen_leaf.distribution.location
@@ -196,7 +197,7 @@ def test_learn_returns_empty_history_for_empty_data():
 
 def test_learnable_units_reject_truncated_gaussian_leaf():
     truncated_gaussian = TruncatedGaussianDistribution(
-        variable=Continuous("x"),
+        variable=Continuous(name="x"),
         interval=closed(0.0, np.inf).simple_sets[0],
         location=0.0,
         scale=1.0,
@@ -248,7 +249,7 @@ def test_fit_reads_columns_by_variable_name():
     )
 
     circuit = ExpectationMaximizationLearning(
-        fully_factorized([Continuous("x"), Continuous("y")]), iterations=1
+        fully_factorized([Continuous(name="x"), Continuous(name="y")]), iterations=1
     ).fit(data)
 
     assert _leaf_of(circuit, "x").distribution.location == pytest.approx(

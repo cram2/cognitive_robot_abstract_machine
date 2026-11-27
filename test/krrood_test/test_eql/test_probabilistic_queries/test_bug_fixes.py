@@ -48,7 +48,7 @@ def _build_robot_circuit():
     single-hop-only class resolution would incorrectly look for.
     """
     x = variable(Robot)
-    var_battery = Continuous(x.arm.battery._name_)
+    var_battery = Continuous(name=x.arm.battery._name_)
     circuit = ProbabilisticCircuit()
     root = ProductUnit(probabilistic_circuit=circuit)
     root.add_subcircuit(

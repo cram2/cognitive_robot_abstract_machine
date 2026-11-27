@@ -87,6 +87,9 @@ def carton() -> Milk:
 
 @pytest.fixture
 def mug_with_handle() -> Mug:
+    """
+    A mug in a world whose box-shaped handle is split off its shape into a handle part.
+    """
     handle_shape = trimesh.creation.box(extents=[0.03, 0.01, 0.04])
     handle_shape.apply_translation([0.055, 0.0, 0.0])
     mug = in_world(
@@ -102,7 +105,7 @@ def mug_with_handle() -> Mug:
     PartSplitter(
         part_type=Handle,
         finder=LocatedFacesFinder(face_centers=handle_shape.triangles_center),
-    ).split(mug)
+    ).split(whole=mug)
     return mug
 
 
@@ -126,7 +129,7 @@ def test_drawn_grasps_lie_where_the_annotation_states(carton):
             (grasp.pitch, allowed["pitch"]),
             (grasp.roll, allowed["roll"]),
         ):
-            assert interval.contains(value)
+            assert interval.contains(item=value)
 
 
 def test_trials_draw_grasps_where_the_strategy_they_are_given_states(carton):
@@ -143,7 +146,7 @@ def test_trials_draw_grasps_where_the_strategy_they_are_given_states(carton):
 
     assert len(grasps) == trials.number_of_trials
     for grasp in grasps:
-        assert allowed_depth.contains(grasp.depth)
+        assert allowed_depth.contains(item=grasp.depth)
 
 
 def test_every_tried_grasp_is_recorded_with_its_result(carton):

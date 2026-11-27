@@ -1,3 +1,9 @@
+"""
+Predicates about what the gripper of an end effector holds.
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from typing_extensions import Callable
@@ -14,7 +20,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GripperOccupancy:
     """
     Base class for predicates that check the gripper occupancy.
@@ -26,7 +32,7 @@ class GripperOccupancy:
     """
 
     def check_manipulator_occupancy(
-        self, condition: Callable[list[Body], bool]
+        self, *, condition: Callable[list[Body], bool]
     ) -> bool:
         """
         Checks the occupancy of the gripper against a condition.
@@ -47,7 +53,7 @@ class GripperOccupancy:
         return condition(bodies_below_tool_frame)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GripperHolds(GripperOccupancy, Predicate):
     """
     Checks if the gripper holds a particular body.
@@ -62,7 +68,9 @@ class GripperHolds(GripperOccupancy, Predicate):
     """
 
     def __call__(self) -> bool:
-        return self.check_manipulator_occupancy(lambda bodies: self.body in bodies)
+        return self.check_manipulator_occupancy(
+            condition=lambda bodies: self.body in bodies
+        )
 
     @classmethod
     def _verbalization_fragment_(

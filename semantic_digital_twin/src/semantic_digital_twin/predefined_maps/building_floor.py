@@ -132,7 +132,7 @@ class SingleDoorRoom:
         )
         door.root.collision.shapes[0].color = self.door_color
         with world.modify_world():
-            wall.add(door.entry_way)
+            wall.add(part=door.entry_way)
 
         return floor
 

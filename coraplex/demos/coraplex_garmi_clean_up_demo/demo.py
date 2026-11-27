@@ -22,11 +22,9 @@ directories.
 from __future__ import annotations
 
 import math
-import os
 from dataclasses import dataclass
 from enum import Enum, StrEnum
 
-from ament_index_python.packages import get_package_share_directory
 
 from coraplex.demonstrations import RobotDemonstration
 from coraplex.plans.context_extensions import RobotAccess
@@ -92,35 +90,18 @@ from semantic_digital_twin.world_description.kinematic_chain import KinematicCha
 
 class SceneFile(StrEnum):
     """
-    The files the demonstration builds its scene from.
+    The files the demonstration builds its scene from, as ``package://`` URIs.
     """
 
-    APARTMENT = os.path.join("mjcf", "scene-bodies.xml")
+    APARTMENT = "package://iai_garmi_apartment/mjcf/scene-bodies.xml"
     """
-    The apartment scene GARMI acts in, in the ``iai_garmi_apartment`` package.
-    """
-
-    MILK = os.path.join("objects", "milk.stl")
-    """
-    The milk's mesh, under the coraplex resources.
+    The apartment scene GARMI acts in.
     """
 
-    @property
-    def path(self) -> str:
-        """
-        :return: Where the file is read from.
-        """
-        if self is SceneFile.APARTMENT:
-            return os.path.join(
-                get_package_share_directory("iai_garmi_apartment"), self.value
-            )
-        return os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "..",
-            "resources",
-            self.value,
-        )
+    MILK = "package://iai_objects/objects/milk.stl"
+    """
+    The milk's mesh.
+    """
 
 
 class SceneBody(StrEnum):
@@ -177,7 +158,7 @@ class HandDistance(float, Enum):
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ScenePlacement:
     """
     A position and an orientation, given as a heading about the vertical and a tilt.
@@ -205,7 +186,7 @@ class ScenePlacement:
             self.x, self.y, self.z, pitch=self.pitch, yaw=self.yaw
         )
 
-    def pose(self, reference_frame: KinematicStructureEntity) -> Pose:
+    def pose(self, *, reference_frame: KinematicStructureEntity) -> Pose:
         """
         :param reference_frame: The frame the placement is given in.
         :return: The placement as a pose in `reference_frame`.
@@ -225,7 +206,7 @@ class ScenePose(Enum):
     Where GARMI and the milk start, and where they go.
     """
 
-    GARMI_START = ScenePlacement(-4.8, 1.5, 0, yaw=math.pi)
+    GARMI_START = ScenePlacement(x=-4.8, y=1.5, z=0, yaw=math.pi)
     """
     Where GARMI starts, in its ``odom`` frame: facing the kitchen from the room.
 
@@ -233,23 +214,23 @@ class ScenePose(Enum):
     in, not the apartment's own frame the other placements are relative to.
     """
 
-    GARMI_AT_COUNTER = ScenePlacement(-4.5, 1.75, 0, yaw=math.pi)
+    GARMI_AT_COUNTER = ScenePlacement(x=-4.5, y=1.75, z=0, yaw=math.pi)
     """
     Where GARMI returns to once the milk is in the drawer, in its ``odom`` frame.
     """
 
-    GARMI_AT_DRAWER = ScenePlacement(-5.0, 2.15, 0, yaw=math.pi + math.pi / 4)
+    GARMI_AT_DRAWER = ScenePlacement(x=-5.0, y=2.15, z=0, yaw=math.pi + math.pi / 4)
     """
     Where GARMI stands while it picks up the milk and opens and closes the drawer, in its
     ``odom`` frame: within reach of both.
     """
 
-    MILK_START = ScenePlacement(-6, 1.87, 1.028)
+    MILK_START = ScenePlacement(x=-6, y=1.87, z=1.028)
     """
     Where the milk starts, on the kitchen counter, in the world's root frame.
     """
 
-    MILK_IN_DRAWER = ScenePlacement(-0.545, 6.885, 0.79, pitch=-math.pi / 2)
+    MILK_IN_DRAWER = ScenePlacement(x=-0.545, y=6.885, z=0.79, pitch=-math.pi / 2)
     """
     Where the milk is put into the drawer once that is open, relative to the apartment:
     lying on its side just above the drawer's bottom plate, so the fingertips, which
@@ -284,7 +265,7 @@ class GraspSelection(Enum):
 # %% the demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GarmiCleanUpDemonstration(RobotDemonstration):
     """
     GARMI puts a milk carton from the kitchen counter into a drawer.
@@ -305,7 +286,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         geom has to stand in for it.
         """
         return WorldSpecification.from_mjcf(
-            SceneFile.APARTMENT.path, use_visual_as_collision_backup=True
+            SceneFile.APARTMENT, use_visual_as_collision_backup=True
         )
 
     def robot_specification(self) -> RobotSpecification:
@@ -317,12 +298,12 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             odometry_T_robot_start=ScenePose.GARMI_START.value.transform,
         )
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(
             SceneBody.APARTMENT.value
         )
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         """
         Annotate the apartment's furniture, then add the milk.
 
@@ -341,20 +322,20 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
             SceneBody.MILK.value,
             BodySpecification.mesh(
                 SceneBody.MILK.value,
-                SceneFile.MILK.path,
+                SceneFile.MILK,
                 parent_T_self=ScenePose.MILK_START.value.transform,
             ),
             parent_connection_specification=Connection6DoFSpecification(),
         ).spawn(world, parent=world.root)
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
                 robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
             ),
         ]
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Pick up the milk with the right arm and grasp the drawer's handle with the left,
         open the drawer while the right arm lays the milk into it from above, then close
@@ -391,7 +372,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                 reference_frame=drawer.handle.root,
             ),
         )
-        milk_in_drawer = ScenePose.MILK_IN_DRAWER.value.pose(apartment)
+        milk_in_drawer = ScenePose.MILK_IN_DRAWER.value.pose(reference_frame=apartment)
 
         statechart = Statechart(context=context)
         statechart.add_node(
@@ -402,11 +383,16 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                     ParkArmsAction(arms=robot.all_arms),
                     NavigateAction(
                         planar_goal_pose=Pose2D.from_pose(
-                            ScenePose.GARMI_AT_DRAWER.value.pose(world.root)
+                            ScenePose.GARMI_AT_DRAWER.value.pose(
+                                reference_frame=world.root
+                            )
                         )
                     ),
                     *self._take_hold_of_the_milk_and_the_handle(
-                        milk_grasp, handle_grasp, left_arm, right_arm
+                        milk_grasp=milk_grasp,
+                        handle_grasp=handle_grasp,
+                        left_arm=left_arm,
+                        right_arm=right_arm,
                     ),
                     # Left hand opens the drawer while the right hands drops the milk in the open
                     # drawer. the gripper is kept at the handle of the drawer the whole time
@@ -429,11 +415,11 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                             ),
                             Sequence(
                                 nodes=self._lay_the_milk_into_the_drawer(
-                                    milk,
-                                    milk_grasp,
-                                    milk_in_drawer,
-                                    storage_drawer,
-                                    right_arm,
+                                    milk=milk,
+                                    milk_grasp=milk_grasp,
+                                    milk_in_drawer=milk_in_drawer,
+                                    storage_drawer=storage_drawer,
+                                    right_arm=right_arm,
                                 )
                             ),
                             StartedWhenTrue(
@@ -481,7 +467,9 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                             ParkArmsAction(arms=robot.all_arms),
                             NavigateAction(
                                 planar_goal_pose=Pose2D.from_pose(
-                                    ScenePose.GARMI_AT_COUNTER.value.pose(world.root)
+                                    ScenePose.GARMI_AT_COUNTER.value.pose(
+                                        reference_frame=world.root
+                                    )
                                 )
                             ),
                         ]
@@ -493,6 +481,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
 
     def _take_hold_of_the_milk_and_the_handle(
         self,
+        *,
         milk_grasp: GraspCandidate,
         handle_grasp: GraspCandidate,
         left_arm: Arm,
@@ -543,7 +532,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                 nodes=[
                     a(GraspingAction)(
                         grasp_candidate=self._grasps_by_closeness(
-                            handle_grasp.graspable, left_arm
+                            graspable=handle_grasp.graspable, arm=left_arm
                         ),
                         arm=left_arm,
                     ),
@@ -551,7 +540,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
                         nodes=[
                             a(PickUpAction)(
                                 grasp_candidate=self._grasps_by_closeness(
-                                    milk_grasp.graspable, right_arm
+                                    graspable=milk_grasp.graspable, arm=right_arm
                                 ),
                                 arm=right_arm,
                             ),
@@ -564,7 +553,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
         ]
 
     @staticmethod
-    def _grasps_by_closeness(graspable: IsGraspable, arm: Arm) -> Match:
+    def _grasps_by_closeness(*, graspable: IsGraspable, arm: Arm) -> Match:
         """
         :param graspable: The object to grasp.
         :param arm: The arm that grasps it.
@@ -586,6 +575,7 @@ class GarmiCleanUpDemonstration(RobotDemonstration):
 
     def _lay_the_milk_into_the_drawer(
         self,
+        *,
         milk: Milk,
         milk_grasp: GraspCandidate,
         milk_in_drawer: Pose,

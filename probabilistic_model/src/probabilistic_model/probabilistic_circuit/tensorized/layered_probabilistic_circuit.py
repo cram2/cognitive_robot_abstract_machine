@@ -159,7 +159,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
     The root layer has exactly one node, which is the output of the circuit.
     """
 
-    variables: SortedSet
+    variables: SortedSet[Variable]
     """
     The variables of the circuit.
 
@@ -492,7 +492,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
         if event.is_empty():
             return LogTruncation.impossible()
 
-        event.fill_missing_variables(set(self.variables))
+        event.fill_missing_variables(variables=set(self.variables))
 
         if len(event.simple_sets) == 1:
             return self.log_truncated_of_simple_event_in_place(
@@ -865,7 +865,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             VariableMap(
                 {
                     variable: type(variable)(
-                        f"{prefix}.{variable.name}", domain=variable.domain
+                        name=f"{prefix}.{variable.name}", domain=variable.domain
                     )
                     for variable in self.variables
                     if variable not in excluded_variables
@@ -948,7 +948,7 @@ class LayeredProbabilisticCircuit(GroundableCircuit[LayerNode], DataclassDeepcop
             MixtureOverVariable(
                 LayerNode(layer, mixing.node),
                 variable,
-                [support.marginal([variable]) for support in mixing.supports],
+                [support.marginal(variables=[variable]) for support in mixing.supports],
             )
             for mixing in layer.component_supports(self.variables, cache=cache)
             if mixing.mixes()

@@ -147,7 +147,7 @@ def gaussian_case() -> InputLayerQueryCase:
             namespace.asarray([-1.0, 2.0]),
             namespace.asarray(np.log([0.5, 1.5])),
         ),
-        variable=Continuous("x"),
+        variable=Continuous(name="x"),
         values=[-3.0, -1.0, 0.0, 0.5, 2.0, 7.0],
         assignment=closed(-1.0, 0.5) | closed(1.0, 3.0),
     )
@@ -173,7 +173,7 @@ def truncated_gaussian_case() -> InputLayerQueryCase:
             namespace.asarray([0.0, 2.5, 0.0]),
             namespace.asarray(np.log([1.0, 0.5, 2.0])),
         ),
-        variable=Continuous("x"),
+        variable=Continuous(name="x"),
         values=[-2.0, -1.0, 0.0, 0.5, 2.0, 3.0, 11.0],
         assignment=closed(-0.5, 2.5),
     )
@@ -196,7 +196,7 @@ def uniform_case() -> InputLayerQueryCase:
                 dtype=np.int64,
             ),
         ),
-        variable=Continuous("x"),
+        variable=Continuous(name="x"),
         values=[-1.0, 0.0, 1.0, 1.5, 2.0, 5.0, 6.0],
         assignment=open(0.5, 1.5) | closed(4.0, 8.0),
     )
@@ -213,7 +213,7 @@ def dirac_delta_case() -> InputLayerQueryCase:
             namespace.asarray([0.5, 3.0]),
             namespace.asarray([1.0, 2.0]),
         ),
-        variable=Continuous("x"),
+        variable=Continuous(name="x"),
         values=[0.0, 0.5, 1.0, 3.0, 4.0],
         assignment=closed(0.0, 1.0),
     )
@@ -224,7 +224,7 @@ def integer_case() -> InputLayerQueryCase:
     """
     Two distributions over the integers that share some of their states.
     """
-    count = Integer("n")
+    count = Integer(name="n")
     distributions = [
         IntegerDistribution(
             variable=count, probabilities=MissingDict(float, {1: 0.2, 2: 0.5, 4: 0.3})
@@ -249,7 +249,7 @@ def binomial_distributions() -> list[BinomialDistribution]:
     """
     Binomial distributions of different trials and offsets, one certain to succeed.
     """
-    count = Integer("n")
+    count = Integer(name="n")
     return [
         BinomialDistribution(
             variable=count, number_of_trials=2, success_probability=0.3, offset=1
@@ -320,7 +320,7 @@ def symbolic_case() -> InputLayerQueryCase:
     """
     Two categorical distributions over :class:`Letter`.
     """
-    letter = Symbolic(name="s", domain=Set.from_iterable(Letter))
+    letter = Symbolic(name="s", domain=Set.from_iterable(iterable=Letter))
     distributions = [
         SymbolicDistribution(
             variable=letter,
@@ -342,7 +342,7 @@ def symbolic_case() -> InputLayerQueryCase:
         build=lambda namespace: convert_table_to_namespace(layer, namespace),
         variable=letter,
         values=[0.0, 1.0, 2.0],
-        assignment=Set.from_iterable([Letter.A, Letter.C]),
+        assignment=Set.from_iterable(iterable=[Letter.A, Letter.C]),
     )
 
 

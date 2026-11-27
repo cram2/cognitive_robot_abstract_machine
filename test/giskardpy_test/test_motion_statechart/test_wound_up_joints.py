@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum
 
 import numpy as np
 import pytest
@@ -39,27 +38,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.degree_of_freedom import PositionLimitSide
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
 
-# %% starts of the wrist
-
-
-class WristWinding(float, Enum):
-    """
-    Where the last wrist joint of Tracy's right arm starts, in radians.
-
-    Both members put the arm in the same geometric configuration; they differ by a full
-    turn of the joint, whose position limits are a full turn either side of zero.
-    """
-
-    UNWOUND = -0.5
-    """
-    Close to zero, a full turn away from either position limit.
-    """
-
-    WOUND_UP = 2 * np.pi - 0.5
-    """
-    Just short of the upper position limit.
-    """
-
+from ...dataset.wound_up_wrist import WristWinding
 
 # %% a wrist turn watched for a stall
 
@@ -131,7 +110,8 @@ def test_wrist_turn_from_an_unwound_wrist_is_reached(
     tracy_world_copy: World, tracy_arm_pose: dict[TracyJoint, float]
 ) -> None:
     """
-    From :attr:`WristWinding.UNWOUND`, the wrist turns to the goal without being cancelled.
+    From :attr:`WristWinding.UNWOUND`, the wrist turns to the goal without being
+    cancelled.
     """
     wrist_turn = WatchedWristTurn.from_winding(
         world=tracy_world_copy, winding=WristWinding.UNWOUND, arm_pose=tracy_arm_pose

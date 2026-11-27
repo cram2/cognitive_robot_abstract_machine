@@ -6,7 +6,15 @@ the object it belongs to.
 from __future__ import annotations
 
 from krrood.class_diagrams.call_arguments import CallArguments
-from krrood.entity_query_language.ground_term import CallTerm, ObjectIdentity
+from krrood.entity_query_language.core.mapped_variable import Attribute
+from krrood.entity_query_language.ground_term import (
+    AttributeTerm,
+    CallTerm,
+    GroundTermExpression,
+    GroundTermType,
+    ObjectIdentity,
+)
+from krrood.entity_query_language.utils import T
 
 from ..dataset.objects_compared_by_value import PointComparedByValue
 
@@ -86,3 +94,23 @@ def test_function_compares_its_arguments_by_value():
             )
         ),
     )
+
+
+# %% the types an expression that reads ground terms is generic over
+
+
+def test_expression_binds_the_value_type_of_the_ground_terms_it_reads():
+    """
+    An attribute of a collection type reads ground terms whose values are collections.
+    """
+
+    class CollectionAttribute(Attribute[list[int]]):
+        """
+        An attribute whose values are lists of integers.
+        """
+
+    assert issubclass(CollectionAttribute, GroundTermExpression)
+    assert (
+        CollectionAttribute.get_type_of_generic_parameter(parameter=GroundTermType),
+        CollectionAttribute.get_type_of_generic_parameter(parameter=T),
+    ) == (AttributeTerm, list[int])

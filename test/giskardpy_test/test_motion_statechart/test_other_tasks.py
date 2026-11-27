@@ -1153,7 +1153,7 @@ class TestArticulateGraspedMechanism:
                 ),
             )
 
-            door.add(handle)
+            door.add(part=handle)
 
         root_C_hinge = door.movable_joint
 
@@ -1250,7 +1250,7 @@ class TestArticulateGraspedMechanism:
             handle = Handle.create_with_new_body_in_world(
                 name="handle", world=world, world_root_T_self=world_T_drawer
             )
-            drawer.add(handle)
+            drawer.add(part=handle)
         tip = world.get_body_by_name("r_gripper_tool_frame")
 
         executor = StatechartExecutor(

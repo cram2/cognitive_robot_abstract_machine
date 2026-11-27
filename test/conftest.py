@@ -87,7 +87,7 @@ from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 from semantic_digital_twin.robots.pr2 import PR2
 from semantic_digital_twin.robots.stretch import Stretch
 from semantic_digital_twin.robots.tiago import Tiago
-from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.tracy import Tracy, TracyJoint
 from semantic_digital_twin.robots.armar7 import Armar7
 from semantic_digital_twin.robots.icub3 import ICub3
 from semantic_digital_twin.robots.justin import Justin
@@ -615,6 +615,29 @@ def tracy_world():
     return world_with_tracy
 
 
+@pytest.fixture()
+def tracy_arm_pose() -> dict[TracyJoint, float]:
+    """
+    :return: An elbow-up pose of Tracy's right arm, away from its singularities.
+    """
+    return {
+        TracyJoint.RIGHT_SHOULDER_PAN: 0.0,
+        TracyJoint.RIGHT_SHOULDER_LIFT: -np.pi / 2,
+        TracyJoint.RIGHT_ELBOW: np.pi / 2,
+        TracyJoint.RIGHT_WRIST_1: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_2: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_3: 0.0,
+    }
+
+
+@pytest.fixture()
+def tracy_world_copy(tracy_world: World) -> World:
+    """
+    :return: A copy of Tracy's world that a test may move the robot in.
+    """
+    return deepcopy(tracy_world)
+
+
 @pytest.fixture(scope="session")
 def daisy_world():
     if not DAiSy.is_description_installed():
@@ -652,46 +675,17 @@ def _tiago_world_setup():
 
 @pytest.fixture(scope="session")
 def _apartment_world_setup():
+    """
+    :return: The apartment with a floor, a milk carton, a cereal box and a spoon in a drawer.
+    """
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "milk.stl",
-        )
-    ).create_world()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     cereal_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "breakfast_cereal.stl",
-        )
+        "package://iai_objects/objects/breakfast_cereal.stl"
     ).create_world()
-    spoon_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "spoon.stl",
-        )
-    ).create_world()
+    spoon_world = STLParser("package://iai_objects/objects/spoon.stl").create_world()
 
     apartment_world.merge_world_at_pose(
         milk_world,
@@ -756,7 +750,10 @@ def _apartment_world_setup():
 
 @pytest.fixture(scope="session")
 def _elevator_world_setup():
-
+    """
+    Build, once per session, a world with an elevator and its door, which other fixtures
+    copy before use.
+    """
     world = World()
 
     with world.modify_world():
@@ -800,7 +797,7 @@ def _elevator_world_setup():
                 ),
                 scale=door_scale,
             )
-            elevator.add(door)
+            elevator.add(part=door)
 
         world.add_semantic_annotation(elevator)
     return world
@@ -826,6 +823,9 @@ def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_set
 
 @pytest.fixture(scope="session")
 def _simple_apartment_setup():
+    """
+    :return: A world of two boxes surrounded by four walls.
+    """
     world = World()
     with world.modify_world():
         root = Body(name=PrefixedName("root"))
@@ -915,16 +915,7 @@ def _simple_apartment_setup():
         world.add_connection(wall_3_connection)
         world.add_connection(wall_4_connection)
 
-    milk_world = STLParser(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "coraplex",
-            "resources",
-            "objects",
-            "milk.stl",
-        )
-    ).create_world()
+    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
     world.merge_world_at_pose(
         milk_world,
         HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
@@ -934,14 +925,10 @@ def _simple_apartment_setup():
 
 @pytest.fixture(scope="session")
 def kitchen_world():
-    path = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "semantic_digital_twin",
-        "resources",
-        "urdf",
-        "kitchen-small.urdf",
-    )
+    """
+    :return: The small IAI kitchen.
+    """
+    path = "package://iai_kitchen/urdf_obj/kitchen-small.urdf"
     parser = URDFParser.from_file(file_path=path)
     world = parser.create_world()
     world.validate()

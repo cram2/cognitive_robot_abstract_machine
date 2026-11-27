@@ -664,7 +664,7 @@ class Sage10kDoor(Sage10kWithID):
         body.visual = geometry_with_texture
 
         with world.modify_world():
-            wall_annotation.add(annotation.entry_way)
+            wall_annotation.add(part=annotation.entry_way)
 
         self._create_handle_in_world(world, annotation)
         self._create_hinge_in_world(annotation)
@@ -691,8 +691,8 @@ class Sage10kDoor(Sage10kWithID):
             world.root.global_pose
         )
         is_handle_in_room = floor_bounding_box.event.marginal(
-            SpatialVariables.xy
-        ).contains((door_T_world.x, door_T_world.y))
+            variables=SpatialVariables.xy
+        ).contains(item=(door_T_world.x, door_T_world.y))
 
         if is_handle_in_room and self.opens_inward:
             door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -711,7 +711,7 @@ class Sage10kDoor(Sage10kWithID):
                 world_root_T_self=world_root_T_handle,
                 scale=Scale(0.05, 0.02, 0.2),
             )
-            door.add(handle)
+            door.add(part=handle)
         return handle
 
     def _create_hinge_in_world(self, door: Door) -> ActiveConnection1DOF:

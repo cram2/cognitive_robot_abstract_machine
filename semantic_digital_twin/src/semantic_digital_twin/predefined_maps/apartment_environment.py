@@ -101,7 +101,7 @@ class ApartmentEnvironment(WorldSource):
                 ("shelf_layer4", 1.613),
             ]:
                 shelf.add(
-                    ShelfLayer.create_with_new_body_in_world(
+                    part=ShelfLayer.create_with_new_body_in_world(
                         world=world,
                         name=layer_name,
                         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(

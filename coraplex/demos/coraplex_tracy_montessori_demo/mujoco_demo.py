@@ -27,7 +27,7 @@ from semantic_digital_twin.adapters.multi_sim import MujocoSim
 from semantic_digital_twin.robots.tracy import Tracy
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoRunner(DemoRunner):
     """
     Carries the sorting plan out against MuJoCo physics.
@@ -90,7 +90,9 @@ class MujocoRunner(DemoRunner):
                 simulation=simulation,
             )
             executor.compile(
-                statechart=ShapeSortingPlan(scene=self.scene).build(executor.context)
+                statechart=ShapeSortingPlan(scene=self.scene).build(
+                    context=executor.context
+                )
             )
             executor.execute()
             executor.close()

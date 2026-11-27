@@ -40,8 +40,8 @@ from probabilistic_model.distributions.uniform import UniformDistribution
 from probabilistic_model.probabilistic_circuit.rx.probabilistic_circuit import ProbabilisticCircuit, SumUnit, ProductUnit, leaf
 
 
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 model = ProbabilisticCircuit()
 sum1, sum2, sum3 = SumUnit(probabilistic_circuit=model), SumUnit(probabilistic_circuit=model), SumUnit(probabilistic_circuit=model)
 sum4, sum5 = SumUnit(probabilistic_circuit=model), SumUnit(probabilistic_circuit=model)
@@ -54,10 +54,10 @@ prod1.add_subcircuit(sum4)
 prod2.add_subcircuit(sum3)
 prod2.add_subcircuit(sum5)
 
-d_x1 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(0, 1)), probabilistic_circuit=model)
-d_x2 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(2, 3)), probabilistic_circuit=model)
-d_y1 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(0, 1)), probabilistic_circuit=model)
-d_y2 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(3, 4)), probabilistic_circuit=model)
+d_x1 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(lower=0, upper=1)), probabilistic_circuit=model)
+d_x2 = leaf(UniformDistribution(variable=x, interval=SimpleInterval.from_data(lower=2, upper=3)), probabilistic_circuit=model)
+d_y1 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(lower=0, upper=1)), probabilistic_circuit=model)
+d_y2 = leaf(UniformDistribution(variable=y, interval=SimpleInterval.from_data(lower=3, upper=4)), probabilistic_circuit=model)
 
 sum2.add_subcircuit(d_x1, np.log(0.8))
 sum2.add_subcircuit(d_x2, np.log(0.2))

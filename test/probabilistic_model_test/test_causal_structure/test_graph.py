@@ -113,7 +113,9 @@ def test_graph_without_member_graphs_raises():
 def test_an_edge_to_a_node_the_graph_lacks_raises():
     graph = confounded()
 
-    outside = GraphNode(variable=Continuous("W"), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+    outside = GraphNode(
+        variable=Continuous(name="W"), level=NodeLevel.EXAMPLE_ATTRIBUTE
+    )
 
     with pytest.raises(UnknownGraphNode):
         graph.add_edge(GraphEdge.directed_edge(graph.node("X"), outside))
@@ -363,7 +365,7 @@ def disturbed_neighbour() -> GraphNode:
     :return: The node of an attribute every neighbour of a scene has.
     """
     return GraphNode(
-        variable=Continuous("Scene.neighbours.disturbed"),
+        variable=Continuous(name="Scene.neighbours.disturbed"),
         level=NodeLevel.PART_ATTRIBUTE,
         collection="neighbours",
     )
@@ -397,7 +399,7 @@ def test_part_index_of_is_none_for_a_variable_that_is_no_copy(variable_name):
 
 def test_part_index_of_is_none_for_a_node_of_no_part():
     node = GraphNode(
-        variable=Continuous("Scene.friction"), level=NodeLevel.EXAMPLE_ATTRIBUTE
+        variable=Continuous(name="Scene.friction"), level=NodeLevel.EXAMPLE_ATTRIBUTE
     )
 
     assert node.part_index_of("Scene.neighbours[3].disturbed") is None

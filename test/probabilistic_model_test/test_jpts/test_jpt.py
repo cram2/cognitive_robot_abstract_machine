@@ -63,7 +63,9 @@ class Letter(Enum):
     [
         AnnotatedVariable(Integer(name="x"), 2, 1),
         AnnotatedVariable(Continuous(name="x"), 2, 3, 1.0, 0.1, 10),
-        AnnotatedVariable(Symbolic(name="x", domain=Set.from_iterable(Letter))),
+        AnnotatedVariable(
+            Symbolic(name="x", domain=Set.from_iterable(iterable=Letter))
+        ),
     ],
     ids=["integer", "continuous", "symbolic"],
 )
@@ -357,7 +359,7 @@ def test_truncation_to_an_interval_holds_all_mass_inside_it(breast_cancer_tree):
     first = breast_cancer_tree.variables[0]
     event = SimpleEvent.from_data({first: closed(0, 10)}).as_composite_set()
     truncated = breast_cancer_tree.probabilistic_circuit.truncated(event).distribution
-    event.fill_missing_variables(truncated.variables)
+    event.fill_missing_variables(variables=truncated.variables)
     assert truncated.probability(event) == pytest.approx(1.0)
 
 

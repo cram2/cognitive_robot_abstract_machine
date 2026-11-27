@@ -47,8 +47,8 @@ You can create them by calling the corresponding class constructors.
 For this tutorial, we will stick to normal distributions.
 
 ```{code-cell} ipython3
-x = Continuous("x")
-y = Continuous("y")
+x = Continuous(name="x")
+y = Continuous(name="y")
 pc = ProbabilisticCircuit()
 p_x_1 = leaf(GaussianDistribution(variable=x, location=0, scale=1), pc)
 ```
@@ -123,9 +123,9 @@ class Mood(IntEnum):
     HAPPY = 0
     SAD = 1
 
-success = Symbolic(name="Success", domain=Set.from_iterable(Success))
-object_position = Symbolic(name="ObjectPosition", domain=Set.from_iterable(ObjectPosition))
-mood = Symbolic(name="Mood", domain=Set.from_iterable(Mood))
+success = Symbolic(name="Success", domain=Set.from_iterable(iterable=Success))
+object_position = Symbolic(name="ObjectPosition", domain=Set.from_iterable(iterable=ObjectPosition))
+mood = Symbolic(name="Mood", domain=Set.from_iterable(iterable=Mood))
 
 # construct Bayesian network
 bn = BayesianNetwork()

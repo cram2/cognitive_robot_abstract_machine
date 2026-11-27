@@ -23,15 +23,22 @@ from krrood.ormatic.helper import (
 from sortedcontainers import SortedSet
 from typing_extensions import Optional, TextIO
 
+from krrood.adapters.json_serializer import (
+    ExternalClassJSONSerializer,
+    SubclassJSONSerializer,
+)
 from krrood.ormatic.default_type_mappings import DefaultTypeMapping
 from krrood.ormatic.field_storage import FieldClassifier
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import (
     DataAccessObject,
     PartDataAccessObject,
+)
+from krrood.ormatic.data_access_objects.relationships import (
     RelationshipInformationKey,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.interface import Interface
 
 from krrood.ormatic.sqlalchemy_generator import SQLAlchemyGenerator
@@ -434,16 +441,16 @@ class ORMatic:
     @cached_property
     def tables_by_class(self) -> dict[type, TableLike]:
         """
-        :return: The table of every mapped class, generated here or by a dependency.
+        :return: The table of every mapped class, specialized generics included,
+            generated here or by a dependency.
         """
-        result = {}
-        for wrapped_class, table in [
-            *self.external_tables.items(),
-            *self.wrapped_tables.items(),
-        ]:
-            if isclass(wrapped_class.clazz):
-                result[wrapped_class.clazz] = table
-        return result
+        return {
+            wrapped_class.clazz: table
+            for wrapped_class, table in [
+                *self.external_tables.items(),
+                *self.wrapped_tables.items(),
+            ]
+        }
 
     @staticmethod
     def part_class_of_external_table(
@@ -535,6 +542,19 @@ class ORMatic:
         sqlalchemy_generator = SQLAlchemyGenerator(ormatic=self)
         sqlalchemy_generator.to_sqlalchemy_file(file=file)
 
+    @classproperty
+    def default_ignored_classes(cls) -> set[type]:
+        """
+        :return: The classes :meth:`from_package` never maps, whatever it is told to
+            ignore: classes that give behaviour but describe nothing to store, such as
+            the serializer mixin and every serializer of a class outside our control.
+        """
+        return {
+            SubclassJSONSerializer,
+            ExternalClassJSONSerializer,
+            *recursive_subclasses(ExternalClassJSONSerializer),
+        }
+
     @classmethod
     def from_package(
         cls,
@@ -554,7 +574,8 @@ class ORMatic:
 
         :param packages: The packages that should be scanned for dataclasses.
         :param ormatic_interface_dependencies: The dependent ormatic_interfaces.
-        :param ignored_classes: The classes that should be ignored.
+        :param ignored_classes: The classes that should be ignored, besides the
+            :attr:`default_ignored_classes`.
         :param type_mappings: The type mappings that should be used.
         :param ignore_krrood_test_classes: Rather to ignore classes from the krrood test
             package.
@@ -586,7 +607,7 @@ class ORMatic:
         for package in packages:
             all_classes |= set(classes_of_package(package))
 
-        all_classes -= ignored_classes
+        all_classes -= ignored_classes | cls.default_ignored_classes
 
         mapping_module_names = [package.__name__ for package in [*packages, krrood]]
         all_alternative_mappings |= set(

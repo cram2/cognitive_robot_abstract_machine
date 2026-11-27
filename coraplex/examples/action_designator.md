@@ -252,10 +252,10 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from cramph.composites import Sequence
 
 description = TransportAction.from_graspable_by_closest_grasps(
-    world.get_semantic_annotations_by_type(Milk)[0],
-    Pose.from_xyz_quaternion(3.0, 2.2, 1.04, 0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
-    pr2.left_arm,
-    context,
+    graspable=world.get_semantic_annotations_by_type(Milk)[0],
+    goal_pose=Pose.from_xyz_quaternion(3.0, 2.2, 1.04, 0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
+    arm=pr2.left_arm,
+    context=context,
 )
 run(Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH),
             description]))
@@ -287,7 +287,7 @@ run(Sequence(nodes=[
     MoveTorsoAction(torso_state=TorsoState.HIGH),
     ParkArmsAction(arms=pr2.all_arms),
     NavigateAction(planar_goal_pose=Pose2D.from_pose(Pose.from_xyz_quaternion(1.7074915981292725, 2.6873629093170166, 0.0, -0.0, 0.0, 0.5253598267689507, -0.850880163370435, reference_frame=world.root))),
-    OpenAction.from_handle(handle, pr2.right_arm)]))
+    OpenAction.from_handle(handle=handle, arm=pr2.right_arm)]))
 ```
 
 ## Closing
@@ -305,5 +305,5 @@ run(Sequence(nodes=[
     MoveTorsoAction(torso_state=TorsoState.HIGH),
     ParkArmsAction(arms=pr2.all_arms),
     NavigateAction(planar_goal_pose=Pose2D.from_pose(Pose.from_xyz_quaternion(1.72, 2.65, 0.0, -0.0, 0.0, 0.5253598267689507, -0.850880163370435, reference_frame=world.root))),
-    CloseAction.from_handle(handle, pr2.right_arm)]))
+    CloseAction.from_handle(handle=handle, arm=pr2.right_arm)]))
 ```

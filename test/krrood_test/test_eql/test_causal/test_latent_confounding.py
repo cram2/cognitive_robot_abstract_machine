@@ -49,8 +49,10 @@ from probabilistic_model.causal_structure.learning import (
     RelationalCausalStructureLearner,
 )
 from probabilistic_model.causal_structure.relational_checks import ExampleToPartCheck
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
-from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.variables import (
+    infer_variables_from_dataframe,
+)
 from probabilistic_model.learning.learning_method import StratifiedLearning
 from probabilistic_model.probabilistic_circuit.causal.causal_circuit import (
     CausalCircuit,
@@ -180,7 +182,7 @@ def learned_structure(
         relations of the class in a class diagram.
     """
     nodes = [
-        GraphNode(variable=Integer(column), level=NodeLevel.EXAMPLE_ATTRIBUTE)
+        GraphNode(variable=Integer(name=column), level=NodeLevel.EXAMPLE_ATTRIBUTE)
         for column in rows.columns
     ]
     graph = FastCausalInferenceStructureLearner().learn(

@@ -1,6 +1,6 @@
 """
-Fits a Nyga distribution on samples of a mixture of normals, logs it and its
-parameters to mlflow as a model, loads it back and plots it.
+Fits a Nyga distribution on samples of a mixture of normals, logs it and its parameters
+to mlflow as a model, loads it back and plots it.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ for component in tqdm.trange(number_of_components, desc="Generating data"):
     data.append(samples)
 
 data = np.concatenate(data, axis=0)
-variable = Continuous("x")
+variable = Continuous(name="x")
 
 rustworkx_model = NygaInduction(
     variable, minimum_samples_per_quantile=minimum_samples_per_quantile

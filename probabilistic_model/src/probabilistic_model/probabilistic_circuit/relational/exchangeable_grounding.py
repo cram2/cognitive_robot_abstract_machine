@@ -512,7 +512,7 @@ class ExchangeablePartGrounder(Generic[NodeType], SubClassSafeGeneric):
         if len(branch_regions) == 1:
             return branch_regions[0].is_singleton()
         return all(
-            left.intersection_with(right).is_empty()
+            left.intersection_with(other=right).is_empty()
             for left, right in itertools.combinations(branch_regions, 2)
         )
 
@@ -636,4 +636,4 @@ class RelationalGrounding:
         :return: Whether the value designates exactly one element of the variable's
             domain.
         """
-        return variable.make_value(value).is_singleton()
+        return variable.make_value(value=value).is_singleton()

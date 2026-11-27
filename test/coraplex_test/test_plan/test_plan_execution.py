@@ -140,7 +140,7 @@ def test_preparing_a_plan_does_not_move_the_robot(pr2_apartment_context) -> None
     executor = simulated_executor(extensions)
 
     executor.prepare(
-        statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
+        statechart=statechart_of(executor, MoveTorsoAction(torso_state=TorsoState.HIGH))
     )
 
     assert world.state[torso].position == position_before

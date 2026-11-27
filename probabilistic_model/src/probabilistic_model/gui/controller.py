@@ -75,7 +75,7 @@ class ModelController:
             return 0.0
 
         # P(query | evidence) = P(query ^ evidence) / P(evidence)
-        joint = query.intersection_with(evidence)
+        joint = query.intersection_with(other=evidence)
         if not joint.simple_sets:
             return 0.0
 

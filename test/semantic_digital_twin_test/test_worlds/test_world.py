@@ -984,21 +984,15 @@ def test_copy_world(world_setup):
 
 
 def test_copy_big_world():
+    """
+    A deep copy of the apartment with a PR2 holds the same world entities.
+    """
     pr2_world = URDFParser.from_file(
         file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     ).create_world()
     PR2.from_world(pr2_world)
     apartment_world = URDFParser.from_file(
-        os.path.join(
-            os.path.dirname(__file__),
-            "..",
-            "..",
-            "..",
-            "coraplex",
-            "resources",
-            "worlds",
-            "apartment.urdf",
-        )
+        "package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
 
     apartment_world.merge_world(pr2_world)

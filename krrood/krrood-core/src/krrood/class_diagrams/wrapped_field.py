@@ -7,6 +7,7 @@ from __future__ import annotations
 import enum
 import inspect
 import logging
+import numbers
 import re
 import sys
 from collections.abc import Sequence
@@ -17,13 +18,13 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
 
+
 # Only this class matches the aliases a ``type`` statement makes before Python 3.14.
 from typing import TypeAliasType  # noqa: TID251
 from typing_extensions import (
     Annotated,
     get_origin,
     get_args,
-    ClassVar,
     Type,
     TYPE_CHECKING,
     Optional,
@@ -42,6 +43,7 @@ from krrood.class_diagrams.utils import (
     is_union_annotation,
 )
 from krrood.class_diagrams.collection_kind import CollectionKind, DeclaredValueKind
+from krrood.patterns.classproperty import classproperty
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -90,10 +92,14 @@ class WrappedField:
     The property descriptor instance that manages the field.
     """
 
-    container_types: ClassVar[list[type]] = [list, set, tuple, type, Sequence]
-    """
-    A list of container types that are supported by the parser.
-    """
+    @classproperty
+    def container_types(cls) -> tuple[type, ...]:
+        """
+        :return: The container types that are supported by the parser: the
+            :attr:`~krrood.class_diagrams.collection_kind.CollectionKind.ELEMENT_SEQUENCE`
+            collections, ``type`` for ``type[X]`` and ``Sequence`` for ``Sequence[X]``.
+        """
+        return *CollectionKind.ELEMENT_SEQUENCE.value, type, Sequence
 
     def __post_init__(self):
         self.public_name = self.public_name or self.field.name
@@ -134,6 +140,7 @@ class WrappedField:
             type_hint = get_type_hints_of_object(
                 self.clazz.class_to_introspect,
                 namespace=tuple(self._build_initial_namespace().items()),
+                wrapped_class=self.clazz,
             )[self.field.name]
 
         if get_origin(type_hint) is Annotated:
@@ -242,6 +249,78 @@ class WrappedField:
         if is_union_annotation(self.resolved_type):
             return get_args(self.resolved_type)
         return (self.resolved_type,)
+
+    def accepts_value(self, *, value: Any) -> bool:
+        """
+        :param value: A value the field may be given.
+        :return: Whether *value* is an instance of a member of the field's annotation, any
+            real number standing for a ``float`` and any integral number for an ``int``.
+            A member no instance check can decide, such as a type variable or ``Any``,
+            accepts every value.
+        """
+        return any(
+            self._annotation_accepts_value_(annotation=annotation, value=value)
+            for annotation in self._union_members_
+        )
+
+    def accepts_element(self, *, element: Any) -> bool:
+        """
+        :param element: A value that may be inserted into the collection the field holds.
+        :return: Whether a member of the field's annotation is a collection whose
+            declared element type admits *element*, as :meth:`accepts_value` decides it,
+            or is a member no instance check can decide. A field that declares no
+            collection admits no element.
+        """
+        return any(
+            self._annotation_accepts_element_(annotation=annotation, element=element)
+            for annotation in self._union_members_
+        )
+
+    @staticmethod
+    def _is_undecidable_class_(*, annotated_class: Any) -> bool:
+        """
+        :param annotated_class: The class one member of a field's annotation names.
+        :return: Whether no instance check can decide membership of *annotated_class*,
+            as for ``Any`` or a type variable.
+        """
+        return annotated_class is Any or not isinstance(annotated_class, type)
+
+    @staticmethod
+    def _annotation_accepts_value_(*, annotation: Any, value: Any) -> bool:
+        """
+        :param annotation: One member of a field's annotation.
+        :param value: A value the field may be given.
+        :return: Whether *value* is an instance of the class *annotation* names, or
+            ``True`` when it names none.
+        """
+        annotated_class = get_origin(annotation) or annotation
+        if WrappedField._is_undecidable_class_(annotated_class=annotated_class):
+            return True
+        if annotated_class is float:
+            return isinstance(value, numbers.Real)
+        if annotated_class is int:
+            return isinstance(value, numbers.Integral)
+        return isinstance(value, annotated_class)
+
+    @staticmethod
+    def _annotation_accepts_element_(*, annotation: Any, element: Any) -> bool:
+        """
+        :param annotation: One member of a field's annotation.
+        :param element: A value that may be inserted into the collection the field holds.
+        :return: Whether *annotation* is a collection whose declared element type admits
+            *element*, or names no class an instance check can decide.
+        """
+        annotated_class = get_origin(annotation) or annotation
+        if WrappedField._is_undecidable_class_(annotated_class=annotated_class):
+            return True
+        if annotated_class not in CollectionKind.all_classes():
+            return False
+        if not get_args(annotation):
+            return True
+        return WrappedField._annotation_accepts_value_(
+            annotation=CollectionKind.declared_element_type(annotation=annotation),
+            value=element,
+        )
 
     @cached_property
     def container_type(self) -> type | None:
