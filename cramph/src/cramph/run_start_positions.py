@@ -18,6 +18,23 @@ from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFr
 # %% where each run found what it moves
 
 
+@dataclass(frozen=True, kw_only=True)
+class RunStart:
+    """
+    The start of one run of a node: the node, and the tick its run started on.
+    """
+
+    node: StatechartNode
+    """
+    The node that ran.
+    """
+
+    tick: int
+    """
+    The tick the run started on.
+    """
+
+
 @dataclass(kw_only=True)
 class RunStartPositions(ContextExtension):
     """
@@ -25,12 +42,12 @@ class RunStartPositions(ContextExtension):
     started.
     """
 
-    positions_by_node: dict[StatechartNode, dict[int, dict[UUID, float]]] = field(
+    positions_at_run_start: dict[RunStart, dict[DegreeOfFreedom, float]] = field(
         default_factory=dict
     )
     """
-    For each node that moves something, the tick each of its runs started on and the
-    positions of the degrees of freedom it moves before that tick, by their ids.
+    For the start of each run of a node that moves something, the position of each
+    degree of freedom the node moves, from before the tick the run started on.
     """
 
     def position_at_start_of(
@@ -41,11 +58,9 @@ class RunStartPositions(ContextExtension):
         :param degree_of_freedom: A degree of freedom the node of `run` moves.
         :return: Its position when `run` started, None if none was recorded.
         """
-        return (
-            self.positions_by_node.get(run.node, {})
-            .get(run.start_tick, {})
-            .get(degree_of_freedom.id)
-        )
+        return self.positions_at_run_start.get(
+            RunStart(node=run.node, tick=run.start_tick), {}
+        ).get(degree_of_freedom)
 
 
 # %% recording them while the statechart runs
@@ -124,8 +139,10 @@ class RunStartPositionRecording(TickingExecutorExtension):
             moved = node.compute_world_access().moved_degrees_of_freedom
             if not moved:
                 continue
-            record.positions_by_node.setdefault(node, {})[executor.tick_count] = {
-                degree_of_freedom.id: self._positions_before_tick[degree_of_freedom.id]
+            record.positions_at_run_start[
+                RunStart(node=node, tick=executor.tick_count)
+            ] = {
+                degree_of_freedom: self._positions_before_tick[degree_of_freedom.id]
                 for degree_of_freedom in moved
                 if degree_of_freedom.id in self._positions_before_tick
             }

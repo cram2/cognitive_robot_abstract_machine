@@ -16,8 +16,8 @@ from coraplex.exceptions import MotionDidNotFinish
 from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph
 from coraplex.plans.failure_diagnosis.counterfactual import (
     StallCounterfactual,
+    RetryWithJointsUnwound,
     TaskWithJointsUnwound,
-    retry_task_with_joints_unwound,
 )
 from giskardpy.motion_statechart.conflict_edges import ConflictEdge
 from coraplex.plans.failure_diagnosis.diagnosis import FailureDiagnoser
@@ -49,6 +49,7 @@ from cramph.composites import Parallel, Sequence, StatementNode
 from cramph.data_types import LifeCycleValue
 from cramph.failure_handling import HandledOnFailure, LimitedRecovery, RetryFailedNode
 from cramph.node import FailsOnObservingFalse, StatechartNode, SucceedsOnObservingTrue
+from cramph.node_runs import StatechartRuns
 from cramph.statechart import Statechart
 from cramph.world_modification_nodes import MoveBranch
 from giskardpy.motion_statechart.monitors.joint_monitors import JointPositionReached
@@ -810,8 +811,10 @@ def test_unwinding_the_wrist_where_the_turn_stalled_lets_the_turn_reach_its_goal
 ) -> None:
     """
     In the world the plan ran in, not in a copy, the turn run again from where it
-    stalled stalls again. Once the wrist is turned a full turn back from its limit, the
-    turn run again reaches its goal.
+    stalled stalls again.
+
+    Once the wrist is turned a full turn back from its limit, the turn run again reaches
+    its goal.
     """
     plan = TurnAfterWindingTheWristUp.run(
         world=tracy_world_copy, arm_pose=tracy_arm_pose
@@ -862,8 +865,13 @@ def test_unwinding_a_joint_that_does_not_block_the_turn_leaves_it_stalled(
     )
 
     assert (
-        retry_task_with_joints_unwound(
-            task=stalled,
+        RetryWithJointsUnwound(world=tracy_world_copy).try_in(
+            trial=FailureDiagnoser.from_statechart(
+                statechart=plan.statechart
+            ).action_trial,
+            stalled=StatechartRuns(statechart=plan.statechart).latest_run_of_node(
+                node=stalled
+            ),
             blocked_position_limits=[
                 BlockedPositionLimit(
                     degree_of_freedom=other_wrist.raw_dof,
@@ -871,10 +879,6 @@ def test_unwinding_a_joint_that_does_not_block_the_turn_leaves_it_stalled(
                     task=stalled,
                 )
             ],
-            world=tracy_world_copy,
-            trial=FailureDiagnoser.from_statechart(
-                statechart=plan.statechart
-            ).action_trial,
         )
         == StallCounterfactual.STILL_STALLED_UNWOUND
     )

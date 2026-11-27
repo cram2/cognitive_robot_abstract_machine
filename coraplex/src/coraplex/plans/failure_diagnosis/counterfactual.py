@@ -8,11 +8,15 @@ were before an earlier node moved them.
 from __future__ import annotations
 
 import math
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
 
 from coraplex.plans.underspecified import ActionTrial, SubtreeRebuild
+from cramph.causal_edges import WorldChanges
 from cramph.node import StatechartNode
+from cramph.run_start_positions import RunStartPositions
+from cramph.state_history import NodeRun
 from giskardpy.motion_statechart.mixins import HasKinematicChainParameter
 from giskardpy.motion_statechart.monitors.progress_monitors import BlockedPositionLimit
 from semantic_digital_twin.world import World
@@ -178,39 +182,6 @@ class TaskWithJointsUnwound(SubtreeRebuild):
         return f"{self.root.name} with its joints turned a full turn back from their limits"
 
 
-def retry_task_with_joints_unwound(
-    *,
-    task: StatechartNode,
-    blocked_position_limits: list[BlockedPositionLimit],
-    world: World,
-    trial: ActionTrial | None,
-) -> StallCounterfactual | None:
-    """
-    :param task: A task that stopped approaching its goal.
-    :param blocked_position_limits: The position limits blocking `task`.
-    :param world: The world `task` ran in.
-    :param trial: The trial to try it in, None if the plan has none.
-    :return: Whether the task, with the tasks running beside it, reaches its goal once
-        its revolute joints are turned a full turn back from the limits blocking them,
-        None if it was not tried because the plan has no trial or no such joint can be
-        turned a full turn.
-    """
-    unwindable = TaskWithJointsUnwound.unwindable(
-        world=world, blocked_position_limits=blocked_position_limits
-    )
-    if trial is None or not unwindable:
-        return None
-    if trial.succeeds(
-        rebuild=TaskWithJointsUnwound(
-            root=SubtreeRebuild.root_around(node=task),
-            candidates={},
-            blocked_position_limits=unwindable,
-        )
-    ):
-        return StallCounterfactual.REACHED_UNWOUND
-    return StallCounterfactual.STILL_STALLED_UNWOUND
-
-
 # %% trying the task with its joints where they were before an earlier node moved them
 
 
@@ -218,8 +189,8 @@ def retry_task_with_joints_unwound(
 class TaskFromEarlierPositions(SubtreeRebuild):
     """
     Rebuilds a stalled task, with the tasks running beside it, onto a copy of the world,
-    with the joints that block it at a position limit put back where they were before
-    an earlier node moved them.
+    with the joints that block it at a position limit put back where they were before an
+    earlier node moved them.
     """
 
     earlier_positions: dict[DegreeOfFreedom, float]
@@ -246,29 +217,156 @@ class TaskFromEarlierPositions(SubtreeRebuild):
         return f"{self.root.name} with its blocked joints where they were before"
 
 
-def retry_task_from_earlier_positions(
-    *,
-    task: StatechartNode,
-    earlier_positions: dict[DegreeOfFreedom, float],
-    trial: ActionTrial | None,
-) -> StallCounterfactual | None:
+# %% the ways to retry a task stalled at a position limit
+
+
+@dataclass(kw_only=True)
+class PositionLimitRetry(ABC):
     """
-    :param task: A task that stopped approaching its goal.
-    :param earlier_positions: Each degree of freedom blocking it at a position limit,
-        and its position before the earlier node that last moved it.
-    :param trial: The trial to try it in, None if the plan has none.
-    :return: Whether the task, with the tasks running beside it, reaches its goal from
-        those positions, None if it was not tried because the plan has no trial or no
-        earlier position is known.
+    One way to try a task stalled at position limits again with the joints that block it
+    moved, which shows whether where those joints were made it stall.
     """
-    if trial is None or not earlier_positions:
-        return None
-    if trial.succeeds(
-        rebuild=TaskFromEarlierPositions(
-            root=SubtreeRebuild.root_around(node=task),
+
+    @property
+    @abstractmethod
+    def reached(self) -> StallCounterfactual:
+        """
+        :return: What the retry showed when the task reached its goal.
+        """
+
+    @property
+    @abstractmethod
+    def still_stalled(self) -> StallCounterfactual:
+        """
+        :return: What the retry showed when the task stalled again.
+        """
+
+    @abstractmethod
+    def rebuild_for(
+        self,
+        *,
+        stalled: NodeRun,
+        blocked_position_limits: list[BlockedPositionLimit],
+    ) -> SubtreeRebuild | None:
+        """
+        :param stalled: The run that stopped approaching its goal.
+        :param blocked_position_limits: The position limits blocking it.
+        :return: The rebuild of its task, with the tasks running beside it and the
+            blocking joints moved; None if this retry can move none of them.
+        """
+
+    def try_in(
+        self,
+        *,
+        trial: ActionTrial | None,
+        stalled: NodeRun,
+        blocked_position_limits: list[BlockedPositionLimit],
+    ) -> StallCounterfactual | None:
+        """
+        :param trial: The trial to try the task in, None if the plan has none.
+        :param stalled: The run that stopped approaching its goal.
+        :param blocked_position_limits: The position limits blocking it.
+        :return: Whether the task reached its goal once retried, None if it was not
+            tried because the plan has no trial or this retry can move no blocking
+            joint.
+        """
+        if trial is None:
+            return None
+        rebuild = self.rebuild_for(
+            stalled=stalled, blocked_position_limits=blocked_position_limits
+        )
+        if rebuild is None:
+            return None
+        if trial.succeeds(rebuild=rebuild):
+            return self.reached
+        return self.still_stalled
+
+
+@dataclass(kw_only=True)
+class RetryWithJointsUnwound(PositionLimitRetry):
+    """
+    Retries the task with each blocking revolute joint whose range spans a full turn
+    turned a full turn back from its limit.
+    """
+
+    world: World
+    """
+    The world the task ran in.
+    """
+
+    @property
+    def reached(self) -> StallCounterfactual:
+        return StallCounterfactual.REACHED_UNWOUND
+
+    @property
+    def still_stalled(self) -> StallCounterfactual:
+        return StallCounterfactual.STILL_STALLED_UNWOUND
+
+    def rebuild_for(
+        self,
+        *,
+        stalled: NodeRun,
+        blocked_position_limits: list[BlockedPositionLimit],
+    ) -> SubtreeRebuild | None:
+        unwindable = TaskWithJointsUnwound.unwindable(
+            world=self.world, blocked_position_limits=blocked_position_limits
+        )
+        if not unwindable:
+            return None
+        return TaskWithJointsUnwound(
+            root=SubtreeRebuild.root_around(node=stalled.node),
+            candidates={},
+            blocked_position_limits=unwindable,
+        )
+
+
+@dataclass(kw_only=True)
+class RetryFromEarlierPositions(PositionLimitRetry):
+    """
+    Retries the task with each blocking joint put back where it was when the last
+    earlier run that moved it started.
+    """
+
+    world_changes: WorldChanges
+    """
+    What each run of the statechart changed in the world.
+    """
+
+    run_start_positions: RunStartPositions
+    """
+    Where each run of the statechart found the degrees of freedom it moves.
+    """
+
+    @property
+    def reached(self) -> StallCounterfactual:
+        return StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS
+
+    @property
+    def still_stalled(self) -> StallCounterfactual:
+        return StallCounterfactual.STILL_STALLED_FROM_EARLIER_POSITIONS
+
+    def rebuild_for(
+        self,
+        *,
+        stalled: NodeRun,
+        blocked_position_limits: list[BlockedPositionLimit],
+    ) -> SubtreeRebuild | None:
+        earlier_positions = {}
+        for limit in blocked_position_limits:
+            mover = self.world_changes.last_run_that_moved(
+                degree_of_freedom_id=limit.degree_of_freedom.id, reader=stalled
+            )
+            if mover is None:
+                continue
+            position = self.run_start_positions.position_at_start_of(
+                run=mover, degree_of_freedom=limit.degree_of_freedom
+            )
+            if position is not None:
+                earlier_positions[limit.degree_of_freedom] = position
+        if not earlier_positions:
+            return None
+        return TaskFromEarlierPositions(
+            root=SubtreeRebuild.root_around(node=stalled.node),
             candidates={},
             earlier_positions=earlier_positions,
         )
-    ):
-        return StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS
-    return StallCounterfactual.STILL_STALLED_FROM_EARLIER_POSITIONS

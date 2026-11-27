@@ -10,10 +10,11 @@ from functools import singledispatchmethod
 
 from coraplex.plans.failure_diagnosis.causal_graph import RunCausalGraph, RootCause
 from coraplex.plans.failure_diagnosis.counterfactual import (
+    PositionLimitRetry,
+    RetryFromEarlierPositions,
+    RetryWithJointsUnwound,
     StallCounterfactual,
-    retry_task_from_earlier_positions,
     retry_task_with_chain_from_world_root,
-    retry_task_with_joints_unwound,
 )
 from coraplex.plans.failure_diagnosis.exceptions import (
     FailureDiagnosis,
@@ -67,10 +68,10 @@ class FailureDiagnoser:
     a diagnosis; None if the plan has none.
     """
 
-    run_start_positions: RunStartPositions | None = None
+    position_limit_retries: list[PositionLimitRetry] = field(default_factory=list)
     """
-    Where each run of the statechart found the degrees of freedom it moves; None if that
-    was not recorded.
+    The ways to retry a task stalled at position limits, tried in this order until one
+    reaches its goal.
     """
 
     stalled_nodes: list[StatechartNode] = field(default_factory=list, init=False)
@@ -128,12 +129,24 @@ class FailureDiagnoser:
             ),
             None,
         )
+        causal_graph = RunCausalGraph.from_statechart(statechart=statechart)
+        retries: list[PositionLimitRetry] = [
+            RetryWithJointsUnwound(world=statechart.context.world)
+        ]
+        run_start_positions = statechart.context.get_extension(
+            extension_type=RunStartPositions
+        )
+        if run_start_positions is not None:
+            retries.append(
+                RetryFromEarlierPositions(
+                    world_changes=causal_graph.world_changes,
+                    run_start_positions=run_start_positions,
+                )
+            )
         return cls(
-            causal_graph=RunCausalGraph.from_statechart(statechart=statechart),
+            causal_graph=causal_graph,
             action_trial=trial,
-            run_start_positions=statechart.context.get_extension(
-                extension_type=RunStartPositions
-            ),
+            position_limit_retries=retries,
         )
 
     @property
@@ -380,28 +393,20 @@ class FailureDiagnoser:
         blocked_degrees_of_freedom = frozenset(
             limit.degree_of_freedom for limit in blocked
         )
-        unwound = retry_task_with_joints_unwound(
-            task=stalled.node,
-            blocked_position_limits=blocked,
-            world=self.runs.statechart.context.world,
-            trial=self.action_trial,
-        )
-        if unwound == StallCounterfactual.REACHED_UNWOUND:
-            return self.last_plan_runs_moving(
-                degrees_of_freedom=blocked_degrees_of_freedom, statement=stalled
-            ), unwound
-        moved_back = retry_task_from_earlier_positions(
-            task=stalled.node,
-            earlier_positions=self.earlier_positions_of(
-                degrees_of_freedom=blocked_degrees_of_freedom, stalled=stalled
-            ),
-            trial=self.action_trial,
-        )
-        if moved_back == StallCounterfactual.REACHED_FROM_EARLIER_POSITIONS:
-            return self.last_plan_runs_moving(
-                degrees_of_freedom=blocked_degrees_of_freedom, statement=stalled
-            ), moved_back
-        limit_counterfactual = moved_back or unwound
+        limit_counterfactual = None
+        for retry in self.position_limit_retries:
+            counterfactual = retry.try_in(
+                trial=self.action_trial,
+                stalled=stalled,
+                blocked_position_limits=blocked,
+            )
+            if counterfactual is None:
+                continue
+            if counterfactual == retry.reached:
+                return self.last_plan_runs_moving(
+                    degrees_of_freedom=blocked_degrees_of_freedom, statement=stalled
+                ), counterfactual
+            limit_counterfactual = counterfactual
         unmovable = (
             access.read_degrees_of_freedom - access.moved_or_held_degrees_of_freedom
         )
@@ -418,32 +423,6 @@ class FailureDiagnoser:
         if counterfactual == StallCounterfactual.STILL_STALLED:
             return [], counterfactual
         return left_by_earlier, counterfactual
-
-    def earlier_positions_of(
-        self, *, degrees_of_freedom: frozenset[DegreeOfFreedom], stalled: NodeRun
-    ) -> dict[DegreeOfFreedom, float]:
-        """
-        :param degrees_of_freedom: Degrees of freedom blocking `stalled` at a limit.
-        :param stalled: A run that stopped approaching its goal.
-        :return: Each of `degrees_of_freedom` an earlier run moved, and where it was
-            when the last such run started; empty if that was not recorded.
-        """
-        if self.run_start_positions is None:
-            return {}
-        changes = self.causal_graph.world_changes
-        earlier_positions = {}
-        for degree_of_freedom in degrees_of_freedom:
-            mover = changes.last_run_that_moved(
-                degree_of_freedom_id=degree_of_freedom.id, reader=stalled
-            )
-            if mover is None:
-                continue
-            position = self.run_start_positions.position_at_start_of(
-                run=mover, degree_of_freedom=degree_of_freedom
-            )
-            if position is not None:
-                earlier_positions[degree_of_freedom] = position
-        return earlier_positions
 
     def find_causes_of_collision(self, *, colliding: NodeRun) -> list[RootCause]:
         """
