@@ -507,7 +507,7 @@ class PR2LeftArm(PR2Arm[PR2LeftGripper]):
                         1.38,
                         -2.12,
                         4.2,
-                        -0.073,
+                        -0.1,
                         0.0,
                     ],
                 )
@@ -555,7 +555,7 @@ class PR2RightArm(PR2Arm[PR2RightGripper]):
             mapping=dict(
                 zip(
                     [c for c in self.active_connections],
-                    [-1.712, -0.256, -1.463, -2.12, 1.766, -0.07, 0.051],
+                    [-1.712, -0.256, -1.463, -2.12, 1.766, -0.1, 0.051],
                 )
             ),
             state_type=StaticJointState.PARK,

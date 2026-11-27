@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.datastructures.definitions import StaticJointState
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import (
     DuplicateRobotAssignmentsError,
@@ -827,3 +828,22 @@ def test_pr2_joint_names_resolve_to_connections(pr2_world_state_reset):
     }
 
     assert resolved == {joint: joint.value for joint in PR2Joint}
+
+
+# %% park poses
+
+
+def test_the_park_poses_lie_within_the_joint_limits(pr2_world_state_reset):
+    """
+    A park position beyond a joint's limit can never be reached, so a motion to the park
+    pose ends short of it.
+    """
+    [pr2] = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)
+    for arm in pr2.all_arms:
+        park_state = arm.get_joint_state_by_type(StaticJointState.PARK)
+        for connection, target in zip(park_state.connections, park_state.target_values):
+            limits = connection.dof.limits
+            if limits.lower.position is not None:
+                assert target >= limits.lower.position, connection.name
+            if limits.upper.position is not None:
+                assert target <= limits.upper.position, connection.name
