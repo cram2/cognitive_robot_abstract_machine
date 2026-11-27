@@ -129,9 +129,8 @@ class Ripeness(Quality):
 @dataclass(kw_only=True)
 class MassDensity(Quality):
     """
-    The mass per volume of its bearer's material, in kilograms per cubic metre.
-
-    .. seealso:: `Density <https://en.wikipedia.org/wiki/Density>`_ (Wikipedia)
+    The mass per volume of its bearer's material, in kilograms per cubic metre
+    :cite:`wikipedia_density`.
     """
 
     value: SimpleInterval
@@ -158,35 +157,27 @@ class MassDensity(Quality):
 class MaterialElasticity(Quality):
     """
     How its bearer's material deforms under load and springs back, given by the two
-    constants that describe an isotropic linear elastic material.
+    constants that describe an isotropic linear elastic material
+    :cite:`wikipedia_linear_elasticity`.
 
     .. note:: Plant tissue is neither isotropic nor linear; the constants approximate it.
 
-    .. seealso::
-        - `Linear elasticity <https://en.wikipedia.org/wiki/Linear_elasticity>`_
-          (Wikipedia)
-        - N. N. Mohsenin, `Physical Properties of Plant and Animal Materials, vol. 1
-          <https://www.routledge.com/Physical-Properties-of-Plant-and-Animal-Materials-v-1-Physical-Characteristics-and-Mechanical-Properties/Mohsenin/p/book/9780677023007>`_,
-          ISBN 978-0-677-02300-7: §4.5 on ideal elastic behaviour, §4.9 on
-          viscoelasticity, §5.4 on Poisson's ratio
+    .. seealso:: :cite:t:`mohsenin1971physical`, §4.5 on ideal elastic behaviour, §4.9
+        on viscoelasticity and §5.4 on Poisson's ratio.
     """
 
     youngs_modulus: SimpleInterval
     """
     The stiffness of the material when stretched or compressed along one axis, in pascals,
-    on :attr:`youngs_modulus_scale`: a single point when measured, or a range.
-
-    .. seealso:: `Young's modulus <https://en.wikipedia.org/wiki/Young%27s_modulus>`_
-        (Wikipedia)
+    on :attr:`youngs_modulus_scale`: a single point when measured, or a range
+    :cite:`wikipedia_youngs_modulus`.
     """
 
     poissons_ratio: SimpleInterval
     """
     How much the material narrows across a stretch relative to how much it lengthens, on
-    :attr:`poissons_ratio_scale`: a single point when measured, or a range.
-
-    .. seealso:: `Poisson's ratio <https://en.wikipedia.org/wiki/Poisson%27s_ratio>`_
-        (Wikipedia)
+    :attr:`poissons_ratio_scale`: a single point when measured, or a range
+    :cite:`wikipedia_poissons_ratio`.
     """
 
     def __post_init__(self) -> None:
@@ -211,10 +202,6 @@ class MaterialElasticity(Quality):
     def poissons_ratio_scale(cls) -> SimpleInterval:
         """
         :return: The scale of Poisson's ratio: the range, from -1 to 1/2, in which an
-            isotropic linear elastic material is stable.
-
-        .. seealso:: P. H. Mott and C. M. Roland, `Limits to Poisson's ratio in isotropic
-            materials <https://doi.org/10.1103/PhysRevB.80.132104>`_, Physical Review B
-            80, 132104
+            isotropic linear elastic material is stable :cite:`mott2009limits`.
         """
         return SimpleInterval.from_data(-1.0, 0.5, Bound.OPEN, Bound.OPEN)
