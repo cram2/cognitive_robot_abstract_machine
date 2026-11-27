@@ -1,5 +1,5 @@
 """
-Generate the ORM interface of the probabilistic_model package.
+Generate the ORM interface of probabilistic_model.
 """
 
 from __future__ import annotations
@@ -7,25 +7,33 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import random_events.variable
-
-import probabilistic_model.probabilistic_circuit.tensorized
+import probabilistic_model
+from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.ormatic.ormatic import ORMatic
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
+    TrainingState,
+)
 from probabilistic_model.orm.custom_types import BackendArrayType
 from probabilistic_model.probabilistic_circuit.tensorized.array_types import (
     BackendArray,
 )
 
+# the state of a running optimizer, not something a model stores
+ignored_classes = {SubclassJSONSerializer, TrainingState}
+
+dependencies = []
+
+type_mappings = {BackendArray: BackendArrayType}
+
+
 ormatic = ORMatic.from_package(
-    packages=[
-        probabilistic_model.probabilistic_circuit.tensorized,
-        random_events.variable,
-    ],
-    ormatic_interface_dependencies=[],
-    ignored_classes=set(),
-    type_mappings={BackendArray: BackendArrayType},
+    packages=[probabilistic_model],
+    ormatic_interface_dependencies=dependencies,
+    ignored_classes=ignored_classes,
+    type_mappings=type_mappings,
 )
 logging.getLogger("krrood").setLevel(logging.DEBUG)
+
 
 ormatic.make_all_tables()
 
