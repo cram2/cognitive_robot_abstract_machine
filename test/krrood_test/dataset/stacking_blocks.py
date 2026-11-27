@@ -1,0 +1,305 @@
+"""
+Mimics of a blocksworld whose blocks are symbols, with assertive knowledge actions that stack them,
+put them on trays, build new blocks and discard old ones.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from krrood.entity_query_language.factories import ConditionType, and_, inference
+from krrood.planning.assertive_knowledge_action import AssertiveKnowledgeAction
+from krrood.planning.effect import (
+    Assignment,
+    Effect,
+    ElementInsertion,
+    ObjectCreation,
+    ObjectRemoval,
+)
+from krrood.symbol_graph.symbol_graph import Symbol
+
+# %% surfaces
+
+
+@dataclass(kw_only=True, eq=False)
+class Surface(Symbol):
+    """
+    Something a block can rest on.
+
+    Compared by identity, as a planning domain's objects are.
+    """
+
+    name: str
+    """
+    The name of the surface.
+    """
+
+    clear: bool = True
+    """
+    Whether nothing rests on the surface.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class StackingTable(Surface):
+    """
+    The table every tower stands on; it stays clear however many blocks it carries.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class StackingBlock(Surface):
+    """
+    A block resting on another block or on the table.
+    """
+
+    support: Surface
+    """
+    What the block rests on.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class PlannedBlock(StackingBlock):
+    """
+    A block that assertive knowledge actions build.
+    """
+
+
+@dataclass(kw_only=True, eq=False)
+class Tray(Symbol):
+    """
+    A tray that collects blocks.
+    """
+
+    name: str
+    """
+    The name of the tray.
+    """
+
+    blocks: list[StackingBlock] = field(default_factory=list)
+    """
+    The blocks on the tray, in the order they were put on it.
+    """
+
+
+# %% worlds
+
+
+@dataclass(kw_only=True)
+class StackingWorld:
+    """
+    Block ``c`` on block ``a``, blocks ``a`` and ``b`` on the table, and an empty tray.
+    """
+
+    table: StackingTable
+    """
+    The table both towers stand on.
+    """
+
+    a: StackingBlock
+    """
+    The bottom block of the first tower.
+    """
+
+    b: StackingBlock
+    """
+    The only block of the second tower.
+    """
+
+    c: StackingBlock
+    """
+    The top block of the first tower.
+    """
+
+    tray: Tray
+    """
+    The empty tray.
+    """
+
+    @classmethod
+    def build(cls) -> StackingWorld:
+        """
+        :return: A new world, whose objects the live symbol graph holds.
+        """
+        table = StackingTable(name="table")
+        a = StackingBlock(name="a", support=table, clear=False)
+        return cls(
+            table=table,
+            a=a,
+            b=StackingBlock(name="b", support=table),
+            c=StackingBlock(name="c", support=a),
+            tray=Tray(name="tray"),
+        )
+
+
+# %% assertive knowledge actions
+
+
+@dataclass(kw_only=True)
+class Stack(AssertiveKnowledgeAction):
+    """
+    Moves a clear block onto another clear block.
+    """
+
+    block: StackingBlock
+    """
+    The block that moves.
+    """
+
+    target: StackingBlock
+    """
+    The block it is put on.
+    """
+
+    def precondition(self) -> ConditionType:
+        return and_(
+            self.block.clear == True,
+            self.target.clear == True,
+            self.block != self.target,
+        )
+
+    def effects(self) -> list[Effect]:
+        return [
+            Assignment(fact=self.block.support.clear == True),
+            Assignment(fact=self.block.support == self.target),
+            Assignment(fact=self.target.clear == False),
+        ]
+
+
+@dataclass(kw_only=True)
+class MoveToTable(AssertiveKnowledgeAction):
+    """
+    Moves a clear block from another block onto the table.
+    """
+
+    block: StackingBlock
+    """
+    The block that moves.
+    """
+
+    table: StackingTable
+    """
+    The table it is put on.
+    """
+
+    def precondition(self) -> ConditionType:
+        return and_(self.block.clear == True, self.block.support != self.table)
+
+    def effects(self) -> list[Effect]:
+        return [
+            Assignment(fact=self.block.support.clear == True),
+            Assignment(fact=self.block.support == self.table),
+        ]
+
+
+@dataclass(kw_only=True)
+class PutOnTray(AssertiveKnowledgeAction):
+    """
+    Records a block on a tray.
+    """
+
+    block: StackingBlock
+    """
+    The block put on the tray.
+    """
+
+    tray: Tray
+    """
+    The tray that collects it.
+    """
+
+    def precondition(self) -> ConditionType:
+        return self.block.clear == True
+
+    def effects(self) -> list[Effect]:
+        return [ElementInsertion(collection=self.tray.blocks, element=self.block)]
+
+
+@dataclass(kw_only=True)
+class BuildBlock(AssertiveKnowledgeAction):
+    """
+    Builds a new block, named after the block it is built on, on top of a clear block.
+    """
+
+    base: StackingBlock
+    """
+    The block the new block is built on.
+    """
+
+    def precondition(self) -> ConditionType:
+        return self.base.clear == True
+
+    def effects(self) -> list[Effect]:
+        return [
+            ObjectCreation(
+                objects=inference(PlannedBlock)(
+                    name=self.base.name, support=self.base, _persist_instance_=False
+                )
+            ),
+            Assignment(fact=self.base.clear == False),
+        ]
+
+
+@dataclass(kw_only=True)
+class Discard(AssertiveKnowledgeAction):
+    """
+    Discards a clear block, which clears what it rested on.
+    """
+
+    block: StackingBlock
+    """
+    The block discarded.
+    """
+
+    def precondition(self) -> ConditionType:
+        return self.block.clear == True
+
+    def effects(self) -> list[Effect]:
+        return [
+            ObjectRemoval(objects=self.block),
+            Assignment(fact=self.block.support.clear == True),
+        ]
+
+
+@dataclass(kw_only=True)
+class Touch(AssertiveKnowledgeAction):
+    """
+    Marks a block as clear, applicable to every block whatever the state.
+    """
+
+    block: StackingBlock
+    """
+    The block touched.
+    """
+
+    def precondition(self) -> ConditionType:
+        return True
+
+    def effects(self) -> list[Effect]:
+        return [Assignment(fact=self.block.clear == True)]
+
+
+@dataclass(kw_only=True)
+class CostedDiscard(Discard):
+    """
+    A :class:`Discard` with a cost that is a field but not a parameter.
+    """
+
+    cost: float = field(init=False, default=1.0)
+    """
+    What discarding the block costs.
+    """
+
+
+@dataclass(kw_only=True)
+class ImpossibleTouch(Touch):
+    """
+    A :class:`Touch` that is applicable in no state.
+    """
+
+    def precondition(self) -> ConditionType:
+        """
+        :return: ``False`` instead of :meth:`Touch.precondition`'s ``True``.
+        """
+        return False

@@ -7,8 +7,11 @@ pipeline without polluting the core evaluation methods.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from functools import cached_property
+
 from ordered_set import OrderedSet
-from typing_extensions import Any
+from typing_extensions import TYPE_CHECKING, Any, Self
 
 from krrood.entity_query_language._monitoring import monitored
 from krrood.entity_query_language.core.base_expressions import (
@@ -25,6 +28,7 @@ from krrood.entity_query_language.evaluation_context import (
     set_evaluation_context,
 )
 from krrood.entity_query_language.exceptions import NoExpressionFoundForGivenID
+from krrood.entity_query_language.ground_term import TermReader
 from krrood.entity_query_language.operators.comparator import Comparator
 from krrood.entity_query_language.operators.core_logical_operators import (
     AND,
@@ -34,6 +38,9 @@ from krrood.entity_query_language.operators.core_logical_operators import (
 )
 from krrood.entity_query_language.predicate import Predicate
 from krrood.entity_query_language.query.query import Query
+
+if TYPE_CHECKING:
+    from krrood.entity_query_language.factories import ConditionType
 
 
 def is_condition_participant(
@@ -205,44 +212,116 @@ class InferenceRecorder(EvaluationObserver):
         register_inference(result.bindings[expression._id_], expression, result)
 
 
-def evaluate_statements_of(condition: SymbolicExpression) -> list[OperationResult]:
+@dataclass(kw_only=True)
+class ConditionEvaluation:
     """
-    Evaluate *condition* and collect the results of its statements: *condition* itself
-    and every condition evaluated within it, except conjunctions, disjunctions and
-    anything inside a negation.
+    One evaluation of a condition: whether it holds, and which of its statements hold.
 
-    :param condition: The condition to evaluate.
-    :return: The results of the statements of *condition*, in the order they were
-        evaluated.
+    The statements of a condition are the condition itself and every condition evaluated
+    within it, except conjunctions, disjunctions and anything inside a negation.
     """
-    evaluation_context = create_default_evaluation_context()
-    results = list(
-        condition._evaluate_in_new_context_(evaluation_context=evaluation_context)
-    )
-    steps = [
-        step
-        for result in results
-        for step in result.result_chain
-        if step.operand is not None
-    ]
-    negated_ids = {
-        negated._id_
-        for step in steps
-        if isinstance(step.operand, Not)
-        for negated in step.operand._descendants_
-    }
-    return [
-        step
-        for step in steps
-        if not isinstance(step.operand, (AND, OR))
-        and step.operand._id_ not in negated_ids
-        and (
-            step.operand._id_ == condition._id_
-            or evaluation_context.is_child_of_truth_value_operator(
-                expression=step.operand
+
+    condition: SymbolicExpression
+    """
+    The evaluated condition.
+    """
+
+    results: list[OperationResult]
+    """
+    The results the condition yielded.
+    """
+
+    statement_results: list[OperationResult]
+    """
+    The results of the statements of :attr:`condition`, in the order they were
+    evaluated.
+    """
+
+    @classmethod
+    def from_condition(
+        cls, *, condition: ConditionType, state: TermReader | None = None
+    ) -> Self:
+        """
+        :param condition: The condition to evaluate; a plain boolean is evaluated as
+            the literal it stands for.
+        :param state: What the evaluation reads ground terms with; as the current
+            evaluation does when omitted.
+        :return: The evaluation of *condition*.
+        """
+        symbolic_condition = SymbolicExpression._as_operand_(value=condition)
+        evaluation_context = create_default_evaluation_context()
+        if state is not None:
+            evaluation_context.term_reader = state
+        results = list(
+            symbolic_condition._evaluate_in_new_context_(
+                evaluation_context=evaluation_context
             )
         )
-    ]
+        steps = [
+            step
+            for result in results
+            for step in result.result_chain
+            if step.operand is not None
+        ]
+        negated_ids = {
+            negated._id_
+            for step in steps
+            if isinstance(step.operand, Not)
+            for negated in step.operand._descendants_
+        }
+        statement_results = [
+            step
+            for step in steps
+            if not isinstance(step.operand, (AND, OR))
+            and step.operand._id_ not in negated_ids
+            and (
+                step.operand._id_ == symbolic_condition._id_
+                or evaluation_context.is_child_of_truth_value_operator(
+                    expression=step.operand
+                )
+            )
+        ]
+        return cls(
+            condition=symbolic_condition,
+            results=results,
+            statement_results=statement_results,
+        )
+
+    @cached_property
+    def is_satisfied(self) -> bool:
+        """
+        :return: Whether :attr:`condition` held for at least one of the values it was
+            evaluated on.
+        """
+        return any(result.is_true for result in self.results)
+
+    @cached_property
+    def true_statements(self) -> list[SymbolicExpression]:
+        """
+        :return: The statements that held for at least one of the values they were
+            evaluated on.
+        """
+        held = {
+            result.operand._id_: result.operand
+            for result in self.statement_results
+            if result.is_true
+        }
+        return list(held.values())
+
+    @cached_property
+    def false_statements(self) -> list[SymbolicExpression]:
+        """
+        :return: The statements that held for none of the values they were evaluated
+            on. In a conjunction that is the first conjunct that could not hold together
+            with the conjuncts before it.
+        """
+        held_ids = {statement._id_ for statement in self.true_statements}
+        never_held = {
+            result.operand._id_: result.operand
+            for result in self.statement_results
+            if result.operand._id_ not in held_ids
+        }
+        return list(never_held.values())
 
 
 def create_default_evaluation_context() -> EvaluationContext:

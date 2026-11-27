@@ -6,11 +6,11 @@ Exhaustive verbalization-result verification for any package, and the first-orde
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from dataclasses import fields as dataclass_fields
 from types import ModuleType
 
 from typing_extensions import Any, Sequence
 
+from krrood.class_diagrams.attribute_introspector import DataclassOnlyIntrospector
 from krrood.class_diagrams.class_diagram import WrappedClass
 from krrood.class_diagrams.utils import class_implements_own_method
 from krrood.class_diagrams.wrapped_field import WrappedField
@@ -23,7 +23,7 @@ from krrood.utils import module_and_class_name
 
 def placeholder_operands(cls: type[SymbolicCallable]) -> dict[str, Any]:
     """
-    One placeholder operand per init dataclass field, from the field's declared type
+    One placeholder operand per public init dataclass field, from the field's declared type
     endpoint alone — a fresh variable of that type (``object`` when the endpoint is not
     a plain class), so the result reads the operand as *"a <TypeName>"*.
 
@@ -36,9 +36,8 @@ def placeholder_operands(cls: type[SymbolicCallable]) -> dict[str, Any]:
     """
     wrapped_class = WrappedClass(clazz=cls)
     operands: dict[str, Any] = {}
-    for field_ in dataclass_fields(cls):
-        if not field_.init:
-            continue
+    for attribute in DataclassOnlyIntrospector().discover(owner_cls=cls):
+        field_ = attribute.field
         endpoint = WrappedField(clazz=wrapped_class, field=field_).type_endpoint
         placeholder_type = (
             endpoint if isinstance(endpoint, type) and endpoint is not Any else object
