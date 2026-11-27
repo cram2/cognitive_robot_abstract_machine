@@ -72,20 +72,6 @@ class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
     that provides semantic_digital_twin Regions via a shared World.
     """
 
-    world_frame_name: str = field(init=False, repr=False)
-    """Name of the world coordinate frame read from parameters"""
-
-    active_region: str = field(init=False, repr=False)
-    """Name of the active region to filter read from parameters"""
-
-    def __post_init__(self) -> None:
-        """Initialize annotator resources after :meth:`robokudo.annotators.core.ThreadedAnnotator.__post_init__`."""
-        super().__post_init__()
-
-        self.world_frame_name: str = self.descriptor.parameters.world_frame_name
-
-        self.active_region = self.descriptor.parameters.active_region
-
     @catch_and_raise_to_blackboard
     def compute(self) -> Status:
         """Filter point cloud using semantic map regions.
@@ -120,7 +106,10 @@ class RegionFilter(ThreadedAnnotator[RegionFilterDescriptor]):
         # Overwrite active_regions, if location is explicitly mentioned
         if query is not None:
             queried_location = query.obj.location
-            if queried_location != "" and queried_location != self.active_region:
+            if (
+                queried_location != ""
+                and queried_location != self.descriptor.parameters.active_region
+            ):
                 self.rk_logger.info(
                     f"Setting region filter to check for location '{queried_location}'"
                 )
