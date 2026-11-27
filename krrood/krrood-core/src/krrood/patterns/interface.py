@@ -11,12 +11,12 @@ from krrood.patterns.exceptions import InterfaceInstantiationError
 
 class Interface(ABC):
     """
-    A class that only declares the typed attributes and methods its subclasses provide,
-    as fields or properties. It cannot be instantiated.
+    A class that declares the typed attributes and methods its subclasses provide, but
+    not how they are stored: each subclass decides whether an attribute is a field or a
+    property. It cannot be instantiated.
 
     .. note::
         Never make an interface a dataclass, which turns its declarations into fields.
-        A base class with fields or behaviour of its own subclasses :class:`abc.ABC`.
         Only a class naming :class:`Interface` among its own bases is an interface.
     """
 
