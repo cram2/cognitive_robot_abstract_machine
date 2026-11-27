@@ -98,6 +98,6 @@ class Sage10kOpenDoor(SequentialAction):
         reach_query._where_conditions_.append(free_space_condition)
         reach_action = StatementNode(statement=reach_query)
 
-        open_action = OpenAction.from_handle(self.door.handle, arm)
+        open_action = OpenAction.from_handle(handle=self.door.handle, arm=arm)
 
         return [reach_action, open_action]

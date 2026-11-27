@@ -26,7 +26,7 @@ from robokudo.types.cv import ColorToDepthRatio
 # %% black wall scene
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BlackWallScene:
     """
     A camera facing a black wall square-on: a black color image and a depth image that
@@ -68,7 +68,7 @@ class BlackWallScene:
         )
 
     def place_in_pipeline(
-        self, annotator: BaseAnnotator, color_to_depth_ratio: float = 1.0
+        self, *, annotator: BaseAnnotator, color_to_depth_ratio: float = 1.0
     ) -> None:
         """
         Set the annotator up in a pipeline whose CAS holds the scene's color image and a
@@ -86,18 +86,18 @@ class BlackWallScene:
         depth_height = int(color_height * color_to_depth_ratio)
         depth_width = int(color_width * color_to_depth_ratio)
         cas = annotator.get_cas()
-        cas.set(CASViews.COLOR_IMAGE, self.color_image())
+        cas.set(view_name=CASViews.COLOR_IMAGE, value=self.color_image())
         cas.set(
-            CASViews.DEPTH_IMAGE,
-            np.full(
+            view_name=CASViews.DEPTH_IMAGE,
+            value=np.full(
                 (depth_height, depth_width),
                 round(self.wall_distance * self.depth_image_units_per_meter),
                 dtype=np.uint16,
             ),
         )
         cas.set(
-            CASViews.COLOR_TO_DEPTH_RATIO,
-            ColorToDepthRatio(
+            view_name=CASViews.COLOR_TO_DEPTH_RATIO,
+            value=ColorToDepthRatio(
                 horizontal=color_to_depth_ratio, vertical=color_to_depth_ratio
             ),
         )

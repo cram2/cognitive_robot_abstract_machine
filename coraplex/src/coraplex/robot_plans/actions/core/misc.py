@@ -117,16 +117,17 @@ class DetectAction(SequentialAction):
         :raises DetectionTargetMissing: If neither an object type nor a box is given.
         """
         if not self.object_sem_annotation and self.detection_box is None:
-            raise DetectionTargetMissing(self)
+            raise DetectionTargetMissing(instance=self)
         return PerceptionQuery(
-            self.object_sem_annotation or SemanticEnvironmentAnnotation,
-            (
+            semantic_annotation=self.object_sem_annotation
+            or SemanticEnvironmentAnnotation,
+            region=(
                 self._box_around_robot()
                 if self.detection_box is None
                 else self.detection_box
             ),
-            self.robot,
-            self.world,
+            robot=self.robot,
+            world=self.world,
             trust_detected_orientation=self.trust_detected_orientation,
         )
 

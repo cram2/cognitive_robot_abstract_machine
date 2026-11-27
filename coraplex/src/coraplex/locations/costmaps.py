@@ -39,7 +39,7 @@ logger = logging.getLogger("coraplex")
 
 
 # %% Costmaps
-@dataclass
+@dataclass(kw_only=True)
 class Costmap(Location):
     """
     The base class of all Costmaps.
@@ -98,7 +98,7 @@ class Costmap(Location):
             self.world.remove_visual_object(visualization_id)
         self.visualization_ids = []
 
-    def merge(self, other: Costmap) -> Costmap:
+    def merge(self, *, other: Costmap) -> Costmap:
         """
         Merges the values of two locations and returns a new locations that has for
         every cell the merged values of both inputs. To merge two locations they
@@ -162,14 +162,17 @@ class Costmap(Location):
         :return: A new Costmap that contains the merged values from this Costmap and the other Costmap
         """
         if isinstance(other, Costmap):
-            return self.merge(other)
+            return self.merge(other=other)
         else:
             raise ValueError(
                 f"Can only combine two locations other type was {type(other)}"
             )
 
-    def __and__(self, other):
-        return self.merge(other)
+    def __and__(self, other: Costmap) -> Costmap:
+        """
+        :return: This map and *other* combined, as :meth:`merge` combines them.
+        """
+        return self.merge(other=other)
 
     def candidates(self) -> Iterator[Pose2Dimensional]:
         return self.sample(number_of_samples=self.number_of_samples, seed=self.seed)
@@ -194,11 +197,11 @@ class Costmap(Location):
         # An entry is only ever offered once, so the whole map is all there is to
         # sample.
         return self._sample(
-            min(number_of_samples, self.map.size),
-            np.random.default_rng(seed),
+            number_of_samples=min(number_of_samples, self.map.size),
+            random_generator=np.random.default_rng(seed),
         )
 
-    def _orientation_facing_origin(self, position: Point3Dimensional) -> Quaternion:
+    def _orientation_facing_origin(self, *, position: Point3Dimensional) -> Quaternion:
         """
         The orientation a candidate sampled at the given position is offered with.
 
@@ -218,7 +221,7 @@ class Costmap(Location):
         return RotationMatrix.from_rpy(0, 0, angle).quaternion
 
     def _budget_per_segment(
-        self, segments: list[np.ndarray], number_of_samples: int
+        self, *, segments: list[np.ndarray], number_of_samples: int
     ) -> list[int]:
         """
         Split a sample budget over this map's segments in proportion to their summed
@@ -247,6 +250,7 @@ class Costmap(Location):
 
     def _pick_entries(
         self,
+        *,
         ratings: NDArray[np.float64],
         count: int,
         random_generator: np.random.Generator,
@@ -269,6 +273,7 @@ class Costmap(Location):
 
     def _sample(
         self,
+        *,
         number_of_samples: int,
         random_generator: np.random.Generator,
     ) -> Iterator[Pose2Dimensional]:
@@ -281,10 +286,14 @@ class Costmap(Location):
         :Yield: A candidate pose.
         """
         segmented_maps = self.segment_map()
-        budgets = self._budget_per_segment(segmented_maps, number_of_samples)
+        budgets = self._budget_per_segment(
+            segments=segmented_maps, number_of_samples=number_of_samples
+        )
         for segmented_map, budget in zip(segmented_maps, budgets):
             indices = self._pick_entries(
-                segmented_map.flatten(), budget, random_generator
+                ratings=segmented_map.flatten(),
+                count=budget,
+                random_generator=random_generator,
             )
             indices = np.column_stack(np.unravel_index(indices, segmented_map.shape))
 
@@ -302,7 +311,7 @@ class Costmap(Location):
                 yield Pose2Dimensional.from_pose(
                     Pose3Dimensional(
                         position,
-                        self._orientation_facing_origin(position),
+                        self._orientation_facing_origin(position=position),
                         self.world.root,
                     )
                 )
@@ -336,7 +345,7 @@ class Costmap(Location):
         return result_maps
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OccupancyCostmap(Costmap):
     """
     The occupancy Costmap represents a map of the environment where obstacles or
@@ -432,7 +441,7 @@ class OccupancyCostmap(Costmap):
             floor.root for floor in self.world.get_semantic_annotations_by_type(Floor)
         }
 
-    def inflate_obstacles(self, free_space: np.ndarray) -> np.ndarray:
+    def inflate_obstacles(self, *, free_space: np.ndarray) -> np.ndarray:
         """
         Inflates found obstacles in the environment by the distance_to_obstacle factor.
 
@@ -455,7 +464,7 @@ class OccupancyCostmap(Costmap):
 
         ray_mask = self.create_ray_mask_around_origin()
 
-        map = np.pad(
+        occupancy = np.pad(
             ray_mask,
             (
                 int(self._distance_to_obstacle_index / 2),
@@ -463,21 +472,21 @@ class OccupancyCostmap(Costmap):
             ),
         )
 
-        map = self.inflate_obstacles(map)
+        occupancy = self.inflate_obstacles(free_space=occupancy)
         # The map loses some size due to the strides and because I dont want to
         # deal with indices outside of the index range
-        offset = self.width - map.shape[0]
+        offset = self.width - occupancy.shape[0]
         odd = 0 if offset % 2 == 0 else 1
-        map = np.pad(map, (offset // 2, offset // 2 + odd))
+        occupancy = np.pad(occupancy, (offset // 2, offset // 2 + odd))
 
-        return np.flip(map)
+        return np.flip(occupancy)
 
     @classmethod
     def default_map(
         cls,
+        *,
         robot: AbstractRobot,
         target: Pose3Dimensional,
-        *,
         resolution: float = 0.02,
         cells: int = 200,
     ) -> OccupancyCostmap:
@@ -505,7 +514,7 @@ class OccupancyCostmap(Costmap):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisibilityCostmap(Costmap):
     """
     A locations that represents the visibility of a specific point for every position around
@@ -735,7 +744,7 @@ class VisibilityCostmap(Costmap):
         self.map = inverted_map
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GaussianCostmap(Costmap):
     """
     Gaussian Costmaps are 2D gaussian distributions around the origin with the given mean and sigma
@@ -759,8 +768,13 @@ class GaussianCostmap(Costmap):
     """
 
     def __post_init__(self) -> None:
+        """
+        Fills :attr:`map` with a square 2D Gaussian of :attr:`mean` cells per side and
+        standard deviation :attr:`sigma`, zeroed around its centre so that no candidate
+        stands right at the origin.
+        """
         self.gaussian_window: np.ndarray = self._create_gaussian_window(
-            self.mean, self.sigma
+            mean=self.mean, standard_deviation=self.sigma
         )
         self.map: np.ndarray = np.outer(self.gaussian_window, self.gaussian_window)
         cut_distance = int(0.05 * self.mean)
@@ -776,7 +790,7 @@ class GaussianCostmap(Costmap):
         self.height = int(self.size)
 
     def _create_gaussian_window(
-        self, mean: int, standard_deviation: float
+        self, *, mean: int, standard_deviation: float
     ) -> np.ndarray:
         """
         Creates a window of values with a gaussian distribution of the given size
@@ -789,7 +803,7 @@ class GaussianCostmap(Costmap):
         return np.exp(-(offsets**2) / twice_variance)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RingCostmap(Costmap):
     """
     Creates a ring locations, similar to the gaussian locations but this looks more like a donut. Can be used to create poses
@@ -812,10 +826,10 @@ class RingCostmap(Costmap):
     @classmethod
     def from_arm_reach_distance(
         cls,
+        *,
         arm: Arm,
         origin: Pose3Dimensional,
         reach_fraction: float,
-        *,
         resolution: float = 0.02,
         cells: int = 200,
         standard_deviation: int = 15,

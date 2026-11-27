@@ -1512,6 +1512,8 @@ class EffectNotIdentified(DataclassException):
         )
 
     def suggest_correction(self) -> str:
+        if self.identification.correction is not None:
+            return self.identification.correction
         return (
             "Name more of the variables in the query, add domain causal knowledge that "
             "orients the undirected edges, or mark the confounders yourself."

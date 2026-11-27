@@ -1,11 +1,16 @@
+"""
+A predefined floor of a building: rooms, each with a single door.
+"""
+
 from __future__ import annotations
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Door,
@@ -107,8 +112,10 @@ class SingleDoorRoom:
             f"{name}_door",
             Door.get_default_root_kinematic_structure_entity_specification(
                 scale=self.door_scale,
-                connection_specification=RevoluteConnectionSpecification(
-                    axis=Vector3Dimensional.Z()
+                connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3Dimensional.Z()
+                    ),
                 ),
             ),
             part_specifications={
@@ -125,7 +132,7 @@ class SingleDoorRoom:
         )
         door.root.collision.shapes[0].color = self.door_color
         with world.modify_world():
-            wall.add(door.entry_way)
+            wall.add(part=door.entry_way)
 
         return floor
 

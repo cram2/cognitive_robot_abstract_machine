@@ -58,7 +58,7 @@ from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedomLimits,
@@ -2489,11 +2489,13 @@ class TestDiffDriveBaseGoal:
         base = world.get_connections_by_type(DifferentialDrive)[0].child
         lift = Body(name=PrefixedName("lift"))
         with world.modify_world():
-            lift_connection = PrismaticConnection.create_with_dofs(
+            lift_connection = ScrewAxisConnection.create_with_dofs(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3Dimensional.Z()
+                ),
                 world=world,
                 parent=world.root,
                 child=lift,
-                axis=Vector3Dimensional.Z(),
                 dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1
                 ),

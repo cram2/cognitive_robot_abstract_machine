@@ -74,6 +74,21 @@ from semantic_digital_twin.world_description.world_entity import (
     KinematicStructureEntity,
 )
 
+# %% Tiago Odometry topic
+
+
+class TiagoOdomTopic(StrEnum):
+    """
+    Names of the topics the Tiago publishes odometry, where it does not
+    follow conventional names.
+    """
+
+    ODOMETRY = "mobile_base_controller/odom"
+    """
+    The name of the topic the Tiago publishes its odometry on.
+    """
+
+
 # %% Robot parts
 
 
@@ -558,6 +573,15 @@ class TiagoMobileBase(
     HasTorso[TiagoTorso],
     HasLidar[TiagoBaseLidar],
 ):
+    """Differential-drive mobile base of the Tiago robot carrying its torso"""
+
+    @classproperty
+    def topic_name(cls) -> str:
+        """
+        The topic the Tiago publishes its odometry on.
+        """
+        return TiagoOdomTopic.ODOMETRY
+
     @classproperty
     def forward_axis(cls) -> Vector3Dimensional:
         return Vector3Dimensional.X()

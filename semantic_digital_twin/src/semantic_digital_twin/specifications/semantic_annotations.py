@@ -13,9 +13,9 @@ from krrood.class_diagrams.wrapped_field import WrappedField
 from semantic_digital_twin.exceptions import (
     PartWholeCardinalityError,
     PartWholeFieldInAnnotationKwargs,
-    UnknownPartWholeRelationshipField,
+    UnknownSemanticRelationshipField,
 )
-from semantic_digital_twin.semantic_annotations.part_whole import (
+from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker import (
     IsPartWholeRelationship,
 )
 from krrood_spatial_math.spatial_types import (
@@ -36,7 +36,9 @@ from semantic_digital_twin.world_description.world_entity import (
 if TYPE_CHECKING:
     from semantic_digital_twin.semantic_annotations.mixins import (
         HasRootKinematicStructureEntity,
-        PartWholeRelationship,
+    )
+    from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
+        HasParts,
     )
 
 # %% specification type parameters
@@ -115,7 +117,7 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
     Nested annotation parts, each bound to the part-whole relationship field it fills.
 
     Each part is spawned during :meth:`spawn` and mounted via the annotation's
-    :meth:`PartWholeRelationship.add`.
+    :meth:`HasParts.add`.
     """
 
     def __post_init__(self):
@@ -202,7 +204,7 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
 
         :param annotation_type: The annotation type whose part-whole fields are
             validated against.
-        :raises UnknownPartWholeRelationshipField: If a binding does not name a part-
+        :raises UnknownSemanticRelationshipField: If a binding does not name a part-
             whole relationship field.
         :raises PartWholeCardinalityError: If several parts target a singular field.
         """
@@ -210,9 +212,10 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
         for binding in self.part_bindings:
             wrapped_field = part_whole_fields_by_name.get(binding.field_name)
             if wrapped_field is None:
-                raise UnknownPartWholeRelationshipField(
+                raise UnknownSemanticRelationshipField(
                     annotation=annotation_type,
                     field_name=binding.field_name,
+                    relationship_type=IsPartWholeRelationship,
                     available_fields=list(part_whole_fields_by_name),
                 )
             if (
@@ -240,12 +243,12 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
     def _mount_part_specifications(
         self,
         world: World,
-        instance: PartWholeRelationship,
+        instance: HasParts,
         root_entity: KinematicStructureEntity,
     ) -> None:
         """
         Spawn each nested part and mount it onto ``instance`` via the part-whole
-        :meth:`PartWholeRelationship.add`, into the field its binding names.
+        :meth:`HasParts.add`, into the field its binding names.
 
         .. note:: Assumes :meth:`_validate_part_bindings` has already run.
 
@@ -256,4 +259,4 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
         for binding in self.part_bindings:
             for part_specification in binding.specifications:
                 part = part_specification.spawn(world, parent=root_entity)
-                instance.add(part, field_name=binding.field_name)
+                instance.add(part=part, field_name=binding.field_name)

@@ -34,6 +34,11 @@ from krrood.entity_query_language.factories import (
     entity,
     variable,
 )
+from semantic_digital_twin.adapters.package_resolver import (
+    CompositePathResolver,
+    PackageUriResolver,
+    SearchPathFileResolver,
+)
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
 )
@@ -71,22 +76,27 @@ from semantic_digital_twin.world import World
 
 class SceneFile(StrEnum):
     """
-    The files the demonstration builds its scene from, under the coraplex resources.
+    The files the demonstration builds its scene from, under the coraplex resources or
+    in a ROS package.
     """
 
-    APARTMENT = os.path.join("worlds", "apartment.urdf")
-    MILK = os.path.join("objects", "milk.stl")
-    BOWL = os.path.join("objects", "bowl.stl")
-    SPOON = os.path.join("objects", "spoon.stl")
+    APARTMENT = "package://iai_apartment/urdf/apartment.urdf"
+    MILK = "package://iai_objects/objects/milk.stl"
+    BOWL = "package://iai_objects/objects/bowl.stl"
+    SPOON = "package://iai_objects/objects/spoon.stl"
 
     @property
     def path(self) -> str:
         """
         :return: Where the file is read from.
         """
-        return os.path.join(
-            os.path.dirname(__file__), "..", "..", "resources", self.value
-        )
+        resources = os.path.join(os.path.dirname(__file__), "..", "..", "resources")
+        return CompositePathResolver(
+            resolvers=[
+                SearchPathFileResolver(root_directories=[resources]),
+                PackageUriResolver(),
+            ]
+        ).resolve(self.value)
 
 
 class ApartmentBody(StrEnum):
@@ -102,7 +112,7 @@ class ApartmentBody(StrEnum):
     SPOON_DRAWER = "cabinet10_drawer_top"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PlaceSettingObject:
     """
     One object of the place setting: what it is, where it starts, and where it is laid.
@@ -156,7 +166,7 @@ class PlaceSettingObject:
     Which way the object faces once it has been laid down.
     """
 
-    def spawn(self, world: World) -> None:
+    def spawn(self, *, world: World) -> None:
         """
         Put the object where it starts and name it among the world's annotations.
 
@@ -177,7 +187,7 @@ class PlaceSettingObject:
             parent_T_self=self.start,
         )
 
-    def annotation_in(self, world: World) -> HasRootKinematicStructureEntity:
+    def annotation_in(self, *, world: World) -> HasRootKinematicStructureEntity:
         """
         :param world: The world the object was spawned into.
         :return: The annotation naming the object, as the plan refers to it.
@@ -193,7 +203,7 @@ class PlaceSettingObject:
             ).evaluate()
         )
 
-    def target_location(self, world: World) -> Pose3Dimensional:
+    def target_location(self, *, world: World) -> Pose3Dimensional:
         """
         :param world: The world the table stands in.
         :return: Where on the table the object is laid.
@@ -210,7 +220,7 @@ class PlaceSettingObject:
 # %% the demonstration
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BulletWorldDemonstration(RobotDemonstration):
     """
     The PR2 transports the milk, a bowl and a spoon onto the table in the apartment.
@@ -231,9 +241,11 @@ class BulletWorldDemonstration(RobotDemonstration):
 
     milk: PlaceSettingObject = field(
         default_factory=lambda: PlaceSettingObject(
-            Milk,
-            SceneFile.MILK,
-            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2.37, 2, 1.0345),
+            semantic_annotation_type=Milk,
+            mesh=SceneFile.MILK,
+            start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                2.37, 2, 1.0345
+            ),
             along_table=4.8,
             height=0.81,
         )
@@ -244,9 +256,11 @@ class BulletWorldDemonstration(RobotDemonstration):
 
     bowl: PlaceSettingObject = field(
         default_factory=lambda: PlaceSettingObject(
-            Bowl,
-            SceneFile.BOWL,
-            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(2.4, 2.2, 0.98),
+            semantic_annotation_type=Bowl,
+            mesh=SceneFile.BOWL,
+            start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+                2.4, 2.2, 0.98
+            ),
             along_table=5.0,
             height=0.76,
         )
@@ -257,9 +271,9 @@ class BulletWorldDemonstration(RobotDemonstration):
 
     spoon: PlaceSettingObject = field(
         default_factory=lambda: PlaceSettingObject(
-            Spoon,
-            SceneFile.SPOON,
-            HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            semantic_annotation_type=Spoon,
+            mesh=SceneFile.SPOON,
+            start=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 -0.05, -0.05, -0.01
             ),
             along_table=5.2,
@@ -294,21 +308,21 @@ class BulletWorldDemonstration(RobotDemonstration):
             semantic_annotation_type=self.used_robot, localization_pose=self.robot_start
         )
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(ApartmentBody.ROOT)
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         """
         Put the place setting where it starts out, and let the world reasoner annotate
         the apartment's furniture, including the drawer the spoon lies in.
         """
         for placed_object in self.place_setting:
-            placed_object.spawn(world)
+            placed_object.spawn(world=world)
 
         with world.modify_world():
             WorldReasoner(world).reason()
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         return [
             RobotAccess(
                 robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
@@ -317,7 +331,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             PlanRewriting(transformations=[OpenDrawerBeforeMoveAndPickUp()]),
         ]
 
-    def segment_events(self, world: World) -> AbstractContextManager:
+    def segment_events(self, *, world: World) -> AbstractContextManager:
         """
         Detect the place setting being grasped, picked up, placed and contained.
         """
@@ -335,7 +349,7 @@ class BulletWorldDemonstration(RobotDemonstration):
             ),
         )
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Carry each object to its place on the table.
         """
@@ -349,22 +363,22 @@ class BulletWorldDemonstration(RobotDemonstration):
                     ParkArmsAction(arms=robot.all_arms),
                     MoveTorsoAction(torso_state=TorsoState.HIGH),
                     TransportAction.from_graspable_by_closest_grasps(
-                        self.milk.annotation_in(world),
-                        self.milk.target_location(world),
-                        left_arm,
-                        context,
+                        graspable=self.milk.annotation_in(world=world),
+                        goal_pose=self.milk.target_location(world=world),
+                        arm=left_arm,
+                        context=context,
                     ),
                     TransportAction.from_graspable_by_closest_grasps(
-                        self.bowl.annotation_in(world),
-                        self.bowl.target_location(world),
-                        left_arm,
-                        context,
+                        graspable=self.bowl.annotation_in(world=world),
+                        goal_pose=self.bowl.target_location(world=world),
+                        arm=left_arm,
+                        context=context,
                     ),
                     TransportAction.from_graspable_by_closest_grasps(
-                        self.spoon.annotation_in(world),
-                        self.spoon.target_location(world),
-                        left_arm,
-                        context,
+                        graspable=self.spoon.annotation_in(world=world),
+                        goal_pose=self.spoon.target_location(world=world),
+                        arm=left_arm,
+                        context=context,
                     ),
                 ]
             )

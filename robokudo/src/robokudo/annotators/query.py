@@ -35,8 +35,9 @@ from robokudo_msgs.msg import ObjectDesignator
 from typing_extensions import Any
 
 from robokudo.annotators.core import BaseAnnotator
+from robokudo.annotators.exceptions import QueryServerNotStarted
 from robokudo.cas import CASViews
-from robokudo.defs import LOGGING_IDENTIFIER_QUERY, PACKAGE_NAME
+from robokudo.defs import LOGGING_IDENTIFIER_QUERY
 from robokudo.identifier import BBIdentifier
 from robokudo.types.annotation import (
     BoundingBox3DAnnotation,
@@ -74,6 +75,9 @@ from robokudo.utils.error_handling import (
     has_blackboard_exception,
 )
 from robokudo.utils.query import ObjectHypothesisQueryMatcher, QueryHandler
+from krrood.patterns.called_positionally import called_positionally
+
+logger = logging.getLogger(__name__)
 
 
 class QueryAnnotator(BaseAnnotator):
@@ -115,7 +119,7 @@ class QueryAnnotator(BaseAnnotator):
         Sets up the action server if not already initialized. Stores server instance on
         blackboard for access by other nodes.
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
+        logger.debug(f"{self.__class__.__name__}.initialise()")
         blackboard = Blackboard()
         if not blackboard.exists(BBIdentifier.QUERY_SERVER):
             query_action_server = QueryActionServer(name="query")
@@ -134,17 +138,16 @@ class QueryAnnotator(BaseAnnotator):
 
         :return: SUCCESS if query processed, RUNNING if waiting
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
+        logger.debug(f"{self.__class__.__name__}.update()")
 
-        assert (
-            self.action_server is not None
-        ), "Action server should be initialized by now."
+        if self.action_server is None:
+            raise QueryServerNotStarted(annotator_name=self.name)
         query = self.action_server.new_query
-        self.rk_logger.debug(f"self.action_server.new_query: {query}")
+        logger.debug(f"self.action_server.new_query: {query}")
 
         if query:
             self.feedback_message = f"Query: {query}"
-            self.get_cas().set(CASViews.QUERY, query)
+            self.get_cas().set(view_name=CASViews.QUERY, value=query)
             self.action_server.start_processing()
             # self.publish_feedback()
 
@@ -174,8 +177,13 @@ class QueryFeedback(BaseAnnotator):
         """
 
     def update(self) -> Status:
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
-        QueryHandler.send_feedback_str(self.feedback_str)
+        """
+        Send :attr:`feedback_str` to the query client.
+
+        Overrides :meth:`BaseAnnotator.update`.
+        """
+        logger.debug(f"{self.__class__.__name__}.update()")
+        QueryHandler.send_feedback_str(feedback_str=self.feedback_str)
 
         return Status.SUCCESS
 
@@ -216,8 +224,14 @@ class QueryFeedbackAndCount(BaseAnnotator):
         """
 
     def update(self) -> Status:
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
-        QueryHandler.send_feedback_str(f"Count: {self.i}")
+        """
+        Send the current count to the query client.
+
+        Overrides :meth:`BaseAnnotator.update`: returns *SUCCESS* and restarts the count
+        once it exceeds :attr:`count_until`, and :attr:`return_code` before that.
+        """
+        logger.debug(f"{self.__class__.__name__}.update()")
+        QueryHandler.send_feedback_str(feedback_str=f"Count: {self.i}")
         self.i = self.i + 1
         if self.i > self.count_until:
             self.i = 0
@@ -246,7 +260,7 @@ class QueryReply(BaseAnnotator):
         """
         Initialize reply generator.
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.initialise()")
+        logger.debug(f"{self.__class__.__name__}.initialise()")
 
     def update(self) -> Status:
         """
@@ -256,7 +270,7 @@ class QueryReply(BaseAnnotator):
 
         :return: SUCCESS after generating response
         """
-        self.rk_logger.debug(f"{self.__class__.__name__}.update()")
+        logger.debug(f"{self.__class__.__name__}.update()")
         result = Query.Result()
         od = ObjectDesignator()
 
@@ -275,7 +289,7 @@ class QueryReply(BaseAnnotator):
         od.pose.append(pose_stamped)
         result.res = [od]
 
-        QueryHandler.send_answer(result)
+        QueryHandler.send_answer(result=result)
 
         return Status.SUCCESS
 
@@ -305,8 +319,6 @@ class GenerateQueryResult(BaseAnnotator):
         :param name: Annotator name
         :param descriptor: Annotator configuration descriptor
         """
-        self.rk_logger = logging.getLogger(PACKAGE_NAME)
-
         self.color_converter = SemanticColor2ODConverter()
         self.class_converter = Classification2ODConverter()
         self.position_converter = Position2ODConverter()
@@ -354,7 +366,7 @@ class GenerateQueryResult(BaseAnnotator):
         """
         if QueryHandler.preempt_requested():
             QueryHandler.acknowledge_preempt_request()
-            self.rk_logger.warning("Acknowledge preempt")
+            logger.warning("Acknowledge preempt")
             return Status.FAILURE
 
         cas = self.get_cas()
@@ -364,8 +376,10 @@ class GenerateQueryResult(BaseAnnotator):
         query_result = []
         result = Query.Result()
         requested_object = None
-        if self.descriptor.parameters.filter_by_query and cas.contains(CASViews.QUERY):
-            query = cas.get(CASViews.QUERY)
+        if self.descriptor.parameters.filter_by_query and cas.contains(
+            view_name=CASViews.QUERY
+        ):
+            query = cas.get(view_name=CASViews.QUERY)
             requested_object = query.obj
 
         for annotation in annotations:
@@ -373,7 +387,7 @@ class GenerateQueryResult(BaseAnnotator):
                 continue
 
             if requested_object is not None and not self.query_matcher.matches(
-                annotation, requested_object
+                object_hypothesis=annotation, requested_object=requested_object
             ):
                 skipped_object_hypotheses_count += 1
                 continue
@@ -383,26 +397,30 @@ class GenerateQueryResult(BaseAnnotator):
             for oh_annotation in annotation.annotations:
                 converter = self.type_converter.get(type(oh_annotation), None)
                 if converter is None:
-                    self.rk_logger.warning(
+                    logger.warning(
                         f"no converter available for annotation type {type(oh_annotation)}, skipping annotation."
                     )
                     continue
-                if not converter.can_convert(oh_annotation):
-                    self.rk_logger.warning(
+                if not converter.can_convert(annotation=oh_annotation):
+                    logger.warning(
                         f"converter for {type(oh_annotation)} available but cannot convert, skipping annotation."
                     )
                     continue
 
-                converter.convert(oh_annotation, cas, object_designator)
-                self.rk_logger.info(
-                    f"converted {type(oh_annotation)} on OH {object_hypotheses_count}"
+                converter.convert(
+                    annotation=oh_annotation,
+                    cas=cas,
+                    object_designator=object_designator,
+                )
+                logger.info(
+                    f"converted {type(oh_annotation)} on object hypothesis {object_hypotheses_count}"
                 )
 
             query_result.append(object_designator)
             object_hypotheses_count += 1
 
         result.res = query_result
-        QueryHandler.send_answer(result)
+        QueryHandler.send_answer(result=result)
 
         self.feedback_message = (
             f"Send result for {object_hypotheses_count} object hypotheses "
@@ -479,11 +497,27 @@ class QueryActionServer(Node):
         Blackboard().set(BBIdentifier.QUERY_PREEMPT_REQUESTED, False)
         Blackboard().set(BBIdentifier.QUERY_PREEMPT_ACK, False)
 
+    @called_positionally
     def goal_cb(self, goal_request: Query.Goal) -> GoalResponse:
+        """
+        Accept every goal the action server receives.
+
+        :param goal_request: The received query goal.
+        :return: :attr:`GoalResponse.ACCEPT`.
+        """
         self.logger.info(f"Received new goal: {goal_request}")
         return GoalResponse.ACCEPT
 
+    @called_positionally
     def cancel_cb(self, goal_handle: ServerGoalHandle) -> CancelResponse:
+        """
+        Accept a cancel request and ask the running pipeline to preempt the query
+        through the
+        blackboard entry :attr:`BBIdentifier.QUERY_PREEMPT_REQUESTED`.
+
+        :param goal_handle: Handle of the goal to cancel.
+        :return: :attr:`CancelResponse.ACCEPT`.
+        """
         self.logger.info(f"Received cancel request:{goal_handle}")
         Blackboard().set(BBIdentifier.QUERY_PREEMPT_REQUESTED, True)
         return CancelResponse.ACCEPT
@@ -506,6 +540,7 @@ class QueryActionServer(Node):
         """
         return self.query is not None
 
+    @called_positionally
     async def execute_cb(self, goal_handle: ServerGoalHandle) -> Query.Result | None:
         """
         Action server execution callback.
@@ -536,7 +571,9 @@ class QueryActionServer(Node):
             # to properly shutdown.
             preempt_acknowledge = Blackboard().get(BBIdentifier.QUERY_PREEMPT_ACK)
             if goal_handle.is_cancel_requested and preempt_acknowledge:
-                self.logger.info("Goal cancel acknowledged by PPT.")
+                self.logger.info(
+                    "Goal cancel acknowledged by the perception pipeline tree."
+                )
                 goal_handle.canceled()
                 cancel_result = Query.Result()
                 cancel_result.text_result = "Canceled"

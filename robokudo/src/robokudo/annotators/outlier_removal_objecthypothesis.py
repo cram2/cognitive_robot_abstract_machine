@@ -19,6 +19,7 @@ Authors:
 
 from __future__ import annotations
 
+import logging
 from timeit import default_timer
 
 import numpy as np
@@ -33,6 +34,7 @@ from robokudo.types.annotation import Classification
 from robokudo.types.scene import ObjectHypothesis
 from robokudo.utils.error_handling import catch_and_raise_to_blackboard
 from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
+from krrood.patterns.called_positionally import called_positionally
 
 """
 This module implements a statistical outlierremoval based on the standard deviation and
@@ -42,6 +44,8 @@ remaining copy of the old state for some point cloud.
 
 Authors: Sorin Arion, Naser Azizi 
 """
+
+logger = logging.getLogger(__name__)
 
 _PYTYPE_TO_ROS_FIELD: dict[type, str] = {
     int: "integer_value",
@@ -106,7 +110,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
         :param descriptor: Configuration descriptor
         """
         super().__init__(name, descriptor)
-        self.rk_logger.debug("%s.__init__()" % self.__class__.__name__)
+        logger.debug("%s.__init__()" % self.__class__.__name__)
 
         self.node = ROSNodeRegistry().get()
 
@@ -115,14 +119,21 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
 
         self.node.add_on_set_parameters_callback(self.parameters_callback)
 
-        self.rk_logger.info("OutlierRemovalNode initialized with current parameters")
+        logger.info("OutlierRemovalNode initialized with current parameters")
 
+    @called_positionally
     def parameters_callback(self, params: list[Parameter]) -> SetParametersResult:
+        """
+        Copy every ROS parameter that names a descriptor parameter into the descriptor.
+
+        :param params: The ROS parameters that were set
+        :return: A successful result
+        """
         for param in params:
             if hasattr(self.descriptor.parameters, param.name):
                 setattr(self.descriptor.parameters, param.name, param.value)
 
-        self.rk_logger.info("Received reconf call: " + str(params))
+        logger.info("Received reconfiguration call: " + str(params))
         return SetParametersResult(successful=True)
 
     @catch_and_raise_to_blackboard
@@ -138,7 +149,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
 
         if not pcd_cluster:
             # TODO This should not be decided by this Annotator, but by the Result Generator - Refactor and test AEs
-            self.rk_logger.warning(f"No Clusters have been found.")
+            logger.warning(f"No Clusters have been found.")
             self.feedback_message = f"No clusters have been found"
             raise Exception("No Clusters have been found.")
         end_timer = default_timer()
@@ -150,7 +161,9 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
 
         :return: True, if at least one of the object hypotheses could be optimized. False otherwise.
         """
-        annotations = self.get_cas().filter_annotations_by_type(ObjectHypothesis)
+        annotations = self.get_cas().filter_annotations_by_type(
+            type_to_include=ObjectHypothesis
+        )
         vis_geometries = []
 
         optimized_one_cluster = False
@@ -161,7 +174,7 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
 
             if len(self.descriptor.parameters.skip_removal_on_classes) > 0:
                 classes: list[Classification] = CAS.filter_by_type(
-                    Classification, annotation.annotations
+                    type_to_include=Classification, input_list=annotation.annotations
                 )
 
                 found_class = False
@@ -220,8 +233,8 @@ class OutlierRemovalOnObjectHypothesisAnnotator(BaseAnnotator):
         if not optimized_one_cluster:
             return False
 
-        visualization_img = self.get_cas().get(CASViews.COLOR_IMAGE)
-        self.get_annotator_output_struct().set_image(visualization_img)
-        self.get_annotator_output_struct().set_geometries(vis_geometries)
+        visualization_img = self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
+        self.get_annotator_output_struct().set_image(img=visualization_img)
+        self.get_annotator_output_struct().set_geometries(geometries=vis_geometries)
 
         return True

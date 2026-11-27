@@ -62,7 +62,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 TrainedAction = TypeVar("TrainedAction", bound=Action)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TrainingEpisode:
     """
     The underspecified action one episode of training executes, and the executor
@@ -80,7 +80,7 @@ class TrainingEpisode:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
     """
     A training environment for generating data for the parameterization of the actions
@@ -116,7 +116,7 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         """
 
     @abstractmethod
-    def setup_episode(self, limit: int = 10, **kwargs: Any) -> TrainingEpisode:
+    def setup_episode(self, *, limit: int = 10, **kwargs: Any) -> TrainingEpisode:
         """
         Create an underspecified action, in a world of its own, whose grounded variants
         the episode tries.
@@ -125,7 +125,7 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         :return: The action and the executor executing it.
         """
 
-    def generate_episodes(self, number_of_actions: int = 10):
+    def generate_episodes(self, *, number_of_actions: int = 10) -> None:
         """
         Generate episodes until `number_of_actions` have been executed.
 
@@ -135,17 +135,17 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         remaining_actions = number_of_actions
 
         while remaining_actions > 0:
-            executed_actions = self.generate_episode(remaining_actions)
+            executed_actions = self.generate_episode(limit=remaining_actions)
             remaining_actions -= executed_actions
 
-    def generate_episode(self, limit: int) -> int:
+    def generate_episode(self, *, limit: int) -> int:
         """
         Generate a single episode.
 
         :param limit: The maximum number of actions that should be executed.
         :return: The number of actions executed in the episode.
         """
-        episode = self.setup_episode(limit)
+        episode = self.setup_episode(limit=limit)
 
         if self.visualize:
             import rclpy
@@ -176,7 +176,7 @@ class TrainingEnvironment(Generic[TrainedAction], SubClassSafeGeneric, ABC):
         return number_of_executed_variants
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
     """
     Training environment for MoveToReach actions in an empty world using the PR2.
@@ -216,7 +216,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
 
         return world_with_urdf
 
-    def setup_episode(self, limit: int = 10, **kwargs: Any) -> TrainingEpisode:
+    def setup_episode(self, *, limit: int = 10, **kwargs: Any) -> TrainingEpisode:
 
         world = self.setup_world()
         [robot] = world.get_semantic_annotations_by_type(AbstractRobot)
@@ -241,9 +241,11 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
         move_to_reach.limit(n=limit)
 
         if self.model_path:
-            query_backend = self.setup_backend_from_path(move_to_reach)
+            query_backend = self.setup_backend_from_path(
+                underspecified_action=move_to_reach
+            )
         else:
-            query_backend = self.setup_backend(move_to_reach)
+            query_backend = self.setup_backend(underspecified_action=move_to_reach)
 
         executor = KinematicallySimulatedPlanExecutor(
             context=StatechartContext.with_extensions(
@@ -259,7 +261,7 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             action=StatementNode(statement=move_to_reach), executor=executor
         )
 
-    def setup_backend(self, underspecified_action: Match) -> ProbabilisticBackend:
+    def setup_backend(self, *, underspecified_action: Match) -> ProbabilisticBackend:
         """
         Create a backend containing the best guesses as distribution for this action in
         this environment.
@@ -287,7 +289,9 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
             model_registry=DictRegistry(models={self.action_type: distribution})
         )
 
-    def setup_backend_from_path(self, underspecified_action: Match):
+    def setup_backend_from_path(
+        self, *, underspecified_action: Match
+    ) -> ProbabilisticBackend:
         """
         Setup a backend from a model file.
 

@@ -182,7 +182,7 @@ def stationary_block_context(robot_setup):
     extensions of its plans, returned to its initial model and state after the test.
     """
     block_world, robot_class = robot_setup
-    snapshot = WorldSnapshot.capture(block_world)
+    snapshot = WorldSnapshot.capture(world=block_world)
     view = block_world.get_semantic_annotations_by_type(robot_class)[0]
     yield block_world, view, robot_extensions(view)
     snapshot.restore()
@@ -402,7 +402,7 @@ def test_move_tcp_follows_sine_waypoints(stationary_block_context, anchor_positi
         reference_frame=world.root,
     )
     target_pose = (anchor_T @ offset_T).pose
-    waypoints = PoseTrajectory(_make_sine_scan_poses(target_pose, lane_axis="z"))
+    waypoints = PoseTrajectory(poses=_make_sine_scan_poses(target_pose, lane_axis="z"))
 
     plan = FollowToolCenterPointPathAction(
         target_locations=waypoints, arm=right_or_only_arm(view)
@@ -558,7 +558,7 @@ def _fail_the_lift() -> None:
     raise PlanFailure()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FailTheFirstLift(SequentialInsertion[PickUpAction]):
     """
     Fails the first pick-up it is offered once its object hangs off the gripper, right
@@ -574,13 +574,13 @@ class FailTheFirstLift(SequentialInsertion[PickUpAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: PickUpAction) -> bool:
+    def is_applicable(self, *, plan_node: PickUpAction) -> bool:
         return not self.failed_once
 
-    def anchor(self, plan_node: PickUpAction) -> StatechartNode:
+    def anchor(self, *, plan_node: PickUpAction) -> StatechartNode:
         return plan_node.nodes[-1]
 
-    def nodes_to_insert(self, plan_node: PickUpAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: PickUpAction) -> list[StatechartNode]:
         self.failed_once = True
         return [FunctionCall(function=_fail_the_lift, failure_types=(PlanFailure,))]
 

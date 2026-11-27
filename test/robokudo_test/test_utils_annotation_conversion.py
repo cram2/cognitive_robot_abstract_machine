@@ -1,5 +1,10 @@
+"""
+Tests of the annotation conversion utilities.
+"""
+
 # %% Imports
 
+from __future__ import annotations
 import sys
 from dataclasses import replace
 
@@ -64,6 +69,10 @@ from . import _assertions
 
 
 class TestUtilsAnnotationConversion(object):
+    """
+    Tests of converting annotations into object designator fields.
+    """
+
     @pytest.fixture
     def cas_with_tf(self):
         cas = CAS()
@@ -109,11 +118,17 @@ class TestUtilsAnnotationConversion(object):
         pose_annotation = PoseAnnotation()
         position_annotation = PositionAnnotation()
 
-        assert converter.can_convert(pose_annotation, StampedPoseAnnotation)
+        assert converter.can_convert(
+            annotation=pose_annotation, target_annotation_type=StampedPoseAnnotation
+        )
 
-        assert not converter.can_convert(pose_annotation, PoseAnnotation)
+        assert not converter.can_convert(
+            annotation=pose_annotation, target_annotation_type=PoseAnnotation
+        )
 
-        assert not converter.can_convert(position_annotation, StampedPoseAnnotation)
+        assert not converter.can_convert(
+            annotation=position_annotation, target_annotation_type=StampedPoseAnnotation
+        )
 
     def test_pose_annotation_to_stamped_pose_annotation_convert(self):
         converter = PoseAnnotationToStampedPoseAnnotationConverter()
@@ -123,7 +138,7 @@ class TestUtilsAnnotationConversion(object):
         pose_annotation.rotation = np.random.rand(4)
         pose_annotation.translation = np.random.rand(3)
 
-        stamped_pose_annotation = converter.convert(pose_annotation)
+        stamped_pose_annotation = converter.convert(annotation=pose_annotation)
 
         assert stamped_pose_annotation.source == pose_annotation.source
         assert np.all(stamped_pose_annotation.rotation == pose_annotation.rotation)
@@ -137,11 +152,17 @@ class TestUtilsAnnotationConversion(object):
         pose_annotation = PoseAnnotation()
         position_annotation = PositionAnnotation()
 
-        assert converter.can_convert(position_annotation, StampedPoseAnnotation)
+        assert converter.can_convert(
+            annotation=position_annotation, target_annotation_type=StampedPoseAnnotation
+        )
 
-        assert not converter.can_convert(pose_annotation, StampedPoseAnnotation)
+        assert not converter.can_convert(
+            annotation=pose_annotation, target_annotation_type=StampedPoseAnnotation
+        )
 
-        assert not converter.can_convert(position_annotation, PoseAnnotation)
+        assert not converter.can_convert(
+            annotation=position_annotation, target_annotation_type=PoseAnnotation
+        )
 
     def test_position_annotation_to_stamped_pose_annotation_convert(self):
         converter = PositionAnnotationToStampedPoseAnnotationConverter()
@@ -150,15 +171,15 @@ class TestUtilsAnnotationConversion(object):
         pos_annotation.source = "some_weird_no_default_source"
         pos_annotation.translation = np.random.rand(3)
 
-        stamped_pose_annotation = converter.convert(pos_annotation)
+        stamped_pose_annotation = converter.convert(annotation=pos_annotation)
 
         assert stamped_pose_annotation.source == pos_annotation.source
         assert np.all(stamped_pose_annotation.translation == pos_annotation.translation)
 
     def test_semantic_color_2_od_converter_can_convert(self):
         converter = SemanticColor2ODConverter()
-        assert converter.can_convert(SemanticColor())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=SemanticColor())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_semantic_color_2_od_converter_convert(self):
         cas = CAS()
@@ -169,15 +190,15 @@ class TestUtilsAnnotationConversion(object):
         semantic_color = SemanticColor()
         semantic_color.color = "some_weird_non_default_color"
 
-        converter.convert(semantic_color, cas, od)
+        converter.convert(annotation=semantic_color, cas=cas, object_designator=od)
 
         assert len(od.color) == 1
         assert od.color[0] == semantic_color.color
 
     def test_classification_2_od_converter_can_convert(self):
         converter = Classification2ODConverter()
-        assert converter.can_convert(Classification())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=Classification())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_classification_2_od_converter_convert(self):
         cas = CAS()
@@ -188,14 +209,14 @@ class TestUtilsAnnotationConversion(object):
         classification = Classification()
         classification.classname = "some_weird_non_default_classname"
 
-        converter.convert(classification, cas, od)
+        converter.convert(annotation=classification, cas=cas, object_designator=od)
 
         assert od.type == classification.classname
 
     def test_stamped_pose_2_od_converter_can_convert(self):
         converter = StampedPose2ODConverter()
-        assert converter.can_convert(StampedPoseAnnotation())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=StampedPoseAnnotation())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_stamped_pose_2_od_converter_convert(self):
         cas = CAS()
@@ -210,7 +231,9 @@ class TestUtilsAnnotationConversion(object):
         stamped_pose_annotation.frame = "some_weird_non_default_frame_id"
         stamped_pose_annotation.timestamp = Time(sec=123, nanosec=456)
 
-        converter.convert(stamped_pose_annotation, cas, od)
+        converter.convert(
+            annotation=stamped_pose_annotation, cas=cas, object_designator=od
+        )
 
         assert len(od.pose) == 1
         pose: PoseStamped = od.pose[0]
@@ -226,8 +249,8 @@ class TestUtilsAnnotationConversion(object):
 
     def test_pose_2_od_converter_can_convert(self):
         converter = Pose2ODConverter()
-        assert converter.can_convert(PoseAnnotation())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=PoseAnnotation())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_pose_2_od_converter_convert_in_camera(self, cas_with_tf: CAS):
         cas_with_tf.camera_observation = replace(
@@ -242,7 +265,9 @@ class TestUtilsAnnotationConversion(object):
         pose_annotation.translation = np.random.rand(3)
         pose_annotation.rotation = np.random.rand(4)
 
-        converter.convert(pose_annotation, cas_with_tf, od)
+        converter.convert(
+            annotation=pose_annotation, cas=cas_with_tf, object_designator=od
+        )
 
         assert len(od.pose) == 1
         pose: PoseStamped = od.pose[0]
@@ -278,7 +303,9 @@ class TestUtilsAnnotationConversion(object):
         pose_annotation.translation = np.random.rand(3)
         pose_annotation.rotation = np.random.rand(4)
 
-        converter.convert(pose_annotation, cas_with_tf, od)
+        converter.convert(
+            annotation=pose_annotation, cas=cas_with_tf, object_designator=od
+        )
 
         new_rotation = (
             R.from_quat(camera_to_world_quat) * R.from_quat(pose_annotation.rotation)
@@ -309,8 +336,8 @@ class TestUtilsAnnotationConversion(object):
         position_annotation = PositionAnnotation()
         other_ann = Annotation()
 
-        assert converter.can_convert(position_annotation)
-        assert not converter.can_convert(other_ann)
+        assert converter.can_convert(annotation=position_annotation)
+        assert not converter.can_convert(annotation=other_ann)
 
     def test_position_2_od_converter_convert(self, cas_with_tf: CAS):
         camera_to_world_quat = (
@@ -327,7 +354,9 @@ class TestUtilsAnnotationConversion(object):
         position_annotation.source = "some_weird_non_default_source"
         position_annotation.translation = np.random.rand(3)
 
-        converter.convert(position_annotation, cas_with_tf, od)
+        converter.convert(
+            annotation=position_annotation, cas=cas_with_tf, object_designator=od
+        )
 
         assert len(od.pose) == 1
         pose: PoseStamped = od.pose[0]
@@ -346,8 +375,8 @@ class TestUtilsAnnotationConversion(object):
 
     def test_stamped_position_2_od_converter_can_convert(self):
         converter = StampedPosition2ODConverter()
-        assert converter.can_convert(StampedPositionAnnotation())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=StampedPositionAnnotation())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_stamped_position_2_od_converter_convert(self, cas_with_tf: CAS):
         camera_to_world_quat = (
@@ -366,7 +395,9 @@ class TestUtilsAnnotationConversion(object):
         stamped_pose_annotation.frame = "some_weird_non_default_frame_id"
         stamped_pose_annotation.timestamp = Time(sec=123, nanosec=456)
 
-        converter.convert(stamped_pose_annotation, cas_with_tf, od)
+        converter.convert(
+            annotation=stamped_pose_annotation, cas=cas_with_tf, object_designator=od
+        )
 
         assert len(od.pose) == 1
         pose: PoseStamped = od.pose[0]
@@ -387,8 +418,8 @@ class TestUtilsAnnotationConversion(object):
 
     def test_bounding_box_3d_for_shape_size_converter_can_convert(self):
         converter = BoundingBox3DForShapeSizeConverter()
-        assert converter.can_convert(BoundingBox3D())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=BoundingBox3D())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_bounding_box_3d_for_shape_size_converter_convert(self):
         od = ObjectDesignator()
@@ -401,7 +432,7 @@ class TestUtilsAnnotationConversion(object):
         bbox3d.y_length = np.random.randint(sys.maxsize)
         bbox3d.z_length = np.random.randint(sys.maxsize)
 
-        converter.convert(bbox3d, cas, od)
+        converter.convert(annotation=bbox3d, cas=cas, object_designator=od)
 
         assert (
             od.size == ""
@@ -415,8 +446,8 @@ class TestUtilsAnnotationConversion(object):
 
     def test_shape_2_od_converter_can_convert(self):
         converter = Shape2ODConverter()
-        assert converter.can_convert(Shape())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=Shape())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_shape_2_od_converter_convert(self):
         od = ObjectDesignator()
@@ -426,15 +457,15 @@ class TestUtilsAnnotationConversion(object):
         shape = Shape()
         shape.geometry = SemDTSphere(radius=0.17)
 
-        converter.convert(shape, CAS(), od)
+        converter.convert(annotation=shape, cas=CAS(), object_designator=od)
 
         assert len(od.shape) == 1
         assert od.shape[0] == shape.shape_name
 
     def test_cuboid_2_od_converter_can_convert(self):
         converter = Cuboid2ODConverter()
-        assert converter.can_convert(Cuboid())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=Cuboid())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_cuboid_2_od_converter_convert(self):
         od = ObjectDesignator()
@@ -444,20 +475,20 @@ class TestUtilsAnnotationConversion(object):
         shape = Cuboid()
         shape.geometry = SemDTBox()
 
-        converter.convert(shape, CAS(), od)
+        converter.convert(annotation=shape, cas=CAS(), object_designator=od)
 
         assert len(od.shape) == 1
         assert od.shape[0] == shape.shape_name
 
     def test_sphere_2_od_converter_can_convert(self):
         converter = Sphere2ODConverter()
-        assert converter.can_convert(Sphere())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=Sphere())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_cylinder_2_od_converter_can_convert(self):
         converter = Cylinder2ODConverter()
-        assert converter.can_convert(Cylinder())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=Cylinder())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_cylinder_2_od_converter_convert(self):
         od = ObjectDesignator()
@@ -467,7 +498,7 @@ class TestUtilsAnnotationConversion(object):
         shape = Cylinder()
         shape.geometry = SemDTCylinder(width=0.22, height=0.41)
 
-        converter.convert(shape, CAS(), od)
+        converter.convert(annotation=shape, cas=CAS(), object_designator=od)
 
         assert len(od.shape) == 1
         assert od.shape[0] == shape.shape_name
@@ -480,7 +511,7 @@ class TestUtilsAnnotationConversion(object):
         shape = Sphere()
         shape.geometry = SemDTSphere(radius=np.random.random())
 
-        converter.convert(shape, CAS(), od)
+        converter.convert(annotation=shape, cas=CAS(), object_designator=od)
 
         assert len(od.shape) == 1
         assert od.shape[0] == shape.shape_name
@@ -490,8 +521,8 @@ class TestUtilsAnnotationConversion(object):
 
     def test_location_2_od_converter_can_convert(self):
         converter = Location2ODConverter()
-        assert converter.can_convert(LocationAnnotation())
-        assert not converter.can_convert(Annotation())
+        assert converter.can_convert(annotation=LocationAnnotation())
+        assert not converter.can_convert(annotation=Annotation())
 
     def test_location_2_od_converter_convert(self):
         od = ObjectDesignator()
@@ -501,7 +532,7 @@ class TestUtilsAnnotationConversion(object):
         loc = LocationAnnotation()
         loc.region = Region(name=PrefixedName(name="some_weird_non_default_name"))
 
-        converter.convert(loc, CAS(), od)
+        converter.convert(annotation=loc, cas=CAS(), object_designator=od)
 
         assert od.location == str(loc.region.name)
 
@@ -513,6 +544,6 @@ class TestUtilsAnnotationConversion(object):
         loc = LocationAnnotation()
         loc.name = "legacy_location_name"
 
-        converter.convert(loc, CAS(), od)
+        converter.convert(annotation=loc, cas=CAS(), object_designator=od)
 
         assert od.location == loc.name

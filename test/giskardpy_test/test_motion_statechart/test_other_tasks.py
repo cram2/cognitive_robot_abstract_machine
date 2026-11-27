@@ -52,9 +52,7 @@ from giskardpy.motion_statechart.tasks.pointing import (
     PointingCone,
 )
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
-    RevoluteConnectionSpecification,
-    ScrewConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.semantic_annotations.semantic_annotations import (
@@ -74,7 +72,7 @@ from semantic_digital_twin.robots.robot_parts import EndEffector
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.derivatives import DerivativeMap
@@ -708,14 +706,16 @@ def test_pointing_follows_a_goal_point_given_as_an_expression_of_a_moving_frame(
     with world.modify_world():
         region = Body(name=PrefixedName("region"))
         world.add_kinematic_structure_entity(region)
-        region_joint = PrismaticConnection.create_with_dofs(
+        region_joint = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3Dimensional.Y()
+            ),
             world=world,
             parent=world.root,
             child=region,
             parent_T_connection_expression=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
                 2, 0, 1, reference_frame=world.root
             ),
-            axis=Vector3Dimensional.Y(),
             dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                 lower_position=-1.0, upper_position=1.0, maximum_speed=0.5
             ),
@@ -950,6 +950,21 @@ def test_keep_held_body_upright_holding_nothing_keeps_the_tool_frame_as_it_is(
     )
 
 
+def test_keep_held_body_upright_holds_the_axis_it_keeps_upright_as_a_number(
+    pr2_world_state_reset: World,
+):
+    """
+    The axis the task keeps upright is a numeric vector, which can be stored, rather
+    than an expression over the pose the task binds while it runs.
+    """
+    keep_upright = _run_keep_held_body_upright(pr2_world_state_reset)
+
+    np.testing.assert_array_equal(
+        keep_upright.tip_normal.to_np(),
+        Vector3Dimensional.Z(reference_frame=keep_upright.kinematic_chain.tip).to_np(),
+    )
+
+
 def test_align_perpendicular(pr2_world_state_reset: World):
     """
     Aligning perpendicular leaves the gripper's normal at a right angle to the reference
@@ -1118,9 +1133,11 @@ class TestArticulateGraspedMechanism:
                 name="door",
                 world=pr2_world_copy,
                 world_root_T_self=world_T_door,
-                parent_connection_specification=RevoluteConnectionSpecification(
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3Dimensional.Z()
+                    ),
                     dof_limits=limits,
-                    axis=Vector3Dimensional.Z(),
                     connection_T_child=world_T_hinge.inverse() @ world_T_door,
                 ),
             )
@@ -1137,7 +1154,7 @@ class TestArticulateGraspedMechanism:
                 ),
             )
 
-            door.add(handle)
+            door.add(part=handle)
 
         root_C_hinge = door.movable_joint
 
@@ -1221,8 +1238,10 @@ class TestArticulateGraspedMechanism:
                 name="drawer",
                 world=world,
                 world_root_T_self=world_T_drawer,
-                parent_connection_specification=PrismaticConnectionSpecification(
-                    axis=Vector3Dimensional.X(),
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3Dimensional.X()
+                    ),
                     dof_limits=DegreeOfFreedomLimits(
                         lower=DerivativeMap(position=0.0, velocity=-10.0),
                         upper=DerivativeMap(position=open_position, velocity=10.0),
@@ -1232,7 +1251,7 @@ class TestArticulateGraspedMechanism:
             handle = Handle.create_with_new_body_in_world(
                 name="handle", world=world, world_root_T_self=world_T_drawer
             )
-            drawer.add(handle)
+            drawer.add(part=handle)
         tip = world.get_body_by_name("r_gripper_tool_frame")
 
         executor = StatechartExecutor(
@@ -1310,10 +1329,11 @@ class TestArticulateGraspedMechanism:
                 scale=Scale(0.02, 0.04, 0.04),
                 # The thread axis points from the bottle out through the cap, here
                 # towards the robot, so unscrewing moves the cap away from the bottle.
-                parent_connection_specification=ScrewConnectionSpecification(
-                    axis=Vector3Dimensional(-1, 0, 0),
+                parent_connection_specification=ScrewAxisConnectionSpecification(
                     dof_limits=limits,
-                    screw_pitch=screw_pitch,
+                    screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                        axis=Vector3Dimensional(-1, 0, 0), pitch=screw_pitch
+                    ),
                 ),
             )
 
@@ -1373,7 +1393,7 @@ class TestArticulateGraspedMechanism:
         unscrew_travel_distance = float(np.linalg.norm(cap_translation))
         tightened_goal_joint_state = (
             unscrew_goal
-            - root_C_screw.rotation_angle_for_travel_distance(unscrew_travel_distance)
+            - root_C_screw.position_for_translation(distance=unscrew_travel_distance)
         )
 
         executor = StatechartExecutor(

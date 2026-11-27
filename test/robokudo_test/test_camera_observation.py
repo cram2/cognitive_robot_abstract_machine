@@ -1,3 +1,7 @@
+"""
+Tests of camera observations: their pose, frames and access through the CAS.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -110,6 +114,10 @@ def test_camera_observation_requires_pose_for_spatial_access():
 
 
 def test_camera_observation_returns_copy_with_pose():
+    """
+    Setting the camera pose returns a new observation with that pose, sharing the camera
+    and camera model, and leaves the original without a pose.
+    """
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
@@ -133,7 +141,9 @@ def test_camera_observation_returns_copy_with_pose():
         child_frame=root,
     )
 
-    updated_observation = observation.with_world_T_camera(world_T_camera)
+    updated_observation = observation.copy_with_world_T_camera(
+        world_T_camera=world_T_camera
+    )
 
     assert observation.world_T_camera is None
     assert updated_observation.world_T_camera is world_T_camera
@@ -174,7 +184,7 @@ def test_observation_rejects_pose_without_reference_frame(
         child_frame=unposed_camera_observation.camera.root
     )
     with pytest.raises(InvalidCameraObservation):
-        unposed_camera_observation.with_world_T_camera(pose)
+        unposed_camera_observation.copy_with_world_T_camera(world_T_camera=pose)
 
 
 def test_observation_rejects_pose_for_another_camera(
@@ -188,7 +198,7 @@ def test_observation_rejects_pose_for_another_camera(
         child_frame=Body(name=PrefixedName(name="another_camera")),
     )
     with pytest.raises(InvalidCameraObservation):
-        unposed_camera_observation.with_world_T_camera(pose)
+        unposed_camera_observation.copy_with_world_T_camera(world_T_camera=pose)
 
 
 @pytest.mark.parametrize("with_pose", [False, True])
@@ -201,8 +211,8 @@ def test_observation_resolves_unspecified_child_to_camera_root(
     """
     observation = unposed_camera_observation
     if with_pose:
-        observation = observation.with_world_T_camera(
-            HomogeneousTransformationMatrix3Dimensional(
+        observation = observation.copy_with_world_T_camera(
+            world_T_camera=HomogeneousTransformationMatrix3Dimensional(
                 reference_frame=Body(name=PrefixedName(name="world"))
             )
         )
@@ -220,7 +230,9 @@ def test_observation_accepts_ros_frame_alias(
     pose = HomogeneousTransformationMatrix3Dimensional(
         reference_frame=Body(name=PrefixedName(name="world")), child_frame=alias
     )
-    observation = unposed_camera_observation.with_world_T_camera(pose)
+    observation = unposed_camera_observation.copy_with_world_T_camera(
+        world_T_camera=pose
+    )
     assert observation.pose_child is alias
 
 
@@ -236,7 +248,7 @@ def test_observation_rejects_alias_from_another_robot(
         reference_frame=Body(name=PrefixedName(name="world")), child_frame=alias
     )
     with pytest.raises(InvalidCameraObservation):
-        unposed_camera_observation.with_world_T_camera(pose)
+        unposed_camera_observation.copy_with_world_T_camera(world_T_camera=pose)
 
 
 # %% Recorded frame validation
@@ -262,7 +274,7 @@ def test_decoded_observation_rejects_invalid_pose_frames(
         world.add_semantic_annotation(observation.camera)
     tracker = WorldEntityWithIDKwargsTracker.from_world(world)
     codec = CameraObservationCodec()
-    payload = codec.encode(observation)
+    payload = codec.encode(value=observation)
     recorded = RecordedCameraObservation(
         camera_id=str(observation.camera.id),
         effective_camera_model=observation.effective_camera_model,
@@ -276,4 +288,4 @@ def test_decoded_observation_rejects_invalid_pose_frames(
         payload, payload=DataclassJSONSerializer.to_json(instance=recorded)
     )
     with pytest.raises(InvalidCameraObservation):
-        codec.decode_with_tracker(invalid_payload, tracker)
+        codec.decode_with_tracker(payload=invalid_payload, tracker=tracker)

@@ -199,13 +199,13 @@ class PathPlanningNavigateAction(
         floors_below = [
             floor
             for floor in self.world.get_semantic_annotations_by_type(Floor)
-            if self._stands_on(floor)
+            if self._stands_on(floor=floor)
         ]
         if not floors_below:
-            raise NoFloorBelowRobot(self.robot)
-        return max(floors_below, key=lambda floor: self._extent_of(floor).max_z)
+            raise NoFloorBelowRobot(robot=self.robot)
+        return max(floors_below, key=lambda floor: self._extent_of(floor=floor).max_z)
 
-    def _extent_of(self, floor: Floor) -> VolumetricBoundingBox:
+    def _extent_of(self, *, floor: Floor) -> VolumetricBoundingBox:
         """
         :param floor: The floor to measure.
         :return: The floor's bounding box in the world's root frame.
@@ -214,13 +214,13 @@ class PathPlanningNavigateAction(
             HomogeneousTransformationMatrix3Dimensional(reference_frame=self.world.root)
         ).bounding_box()
 
-    def _stands_on(self, floor: Floor) -> bool:
+    def _stands_on(self, *, floor: Floor) -> bool:
         """
         :param floor: The floor to test.
         :return: Whether the robot's base rests within this floor's footprint and no
             lower than its top.
         """
-        extent = self._extent_of(floor)
+        extent = self._extent_of(floor=floor)
         base_pose = self.robot.root.global_pose
         return (
             extent.min_x <= float(base_pose.x) <= extent.max_x
@@ -305,7 +305,7 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
         return [
             NavigateAction(planar_goal_pose=self._pose_infront_of_elevator),
             PausedUntilTrue(
-                monitor=self._elevator_open_at_floor(self._current_floor),
+                monitor=self._elevator_open_at_floor(target_floor=self._current_floor),
                 monitored_node=NavigateAction(
                     planar_goal_pose=Pose2Dimensional(
                         reference_frame=self.elevator.root
@@ -314,7 +314,7 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
             ),
             *self.reattach(branch_root=self.robot.root, new_parent=self.elevator.root),
             PausedUntilTrue(
-                monitor=self._elevator_open_at_floor(self.target_floor),
+                monitor=self._elevator_open_at_floor(target_floor=self.target_floor),
                 monitored_node=NavigateAction(
                     planar_goal_pose=self._pose_infront_of_elevator
                 ),
@@ -338,9 +338,13 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
             > 0.9
         ]
         if len(current_floor) == 0:
-            raise NotOnASingleLevelException("Robot is not on any recognized floor.")
+            raise NotOnASingleLevelException(
+                message="Robot is not on any recognized floor."
+            )
         if len(current_floor) > 1:
-            raise NotOnASingleLevelException("Robot is on multiple floors at once.")
+            raise NotOnASingleLevelException(
+                message="Robot is on multiple floors at once."
+            )
         return current_floor[0]
 
     @property
@@ -354,7 +358,7 @@ class ElevatorNavigation(ReattachesBranches, SequentialAction):
             reference_frame=self.elevator.root,
         )
 
-    def _elevator_open_at_floor(self, target_floor: Level) -> Parallel:
+    def _elevator_open_at_floor(self, *, target_floor: Level) -> Parallel:
         """
         Observes True once the cabin serves :attr:`target_floor` with its doors open.
         """

@@ -4,8 +4,6 @@ Tests of grasping a bowl by its rim, closing the fingers on the bowl's wall.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 from numpy.typing import NDArray
 import pytest
@@ -30,13 +28,7 @@ from ..plan_running import context_of, robot_extensions
 
 # %% fixtures
 
-BOWL_MESH = str(
-    Path(__file__).resolve().parents[2]
-    / "coraplex"
-    / "resources"
-    / "objects"
-    / "bowl.stl"
-)
+BOWL_MESH = "package://iai_objects/objects/bowl.stl"
 """
 The bowl the demos transport, an irregular scan rather than a turned shape.
 """
@@ -62,7 +54,7 @@ def split_off_rim(bowl: Bowl, rim_depth: float = 0.02) -> Rim:
     rim_centers = centers[centers[:, 2] > mesh.bounds[1][2] - rim_depth]
     return PartSplitter(
         part_type=Rim, finder=LocatedFacesFinder(face_centers=rim_centers)
-    ).split(bowl)
+    ).split(whole=bowl)
 
 
 @pytest.fixture
@@ -167,10 +159,12 @@ def test_transporting_a_bowl_grasps_it_at_its_rim(pr2_and_bowl):
     """
     world, robot, bowl = pr2_and_bowl
     transport = TransportAction.from_graspable_by_closest_grasps(
-        bowl,
-        Pose3Dimensional.from_xyz_rpy(5.0, 3.3, 0.75, reference_frame=world.root),
-        robot.left_arm,
-        context_of(robot_extensions(robot)),
+        graspable=bowl,
+        goal_pose=Pose3Dimensional.from_xyz_rpy(
+            5.0, 3.3, 0.75, reference_frame=world.root
+        ),
+        arm=robot.left_arm,
+        context=context_of(robot_extensions(robot)),
     )
 
     Sequence(nodes=[transport])

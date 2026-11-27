@@ -27,15 +27,21 @@ from random_events.variable import Continuous, Integer, Symbolic
 from sortedcontainers import SortedSet
 from krrood.adapters.json_serializer import from_json
 
-from probabilistic_model.learning.exceptions import UnscheduledOptimizerError
-from probabilistic_model.learning.gradient_descent import AverageNegativeLogLikelihood
-from probabilistic_model.learning.region_graph.region_graph import RegionGraph
-from probabilistic_model.learning.jax_gradient_descent import (
+from probabilistic_model.learning.parameters.gradient_descent.exceptions import (
+    UnscheduledOptimizerError,
+)
+from probabilistic_model.learning.parameters.gradient_descent.gradient_descent import (
+    AverageNegativeLogLikelihood,
+)
+from probabilistic_model.learning.structure.region_graph.region_graph import RegionGraph
+from probabilistic_model.learning.parameters.jax_circuit_parameter_learning import (
     CompilerOption,
     CompilerVariable,
+)
+from probabilistic_model.learning.parameters.gradient_descent.jax_gradient_descent import (
     JaxGradientDescent,
 )
-from probabilistic_model.learning.training_schedule import (
+from probabilistic_model.learning.parameters.training_schedule import (
     Convergence,
     ConvergenceHistory,
     LearningRatePlateau,
@@ -218,6 +224,34 @@ def test_no_epoch_has_no_average_duration():
     )
 
 
+def test_consecutive_histories_join_their_epochs_in_order():
+    """
+    Trainings run one after another give the history of all their epochs, converged only
+    if each of them converged.
+    """
+    first = ConvergenceHistory(
+        epoch_losses=[3.0, 2.0],
+        converged=True,
+        duration=timedelta(seconds=3),
+        epoch_durations=[timedelta(seconds=1), timedelta(seconds=2)],
+    )
+    second = ConvergenceHistory(
+        epoch_losses=[1.5],
+        converged=False,
+        duration=timedelta(seconds=4),
+        epoch_durations=[timedelta(seconds=4)],
+    )
+
+    joined = ConvergenceHistory.from_consecutive(histories=[first, second])
+
+    assert joined == ConvergenceHistory(
+        epoch_losses=first.epoch_losses + second.epoch_losses,
+        converged=False,
+        duration=first.duration + second.duration,
+        epoch_durations=first.epoch_durations + second.epoch_durations,
+    )
+
+
 # %% learning rate plateau
 
 
@@ -299,14 +333,40 @@ def test_a_plateau_needs_an_optimizer_whose_learning_rate_can_change(jax_circuit
     A schedule for an optax optimizer with a fixed learning rate is rejected.
     """
     trainer = JaxGradientDescent(
-        jax_circuit.root, AverageNegativeLogLikelihood(), optax.adam(1e-2)
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(1e-2),
+        learning_rate_plateau=LearningRatePlateau(),
     )
     with pytest.raises(UnscheduledOptimizerError):
         trainer.start_training(
             arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
             mini_batches=MiniBatches(),
-            learning_rate_plateau=LearningRatePlateau(),
         )
+
+
+def test_every_gradient_descent_training_records_epochs_in_its_own_plateau(
+    jax_circuit,
+):
+    """
+    A training starts from a fresh copy of the plateau of its gradient descent, so an
+    epoch it records changes neither the learner's plateau nor that of another training.
+    """
+    plateau = LearningRatePlateau(patience=0)
+    trainer = JaxGradientDescent(
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.inject_hyperparams(optax.adam)(learning_rate=0.1),
+        learning_rate_plateau=plateau,
+    )
+    arguments = (jnp.zeros((1, len(jax_circuit.variables))),)
+    first = trainer.start_training(arguments=arguments, mini_batches=MiniBatches())
+    first.finish_epoch(average_loss=1.0)
+    second = trainer.start_training(arguments=arguments, mini_batches=MiniBatches())
+
+    assert first.learning_rate_plateau.best_loss == 1.0
+    assert second.learning_rate_plateau == plateau
+    assert second.learning_rate_plateau is not plateau
 
 
 def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
@@ -315,13 +375,13 @@ def test_jax_training_scales_the_learning_rate_of_its_optimizer(jax_circuit):
     """
     learning_rate = 0.1
     training = JaxGradientDescent(
-        jax_circuit.root,
-        AverageNegativeLogLikelihood(),
-        optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.inject_hyperparams(optax.adam)(learning_rate=learning_rate),
+        learning_rate_plateau=LearningRatePlateau(),
     ).start_training(
         arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
         mini_batches=MiniBatches(),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     training.scale_learning_rate(scale=0.5)
 
@@ -338,18 +398,20 @@ def test_torch_training_scales_the_learning_rate_of_its_optimizer(
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
     circuit = mixture_of_products_case.circuit(np).to_namespace(
         array_namespace(torch.zeros(0))
     )
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=0.1
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        learning_rate=0.1,
+        learning_rate_plateau=LearningRatePlateau(),
     )
     training = trainer.start_training(
         arguments=(torch.zeros((1, len(circuit.variables))),),
         mini_batches=MiniBatches(),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     training.scale_learning_rate(scale=0.5)
 
@@ -403,6 +465,95 @@ def test_without_a_batch_size_an_epoch_is_one_batch_of_every_row():
     assert sorted(batches[0][0]) == list(rows)
 
 
+def test_the_row_indices_of_an_epoch_select_the_rows_of_its_batches():
+    """
+    The row indices of an epoch pick out the rows of the batches of an epoch shuffled by
+    the same seed, batch by batch.
+    """
+    data = np.arange(10.0)
+    labels = np.arange(10.0) * 2
+
+    row_indices = MiniBatches(batch_size=4, seed=0).row_indices_of_epoch(
+        number_of_rows=10
+    )
+    batches = MiniBatches(batch_size=4, seed=0).batches_of_epoch(
+        arguments=(data, labels)
+    )
+
+    for rows, (batch_data, batch_labels) in zip(row_indices, batches, strict=True):
+        np.testing.assert_array_equal(batch_data, data[rows])
+        np.testing.assert_array_equal(batch_labels, labels[rows])
+
+
+@dataclass(kw_only=True)
+class BatchRecordingTraining(MiniBatchTraining):
+    """
+    Training whose steps record the batch they are given and report no loss.
+    """
+
+    batches: list[tuple[np.ndarray, ...]]
+    """
+    The batch of every step so far, in order.
+    """
+
+    def step_on_batch(self, *, batch: tuple[np.ndarray, ...]) -> float:
+        self.batches.append(batch)
+        return 0.0
+
+
+def test_a_step_on_rows_steps_on_the_batch_of_those_rows_of_every_argument():
+    """
+    A step on some rows is a step on the batch holding those rows of every training
+    array, in the order of the rows.
+    """
+    data = np.arange(10.0)
+    labels = np.arange(10.0) * 2
+    rows = np.asarray([7, 2, 5])
+    training = BatchRecordingTraining(
+        arguments=(data, labels), mini_batches=MiniBatches(), batches=[]
+    )
+
+    training.step_on_rows(rows=rows)
+
+    [(batch_data, batch_labels)] = training.batches
+    np.testing.assert_array_equal(batch_data, data[rows])
+    np.testing.assert_array_equal(batch_labels, labels[rows])
+
+
+def test_a_jax_step_on_rows_learns_what_a_step_on_the_batch_of_those_rows_learns(
+    mixture_of_products_case, jax_circuit
+):
+    """
+    Jax gradient descent stepping on rows of its training array learns the parameters of
+    stepping on the batches of those rows.
+    """
+    np.random.seed(0)
+    data = jnp.asarray(mixture_of_products_case.circuit(np).sample(12))
+    row_indices = [np.asarray([3, 0, 7, 11]), np.asarray([5, 1]), np.asarray([9])]
+
+    def trained_parameters(steps_on_rows: bool) -> list[np.ndarray]:
+        """
+        :param steps_on_rows: Whether every step is given rows instead of their batch.
+        :return: The parameters after one step on each of the rows.
+        """
+        training = JaxGradientDescent(
+            layer=jax_circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adam(1e-2),
+        ).start_training(arguments=(data,), mini_batches=MiniBatches())
+        for rows in row_indices:
+            if steps_on_rows:
+                training.step_on_rows(rows=rows)
+            else:
+                training.step_on_batch(batch=(data[rows],))
+        return [np.asarray(parameter) for parameter in training.state.parameters]
+
+    for on_rows, on_batches in zip(
+        trained_parameters(True), trained_parameters(False), strict=True
+    ):
+        np.testing.assert_allclose(on_rows, on_batches, rtol=1e-6, atol=1e-7)
+
+
 # %% losses of an epoch
 
 
@@ -431,7 +582,9 @@ def test_a_jax_step_reports_its_loss_as_a_jax_array(jax_circuit):
     A step of jax training reports the loss of its batch as a jax array.
     """
     training = JaxGradientDescent(
-        jax_circuit.root, AverageNegativeLogLikelihood(), optax.adam(1e-2)
+        layer=jax_circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        optimizer=optax.adam(1e-2),
     ).start_training(
         arguments=(jnp.zeros((1, len(jax_circuit.variables))),),
         mini_batches=MiniBatches(),
@@ -447,13 +600,13 @@ def test_a_torch_step_reports_its_loss_as_a_tensor(mixture_of_products_case):
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
     circuit = mixture_of_products_case.circuit(np).to_namespace(
         array_namespace(torch.zeros(0))
     )
     training = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=0.1
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=0.1
     ).start_training(
         arguments=(torch.zeros((1, len(circuit.variables)), dtype=torch.float64),),
         mini_batches=MiniBatches(),
@@ -487,22 +640,22 @@ def torch_parameters_after_training(
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
     np.random.seed(0)
     namespace = array_namespace(torch.zeros(0))
     circuit = host.to_namespace(namespace, device=device)
     data = namespace.asarray(host.sample(450), device=device)
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root,
-        AverageNegativeLogLikelihood(),
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
         learning_rate=0.05,
         records_cuda_graphs=records_cuda_graphs,
+        learning_rate_plateau=LearningRatePlateau(),
     )
     training = trainer.start_training(
         arguments=(data,),
         mini_batches=MiniBatches(batch_size=100, seed=0),
-        learning_rate_plateau=LearningRatePlateau(),
     )
     for epoch in range(4):
         if epoch == 3:
@@ -521,10 +674,10 @@ def test_batches_of_the_same_array_shapes_share_their_recorded_step():
     apart from batches of other shapes.
     """
     torch = pytest.importorskip("torch")
-    torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+    torch_circuit_parameter_learning = pytest.importorskip(
+        "probabilistic_model.learning.parameters.torch_circuit_parameter_learning"
     )
-    batch_shape = torch_gradient_descent.BatchShape.from_batch
+    batch_shape = torch_circuit_parameter_learning.BatchShape.from_batch
 
     first = batch_shape(batch=(torch.zeros(100, 3),))
 
@@ -651,7 +804,7 @@ def test_a_circuit_with_a_layer_that_copies_from_the_host_takes_its_steps_one_by
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
     if not torch.cuda.is_available():
         pytest.skip("needs a CUDA device")
@@ -669,7 +822,9 @@ def test_a_circuit_with_a_layer_that_copies_from_the_host_takes_its_steps_one_by
     )
 
     trainer = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), records_cuda_graphs=True
+        layer=circuit.root,
+        loss=AverageNegativeLogLikelihood(),
+        records_cuda_graphs=True,
     )
 
     assert not trainer.replays_recorded_steps
@@ -787,7 +942,9 @@ def test_training_a_jax_circuit_on_mini_batches_raises_the_log_likelihood(
         events = jnp.asarray(data)
         before = float(jnp.mean(circuit.log_likelihood(events=events)))
         run = JaxGradientDescent(
-            circuit.root, AverageNegativeLogLikelihood(), optax.adam(5e-2)
+            layer=circuit.root,
+            loss=AverageNegativeLogLikelihood(),
+            optimizer=optax.adam(5e-2),
         ).minimize_until_converged(
             events,
             convergence=training_convergence,
@@ -808,7 +965,7 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     """
     torch = pytest.importorskip("torch")
     torch_gradient_descent = pytest.importorskip(
-        "probabilistic_model.learning.torch_gradient_descent"
+        "probabilistic_model.learning.parameters.gradient_descent.torch_gradient_descent"
     )
 
     case = mixture_of_products_case
@@ -822,7 +979,7 @@ def test_training_a_torch_circuit_on_mini_batches_raises_the_log_likelihood(
     events = namespace.asarray(data)
     before = float(circuit.log_likelihood(events=events).mean())
     run = torch_gradient_descent.TorchGradientDescent(
-        circuit.root, AverageNegativeLogLikelihood(), learning_rate=5e-2
+        layer=circuit.root, loss=AverageNegativeLogLikelihood(), learning_rate=5e-2
     ).minimize_until_converged(
         events,
         convergence=training_convergence,

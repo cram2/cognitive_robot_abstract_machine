@@ -1,3 +1,9 @@
+"""
+Tests of the OpenCV helper utilities.
+"""
+
+from __future__ import annotations
+
 import copy
 
 import numpy as np
@@ -31,6 +37,10 @@ from robokudo.utils.cv_helper import (
 
 
 class TestUtilsCVHelper(object):
+    """
+    Tests of the OpenCV helper functions.
+    """
+
     @pytest.fixture()
     def annotator_in_pipeline(self) -> BaseAnnotator:
         root = Pipeline("Sequence")
@@ -135,8 +145,8 @@ class TestUtilsCVHelper(object):
         image = np.zeros((height, width, 3), dtype=np.uint8)
 
         cas.set(
-            robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
-            ColorToDepthRatio(horizontal=scalex, vertical=scaley),
+            view_name=robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO,
+            value=ColorToDepthRatio(horizontal=scalex, vertical=scaley),
         )
 
         annotator_in_pipeline.camera_intrinsics = copy.deepcopy(kinect_intrinsics)
@@ -151,7 +161,7 @@ class TestUtilsCVHelper(object):
         self, annotator_in_pipeline: BaseAnnotator
     ):
         cas = annotator_in_pipeline.get_cas()
-        cas.set(robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO, None)
+        cas.set(view_name=robokudo.cas.CASViews.COLOR_TO_DEPTH_RATIO, value=None)
         image = np.zeros((640, 480, 3), dtype=np.uint8)
         assert pytest.raises(
             RuntimeError, get_scaled_color_image_for_depth_image, cas, image

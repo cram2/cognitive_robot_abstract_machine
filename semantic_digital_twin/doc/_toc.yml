@@ -13,6 +13,7 @@ parts:
         - file: examples/loading_worlds
         - file: examples/visualizing_worlds
         - file: examples/world_structure_manipulation
+        - file: examples/screw_axis_connections
         - file: examples/semantic_annotations_overview
           sections:
             - file: examples/semantic_annotations

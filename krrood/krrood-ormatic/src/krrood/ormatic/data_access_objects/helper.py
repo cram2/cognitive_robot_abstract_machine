@@ -58,15 +58,20 @@ def _same_domain_class(candidate: type, original_clazz: type) -> bool:
 
 
 @lru_cache(maxsize=None)
-def _get_clazz_by_original_clazz(base_clazz: type, original_clazz: type) -> type | None:
+def _get_clazz_by_original_clazz(
+    base_clazz: type, original_clazz: type, excluded_clazz: type | None = None
+) -> type | None:
     """
     Find a subclass that maps to a specific domain class.
 
     :param base_clazz: The base class to search from.
     :param original_clazz: The domain class to match.
+    :param excluded_clazz: A subclass of *base_clazz* whose subclasses never match.
     :return: The matching subclass or None.
     """
     for subclass in recursive_subclasses(base_clazz):
+        if excluded_clazz is not None and issubclass(subclass, excluded_clazz):
+            continue
         try:
             if _same_domain_class(subclass.original_class(), original_clazz):
                 return subclass
@@ -134,6 +139,45 @@ def _get_concrete_generic_subclass(
 
 
 @lru_cache(maxsize=None)
+def get_mapping_data_access_object_class(
+    original_clazz: type,
+) -> type[DataAccessObject] | None:
+    """
+    Retrieve the DAO class that maps a domain class itself.
+
+    Its table holds the rows of the objects of the domain class and of all its mapped
+    subclasses, so a query for the domain class selects from it.
+
+    :param original_clazz: The domain class.
+    :return: The DAO class mapping the domain class, or None.
+    """
+    from krrood.ormatic.data_access_objects.dao import (
+        DataAccessObject,
+        PartDataAccessObject,
+    )
+
+    if issubclass(original_clazz, DataAccessObject):
+        return original_clazz
+    return _get_clazz_by_original_clazz(
+        DataAccessObject,
+        _resolve_alternative_mapping(original_clazz),
+        PartDataAccessObject,
+    )
+
+
+def _resolve_alternative_mapping(original_clazz: type) -> type:
+    """
+    :param original_clazz: A domain class.
+    :return: The alternative mapping that stores the domain class, if one does, and the
+        domain class otherwise.
+    """
+    alternative_mapping = get_alternative_mapping(original_clazz)
+    if alternative_mapping is None:
+        return original_clazz
+    return alternative_mapping
+
+
+@lru_cache(maxsize=None)
 def get_data_access_object_class(
     original_clazz: type, expected_type: type | None = None
 ) -> type[DataAccessObject] | None:
@@ -144,37 +188,49 @@ def get_data_access_object_class(
     :param expected_type: The expected domain type (from relationship).
     :return: The corresponding DAO class or None.
     """
-    from krrood.ormatic.data_access_objects.dao import DataAccessObject
+    from krrood.ormatic.data_access_objects.dao import (
+        DataAccessObject,
+        PartDataAccessObject,
+    )
 
-    if issubclass(original_clazz, DataAccessObject):
-        return original_clazz
-
-    alternative_mapping = get_alternative_mapping(original_clazz)
-    if alternative_mapping is not None:
-        original_clazz = alternative_mapping
+    mapping_dao = get_mapping_data_access_object_class(original_clazz)
+    if mapping_dao is original_clazz:
+        return mapping_dao
+    mapped_clazz = _resolve_alternative_mapping(original_clazz)
+    expected_dao = (
+        None
+        if expected_type is None
+        else _get_clazz_by_original_clazz(
+            DataAccessObject, expected_type, PartDataAccessObject
+        )
+    )
 
     # If the actual class is the same as the origin of the expected type,
     # the expected type is more specific (likely a parametrized generic)
     # and we should prefer it.
-    if expected_type is not None and original_clazz == get_origin(expected_type):
-        dao = _get_clazz_by_original_clazz(DataAccessObject, expected_type)
-        if dao is not None:
-            return dao
+    if expected_dao is not None and mapped_clazz == get_origin(expected_type):
+        return expected_dao
 
     # Try the actual class first.
     # This is important for polymorphic inheritance to get the most specific DAO.
-    dao = _get_clazz_by_original_clazz(DataAccessObject, original_clazz)
-    if dao is not None:
-        concrete_dao = _get_concrete_generic_subclass(dao, original_clazz)
-        return concrete_dao if concrete_dao is not None else dao
+    if mapping_dao is not None:
+        concrete_dao = _get_concrete_generic_subclass(mapping_dao, mapped_clazz)
+        return concrete_dao if concrete_dao is not None else mapping_dao
 
     # Fallback to the expected type if provided.
-    if expected_type is not None:
-        dao = _get_clazz_by_original_clazz(DataAccessObject, expected_type)
-        if dao is not None:
-            return dao
+    return expected_dao
 
-    return None
+
+@lru_cache(maxsize=None)
+def get_part_class(original_clazz: type) -> type | None:
+    """
+    :param original_clazz: A domain class.
+    :return: The part class holding rows of the domain class's table for objects of
+        other classes, which only an open class has; None for a closed class.
+    """
+    from krrood.ormatic.data_access_objects.dao import PartDataAccessObject
+
+    return _get_clazz_by_original_clazz(PartDataAccessObject, original_clazz)
 
 
 def clear_dao_lookup_caches() -> None:
@@ -187,8 +243,10 @@ def clear_dao_lookup_caches() -> None:
     """
     _get_clazz_by_original_clazz.cache_clear()
     _get_concrete_generic_subclass.cache_clear()
+    get_mapping_data_access_object_class.cache_clear()
     get_data_access_object_class.cache_clear()
     get_alternative_mapping.cache_clear()
+    get_part_class.cache_clear()
 
 
 @lru_cache(maxsize=None)

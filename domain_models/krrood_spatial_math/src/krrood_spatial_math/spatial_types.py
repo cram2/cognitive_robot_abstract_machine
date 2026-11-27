@@ -24,6 +24,7 @@ from krrood.adapters.json_serializer import SubclassJSONSerializer
 from krrood.patterns.classproperty import classproperty
 from krrood.patterns.subclass_safe_generic import DerivedGenericParameter
 from krrood.symbolic_math.exceptions import (
+    HasFreeVariablesError,
     WrongDimensionsError,
     MathematicalOperation,
     UnsupportedOperationError,
@@ -2771,7 +2772,7 @@ class RigidMotionRate(VectorPair, ABC):
         r"""
         The rotation angle below which the left Jacobian's coefficients take three terms
         of their series: omitting the fourth costs what the closed forms' round-off does
-        (`Todesco and Brüls <https://orbi.uliege.be/handle/2268/306081>`__, section 8):
+        :cite:p:`todesco2023highly` (section 8):
 
         .. math::
 
@@ -2784,8 +2785,8 @@ class RigidMotionRate(VectorPair, ABC):
 
     def _integrate(self, *, parameter_change: sm.ScalarData) -> Displacement:
         """
-        The exponential of this rate times ``parameter_change`` (Solà, Deray and
-        Atchuthan, *A micro Lie theory*, equation (172)): the body turns by the
+        The exponential of this rate times ``parameter_change``
+        :cite:p:`sola2018micro` (equation (172)): the body turns by the
         rotational part times the change, and its origin moves by
         :meth:`_apply_left_jacobian` of the translational part times the change.
 
@@ -2803,6 +2804,18 @@ class RigidMotionRate(VectorPair, ABC):
             reference_frame=self.reference_frame,
         )
 
+    def turns_body(self, *, tolerance: float = 0.0) -> bool:
+        """
+        :param tolerance: The length of the rotational part up to which the body counts
+            as not turning, to absorb rounding errors.
+        :return: Whether the body turns: whether the rotational part is longer than
+            ``tolerance``.
+        :raises HasFreeVariablesError: if the rate has free variables.
+        """
+        if not self.is_constant():
+            raise HasFreeVariablesError(variables=self.free_variables())
+        return bool(np.linalg.norm(self.rotational_part.to_np()[:3]) > tolerance)
+
     @classmethod
     def _apply_left_jacobian(
         cls, *, rotation: Vector3Dimensional, translation: Vector3Dimensional
@@ -2815,8 +2828,7 @@ class RigidMotionRate(VectorPair, ABC):
             :math:`t + a\,(r \times t) + b\,(r \times (r \times t))`, with :math:`a`
             from :meth:`_first_order_coefficient` and :math:`b` from
             :meth:`_second_order_coefficient`. This is the left Jacobian of :math:`r`
-            applied to :math:`t` (Eade, `Lie Groups for 2D and 3D Transformations
-            <https://www.ethaneade.com/lie.pdf>`__, section 3.2, equation (83)).
+            applied to :math:`t` :cite:p:`eade2017lie` (section 3.2, equation (83)).
         """
         angle_squared = rotation.dot(rotation)
         first_order = rotation.cross(other=translation)
@@ -2832,7 +2844,7 @@ class RigidMotionRate(VectorPair, ABC):
         r"""
         The coefficient :math:`a` of :math:`r \times t` in the left Jacobian: above
         :attr:`_series_rotation_angle` the closed form, below it the first three terms
-        of its series (Eade, section 3.2, equations (76) and (75)):
+        of its series :cite:p:`eade2017lie` (section 3.2, equations (76) and (75)):
 
         .. math::
 
@@ -2858,7 +2870,7 @@ class RigidMotionRate(VectorPair, ABC):
         r"""
         The coefficient :math:`b` of :math:`r \times (r \times t)` in the left Jacobian:
         above :attr:`_series_rotation_angle` the closed form, below it the first three
-        terms of its series (Eade, section 3.2, equations (76) and (75)):
+        terms of its series :cite:p:`eade2017lie` (section 3.2, equations (76) and (75)):
 
         .. math::
 
@@ -2886,7 +2898,7 @@ class Twist(RigidMotionRate):
     A twist ``(ω, v)``: how fast a rigid body turns, and how fast the point of the body
     at the origin of the reference frame moves, both along that frame's axes and per
     unit of the parameter they are taken with respect to, usually time. Unlike a
-    :class:`Displacement`, it is a velocity (Lynch and Park, *Modern Robotics*, §3.3.2).
+    :class:`Displacement`, it is a velocity :cite:p:`lynch2017modern` (section 3.3.2).
     """
 
     def __init__(
@@ -3000,8 +3012,9 @@ class ScrewAxis(RigidMotionRate):
     def unit_direction(self) -> Vector3Dimensional:
         """
         :return: The unit vector along the axis: that of the rotation, or of the
-            translation for an axis that does not turn the body (Lynch and Park,
-            *Modern Robotics*, section 3.3.2.2). The zero vector for a zero screw axis.
+            translation for an axis that does not turn the body
+            :cite:p:`lynch2017modern` (section 3.3.2.2). The zero vector for a zero
+            screw axis.
         """
         rotation = self.rotation_per_unit_position
         translation = self.translation_per_unit_position
@@ -3010,6 +3023,90 @@ class ScrewAxis(RigidMotionRate):
             angle_per_unit_position,
             rotation.safe_division(other=angle_per_unit_position),
             translation.safe_division(other=translation.norm()),
+        )
+        result.reference_frame = self.reference_frame
+        return result
+
+    @classproperty
+    def normalization_tolerance(cls) -> float:
+        """
+        How far the length of the rotation, or of the translation of an axis that does
+        not turn the body, may lie from its normalized value, to absorb rounding errors.
+        The same tolerance tells a unit rotation and no rotation apart.
+        """
+        return 1e-9
+
+    @property
+    def is_normalized(self) -> bool:
+        """
+        :return: Whether the screw axis is normalized as :cite:t:`lynch2017modern`
+            define it (definition 3.24): the
+            body turns by one radian per unit of position, or, if it does not turn,
+            moves by one meter, each up to :attr:`normalization_tolerance`.
+        :raises HasFreeVariablesError: if the screw axis has free variables.
+        """
+        if not self.is_constant():
+            raise HasFreeVariablesError(variables=self.free_variables())
+        tolerance = self.normalization_tolerance
+        angle_per_unit_position = np.linalg.norm(self.rotation_per_unit_position[:3])
+        if abs(angle_per_unit_position - 1) <= tolerance:
+            return True
+        distance_per_unit_position = np.linalg.norm(
+            self.translation_per_unit_position[:3]
+        )
+        return bool(
+            angle_per_unit_position <= tolerance
+            and abs(distance_per_unit_position - 1) <= tolerance
+        )
+
+    @property
+    def passes_through_origin(self) -> bool:
+        """
+        :return: Whether the axis passes through the origin of the reference frame,
+            so that the translation is parallel to the rotation. A screw axis that does
+            not turn the body has no line and passes through every point.
+        :raises HasFreeVariablesError: if the screw axis has free variables.
+        """
+        if not self.is_constant():
+            raise HasFreeVariablesError(variables=self.free_variables())
+        rotation = self.rotation_per_unit_position[:3]
+        translation = self.translation_per_unit_position[:3]
+        return bool(np.allclose(np.cross(rotation, translation), 0))
+
+    @property
+    def translation_per_radian(self) -> sm.Scalar:
+        r"""
+        :return: How far the body advances along the axis per radian it turns, in
+            meters: the pitch :math:`h = \omega^\top v / \lVert\omega\rVert^2`, with
+            :math:`\omega` the rotation and :math:`v` the translation per unit of
+            position :cite:p:`murray1994mathematical` (equation (2.42)).
+            Infinite, as there, if the body does not turn.
+        """
+        rotation = self.rotation_per_unit_position
+        squared_angle_per_unit_position = rotation.dot(rotation)
+        return sm.if_greater_zero(
+            squared_angle_per_unit_position,
+            rotation.dot(self.translation_per_unit_position)
+            / squared_angle_per_unit_position,
+            sm.Scalar(np.inf),
+        )
+
+    @property
+    def axis_point_closest_to_origin(self) -> Point3Dimensional:
+        r"""
+        :return: The point :math:`q = \omega \times v / \lVert\omega\rVert^2` of the
+            axis, with :math:`\omega` the rotation and :math:`v` the translation per
+            unit of position :cite:p:`murray1994mathematical` (equation (2.43)).
+            It is orthogonal to :math:`\omega` and so the axis's point closest to the
+            origin. If the body does not turn, the division by
+            :math:`\lVert\omega\rVert^2 = 0` gives zero, the origin, through which the
+            axis then runs, as there.
+        """
+        rotation = self.rotation_per_unit_position
+        result = (
+            rotation.cross(other=self.translation_per_unit_position)
+            .safe_division(other=rotation.dot(rotation))
+            .point_3_dimensional
         )
         result.reference_frame = self.reference_frame
         return result

@@ -1,3 +1,9 @@
+"""
+Reading ProcTHOR houses into worlds.
+"""
+
+from __future__ import annotations
+
 import json
 import logging
 import math
@@ -11,12 +17,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import Session
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.adapters.procthor.exceptions import (
     ProcthorDoorWallNotFound,
     UnpairedProcthorWalls,
 )
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.variables import SpatialVariables
@@ -244,10 +251,14 @@ class ProcthorDoor:
                 scale=scale,
                 world_root_T_self=world_T_door,
             )
-            door.add(handle)
+            door.add(part=handle)
 
         door.mount_on_movable_joint(
-            RevoluteConnectionSpecification(axis=Vector3Dimensional.Z())
+            ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3Dimensional.Z()
+                ),
+            )
         )
         return door
 
@@ -422,10 +433,10 @@ class ProcthorWall:
             door = procthor_door.add_to_world(world=world)
             with world.modify_world():
                 if isinstance(door, Door):
-                    wall.add(door.entry_way)
+                    wall.add(part=door.entry_way)
                 elif isinstance(door, DoubleDoor):
-                    wall.add(door.door_0.entry_way)
-                    wall.add(door.door_1.entry_way)
+                    wall.add(part=door.door_0.entry_way)
+                    wall.add(part=door.door_1.entry_way)
                 else:
                     assert_never(door)
 

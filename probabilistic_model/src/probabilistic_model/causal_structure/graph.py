@@ -6,19 +6,28 @@ as the data settles it, and the directed acyclic graphs it stands for.
 from __future__ import annotations
 
 import itertools
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import cached_property
 
-from krrood.adapters.json_serializer import SubclassJSONSerializer, from_json, to_json
+from krrood.adapters.json_serializer import (
+    DataclassJSONSerializer,
+    SubclassJSONSerializer,
+    from_json,
+    to_json,
+)
+from krrood.patterns.classproperty import classproperty
 from random_events.variable import Variable
-from typing_extensions import Any, Iterable, Self
+from typing_extensions import Any, Iterable, Self, TypeVar
 
 from probabilistic_model.graph import DirectedAcyclicGraph, Graph
 from probabilistic_model.causal_structure.exceptions import (
     CyclicGraph,
     EquivalenceClassTooLarge,
     InconsistentGraph,
+    NotADirectedEdge,
+    NotAnEndOfTheEdge,
     NotAPartAttribute,
     UnknownGraphNode,
 )
@@ -40,6 +49,38 @@ class EdgeMark(StrEnum):
     """
     The node at this end is caused by the node at the other.
     """
+
+    CIRCLE = "circle"
+    """
+    The data leaves open whether the node at this end is caused by the node at the
+    other.
+    """
+
+    @property
+    def symbol_at_start(self) -> str:
+        """
+        :return: How the mark is drawn at the left end of an edge, as in ``o->``.
+        """
+        match self:
+            case EdgeMark.TAIL:
+                return "-"
+            case EdgeMark.ARROW:
+                return "<"
+            case EdgeMark.CIRCLE:
+                return "o"
+
+    @property
+    def symbol_at_end(self) -> str:
+        """
+        :return: How the mark is drawn at the right end of an edge, as in ``o->``.
+        """
+        match self:
+            case EdgeMark.TAIL:
+                return "-"
+            case EdgeMark.ARROW:
+                return ">"
+            case EdgeMark.CIRCLE:
+                return "o"
 
 
 class NodeLevel(StrEnum):
@@ -189,6 +230,36 @@ class GraphEdge:
         """
         return cls(first, second, EdgeMark.TAIL, EdgeMark.TAIL)
 
+    @classmethod
+    def bidirected_edge(cls, *, first: GraphNode, second: GraphNode) -> GraphEdge:
+        """
+        :param first: The node at one end.
+        :param second: The node at the other end.
+        :return: The edge ``first ↔ second``: neither causes the other, and a hidden
+            variable causes both.
+        """
+        return cls(first, second, EdgeMark.ARROW, EdgeMark.ARROW)
+
+    @classmethod
+    def partially_directed_edge(
+        cls, *, circle_end: GraphNode, arrow_end: GraphNode
+    ) -> GraphEdge:
+        """
+        :param circle_end: The node that may or may not cause the other.
+        :param arrow_end: The node that does not cause the other.
+        :return: The edge ``circle_end o→ arrow_end``.
+        """
+        return cls(circle_end, arrow_end, EdgeMark.CIRCLE, EdgeMark.ARROW)
+
+    @classmethod
+    def nondirected_edge(cls, *, first: GraphNode, second: GraphNode) -> GraphEdge:
+        """
+        :param first: The node at one end.
+        :param second: The node at the other end.
+        :return: The edge ``first o–o second``, about which the data settles nothing.
+        """
+        return cls(first, second, EdgeMark.CIRCLE, EdgeMark.CIRCLE)
+
     @property
     def is_directed(self) -> bool:
         """
@@ -207,18 +278,91 @@ class GraphEdge:
         return self.mark_at_first is self.mark_at_second is EdgeMark.TAIL
 
     @property
+    def is_bidirected(self) -> bool:
+        """
+        :return: Whether the edge shows an arrow at both ends.
+        """
+        return self.mark_at_first is self.mark_at_second is EdgeMark.ARROW
+
+    @property
+    def is_partially_directed(self) -> bool:
+        """
+        :return: Whether the edge shows a circle at one end and an arrow at the other.
+        """
+        return {self.mark_at_first, self.mark_at_second} == {
+            EdgeMark.CIRCLE,
+            EdgeMark.ARROW,
+        }
+
+    @property
+    def is_nondirected(self) -> bool:
+        """
+        :return: Whether the edge shows a circle at both ends.
+        """
+        return self.mark_at_first is self.mark_at_second is EdgeMark.CIRCLE
+
+    @property
+    def implies_selection_bias(self) -> bool:
+        """
+        :return: Whether, read as an edge of an ancestral graph, the edge says the rows
+            were selected by a variable both ends cause: a tail at one end and no arrow
+            at the other.
+        """
+        marks = {self.mark_at_first, self.mark_at_second}
+        return EdgeMark.TAIL in marks and EdgeMark.ARROW not in marks
+
+    @property
     def parent(self) -> GraphNode:
         """
         :return: The node at the tail of a directed edge.
+        :raises NotADirectedEdge: If the edge is not directed.
         """
+        if not self.is_directed:
+            raise NotADirectedEdge(edge=self)
         return self.first if self.mark_at_first is EdgeMark.TAIL else self.second
 
     @property
     def child(self) -> GraphNode:
         """
         :return: The node at the arrow of a directed edge.
+        :raises NotADirectedEdge: If the edge is not directed.
         """
+        if not self.is_directed:
+            raise NotADirectedEdge(edge=self)
         return self.second if self.mark_at_first is EdgeMark.TAIL else self.first
+
+    def mark_at(self, *, node: GraphNode) -> EdgeMark:
+        """
+        :param node: One end of the edge.
+        :return: What the edge shows at that end.
+        :raises NotAnEndOfTheEdge: If the node is neither end.
+        """
+        if node == self.first:
+            return self.mark_at_first
+        if node == self.second:
+            return self.mark_at_second
+        raise NotAnEndOfTheEdge(node=node, edge=self)
+
+    def other_end(self, *, node: GraphNode) -> GraphNode:
+        """
+        :param node: One end of the edge.
+        :return: The node at the other end.
+        :raises NotAnEndOfTheEdge: If the node is neither end.
+        """
+        if node == self.first:
+            return self.second
+        if node == self.second:
+            return self.first
+        raise NotAnEndOfTheEdge(node=node, edge=self)
+
+    def __str__(self) -> str:
+        """
+        :return: The edge drawn between its nodes' names, such as ``V o-> X``.
+        """
+        return (
+            f"{self.first.name} {self.mark_at_first.symbol_at_start}-"
+            f"{self.mark_at_second.symbol_at_end} {self.second.name}"
+        )
 
 
 # %% the directed acyclic graphs a causal graph stands for
@@ -304,7 +448,7 @@ class NodeReference:
 
 class CausalGraphJSONKey(StrEnum):
     """
-    The keys of a causal graph's JSON dict.
+    The keys of an edge-marked graph's JSON dict.
     """
 
     NODES = "nodes"
@@ -317,29 +461,18 @@ class CausalGraphJSONKey(StrEnum):
     The edges, in the graph's order.
     """
 
-    MAXIMUM_MEMBER_GRAPHS = "maximum_member_graphs"
-    """
-    The graph's :attr:`CausalGraph.maximum_member_graphs`.
-    """
-
 
 @dataclass(eq=False)
-class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
+class EdgeMarkedGraph(Graph[GraphNode], SubclassJSONSerializer, ABC):
     """
-    A causal graph: a directed acyclic graph, or the equivalence class of those the data
-    cannot tell apart, whose undirected edges any of them may orient either way.
-    """
-
-    maximum_member_graphs: int = 1000
-    """
-    How many directed acyclic graphs the graph may stand for and still have them
-    listed.
+    A graph over the variables of a model whose edges show at each end what the data
+    settles about that end; a subclass says what the marks mean.
     """
 
     @classmethod
     def from_edges(
-        cls, nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]
-    ) -> CausalGraph:
+        cls, *, nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]
+    ) -> Self:
         """
         :param nodes: The nodes, one per variable.
         :param edges: The edges between them, at most one between two nodes.
@@ -347,10 +480,28 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         :raises UnknownGraphNode: If an edge joins a node that is not among the nodes.
         """
         graph = cls()
-        graph.add_nodes_from(nodes)
-        for edge in edges:
-            graph.add_edge(edge)
+        graph.add_nodes_and_edges(nodes=nodes, edges=edges)
         return graph
+
+    def add_nodes_and_edges(
+        self, *, nodes: Iterable[GraphNode], edges: Iterable[GraphEdge]
+    ) -> None:
+        """
+        :param nodes: Nodes to add.
+        :param edges: Edges to add between the graph's nodes and those.
+        :raises UnknownGraphNode: If an edge joins a node the graph then lacks.
+        """
+        self.add_nodes_from(nodes)
+        for edge in edges:
+            self.add_edge(edge)
+
+    @classproperty
+    def is_closed_under_union(cls) -> bool:
+        """
+        :return: Whether the edges of graphs of this kind, learned from tables over
+            overlapping variables, together form a graph of this kind again.
+        """
+        return True
 
     def add_edge(self, edge: GraphEdge) -> None:
         """
@@ -400,21 +551,27 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
         """
         return [node.name for node in self.nodes()]
 
-    def to_json(self, **kwargs) -> dict[str, Any]:
+    def to_json(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Extends :meth:`DataclassJSONSerializer.to_json` with the nodes and the edges.
+        """
         return {
-            **super().to_json(**kwargs),
+            **DataclassJSONSerializer.to_json(instance=self, **kwargs),
             CausalGraphJSONKey.NODES: to_json(self.nodes(), **kwargs),
             CausalGraphJSONKey.EDGES: to_json(self.edges(), **kwargs),
-            CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS: self.maximum_member_graphs,
         }
 
     @classmethod
-    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
-        graph = cls.from_edges(
-            from_json(data[CausalGraphJSONKey.NODES], **kwargs),
-            from_json(data[CausalGraphJSONKey.EDGES], **kwargs),
+    def _from_json(cls, *, data: dict[str, Any], **kwargs: Any) -> Self:
+        """
+        :return: The graph :meth:`DataclassJSONSerializer.from_json` reads, over the
+            nodes and the edges in *data*.
+        """
+        graph = DataclassJSONSerializer.from_json(data=data, clazz=cls, **kwargs)
+        graph.add_nodes_and_edges(
+            nodes=from_json(data[CausalGraphJSONKey.NODES], **kwargs),
+            edges=from_json(data[CausalGraphJSONKey.EDGES], **kwargs),
         )
-        graph.maximum_member_graphs = data[CausalGraphJSONKey.MAXIMUM_MEMBER_GRAPHS]
         return graph
 
     def edge_between(self, first: GraphNode, second: GraphNode) -> GraphEdge | None:
@@ -428,9 +585,51 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
                 return edge
         return None
 
-    def possible_ancestors(self, node: GraphNode) -> set[GraphNode]:
+    def adjacent(self, *, first: GraphNode, second: GraphNode) -> bool:
+        """
+        :param first: A node.
+        :param second: Another node.
+        :return: Whether an edge joins them.
+        """
+        return self.edge_between(first, second) is not None
+
+    def edges_at(self, *, node: GraphNode) -> list[GraphEdge]:
         """
         :param node: A node of the graph.
+        :return: The edges with the node at one end.
+        """
+        index = self.index_of(node)
+        return [edge for _, _, edge in self.graph.in_edges(index)] + [
+            edge for _, _, edge in self.graph.out_edges(index)
+        ]
+
+    @abstractmethod
+    def possible_ancestors(self, *, node: GraphNode) -> set[GraphNode]:
+        """
+        :param node: A node of the graph.
+        :return: The nodes, other than itself, that may cause it as far as the graph
+            settles.
+        """
+
+
+MarkedGraphType = TypeVar("MarkedGraphType", bound=EdgeMarkedGraph)
+
+
+@dataclass(eq=False, kw_only=True)
+class CausalGraph(EdgeMarkedGraph):
+    """
+    A causal graph: a directed acyclic graph, or the equivalence class of those the data
+    cannot tell apart, whose undirected edges any of them may orient either way.
+    """
+
+    maximum_member_graphs: int = 1000
+    """
+    How many directed acyclic graphs the graph may stand for and still have them
+    listed.
+    """
+
+    def possible_ancestors(self, *, node: GraphNode) -> set[GraphNode]:
+        """
         :return: The nodes with a directed path to it in at least one member graph.
         """
         return {
@@ -438,14 +637,6 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             for member in self.member_graphs()
             for ancestor in member.ancestors(node)
         }
-
-    def adjacent(self, first: GraphNode, second: GraphNode) -> bool:
-        """
-        :param first: A node.
-        :param second: Another node.
-        :return: Whether an edge joins them.
-        """
-        return self.edge_between(first, second) is not None
 
     def unshielded_colliders(self) -> set[ColliderPatternInCausalGraph]:
         """
@@ -471,7 +662,7 @@ class CausalGraph(Graph[GraphNode], SubclassJSONSerializer):
             for first_parent, second_parent in itertools.combinations(
                 sorted(directed.predecessors(child)), 2
             )
-            if not self.adjacent(first_parent, second_parent)
+            if not self.adjacent(first=first_parent, second=second_parent)
         }
 
     def member_graphs(self) -> list[MemberGraph]:

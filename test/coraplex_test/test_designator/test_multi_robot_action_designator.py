@@ -2,6 +2,7 @@
 Every action performed by each of the robots the plans are written for.
 """
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -138,7 +139,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import (
     Level,
 )
 from semantic_digital_twin.specifications.connections import (
-    PrismaticConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
@@ -343,7 +344,7 @@ def multiple_robot_apartment_context(
     the test.
     """
     world, view = setup_multi_robot_apartment
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     full_body_controlled = (
         view.mobile_base.full_body_controlled
         if isinstance(view, HasMobileBase)
@@ -526,7 +527,7 @@ def test_follow_tcp_path_multi(multiple_robot_apartment_context):
     else:
         target_pose = pose
 
-    waypoints = PoseTrajectory([target_pose])
+    waypoints = PoseTrajectory(poses=[target_pose])
     plan = Sequence(
         nodes=[
             MoveTorsoAction(torso_state=TorsoState.HIGH),
@@ -755,8 +756,8 @@ def test_open(multiple_robot_apartment_context):
                 )
             ),
             OpenAction.from_handle(
-                _handle_annotation(world, "handle_cab10_m"),
-                left_or_only_arm(robot),
+                handle=_handle_annotation(world, "handle_cab10_m"),
+                arm=left_or_only_arm(robot),
             ),
         ]
     )
@@ -793,7 +794,7 @@ def test_close(multiple_robot_apartment_context, rclpy_node):
                     )
                 )
             ),
-            CloseAction.from_handle(handle, left_or_only_arm(robot)),
+            CloseAction.from_handle(handle=handle, arm=left_or_only_arm(robot)),
         ]
     )
     run_plan(plan, extensions)
@@ -830,14 +831,14 @@ def test_transport(multiple_robot_apartment_context, rclpy_node):
     world, robot, extensions = multiple_robot_apartment_context
 
     description = TransportAction.from_graspable_by_closest_grasps(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Pose3Dimensional(
+        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+        goal_pose=Pose3Dimensional(
             Point3Dimensional.from_iterable([3.1, 2.2, 0.95]),
             Quaternion.from_iterable([0.0, 0.0, 1.0, 0.0]),
             reference_frame=world.root,
         ),
-        right_or_only_arm(robot),
-        context_of(extensions),
+        arm=right_or_only_arm(robot),
+        context=context_of(extensions),
     )
     plan = Sequence(nodes=[MoveTorsoAction(torso_state=TorsoState.HIGH), description])
     run_plan(plan, extensions)
@@ -881,10 +882,10 @@ def test_transport_open_container(multiple_robot_apartment_context, rclpy_node):
     )
     plan_transformations = [OpenDrawerBeforeMoveAndPickUp()]
     description = TransportAction.from_graspable_by_closest_grasps(
-        world.get_semantic_annotations_by_type(Spoon)[0],
-        target_pose,
-        right_or_only_arm(robot),
-        context_of(extensions),
+        graspable=world.get_semantic_annotations_by_type(Spoon)[0],
+        goal_pose=target_pose,
+        arm=right_or_only_arm(robot),
+        context=context_of(extensions),
     )
     plan = Sequence(
         nodes=[
@@ -1041,7 +1042,7 @@ def test_gcs_navigation_needs_a_floor_below_the_robot(
 # %% riding an elevator
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ElevatorOperator(ModelChangeCallback):
     """
     Drives an elevator to a floor as soon as a robot boards it, standing in for whatever
@@ -1083,6 +1084,9 @@ class ElevatorOperator(ModelChangeCallback):
 
 
 def test_elevator_navigation_needs_doors_that_can_open():
+    """
+    Navigating with an elevator whose door has no movable joint is refused.
+    """
     world = World.create_with_root_body("root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
@@ -1091,17 +1095,20 @@ def test_elevator_navigation_needs_doors_that_can_open():
         door = Door.create_with_new_body_in_world(
             name="door", world=world, scale=Scale(0.05, 1, 2)
         )
-        elevator.add(door)
+        elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
             name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
         )
     navigation = ElevatorNavigation(elevator=elevator, target_floor=ground_floor)
 
     with pytest.raises(MissingMovableJointError):
-        navigation._elevator_open_at_floor(ground_floor)
+        navigation._elevator_open_at_floor(target_floor=ground_floor)
 
 
 def test_elevator_navigation_needs_a_cabin_that_can_move():
+    """
+    Navigating with an elevator whose cabin has no movable joint is refused.
+    """
     world = World.create_with_root_body("root")
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
@@ -1111,18 +1118,20 @@ def test_elevator_navigation_needs_a_cabin_that_can_move():
             name="door",
             world=world,
             scale=Scale(0.05, 1, 2),
-            parent_connection_specification=PrismaticConnectionSpecification(
-                axis=Vector3Dimensional.Y()
+            parent_connection_specification=ScrewAxisConnectionSpecification(
+                screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3Dimensional.Y()
+                ),
             ),
         )
-        elevator.add(door)
+        elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
             name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
         )
     navigation = ElevatorNavigation(elevator=elevator, target_floor=ground_floor)
 
     with pytest.raises(MissingMovableJointError):
-        navigation._elevator_open_at_floor(ground_floor)
+        navigation._elevator_open_at_floor(target_floor=ground_floor)
 
 
 def test_elevator_navigation(multiple_robot_apartment_context, rclpy_node):
@@ -1192,7 +1201,9 @@ def test_search_action(multiple_robot_apartment_context) -> None:
         )
     )
     search = SearchAction.looking_around(
-        milk_body.global_pose, Milk, context_of(extensions)
+        target_location=milk_body.global_pose,
+        object_semantic_annotation=Milk,
+        context=context_of(extensions),
     )
 
     run_plan(search, extensions)
@@ -1216,7 +1227,10 @@ def test_a_search_looks_at_the_target_then_at_the_ends_of_a_cross_around_it(
     arm = 0.3
 
     search = SearchAction.looking_around(
-        target, Milk, context_of(extensions), cross_arm_length=arm
+        target_location=target,
+        object_semantic_annotation=Milk,
+        context=context_of(extensions),
+        cross_arm_length=arm,
     )
 
     x, y, z = target.position.to_np()[:3]
@@ -1243,9 +1257,9 @@ def test_a_search_detects_within_its_cross_and_the_detection_margin(
     margin = 0.2
 
     search = SearchAction.looking_around(
-        target,
-        Milk,
-        context_of(extensions),
+        target_location=target,
+        object_semantic_annotation=Milk,
+        context=context_of(extensions),
         cross_arm_length=arm,
         detection_margin=margin,
     )
@@ -1278,7 +1292,9 @@ def test_a_search_leaves_the_world_as_it_found_it(multiple_robot_apartment_conte
 
     run_plan(
         SearchAction.looking_around(
-            milk_body.global_pose, Milk, context_of(extensions)
+            target_location=milk_body.global_pose,
+            object_semantic_annotation=Milk,
+            context=context_of(extensions),
         ),
         extensions,
     )
@@ -1453,7 +1469,7 @@ def test_following_a_path_runs_one_goal_per_waypoint(
     _, robot, extensions = multiple_robot_apartment_context
     waypoints = [Pose3Dimensional(), Pose3Dimensional(), Pose3Dimensional()]
     action = FollowToolCenterPointPathAction(
-        target_locations=PoseTrajectory(waypoints), arm=left_or_only_arm(robot)
+        target_locations=PoseTrajectory(poses=waypoints), arm=left_or_only_arm(robot)
     )
 
     expand(action, extensions)
@@ -1701,7 +1717,7 @@ def arm_and_look_actions(robot: AbstractRobot) -> list[Action]:
             allow_gripper_collision=False,
         ),
         FollowToolCenterPointPathAction(
-            target_locations=PoseTrajectory([Pose3Dimensional()]), arm=arm
+            target_locations=PoseTrajectory(poses=[Pose3Dimensional()]), arm=arm
         ),
         LookAtAction(look_target=Pose3Dimensional()),
     ]
@@ -2265,7 +2281,7 @@ def test_a_carry_runs_where_the_statechart_was_received(
     )
     sender = simulated_executor(extensions)
     sent = statechart_of(sender, carry)
-    sender.prepare(sent)
+    sender.prepare(statechart=sent)
     receiver = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
@@ -2312,7 +2328,7 @@ def test_a_placing_carries_its_object_to_where_it_stands(
 # %% both arms handling objects at once
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CupForEachArm:
     """
     A two-armed robot whose base moves with its arms, with one cup for each arm to pick

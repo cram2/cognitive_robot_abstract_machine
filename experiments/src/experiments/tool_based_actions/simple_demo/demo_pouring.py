@@ -86,7 +86,7 @@ def main() -> None:
         ]
     )
 
-    with RobotDemonstrationRosSession.start("pouring_demo") as ros_session:
+    with RobotDemonstrationRosSession.start(node_name="pouring_demo") as ros_session:
         executor = KinematicallySimulatedPlanExecutor(
             context=StatechartContext.with_extensions(
                 world=world, extensions=[RobotAccess(robot=pr2)]

@@ -1,9 +1,16 @@
+"""
+Building the drawers, doors and dressers of ProcTHOR houses from their bodies.
+"""
+
+from __future__ import annotations
+
 import re
 
 import numpy as np
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.datastructures.variables import SpatialVariables
 from semantic_digital_twin.semantic_annotations.position_descriptions import (
@@ -52,7 +59,7 @@ def drawer_from_body_in_world(drawer_body: Body, world: World) -> Drawer:
             world=world,
             world_root_T_self=world_T_handle,
         )
-        drawer.add(handle)
+        drawer.add(part=handle)
 
     return drawer
 
@@ -94,9 +101,13 @@ def door_from_body_in_world(door_body: Body, world: World) -> Door:
             world=world,
             world_root_T_self=world_T_handle,
         )
-        door.add(handle)
+        door.add(part=handle)
     door.mount_on_movable_joint(
-        RevoluteConnectionSpecification(axis=Vector3Dimensional.Z())
+        ScrewAxisConnectionSpecification(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
+        )
     )
 
     return door
@@ -125,9 +136,9 @@ def dresser_from_body_in_world(dresser: Body, world: World) -> Dresser:
             child: Body
             if bool(drawer_pattern.fullmatch(child.name.name)):
                 drawer = drawer_from_body_in_world(child, world)
-                dresser.add(drawer)
+                dresser.add(part=drawer)
             elif bool(door_pattern.fullmatch(child.name.name)):
                 door = door_from_body_in_world(child, world)
-                dresser.add(door)
+                dresser.add(part=door)
 
     return dresser

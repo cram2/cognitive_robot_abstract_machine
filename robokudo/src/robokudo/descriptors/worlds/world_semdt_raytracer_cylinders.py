@@ -1,4 +1,10 @@
+"""
+World descriptor ``world_semdt_raytracer_cylinders``: a table with a red and a blue
+cylinder, rendered by the semantic digital twin ray tracer.
+"""
+
 # %% Imports
+from __future__ import annotations
 from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.datastructures.camera_model import (
@@ -29,6 +35,10 @@ class WorldDescriptor(BaseWorldDescriptor):
     """
 
     def __init__(self) -> None:
+        """
+        Place the table, its surface region, a red and a blue cylinder on it and the
+        camera optical frame in the world.
+        """
         super().__init__()
         root = self.world.root
 
@@ -95,12 +105,12 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
         ]
 
-        self.build_objects(root, object_specs)
-        self.build_regions(root, region_specs)
+        self.build_objects(root=root, specs=object_specs)
+        self.build_regions(root=root, specs=region_specs)
         camera_name = PrefixedName(name="semdt_camera_optical_frame")
         self.build_camera(
-            root,
-            CameraPlacement(
+            parent=root,
+            placement=CameraPlacement(
                 camera=Camera(
                     name=camera_name,
                     root=Body(name=camera_name),

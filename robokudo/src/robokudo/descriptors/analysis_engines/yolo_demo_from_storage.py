@@ -36,7 +36,9 @@ class AnalysisEngine(AnalysisEngineInterface):
 
         :return: The configured pipeline
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         yolo_descriptor = YoloAnnotator.Descriptor()
         yolo_descriptor.parameters.pretrained_model = "yolov8m.pt"

@@ -1,3 +1,9 @@
+"""
+Parsing of MuJoCo MJCF files into a world.
+"""
+
+from __future__ import annotations
+
 import logging
 import os
 import tempfile
@@ -38,8 +44,7 @@ from krrood_spatial_math.spatial_types import (
 from semantic_digital_twin.world import World, Body
 from semantic_digital_twin.world_description.connection_properties import JointDynamics
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     FixedConnection,
     Connection6DoF,
 )
@@ -110,12 +115,21 @@ class MJCFParser(WorldModelParser):
     """
 
     def __post_init__(self) -> None:
+        """
+        Resolves the package URIs of the file and its meshes and loads the MuJoCo spec.
+        """
         package_uri_resolver = PackageUriResolver()
         if package_uri_resolver.supports(self.file_path):
             self.file_path = package_uri_resolver.resolve(self.file_path)
         if self.prefix is None:
             self.prefix = os.path.basename(self.file_path).split(".")[0]
         self.spec: mujoco.MjSpec = mujoco.MjSpec.from_file(self.file_path)
+        for mesh in self.spec.meshes:
+            # MuJoCo 4 shortens the ``//`` of a ``package://`` URI in a file path to ``/``.
+            if mesh.file.startswith("package:/"):
+                mesh.file = package_uri_resolver.resolve(
+                    "package://" + mesh.file.removeprefix("package:").lstrip("/")
+                )
 
     @cached_property
     def resolved_document(self) -> ET.Element:
@@ -535,12 +549,27 @@ class MJCFParser(WorldModelParser):
                     mujoco_geom.material
                 )
                 meshscale = Scale(*mujoco_mesh.scale)
+                reference_orientation = mujoco_mesh.refquat / numpy.linalg.norm(
+                    mujoco_mesh.refquat
+                )
+                file_T_mesh = (
+                    HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+                        pos_x=mujoco_mesh.refpos[0],
+                        pos_y=mujoco_mesh.refpos[1],
+                        pos_z=mujoco_mesh.refpos[2],
+                        quat_w=reference_orientation[0],
+                        quat_x=reference_orientation[1],
+                        quat_y=reference_orientation[2],
+                        quat_z=reference_orientation[3],
+                    )
+                )
                 if mujoco_material is None:
                     return Mesh(
                         filename=filename,
                         origin=origin_transform,
                         color=color,
                         scale=meshscale,
+                        file_T_mesh=file_T_mesh,
                     )
                 else:
                     texture_name = mujoco_material.textures[1]
@@ -552,6 +581,7 @@ class MJCFParser(WorldModelParser):
                             origin=origin_transform,
                             color=color,
                             scale=meshscale,
+                            file_T_mesh=file_T_mesh,
                         )
                     texturedir = os.path.join(
                         os.path.dirname(self.file_path), self.spec.texturedir
@@ -564,6 +594,7 @@ class MJCFParser(WorldModelParser):
                             color=color,
                             texture_file_path=texture_file_path,
                             scale=meshscale,
+                            file_T_mesh=file_T_mesh,
                         )
                     else:
                         return Mesh(
@@ -571,6 +602,7 @@ class MJCFParser(WorldModelParser):
                             origin=origin_transform,
                             color=color,
                             scale=meshscale,
+                            file_T_mesh=file_T_mesh,
                         )
 
         raise NotImplementedError(f"Geometry type {mujoco_geom.type} not implemented.")
@@ -633,11 +665,10 @@ class MJCFParser(WorldModelParser):
             else:
                 joint_to_child_body_transform = child_body_to_joint_transform.inverse()
                 joint_axis = Vector3Dimensional(
-                    mujoco_joint.axis[0],
-                    mujoco_joint.axis[1],
-                    mujoco_joint.axis[2],
-                    reference_frame=parent_body,
+                    mujoco_joint.axis[0], mujoco_joint.axis[1], mujoco_joint.axis[2]
                 )
+                # MuJoCo scales the axis to unit length when it compiles the model.
+                joint_axis.scale(a=1)
                 dof = self.parse_dof(mujoco_joint=mujoco_joint)
                 joint_dynamics = JointDynamics(
                     armature=mujoco_joint.armature,
@@ -649,31 +680,27 @@ class MJCFParser(WorldModelParser):
                     ),
                 )
                 if mujoco_joint.type == mujoco.mjtJoint.mjJNT_HINGE:
-                    connection = RevoluteConnection(
-                        name=PrefixedName(mujoco_joint.name),
-                        parent=parent_body,
-                        child=child_body,
-                        parent_T_connection_expression=parent_body_to_joint_transform,
-                        connection_T_child_expression=joint_to_child_body_transform,
-                        axis=joint_axis,
-                        raw_dof=dof,
-                        dynamics=joint_dynamics,
+                    screw_axis = ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=joint_axis
                     )
                 elif mujoco_joint.type == mujoco.mjtJoint.mjJNT_SLIDE:
-                    connection = PrismaticConnection(
-                        name=PrefixedName(mujoco_joint.name),
-                        parent=parent_body,
-                        child=child_body,
-                        parent_T_connection_expression=parent_body_to_joint_transform,
-                        connection_T_child_expression=joint_to_child_body_transform,
-                        axis=joint_axis,
-                        raw_dof=dof,
-                        dynamics=joint_dynamics,
+                    screw_axis = ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=joint_axis
                     )
                 else:
                     raise NotImplementedError(
                         f"Joint type {mujoco_joint.type} not implemented yet."
                     )
+                connection = ScrewAxisConnection(
+                    name=PrefixedName(mujoco_joint.name),
+                    parent=parent_body,
+                    child=child_body,
+                    parent_T_connection_expression=parent_body_to_joint_transform,
+                    connection_T_child_expression=joint_to_child_body_transform,
+                    raw_dof=dof,
+                    dynamics=joint_dynamics,
+                    screw_axis=screw_axis,
+                )
                 connection.add_simulator_property(
                     MujocoJoint(
                         stiffness=(

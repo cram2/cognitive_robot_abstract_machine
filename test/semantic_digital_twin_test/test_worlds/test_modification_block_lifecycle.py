@@ -19,7 +19,7 @@ from krrood_spatial_math.exceptions import ReferenceFrameMismatchError
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.world_entity import Body
@@ -45,10 +45,12 @@ def test_nested_block_keeps_degree_of_freedom_of_outer_block(
         with world.modify_world():
             world.add_kinematic_structure_entity(child)
         world.add_connection(
-            RevoluteConnection(
+            ScrewAxisConnection(
+                screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3Dimensional.Z()
+                ),
                 parent=parent,
                 child=child,
-                axis=Vector3Dimensional.Z(),
                 raw_dof=degree_of_freedom,
             )
         )

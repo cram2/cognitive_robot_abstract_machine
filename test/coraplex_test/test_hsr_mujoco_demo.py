@@ -59,7 +59,7 @@ def test_the_milk_ends_where_it_is_set_down_on_the_table(hsr_demo):
 
     [milk] = world.get_semantic_annotations_by_type(Milk)
     set_down_at = demonstration._milk_pose_on(
-        world.get_body_by_name(hsr_demo.SceneBody.TABLE), milk
+        surface=world.get_body_by_name(hsr_demo.SceneBody.TABLE), milk=milk
     )
     position = world.compute_forward_kinematics_np(world.root, milk.root)[:3, 3]
     assert list(position) == pytest.approx(

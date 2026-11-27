@@ -1,5 +1,10 @@
+"""
+Tests of converting camera models to and from ROS camera infos and Open3D intrinsics.
+"""
+
 # %% Imports
 
+from __future__ import annotations
 import pytest
 
 import numpy as np
@@ -27,6 +32,9 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 
 # %% Camera model conversion
 def test_ros_camera_model_adapter_reads_camera_info():
+    """
+    A ROS camera info becomes a camera model with its resolution and intrinsics.
+    """
     camera_info = CameraInfo()
     camera_info.width = 640
     camera_info.height = 480
@@ -34,7 +42,7 @@ def test_ros_camera_model_adapter_reads_camera_info():
     camera_info.d = [0.1, -0.2, 0.01, 0.02, 0.03]
     camera_info.k = [500.0, 0.0, 321.0, 0.0, 510.0, 239.0, 0.0, 0.0, 1.0]
 
-    model = RosCameraModelAdapter.from_camera_info(camera_info)
+    model = RosCameraModelAdapter.from_camera_info(camera_info=camera_info)
 
     assert model.resolution == CameraResolution(width=640, height=480)
     assert np.array_equal(
@@ -44,6 +52,10 @@ def test_ros_camera_model_adapter_reads_camera_info():
 
 
 def test_ros_camera_model_adapter_accepts_empty_model_with_zero_coefficients():
+    """
+    A camera info without a distortion model and with zero coefficients becomes a model
+    without distortion.
+    """
     camera_info = CameraInfo()
     camera_info.width = 640
     camera_info.height = 480
@@ -51,7 +63,7 @@ def test_ros_camera_model_adapter_accepts_empty_model_with_zero_coefficients():
     camera_info.d = [0.0] * CameraDistortionModel.PLUMB_BOB.coefficient_count
     camera_info.k = [500.0, 0.0, 321.0, 0.0, 510.0, 239.0, 0.0, 0.0, 1.0]
 
-    model = RosCameraModelAdapter.from_camera_info(camera_info)
+    model = RosCameraModelAdapter.from_camera_info(camera_info=camera_info)
 
     assert isinstance(model.distortion, NoCameraDistortion)
 
@@ -81,6 +93,9 @@ def test_ros_camera_model_adapter_writes_camera_info():
 
 
 def test_open3d_camera_model_adapter_creates_intrinsic():
+    """
+    A camera model becomes an Open3D intrinsic with the same resolution and matrix.
+    """
     model = PinholeCameraModel(
         image_resolution=CameraResolution(width=640, height=480),
         focal_length_x=500.0,
@@ -88,7 +103,7 @@ def test_open3d_camera_model_adapter_creates_intrinsic():
         principal_point=Point2Dimensional(x=321.0, y=239.0),
     )
 
-    camera_intrinsic = Open3DCameraModelAdapter.to_intrinsic(model)
+    camera_intrinsic = Open3DCameraModelAdapter.to_intrinsic(camera_model=model)
 
     assert camera_intrinsic.width == model.resolution.width
     assert camera_intrinsic.height == model.resolution.height
@@ -105,7 +120,7 @@ def test_camera_info_requires_model_for_nonzero_distortion() -> None:
     camera_info = CameraInfo()
     camera_info.d = [0.1, 0.0, 0.0, 0.0, 0.0]
     with pytest.raises(CameraDistortionModelMissing) as error:
-        RosCameraModelAdapter.from_camera_info(camera_info)
+        RosCameraModelAdapter.from_camera_info(camera_info=camera_info)
     assert error.value.coefficients == tuple(camera_info.d)
     assert isinstance(error.value, InvalidCameraObservation)
 
@@ -117,6 +132,6 @@ def test_camera_info_rejects_unsupported_distortion_model() -> None:
     camera_info = CameraInfo()
     camera_info.distortion_model = "unsupported"
     with pytest.raises(UnsupportedCameraDistortionModel) as error:
-        RosCameraModelAdapter.from_camera_info(camera_info)
+        RosCameraModelAdapter.from_camera_info(camera_info=camera_info)
     assert error.value.distortion_model == camera_info.distortion_model
     assert isinstance(error.value, InvalidCameraObservation)

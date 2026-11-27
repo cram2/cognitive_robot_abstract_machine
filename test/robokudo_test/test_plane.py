@@ -57,9 +57,11 @@ def cas_with_a_noisy_plane() -> CAS:
         np.vstack([on_the_plane, above_the_plane])
     )
     cas = CAS()
-    cas.set_ref(CASViews.CLOUD, cloud)
-    cas.set(CASViews.COLOR_IMAGE, np.zeros((200, 200, 3), dtype=np.uint8))
-    cas.set(CASViews.DEPTH_IMAGE, np.zeros((200, 200), dtype=np.uint16))
+    cas.set_ref(view_name=CASViews.CLOUD, value=cloud)
+    cas.set(
+        view_name=CASViews.COLOR_IMAGE, value=np.zeros((200, 200, 3), dtype=np.uint8)
+    )
+    cas.set(view_name=CASViews.DEPTH_IMAGE, value=np.zeros((200, 200), dtype=np.uint16))
     return cas
 
 

@@ -38,7 +38,9 @@ class AnalysisEngine(AnalysisEngineInterface):
         """
         Create a tabletop segmentation pipeline that synchronizes detections to SemDT.
         """
-        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor("mongo")
+        cr_storage_config = CollectionReaderDescriptorFactory.create_descriptor(
+            camera="mongo"
+        )
 
         seq = Pipeline("RWPipeline")
         seq.add_children(

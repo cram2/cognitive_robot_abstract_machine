@@ -1,3 +1,8 @@
+"""
+The exceptions raised across coraplex: by plan execution, by the actions building their
+motions, by perception and by navigation between floors.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
@@ -17,7 +22,7 @@ if TYPE_CHECKING:
 
 
 # %% plan execution
-@dataclass
+@dataclass(kw_only=True)
 class PlanNotCompiled(DataclassException):
     """
     Raised when a plan executor is asked to execute before it compiled a plan.
@@ -30,7 +35,7 @@ class PlanNotCompiled(DataclassException):
         return "call compile with the plan before calling execute."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DebuggingWithoutRosNode(DataclassException):
     """
     A plan executor is created in debug mode without a ROS node to show the worlds its
@@ -44,7 +49,7 @@ class DebuggingWithoutRosNode(DataclassException):
         return "Pass a ROS node to the executor, or leave debug mode off."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CannotMatchOnType(DataclassException):
     """
     Raised when a plan transformation is bound to a type that is neither a plan node nor
@@ -71,7 +76,7 @@ class CannotMatchOnType(DataclassException):
         return "bind the transformation to a plan node type or a designator type"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClosingGoalNotFound(DataclassException):
     """
     Raised when the goal closing the container is asked for, but no such goal lies below
@@ -90,7 +95,7 @@ class ClosingGoalNotFound(DataclassException):
         return "ask for the closing goal only once the close action has been expanded"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReachHasNoFinalApproach(DataclassException):
     """
     Raised when the final approach of a reach is asked for, but no tool center point
@@ -109,7 +114,7 @@ class ReachHasNoFinalApproach(DataclassException):
         return "ask for the final approach only once the reach has been expanded"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspHasNoClosingGoal(DataclassException):
     """
     Raised when the goal a grasp closes its gripper with is asked for, but no goal that
@@ -128,7 +133,7 @@ class GraspHasNoClosingGoal(DataclassException):
         return "ask for the closing goal only once the grasp has been expanded"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ToolPathNotFound(DataclassException):
     """
     Raised when the goal moving a tool along its path is asked for, but no such goal
@@ -147,7 +152,7 @@ class ToolPathNotFound(DataclassException):
         return "ask for the tool path only once the tool action has been expanded"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingWaypoints(DataclassException):
     """
     Raised when a waypoint motion or tool action produced no waypoints to follow.
@@ -165,7 +170,7 @@ class MissingWaypoints(DataclassException):
         return "ensure the motion sequence samples at least one point."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WipingTargetMissing(DataclassException):
     """
     Raised when a wiping action is created without a surface to wipe.
@@ -183,7 +188,7 @@ class WipingTargetMissing(DataclassException):
         return "provide either a container body or a target pose to wipe."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingToolFrame(DataclassException):
     """
     Raised when no tool frame is available for the requested arm.
@@ -229,14 +234,14 @@ class MotionDidNotFinish(PlanFailure):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerceptionException(DataclassException, ABC):
     """
     Represents a custom exception specific to perception-related errors.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerceptionExceptionWithSemanticAnnotation(PerceptionException, ABC):
     """
     For PerceptionExceptions that name the annotation the perception was about.
@@ -248,7 +253,7 @@ class PerceptionExceptionWithSemanticAnnotation(PerceptionException, ABC):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerceivedObjectNotInWorld(PerceptionExceptionWithSemanticAnnotation):
     """
     Raised when a detection names an object the world does not hold, so there is nothing
@@ -268,7 +273,7 @@ class PerceivedObjectNotInWorld(PerceptionExceptionWithSemanticAnnotation):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousDetection(PerceptionExceptionWithSemanticAnnotation):
     """
     Raised when a detection's annotation describes several bodies, so the perceived pose
@@ -290,7 +295,7 @@ class AmbiguousDetection(PerceptionExceptionWithSemanticAnnotation):
         return "narrow the query's semantic annotation so it names a single object."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnidentifiedDetections(PerceptionExceptionWithSemanticAnnotation):
     """
     Raised when a perception source reports several candidates it cannot tell apart.
@@ -317,7 +322,7 @@ class UnidentifiedDetections(PerceptionExceptionWithSemanticAnnotation):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PerceptionSourceUnavailable(PerceptionException):
     """
     Raised when the perception pipeline does not answer within the configured timeout.
@@ -335,7 +340,7 @@ class PerceptionSourceUnavailable(PerceptionException):
         return "start the perception pipeline before running the plan."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoFloorBelowRobot(DataclassException):
     """
     Raised when a robot that has to plan its way over a floor stands over none.
@@ -356,7 +361,7 @@ class NoFloorBelowRobot(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NotOnASingleLevelException(DataclassException):
     """
     Raised when an entity is detected to be on None or multiple levels at the same time.

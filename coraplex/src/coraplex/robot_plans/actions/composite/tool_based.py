@@ -152,7 +152,7 @@ class ToolMotionAction(
             for point in points
         ][::stride]
         if not waypoints:
-            raise MissingWaypoints(self)
+            raise MissingWaypoints(instance=self)
         return waypoints
 
     @property
@@ -351,14 +351,14 @@ class WipingAction(ToolMotionAction, TryAllAction):
         """
         super().__post_init__()
         if self.surface is None and self.target_pose is None:
-            raise WipingTargetMissing(self)
+            raise WipingTargetMissing(instance=self)
 
     def _build_tool_path(self) -> ToolPath:
         if self.surface is not None:
             return build_surface_path(self.surface, technique=self.technique)
         if self.technique is WipingTechnique.SPREAD:
             return ToolPath(
-                [
+                segments=[
                     ToolPathSegment(
                         kind=ToolPathSegmentKind.SWEEP,
                         duration=2.0,
@@ -371,7 +371,7 @@ class WipingAction(ToolMotionAction, TryAllAction):
                 ]
             )
         return ToolPath(
-            [
+            segments=[
                 ToolPathSegment(
                     kind=ToolPathSegmentKind.SPIRAL,
                     duration=2.0,
@@ -502,7 +502,7 @@ class PouringAction(
         return float((tool_frame_T_source @ mouth_in_source)[2])
 
     def _approach_direction(
-        self, target_pose: Pose3Dimensional, robot_pose: Pose3Dimensional
+        self, *, target_pose: Pose3Dimensional, robot_pose: Pose3Dimensional
     ) -> tuple[float, float]:
         """
         :return: The XY unit vector from the robot toward the target container,
@@ -541,7 +541,9 @@ class PouringAction(
         target_pose = self.target_container.global_pose
         robot_pose = self.robot.root.global_pose
 
-        approach_x, approach_y = self._approach_direction(target_pose, robot_pose)
+        approach_x, approach_y = self._approach_direction(
+            target_pose=target_pose, robot_pose=robot_pose
+        )
         robot_right_x = approach_y
         robot_right_y = -approach_x
         side_sign = 1.0 if pour_side == PouringSide.RIGHT else -1.0
@@ -575,12 +577,16 @@ class PouringAction(
         )
         tilted_rotation = base_rotation * Rotation.from_euler("y", signed_tilt_angle)
 
-        pre_pour_pose = self._pose_from_rotation(pour_x, pour_y, pour_z, base_rotation)
-        pour_pose = self._pose_from_rotation(pour_x, pour_y, pour_z, tilted_rotation)
+        pre_pour_pose = self._pose_from_rotation(
+            x=pour_x, y=pour_y, z=pour_z, rotation=base_rotation
+        )
+        pour_pose = self._pose_from_rotation(
+            x=pour_x, y=pour_y, z=pour_z, rotation=tilted_rotation
+        )
         return pre_pour_pose, pour_pose
 
     def _pose_from_rotation(
-        self, x: float, y: float, z: float, rotation: Rotation
+        self, *, x: float, y: float, z: float, rotation: Rotation
     ) -> Pose3Dimensional:
         """
         :param x: X position of the pose in the world frame.

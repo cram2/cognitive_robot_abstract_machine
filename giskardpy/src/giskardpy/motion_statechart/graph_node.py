@@ -52,6 +52,7 @@ from semantic_digital_twin.world_description.world_entity import (
 
 from cramph.node import NodeArtifacts, StatechartNode, EndStatechart
 from semantic_digital_twin.world_description.kinematic_chain import KinematicChain
+from cramph.world_access import WorldAccess
 
 
 @dataclass(kw_only=True)
@@ -173,6 +174,44 @@ class MotionStatechartNode(StatechartNode):
             directly affect the motion to return empty artifacts.
         """
         return MotionNodeArtifacts()
+
+    def compute_world_access(self) -> WorldAccess:
+        """
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with the degrees of freedom of a connection with an active one that
+            its constraints move, and the degrees of freedom its error reads or its
+            constraints depend on but cannot move.
+        """
+        artifacts = self.artifacts
+        in_constraints = frozenset(
+            degree_of_freedom
+            for constraint in [
+                *artifacts.constraints.equality_constraints,
+                *artifacts.constraints.inequality_constraints,
+            ]
+            for degree_of_freedom in WorldAccess.degrees_of_freedom_in_expression(
+                expression=constraint.expression
+            )
+        )
+        moved = in_constraints & frozenset(
+            degree_of_freedom
+            for connection in self.context.world.connections
+            if connection.active_dofs
+            for degree_of_freedom in connection.dofs
+        )
+        return (
+            super()
+            .compute_world_access()
+            .union_with(
+                other=WorldAccess(
+                    moved_degrees_of_freedom=moved,
+                    read_degrees_of_freedom=WorldAccess.degrees_of_freedom_in_expression(
+                        expression=artifacts.error
+                    )
+                    | (in_constraints - moved),
+                )
+            )
+        )
 
     @property
     def constraint_collection(self) -> ConstraintCollection:
@@ -387,6 +426,14 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
     :attr:`goal_reference_frame`.
     """
 
+    _goal_binding_world_access: WorldAccess = field(
+        default_factory=WorldAccess, init=False, repr=False
+    )
+    """
+    The degrees of freedom and frames the latest binding of the goal reference frame
+    read.
+    """
+
     @property
     @abstractmethod
     def goal_reference_frame(self) -> KinematicStructureEntity:
@@ -432,7 +479,7 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
             root_T_tip=self._root_T_goal_reference_frame_to_bind(),
         )
         self.root_T_goal_reference_frame = self._goal_reference_frame_binding.root_T_tip
-        self._goal_reference_frame_binding.bind(world=self.context.world)
+        self._bind_goal_reference_frame()
 
     def on_start(self) -> None:
         """
@@ -442,7 +489,43 @@ class BindsGoalReferenceFrame(StatechartNode, HasGoalBindingPolicyParameter, ABC
         """
         super().on_start()
         if self.goal_binding_policy == GoalBindingPolicy.Bind_on_start:
-            self._goal_reference_frame_binding.bind(world=self.context.world)
+            self._bind_goal_reference_frame()
+
+    def _bind_goal_reference_frame(self) -> None:
+        """
+        Fix :attr:`root_T_goal_reference_frame` to where the goal reference frame lies
+        now, and remember the degrees of freedom and frames between
+        :attr:`goal_binding_root` and :attr:`goal_reference_frame` that this read.
+        """
+        self._goal_reference_frame_binding.bind(world=self.context.world)
+        root_chain, tip_chain = self.context.world.compute_split_chain_of_connections(
+            self.goal_binding_root, self.goal_reference_frame
+        )
+        chain = [*root_chain, *tip_chain]
+        self._goal_binding_world_access = WorldAccess(
+            read_degrees_of_freedom=frozenset(
+                degree_of_freedom
+                for connection in chain
+                for degree_of_freedom in connection.dofs
+            ),
+            read_frames=frozenset(
+                frame
+                for connection in chain
+                for frame in (connection.parent, connection.child)
+            ),
+        )
+
+    def compute_world_access(self) -> WorldAccess:
+        """
+        :return: What :meth:`~cramph.node.StatechartNode.compute_world_access`
+            returns, with the degrees of freedom and frames the latest binding of the
+            goal reference frame read.
+        """
+        return (
+            super()
+            .compute_world_access()
+            .union_with(other=self._goal_binding_world_access)
+        )
 
 
 @dataclass(eq=False, repr=False, kw_only=True)

@@ -99,7 +99,7 @@ How often running this module as a script transports the cereal there and back a
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StretchApartmentDemonstration(RobotDemonstration):
     """
     Stretch transports a cereal box between a shelf and a bedside table in the apartment.
@@ -126,10 +126,10 @@ class StretchApartmentDemonstration(RobotDemonstration):
             ),
         )
 
-    def is_scene_populated(self, world: World) -> bool:
+    def is_scene_populated(self, *, world: World) -> bool:
         return world.is_kinematic_structure_entity_in_world_by_name(CEREAL_NAME)
 
-    def populate_scene(self, world: World) -> None:
+    def populate_scene(self, *, world: World) -> None:
         """
         Spawn the cereal box on its shelf.
         """
@@ -146,7 +146,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
             parent_connection_specification=Connection6DoFSpecification(),
         ).spawn(world, parent=world.get_body_by_name(CEREAL_SHELF_LAYER_NAME))
 
-    def build_context_extensions(self, world: World) -> list[ContextExtension]:
+    def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         """
         Give the plan the Stretch in ``world``, detecting an object before grasping it.
         """
@@ -157,7 +157,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
             PlanRewriting(transformations=[DetectBeforeGrasp()]),
         ]
 
-    def build_statechart(self, context: StatechartContext) -> Statechart:
+    def build_statechart(self, *, context: StatechartContext) -> Statechart:
         """
         Carry the cereal box from its shelf to the bedside table and back again.
         """

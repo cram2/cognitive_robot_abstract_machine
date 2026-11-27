@@ -27,7 +27,7 @@ from krrood.ormatic.eql_interface import eql_to_sql
 from krrood.parametrization.feature_extraction.feature_extractor import FeatureExtractor
 from krrood.parametrization.model_registries import DictRegistry
 from krrood.parametrization.parameterizer import ConditionParameters
-from probabilistic_model.learning.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
 from krrood_spatial_math.spatial_types import (
     AxisAngle,
     HomogeneousTransformationMatrix3Dimensional,

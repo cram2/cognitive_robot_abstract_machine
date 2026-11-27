@@ -23,7 +23,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% Camera definitions
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RecordedCameraWorld:
     """
     Restore the recorded camera and its pose for reprocessing sensor data.
@@ -45,8 +45,8 @@ class RecordedCameraWorld:
         :raises InvalidCameraObservation: If sampled pose frames are inconsistent.
         """
         observation = self._copy_observation()
-        sensor_world = self._create_world(observation)
-        self.apply_pose(sensor_world, observation)
+        sensor_world = self._create_world(observation=observation)
+        self.apply_pose(world=sensor_world, observation=observation)
         return sensor_world
 
     def _copy_observation(self) -> CameraObservation:
@@ -95,7 +95,7 @@ class RecordedCameraWorld:
         return replace(self.observation, camera=camera, world_T_camera=pose)
 
     @staticmethod
-    def _create_world(observation: CameraObservation) -> World:
+    def _create_world(*, observation: CameraObservation) -> World:
         """
         Attach the observation's camera and direct pose frames to a new world.
 
@@ -130,7 +130,7 @@ class RecordedCameraWorld:
             sensor_world.add_semantic_annotation(camera)
         return sensor_world
 
-    def install(self, reasoning_world: World) -> Camera:
+    def install(self, *, reasoning_world: World) -> Camera:
         """
         Merge the sensor context and bind the camera to its merged root body.
 
@@ -155,7 +155,7 @@ class RecordedCameraWorld:
         return camera
 
     @staticmethod
-    def apply_pose(world: World, observation: CameraObservation) -> None:
+    def apply_pose(*, world: World, observation: CameraObservation) -> None:
         """
         Apply the sampled optical pose directly to the camera root.
 

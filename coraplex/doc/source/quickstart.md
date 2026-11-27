@@ -39,14 +39,14 @@ Now to set up the environment, we will use URDF files for the robot and the envi
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment_world = URDFParser.from_file("<path-to-coraplex>/resources/worlds/apartment.urdf").create_world()
-milk_world = STLParser("<path-to-coraplex>/resources/objects/milk.stl").create_world()
+apartment_world = URDFParser.from_file("package://iai_apartment/urdf/apartment.urdf").create_world()
+milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
 pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 ```
 
 ```{note}
-The PR2 description is resolved from the `iai_pr2_description` ROS package rather than a file shipped with
-CoraPlex. CoraPlex itself only bundles `resources/worlds` and `resources/objects`.
+The apartment, the PR2 description and the milk mesh are resolved from the `iai_apartment`, `iai_pr2_description`
+and `iai_objects` ROS packages rather than files shipped with CoraPlex.
 ```
 
 As you might have noticed each of the parsers returns an independent world which is not really useful. Therefore we need to

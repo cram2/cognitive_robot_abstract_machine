@@ -1,3 +1,7 @@
+"""
+Reading URDF files into worlds.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -29,10 +33,11 @@ from semantic_digital_twin.utils import (
     robot_name_from_urdf_string,
 )
 from semantic_digital_twin.world import World
-from semantic_digital_twin.world_description.connection_properties import JointDynamics
+from semantic_digital_twin.world_description.connection_properties import (
+    JointDynamics,
+)
 from semantic_digital_twin.world_description.connections import (
-    RevoluteConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
     FixedConnection,
     Connection6DoF,
 )
@@ -57,9 +62,9 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body, Connection
 
 connection_type_map = {  # 'unknown': JointType.UNKNOWN,
-    "revolute": RevoluteConnection,
-    "continuous": RevoluteConnection,
-    "prismatic": PrismaticConnection,
+    "revolute": ScrewAxisConnection,
+    "continuous": ScrewAxisConnection,
+    "prismatic": ScrewAxisConnection,
     "floating": Connection6DoF,
     # 'planar': JointType.PLANAR,
     "fixed": FixedConnection,
@@ -221,10 +226,7 @@ class URDFParser(WorldModelParser):
 
     def create_world(self) -> World:
         for joint in self.parsed.joints:
-            if connection_type_map.get(joint.type) in (
-                RevoluteConnection,
-                PrismaticConnection,
-            ):
+            if connection_type_map.get(joint.type) is ScrewAxisConnection:
                 urdf_joint_axis(joint)
 
         prefix = self.parsed.name
@@ -328,9 +330,17 @@ class URDFParser(WorldModelParser):
             parent_T_connection_expression=parent_T_connection,
             multiplier=multiplier,
             offset=offset,
-            axis=Vector3Dimensional(*urdf_joint_axis(joint), reference_frame=parent),
             raw_dof=dof,
             dynamics=self.parse_dynamics(joint),
+            screw_axis=(
+                ScrewAxisConnection.create_prismatic_screw_axis(
+                    axis=Vector3Dimensional(*urdf_joint_axis(joint))
+                )
+                if joint.type == "prismatic"
+                else ScrewAxisConnection.create_revolute_screw_axis(
+                    axis=Vector3Dimensional(*urdf_joint_axis(joint))
+                )
+            ),
         )
         return result
 

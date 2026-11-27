@@ -17,7 +17,7 @@ from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -47,7 +47,7 @@ class DrawerOnRails:
     The drawer.
     """
 
-    rails: PrismaticConnection
+    rails: ScrewAxisConnection
     """
     The joint the drawer slides on.
     """
@@ -118,11 +118,13 @@ def drawer_on_rails(starting_position: float) -> DrawerOnRails:
             ),
         )
         world.add_degree_of_freedom(degree_of_freedom)
-        rails = PrismaticConnection(
+        rails = ScrewAxisConnection(
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3Dimensional.X(reference_frame=drawer)
+            ),
             name=PrefixedName("rails"),
             parent=cabinet,
             child=drawer,
-            axis=Vector3Dimensional.X(reference_frame=drawer),
             raw_dof=degree_of_freedom,
         )
         world.add_connection(rails)

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # %% Object pose estimators
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectPoseEstimator(ABC):
     """
     Estimates and tracks the pose of an object in the camera frame.
@@ -28,7 +28,7 @@ class ObjectPoseEstimator(ABC):
 
     @abstractmethod
     def estimate_pose(
-        self, object_observation: ObjectObservation
+        self, *, object_observation: ObjectObservation
     ) -> Pose3Dimensional | None:
         """
         Estimate the pose of an object without prior knowledge.
@@ -40,7 +40,7 @@ class ObjectPoseEstimator(ABC):
 
     @abstractmethod
     def track_pose(
-        self, object_observation: ObjectObservation, previous_pose: Pose3Dimensional
+        self, *, object_observation: ObjectObservation, previous_pose: Pose3Dimensional
     ) -> Pose3Dimensional:
         """
         Refine a known pose of an object to an observation of the object that moved a
@@ -52,7 +52,7 @@ class ObjectPoseEstimator(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshBasedPoseEstimator(ObjectPoseEstimator, ABC):
     """
     An object pose estimator that needs the mesh of the object.
@@ -62,7 +62,7 @@ class MeshBasedPoseEstimator(ObjectPoseEstimator, ABC):
     """
 
     @abstractmethod
-    def load_meshes(self, mesh_files: list[Path]) -> None:
+    def load_meshes(self, *, mesh_files: list[Path]) -> None:
         """
         Load meshes so that selecting any of them with :meth:`select_mesh` is immediate.
 
@@ -70,7 +70,7 @@ class MeshBasedPoseEstimator(ObjectPoseEstimator, ABC):
         """
 
     @abstractmethod
-    def select_mesh(self, mesh_file: Path) -> None:
+    def select_mesh(self, *, mesh_file: Path) -> None:
         """
         Use a mesh for the following pose estimates and tracks.
 

@@ -163,12 +163,12 @@ def test_a_plan_whose_transport_still_holds_queries_cannot_be_stored(
     """
     world, robot_view, extensions = pr2_apartment_context
     transport = TransportAction.from_graspable_by_closest_grasps(
-        world.get_semantic_annotations_by_type(Milk)[0],
-        Pose3Dimensional.from_xyz_quaternion(
+        graspable=world.get_semantic_annotations_by_type(Milk)[0],
+        goal_pose=Pose3Dimensional.from_xyz_quaternion(
             2.4, 2.8, 1, 0, 0, 0, 1, reference_frame=world.root
         ),
-        robot_view.left_arm,
-        context_of(extensions),
+        arm=robot_view.left_arm,
+        context=context_of(extensions),
     )
 
     with pytest.raises(QueryCannotBePersisted) as failure:

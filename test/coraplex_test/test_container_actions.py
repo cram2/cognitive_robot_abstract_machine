@@ -95,7 +95,9 @@ def test_gripper_backs_off_the_handle_after_letting_go(pr2_at_drawer, action_typ
     ]
     np.testing.assert_allclose(
         back_off_goal.goal_pose.to_np(),
-        action.back_off_pose(grasp.grasp_pose, arm.end_effector).to_np(),
+        action.back_off_pose(
+            grasp_pose=grasp.grasp_pose, end_effector=arm.end_effector
+        ).to_np(),
         atol=1e-9,
     )
 
@@ -114,7 +116,7 @@ def test_back_off_pose_clears_the_grasp_by_the_release_clearance(pr2_at_drawer):
     grasp_pose = Pose3Dimensional(reference_frame=handle.root)
 
     tool_goal = end_effector.tool_frame_goal_for_grasp(grasp_pose)
-    back_off = action.back_off_pose(grasp_pose, end_effector)
+    back_off = action.back_off_pose(grasp_pose=grasp_pose, end_effector=end_effector)
 
     np.testing.assert_allclose(
         back_off.to_np()[:3, :3], tool_goal.to_np()[:3, :3], atol=1e-9
@@ -153,7 +155,8 @@ def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
         arm.end_effector.tool_frame_goal_for_grasp(grasp_pose), world.root
     )
     back_off = world.transform(
-        action.back_off_pose(grasp_pose, arm.end_effector), world.root
+        action.back_off_pose(grasp_pose=grasp_pose, end_effector=arm.end_effector),
+        world.root,
     )
     drawer = world.get_body_by_name(ApartmentBody.DRAWER)
     drawer_top = (

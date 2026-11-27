@@ -4,6 +4,8 @@ Fixtures shared by the tests of the layered circuits.
 
 from __future__ import annotations
 
+import contextlib
+from collections.abc import Iterator
 from enum import StrEnum
 from types import ModuleType
 
@@ -106,15 +108,14 @@ class ArrayBackend(StrEnum):
     """
 
 
-@pytest.fixture(params=list(ArrayBackend))
-def array_backend(request) -> ModuleType:
+@contextlib.contextmanager
+def namespace_in_double_precision(backend: ArrayBackend) -> Iterator[ModuleType]:
     """
-    The array namespace of every supported backend, with jax computing in double
-    precision and torch defaulting to double precision.
-
-    Torch is an optional dependency, so its tests are skipped without it.
+    :param backend: The array library.
+    :return: Its array namespace while jax computes in double precision and torch
+        defaults to it; torch tests are skipped without torch.
     """
-    match request.param:
+    match backend:
         case ArrayBackend.NUMPY:
             yield np
         case ArrayBackend.JAX:
@@ -126,3 +127,22 @@ def array_backend(request) -> ModuleType:
             torch.set_default_dtype(torch.float64)
             yield array_namespace(torch.zeros(0))
             torch.set_default_dtype(default_dtype)
+
+
+@pytest.fixture(params=list(ArrayBackend))
+def array_backend(request) -> ModuleType:
+    """
+    The array namespace of every supported backend, in double precision.
+    """
+    with namespace_in_double_precision(request.param) as namespace:
+        yield namespace
+
+
+@pytest.fixture(params=[ArrayBackend.JAX, ArrayBackend.TORCH])
+def differentiable_backend(request) -> ModuleType:
+    """
+    The array namespace of every backend that differentiates automatically, in double
+    precision.
+    """
+    with namespace_in_double_precision(request.param) as namespace:
+        yield namespace

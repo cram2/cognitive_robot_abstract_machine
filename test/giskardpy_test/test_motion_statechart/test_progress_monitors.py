@@ -14,7 +14,10 @@ import pytest
 from cramph.node import EndedByOwner
 from cramph.data_types import ObservationStateValue
 from cramph.exceptions import CyclicNodeDependencyError, PrerequisiteNotExpandedError
-from giskardpy.motion_statechart.exceptions import NoProgressError
+from giskardpy.motion_statechart.exceptions import (
+    NoProgressError,
+    PositionLimitBlockedError,
+)
 from giskardpy.motion_statechart.tasks.drive_tasks import DifferentialDriveBaseGoal
 from cramph.composites import Parallel, Sequence
 from giskardpy.motion_statechart.graph_node import EndMotion, MotionStatechartNode
@@ -162,15 +165,19 @@ class TestStallDetection:
 
         executor.compile(statechart=motion_statechart)
 
-        with pytest.raises(NoProgressError) as exception_info:
+        with pytest.raises(PositionLimitBlockedError) as exception_info:
             executor.tick_until_end(timeout=2000)
 
         assert goal.unique_name in str(exception_info.value)
 
-    def test_a_task_jittering_in_place_stalls(self, *, cylinder_bot_world: World):
+    def test_a_task_jittering_in_place_stalls(
+        self, *, cylinder_bot_world: World
+    ) -> None:
         """
         A task pushed back every cycle, as an arm held off by a collision is, keeps
-        moving without getting any closer to its goal, so the motion is cancelled.
+        moving without getting any closer to its goal, so the motion is cancelled with a
+        plain :class:`NoProgressError`, since no degree of freedom is at a position
+        limit.
         """
         goal = CartesianPosition(
             kinematic_chain=KinematicChain(
@@ -199,13 +206,15 @@ class TestStallDetection:
             / motion_control.qp_controller_config.control_time_step.total_seconds()
         )
 
-        with pytest.raises(NoProgressError):
+        with pytest.raises(NoProgressError) as exception_info:
             for cycle in range(cycles):
                 executor.tick()
                 cylinder_bot_world.state[drive.x.id].position = JITTER_POSITIONS[
                     cycle % len(JITTER_POSITIONS)
                 ]
                 cylinder_bot_world.notify_state_change()
+
+        assert type(exception_info.value) is NoProgressError
 
     def test_reachable_goal_is_never_reported_as_stalled(
         self, *, cylinder_bot_world: World
@@ -331,7 +340,7 @@ class TestStallDetection:
 
         assert progressing.monitored_tasks == [reachable, unreachable]
 
-        with pytest.raises(NoProgressError) as exception_info:
+        with pytest.raises(PositionLimitBlockedError) as exception_info:
             executor.tick_until_end(timeout=2000)
 
         assert exception_info.value.stalled_tasks == [unreachable]
@@ -380,7 +389,7 @@ class TestStallDetection:
 
         executor.compile(statechart=motion_statechart)
 
-        with pytest.raises(NoProgressError) as exception_info:
+        with pytest.raises(PositionLimitBlockedError) as exception_info:
             executor.tick_until_end(timeout=2000)
 
         assert exception_info.value.stalled_tasks == [unreachable]

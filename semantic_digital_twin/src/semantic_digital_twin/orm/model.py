@@ -120,6 +120,11 @@ class WorldStateMapping(AlternativeMapping[WorldState]):
 
 @dataclass(eq=False)
 class Vector3DimensionalMapping(AlternativeMapping[Vector3Dimensional]):
+    """
+    The coordinates of a :class:`Vector3Dimensional`, as they evaluate in the world's
+    state when it is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -128,7 +133,7 @@ class Vector3DimensionalMapping(AlternativeMapping[Vector3Dimensional]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Vector3Dimensional) -> Self:
-        x, y, z, _ = obj.to_np().tolist()
+        x, y, z, _ = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
         return result
 
@@ -173,12 +178,8 @@ class Point3DimensionalMapping(PointMapping, AlternativeMapping[Point3Dimensiona
 
     @classmethod
     def from_domain_object(cls, *, obj: Point3Dimensional) -> Self:
-        return cls(
-            x=float(obj.x),
-            y=float(obj.y),
-            z=float(obj.z),
-            reference_frame=obj.reference_frame,
-        )
+        x, y, z, _ = obj.evaluate().tolist()
+        return cls(x=x, y=y, z=z, reference_frame=obj.reference_frame)
 
     def to_domain_object(self) -> Point3Dimensional:
         return Point3Dimensional(
@@ -188,6 +189,11 @@ class Point3DimensionalMapping(PointMapping, AlternativeMapping[Point3Dimensiona
 
 @dataclass(eq=False)
 class QuaternionMapping(AlternativeMapping[Quaternion]):
+    """
+    The components of a :class:`Quaternion`, as they evaluate in the world's state when
+    it is stored, and the frame it is expressed in.
+    """
+
     x: float
     y: float
     z: float
@@ -197,7 +203,7 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
     @classmethod
     def from_domain_object(cls, *, obj: Quaternion):
-        x, y, z, w = float(obj.x), float(obj.y), float(obj.z), float(obj.w)
+        x, y, z, w = obj.evaluate().tolist()
         result = cls(x=x, y=y, z=z, w=w, reference_frame=obj.reference_frame)
         return result
 
@@ -213,6 +219,11 @@ class QuaternionMapping(AlternativeMapping[Quaternion]):
 
 @dataclass(eq=False)
 class AxisAngleMapping(AlternativeMapping[AxisAngle]):
+    """
+    The axis of an :class:`AxisAngle` and its angle, as the angle evaluates in the
+    world's state when it is stored, and the frame it is expressed in.
+    """
+
     axis: Vector3Dimensional
     angle: float
     reference_frame: KinematicStructureEntity | None
@@ -220,7 +231,9 @@ class AxisAngleMapping(AlternativeMapping[AxisAngle]):
     @classmethod
     def from_domain_object(cls, *, obj: AxisAngle):
         return cls(
-            axis=obj.axis, angle=float(obj.angle), reference_frame=obj.reference_frame
+            axis=obj.axis,
+            angle=float(obj.angle.evaluate()[0]),
+            reference_frame=obj.reference_frame,
         )
 
     def to_domain_object(self) -> AxisAngle:
@@ -451,7 +464,8 @@ class Pose3DimensionalMapping(AlternativeMapping[Pose3Dimensional]):
 @dataclass(eq=False)
 class Point2DimensionalMapping(PointMapping, AlternativeMapping[Point2Dimensional]):
     """
-    A stored point given by two coordinates on the x-y plane of its reference frame.
+    A stored point given by two coordinates on the x-y plane of its reference frame, as
+    they evaluate in the world's state when it is stored.
     """
 
     x: float
@@ -466,7 +480,8 @@ class Point2DimensionalMapping(PointMapping, AlternativeMapping[Point2Dimensiona
 
     @classmethod
     def from_domain_object(cls, *, obj: Point2Dimensional) -> Self:
-        return cls(x=float(obj.x), y=float(obj.y), reference_frame=obj.reference_frame)
+        x, y = obj.evaluate().tolist()[:2]
+        return cls(x=x, y=y, reference_frame=obj.reference_frame)
 
     def to_domain_object(self) -> Point2Dimensional:
         return Point2Dimensional(
@@ -476,13 +491,18 @@ class Point2DimensionalMapping(PointMapping, AlternativeMapping[Point2Dimensiona
 
 @dataclass(eq=False)
 class Pose2DimensionalMapping(AlternativeMapping[Pose2Dimensional]):
+    """
+    The position of a :class:`Pose2Dimensional` and its yaw, as the yaw evaluates in the
+    world's state when it is stored, and the frame it is expressed in.
+    """
+
     position: Point2Dimensional
     yaw: float
     reference_frame: KinematicStructureEntity | None = field(default=None, kw_only=True)
 
     @classmethod
     def from_domain_object(cls, *, obj: Pose2Dimensional) -> Self:
-        result = cls(position=obj.position, yaw=float(obj.yaw))
+        result = cls(position=obj.position, yaw=float(obj.yaw.evaluate()[0]))
         result.reference_frame = obj.reference_frame
         return result
 

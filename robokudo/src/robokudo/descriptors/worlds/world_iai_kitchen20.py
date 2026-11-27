@@ -1,6 +1,14 @@
+"""
+World descriptor ``world_iai_kitchen20``: a cereal box and a milk carton on the kitchen
+island of the IAI kitchen.
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
 from robokudo.world_descriptor import BaseWorldDescriptor, ObjectSpec, RegionSpec
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
 )
@@ -8,16 +16,20 @@ from semantic_digital_twin.world_description.geometry import Scale
 
 
 class WorldDescriptor(BaseWorldDescriptor):
+    """
+    A cereal box and a milk carton on the kitchen island region of the IAI kitchen.
+    """
+
     def __init__(self) -> None:
+        """
+        Place the cereal box, the milk carton and the kitchen island region in the
+        world.
+        """
         super().__init__()
         root = self.world.root
 
-        milk_path = (
-            Path(__file__).resolve().parents[5]
-            / "semantic_digital_twin"
-            / "resources"
-            / "stl"
-            / "milk.stl"
+        milk_path = Path(
+            PackageUriResolver().resolve("package://iai_objects/objects/milk.stl")
         )
 
         object_specs = [
@@ -51,5 +63,5 @@ class WorldDescriptor(BaseWorldDescriptor):
             )
         ]
 
-        self.build_objects(root, object_specs)
-        self.build_regions(root, region_specs)
+        self.build_objects(root=root, specs=object_specs)
+        self.build_regions(root=root, specs=region_specs)

@@ -69,7 +69,7 @@ def door() -> Door:
         world.add_connection(FixedConnection(parent=body, child=handle_body))
         world.add_semantic_annotation(door)
         world.add_semantic_annotation(handle)
-        door.add(handle)
+        door.add(part=handle)
     return door
 
 

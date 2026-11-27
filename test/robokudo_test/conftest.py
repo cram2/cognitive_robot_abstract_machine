@@ -39,7 +39,7 @@ from .dataset.cup_on_counter import CupOnCounterRecording
 # %% Mongo storage preservation
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class MongoStorageSnapshot:
     """
     Availability and contents of RoboKudo's default storage database.
@@ -61,7 +61,7 @@ class MongoStorageSnapshot:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class MongoStoragePreservationCheck:
     """
     Capture the default RoboKudo storage database without modifying it.
@@ -240,4 +240,4 @@ def cup_on_counter_directory(tmp_path: Path) -> Path:
     """
     Provide a directory holding the :class:`CupOnCounterRecording` frames.
     """
-    return CupOnCounterRecording().write_to(tmp_path)
+    return CupOnCounterRecording().write_to(directory=tmp_path)

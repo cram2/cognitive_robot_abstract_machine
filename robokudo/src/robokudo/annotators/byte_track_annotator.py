@@ -1,6 +1,11 @@
+"""
+Tracking of detected objects across pipeline ticks with ByteTrack.
+"""
+
 from __future__ import annotations
 
 # %% Imports
+import logging
 import copy
 
 import numpy as np
@@ -17,6 +22,8 @@ from robokudo.types.scene import ObjectHypothesis
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+logger = logging.getLogger(__name__)
 
 
 class ByteTrackAnnotator(BaseAnnotator):
@@ -64,15 +71,15 @@ class ByteTrackAnnotator(BaseAnnotator):
         data_ts = observation.timestamp_nanoseconds
         if data_ts < self.last_ts:
             # This is expected when looping data
-            self.rk_logger.debug("Time moved backward, resetting tracker.")
+            logger.debug("Time moved backward, resetting tracker.")
             self.tracker.reset()
         self.last_ts = data_ts
 
         object_hypotheses: list[ObjectHypothesis] = cas.filter_annotations_by_type(
-            ObjectHypothesis
+            type_to_include=ObjectHypothesis
         )
         if len(object_hypotheses) == 0:
-            self.rk_logger.debug(
+            logger.debug(
                 f"{len(object_hypotheses)} object hypothesis found, nothing to do."
             )
             return Status.SUCCESS
@@ -84,8 +91,8 @@ class ByteTrackAnnotator(BaseAnnotator):
             ]
         )
         if len(rois_xyxy) == 0:
-            self.rk_logger.debug(
-                f"No ROI found in {len(object_hypotheses)} object hypothesis."
+            logger.debug(
+                f"No region of interest found in {len(object_hypotheses)} object hypothesis."
             )
             return Status.FAILURE
 
@@ -111,14 +118,12 @@ class ByteTrackAnnotator(BaseAnnotator):
                 restored_masks.append(restored_mask)
             detections["mask"] = np.array(restored_masks).astype(bool)
 
-            self.rk_logger.debug(
-                f"Using {len(restored_masks)} masks for object tracking."
-            )
+            logger.debug(f"Using {len(restored_masks)} masks for object tracking.")
 
         classifications: list[Classification] = []
         for object_hypothesis in object_hypotheses:
             classification = cas.filter_by_type(
-                Classification, object_hypothesis.annotations
+                type_to_include=Classification, input_list=object_hypothesis.annotations
             )
             if len(classification) == 0:
                 break
@@ -137,25 +142,25 @@ class ByteTrackAnnotator(BaseAnnotator):
                 detections["confidence"][i] = cls.confidence
                 detections["data"][CLASS_NAME_DATA_FIELD] = cls.classname
 
-            self.rk_logger.debug(
-                f"Using {len(object_hypotheses)} class ids for object tracking."
+            logger.debug(
+                f"Using {len(object_hypotheses)} class identifiers for object tracking."
             )
 
         detections = sv.Detections(**detections)
         tracked_detections = self.tracker.update(detections)
 
-        self.visualize(tracked_detections)
+        self.visualize(tracked_detections=tracked_detections)
 
         return Status.SUCCESS
 
-    def visualize(self, tracked_detections: sv.Detections) -> None:
+    def visualize(self, *, tracked_detections: sv.Detections) -> None:
         """
         Visualize the tracked detections and set the resulting image in the annotator output struct.
 
         :param tracked_detections: The tracked detections to visualize.
         """
         vis_image: npt.NDArray[np.uint8] = copy.deepcopy(
-            self.get_cas().get(CASViews.COLOR_IMAGE)
+            self.get_cas().get(view_name=CASViews.COLOR_IMAGE)
         )
 
         if (
@@ -179,4 +184,4 @@ class ByteTrackAnnotator(BaseAnnotator):
                 scene=vis_image, detections=tracked_detections, labels=labels
             )
 
-        self.get_annotator_output_struct().set_image(vis_image)
+        self.get_annotator_output_struct().set_image(img=vis_image)

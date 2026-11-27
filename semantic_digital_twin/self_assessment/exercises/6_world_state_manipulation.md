@@ -24,10 +24,11 @@ You will:
 
 ```{code-cell} ipython3
 :tags: [remove-input]
+from krrood_spatial_math.spatial_types import ScrewAxis
 from semantic_digital_twin.world import World
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.world_description.connections import PrismaticConnection
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from krrood_spatial_math.spatial_types import Vector3Dimensional
 from semantic_digital_twin.world_description.geometry import Box, Scale, Color
 from semantic_digital_twin.world_description.shape_collection import ShapeCollection
@@ -39,7 +40,7 @@ from semantic_digital_twin.exceptions import ExerciseVerificationFailed
 Your goal:
 - Create a `World` with two bodies named `root` and `slider`
 - Add a small red box shape to `root`, and a small green box shape to `slider` for visibility
-- Add a `PrismaticConnection` along the X axis from `root` to `slider`
+- Add a prismatic `ScrewAxisConnection` along the X axis from `root` to `slider`
 - Keep a reference to this connection in a variable named `root_C_slider`
 - Set `root_C_slider.position = 0.2`
 
@@ -51,7 +52,7 @@ red_box = ...
 green_box = ...
 root = ...
 slider = ...
-root_C_slider: PrismaticConnection = ...
+root_C_slider: ScrewAxisConnection = ...
 
 ```
 
@@ -69,10 +70,9 @@ green_box = ShapeCollection([Box(
 root = Body(name=PrefixedName("root"), visual=red_box, collision=red_box)
 slider = Body(name=PrefixedName("slider"), visual=green_box, collision=green_box)
 with world.modify_world():
-    root_C_slider: PrismaticConnection = PrismaticConnection.create_with_dofs(
-        parent=root,
+    root_C_slider: ScrewAxisConnection = ScrewAxisConnection.create_with_dofs(
+        screw_axis=ScrewAxis(translation_per_unit_position=Vector3Dimensional.X(reference_frame=root)), parent=root,
         child=slider,
-        axis=Vector3Dimensional.X(reference_frame=root),
         world=world,
     )
     world.add_connection(root_C_slider)
@@ -91,7 +91,7 @@ if slider is ...: raise ExerciseVerificationFailed("The slider body should be cr
 if root_C_slider is ...: raise ExerciseVerificationFailed("The prismatic connection should be created.")
 if not isinstance(root, Body): raise ExerciseVerificationFailed("`root` must be a Body.")
 if not isinstance(slider, Body): raise ExerciseVerificationFailed("`slider` must be a Body.")
-if not isinstance(root_C_slider, PrismaticConnection): raise ExerciseVerificationFailed("`root_C_slider` must be a PrismaticConnection.")
+if not (isinstance(root_C_slider, ScrewAxisConnection) and root_C_slider.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("`root_C_slider` must be a prismatic ScrewAxisConnection.")
 if not abs(root_C_slider.position - 0.2) < 1e-6: raise ExerciseVerificationFailed("The slider should be at position 0.1 along X.")
 rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
 ```

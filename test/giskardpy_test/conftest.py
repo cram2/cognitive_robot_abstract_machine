@@ -16,6 +16,10 @@ from ..orm_interface_build import regenerate_orm_interfaces
 regenerate_orm_interfaces(OrmPackage.GISKARDPY)
 
 
+# Below the ORM build at the top of this module, which has to run first.
+from copy import deepcopy  # noqa: E402
+
+import numpy as np  # noqa: E402
 import pytest
 
 from giskardpy.middleware.ros2.giskard_tester import GiskardTester
@@ -37,7 +41,7 @@ from semantic_digital_twin.world_description.derivatives import DerivativeMap
 from semantic_digital_twin.world import World
 from semantic_digital_twin.world_description.connections import (
     FixedConnection,
-    PrismaticConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import (
     DegreeOfFreedom,
@@ -52,7 +56,7 @@ from semantic_digital_twin.robots.daisy import DAiSy, DAiSyJoint
 from semantic_digital_twin.robots.hsrb import HSRB, HSRBJoint
 from semantic_digital_twin.robots.pr2 import PR2, PR2Joint
 from semantic_digital_twin.robots.stretch import Stretch
-from semantic_digital_twin.robots.tracy import Tracy
+from semantic_digital_twin.robots.tracy import Tracy, TracyJoint  # noqa: E402
 from semantic_digital_twin.specifications.robots import RobotSpecification
 from semantic_digital_twin.specifications.worlds import WorldSpecification
 
@@ -177,6 +181,29 @@ def default_daisy_pose() -> dict[str, float]:
 
 
 @pytest.fixture()
+def tracy_arm_pose() -> dict[TracyJoint, float]:
+    """
+    :return: An elbow-up pose of Tracy's right arm, away from its singularities.
+    """
+    return {
+        TracyJoint.RIGHT_SHOULDER_PAN: 0.0,
+        TracyJoint.RIGHT_SHOULDER_LIFT: -np.pi / 2,
+        TracyJoint.RIGHT_ELBOW: np.pi / 2,
+        TracyJoint.RIGHT_WRIST_1: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_2: -np.pi / 2,
+        TracyJoint.RIGHT_WRIST_3: 0.0,
+    }
+
+
+@pytest.fixture()
+def tracy_world_copy(tracy_world: World) -> World:
+    """
+    :return: A copy of Tracy's world that a test may move the robot in.
+    """
+    return deepcopy(tracy_world)
+
+
+@pytest.fixture()
 def orientation_speed_ratio_tolerance() -> float:
     """
     :return: How much faster a far away orientation goal may turn than a close one.
@@ -293,11 +320,13 @@ def _make_prismatic_world(dof_limits: list[DegreeOfFreedomLimits]) -> World:
             dof = DegreeOfFreedom(limits=limits, has_hardware_interface=True)
             world.add_degree_of_freedom(dof)
             world.add_connection(
-                PrismaticConnection(
+                ScrewAxisConnection(
+                    screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                        axis=Vector3Dimensional.Z()
+                    ),
                     parent=map_body,
                     child=child,
                     raw_dof=dof,
-                    axis=Vector3Dimensional.Z(),
                 )
             )
     MinimalRobot.from_world(world)

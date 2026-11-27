@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from giskardpy.motion_statechart.binding_policy import GoalBindingPolicy
 from giskardpy.motion_statechart.cruise_velocities import DefaultCruiseVelocity
 from giskardpy.motion_statechart.weights import DefaultWeights
+from giskardpy.motion_statechart.goal_concept import HasGoal
 from krrood.patterns.mixin import ParameterMixin
 from krrood_spatial_math.spatial_types import (
     Point3Dimensional,
@@ -82,7 +83,7 @@ class HasWeightParameter(ParameterMixin):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalPoseParameter(ParameterMixin):
+class HasGoalPoseParameter(HasGoal, ParameterMixin):
     """
     A node bringing something to a pose.
     """
@@ -94,7 +95,7 @@ class HasGoalPoseParameter(ParameterMixin):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalPointParameter(ParameterMixin):
+class HasGoalPointParameter(HasGoal, ParameterMixin):
     """
     A node bringing the tip of a kinematic chain to a point, or aiming it at one.
     """
@@ -106,7 +107,7 @@ class HasGoalPointParameter(ParameterMixin):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalPointsParameter(ParameterMixin):
+class HasGoalPointsParameter(HasGoal, ParameterMixin):
     """
     A node moving the tip of a kinematic chain along a sequence of points.
     """
@@ -118,7 +119,7 @@ class HasGoalPointsParameter(ParameterMixin):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalOrientationParameter(ParameterMixin):
+class HasGoalOrientationParameter(HasGoal, ParameterMixin):
     """
     A node turning the tip of a kinematic chain to an orientation.
     """
@@ -130,7 +131,7 @@ class HasGoalOrientationParameter(ParameterMixin):
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
-class HasGoalStateParameter(ParameterMixin):
+class HasGoalStateParameter(HasGoal, ParameterMixin):
     """
     A node moving joints to positions of their own.
     """

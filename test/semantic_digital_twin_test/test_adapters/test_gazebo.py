@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from typing_extensions import ClassVar
 
+from krrood_spatial_math.spatial_types import ScrewAxis, Vector3Dimensional
 from semantic_digital_twin.adapters.package_resolver import (
     CompositePathResolver,
     ModelUriResolver,
@@ -23,8 +24,6 @@ from semantic_digital_twin.exceptions import (
 from semantic_digital_twin.world_description.connections import (
     Connection6DoF,
     FixedConnection,
-    PrismaticConnection,
-    RevoluteConnection,
 )
 from semantic_digital_twin.world_description.geometry import Box, Cylinder, Mesh, Sphere
 
@@ -245,7 +244,7 @@ class TestJointParsing:
 
     def test_revolute_joint_becomes_revolute_connection(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
-        assert isinstance(connection_named(world, "hinge"), RevoluteConnection)
+        assert connection_named(world, "hinge").behaves_like_a_revolute_connection
         assert world.validate()
 
     def test_link_pose_is_relative_to_the_model(self, gazebo_paths):
@@ -279,8 +278,10 @@ class TestJointParsing:
 
     def test_parses_axis(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
-        axis = connection_named(world, "hinge").axis.to_np().flatten()[:3]
-        assert np.allclose(axis, [1.0, 0.0, 0.0])
+        screw_axis = connection_named(world, "hinge").screw_axis
+        assert np.allclose(
+            screw_axis, ScrewAxis(rotation_per_unit_position=Vector3Dimensional.X())
+        )
 
     def test_parses_limits(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.hinged_door).create_world()
@@ -303,7 +304,7 @@ class TestJointParsing:
     def test_prismatic_joint_becomes_prismatic_connection(self, gazebo_paths):
         world = GazeboParser.from_file(gazebo_paths.drawer).create_world()
         connection = connection_named(world, "slide")
-        assert isinstance(connection, PrismaticConnection)
+        assert connection.behaves_like_a_prismatic_connection
         assert connection.raw_dof.limits.upper.position == 0.45
         assert world.validate()
 

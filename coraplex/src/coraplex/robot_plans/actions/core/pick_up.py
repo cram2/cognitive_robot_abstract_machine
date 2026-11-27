@@ -252,7 +252,7 @@ class GraspingAction(
                 grasp_detection_threshold=self.grasp_detection_threshold,
             ),
             self.closing_step(
-                self.gripper_goal_type.create_gripper_goal(
+                closing_goal=self.gripper_goal_type.create_gripper_goal(
                     configuration=self.arm.end_effector.default_configuration(
                         GripperState.CLOSE,
                         finger_velocity=self.max_grasp_closing_velocity,
@@ -263,7 +263,7 @@ class GraspingAction(
             ),
         ]
 
-    def closing_step(self, closing_goal: StatechartNode) -> Parallel:
+    def closing_step(self, *, closing_goal: StatechartNode) -> Parallel:
         """
         :param closing_goal: A new node closing the gripper on the object.
         :return: A new step running `closing_goal` while the gripper is kept at the

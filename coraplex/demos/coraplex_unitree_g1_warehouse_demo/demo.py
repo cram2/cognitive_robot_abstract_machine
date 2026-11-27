@@ -256,7 +256,7 @@ robot = world.get_semantic_annotations_by_type(UnitreeG1)[0]
 # sink into it or hover above it.
 assert abs(lowest_collision_point_of(robot, world)) < 1e-3
 
-with RobotDemonstrationRosSession.start("warehouse_demo") as ros_session:
+with RobotDemonstrationRosSession.start(node_name="warehouse_demo") as ros_session:
     visualizations = selected_visualizations(ros_session.node)
     for _ in range(10):
         run(

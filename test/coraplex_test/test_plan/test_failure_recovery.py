@@ -87,13 +87,13 @@ class GraspFailingItsFirstRuns(SequentialInsertion[GraspingAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.AFTER
 
-    def is_applicable(self, plan_node: GraspingAction) -> bool:
+    def is_applicable(self, *, plan_node: GraspingAction) -> bool:
         return True
 
-    def anchor(self, plan_node: GraspingAction) -> StatechartNode:
+    def anchor(self, *, plan_node: GraspingAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: GraspingAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: GraspingAction) -> list[StatechartNode]:
         step = StepFailingItsFirstRuns(failing_runs=self.failing_runs)
         self.inserted_steps.append(step)
         return [step]
@@ -162,13 +162,13 @@ class OpenGripperBeforeReadingIt(SequentialInsertion[GripperIsOpen]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: GripperIsOpen) -> bool:
+    def is_applicable(self, *, plan_node: GripperIsOpen) -> bool:
         return self.applicable
 
-    def anchor(self, plan_node: GripperIsOpen) -> StatechartNode:
+    def anchor(self, *, plan_node: GripperIsOpen) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: GripperIsOpen) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: GripperIsOpen) -> list[StatechartNode]:
         action = SetGripperAction(
             gripper_configuration=plan_node.end_effector.default_configuration(
                 self.gripper_state
@@ -188,13 +188,13 @@ class TransformationOnADifferentType(SequentialInsertion[ParkArmsAction]):
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: ParkArmsAction) -> bool:
+    def is_applicable(self, *, plan_node: ParkArmsAction) -> bool:
         return True
 
-    def anchor(self, plan_node: ParkArmsAction) -> StatechartNode:
+    def anchor(self, *, plan_node: ParkArmsAction) -> StatechartNode:
         return plan_node
 
-    def nodes_to_insert(self, plan_node: ParkArmsAction) -> list[StatechartNode]:
+    def nodes_to_insert(self, *, plan_node: ParkArmsAction) -> list[StatechartNode]:
         return []
 
 
@@ -209,10 +209,10 @@ class TransformationRecordingGripperActions(PlanTransformation[SetGripperAction]
     The gripper actions this transformation was applied to, in order.
     """
 
-    def is_applicable(self, plan_node: SetGripperAction) -> bool:
+    def is_applicable(self, *, plan_node: SetGripperAction) -> bool:
         return True
 
-    def apply(self, plan_node: SetGripperAction) -> None:
+    def apply(self, *, plan_node: SetGripperAction) -> None:
         self.offered_actions.append(plan_node)
 
 
@@ -231,14 +231,14 @@ class CloseGripperBeforeAFailingStep(SequentialInsertion[StepFailingItsFirstRuns
     def position(self) -> InsertionPosition:
         return InsertionPosition.BEFORE
 
-    def is_applicable(self, plan_node: StepFailingItsFirstRuns) -> bool:
+    def is_applicable(self, *, plan_node: StepFailingItsFirstRuns) -> bool:
         return True
 
-    def anchor(self, plan_node: StepFailingItsFirstRuns) -> StatechartNode:
+    def anchor(self, *, plan_node: StepFailingItsFirstRuns) -> StatechartNode:
         return plan_node
 
     def nodes_to_insert(
-        self, plan_node: StepFailingItsFirstRuns
+        self, *, plan_node: StepFailingItsFirstRuns
     ) -> list[StatechartNode]:
         return [
             SetGripperAction(

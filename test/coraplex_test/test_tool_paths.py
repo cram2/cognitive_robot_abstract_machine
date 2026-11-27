@@ -249,7 +249,7 @@ def test_tool_path_sample_stitches_segments_without_duplicates():
         duration=1.0,
         local_curve=lambda tau: np.array([1.0, tau, 0.0]),
     )
-    path = ToolPath([first, second])
+    path = ToolPath(segments=[first, second])
 
     times, points, segment_ids = _sample(path)
 

@@ -1,6 +1,13 @@
+"""
+Tests of shapes, their meshes and their serialization.
+"""
+
+from __future__ import annotations
+
 import gc
 import math
 import os
+import shutil
 import tracemalloc
 from importlib.resources import files
 from pathlib import Path
@@ -13,6 +20,10 @@ from trimesh.visual import TextureVisuals
 from trimesh.visual.material import SimpleMaterial
 
 from krrood.adapters.json_serializer import from_json, to_json
+from semantic_digital_twin.adapters.package_resolver import PackageUriResolver
+from semantic_digital_twin.world_description.exceptions import (
+    MeshFileNotPlaceableByAPose,
+)
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from krrood_spatial_math.spatial_types import (
     HomogeneousTransformationMatrix3Dimensional,
@@ -255,20 +266,27 @@ def test_per_vertex_colors_survive_serialization_unwelded(tmp_path):
     )
 
 
-def test_serialization_reproduces_the_same_mesh():
+@pytest.fixture
+def milk_file_outside_any_package(tmp_path) -> Path:
+    """
+    :return: A copy of the milk carton mesh outside any ROS package, which a mesh
+        serializes with its geometry.
+    """
+    milk_file = tmp_path / "milk.stl"
+    shutil.copy(
+        PackageUriResolver().resolve("package://iai_objects/objects/milk.stl"),
+        milk_file,
+    )
+    return milk_file
+
+
+def test_serialization_reproduces_the_same_mesh(milk_file_outside_any_package):
     """
     A deserialized mesh is the mesh that was serialized, not a differently tessellated
     reading of the same file: same vertices, same faces, and the same answer to whether
     it bounds a volume.
     """
-    original = Mesh(
-        filename=os.path.join(
-            Path(files("semantic_digital_twin")).parent.parent,
-            "resources",
-            "stl",
-            "milk.stl",
-        )
-    )
+    original = Mesh(filename=str(milk_file_outside_any_package))
 
     restored = Mesh.from_json(data=original.to_json())
 
@@ -283,19 +301,14 @@ def test_serialization_reproduces_the_same_mesh():
     assert restored.mesh.is_volume == original.mesh.is_volume
 
 
-def test_serialization_preserves_watertightness_of_a_closed_mesh():
+def test_serialization_preserves_watertightness_of_a_closed_mesh(
+    milk_file_outside_any_package,
+):
     """
     Volume and boolean operations need a watertight mesh, so a closed mesh must still
     bound a volume after a round-trip.
     """
-    original = Mesh(
-        filename=os.path.join(
-            Path(files("semantic_digital_twin")).parent.parent,
-            "resources",
-            "stl",
-            "milk.stl",
-        )
-    )
+    original = Mesh(filename=str(milk_file_outside_any_package))
     assert original.mesh.is_volume
 
     restored = Mesh.from_json(data=original.to_json())
@@ -650,6 +663,55 @@ def test_serializing_a_mesh_holds_less_than_twice_the_memory_of_its_arrays(tmp_p
     assert held < 2 * sum(np.asarray(array).nbytes for array in arrays)
 
 
+# %% meshes of a ROS package in json
+
+
+def test_a_mesh_in_a_package_is_serialized_without_its_geometry(installed_mesh_file):
+    """
+    A mesh whose file lies in an installed package is serialized by reference only.
+    """
+    payload = Mesh(filename=str(installed_mesh_file)).to_json()
+
+    assert "mesh" not in payload
+
+
+def test_a_received_package_mesh_reads_the_file_of_the_receiving_install(
+    mesh_package_installer, tmp_path
+):
+    """
+    A mesh received by its package URI reads the file of the receiver's install, not the
+    sender's.
+    """
+    sender_file = mesh_package_installer(tmp_path / "sender")
+    payload = Mesh(filename=str(sender_file)).to_json()
+    receiver_file = mesh_package_installer(tmp_path / "receiver")
+
+    received = Mesh.from_json(data=payload)
+
+    assert received.local_file == receiver_file
+
+
+def test_a_package_mesh_turned_within_its_file_keeps_its_vertices_through_serialization(
+    installed_mesh_file,
+):
+    """
+    A JSON round trip by package URI keeps the vertices of a mesh turned within its
+    file.
+    """
+    mesh = Mesh(
+        filename=str(installed_mesh_file),
+        file_T_mesh=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+            pos_x=0.01, quat_w=math.sqrt(0.5), quat_x=math.sqrt(0.5)
+        ),
+    )
+
+    deserialized = from_json(to_json(mesh))
+
+    assert np.sort(deserialized.mesh.vertices, axis=0) == pytest.approx(
+        np.sort(mesh.mesh.vertices, axis=0)
+    )
+
+
 # %% a prism of equilateral cross-section
 
 PRISM_SIDE = 0.04
@@ -760,3 +822,85 @@ def test_telling_a_file_textured_does_not_merge_the_textures_of_its_parts(
     tracemalloc.stop()
 
     assert checking_peak < merging_peak / 2
+
+
+# %% meshes turned within their file
+
+CYLINDER_FILE = (
+    Path(files("semantic_digital_twin")).parent.parent
+    / "resources"
+    / "obj"
+    / "cylinder.obj"
+)
+"""
+A mesh file whose vertices are not symmetric under a quarter turn about the x axis.
+"""
+
+
+def turned_cylinder(scale: Scale) -> Mesh:
+    """
+    :param scale: The scale of the mesh.
+    :return: The cylinder, whose own frame lies shifted and a quarter turn about the x
+        axis within its file, placed off the origin of its body.
+    """
+    return Mesh(
+        filename=str(CYLINDER_FILE),
+        scale=scale,
+        origin=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
+            x=0.3, y=-0.2, z=1.0, yaw=0.4
+        ),
+        file_T_mesh=HomogeneousTransformationMatrix3Dimensional.from_xyz_quaternion(
+            pos_x=0.01,
+            pos_y=0.02,
+            pos_z=0.03,
+            quat_w=math.sqrt(0.5),
+            quat_x=math.sqrt(0.5),
+        ),
+    )
+
+
+def bounds_in_the_body(vertices: np.ndarray, body_T_vertices: np.ndarray) -> np.ndarray:
+    """
+    :return: The lower and upper corner of the vertices, given in a frame placed by
+        ``body_T_vertices``, in the body's frame.
+    """
+    in_body = vertices @ body_T_vertices[:3, :3].T + body_T_vertices[:3, 3]
+    return np.stack([in_body.min(axis=0), in_body.max(axis=0)])
+
+
+def test_a_mesh_turned_within_its_file_keeps_its_vertices_through_serialization():
+    """
+    A JSON round trip keeps the vertices of a mesh turned within its file.
+    """
+    mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
+
+    deserialized = from_json(to_json(mesh))
+
+    assert np.sort(deserialized.mesh.vertices, axis=0) == pytest.approx(
+        np.sort(mesh.mesh.vertices, axis=0)
+    )
+
+
+def test_the_scaled_file_placed_at_its_file_origin_lies_where_the_mesh_does():
+    """
+    The file's scaled vertices, placed at the file origin, cover the mesh's bounds.
+    """
+    mesh = turned_cylinder(scale=Scale(0.5, 0.5, 0.5))
+
+    placed_file = bounds_in_the_body(
+        mesh.stored_mesh.vertices * mesh.scale.to_np(), mesh.file_origin.to_np()
+    )
+
+    assert placed_file == pytest.approx(
+        bounds_in_the_body(mesh.mesh.vertices, mesh.origin.to_np())
+    )
+
+
+def test_an_unevenly_scaled_mesh_turned_within_its_file_has_no_file_origin():
+    """
+    No pose places the file of a mesh that is turned within it and scaled unevenly.
+    """
+    mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
+
+    with pytest.raises(MeshFileNotPlaceableByAPose):
+        mesh.file_origin

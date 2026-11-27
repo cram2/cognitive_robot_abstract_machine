@@ -31,9 +31,7 @@ from semantic_digital_twin.world_description.connections import (
     DifferentialDrive,
     FixedConnection,
     OmniDrive,
-    PrismaticConnection,
-    RevoluteConnection,
-    ScrewConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.degree_of_freedom import DegreeOfFreedom
 from semantic_digital_twin.world_description.soft_connections import (
@@ -67,8 +65,13 @@ def simulated_world() -> World:
     arm.add_simulator_property(GravityCompensation(fraction=0.5))
     with world.modify_world():
         world.add_simulator_property(MujocoTendon(name="coupling"))
-        hinge = RevoluteConnection.create_with_dofs(
-            world=world, parent=root, child=arm, axis=Vector3Dimensional.Z()
+        hinge = ScrewAxisConnection.create_with_dofs(
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
+            world=world,
+            parent=root,
+            child=arm,
         )
         hinge.add_simulator_property(MujocoJoint(stiffness=[1.0, 2.0, 3.0]))
         world.add_connection(hinge)
@@ -374,10 +377,23 @@ def connect_with_dofs(
     "connect",
     [
         lambda world, parent, child: FixedConnection(parent=parent, child=child),
-        connect_with_dofs(RevoluteConnection, axis=Vector3Dimensional.Z()),
-        connect_with_dofs(PrismaticConnection, axis=Vector3Dimensional.X()),
         connect_with_dofs(
-            ScrewConnection, axis=Vector3Dimensional.Z(), screw_pitch=0.01
+            ScrewAxisConnection,
+            screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                axis=Vector3Dimensional.Z()
+            ),
+        ),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
+                axis=Vector3Dimensional.X()
+            ),
+        ),
+        connect_with_dofs(
+            ScrewAxisConnection,
+            screw_axis=ScrewAxisConnection.create_helical_screw_axis(
+                axis=Vector3Dimensional.Z(), pitch=0.01
+            ),
         ),
         connect_with_dofs(Connection6DoF),
         connect_with_dofs(OmniDrive),

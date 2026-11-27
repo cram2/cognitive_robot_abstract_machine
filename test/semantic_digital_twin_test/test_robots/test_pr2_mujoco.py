@@ -45,7 +45,7 @@ from semantic_digital_twin.world_description.connection_properties import (
 from semantic_digital_twin.world_description.connections import (
     ActiveConnection1DOF,
     FixedConnection,
-    RevoluteConnection,
+    ScrewAxisConnection,
 )
 from semantic_digital_twin.world_description.world_entity import (
     Body,
@@ -210,7 +210,10 @@ def test_each_connection_is_built_by_the_realisation_for_its_type(pr2):
     revolute = next(
         connection
         for connection in world.connections
-        if type(connection) is RevoluteConnection
+        if (
+            isinstance(connection, ScrewAxisConnection)
+            and connection.behaves_like_a_revolute_connection
+        )
     )
     fixed = next(
         connection

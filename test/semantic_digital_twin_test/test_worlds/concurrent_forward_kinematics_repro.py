@@ -8,23 +8,13 @@ subprocess, because the crash it reproduced took the whole process down.
 from __future__ import annotations
 
 import argparse
-import os
 import random
 import threading
 import time
 
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-APARTMENT_URDF_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..",
-    "..",
-    "..",
-    "semantic_digital_twin",
-    "resources",
-    "urdf",
-    "apartment.urdf",
-)
+APARTMENT_URDF_PATH = "package://iai_apartment/urdf/apartment.urdf"
 
 
 def hammer_forward_kinematics_composition(

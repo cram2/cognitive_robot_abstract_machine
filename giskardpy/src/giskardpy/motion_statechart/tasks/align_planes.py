@@ -58,9 +58,7 @@ class AlignPlanes(
             plane normals.
         """
         artifacts = MotionNodeArtifacts()
-        tip_V_tip_normal = self.context.world.transform(
-            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_normal
-        )
+        tip_V_tip_normal = self.express_tip_normal_in_tip()
         tip_V_tip_normal.scale(1)
         root_V_root_normal = self.context.world.transform(
             target_frame=self.kinematic_chain.root, spatial_object=self.reference_normal
@@ -101,6 +99,15 @@ class AlignPlanes(
         artifacts.error = root_V_tip_normal.angle_between(root_V_root_normal)
         return artifacts
 
+    def express_tip_normal_in_tip(self) -> Vector3Dimensional:
+        """
+        :return: The normal of the tip plane, expressed in the tip of
+            :attr:`kinematic_chain`.
+        """
+        return self.context.world.transform(
+            target_frame=self.kinematic_chain.tip, spatial_object=self.tip_normal
+        )
+
 
 # %% keeping what a gripper holds upright
 
@@ -132,7 +139,7 @@ class KeepHeldBodyUpright(AlignPlanes, HasRootLinkParameter):
 
     tip_normal: Vector3Dimensional = field(init=False)
     """
-    The z-axis of the held body in the tool frame, as bound when this task starts.
+    The z-axis of the held body, before its pose in the tool frame is applied.
     """
 
     _tool_T_held_body: ForwardKinematicsBinding = field(init=False, repr=False)
@@ -154,9 +161,14 @@ class KeepHeldBodyUpright(AlignPlanes, HasRootLinkParameter):
             float_variable_data=self.context.float_variable_data,
         )
         self._tool_T_held_body.bind(world=self.context.world)
-        self.tip_normal = self._tool_T_held_body.root_T_tip @ Vector3Dimensional.Z(
-            reference_frame=tool_frame
-        )
+        self.tip_normal = Vector3Dimensional.Z(reference_frame=tool_frame)
+
+    def express_tip_normal_in_tip(self) -> Vector3Dimensional:
+        """
+        Unlike :meth:`AlignPlanes.express_tip_normal_in_tip`, applies the pose of the
+        held body in the tool frame, bound when this task starts.
+        """
+        return self._tool_T_held_body.root_T_tip @ self.tip_normal
 
     def on_start(self) -> None:
         """

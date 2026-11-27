@@ -63,7 +63,7 @@ cylinder_origin = HomogeneousTransformationMatrix3Dimensional.from_point_rotatio
 cylinder = Cylinder(origin=cylinder_origin, width=0.05, height=0.5)
 
 mesh = Mesh(origin=HomogeneousTransformationMatrix3Dimensional(),
-            filename=os.path.join(Path(files("semantic_digital_twin")).parent.parent, "resources", "stl", "milk.stl"))
+            filename="package://iai_objects/objects/milk.stl")
 
 collision = ShapeCollection([cylinder, sphere, box])
 visual = ShapeCollection([mesh])

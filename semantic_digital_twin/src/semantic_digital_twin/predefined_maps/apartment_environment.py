@@ -2,13 +2,14 @@
 The apartment described by the ``iai_apartment`` package, built from its visual meshes.
 """
 
+from semantic_digital_twin.world_description.connections import ScrewAxisConnection
 from dataclasses import dataclass
 
 import numpy as np
 
 from semantic_digital_twin.adapters.package_resolver import CompositePathResolver
 from semantic_digital_twin.specifications.connections import (
-    RevoluteConnectionSpecification,
+    ScrewAxisConnectionSpecification,
 )
 from semantic_digital_twin.specifications.kinematic_structure_entities import (
     BodySpecification,
@@ -100,7 +101,7 @@ class ApartmentEnvironment(WorldSource):
                 ("shelf_layer4", 1.613),
             ]:
                 shelf.add(
-                    ShelfLayer.create_with_new_body_in_world(
+                    part=ShelfLayer.create_with_new_body_in_world(
                         world=world,
                         name=layer_name,
                         world_root_T_self=HomogeneousTransformationMatrix3Dimensional.from_xyz_rpy(
@@ -202,8 +203,10 @@ class ApartmentEnvironment(WorldSource):
                         -0.3246, door_y
                     ),
                 ),
-                parent_connection_specification=RevoluteConnectionSpecification(
-                    axis=Vector3Dimensional.Z(),
+                parent_connection_specification=ScrewAxisConnectionSpecification(
+                    screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
+                        axis=Vector3Dimensional.Z()
+                    ),
                     dof_limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                         lower_position=min(0.0, opening_angle),
                         upper_position=max(0.0, opening_angle),

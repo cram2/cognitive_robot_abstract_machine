@@ -1,3 +1,7 @@
+"""
+Two recorded Kinect frames of a cup on a kitchen counter, in the file reader's layout.
+"""
+
 from __future__ import annotations
 
 # %% Imports
@@ -18,7 +22,7 @@ from semantic_digital_twin.datastructures.camera_resolution import CameraResolut
 
 
 # %% Recorded frames
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RecordedFrame:
     """
     One RGB-D frame of a file recording, identified by the name its files share.
@@ -36,7 +40,7 @@ class RecordedFrame:
 
 
 # %% Cup on counter recording
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CupOnCounterRecording:
     """
     Two Kinect frames of a single cup standing on a kitchen counter, recorded in the
@@ -80,7 +84,7 @@ class CupOnCounterRecording:
     Recorded frames in playback order.
     """
 
-    def write_to(self, directory: Path) -> Path:
+    def write_to(self, *, directory: Path) -> Path:
         """
         Write the recording's images and camera observations into a directory.
 

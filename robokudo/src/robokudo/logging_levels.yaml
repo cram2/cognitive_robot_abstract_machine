@@ -12,6 +12,18 @@ robokudo: 20
 robokudo.main: 20
 robokudo.query: 20
 robokudo_example_package: 20
+robokudo_faces: 20
+robokudo_foundation_pose: 20
+robokudo_foundation_pose.Utils: 30
+robokudo_foundation_pose.estimater: 30
+robokudo_foundation_pose.learning: 30
+robokudo_grounded_sam: 20
+robokudo_human_activity: 20
+robokudo_human_detection: 20
+robokudo_lab: 20
+robokudo_spill: 20
+robokudo_yolo_world: 20
+robokudo_zero_shot_classification: 20
 
 # ROS2 (rclpy and related libraries)
 rclpy: 10

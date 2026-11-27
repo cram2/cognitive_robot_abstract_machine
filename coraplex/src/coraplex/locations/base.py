@@ -12,7 +12,7 @@ from typing_extensions import Iterator, Iterable
 from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Location(Iterable[Pose2Dimensional], ABC):
     """
     A region of poses the robot can be sent to, iterated as the pose candidates sampled

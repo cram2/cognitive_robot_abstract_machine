@@ -1,3 +1,7 @@
+"""
+Converters from spatial types and shapes of the world to ROS 2 messages.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -204,6 +208,10 @@ class SphereToRos2Converter(ShapeToRos2Converter[Sphere]):
 
 @dataclass
 class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
+    """
+    Converts a mesh to a marker that draws its file, placed at the mesh's file origin.
+    """
+
     @classmethod
     def mesh_resource_of(cls, mesh: Mesh) -> str:
         """
@@ -211,17 +219,15 @@ class FileMeshToRos2Converter(ShapeToRos2Converter[Mesh]):
             directory, so the receiving machine resolves it in its own install;
             otherwise a ``file://`` URI.
         """
-        if mesh.filename.startswith("package://"):
-            return mesh.filename
-        parts = mesh.local_file.parts
-        if "share" not in parts[:-2]:
+        package_uri = mesh.package_uri
+        if package_uri is None:
             return "file://" + str(mesh.local_file)
-        share_index = len(parts) - 1 - parts[::-1].index("share")
-        return "package://" + "/".join(parts[share_index + 1 :])
+        return package_uri
 
     @classmethod
     def convert(cls, data: Mesh) -> Marker:
         marker = super().convert(data)
+        marker.pose = PoseToRos2Converter.convert(data.file_origin.pose)
         marker.type = visualization_msgs.Marker.MESH_RESOURCE
         marker.mesh_resource = cls.mesh_resource_of(data)
         marker.scale.x = data.scale.x

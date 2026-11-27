@@ -114,7 +114,7 @@ def multiple_robot_simple_apartment_context(
     extensions of its plans, returned to its initial model and state after the test.
     """
     world, view = setup_multi_robot_simple_apartment
-    snapshot = WorldSnapshot.capture(world)
+    snapshot = WorldSnapshot.capture(world=world)
     yield world, view, robot_extensions(view)
     snapshot.restore()
 
@@ -153,8 +153,8 @@ def test_new_reachability_location_body(
     arm = right_or_only_arm(robot)
     milk = world.get_body_by_name("milk.stl")
     location = ReachabilityLocation(
-        Pose3Dimensional(reference_frame=milk),
-        arm,
+        target_pose=Pose3Dimensional(reference_frame=milk),
+        arm=arm,
         context=context_of(extensions),
     )
 
@@ -178,7 +178,7 @@ def test_visibility_location_pose(multiple_robot_simple_apartment_context):
     world.notify_state_change()
 
     location = VisibilityLocation(
-        world.get_body_by_name("milk.stl").global_pose,
+        target_pose=world.get_body_by_name("milk.stl").global_pose,
         context=context_of(extensions),
     )
 
@@ -201,7 +201,9 @@ def test_visibility_location_body(multiple_robot_simple_apartment_context):
     world.notify_state_change()
 
     location = VisibilityLocation(
-        Pose3Dimensional(reference_frame=world.get_body_by_name("milk.stl")),
+        target_pose=Pose3Dimensional(
+            reference_frame=world.get_body_by_name("milk.stl")
+        ),
         context=context_of(extensions),
     )
 

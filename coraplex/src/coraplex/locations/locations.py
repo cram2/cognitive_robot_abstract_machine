@@ -26,7 +26,7 @@ from krrood_spatial_math.spatial_types import Pose3Dimensional
 from krrood_spatial_math.spatial_types_2_dimensional import Pose2Dimensional
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CostmapLocation(Location, ABC):
     """
     A location whose candidates are sampled from a costmap of the world as it is when
@@ -78,7 +78,7 @@ class CostmapLocation(Location, ABC):
             number_of_samples=self.number_of_samples, seed=self.sampling_seed
         )
 
-    def _in_world(self, pose: Pose3Dimensional) -> Pose3Dimensional:
+    def _in_world(self, *, pose: Pose3Dimensional) -> Pose3Dimensional:
         """
         :param pose: A pose in any frame of the world.
         :return: Where `pose` is in the world frame now, so a pose given relative to a
@@ -88,7 +88,7 @@ class CostmapLocation(Location, ABC):
         return world.transform(pose, world.root)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ReachabilityLocation(CostmapLocation):
     """
     Where the robot can stand to reach a target with one arm.
@@ -121,7 +121,7 @@ class ReachabilityLocation(CostmapLocation):
         :return: Standing poses clear of the surroundings, at the arm's reach distance
             around the target.
         """
-        target_pose = self._in_world(self.target_pose)
+        target_pose = self._in_world(pose=self.target_pose)
         occupancy = OccupancyCostmap.default_map(
             robot=self.robot,
             target=target_pose,
@@ -144,7 +144,7 @@ class ReachabilityLocation(CostmapLocation):
             leaving out those farther from the target along the floor than the arm is
             long, since the target cannot be reached from there.
         """
-        target = self._in_world(self.target_pose).position
+        target = self._in_world(pose=self.target_pose).position
         arm_length = float(self.arm.approximate_length())
         for candidate in super().candidates():
             offset = candidate.position.to_np()[:2] - target.to_np()[:2]
@@ -152,7 +152,7 @@ class ReachabilityLocation(CostmapLocation):
                 yield candidate
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisibilityLocation(CostmapLocation):
     """
     Where the robot can stand to see a target with its camera.
@@ -170,7 +170,7 @@ class VisibilityLocation(CostmapLocation):
         :return: Standing poses clear of the surroundings from which the target is in
             view.
         """
-        target_pose = self._in_world(self.target_pose)
+        target_pose = self._in_world(pose=self.target_pose)
         camera = self.robot.get_default_camera()
         occupancy = OccupancyCostmap.default_map(
             robot=self.robot,
